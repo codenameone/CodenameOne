@@ -724,6 +724,40 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void theGesturesOwnPreviewSurvivesTheStart() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container source = new Container();
+            source.setPreferredSize(new com.codename1.ui.geom.Dimension(40, 40));
+            NativeDragOperation op = new NativeDragOperation("dragged by hand");
+            source.setNativeDragOperation(op);
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, source);
+            form.revalidate();
+
+            // Pressed near one corner, not in the middle.
+            int x = source.getAbsoluteX() + 3;
+            int y = source.getAbsoluteY() + 4;
+            form.pointerPressed(x, y);
+            drag(form, x + 200, y + 200);
+
+            assertNotNull(implementation.getStartedNativeDrag());
+            assertEquals(3, op.getDragImageOffsetX(),
+                    "the preview hangs from where the press actually landed; re-rendering it "
+                            + "at the start replaces that with the component's centre and the "
+                            + "image jumps out from under the pointer");
+            assertEquals(4, op.getDragImageOffsetY());
+        } finally {
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void aDragStartedInCodeStillGetsTheSourcesPreview() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

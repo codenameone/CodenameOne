@@ -177,6 +177,17 @@ public final class NativeDragAndDrop {
     /// true when the operating system took the drag; false when the platform has no native drag
     /// and drop, refused to start a session, or is already running one
     public static boolean startDrag(Component source, NativeDragOperation op) {
+        return startDrag(source, op, true);
+    }
+
+    /// `renderPreview` is false for the gesture, which has already rendered one at the point the
+    /// press actually landed. Rendering again here would take a second snapshot of the same
+    /// component and replace that grab point with the component's centre, so the preview jumped
+    /// out from under the pointer the moment the drag began. A generated image is re-rendered
+    /// per gesture *by* the gesture; this entry point renders one only for a caller who has no
+    /// gesture to have done it.
+    private static boolean startDrag(Component source, NativeDragOperation op,
+            boolean renderPreview) {
         if (op == null || !isSupported()
                 || op.getAllowedActions() == NativeDragOperation.ACTION_NONE) {
             // Allowing nothing to be done with a drag is having no drag, and a press stages one
@@ -201,7 +212,7 @@ public final class NativeDragAndDrop {
         }
         op.setSource(source);
         op.resetPerformedAction();
-        if (needsGeneratedImage(op) && source != null) {
+        if (renderPreview && needsGeneratedImage(op) && source != null) {
             try {
                 // The same snapshot the gesture path renders, because this method documents the
                 // source as providing the default preview and without it the ports fall back to
@@ -471,7 +482,7 @@ public final class NativeDragAndDrop {
                 Log.e(err);
             }
         }
-        if (!startDrag(source, op)) {
+        if (!startDrag(source, op, false)) {
             // The port did not take it. Keep the prepared operation: on a platform whose own
             // gesture recognizer owns dragging, the session begins later and this is what it
             // will carry. Where there is no native drag and drop at all nothing was prepared
