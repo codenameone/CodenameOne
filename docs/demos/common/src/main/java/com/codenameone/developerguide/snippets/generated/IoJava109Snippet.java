@@ -110,7 +110,7 @@ class IoJava109Snippet {
         ConnectionRequest request = new ConnectionRequest(url, false);
         request.setFailSilently(true);
         NetworkManager.getInstance().addToQueueAndWait(request);
-        if(request.getResponseCode() != 200) {
+        if(request.getResponseCode() < 200 || request.getResponseCode() > 299) {
             // probably an error...
         }
         // end::io-java-109[]

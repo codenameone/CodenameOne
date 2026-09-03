@@ -120,6 +120,10 @@ class IoJava095Snippet {
                         files = FileSystemStorage.getInstance().listFiles((String)parent);
                     } catch(IOException err) {
                         Log.e(err);
+                        files = null;
+                    }
+                    if(files == null) {
+                        // the directory went away or cannot be read
                         files = new String[0];
                     }
                 }

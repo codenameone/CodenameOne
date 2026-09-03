@@ -127,10 +127,16 @@ class IoJava149Snippet {
             Button btn = new Button("Create Server");
             Button connect = new Button("Connect");
             final TextField host = new TextField("127.0.0.1");
+            // the handle is the only way to close the listening socket, so a second
+            // tap would otherwise leave the first accept thread running for good
+            Socket.StopListening[] listening = new Socket.StopListening[1];
             btn.addActionListener((evt) -> {
+                if(listening[0] != null) {
+                    listening[0].stop();
+                }
                 soc.addComponent(new Label("Listening: " + Socket.getHostOrIP()));
                 soc.revalidate();
-                Socket.listen(5557, SocketListenerCallback.class);
+                listening[0] = Socket.listen(5557, SocketListenerCallback.class);
             });
             connect.addActionListener((evt) -> {
                 Socket.connect(host.getText(), 5557, new SocketConnection() {
