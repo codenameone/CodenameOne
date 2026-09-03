@@ -143,6 +143,19 @@ public class CertificateWizard extends Lifecycle {
         CN.setDarkMode(Boolean.valueOf(darkMode));
         applyThemeForCurrentScheme();
         binding = ProjectIO.loadBinding();
+        if (projectBundleIdentifier() == null) {
+            // Everything here is an operation on ONE project's identifiers: which App IDs
+            // are its own, which profile to preselect, which push hint to read, what
+            // automatic setup registers. Without the project's package name none of those
+            // questions has an answer, and the placeholder that used to stand in for it --
+            // com.example.app -- is a real identifier somebody's account can hold. It was
+            // then treated as this project's own: the account was narrowed to it, it was
+            // preselected, and Create would submit a profile for an app the developer has
+            // nothing to do with. There is no useful unbound mode to preserve, so the
+            // wizard says so and stops.
+            showLaunchFailure();
+            return;
+        }
         userEmail = firstNonEmpty(System.getProperty("certificatewizard.user"),
                 binding == null ? null : binding.user(), "Not signed in");
         token = firstNonEmpty(System.getProperty("certificatewizard.token"), binding == null ? null : binding.token(), "");
@@ -1249,6 +1262,9 @@ public class CertificateWizard extends Lifecycle {
             final String bundlePlatform = platformForProfile(profileType[0]);
             final List<SigningState.BundleId> usableBundles =
                     WizardDecisions.usableBundleIds(state.bundleIds, bundlePlatform);
+            // Always the project's real identifier: the wizard refuses to start without one
+            // (see runApp), so this cannot narrow the account to a placeholder that merely
+            // happens to be registered in it and then preselect somebody else's app.
             final List<SigningState.BundleId> ownBundles =
                     WizardDecisions.projectBundleIds(usableBundles, projectDefaults().bundleId);
             final boolean narrowed = !showAllBundles[0] && !ownBundles.isEmpty();
@@ -2535,13 +2551,36 @@ public class CertificateWizard extends Lifecycle {
         return out;
     }
 
+    /// The project's own bundle identifier, or null when it has none. The wizard refuses
+    /// to start in that state, so every later caller is reading a real identifier -- see
+    /// runApp and `#showLaunchFailure()`.
+    private String projectBundleIdentifier() {
+        String settings = binding == null ? null : binding.settings();
+        String id = firstNonEmpty(readSetting(settings, "codename1.packageName"),
+                stripTeamPrefix(readSetting(settings, "codename1.ios.appid")));
+        return id == null || id.trim().isEmpty() ? null : id.trim();
+    }
+
+    /// The one screen the wizard shows when it was not given a project to work on.
+    private void showLaunchFailure() {
+        form = new Form("Codename One Certificate Wizard", new BorderLayout());
+        SpanLabel message = new SpanLabel("This tool works on one project's signing identities, "
+                + "and it was not given one. Open it from Codename One Settings for the project "
+                + "you want to sign, and make sure that project's codename1.packageName is set.");
+        message.setName("page.launchError");
+        message.getTextComponent().setTextSelectionEnabled(true);
+        form.add(BorderLayout.CENTER, message);
+        form.show();
+    }
+
     private ProjectDefaults projectDefaults() {
         String settings = binding == null ? null : binding.settings();
         String packageName = readSetting(settings, "codename1.packageName");
-        String iosAppId = readSetting(settings, "codename1.ios.appid");
         String appName = firstNonEmpty(readSetting(settings, "codename1.displayName"),
                 readSetting(settings, "codename1.mainName"), "Codename One App");
-        String bundleId = firstNonEmpty(packageName, stripTeamPrefix(iosAppId), "com.example.app");
+        // No placeholder: the wizard does not start without a real identifier, so there is
+        // nothing here to stand in for one.
+        String bundleId = projectBundleIdentifier();
         return new ProjectDefaults(appName, bundleId, firstNonEmpty(packageName, bundleId));
     }
 
@@ -3694,7 +3733,7 @@ public class CertificateWizard extends Lifecycle {
 
         ProjectDefaults(String appName, String bundleId, String packageName) {
             this.appName = appName == null || appName.trim().isEmpty() ? "Codename One App" : appName.trim();
-            this.bundleId = bundleId == null || bundleId.trim().isEmpty() ? "com.example.app" : bundleId.trim();
+            this.bundleId = bundleId == null ? null : bundleId.trim();
             this.packageName = packageName == null || packageName.trim().isEmpty()
                     ? this.bundleId : packageName.trim();
         }

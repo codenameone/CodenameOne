@@ -74,6 +74,9 @@ public final class CertificateWizardStructureHarness {
             }
         });
 
+        // Bound to a project, because there is no other way to start: the wizard operates
+        // on one project's identifiers and refuses to run without one.
+        writeProjectBinding();
         final CertificateWizard[] app = new CertificateWizard[1];
         Display.getInstance().callSeriallyAndWait(new Runnable() {
             public void run() {
@@ -357,10 +360,12 @@ public final class CertificateWizardStructureHarness {
     }
 
     /// A second wizard, opened the way the IDE opens it: bound to a project whose package
-    /// name is one of the mock account's App IDs. Everything above runs unbound, which is
-    /// the case where the wizard knows nothing about the project and has to offer
-    /// everything.
-    private static CertificateWizard openProjectBoundWizard() {
+    /// name is one of the mock account's App IDs, which is what makes the project's own
+    /// rows tell themselves apart from the rest of the account.
+    /// Points the wizard at a throwaway project whose package name is one of the mock
+    /// account's App IDs. Required before any launch: without a project identifier the
+    /// wizard shows its launch failure and builds none of the pages checked here.
+    private static void writeProjectBinding() {
         try {
             java.io.File dir = new java.io.File(System.getProperty("java.io.tmpdir"),
                     "cn1-certificatewizard-harness");
@@ -375,6 +380,10 @@ public final class CertificateWizardStructureHarness {
         } catch (Exception ex) {
             check(false, "the harness could not write a project binding: " + ex);
         }
+    }
+
+    private static CertificateWizard openProjectBoundWizard() {
+        writeProjectBinding();
         CertificateWizard.setServiceForTesting(new MockSigningService());
         CertificateWizard bound = new CertificateWizard();
         bound.runApp();
