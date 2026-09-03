@@ -90,6 +90,14 @@ class CommerceJava004Snippet {
         // straight after a purchase it would not see the new one, and nothing
         // retries it later, so chain it off the synchronization instead.
         Purchase.getInAppPurchase().synchronizeReceipts(0, synced -> {
+            if (!Boolean.TRUE.equals(synced)) {
+                // The receipt was not submitted or fetched, so it is still
+                // pending and the stored list is the old one. Refreshing from
+                // it would read a stale entitlement and leave a paying user
+                // locked out with no sign anything went wrong.
+                showPurchasePendingRetry();
+                return;
+            }
             // This callback arrives on the EDT and refresh() blocks on the
             // network, so it needs a thread of its own.
             new Thread(() -> {
@@ -107,5 +115,8 @@ class CommerceJava004Snippet {
     }
 
     CommerceManager cm = CommerceManager.getInstance();
+
+
+    void showPurchasePendingRetry() { }
 
 }

@@ -85,11 +85,18 @@ class AppReviewJava002Snippet {
     
     void snippet() throws Exception {
         // tag::app-review-java-002[]
+        // When the native review prompt is unavailable the dialog falls back to
+        // opening this URL, so it has to be the listing for the store the app
+        // came from -- an Apple link sends Android users to the wrong place.
+        String storeUrl = "and".equals(CN.getPlatformName())
+                ? "https://play.google.com/store/apps/details?id=com.example.app"
+                : "https://apps.apple.com/app/id0000000000";
+
         AppReview.getInstance()
                 .setMinimumLaunches(5)          // at least 5 launches
                 .setMinimumDaysInstalled(3)     // and installed at least 3 days
                 .setDaysBetweenPrompts(30)      // never nag more than monthly
-                .setStoreUrl("https://apps.apple.com/app/id0000000000")
+                .setStoreUrl(storeUrl)
                 .setSupportEmail("support@example.com")
                 .registerSession();
         // end::app-review-java-002[]

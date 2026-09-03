@@ -87,23 +87,29 @@ class AdvertisingJava006Snippet {
         // tag::advertising-java-006[]
         RewardedAd ad = new RewardedAd("ca-app-pub-xxx/yyy");
         ad.setServerSideVerificationOptions(new ServerSideVerificationOptions(userId, "level=7"));
+        // show() does nothing when no ad is loaded, so the offer starts disabled
+        // and goes back to disabled the moment it is spent.
+        watchForCoins.setEnabled(false);
+        watchForCoins.addActionListener(e -> {
+            watchForCoins.setEnabled(false);
+            ad.show(reward -> {
+                // Server-side verification is configured above, so the network
+                // posts the reward to your server and that is what credits the
+                // user. This callback runs before anything has verified it, so
+                // it is presentation only -- crediting here would pay twice.
+                showRewardPending(reward.getAmount());
+            });
+        });
+
         ad.setAdListener(new AdListener() {
             public void onLoaded() {
-                // A rewarded ad is an opt-in format, so loading only enables the
-                // offer. Showing it here would put a full screen ad in front of a
-                // user who never asked for one.
+                // A rewarded ad is an opt-in format, so a loaded ad only enables
+                // the offer. Showing it here would put a full screen ad in front
+                // of a user who never asked for one.
                 watchForCoins.setEnabled(true);
             }
         });
         ad.load();
-
-        watchForCoins.addActionListener(e -> ad.show(reward -> {
-            // Server-side verification is configured above, so the network posts
-            // the reward to your server and that is what credits the user. This
-            // callback runs before anything has verified it, so it is for
-            // presentation only -- crediting here too would pay the reward twice.
-            showRewardPending(reward.getAmount());
-        }));
         // end::advertising-java-006[]
     }
 
