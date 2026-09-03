@@ -33,6 +33,8 @@ import com.codename1.ui.Display;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -145,7 +147,15 @@ public final class Continuity {
 
     /// Highest sequence seen from each device, so a state delivered twice -- which happens
     /// routinely, since a continuation and a relay can carry the same one -- acts once.
-    private static final Map<String, Long> lastSeen = new HashMap<String, Long>();
+    /// Insertion-ordered, so the cap can evict the device that has been quiet longest.
+    ///
+    /// A HashMap forced the eviction to pick a victim by comparing SEQUENCES, and sequences are
+    /// each origin's own counter -- a device at 5000 is not busier than one at 3, it has simply
+    /// been counting longer. Worse, the lowest sequence in a full map is usually a device that
+    /// has just been set up and sent its first state, so admitting it evicted it immediately and
+    /// the dispatch queued behind admit() found its mark gone and dropped a perfectly good
+    /// continuation without a word.
+    private static final Map<String, Long> lastSeen = new LinkedHashMap<String, Long>();
 
     // EDT-owned, like every field in this class. See the threading note on the class.
     private static StateProvider provider;
@@ -219,10 +229,9 @@ public final class Continuity {
         for (Map.Entry<String, Long> e : restored.entrySet()) {
             Long have = lastSeen.get(e.getKey());
             if (have == null || have.longValue() < e.getValue().longValue()) {
-                lastSeen.put(e.getKey(), e.getValue());
+                recordSeen(e.getKey(), e.getValue().longValue());
             }
         }
-        trimSeen();
         enabled = true;
         ContinuityBridge b = bridgeInternal();
         if (b != null) {
@@ -1258,8 +1267,7 @@ public final class Continuity {
             // the same state.
             return;
         }
-        lastSeen.put(state.getDeviceId(), Long.valueOf(state.getSequence()));
-        trimSeen();
+        recordSeen(state.getDeviceId(), state.getSequence());
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
@@ -1417,8 +1425,7 @@ public final class Continuity {
         }
         Long seen = lastSeen.get(from);
         if (seen == null || seen.longValue() < state.getSequence()) {
-            lastSeen.put(from, Long.valueOf(state.getSequence()));
-            trimSeen();
+            recordSeen(from, state.getSequence());
         }
         // ALWAYS, not only when the in-memory map moved. That condition was written when the
         // durable copy tracked memory exactly; it no longer does -- the mark goes into memory at
@@ -1438,7 +1445,18 @@ public final class Continuity {
         return lastSeen.size();
     }
 
-    /// Evicts the lowest sequences until the live map is back inside MAX_SEEN.
+    /// Records a device's high-water mark, most recently used LAST.
+    ///
+    /// Removed before it is put back, because the map keeps INSERTION order and a plain put()
+    /// over an existing key leaves it where it first appeared -- so a device that has been active
+    /// all along would still be evicted ahead of one that has said nothing since.
+    private static void recordSeen(String device, long sequence) {
+        lastSeen.remove(device);
+        lastSeen.put(device, Long.valueOf(sequence));
+        trimSeen();
+    }
+
+    /// Evicts the least recently seen devices until the map is back inside MAX_SEEN.
     ///
     /// The LIVE map, not a copy taken on the way to storage. A user has a handful of devices, but
     /// the ids arrive from a relay and nothing stops one from feeding many, which is the reason
@@ -1449,18 +1467,16 @@ public final class Continuity {
     /// mark costs one duplicate delivery rather than anything durable.
     private static void trimSeen() {
         while (lastSeen.size() > MAX_SEEN) {
-            String lowest = null;
-            long lowestSeq = Long.MAX_VALUE;
-            for (Map.Entry<String, Long> e : lastSeen.entrySet()) {
-                if (e.getValue().longValue() < lowestSeq) {
-                    lowestSeq = e.getValue().longValue();
-                    lowest = e.getKey();
-                }
-            }
-            if (lowest == null) {
+            Iterator<String> i = lastSeen.keySet().iterator();
+            if (!i.hasNext()) {
                 break;
             }
-            lastSeen.remove(lowest);
+            // The eldest, and ALWAYS one: the sequence comparison this replaced could select
+            // nothing at all -- every value equal to Long.MAX_VALUE left its "lowest" null -- and
+            // then simply stopped enforcing the cap. Taking the front of the iteration order
+            // cannot fail to find a victim while the map is over size.
+            i.next();
+            i.remove();
         }
     }
 

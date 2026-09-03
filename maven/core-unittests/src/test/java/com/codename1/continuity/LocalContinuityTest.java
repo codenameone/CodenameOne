@@ -1606,6 +1606,65 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A brand new device is not the one to evict. Sequences are each origin's own counter, so a
+     * device that has just been set up and sent its first state carries the LOWEST number in the
+     * map -- and evicting by sequence therefore threw that entry out the moment it was admitted.
+     * The dispatch queued behind admit() then found no mark of its own and dropped a perfectly
+     * good continuation with nothing logged.
+     */
+    @EdtTest
+    public void aBrandNewDeviceIsNotEvictedByItsOwnArrival() {
+        Continuity.enable();
+        final int[] seen = new int[1];
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                seen[0]++;
+                return true;
+            }
+        });
+
+        // Fill the map with established devices, all counting far higher than a new one would.
+        for (int i = 0; i < 64; i++) {
+            AppState old = new AppState()
+                    .setDeviceId("established-" + i)
+                    .setSequence(5000 + i)
+                    .setTimestamp(System.currentTimeMillis());
+            Continuity.deliver(old);
+        }
+        flushSerialCalls();
+        seen[0] = 0;
+
+        // A device unboxed this morning, sending its first ever state.
+        AppState firstEver = fromElsewhere("hello from a new phone", 1L);
+        Continuity.deliver(firstEver);
+        flushSerialCalls();
+
+        assertEquals(1, seen[0],
+                "a new device's first state was evicted by its own admission and never dispatched");
+    }
+
+    /**
+     * And the cap is enforced whatever the sequences are. The eviction this replaced scanned for
+     * the lowest value starting from Long.MAX_VALUE, so a map whose values all equalled
+     * Long.MAX_VALUE selected nothing and quietly stopped bounding anything at all.
+     */
+    @EdtTest
+    public void theCapHoldsEvenWhenEverySequenceIsMaxValue() {
+        Continuity.enable();
+        for (int i = 0; i < 80; i++) {
+            AppState s = new AppState()
+                    .setDeviceId("maxed-" + i)
+                    .setSequence(Long.MAX_VALUE)
+                    .setTimestamp(System.currentTimeMillis());
+            Continuity.deliver(s);
+        }
+        flushSerialCalls();
+
+        assertTrue(Continuity.seenSizeForTest() <= 64,
+                "the cap stopped being enforced: " + Continuity.seenSizeForTest());
+    }
+
+    /**
      * A checkpoint whose write failed is still owed. `dirty` is cleared on the way in, so leaving
      * it clear told the next suspend there was nothing to save -- a checkpoint lost to a full
      * disk was never retried and the app came back to the last write that had succeeded.
