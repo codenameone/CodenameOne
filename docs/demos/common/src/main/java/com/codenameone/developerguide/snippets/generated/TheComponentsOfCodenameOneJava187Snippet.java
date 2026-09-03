@@ -94,6 +94,7 @@ class TheComponentsOfCodenameOneJava187Snippet {
         Form hi = new Form("ImageViewer", new BorderLayout());
         ImageViewer iv = new ImageViewer(duke);
         hi.add(BorderLayout.CENTER, iv);
+        hi.show();
         // end::the-components-of-codename-one-java-187[]
     }
 

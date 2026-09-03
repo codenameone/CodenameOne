@@ -109,6 +109,7 @@ class TheComponentsOfCodenameOneJava207Snippet {
             JSObject jo = (JSObject)ctx.get("window");
             jo.set("location", "https://www.codenameone.com/");
         });
+        hi.show();
         // end::the-components-of-codename-one-java-207[]
     }
 }

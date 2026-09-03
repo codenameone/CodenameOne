@@ -108,6 +108,7 @@ class TheComponentsOfCodenameOneJava183Snippet {
         } catch(IOException err) {
             Log.e(err);
         }
+        hi.show();
         // end::the-components-of-codename-one-java-183[]
     }
 

@@ -106,6 +106,7 @@ class TheComponentsOfCodenameOneJava167Snippet {
         DefaultListModel<Map<String, Object>> model = new DefaultListModel<>(data);
         MultiList ml = new MultiList(model);
         hi.add(BorderLayout.CENTER, ml);
+        hi.show();
         // end::the-components-of-codename-one-java-167[]
     }
 

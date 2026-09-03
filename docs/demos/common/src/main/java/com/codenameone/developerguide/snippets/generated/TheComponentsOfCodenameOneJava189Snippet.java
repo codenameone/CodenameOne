@@ -165,6 +165,7 @@ class TheComponentsOfCodenameOneJava189Snippet {
         ImageViewer iv = new ImageViewer(imodel.getItemAt(0));
         iv.setImageList(imodel);
         hi.add(BorderLayout.CENTER, iv);
+        hi.show();
         // end::the-components-of-codename-one-java-189[]
     }
 

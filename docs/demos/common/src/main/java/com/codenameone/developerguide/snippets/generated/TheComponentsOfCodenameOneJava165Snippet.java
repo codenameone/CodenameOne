@@ -117,6 +117,7 @@ class TheComponentsOfCodenameOneJava165Snippet {
             }
         };
         hi.add(BorderLayout.CENTER, ic);
+        hi.show();
         // end::the-components-of-codename-one-java-165[]
     }
 

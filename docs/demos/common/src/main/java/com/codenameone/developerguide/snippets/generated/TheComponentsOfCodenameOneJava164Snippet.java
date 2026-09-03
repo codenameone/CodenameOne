@@ -99,6 +99,10 @@ class TheComponentsOfCodenameOneJava164Snippet {
 
         InfiniteScrollAdapter.createInfiniteScroll(hi.getContentPane(), () -> { // <2>
             java.util.List<Map<String, Object>> data = fetchPropertyData("Leeds"); // <3>
+            if(data == null) { // the fetch failed, so there is nothing more to add
+                InfiniteScrollAdapter.addMoreComponents(hi.getContentPane(), new Component[0], false);
+                return;
+            }
             MultiButton[] cmps = new MultiButton[data.size()];
             for(int iter = 0 ; iter < cmps.length ; iter++) {
                 Map<String, Object> currentListing = data.get(iter);
@@ -114,6 +118,7 @@ class TheComponentsOfCodenameOneJava164Snippet {
             }
             InfiniteScrollAdapter.addMoreComponents(hi.getContentPane(), cmps, true); // <5>
         }, true); // <6>
+        hi.show();
         // end::the-components-of-codename-one-java-164[]
     }
 

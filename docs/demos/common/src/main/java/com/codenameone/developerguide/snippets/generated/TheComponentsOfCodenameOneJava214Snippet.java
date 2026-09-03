@@ -96,6 +96,7 @@ class TheComponentsOfCodenameOneJava214Snippet {
         Calendar cld = new Calendar();
         cld.addActionListener((e) -> Log.p("You picked: " + new Date(cld.getSelectedDay())));
         hi.add(BorderLayout.CENTER, cld);
+        hi.show();
         // end::the-components-of-codename-one-java-214[]
     }
 }
