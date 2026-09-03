@@ -97,13 +97,13 @@ class MonetizationJava036Snippet {
      } else {
      receipts = new ArrayList<Receipt>();
      }
-     // Check to see if this receipt already exists
-     // This probably won't ever happen (that you will be asked to submit an
-     // existing receipt, but better safe than sorry
+     // Check to see if this receipt already exists. That should not happen,
+     // but a store can resend one, and the transaction id may be null.
      for (Receipt r : receipts) {
-     if (r.getStoreCode().equals(receipt.getStoreCode()) &&
-     r.getTransactionId().equals(receipt.getTransactionId())) {
-     // If you've already got this receipt, you will this submission.
+     if (Objects.equals(r.getStoreCode(), receipt.getStoreCode()) &&
+     Objects.equals(r.getTransactionId(), receipt.getTransactionId())) {
+     // Already stored. Report success, or synchronizeReceipts() never finishes.
+     callback.onSucess(Boolean.TRUE);
      return;
      }
      }
@@ -112,7 +112,7 @@ class MonetizationJava036Snippet {
      Date currExpiry = new Date();
      List<String> lProducts = Arrays.asList(PRODUCTS);
      for (Receipt r : receipts) {
-     if (!lProducts.contains(receipt.getSku())) {
+     if (!lProducts.contains(r.getSku())) {
      continue;
      }
      if (r.getCancellationDate()!= null) {
