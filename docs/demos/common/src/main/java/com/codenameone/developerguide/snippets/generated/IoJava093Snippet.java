@@ -117,13 +117,25 @@ class IoJava093Snippet {
             Command cancel = new Command("Cancel");
             Command result = Dialog.show("File Name", BorderLayout.north(tf).add(BorderLayout.CENTER, body), ok, cancel);
             if(ok == result) {
-                try(OutputStream os = Storage.getInstance().createOutputStream(tf.getText());) {
+                String name = tf.getText();
+                boolean isNew = !Arrays.asList(Storage.getInstance().listEntries()).contains(name);
+                try(OutputStream os = Storage.getInstance().createOutputStream(name);) {
                     os.write(body.getText().getBytes("UTF-8"));
-                    createFileEntry(hi, tf.getText());
-                    hi.getContentPane().animateLayout(250);
                 } catch(IOException err) {
                     Log.e(err);
+                    return;
                 }
+                // entrySize() is only right once the stream is closed, and an
+                // overwrite already has a row whose size label is now stale
+                if(isNew) {
+                    createFileEntry(hi, name);
+                } else {
+                    hi.removeAll();
+                    for(String file : Storage.getInstance().listEntries()) {
+                        createFileEntry(hi, file);
+                    }
+                }
+                hi.getContentPane().animateLayout(250);
             }
         });
         for(String file : Storage.getInstance().listEntries()) {
