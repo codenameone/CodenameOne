@@ -79,6 +79,24 @@ import com.codename1.ui.events.ActionListener;
 /// Passing it to `ContactsManager#getContactById(String)` needs full
 /// address-book access, which is the thing this class exists to avoid.
 ///
+/// #### What a platform can actually deliver
+///
+/// A picker returns what its platform is able to hand over without the broad
+/// permission, and that is not the same everywhere. Read every field you
+/// asked for defensively: a null one means the user's contact did not carry
+/// it, or the platform could not supply it.
+///
+/// Android 17 and later, iOS and the simulator serve every field on this
+/// class. Android before 17 has no contact picker of its own, so the fallback
+/// is the contacts app's own single-row picker: it returns one contact
+/// carrying one kind of data, `#NAME` plus whichever of `#PHONE`, `#EMAIL`
+/// and `#ADDRESS` was requested first. `#PHOTO`, `#BIRTHDAY` and `#WEBSITE`
+/// are best-effort there -- they are read through the granted contact's own
+/// data rows, which some devices allow and some refuse -- and
+/// `#setMultiSelect(boolean)` and `#setRequireAllRequestedFields(boolean)`
+/// have no effect. None of that ever escalates into a permission prompt;
+/// the fields simply come back null.
+///
 /// #### Availability
 ///
 /// `#isSupported()` reports whether the platform has a picker at all. Where it

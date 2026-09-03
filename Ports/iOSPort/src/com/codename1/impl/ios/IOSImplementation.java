@@ -29,6 +29,7 @@ import com.codename1.codescan.CodeScanner;
 import com.codename1.codescan.ScanResult;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
+import com.codename1.contacts.ContactPicker;
 import com.codename1.db.Database;
 import com.codename1.db.DatabaseEncryptionException;
 import com.codename1.db.DatabaseConfig;
@@ -9997,6 +9998,23 @@ public class IOSImplementation extends CodenameOneImplementation {
                 multiSelect, selectionLimit);
     }
 
+    /// Nulls out the picker tables the native side found nothing for.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the contact just populated from a picked CNContact
+    private static void dropEmpty(Contact c) {
+        if (c.getPhoneNumbers() != null && c.getPhoneNumbers().isEmpty()) {
+            c.setPhoneNumbers(null);
+        }
+        if (c.getEmails() != null && c.getEmails().isEmpty()) {
+            c.setEmails(null);
+        }
+        if (c.getAddresses() != null && c.getAddresses().isEmpty()) {
+            c.setAddresses(null);
+        }
+    }
+
     /// Marks `#pickContacts` as wanting every requested field present.
     ///
     /// Rides the field bit set rather than a separate argument so the native
@@ -10023,10 +10041,21 @@ public class IOSImplementation extends CodenameOneImplementation {
             for (int iter = 0; iter < picked.length; iter++) {
                 Contact c = new Contact();
                 // The native side fills these rather than creating them, the
-                // same way updatePersonWithRecordID does.
-                c.setAddresses(new Hashtable());
-                c.setEmails(new Hashtable());
-                c.setPhoneNumbers(new Hashtable());
+                // same way updatePersonWithRecordID does -- but only for the
+                // fields that were asked for. Creating all three regardless
+                // would hand the caller an empty table where this API
+                // promises null, and only on iOS, so code that tells "not
+                // requested" from "requested and absent" would read the two
+                // the same way here and differently everywhere else.
+                if ((fields & ContactPicker.ADDRESS) != 0) {
+                    c.setAddresses(new Hashtable());
+                }
+                if ((fields & ContactPicker.EMAIL) != 0) {
+                    c.setEmails(new Hashtable());
+                }
+                if ((fields & ContactPicker.PHONE) != 0) {
+                    c.setPhoneNumbers(new Hashtable());
+                }
                 if (System.currentTimeMillis() == 0) {
                     // Keeps Address and its setters out of the dead-code pass;
                     // only the native side ever calls them. Same hack, and
@@ -10040,6 +10069,12 @@ public class IOSImplementation extends CodenameOneImplementation {
                     c.getAddresses().put("", tmp);
                 }
                 instance.nativeInstance.updatePickedContact(iter, c, fields);
+                // A table the native side left empty means the contact simply
+                // had none of that kind. Android and the simulator report that
+                // as null because they build the table only once they have a
+                // value, so it is dropped here rather than leaving iOS the one
+                // platform that answers an empty table.
+                dropEmpty(c);
                 picked[iter] = c;
             }
         } finally {

@@ -243,6 +243,27 @@ class AndroidContactPicker {
                 ? sessionPickerIntent(requestedFields, multiSelect,
                         selectionLimit, requireAllRequestedFields)
                 : legacyPickerIntent(requestedFields);
+        Activity activity = AndroidNativeUtil.getActivity();
+        // instanceof rather than a cast: ParparVM's CHECKCAST is unchecked, so
+        // a wrong type here would be handed to the next instruction rather
+        // than throwing.
+        CodenameOneActivity host = activity instanceof CodenameOneActivity
+                ? (CodenameOneActivity) activity : null;
+        if (host != null && host.isWaitingForResult()) {
+            // The activity has ONE result channel, and
+            // setIntentResultListener refuses a new listener while a flow --
+            // the camera, a gallery, a VPN consent dialog -- is outstanding.
+            // It refuses silently, so launching anyway would send the picker's
+            // result to that other flow's listener and leave this pick with no
+            // answer at all, which wedges the caller: Display treats a pick
+            // that never reports as still in progress and refuses the next
+            // one. Reporting an empty selection is what a cancelled pick
+            // reports, and it keeps the channel intact for whoever owns it.
+            Log.p("Contact picker: another activity result is outstanding, "
+                    + "reporting an empty selection");
+            result.picked(new Contact[0]);
+            return;
+        }
         try {
             AndroidNativeUtil.startActivityForResult(intent,
                     PICK_CONTACTS_REQUEST, new IntentResultListener() {
@@ -258,10 +279,31 @@ class AndroidContactPicker {
             // installed. Reporting nothing is the whole contract of a
             // cancelled pick, so the caller needs no separate case for it.
             Log.e(err);
+            releaseResultChannel(host);
             result.picked(new Contact[0]);
         } catch (RuntimeException err) {
             Log.e(err);
+            releaseResultChannel(host);
             result.picked(new Contact[0]);
+        }
+    }
+
+    /**
+     * Hands the activity's result channel back after a launch that threw.
+     *
+     * <p>{@code AndroidNativeUtil.startActivityForResult} installs its
+     * listener and the activity marks itself waiting BEFORE the call that can
+     * throw, and only the result callback puts either back. So a launch that
+     * fails synchronously leaves this pick's listener installed forever: the
+     * next camera, gallery or consent flow is refused its own listener and its
+     * result is delivered here instead. Nothing else notices, because the
+     * failure was reported as an ordinary cancelled pick.</p>
+     *
+     * @param host the activity, or null when it is not one of ours
+     */
+    private static void releaseResultChannel(CodenameOneActivity host) {
+        if (host != null) {
+            host.restoreIntentResultListener();
         }
     }
 
@@ -439,6 +481,19 @@ class AndroidContactPicker {
      * readable. That is the same outcome as before this existed -- it can
      * only add fields, never lose one -- and it never falls back to asking
      * for {@code READ_CONTACTS}, which is the whole point of the picker.</p>
+     *
+     * <p>Review asked for the alternative: report these requests unsupported,
+     * or serve them from a URI the grant certainly covers. Neither is
+     * available. There is no permission-free path to a photo, a birthday or a
+     * web site before Android 17 -- that absence is precisely why Android 17
+     * added a picker -- so no URI can be substituted here. And failing the
+     * whole pick would be worse than the partial answer it replaces: a
+     * request for a name, a number and a photo would return nothing on
+     * Android 16 rather than the name and the number the platform can
+     * genuinely deliver. So the request is served as far as the device
+     * allows, the shortfall is visible to the caller as a null field, and
+     * which fields are best-effort before Android 17 is written down on
+     * {@code ContactPicker} where an application author reads it.</p>
      *
      * @param contact         the contact being assembled
      * @param resolver        used to query the directory

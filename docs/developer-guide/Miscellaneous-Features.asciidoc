@@ -163,7 +163,7 @@ The contacts you get back are snapshots. There's no continuing access behind the
 
 `ContactPicker.isSupported()` tells you whether the platform has a picker at all. Android, iOS and the simulator do; where a platform doesn't, `pick` reports an empty selection rather than falling back to reading the address book, because that fallback would need the permission you were avoiding. A cancelled pick reports the same empty selection, so `getPickedContacts` is the only thing your listener has to check.
 
-TIP: Android 17 and newer show the system picker. Older releases fall back to the contacts app's own single-row picker, which needs no permission either but returns one contact carrying one kind of data. On those releases a multiple selection comes back with a single contact, and the field ranking is phone, then email, then postal address.
+TIP: Android 17 and newer show the system picker, and serve every field. Older releases fall back to the contacts app's own single-row picker, which needs no permission either but returns one contact carrying one kind of data: the name plus whichever of phone, email and postal address was requested first. A photo, a birthday or a web site is best-effort there, a multiple selection comes back as a single contact, and `setRequireAllRequestedFields` has no effect. Nothing about that escalates into a permission prompt - the fields you can't have simply come back null, so read every one you asked for defensively.
 
 
 === Localization & internationalization (L10N & I18N)
