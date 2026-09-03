@@ -381,6 +381,19 @@ class PlatformFeatureCatalogTest {
     }
 
     @Test
+    void whisperRaisesTheAndroidFloorToTwentyOne() {
+        // The Android AAR declares minSdk 21, which its native code always
+        // required (the NDK floor is API 21). Without this floor the manifest
+        // merger rejects a default project (android.min_sdk_version 19) with
+        // "uses-sdk:minSdkVersion 19 cannot be smaller than version 21
+        // declared in library".
+        PlatformFeatureCatalog.Accumulator acc = new PlatformFeatureCatalog.Accumulator();
+        acc.consume("com/codename1/ai/whisper/WhisperRecognizer");
+        assertEquals(21, acc.minimumAndroidSdk(),
+                "cn1-ai-whisper-android.aar declares minSdk 21");
+    }
+
+    @Test
     void builtInVisionDoesNotFlagBigUpload() {
         PlatformFeatureCatalog.Accumulator acc = new PlatformFeatureCatalog.Accumulator();
         acc.consume("com/codename1/ai/vision/TextRecognizer");
