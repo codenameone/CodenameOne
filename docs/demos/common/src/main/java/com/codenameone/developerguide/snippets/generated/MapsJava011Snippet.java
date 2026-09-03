@@ -87,8 +87,15 @@ class MapsJava011Snippet {
         MapProviderRegistry.register(WebMapProvider.google("YOUR_MAPS_JS_API_KEY"));
 
         // Registering only appends to the registry, and a build-injected native
-        // provider that is already there wins -- Apple Maps on iOS, for one. Ask
-        // for the web provider explicitly if that is the one you want everywhere.
+        // provider already there wins -- Apple Maps on iOS, for one. Asking for
+        // the web provider by name is what makes this one render everywhere.
+        //
+        // Ask for it only when a basemap is all you need. WebMapProvider draws
+        // the tiles and little else: the camera getters answer zero, and
+        // markers, shapes, coordinate conversion and the gesture callbacks are
+        // no-ops. setZoom() through it reads that zero position and recenters on
+        // (0, 0). For the operations the MapSurface section shows, leave the
+        // native provider in front.
         MapProviderRegistry.setPreferredProvider("web");
 
         NativeMap map = new NativeMap(new LatLng(41.0, 13.0), 5);

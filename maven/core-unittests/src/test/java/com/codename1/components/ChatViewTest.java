@@ -74,6 +74,36 @@ class ChatViewTest extends UITestBase {
     }
 
     @FormTest
+    void textAppendedAfterAnAnnotationDoesNotDragItIntoHistory() {
+        // The annotation stays in the bubble, so deriving the conversation from
+        // the rendered body folds it in on the very next delta -- excluding it
+        // for exactly one append and no longer.
+        ChatView v = new ChatView();
+        ChatBubble bubble = v.beginAssistantStream();
+        bubble.appendText("the answer so far");
+        bubble.appendAnnotation(" [reconnecting]");
+        bubble.appendText(" and the rest");
+
+        List<ChatMessage> history = v.getHistory();
+        assertEquals("the answer so far and the rest",
+                history.get(history.size() - 1).getText());
+    }
+
+    @FormTest
+    void setTextReplacesTheConversationOutright() {
+        ChatView v = new ChatView();
+        ChatBubble bubble = v.beginAssistantStream();
+        bubble.appendText("draft");
+        bubble.appendAnnotation(" [stale]");
+        bubble.setText("final answer");
+        bubble.appendText(" plus more");
+
+        List<ChatMessage> history = v.getHistory();
+        assertEquals("final answer plus more",
+                history.get(history.size() - 1).getText());
+    }
+
+    @FormTest
     void annotationsStayOutOfHistoryWhenAppendedOffTheEdt() throws Exception {
         // The exclusion has to survive the hop to the EDT. appendText only
         // queues the update when it is called from another thread, so an

@@ -43,6 +43,10 @@ public class ChatBubble extends Container {
     /// this is bookkeeping between ChatView and its bubbles, not API.
     ChatView owner;
 
+    /// The part of the rendered body that is conversation. Annotations are
+    /// shown in the bubble but never recorded here.
+    private String conversation = "";
+
     private final TextArea body;
     private final ChatMessage message;
 
@@ -76,6 +80,9 @@ public class ChatBubble extends Container {
     }
 
     private void applyText(String text) {
+        // A full replace makes everything shown conversational again: whatever
+        // annotation was on the bubble is gone from the body too.
+        conversation = text == null ? "" : text;
         applyText(text, true);
     }
 
@@ -98,7 +105,9 @@ public class ChatBubble extends Container {
         // when this bubble was created stays empty, and anything building a
         // request from getHistory() sends a blank assistant turn.
         if (sync && owner != null) {
-            owner.bubbleTextChanged(this, body.getText());
+            // The conversation, not the body: the body may also carry
+            // annotations, and those are not something the model said.
+            owner.bubbleTextChanged(this, conversation);
         }
         revalidateLater();
     }
@@ -126,16 +135,25 @@ public class ChatBubble extends Container {
         if (delta == null || delta.length() == 0) {
             return;
         }
-        if (Display.getInstance().isEdt()) {
-            applyText(body.getText() + delta, sync);
-            return;
-        }
-        Display.getInstance().callSerially(new Runnable() {
+        Runnable r = new Runnable() {
             @Override
             public void run() {
+                // Track the conversation separately from what is rendered. An
+                // annotation already on the bubble is part of the body, so
+                // deriving the conversation from the body would fold it in on
+                // the next delta -- and the note would reach history after all,
+                // one append later than the case this guards.
+                if (sync) {
+                    conversation = conversation + delta;
+                }
                 applyText(body.getText() + delta, sync);
             }
-        });
+        };
+        if (Display.getInstance().isEdt()) {
+            r.run();
+            return;
+        }
+        Display.getInstance().callSerially(r);
     }
 
     public ChatMessage getMessage() {

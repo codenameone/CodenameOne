@@ -83,7 +83,10 @@ class AiAndSpeechJava016Snippet {
     void snippet() throws Exception {
         // tag::ai-and-speech-java-016[]
         ChatRequest req = ChatRequest.builder()
-                .model("gpt-4o-mini")
+                // No model named: the request uses the client's default, which
+                // LlmClient#setDefaultModel sets and the simulator's Ollama
+                // redirect sets for you. Naming a cloud model here would ask a
+                // local server for one it has never heard of.
                 .addMessage(ChatMessage.system("Reply in haiku."))
                 .addMessage(ChatMessage.user("Describe a Codename One app."))
                 .temperature(0.7f)

@@ -138,7 +138,7 @@ codename1.arg.ios.afterFinishLaunching=[GMSServices provideAPIKey:@"YOUR_IOS_API
 
 ==== Cross-platform web maps
 
-A native provider only renders on the platforms that ship its SDK. To show a provider's map *everywhere* -- including platforms with no native SDK for it -- register a `WebMapProvider`, which hosts the provider's JavaScript SDK inside a `BrowserComponent`:
+A native provider only renders on the platforms that ship its SDK. To show a provider's map *everywhere* -- including platforms with no native SDK for it -- register a `WebMapProvider`, which hosts the provider's JavaScript SDK inside a `BrowserComponent`. It draws the basemap and not much else, though: the camera getters report zero and markers, shapes, coordinate conversion and gestures are no-ops, so prefer it only where a static map is what you want:
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MapsJava011Snippet.java[tag=maps-java-011,indent=0]
