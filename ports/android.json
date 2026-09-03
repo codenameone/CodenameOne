@@ -1,48 +1,48 @@
 {
-  "commit": "12fab61bd6cf6063b8351b8c24dc67c334c59efe",
-  "generated_at": "2026-09-03T08:21:55Z",
+  "commit": "d46b12595eb7adf8b5e7e1c180c91cc575dcd88b",
+  "generated_at": "2026-09-03T10:25:49Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 261572803
+        "duration_ns": 256510978
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 35321315
+        "duration_ns": 34912913
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 334589082
+        "duration_ns": 325850411
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 260427142
+        "duration_ns": 178200856
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 185626364
+        "duration_ns": 145467336
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 4986183117
+        "duration_ns": 4167016821
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 151258604
+        "duration_ns": 149673966
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 150977910
+        "duration_ns": 172899748
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 729334983
+        "duration_ns": 767665605
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 329097958
+        "duration_ns": 293979544
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,13 +52,13 @@
     "suite_checksum": 0
   },
   "port": "android",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/33730420816",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/33742244219",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 182,
+    "pass": 183,
     "skip": 1
   },
   "tests": {
@@ -239,6 +239,10 @@
     },
     "ComponentReplaceSlideScreenshotTest": {
       "feature": "layout-animation",
+      "status": "pass"
+    },
+    "ContactPickerApiTest": {
+      "feature": "contact-picker",
       "status": "pass"
     },
     "CoverHorizontalTransitionTest": {
