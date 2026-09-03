@@ -2941,31 +2941,27 @@ public class Container extends Component implements Iterable<Component> {
 
     }
 
-    /// Applies the safe-area insets without announcing them as a style change.
-    ///
-    /// The padding written here is scaffolding: `doLayout` and `calcPreferredSize` both
-    /// set it, use it for one measurement or layout, and hand it straight back to
-    /// `TmpInsets#restore`, which has always suppressed events for the same reason. Only
-    /// the setting half was left announcing, and a PADDING change is exactly what
-    /// `Component#styleChanged` answers with `revalidateLater()` on the parent - so
-    /// laying a safe-area container out queued another revalidate of the whole Form,
-    /// which laid it out again, which queued another. Nothing converged, because the
-    /// padding is reverted before anyone can observe it having settled.
-    ///
-    /// An idle app hides this: the EDT sleeps and the treadmill only turns once per
-    /// wake-up. It shows up the moment something keeps the EDT awake - a drag, or any
-    /// animation - where it consumed the entire frame budget (measured at ~200ms per
-    /// pass on the gallery, i.e. under 5fps, against ~15ms of actual painting).
-    private boolean snapToSafeAreaQuietly() {
-        Style s = getStyle();
-        boolean suppressed = s.isSuppressChangeEvents();
-        s.setSuppressChangeEvents(true);
-        try {
-            return snapToSafeAreaInternal();
-        } finally {
-            s.setSuppressChangeEvents(suppressed);
-        }
-    }
+    // NOT suppressed, deliberately -- see the history before changing this.
+    //
+    // The padding written by the safe-area snap is scaffolding: doLayout and
+    // calcPreferredSize set it, use it for one measurement, and hand it straight
+    // back to TmpInsets.restore, which has always suppressed events. Only the
+    // SETTING half announces, and a padding change is exactly what
+    // Component.styleChanged answers with revalidateLater() on the parent -- so
+    // laying out a safe-area container queues another revalidate of the whole
+    // Form, which lays it out again, which queues another. On a busy event
+    // dispatch thread that treadmill measured ~200ms per pass against ~15ms of
+    // real painting.
+    //
+    // Suppressing the announcement removes the treadmill and is WRONG here
+    // anyway: peer components rely on those repaints. The JavaSE video peer
+    // fills its buffer from the AWT side and never asks for a repaint itself
+    // (Peer.paint deliberately calls paintOnBuffer rather than cnt.repaint, to
+    // avoid a loop), so with nothing else repainting the form its frames never
+    // reach the screen -- a video that decoded correctly and displayed nothing.
+    //
+    // Fixing the treadmill therefore needs the peers to drive their own
+    // repaints first; until then the wasted passes are the cheaper defect.
 
     void doLayout() {
         doLayoutDepth++;
@@ -2983,7 +2979,7 @@ public class Container extends Component implements Iterable<Component> {
                 }
                 Style s = getStyle();
                 tmpInsets.set(s);
-                restoreBounds = snapToSafeAreaQuietly();
+                restoreBounds = snapToSafeAreaInternal();
             }
         }
         layout.layoutContainer(this);
@@ -3606,7 +3602,7 @@ public class Container extends Component implements Iterable<Component> {
                 }
                 Style s = getStyle();
                 calcTmpInsets.set(s);
-                restoreBounds = snapToSafeAreaQuietly();
+                restoreBounds = snapToSafeAreaInternal();
             }
         }
 

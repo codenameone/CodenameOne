@@ -33,7 +33,6 @@ import com.codename1.ui.events.StyleListener;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -81,7 +80,7 @@ class SafeAreaRevalidateLoopTest extends UITestBase {
     }
 
     @FormTest
-    void measuringASafeAreaContainerAnnouncesNoStyleChange() {
+    void measuringASafeAreaContainerAnnouncesItsPadding() {
         Form f = Display.getInstance().getCurrent();
         Container inner = notchedSafeAreaForm(f);
 
@@ -91,42 +90,16 @@ class SafeAreaRevalidateLoopTest extends UITestBase {
         inner.getPreferredSize();
         inner.getStyle().removeStyleListener(rec);
 
-        assertEquals(0, rec.properties.size(),
-                "measuring a safe-area container announced " + rec.properties);
+        // It DOES announce, and that is load-bearing -- see the comment on the
+        // snapToSafeAreaInternal call in Container. Suppressing it removes the
+        // revalidate treadmill, and with it the repaints that peer components
+        // depend on: the JavaSE video peer fills its buffer from the AWT side
+        // and never requests a repaint itself, so with nothing else repainting
+        // the form its frames decode correctly and never reach the screen.
+        // Pinned so the optimisation is not reinstated without first making
+        // peers drive their own repaints.
+        assertTrue(rec.properties.size() > 0,
+                "measuring a safe-area container must still announce its padding");
     }
 
-    @FormTest
-    void layingOutASafeAreaContainerAnnouncesNoStyleChange() {
-        Form f = Display.getInstance().getCurrent();
-        Container inner = notchedSafeAreaForm(f);
-
-        Recorder rec = new Recorder();
-        inner.getStyle().addStyleListener(rec);
-        f.layoutContainer();
-        inner.getStyle().removeStyleListener(rec);
-
-        assertEquals(0, rec.properties.size(),
-                "laying out a safe-area container announced " + rec.properties);
-    }
-
-    /**
-     * The property that actually broke: a layout pass must settle rather than leave work
-     * queued that makes the next pass queue the same work again.
-     */
-    @FormTest
-    void aLayoutPassDoesNotQueueAnotherOne() {
-        Form f = Display.getInstance().getCurrent();
-        notchedSafeAreaForm(f);
-
-        f.flushRevalidateQueue();
-        boolean settled = true;
-        for (int i = 0; i < 5 && settled; i++) {
-            f.setShouldCalcPreferredSize(true);
-            f.layoutContainer();
-            f.getPreferredSize();
-            f.flushRevalidateQueue();
-            settled = !f.hasPendingRevalidations();
-        }
-        assertTrue(settled, "a layout/measure pass keeps re-queueing a revalidate of the Form");
-    }
 }
