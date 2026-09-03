@@ -91,11 +91,17 @@ class TheComponentsOfCodenameOneJava144Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-144[]
+        Form hi = new Form("Popup Dialog", new BoxLayout(BoxLayout.Y_AXIS));
         Button showDialog = new Button("Show");
-        Dialog d = new Dialog("Title");
-        d.setLayout(new BorderLayout());
-        d.add(BorderLayout.CENTER, new SpanLabel("Dialog Body", "DialogBody"));
-        d.showPopupDialog(showDialog);
+        showDialog.addActionListener(e -> {
+            Dialog d = new Dialog("Title");
+            d.setLayout(new BorderLayout());
+            d.add(BorderLayout.CENTER, new SpanLabel("Dialog Body", "DialogBody"));
+            // the popup points at the button, which must be on screen to have a position
+            d.showPopupDialog(showDialog);
+        });
+        hi.add(showDialog);
+        hi.show();
         // end::the-components-of-codename-one-java-144[]
     }
 

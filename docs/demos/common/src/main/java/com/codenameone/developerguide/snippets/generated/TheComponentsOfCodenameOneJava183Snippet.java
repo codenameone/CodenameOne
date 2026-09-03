@@ -92,7 +92,12 @@ class TheComponentsOfCodenameOneJava183Snippet {
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-183[]
         Form hi = new Form("XML Tree", new BorderLayout());
+        // any XML you package with the application will do
         InputStream is = Display.getInstance().getResourceAsStream(getClass(), "/build.xml");
+        if(is == null) {
+            Log.p("/build.xml is not packaged with this application");
+            return;
+        }
         try(Reader r = new InputStreamReader(is, "UTF-8");) {
             Element e = new XMLParser().parse(r);
             Tree xmlTree = new Tree(new XMLTreeModel(e)) {

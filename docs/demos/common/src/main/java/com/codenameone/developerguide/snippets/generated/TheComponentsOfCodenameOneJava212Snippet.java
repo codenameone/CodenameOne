@@ -101,7 +101,8 @@ class TheComponentsOfCodenameOneJava212Snippet {
            Location loc = LocationManager.getLocationManager().getCurrentLocation();
 
           Coord lastLocation = new Coord(loc.getLatitude(), loc.getLongtitude());
-           Image i = Image.createImage("/blue_pin.png");
+           // a material icon rather than an asset you would have to add
+           Image i = FontImage.createMaterial(FontImage.MATERIAL_PLACE, "Label", 4.0f);
            PointsLayer pl = new PointsLayer();
            pl.setPointIcon(i);
            PointLayer p = new PointLayer(lastLocation, "You Are Here", i);
@@ -114,12 +115,9 @@ class TheComponentsOfCodenameOneJava212Snippet {
         mc.zoomToLayers();
 
         map.addComponent(BorderLayout.CENTER, mc);
-        map.addCommand(new BackCommand());
-        map.setBackCommand(new BackCommand());
         map.show();
         // end::the-components-of-codename-one-java-212[]
     }
 
-    class BackCommand extends Command { BackCommand() { super("Back"); } }
 
 }
