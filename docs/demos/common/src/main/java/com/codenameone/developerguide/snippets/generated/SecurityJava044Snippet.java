@@ -96,6 +96,10 @@ class SecurityJava044Snippet {
                 // server. tolerance=0 is strict but unforgiving; tolerance=2 or 3
                 // is more permissive but increases the brute-force attack surface.
                 if (Otp.verifyTotp(secret, userInput, 1)) {
+                    // Where this check runs on your server, record the time
+                    // step this code belongs to and reject a second code from
+                    // the same step: verifyTotp is stateless, so a captured
+                    // code stays valid for the rest of the tolerance window.
                     grantAccess();
                 } else {
                     field.clear();
