@@ -1575,6 +1575,37 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A provider that throws is an attempt that FAILED, not an absence of work. It happens
+     * transiently -- a dependency that is not up yet on a cold launch is the ordinary cause --
+     * and marking the state handled with none of its payload applied and nothing stored left the
+     * relay's remaining copy refused after the next launch, so the state was gone for good.
+     *
+     * <p>The distinction matters because "no provider at all" must still acknowledge, or a state
+     * an application can never consume re-prompts for ever. Same flag once, two opposite right
+     * answers, which is why there are two now.</p>
+     */
+    @EdtTest
+    public void aProviderThatThrowsLeavesTheStateOnTheRelay() {
+        Continuity.setStateProvider(new StateProvider() {
+            public Map<String, Object> saveState() {
+                return new HashMap<String, Object>();
+            }
+
+            public void restoreState(Map<String, Object> payload) {
+                throw new IllegalStateException("a dependency is not up yet");
+            }
+        });
+
+        AppState arrival = fromElsewhere("provider blew up", 41L);
+        assertFalse(Continuity.restore(arrival), "a route-less state shows no form");
+
+        Map<String, Long> persisted = Continuity.readSeenForTest();
+        assertFalse(persisted.containsKey("some-other-device"),
+                "a state whose provider threw was marked handled, so the relay's remaining copy "
+                        + "is refused and none of its payload was ever applied");
+    }
+
+    /**
      * A checkpoint whose write failed is still owed. `dirty` is cleared on the way in, so leaving
      * it clear told the next suspend there was nothing to save -- a checkpoint lost to a full
      * disk was never retried and the app came back to the last write that had succeeded.

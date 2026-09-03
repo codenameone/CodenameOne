@@ -707,6 +707,13 @@ public final class Continuity {
         // checkpoint had been. Left alone, the old checkpoint still restores and the relay may
         // offer this one to a build that understands it.
         boolean applied = false;
+        // Separate from `applied`, because "there was nothing to do" and "I tried and could not"
+        // need opposite answers and one flag cannot say both. A provider that throws is the
+        // second: it can happen transiently on a cold launch, when a dependency it needs is not
+        // up yet, and treating it as "nothing to do" marked the state handled with none of its
+        // payload applied and nothing stored -- so the relay's remaining copy was refused after
+        // the next launch and the state was gone.
+        boolean failed = false;
         StateProvider p = provider;
         if (p != null) {
             try {
@@ -716,6 +723,7 @@ public final class Continuity {
                 applied = !state.getPayload().isEmpty();
             } catch (Throwable t) {
                 Log.e(t);
+                failed = true;
             }
         }
         List<String> routes = state.getRoutes();
@@ -729,7 +737,7 @@ public final class Continuity {
             // that way, and StateProvider.restoreState tells providers not to be. True would be
             // the worse failure of the two: a provider that only populates fields -- the
             // documented shape -- would leave the application on no screen at all.
-            commit(state, applied);
+            commit(state, applied, failed);
             return false;
         }
         // Applying a state is not the user navigating, and the difference is not cosmetic. The
@@ -748,7 +756,12 @@ public final class Continuity {
         } finally {
             applyingRestore = false;
         }
-        commit(state, applied || shown);
+        if (!shown) {
+            // Routes were named and none could be rebuilt -- an attempt that failed, not an
+            // absence of work. The state stays on the relay for a launch that can use it.
+            failed = true;
+        }
+        commit(state, applied || shown, failed);
         return shown;
     }
 
@@ -926,15 +939,23 @@ public final class Continuity {
     /// longer registers, with no payload the application could take -- must not replace the
     /// user's own checkpoint with something unusable.
     ///
-    /// WHETHER TO ACKNOWLEDGE is not the same question. The mark is durable and stops the relay
-    /// ever offering this state again, so the one case that must never mark is a write that was
-    /// attempted and FAILED: the relay's copy is then the only copy left. Nothing to store is not
-    /// that case -- there is nothing to recover, the application has had the state offered to its
-    /// listeners, and refusing to mark it only re-prompts the user on every launch for something
-    /// this build cannot use. A review asked for both halves to be gated together; this is the
-    /// half of that finding which does not hold, and the checkpoint it was really protecting is
-    /// protected by `applied` above.
-    private static void commit(AppState state, boolean applied) {
+    /// WHETHER TO ACKNOWLEDGE turns on a different question: did anything FAIL. The mark is
+    /// durable and stops the relay ever offering this state again, so it must never follow an
+    /// attempt that did not work -- a provider that threw, routes that could not be rebuilt, or
+    /// a write that was refused. In each of those the relay's copy is the only one left.
+    ///
+    /// "Nothing to do" is not a failure, and does mean acknowledge: an application with no
+    /// provider can never consume a payload, so there is nothing to recover and withholding the
+    /// mark only re-prompts the user on every launch for ever. That distinction is why there are
+    /// two flags and not one -- a single "did it apply" answers both questions and gets one of
+    /// them wrong whichever way it is set.
+    private static void commit(AppState state, boolean applied, boolean failed) {
+        if (failed) {
+            // An attempt was made and it did not work: a provider that threw, or routes that
+            // could not be rebuilt. The relay's copy has to stay on offer for a launch that can
+            // use it, so nothing is marked.
+            return;
+        }
         if (applied && !persist(state)) {
             // Tried to store it and could not. The relay's copy is now the only one that exists,
             // so it must go on being offered: acknowledging here loses the state in both
