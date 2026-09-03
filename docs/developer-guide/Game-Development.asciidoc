@@ -95,6 +95,10 @@ the loop accumulates real time and may call `update` several times in one frame 
 catch up (capped to avoid a "spiral of death" after a long pause). The leftover
 fraction is available from `getInterpolationAlpha()` (0 to 1) so you can interpolate
 rendered positions between physics states:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameDevelopmentJava001Snippet.java[tag=game-development-java-001,indent=0]
+----
 
 
 ==== Threading
@@ -146,6 +150,10 @@ Anchor controls to a corner of the view's *safe area* with the alignment constan
 margin. The framework keeps them clear of notches and home indicators and
 repositions them automatically when the view resizes or the device rotates -- you
 never recompute coordinates:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameDevelopmentJava002Snippet.java[tag=game-development-java-002,indent=0]
+----
 
 
 The joystick (bottom-left) and JUMP button (bottom-right) are visible in the
@@ -203,6 +211,10 @@ A sprite sheet is just a strip (or grid) of frames like the run cycle above: the
 arms and legs swing a little further each frame, and playing them in sequence reads
 as motion. `AnimatedSprite` also accepts a plain `com.codename1.ui.Image[]` when you
 build the frames yourself, which is what `ScrollerGameSample`'s runner does:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameDevelopmentJava003Snippet.java[tag=game-development-java-003,indent=0]
+----
 
 
 Setting a *negative scale* flips the sprite horizontally, so a single set of frames
@@ -229,6 +241,10 @@ so the sample needs no assets). Changing what a card shows is just
 *A flip you can fake with scale.* A real card flip is a 3D rotation, but
 squeezing the sprite's horizontal scale through zero and swapping the image at
 the thin point reads exactly the same to the eye:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameDevelopmentJava004Snippet.java[tag=game-development-java-004,indent=0]
+----
 
 
 This is the same negative/positive scale trick the scroller uses to flip its
@@ -237,6 +253,10 @@ runner, driven over time to play as an animation.
 *Polled taps against sprite bounds.* There are no buttons to wire up;
 `update(double)` polls the `GameInput` edge state and hit-tests the tap against
 each card's bounding box:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameDevelopmentJava005Snippet.java[tag=game-development-java-005,indent=0]
+----
 
 
 The rest of the sample is a small state machine living in plain fields: the
@@ -258,11 +278,19 @@ strategy and tycoon games and still works just as well on a GPU sprite pipeline.
 
 *The projection.* Board cell `(r, c)` maps to screen pixels by laying the grid out
 as 2:1 diamonds -- columns step right-and-down, rows step left-and-down:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameDevelopmentJava006Snippet.java[tag=game-development-java-006,indent=0]
+----
 
 
 *Picking is the inverse.* Because the mapping is linear it inverts with two
 divisions, turning a tap back into a board cell -- no per-tile hit testing
 required:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameDevelopmentJava007Snippet.java[tag=game-development-java-007,indent=0]
+----
 
 
 *Depth from z-order.* Cells further down the screen must draw over the cells
@@ -270,6 +298,10 @@ behind them, and within one cell the stacking is tile, then shadow, then
 selection/move markers, then the piece. Both rules collapse into a single
 number -- `(r + c)` strides the cells from back to front, and a small offset
 layers the sprites within a cell:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameDevelopmentJava008Snippet.java[tag=game-development-java-008,indent=0]
+----
 
 
 That pair of lines is also the whole "3D height" illusion: the piece is drawn
@@ -311,6 +343,10 @@ Call `GameCamera#setPerspective(float, float, float)` and position the camera wi
 `setPosition` / `setTarget`. Once in perspective mode a `Sprite` is placed in world
 space with `Sprite#setPosition(double, double, double)` and is drawn as a billboard
 that always faces the camera, so your existing 2D art keeps working in 3D:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameDevelopmentJava009Snippet.java[tag=game-development-java-009,indent=0]
+----
 
 
 World coordinates are right-handed with y up (the `com.codename1.gpu` convention),
@@ -325,6 +361,10 @@ real 3D mesh -- a `com.codename1.gpu.Material` plus a position, rotation, and sc
 Because GPU meshes need the `com.codename1.gpu.GraphicsDevice`, build them in
 `GameView#onSetup(com.codename1.gpu.GraphicsDevice)`, the render-thread hook that
 runs once before the first frame:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameDevelopmentJava010Snippet.java[tag=game-development-java-010,indent=0]
+----
 
 
 `onSetup` is also where you load real assets with `com.codename1.gpu.GltfLoader`
@@ -342,6 +382,10 @@ pillars or buildings of any proportion, so a whole skyline can share a single me
 Lit materials multiply their base color by a texture, so you can detail a surface --
 a grid on the ground for depth, say -- by drawing an `com.codename1.ui.Image` and
 uploading it with `com.codename1.gpu.GraphicsDevice#createTexture(com.codename1.ui.Image)`:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameDevelopmentJava011Snippet.java[tag=game-development-java-011,indent=0]
+----
 
 
 For richer geometry, load glTF (`.glb`/`.gltf`) assets with
@@ -374,6 +418,10 @@ effect ends -- register a
 https://www.codenameone.com/javadoc/com/codename1/gaming/VoiceListener.html[`VoiceListener`].
 It's called on the EDT with the voice id as each voice completes. Not every native
 engine can report completion, so guard with `isVoiceCompletionSupported()`:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameDevelopmentJava012Snippet.java[tag=game-development-java-012,indent=0]
+----
 
 
 NOTE: Load your sounds once, up front -- ideally on a background thread with
@@ -400,6 +448,10 @@ The practical consequence: a positive gravity y pulls bodies *down* the screen.
 Create a https://www.codenameone.com/javadoc/com/codename1/gaming/physics/PhysicsWorld.html[`PhysicsWorld`],
 populate it with https://www.codenameone.com/javadoc/com/codename1/gaming/physics/PhysicsBody.html[`PhysicsBody`]
 objects, and step it once per frame from your `update`:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameDevelopmentJava013Snippet.java[tag=game-development-java-013,indent=0]
+----
 
 
 Bodies come in three kinds, the
@@ -418,6 +470,10 @@ compound body); a closed convex subpath of up to eight points becomes a solid po
 usable by any body type, while a concave, larger, or open subpath becomes a one-sided
 edge chain (ideal for static terrain). This lets the hit-shape and the drawn shape
 come from one piece of geometry:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameDevelopmentJava014Snippet.java[tag=game-development-java-014,indent=0]
+----
 
 
 ==== Driving sprites from physics
@@ -426,6 +482,10 @@ A body can drive a sprite directly. `Sprite` implements
 https://www.codenameone.com/javadoc/com/codename1/gaming/physics/PhysicsLinkable.html[`PhysicsLinkable`],
 so linking the two means `world.step(...)` updates the sprite's position and
 rotation automatically (in pixels, screen space) -- and the scene draws it there:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameDevelopmentJava015Snippet.java[tag=game-development-java-015,indent=0]
+----
 
 
 ==== Collisions
@@ -447,6 +507,10 @@ Joints constrain how two bodies move relative to each other -- hinges, ropes, ax
 welds. `PhysicsWorld` creates them in pixel coordinates and returns a
 https://www.codenameone.com/javadoc/com/codename1/gaming/physics/PhysicsJoint.html[`PhysicsJoint`]
 handle:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameDevelopmentJava016Snippet.java[tag=game-development-java-016,indent=0]
+----
 
 
 `createWeldJoint` and `createPrismaticJoint` (a sliding axis) round out the set.
