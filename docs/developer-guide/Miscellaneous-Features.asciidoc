@@ -484,9 +484,9 @@ builder to a path and a MIME type again.
 How far the settings then travel depends on the port, and on the format. The
 JavaScript port takes only the path when recording to a file, so a web file
 recording uses the browser's defaults; recording into an audio buffer it does ask
-for the sampling rate, and the browser is free to decline -- Safari, and any
-browser that doesn't offer the `sampleRate` constraint, hands back its own rate
-instead. Elsewhere the whole builder reaches the port, which applies
+for the sampling rate, and the browser is free to decline -- Safari on iOS, and
+any browser that doesn't offer the `sampleRate` constraint, hands back its own
+rate instead. Elsewhere the whole builder reaches the port, which applies
 what its codec supports: Android sets the sampling rate and
 bit rate when encoding AAC and leaves both to the encoder for AMR, and the
 simulator never reads the bit rate at all.
