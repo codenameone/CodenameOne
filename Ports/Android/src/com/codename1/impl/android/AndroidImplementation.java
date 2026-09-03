@@ -11107,6 +11107,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         if (description != null) {
             fillAdvertisedTypes(content, description, plain, publishedUris, unnamedUris);
+        } else if (!publishedUris.isEmpty() && !content.hasMimeType(ClipboardContent.MIME_URI_LIST)) {
+            // A paste is told nothing about what the clip advertises, so what it reports can
+            // only come from what the clip carried -- and what this one carried is URIs.
+            // Another application copying a link publishes exactly that, one item with a URI
+            // and no text at all: nothing above it produces a representation, so without this
+            // the read answered with an empty content and the paste with null.
+            //
+            // Nothing is invented by it either. These are the URIs the clip itself carried,
+            // minus the ones this exporter minted as transport, which is what a URI list is.
+            content.setData(ClipboardContent.MIME_URI_LIST, uriListOf(publishedUris));
         }
         return content;
     }
@@ -11302,6 +11312,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         };
     }
 
+    /// The `text/uri-list` spelling of the URIs a clip carried: one per line, CRLF separated
+    /// as RFC 2483 has it.
+    private static String uriListOf(List<String> uris) {
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < uris.size(); iter++) {
+            if (iter > 0) {
+                out.append("\r\n");
+            }
+            out.append(uris.get(iter));
+        }
+        return out.toString();
+    }
+
     /// Fills the MIME types the drag advertised but the read did not produce, from what it did.
     ///
     /// An Android clip carries a single text payload and the description says what that text
@@ -11325,14 +11348,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 // Every URI, not only the ones that name files: a URI list is a URI list, and a
                 // link the source published belongs in it even though it is not a document.
                 if (!publishedUris.isEmpty()) {
-                    StringBuilder uris = new StringBuilder();
-                    for (int j = 0; j < publishedUris.size(); j++) {
-                        if (j > 0) {
-                            uris.append("\r\n");
-                        }
-                        uris.append(publishedUris.get(j));
-                    }
-                    content.setData(ClipboardContent.MIME_URI_LIST, uris.toString());
+                    content.setData(ClipboardContent.MIME_URI_LIST, uriListOf(publishedUris));
                 }
                 continue;
             }

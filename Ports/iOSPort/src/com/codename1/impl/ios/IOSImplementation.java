@@ -9643,9 +9643,42 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         if(value instanceof String) {
             String one = (String)value;
-            if(one.length() > 0 && !urls.contains(one)) {
-                urls.add(one);
+            if(one.length() == 0) {
+                return;
             }
+            String key = clipboardUrlKey(one);
+            for(int i = 0 ; i < urls.size() ; i++) {
+                if(clipboardUrlKey(urls.get(i)).equals(key)) {
+                    return;
+                }
+            }
+            urls.add(one);
+        }
+    }
+
+    /// What two spellings of one file have in common.
+    ///
+    /// The same document is commonly published both ways -- `/tmp/report.pdf` under MIME_FILE and
+    /// `file:///tmp/report.pdf` in the URI list -- and comparing the raw strings put both on the
+    /// pasteboard. The native writer turns each of them into the very same file URL, so a
+    /// receiver imported the document twice. Only the key is normalized; what is published stays
+    /// the spelling the source used.
+    private static String clipboardUrlKey(String url) {
+        if(url.length() <= 5 || !url.substring(0, 5).toLowerCase().equals("file:")) {
+            return url;
+        }
+        String key = url.substring(5);
+        if(key.startsWith("///")) {
+            // The empty authority of a local file URL. A real one -- file://host/share -- is left
+            // alone, because that is not the same file as a path of its own.
+            key = key.substring(2);
+        }
+        try {
+            // Percent decoded, or file:///tmp/a%20b.pdf and /tmp/a b.pdf read as two documents.
+            return com.codename1.io.Util.decode(key, "UTF-8", false);
+        } catch(Throwable err) {
+            // Undecodable is not a reason to publish twice; the raw form still keys.
+            return key;
         }
     }
 
