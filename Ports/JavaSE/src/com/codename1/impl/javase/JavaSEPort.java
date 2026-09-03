@@ -2140,9 +2140,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (pathOrUri == null || pathOrUri.length() == 0) {
                 return null;
             }
-            if (pathOrUri.startsWith("file:")) {
+            if (JavaSENativeDragAndDrop.isFileUri(pathOrUri)) {
                 try {
-                    return new java.io.File(new java.net.URI(pathOrUri));
+                    // The canonical spelling of the scheme, because File(URI) is specified
+                    // for "file" and a source may perfectly well have written FILE:.
+                    return new java.io.File(new java.net.URI("file" + pathOrUri.substring(4)));
                 } catch (Exception ex) {
                     return null;
                 }

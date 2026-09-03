@@ -112,11 +112,21 @@ static NSURL* cn1FileUrlFromItem(id item) {
 /// with them, and the preview. Named but not built -- see CN1DragAndDrop.h.
 static NSArray* cn1PreparedMimes = nil;
 
-/// What a receiver is allowed to do with the drag. Staged by the press and replaced by the
-/// authoritative set when a session really starts; it is what a *local* drop session is told
-/// the source allows. UIKit carries no action information for a session that arrived from
-/// another application, so those are told copy -- see cn1AllowedActionsFor.
+/// What a receiver is allowed to do with the drag *now running*. Written when a session
+/// really starts and cleared when it ends; it is what a local drop session is told the source
+/// allows. UIKit carries no action information for a session that arrived from another
+/// application, so those are told copy -- see cn1AllowedActionsFor.
 static int cn1SessionActions = CN1_DND_ACTION_NONE;
+
+/// What the press staged, which is a different thing and used to share the field above.
+///
+/// A press is not a session: it happens before one exists, and it can happen *during* one --
+/// a second finger landing on another drag source while the first drag is still running.
+/// Sharing one field, that second press replaced the mask of the session already in flight,
+/// so a copy-only drag could be told a move was allowed and its source deleted data the
+/// operation had explicitly refused to let move. Cancelling a press did the same by clearing
+/// it outright.
+static int cn1PreparedActions = CN1_DND_ACTION_NONE;
 
 /// The drag session this source started, retained for as long as it runs and released when
 /// UIKit reports it finished -- which it always does for a session it started here.
@@ -139,8 +149,44 @@ static NSMutableArray* cn1DragFileUrls = nil;
 /// so a late read resolves against its own operation and not the next drag's.
 static int cn1DragSessionId = 0;
 
-/// The last action the framework agreed to, reused when a drop arrives without one.
+/// The last action the framework agreed to, reused when a drop arrives without one -- and
+/// the session it was agreed for.
+///
+/// Two drop sessions overlap whenever one is still loading its representations, which this
+/// file supports on purpose. Kept as one value for all of them, the session that finished
+/// cleared the decision belonging to the session still hovering: released without another
+/// update, that one then read "undecided" and substituted the default -- a copy -- for the
+/// action its target had actually chosen. So the answer is only ever read, and only ever
+/// cleared, by the session it was given for.
 static int cn1LastDropAction = CN1_DND_ACTION_NONE;
+static id cn1LastDropActionSession = nil;
+
+/// Records the action the framework agreed to for this session.
+static void cn1RememberDropAction(id session, int action) {
+#ifndef CN1_USE_ARC
+    [session retain];
+    [cn1LastDropActionSession release];
+#endif
+    cn1LastDropActionSession = session;
+    cn1LastDropAction = action;
+}
+
+/// Forgets it, but only if it is still this session's to forget.
+static void cn1ForgetDropAction(id session) {
+    if (cn1LastDropActionSession != session) {
+        return;
+    }
+#ifndef CN1_USE_ARC
+    [cn1LastDropActionSession release];
+#endif
+    cn1LastDropActionSession = nil;
+    cn1LastDropAction = CN1_DND_ACTION_NONE;
+}
+
+/// The action agreed for this session, or none when the agreement was another session's.
+static int cn1DropActionFor(id session) {
+    return cn1LastDropActionSession == session ? cn1LastDropAction : CN1_DND_ACTION_NONE;
+}
 
 /// True while this application is the source of the session in progress.
 static BOOL cn1DraggingOut = NO;
@@ -450,7 +496,7 @@ void CN1PrepareNativeDrag(NSString* mimeTypes, int allowedActions, NSData* dragI
     [cn1PreparedPreview release];
 #endif
     cn1PreparedMimes = mimes;
-    cn1SessionActions = allowedActions;
+    cn1PreparedActions = allowedActions;
     // At the screen's scale, because the framework renders in device pixels and UIKit lays
     // the preview out in points. Decoded at scale 1, a snapshot from a 2x or 3x screen is
     // that many times too big -- and the touch offset below is converted to points, so the
@@ -518,7 +564,9 @@ void CN1CancelNativeDrag(void) {
 #endif
     cn1PreparedMimes = nil;
     cn1PreparedPreview = nil;
-    cn1SessionActions = CN1_DND_ACTION_NONE;
+    // What the press staged, not what a session is carrying: this is the press turning out
+    // to be a click, and a drag already running is unaffected by that.
+    cn1PreparedActions = CN1_DND_ACTION_NONE;
 }
 
 /// Holds a drag's payload alive for exactly as long as something can still read it.
@@ -800,8 +848,23 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
     // following the documented advice would delete data the operation had explicitly refused to
     // allow moving.
     //
-    // The mask belongs to the session this interaction started; see cn1OutgoingSession.
-    return (cn1SessionActions & CN1_DND_ACTION_MOVE) != 0;
+    // The mask belongs to the session this interaction started, so the session is checked
+    // rather than assumed -- another interaction's drag is as foreign here as one from
+    // another application, and answering for it out of our mask is how a drag this framework
+    // never described would be permitted a move.
+    //
+    // With nothing outgoing yet the press's own mask answers: UIKit may ask this while the
+    // session it is setting up is still the one being begun, and refusing there would
+    // disallow every move rather than the ones that are not ours.
+    int allowed;
+    if (cn1OutgoingSession == session) {
+        allowed = cn1SessionActions;
+    } else if (cn1OutgoingSession == nil) {
+        allowed = cn1PreparedActions;
+    } else {
+        allowed = CN1_DND_ACTION_NONE;
+    }
+    return (allowed & CN1_DND_ACTION_MOVE) != 0;
 }
 
 - (void)dragInteraction:(UIDragInteraction *)interaction
@@ -855,18 +918,22 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
 
 - (void)dropInteraction:(UIDropInteraction *)interaction sessionDidEnter:(id<UIDropSession>)session {
     CGPoint point = [session locationInView:interaction.view];
-    cn1LastDropAction = CN1NativeDragDeliverOver((int)(point.x * scaleValue), (int)(point.y * scaleValue),
-                                                 cn1MimesForSession(session),
-                                                 cn1AllowedActionsFor(session), YES);
+    cn1RememberDropAction(session,
+                          CN1NativeDragDeliverOver((int)(point.x * scaleValue),
+                                                   (int)(point.y * scaleValue),
+                                                   cn1MimesForSession(session),
+                                                   cn1AllowedActionsFor(session), YES));
 }
 
 - (UIDropProposal *)dropInteraction:(UIDropInteraction *)interaction
                    sessionDidUpdate:(id<UIDropSession>)session {
     CGPoint point = [session locationInView:interaction.view];
-    cn1LastDropAction = CN1NativeDragDeliverOver((int)(point.x * scaleValue), (int)(point.y * scaleValue),
-                                                 cn1MimesForSession(session),
-                                                 cn1AllowedActionsFor(session), NO);
-    UIDropProposal* proposal = [[UIDropProposal alloc] initWithDropOperation:cn1DropOperationFor(cn1LastDropAction)];
+    const int agreed = CN1NativeDragDeliverOver((int)(point.x * scaleValue),
+                                                (int)(point.y * scaleValue),
+                                                cn1MimesForSession(session),
+                                                cn1AllowedActionsFor(session), NO);
+    cn1RememberDropAction(session, agreed);
+    UIDropProposal* proposal = [[UIDropProposal alloc] initWithDropOperation:cn1DropOperationFor(agreed)];
 #ifndef CN1_USE_ARC
     [proposal autorelease];
 #endif
@@ -874,7 +941,7 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
 }
 
 - (void)dropInteraction:(UIDropInteraction *)interaction sessionDidExit:(id<UIDropSession>)session {
-    cn1LastDropAction = CN1_DND_ACTION_NONE;
+    cn1ForgetDropAction(session);
     CN1NativeDragDeliverExit();
 }
 
@@ -891,7 +958,7 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
     if (cn1DropIsLoading(session)) {
         return;
     }
-    cn1LastDropAction = CN1_DND_ACTION_NONE;
+    cn1ForgetDropAction(session);
     CN1NativeDragDeliverExit();
 }
 
@@ -899,8 +966,9 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
     CGPoint point = [session locationInView:interaction.view];
     const int x = (int)(point.x * scaleValue);
     const int y = (int)(point.y * scaleValue);
-    const int action = cn1LastDropAction == CN1_DND_ACTION_NONE
-            ? cn1DefaultAction(cn1AllowedActionsFor(session)) : cn1LastDropAction;
+    const int agreed = cn1DropActionFor(session);
+    const int action = agreed == CN1_DND_ACTION_NONE
+            ? cn1DefaultAction(cn1AllowedActionsFor(session)) : agreed;
     if (cn1LoadingDropSessions == nil) {
         cn1LoadingDropSessions = [NSHashTable weakObjectsHashTable];
 #ifndef CN1_USE_ARC
@@ -1153,7 +1221,9 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
         // flicker that repairs itself. Withholding the commit instead would lose a drop the
         // user actually performed, and unperformed work is worse than a repaired frame.
         int accepted = CN1NativeDragDeliverDropCommit(x, y, action, sessionActions, localAssembly);
-        cn1LastDropAction = CN1_DND_ACTION_NONE;
+        // This session's own agreement, and only it: another drop hovering while this one
+        // finished loading is still entitled to the action its target chose.
+        cn1ForgetDropAction(session);
         // This assembly's commit cleared the hover state itself, so its own end -- which went
         // past long ago -- can stop holding off. Only this one: another drop still loading is
         // still entitled to its answer.

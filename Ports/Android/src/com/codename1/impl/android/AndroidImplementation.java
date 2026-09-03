@@ -10464,10 +10464,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 // reported success.
                 try {
                     Uri u;
-                    if (pathOrUri.startsWith("content:")) {
+                    if (hasScheme(pathOrUri, "content:")) {
                         u = Uri.parse(pathOrUri);
                     } else {
-                        File file = pathOrUri.startsWith("file:")
+                        File file = hasScheme(pathOrUri, "file:")
                                 ? new File(Uri.parse(pathOrUri).getPath())
                                 : new File(pathOrUri);
                         u = shareableUriFor(file, authority, clip);
@@ -11277,6 +11277,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// extensions are ASCII by definition, which is what makes folding only ASCII correct
     /// rather than merely safe. Codename One has no java.util.Locale to ask for the root
     /// locale instead.
+    /// True when this value opens with that scheme, whatever case it was written in.
+    ///
+    /// A URI scheme is case insensitive by specification, and a case-sensitive prefix test
+    /// read FILE:///sdcard/report.pdf as a literal path -- a file that does not exist, so
+    /// the only representation a file-only clip had was quietly dropped.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the path or URI
+    ///
+    /// - `scheme`: the scheme to test for, colon included, in lower case
+    private static boolean hasScheme(String value, String scheme) {
+        return value.length() >= scheme.length()
+                && value.regionMatches(true, 0, scheme, 0, scheme.length());
+    }
+
     static String asciiLower(String s) {
         StringBuilder out = new StringBuilder(s.length());
         for (int iter = 0; iter < s.length(); iter++) {

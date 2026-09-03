@@ -347,6 +347,12 @@ final class JavaSENativeDragAndDrop {
         return null;
     }
 
+    /// True when this line is a `file:` URI, whatever case its scheme was written in --
+    /// which is a thing a scheme is allowed to vary in.
+    static boolean isFileUri(String value) {
+        return value.length() >= 5 && value.regionMatches(true, 0, "file:", 0, 5);
+    }
+
     /// Lowercases ASCII letters only, so the result never depends on the JVM's locale.
     ///
     /// MIME types are ASCII by definition, and Codename One has no java.util.Locale to ask
@@ -483,7 +489,9 @@ final class JavaSENativeDragAndDrop {
             if (path == null || path.length() == 0) {
                 continue;
             }
-            out.append(path.startsWith("file:") ? path : new File(path).toURI().toString());
+            // Case insensitively: a scheme is, by specification, and FILE:///x read as a
+            // path would be encoded a second time into a file URI of something relative.
+            out.append(isFileUri(path) ? path : new File(path).toURI().toString());
             out.append("\r\n");
         }
         return out.length() == 0 ? null : out.toString();
@@ -639,8 +647,12 @@ final class JavaSENativeDragAndDrop {
                 continue;
             }
             try {
-                if (line.startsWith("file:")) {
-                    paths.add(new File(new URI(line)).getAbsolutePath());
+                if (isFileUri(line)) {
+                    // Rebuilt on the canonical spelling of the scheme: File(URI) is
+                    // specified for a "file" URI, and handing it FILE: relies on a
+                    // leniency it does not promise.
+                    paths.add(new File(new URI("file" + line.substring(4)))
+                            .getAbsolutePath());
                 }
             } catch (Throwable err) {
                 // Not a URI this platform writes; skip it rather than fail the whole drop.
