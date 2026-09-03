@@ -475,11 +475,16 @@ and what it does with it depends on the destination. A builder with
 survives. A builder recording to a file is reduced to its path and MIME type,
 which drops the sample rate, bit rate and channel count set on it and leaves the
 platform's defaults in place. A stereo request isn't refused so much as ignored,
-and what you get is whatever that platform would have recorded anyway. Call
-`build()` yourself when those settings matter, bearing in mind that it reaches
-only the ports implementing the builder overload -- Android, iOS, the JavaScript
-port and the simulator. Anywhere else the framework's own fallback reduces the
-builder to a path and a MIME type again.
+and what you get is whatever that platform would have recorded anyway.
+
+Call `build()` yourself when those settings matter, bearing in mind how far each
+port carries them. Android, iOS, the JavaScript port and the simulator implement
+the builder overload in full. The native Linux and Windows ports implement it
+too but read only the sampling rate and channel count, their WAV recorders
+fixing the MIME type and ignoring the bit rate; they also take no notice of
+`redirectToAudioBuffer(true)`, so asking those two for live PCM writes a file at
+the builder's path instead. Anywhere else the framework's own fallback reduces
+the builder to a path and a MIME type again.
 
 How far the settings then travel depends on the port, and on the format. The
 JavaScript port takes only the path when recording to a file, so a web file
