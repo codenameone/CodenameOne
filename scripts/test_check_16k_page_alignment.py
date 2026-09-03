@@ -17,19 +17,37 @@ ELF payloads are synthesised rather than copied from a build, so the test is
 self-contained and does not need a toolchain or a checked-in fixture.
 """
 
-import importlib.util
 import io
 import os
 import struct
+import types
 import unittest
 import zipfile
 
-GATE = importlib.util.spec_from_file_location(
-    "check_16k_page_alignment",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                 "check-16k-page-alignment.py"))
-gate = importlib.util.module_from_spec(GATE)
-GATE.loader.exec_module(gate)
+GATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "check-16k-page-alignment.py")
+
+
+def load_gate():
+    """Load the gate from source, never from `__pycache__`.
+
+    importlib would happily serve a stale `.pyc` -- `python3 -m py_compile`
+    on the gate leaves one behind, and it really did shadow an edit here,
+    reporting a behaviour the source no longer had. A pinning test that can
+    pass against code that no longer exists is worse than no test, so the
+    source is compiled every run.
+    """
+    with io.open(GATE_PATH, encoding="utf-8") as handle:
+        source = handle.read()
+    module = types.ModuleType("check_16k_page_alignment")
+    module.__file__ = GATE_PATH
+    exec(compile(source, GATE_PATH, "exec"), module.__dict__)
+    return module
+
+
+gate = load_gate()
+
+ALIGNED_DEFAULT = 0x4000
 
 ELF64_HEADER = 64
 ELF64_PHENTSIZE = 56
@@ -68,6 +86,31 @@ def elf32(p_align):
         1, 0, 0, 0,                      # PT_LOAD, offset, vaddr, paddr
         total, total, 5, p_align)        # filesz, memsz, flags, align
     return header + phdr
+
+
+def patched_elf64(**fields):
+    """A 64-bit ELF with named header fields overwritten, to reach the
+    malformed-ELF guards that a well-formed payload never exercises."""
+    payload = bytearray(elf64(ALIGNED_DEFAULT))
+    layout = {
+        "ei_class": (4, "<B"),
+        "e_phoff": (0x20, "<Q"),
+        "e_phentsize": (0x36, "<H"),
+        "e_phnum": (0x38, "<H"),
+        "p_type": (ELF64_HEADER + 0x00, "<I"),
+    }
+    for field, value in fields.items():
+        offset, code = layout[field]
+        struct.pack_into(code, payload, offset, value)
+    return bytes(payload)
+
+
+def nested_zips(depth, innermost):
+    """`depth` archives, one inside the next, innermost holding a library."""
+    payload = zipped({"jni/arm64-v8a/libfoo.so": innermost})
+    for level in range(depth - 1):
+        payload = zipped({"level%d.zip" % level: payload})
+    return payload
 
 
 def zipped(entries):
@@ -203,6 +246,20 @@ class UnreadableIsAlwaysReported(unittest.TestCase):
         self.assertEqual(1, len(failures), failures)
         self.assertIn("past the", failures[0])
 
+    def test_container_replaced_by_a_valid_elf_is_reported(self):
+        # The mirror of the .so case, and the one that stayed open longest:
+        # a valid ELF left in place of an .aar was read as a library and
+        # counted compliant, and the same bytes named .cn1lib were waved
+        # through as non-Android. Either way a destroyed container kept the
+        # run green. Aligned on purpose -- the alignment is not the point.
+        for name in ["libs/app.aar", "libs/L.cn1lib", "libs/x.apk",
+                     "libs/x.aab", "libs/x.jar", "libs/x.zip"]:
+            failures, scanner = scan(name, elf64(ALIGNED))
+            self.assertEqual(1, len(failures), name)
+            self.assertIn("cannot read archive", failures[0])
+            self.assertEqual(0, scanner.libraries_scanned, name)
+            self.assertEqual(0, scanner.skipped_non_android, name)
+
     def test_unreadable_archive_fails(self):
         failures, _ = scan("libs/corrupt.aar", b"\x00" * 4096)
         self.assertEqual(1, len(failures), failures)
@@ -214,6 +271,51 @@ class UnreadableIsAlwaysReported(unittest.TestCase):
                            b"\x00" * 4096)
         self.assertEqual(1, len(failures), failures)
         self.assertIn("not an ELF file", failures[0])
+
+
+class MalformedElfHeadersAreReported(unittest.TestCase):
+    """Guards a well-formed payload never reaches, each pinned so removing
+    it cannot pass unnoticed. Every one of these means the same thing: the
+    bytes claim to be a library and are not readable as one."""
+
+    def assert_reported(self, payload, fragment):
+        failures, scanner = scan(ANDROID_64, payload)
+        self.assertEqual(1, len(failures), failures)
+        self.assertIn(fragment, failures[0])
+        self.assertEqual(0, scanner.libraries_scanned)
+
+    def test_program_header_table_past_end_of_file(self):
+        self.assert_reported(patched_elf64(e_phnum=4096),
+                             "program header table runs past end of file")
+
+    def test_program_header_entry_too_small(self):
+        self.assert_reported(patched_elf64(e_phentsize=8),
+                             "program header entry size 8 is too small")
+
+    def test_no_program_headers(self):
+        self.assert_reported(patched_elf64(e_phnum=0), "no program headers")
+        self.assert_reported(patched_elf64(e_phoff=0), "no program headers")
+
+    def test_unknown_elf_class(self):
+        self.assert_reported(patched_elf64(ei_class=7), "unknown ELF class")
+
+    def test_no_load_segments(self):
+        # A single PT_NOTE (4) and nothing to measure alignment against.
+        self.assert_reported(patched_elf64(p_type=4), "no PT_LOAD segments")
+
+
+class ArchiveRecursionIsBounded(unittest.TestCase):
+    def test_within_the_depth_limit_the_library_is_still_found(self):
+        payload = nested_zips(gate.MAX_ARCHIVE_DEPTH, elf64(MISALIGNED))
+        failures, _ = scan("app.aar", payload)
+        self.assertEqual(1, len(failures), failures)
+        self.assertIn("p_align 0x1000", failures[0])
+
+    def test_beyond_the_depth_limit_is_reported_not_skipped(self):
+        payload = nested_zips(gate.MAX_ARCHIVE_DEPTH + 2, elf64(MISALIGNED))
+        failures, _ = scan("app.aar", payload)
+        self.assertEqual(1, len(failures), failures)
+        self.assertIn("nested more than", failures[0])
 
 
 class ContentDecidesWhatIsScanned(unittest.TestCase):

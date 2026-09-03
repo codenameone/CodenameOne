@@ -264,21 +264,30 @@ def looks_like_archive(name):
 def classify(name, head):
     """Return "elf", "zip" or None for one file, from its name and content.
 
-    A name claiming to be a shared library always routes to the ELF reader,
-    whatever the bytes turn out to be, so a corrupted library is reported
-    rather than quietly reclassified as something the rule does not cover.
-    Otherwise content decides, which is what finds a container or a library
-    under any name at all. An unreadable file whose name claims a container
-    format falls through to the archive reader for the same reason as the
-    first rule: it is reported, not skipped.
+    Declarations are answered before discoveries, and for both formats
+    symmetrically. A name that declares a format routes to that format's
+    reader whatever the bytes turn out to be, so a file that is not what it
+    says it is gets reported instead of quietly reinterpreted. Checking the
+    library name first but leaving the archive name as a fallback after
+    content was an asymmetry with real consequences: a valid ELF left in
+    place of an `.aar` was read as a library and counted as a compliant
+    Android slice, and the same bytes named `.cn1lib` were waved through as
+    non-Android -- either way a destroyed container kept the run green.
+
+    Only once a name declares nothing does content decide, which is what
+    finds a container or a library under a name nobody anticipated.
+
+    A deliberately corrupt archive fixture would now be reported. None
+    exists, and renaming it would be the fix; the alternative is a gate that
+    cannot tell a broken container from an absent one.
     """
     if looks_like_shared_library(name):
         return "elf"
+    if looks_like_archive(name):
+        return "zip"
     if head[:4] == ELF_MAGIC:
         return "elf"
     if head[:4] in ZIP_MAGIC:
-        return "zip"
-    if looks_like_archive(name):
         return "zip"
     return None
 
