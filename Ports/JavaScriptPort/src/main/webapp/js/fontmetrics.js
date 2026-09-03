@@ -2770,6 +2770,12 @@ window.virtualKeyboardDetector = ( function( window, undefined ) {
                 if (supportedConstraints.sampleRate) {
                     audioConstraints.sampleRate = {ideal: SAMPLE_RATE};
                 }
+                // NOTE: this guard never passes. MediaTrackSupportedConstraints has no
+                // audioChannels member -- the standard key is channelCount, which is what
+                // the line below correctly uses for the constraint itself. So the channel
+                // count is never submitted to getUserMedia, the stream keeps the browser's
+                // own layout, and onAudioProcess still reports the configured audioChannels
+                // value, which AudioBuffer.getNumChannels() then echoes back to the app.
                 if (supportedConstraints.audioChannels) {	
                     audioConstraints.channelCount = {ideal: audioChannels};
                 }
