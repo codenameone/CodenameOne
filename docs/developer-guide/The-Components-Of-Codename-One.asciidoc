@@ -1812,6 +1812,14 @@ In the sample below you fetch all the contacts from the device and enable search
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava192Snippet.java[tag=the-components-of-codename-one-java-192,indent=0]
 ----
 
+The filter itself, shared by the search command and the load callback so a query
+typed while the contacts are still arriving is reapplied once they do:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava192Snippet.java[tag=the-components-of-codename-one-java-192-filter,indent=0]
+----
+
 ==== South Component
 
 A common feature in side menu bar is the ability to add a component to the "south" part of the side menu.

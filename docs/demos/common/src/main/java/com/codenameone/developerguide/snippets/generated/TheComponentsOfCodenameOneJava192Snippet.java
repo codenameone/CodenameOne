@@ -120,39 +120,52 @@ class TheComponentsOfCodenameOneJava192Snippet {
                     }
                     hi.add(m);
                 }
+                // the query may have been typed while the contacts were loading
+                filterContacts(hi, currentSearch);
                 hi.revalidate();
             });
         });
 
         hi.getToolbar().addSearchCommand(e -> {
-            String text = (String)e.getSource();
-            if(text == null || text.length() == 0) {
-                // clear search
-                for(Component cmp : hi.getContentPane()) {
-                    cmp.setHidden(false);
-                    cmp.setVisible(true);
-                }
-                hi.getContentPane().animateLayout(150);
-            } else {
-                text = text.toLowerCase();
-                for(Component cmp : hi.getContentPane()) {
-                    if(!(cmp instanceof MultiButton)) {
-                        // the loading indicator is still there until the contacts arrive
-                        continue;
-                    }
-                    MultiButton mb = (MultiButton)cmp;
-                    String line1 = mb.getTextLine1();
-                    String line2 = mb.getTextLine2();
-                    boolean show = line1 != null && line1.toLowerCase().indexOf(text) > -1 ||
-                            line2 != null && line2.toLowerCase().indexOf(text) > -1;
-                    mb.setHidden(!show);
-                    mb.setVisible(show);
-                }
-                hi.getContentPane().animateLayout(150);
-            }
+            currentSearch = (String)e.getSource();
+            filterContacts(hi, currentSearch);
         }, 4);
 
         hi.show();
+
         // end::the-components-of-codename-one-java-192[]
     }
+
+
+
+    String currentSearch;
+
+    // tag::the-components-of-codename-one-java-192-filter[]
+    void filterContacts(Form hi, String text) {
+        if(text == null || text.length() == 0) {
+            // clear search
+            for(Component cmp : hi.getContentPane()) {
+                cmp.setHidden(false);
+                cmp.setVisible(true);
+            }
+            hi.getContentPane().animateLayout(150);
+            return;
+        }
+        text = text.toLowerCase();
+        for(Component cmp : hi.getContentPane()) {
+            if(!(cmp instanceof MultiButton)) {
+                // the loading indicator is still there until the contacts arrive
+                continue;
+            }
+            MultiButton mb = (MultiButton)cmp;
+            String line1 = mb.getTextLine1();
+            String line2 = mb.getTextLine2();
+            boolean show = line1 != null && line1.toLowerCase().indexOf(text) > -1 ||
+                    line2 != null && line2.toLowerCase().indexOf(text) > -1;
+            mb.setHidden(!show);
+            mb.setVisible(show);
+        }
+        hi.getContentPane().animateLayout(150);
+    }
+    // end::the-components-of-codename-one-java-192-filter[]
 }

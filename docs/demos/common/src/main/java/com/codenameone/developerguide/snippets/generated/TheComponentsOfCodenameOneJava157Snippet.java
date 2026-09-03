@@ -99,6 +99,7 @@ class TheComponentsOfCodenameOneJava157Snippet {
         RadioButton rb1 = new RadioButton("Radio 1");
         RadioButton rb2 = new RadioButton("Radio 2");
         RadioButton rb3 = new RadioButton("Radio 3");
+        new ButtonGroup(rb1, rb2, rb3);
         hi.add(ComponentGroup.enclose(cb1, cb2, cb3, cb4)).
                 add(ComponentGroup.encloseHorizontal(rb1, rb2, rb3));
         // end::the-components-of-codename-one-java-157[]
