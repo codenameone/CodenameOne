@@ -138,9 +138,9 @@ class TheComponentsOfCodenameOneJava192Snippet {
 
 
 
+    // tag::the-components-of-codename-one-java-192-filter[]
     String currentSearch;
 
-    // tag::the-components-of-codename-one-java-192-filter[]
     void filterContacts(Form hi, String text) {
         if(text == null || text.length() == 0) {
             // clear search

@@ -60,6 +60,7 @@ import com.codename1.javascript.*;
 import com.codename1.ui.tree.*;
 import com.codename1.ui.table.*;
 import java.util.*;
+import com.codename1.contacts.*;
 import com.codename1.ui.List;
 
 
@@ -104,7 +105,7 @@ class TheComponentsOfCodenameOneJava174Snippet {
              addComponent(BorderLayout.WEST, pic);
              Container cnt = new Container(new BoxLayout(BoxLayout.Y_AXIS));
              name.getAllStyles().setBgTransparency(0);
-             name.getAllStyles().setFont(Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_MEDIUM));
+             name.getAllStyles().setFont(Font.createTrueTypeFont("native:MainBold"));
              email.getAllStyles().setBgTransparency(0);
              cnt.addComponent(name);
              cnt.addComponent(email);
@@ -116,9 +117,9 @@ class TheComponentsOfCodenameOneJava174Snippet {
          public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
 
              Contact person = (Contact) value;
-             name.setText(person.getName());
-             email.setText(person.getEmail());
-             pic.setIcon(person.getPic());
+             name.setText(person.getDisplayName());
+             email.setText(person.getPrimaryEmail());
+             pic.setIcon(person.getPhoto());
              return this;
          }
 
@@ -131,10 +132,5 @@ class TheComponentsOfCodenameOneJava174Snippet {
 
 
 
-    class Contact {
-        String getName() { return ""; }
-        String getEmail() { return ""; }
-        Image getPic() { return null; }
-    }
 
 }
