@@ -125,17 +125,23 @@ class AdvertisingJava006Snippet {
             }
 
             public void onFailedToLoad(AdError error) {
-                // getCode() is provider specific -- adapters forward their own
-                // SDK's numbers -- so the only codes that mean the same thing
-                // everywhere are Codename One's own. Stop on those, since an
-                // unsupported platform or a bad ad unit id never becomes valid
-                // and retrying turns the graceful no-ads path into a permanent
-                // timer. Anything else may be transient, so retry it, but bound
-                // the attempts: an unrecognized permanent failure must not
-                // retry for the life of the screen either.
-                if (error.getCode() == AdError.CODE_UNSUPPORTED
-                        || error.getCode() == AdError.CODE_INVALID_REQUEST
-                        || ++loadFailures > 5) {
+                // getCode() is provider specific and getDomain() says whose it
+                // is: Codename One's own errors carry no domain, an adapter's
+                // carry the SDK's. The numbers collide -- AppLovin reports -1
+                // for an unspecified error and CODE_UNSUPPORTED is also -1 --
+                // so read the constants only for a framework error. Those two
+                // are genuinely permanent: an unsupported platform or a bad ad
+                // unit id never becomes valid, and retrying them turns the
+                // graceful no-ads path into a permanent timer.
+                if (error.getDomain() == null
+                        && (error.getCode() == AdError.CODE_UNSUPPORTED
+                            || error.getCode() == AdError.CODE_INVALID_REQUEST)) {
+                    return;
+                }
+                // A provider's code means nothing here, so treat it as possibly
+                // transient -- bounded, so an unrecognized permanent failure
+                // cannot retry for the life of the screen either.
+                if (++loadFailures > 5) {
                     return;
                 }
                 retryDelay = Math.min(retryDelay * 2, 60000);
