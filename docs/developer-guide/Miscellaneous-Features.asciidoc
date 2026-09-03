@@ -462,10 +462,51 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 .Captured recordings in the demo
 image::img/capture-audio.png[Captured recordings in the demo,scaledwidth=20%]
 
-Or, you can use the `Media`, `MediaManager` and `MediaRecorderBuilder` APIs to capture audio, as a more customizable approach than using the Capture API:
+You can also record audio through `MediaRecorderBuilder`, which describes a
+recording by path, MIME type, sample rate, bit rate and channel count instead of
+handing the job to the platform's own capture UI.
 
+Build it with `MediaRecorderBuilder.build()`, which passes the whole builder to
+the platform implementation.
 
-image::img/media-audio-recording-example.png[Example of recording and playback audio using Media API]
+`MediaManager.createMediaRecorder(MediaRecorderBuilder)` accepts the same object,
+and what it does with it depends on the destination. A builder with
+`redirectToAudioBuffer(true)` is delegated straight to `build()`, so every setting
+survives. A builder recording to a file is reduced to its path and MIME type,
+which drops the sample rate, bit rate and channel count set on it and leaves the
+platform's defaults in place. A stereo request isn't refused so much as ignored,
+and what you get is whatever that platform would have recorded anyway.
+
+Call `build()` yourself when those settings matter, bearing in mind how far each
+port carries them. Android, iOS, the JavaScript port and the simulator implement
+the builder overload in full. The native Linux and Windows ports implement it
+too but read only the sampling rate and channel count, their WAV recorders
+fixing the MIME type and ignoring the bit rate; they also take no notice of
+`redirectToAudioBuffer(true)`, so asking those two for live PCM writes a file at
+the builder's path instead. Anywhere else the framework's own fallback reduces
+the builder to a path and a MIME type again.
+
+How far the settings then travel depends on the port, and on the format. The
+JavaScript port takes only the path when recording to a file, so a web file
+recording uses the browser's defaults; recording into an audio buffer it does ask
+for the sampling rate -- though not always. It skips the request on iOS whatever
+the browser, and on any browser that doesn't advertise the `sampleRate`
+constraint, so those recordings arrive at the platform's own rate. Elsewhere the whole builder reaches the port, which applies
+what its codec supports: Android sets the sampling rate and
+bit rate when encoding AAC and leaves both to the encoder for AMR, and the
+simulator never reads the bit rate at all.
+
+Treat the builder's numbers as preferences rather than guarantees. An
+`AudioBuffer` reports `getSampleRate()` for the data it holds -- the recorder
+fills that in from the rate the audio actually arrived at, or from the rate it
+resampled the audio to, so the figure describes the samples in your hands.
+
+`getNumChannels()` reports the layout the recorder built, and on the JavaScript
+port that much is exact: it emits channel 0 alone for a mono request and
+interleaves left and right for a stereo one, so the count always matches the PCM
+you hold and you can split the channels by it. It says nothing about the capture,
+though -- the port never submits a channel count to the browser, so a stereo
+request depends on the input device already providing two channels.
 
 ==== Capture asynchronous API
 

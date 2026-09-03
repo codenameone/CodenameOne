@@ -3260,6 +3260,10 @@ public class WindowsImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    // NOTE: isRedirectToAudioBuffer() is not honoured here. MediaManager sends a
+    // redirected builder to build(), which lands in this method, and this recorder
+    // always writes a WAV file at getPath(). A caller asking for live PCM on this
+    // port therefore gets a file recorder rather than an AudioBuffer.
     public Media createMediaRecorder(com.codename1.media.MediaRecorderBuilder builder) throws IOException {
         if (builder == null || builder.getPath() == null) {
             return null;
