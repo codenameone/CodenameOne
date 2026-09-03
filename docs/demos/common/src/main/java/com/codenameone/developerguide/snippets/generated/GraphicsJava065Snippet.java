@@ -90,6 +90,7 @@ class GraphicsJava065Snippet {
                     }
                 }
             }
+            new MyForm().show();
         // end::graphics-java-065[]
     }
 

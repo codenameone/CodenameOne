@@ -82,7 +82,8 @@ class GraphicsJava056Snippet {
     void snippet() throws Exception {
         // tag::graphics-java-056[]
         // a fresh path each repaint, otherwise the segments accumulate
-            // Draw a tick for each "second" (1 through 60)
+        GeneralPath ticksPath = new GeneralPath();
+                // Draw a tick for each "second" (1 through 60)
         for ( int i=1; i<= 60; i++){
             // default tick length is short
             int len = tickLen;
@@ -128,7 +129,6 @@ class GraphicsJava056Snippet {
     double r;
     double cX;
     int tickLen = 30;
-    GeneralPath ticksPath = new GeneralPath();
     double cY;
 
 

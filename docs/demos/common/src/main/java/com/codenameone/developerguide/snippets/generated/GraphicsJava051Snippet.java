@@ -84,16 +84,18 @@ class GraphicsJava051Snippet {
         int[] colors  = { 0xffff0080, 0xffff8c00, 0xff40e0d0 };
         float[] stops = { 0f, 0.5f, 1f };
 
+        // one band each, so all three are visible at once
+        int band = getHeight() / 3;
         g.fillGradient(new LinearGradient(45f, colors, stops),
-                getX(), getY(), getWidth(), getHeight());
+                getX(), getY(), getWidth(), band);
 
         RadialGradient circle = new RadialGradient(colors, stops);
         circle.setShape(RadialGradient.SHAPE_CIRCLE)
               .setExtent(RadialGradient.EXTENT_FARTHEST_CORNER);
-        g.fillGradient(circle, getX(), getY(), getWidth(), getHeight());
+        g.fillGradient(circle, getX(), getY() + band, getWidth(), band);
 
         g.fillGradient(new ConicGradient(colors, stops),
-                getX(), getY(), getWidth(), getHeight());
+                getX(), getY() + band * 2, getWidth(), band);
         // end::graphics-java-051[]
     }
 

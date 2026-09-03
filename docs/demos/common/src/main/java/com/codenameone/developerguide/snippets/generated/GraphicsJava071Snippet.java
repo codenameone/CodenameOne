@@ -81,7 +81,8 @@ class GraphicsJava071Snippet {
     
     void snippet() throws Exception {
         // tag::graphics-java-071[]
-        // Global default -- applied to every URLImage download from this point on.
+        // Global default for createToStorage images from this point on.
+        // createToFileSystem downloads do not consult it.
         // The most common case is "all our images sit behind the same bearer
         // token", which has its own shorthand:
         URLImage.setDefaultBearerToken(Preferences.get("auth.token", null));
