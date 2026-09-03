@@ -1758,6 +1758,40 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A payload the provider took is real work even when every route in the same state is stale.
+     * Treating the route failure as fatal discarded it twice: never written to the local
+     * checkpoint, so a cold start lost it, and never acknowledged, so the relay offered the same
+     * half-usable state after every restart -- re-applying the payload and failing the same
+     * routes each time. The routes will not start working on the next launch; the payload
+     * already worked on this one.
+     */
+    @EdtTest
+    public void anAppliedPayloadSurvivesStaleRoutesInTheSameState() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("note", "the payload applied fine");
+        AppState mixed = new AppState().setPayload(payload).setDeviceId("some-other-device")
+                .setSequence(55L).setTimestamp(System.currentTimeMillis());
+        List<String> stale = new ArrayList<String>();
+        stale.add("/a-route-this-build-does-not-register");
+        mixed.setRoutes(stale);
+
+        assertFalse(Continuity.restore(mixed), "no form can be shown for a stale route");
+
+        assertTrue(provider.restored.containsKey("note"),
+                "the provider should have been given the payload");
+        AppState stored = Continuity.getRestorableState();
+        assertNotNull(stored, "the applied payload never reached the local checkpoint");
+        assertEquals(Long.valueOf(55L), Long.valueOf(stored.getSequence()),
+                "the checkpoint holds a different state than the one that was applied");
+        Map<String, Long> persisted = Continuity.readSeenForTest();
+        assertTrue(persisted.containsKey("some-other-device"),
+                "the state was never acknowledged, so the relay re-offers it after every restart");
+    }
+
+    /**
      * A checkpoint whose write failed is still owed. `dirty` is cleared on the way in, so leaving
      * it clear told the next suspend there was nothing to save -- a checkpoint lost to a full
      * disk was never retried and the app came back to the last write that had succeeded.

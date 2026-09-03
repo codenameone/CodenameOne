@@ -778,9 +778,18 @@ public final class Continuity {
         } finally {
             applyingRestore = false;
         }
-        if (!shown) {
-            // Routes were named and none could be rebuilt -- an attempt that failed, not an
-            // absence of work. The state stays on the relay for a launch that can use it.
+        if (!shown && !applied) {
+            // Routes were named, none could be rebuilt, and nothing else in the state applied
+            // either -- an attempt that failed outright, so it stays on the relay for a launch
+            // that can use it.
+            //
+            // Only when nothing else applied. A payload the provider took is real work, already
+            // in the application, and discarding it because the ROUTES are stale threw it away
+            // twice over: never written to the local checkpoint, so a cold start lost it, and
+            // never acknowledged, so the relay offered the same half-usable state after every
+            // restart -- re-applying the payload and failing the same routes each time. A route
+            // this build no longer registers will not start working on the next launch; the
+            // payload already worked on this one.
             failed = true;
         }
         commit(state, applied || shown, failed);
