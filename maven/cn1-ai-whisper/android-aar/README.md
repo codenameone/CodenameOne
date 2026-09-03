@@ -77,4 +77,7 @@ scripts/check-16k-page-alignment.py --verbose
 ```
 
 It runs on every PR as `.github/workflows/check-16k-page-alignment.yml` and
-covers every native artifact in the tree, not just this one.
+covers every native artifact in the tree, not just this one. It finds
+containers and libraries by magic bytes rather than by extension, and applies
+the alignment rule only to 64-bit libraries under Android packaging -- a
+desktop `.so` shipped through `nativelinux`/`nativese` is correct at 0x1000.

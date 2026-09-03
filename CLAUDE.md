@@ -283,7 +283,14 @@ slice was really compiled against.
 loose `.so` in the tree, in its own workflow
 (`.github/workflows/check-16k-page-alignment.yml`) rather than inside `pr.yml`,
 whose `paths` filter would let a PR that only adds a native artifact skip it.
-32-bit slices are exempt because 16 KB pages are a 64-bit feature.
+Containers and libraries are found by magic bytes, not by extension, so a
+`.cn1lib` or any future container is covered.
+
+The rule reaches only 64-bit libraries under Android packaging. 32-bit slices
+are exempt because 16 KB pages are a 64-bit feature, and a desktop `.so` --
+which a cn1lib can ship through `nativelinux`/`nativese` -- is correct at
+0x1000. Integrity is not scoped that way: a `.so` that is not an ELF, or is
+truncated, fails wherever it sits.
 
 ```bash
 scripts/check-16k-page-alignment.py            # every tracked artifact

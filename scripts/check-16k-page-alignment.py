@@ -20,10 +20,14 @@ builds, uploads, and runs on every 4 KB device the developer owns, and only
 Play review or a 16 KB device says otherwise. And because the artifact is
 Codename One's rather than the developer's, they cannot fix it themselves.
 
-Scope is 64-bit ELF only (`arm64-v8a`, `x86_64`). 16 KB pages are a 64-bit
-feature; `armeabi-v7a` and `x86` never run on such a device, so holding their
-slices to the same rule would fail builds for no benefit. Both are still
-reported under --verbose so a mixed AAR is legible.
+The alignment rule is scoped twice. It covers 64-bit ELF only, because 16 KB
+pages are a 64-bit feature and `armeabi-v7a`/`x86` never run on such a
+device. And it covers only libraries Android packaging actually ships -- a
+desktop Linux `.so` is built for 4 KB pages and is correct at 0x1000, and a
+cn1lib can carry one (Cn1libMojo packages `linux`/`javase` resources into
+`nativelinux`/`nativese`). Everything skipped is still reported under
+--verbose, and the integrity checks below are NOT scoped: a `.so` that is not
+an ELF, or one that is truncated, is a bug on any platform.
 
 Usage:
   scripts/check-16k-page-alignment.py             # every tracked artifact
@@ -67,6 +71,33 @@ ZIP_MAGIC = (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")
 # this gate exists to avoid, reachable by corrupting a library rather than
 # misaligning it.
 ARCHIVE_NAME_SUFFIXES = (".aar", ".apk", ".aab", ".jar", ".zip", ".cn1lib")
+
+# 16 KB pages are an Android/Google Play requirement, not a property of ELF.
+# An ordinary desktop Linux x86_64 `.so` is built for 4 KB pages and is
+# perfectly correct at 0x1000, so the alignment rule must apply only where
+# Android packaging says the library ships to a device. Codename One really
+# can carry such a file: Cn1libMojo.buildLinux() packages a cn1lib's
+# `linux/src/main/resources` into `nativelinux`, and buildJavase() does the
+# same for `nativese`. Without this scoping the workflow -- which reads every
+# tracked file -- would block every PR over a valid artifact.
+#
+# Only the alignment rule is scoped. The integrity checks (a `.so` that is
+# not an ELF, a truncated one) stay universal, because those are bugs on any
+# platform.
+ANDROID_CONTAINER_SUFFIXES = (".aar", ".apk", ".aab")
+
+# The Android payload a cn1lib carries, written by Cn1libMojo.buildAndroid().
+ANDROID_CN1LIB_PAYLOAD = "nativeand.zip"
+
+# Directory names Android packaging uses for native libraries, and the ABI
+# directory that must sit directly inside one. Together they are what marks a
+# path as Android even outside an AAR -- a loose `jniLibs/arm64-v8a/libfoo.so`
+# in a port is still an Android artifact.
+ANDROID_LIB_DIRS = frozenset(["jni", "lib", "jnilibs"])
+ANDROID_ABIS = frozenset([
+    "armeabi", "armeabi-v7a", "arm64-v8a", "x86", "x86_64",
+    "mips", "mips64", "riscv64",
+])
 
 # An archive inside an archive is legitimate and, as the QRScanner cn1lib
 # shows, three deep happens in practice. Bounded so a malformed or hostile
@@ -182,6 +213,28 @@ def read_load_alignments(data):
     return ei_class == ELFCLASS64, alignments
 
 
+def is_android_payload(label):
+    """True when the accumulated label shows Android packaging.
+
+    `label` is the scan path, with `!` separating each archive from what was
+    read out of it, so this sees the whole chain -- an `.so` reached through
+    `QRScanner.cn1lib!nativeand.zip!ZBarScannerLibrary.aar!jni/...` is Android
+    because of containers three levels up.
+    """
+    for part in label.split("!"):
+        base = os.path.basename(part).lower()
+        if base.endswith(ANDROID_CONTAINER_SUFFIXES):
+            return True
+        if base == ANDROID_CN1LIB_PAYLOAD:
+            return True
+        segments = [segment.lower() for segment in part.replace("\\", "/").split("/")]
+        for index in range(len(segments) - 1):
+            if (segments[index] in ANDROID_LIB_DIRS
+                    and segments[index + 1] in ANDROID_ABIS):
+                return True
+    return False
+
+
 def looks_like_shared_library(name):
     """True for `libfoo.so` and for a versioned `libfoo.so.1`."""
     base = os.path.basename(name).lower()
@@ -220,6 +273,7 @@ class Scanner(object):
         self.failures = []
         self.libraries_scanned = 0
         self.skipped_32bit = 0
+        self.skipped_non_android = 0
         self.has_alignment_failure = False
 
     def check_library(self, label, data):
@@ -232,6 +286,14 @@ class Scanner(object):
             self.skipped_32bit += 1
             if self.verbose:
                 print("  32-bit (not subject to 16 KB pages): %s" % label)
+            return
+        if not is_android_payload(label):
+            # Parsed and sound, but not shipped to an Android device, so the
+            # Play requirement does not reach it.
+            self.skipped_non_android += 1
+            if self.verbose:
+                print("  not Android packaging (16 KB rule does not apply): %s"
+                      % label)
             return
 
         self.libraries_scanned += 1
@@ -366,10 +428,11 @@ def main(argv):
                   file=sys.stderr)
         return 1
 
-    print("check-16k-page-alignment: %d 64-bit native libraries aligned to "
-          "0x%x or more (%d 32-bit libraries not subject to the rule)"
+    print("check-16k-page-alignment: %d Android 64-bit native libraries "
+          "aligned to 0x%x or more (%d 32-bit and %d non-Android libraries "
+          "are not subject to the rule)"
           % (scanner.libraries_scanned, REQUIRED_ALIGNMENT,
-             scanner.skipped_32bit))
+             scanner.skipped_32bit, scanner.skipped_non_android))
     return 0
 
 
