@@ -92,17 +92,22 @@ class MonetizationJava036Snippet {
      Storage s = Storage.getInstance();
      boolean stored;
      synchronized(RECEIPTS_KEY) {
-     // Same guard as fetchReceipts(): readObject() answers null when the
-     // entry cannot be read or deserialized, and this runs inside
-     // synchronizeReceipts(), so throwing here would leave synchronization
-     // marked in progress for the rest of the session.
-     List<Receipt> receipts;
-     Object raw = s.exists(RECEIPTS_KEY) ? s.readObject(RECEIPTS_KEY) : null;
-     if (raw instanceof List) {
-     receipts = (List<Receipt>)raw;
-     } else {
-     receipts = new ArrayList<Receipt>();
+     // readObject() answers null when the entry cannot be read or
+     // deserialized, and this runs inside synchronizeReceipts(), so throwing
+     // would leave synchronization marked in progress for the rest of the
+     // session. An unreadable entry is not an empty one, though: carrying on
+     // as if it were would write this single receipt over every receipt the
+     // user has already paid for. Report failure and write nothing, and
+     // Purchase keeps the receipt pending and retries later.
+     boolean entryExists = s.exists(RECEIPTS_KEY);
+     Object raw = entryExists ? s.readObject(RECEIPTS_KEY) : null;
+     if (entryExists && !(raw instanceof List)) {
+     callback.onSucess(Boolean.FALSE);
+     return;
      }
+     List<Receipt> receipts = raw instanceof List
+     ? (List<Receipt>)raw
+     : new ArrayList<Receipt>();
      // Check to see if this receipt already exists. That should not happen,
      // but a store can resend one.
      for (Receipt r : receipts) {

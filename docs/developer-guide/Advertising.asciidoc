@@ -135,7 +135,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 === Rewarded and rewarded interstitial ads
 
 Register a reward listener and grant the reward when it fires. For valuable
-rewards, verify server side rather than trusting the client:
+rewards, configure server-side verification. The network then posts the reward
+to your server, and that callback rather than the client one is what credits
+the user. The client listener still fires, before any verification has
+happened, so with verification configured it's for presentation only -- credit
+the user there as well and you'll pay the reward twice:
 
 [source,java]
 ----

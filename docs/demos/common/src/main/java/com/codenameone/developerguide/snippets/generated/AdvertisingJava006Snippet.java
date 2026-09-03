@@ -89,7 +89,12 @@ class AdvertisingJava006Snippet {
         ad.setServerSideVerificationOptions(new ServerSideVerificationOptions(userId, "level=7"));
         ad.setAdListener(new AdListener() {
             public void onLoaded() {
-                ad.show(reward -> grantCoins(reward.getAmount()));
+                // Server-side verification is configured above, so the network
+                // posts the reward to your server and that is what credits the
+                // user. This callback fires before any verification has
+                // happened, so it is for presentation only -- crediting here
+                // would pay the reward twice, and pay it unverified.
+                ad.show(reward -> showRewardPending(reward.getAmount()));
             }
         });
         ad.load();
@@ -97,6 +102,7 @@ class AdvertisingJava006Snippet {
     }
 
     void grantCoins(int coins) { }
+    void showRewardPending(int coins) { }
     String userId = "42";
 
 }
