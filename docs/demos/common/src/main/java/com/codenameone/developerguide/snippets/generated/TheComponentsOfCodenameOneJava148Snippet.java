@@ -92,8 +92,11 @@ class TheComponentsOfCodenameOneJava148Snippet {
     // tag::the-components-of-codename-one-java-148[]
     private void automoveToNext(final TextField current, final TextField next) {
         current.addDataChangedListener((type, index) -> {
-            if(current.getText().length() == 5) {
-                String val = current.getText();
+            String val = current.getText();
+            // more than one digit can arrive at once from a paste or autofill, so
+            // keep four and hand the whole remainder on -- the next field's own
+            // listener splits it again if it is still too long
+            if(val.length() > 4) {
                 current.stopEditing();
                 current.setText(val.substring(0, 4));
                 next.setText(val.substring(4));
