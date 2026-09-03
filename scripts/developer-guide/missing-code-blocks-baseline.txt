@@ -5,19 +5,6 @@ Advanced-Topics-Under-The-Hood.asciidoc	For the release build, you will also nee
 Advanced-Topics-Under-The-Hood.asciidoc	You can override these methods in the draggable components:
 Advertising.asciidoc	identifier. The recommended order is to initialize, gather consent, then load:
 Advertising.asciidoc	method that registers its provider with `AdManager`:
-Ai-And-Speech.asciidoc	`ChatMessage` values to JSON under a named key:
-Ai-And-Speech.asciidoc	`SecureStorage` overloads:
-Ai-And-Speech.asciidoc	`chatStream(...)` can mutate the view directly:
-Ai-And-Speech.asciidoc	`cn1-ai-stablediffusion` cn1lib (when present in the consumer project):
-Ai-And-Speech.asciidoc	accepts either inline bytes plus a MIME type or a remote HTTPS URL:
-Ai-And-Speech.asciidoc	and streams the same text into a `ChatView`:
-Ai-And-Speech.asciidoc	calling `cancel()` on the resource closes the underlying socket:
-Ai-And-Speech.asciidoc	clustering:
-Ai-And-Speech.asciidoc	conversation:
-Ai-And-Speech.asciidoc	one user message:
-Ai-And-Speech.asciidoc	returns a string the runtime can hand to `JSONParser`:
-Ai-And-Speech.asciidoc	safe to log:
-Ai-And-Speech.asciidoc	you need a custom send pipeline:
 Animations.asciidoc	That one command will enable swiping back from `currentForm`. https://www.codenameone.com/javadoc/com/codename1/util/LazyValue.html[LazyValue] allows you to pass a value lazily:
 Animations.asciidoc	builder:
 Annotation-Component-Binding.asciidoc	ASM and inserts the equivalent of:
@@ -47,14 +34,8 @@ Introduction.asciidoc	In a cold start `init(Object)` is invoked followed by the 
 Introduction.asciidoc	Next consider the first lifecycle method `init(Object)`. The <<ApplicationLifecycle,Application Lifecycle Sidebar>> discusses the lifecycle in depth:
 Introduction.asciidoc	Now that you have a general sense of the lifecycle lets look at the last two lifecycle methods:
 Introduction.asciidoc	The hello world Java source file looks like this (removed some comments and whitespace):
-Maps.asciidoc	A native provider only renders on the platforms that ship its SDK. To show a provider's map *everywhere* -- including platforms with no native SDK for it -- register a `WebMapProvider`, which hosts the provider's JavaScript SDK inside a `BrowserComponent`:
-Maps.asciidoc	Because it needs only a web view, the web provider (id `web`) is the natural last step before the pure-vector fallback in a provider chain. The order is fully customizable from code, so you can express per-platform preferences -- for example "try the native Google SDK, then the web map, then the vector `MapView`":
-Maps.asciidoc	Every map -- vector or native -- exposes the same operations through `MapSurface`:
-Maps.asciidoc	For a real app you point `MapView` at a hosted tile service. The simplest keyless option is OpenFreeMap (OpenStreetMap-based vector tiles); for branded styles or higher quotas use a keyed provider such as MapTiler or your own self-hosted Protomaps/TileServer GL endpoint:
-Maps.asciidoc	When a provider is selected the build server injects that provider's implementation into your app and wires it in; with no provider selected (or when the provider is unavailable at runtime, for example when Google Play Services is missing) `NativeMap` simply renders the vector `MapView` fallback. You can configure the fallback basemap explicitly:
 Maven-Creating-CN1Libs.adoc	Now try it out. Try adding the following code to your application project's main class (or anywhere in the application project, for that matter):
 Maven-Creating-CN1Libs.adoc	The simulator dispatches every action on the Codename One EDT through `Display.callSerially`, so your method can call `Display.getInstance()`, `Form.show()`, `Dialog.show()`, `ToastBar.showInfoMessage()` and any other CN1 API. Reflection uses the same classloader that loaded `Display`, so cn1lib internals (including package-private classes) resolve normally:
-Media-And-Audio.asciidoc	`AudioEffects` provides small platform-neutral PCM transforms that compose with the mixer:
 Miscellaneous-Features.asciidoc	A typical use of this API would be something like this:
 Miscellaneous-Features.asciidoc	Easy thread can be created like this:
 Miscellaneous-Features.asciidoc	For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize the permission prompt message using the localization key `android.permission.ACCESS_BACKGROUND_LOCATION`:
