@@ -591,6 +591,18 @@ public class ImageViewer extends Component {
         float wasPanY = panPositionY;
         int wasX = constrainedImageX();
         int wasY = constrainedImageY();
+        // Divided by the viewer, not by the zoomed image, which is what the drag path does
+        // with the zoom cancelled out of it:
+        //
+        //     distanceX = (pressX - x) / getZoom(); distanceX /= getWidth();
+        //     panPositionX += distanceX * getZoom();      // == (pressX - x) / getWidth()
+        //
+        // So a gesture across the viewer travels the whole image whatever the zoom, and the
+        // painted distance per pixel of gesture grows with it. Reviewed as a bug -- pan
+        // should be normalised by the zoomed draw size so a notch moves a fixed number of
+        // painted pixels -- but that is this component's pan model, not an oversight in the
+        // wheel: changing it here alone would make the wheel and the finger disagree, and
+        // changing both would alter dragging on every touch device for everyone.
         if (pansX) {
             panPositionX = clampPan(panPositionX - ((float) ev.getDeltaX()) / ((float) getWidth()));
         }

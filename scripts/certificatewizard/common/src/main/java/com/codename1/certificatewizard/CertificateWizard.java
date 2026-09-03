@@ -1080,7 +1080,17 @@ public class CertificateWizard extends Lifecycle {
     }
 
     private void bundleDialog(String initialIdentifier, String initialName) {
-        InteractionDialog d = modal("Register bundle ID");
+        bundleDialog(initialIdentifier, initialName, "IOS");
+    }
+
+    /// Registers an App ID for `platform`, which is not always iOS: the profiles page
+    /// offers this when the account has none that the selected profile type can use, and
+    /// registering an iOS identifier there leaves the user exactly where they started --
+    /// the platform filter still shows nothing, and the advertised way out is a dead end.
+    private void bundleDialog(String initialIdentifier, String initialName, String platform) {
+        InteractionDialog d = modal("IOS".equals(platform)
+                ? "Register bundle ID"
+                : "Register " + bundlePlatformName(platform) + " bundle ID");
         TextField id = field("Identifier", "com.example.app");
         TextField name = field("Name", "My App");
         if (initialIdentifier != null) {
@@ -1094,7 +1104,7 @@ public class CertificateWizard extends Lifecycle {
         // Starts on what the project asks for. This dialog is the deliberate way to turn
         // the capability on, so it follows ios.includePush rather than deciding for
         // itself the way automatic setup used to.
-        push.setSelected(projectWantsPush("IOS"));
+        push.setSelected(projectWantsPush(platform));
         CheckBox appGroups = new CheckBox("Enable App Groups (widgets / live activities)");
         appGroups.setUIID(uiid("CWFieldLabel"));
         d.add(id).add(name).add(push).add(appGroups);
@@ -1103,7 +1113,7 @@ public class CertificateWizard extends Lifecycle {
             d.dispose();
             final String bundleIdentifier = id.getText();
             final boolean withGroups = appGroups.isSelected();
-            service.createBundleId(bundleIdentifier, name.getText(), push.isSelected(), r -> {
+            service.createBundleId(bundleIdentifier, name.getText(), platform, push.isSelected(), r -> {
                 if (!r.ok) {
                     showPageMessage(r.message, true);
                     return;
@@ -1296,7 +1306,7 @@ public class CertificateWizard extends Lifecycle {
             if (usableBundles.isEmpty()) {
                 if (state.bundleIds.isEmpty()) {
                     Button createBundle = outline("Register bundle ID first", "btn.profileNeedsBundle");
-                    createBundle.addActionListener(e -> { d.dispose(); bundleDialog(null, null); });
+                    createBundle.addActionListener(e -> { d.dispose(); bundleDialog(null, null, bundlePlatform); });
                     c.add(createBundle);
                 } else {
                     // Registered, but not for this platform -- and this is not the same

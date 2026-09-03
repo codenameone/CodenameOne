@@ -8774,6 +8774,23 @@ public final class Display extends CN1Constants {
         int ceiling = max < 0 ? 0 : max;
         int before = vertical ? target.getScrollY() : target.getScrollX();
         boolean snapping = target.isSnapToGrid();
+        if (snapping) {
+            // A snapping component cannot come to rest between rows, so the last position
+            // it can actually hold is the last one on its grid -- not the raw scroll
+            // ceiling, which can sit well past it. Spinner3D's scroller is exactly that
+            // shape: calcScrollSize returns listHeight + 6 * rowHeight so the final item
+            // can reach the middle of the view, while its getGridPosY caps at
+            // calcFlatListHeight() - rowHeight, six rows short of that ceiling.
+            //
+            // Measured against the raw ceiling, every further notch at the last item moves
+            // `wanted` and nothing else: the event counts as handled, the component does
+            // not move, and the page under a spinner sitting at the end of its list would
+            // never scroll again.
+            int gridCeiling = target.gridPositionFor(vertical, ceiling);
+            if (gridCeiling >= 0 && gridCeiling < ceiling) {
+                ceiling = gridCeiling;
+            }
+        }
         // A snapping component moves in whole rows, so anything left over from the last
         // event is carried into this one. The position the gesture has actually asked for
         // is therefore the visible one plus that carry -- and comparing THAT before and

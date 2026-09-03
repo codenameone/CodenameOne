@@ -495,6 +495,77 @@ class ScrollWheelGestureTest extends UITestBase {
     }
 
     @FormTest
+    void aSpinnerAtItsLastRowHandsTheWheelToThePage() {
+        // A snapping component whose scroll range runs past its last row: Spinner3D is
+        // built this way, so the final item can reach the middle of the view. Its grid
+        // stops at that item while the raw ceiling is rows further down, and measuring the
+        // limit against the raw ceiling means every notch at the last item is taken and
+        // nothing moves -- the page under a spinner would never scroll again once the
+        // pointer sat over one at the end of its list.
+        Form f = new Form("spinner-tail", new BorderLayout());
+        Container page = f.getContentPane();
+        page.setLayout(BoxLayout.y());
+        page.setScrollableY(true);
+        final SpinnerShapedContainer spinner = new SpinnerShapedContainer();
+        spinner.setScrollableY(true);
+        for (int i = 0; i < 8; i++) {
+            Label l = new Label("row");
+            l.setPreferredH(px(20));
+            spinner.add(l);
+        }
+        // The tail that carries the scroll range past the last row.
+        Label tail = new Label("tail");
+        tail.setPreferredH(px(90));
+        spinner.add(tail);
+        // Shorter than its own content, or the layout hands it the height it asks for and
+        // it never scrolls at all -- the test would then pass for having nothing to scroll.
+        spinner.setPreferredH(px(60));
+        page.add(spinner);
+        // Enough to overflow the form. isScrollableY() is the flag AND having something to
+        // scroll, so a page that merely fits reports false and the wheel would reach the
+        // ancestor for the wrong reason.
+        for (int i = 0; i < 80; i++) {
+            page.add(filler());
+        }
+        f.show();
+        f.revalidate();
+        DisplayTest.flushEdt();
+        // Snapping goes on after show: initialising a component resets it to the look and
+        // feel's default, so setting it before silently does nothing.
+        spinner.setSnapToGrid(true);
+        f.revalidate();
+        DisplayTest.flushEdt();
+        spinner.setLastGridRow(spinner.getComponentAt(7).getY());
+        spinner.setScrollY(spinner.lastGridRow());
+        DisplayTest.flushEdt();
+        assertTrue(page.isScrollableY() && spinner.isScrollableY() && spinner.isSnapToGrid(),
+                "the page has to scroll and the spinner has to snap, or this proves nothing");
+        assertEquals(spinner.lastGridRow(), spinner.getScrollY(),
+                "the spinner has to start on its last row");
+        assertEquals(0, page.getScrollY(), "the page starts unscrolled");
+
+        // Aimed through the page, not off the spinner's own absolute position:
+        // getAbsoluteY() subtracts the component's OWN scroll, so a spinner scrolled to its
+        // last row reports a point far above itself and the wheel lands on nothing.
+        int x = page.getAbsoluteX() + spinner.getX() + spinner.getWidth() / 2;
+        int y = page.getAbsoluteY() + spinner.getY() + spinner.getHeight() / 2;
+        assertTrue(isInside(spinner, f.getComponentAt(x, y)),
+                "the wheel has to land on the spinner, not past it");
+
+        // Two notches past the last row. The spinner cannot move, so they belong to the
+        // page -- and the second one matters as much as the first: a carry accumulating
+        // towards a position the grid will never return is how this stays stuck.
+        int pageWas = page.getScrollY();
+        wheelPrecise(x, y, 0, -px(20));
+        wheelPrecise(x, y, 0, -px(20));
+
+        assertEquals(spinner.lastGridRow(), spinner.getScrollY(),
+                "the spinner stays on its last row");
+        assertTrue(page.getScrollY() > pageWas,
+                "and the page under it scrolls instead of swallowing the gesture");
+    }
+
+    @FormTest
     void aListenerThatMovesTheTargetDuringTheNotchDropsTheCarry() {
         // The carry measures a distance from where the wheel put the component. A
         // ScrollListener runs synchronously inside that move and may scroll the component
@@ -757,6 +828,18 @@ class ScrollWheelGestureTest extends UITestBase {
         return c.getGridPosY() == c.getScrollY();
     }
 
+    /// Whether `c` is `ancestor` or sits inside it, so a test can prove the point it
+    /// aimed at actually landed where it meant to.
+    private static boolean isInside(Container ancestor, Component c) {
+        while (c != null) {
+            if (c == ancestor) { //NOPMD CompareObjectsWithEquals
+                return true;
+            }
+            c = c.getParent();
+        }
+        return false;
+    }
+
     /// A trackpad's deltas, which arrive small and often and are flagged precise.
     private void wheelPrecise(int x, int y, int deltaX, int deltaY) {
         Display.impl.pointerWheelMoved(x, y, deltaX, deltaY, true, 0);
@@ -811,6 +894,41 @@ class ScrollWheelGestureTest extends UITestBase {
             }
             int rows = Math.round((getScrollY() - first) / (float) pitch);
             return Math.max(first, first + rows * pitch);
+        }
+    }
+
+    /// Snaps to rows that stop before its scroll range does, the way Spinner3D does: the
+    /// last item has to be able to reach the middle of the view, so the content runs on
+    /// past the last position the grid will ever return.
+    private static final class SpinnerShapedContainer extends Container {
+        private int lastGridRow;
+
+        SpinnerShapedContainer() {
+            super(BoxLayout.y());
+        }
+
+        void setLastGridRow(int y) {
+            lastGridRow = y;
+        }
+
+        int lastGridRow() {
+            return lastGridRow;
+        }
+
+        @Override
+        protected int getGridPosY() {
+            int scroll = getScrollY();
+            if (scroll >= lastGridRow) {
+                return lastGridRow;
+            }
+            int pitch = getComponentCount() < 2
+                    ? 0
+                    : getComponentAt(1).getY() - getComponentAt(0).getY();
+            if (pitch <= 0) {
+                return scroll;
+            }
+            int first = getComponentAt(0).getY();
+            return Math.min(lastGridRow, first + Math.round((scroll - first) / (float) pitch) * pitch);
         }
     }
 
