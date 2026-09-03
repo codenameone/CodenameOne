@@ -100,6 +100,9 @@ class TheComponentsOfCodenameOneJava188Snippet {
         iv.setNavigationArrowsVisible(true);
         iv.setThumbnailsVisible(true);
         iv.setThumbnailBarHeight(6f); // Optional, defaults to 6mm
+        Form hi = new Form("ImageViewer", new BorderLayout());
+        hi.add(BorderLayout.CENTER, iv);
+        hi.show();
         // end::the-components-of-codename-one-java-188[]
     }
 

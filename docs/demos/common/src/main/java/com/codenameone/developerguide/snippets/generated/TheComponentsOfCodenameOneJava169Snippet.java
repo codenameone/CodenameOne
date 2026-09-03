@@ -92,6 +92,9 @@ class TheComponentsOfCodenameOneJava169Snippet {
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-169[]
         MultiList ml = new MultiList(new GRMMModel());
+        Form hi = new Form("Million Entries", new BorderLayout());
+        hi.add(BorderLayout.CENTER, ml);
+        hi.show();
         // end::the-components-of-codename-one-java-169[]
     }
 
