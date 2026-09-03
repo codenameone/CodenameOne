@@ -85,6 +85,12 @@ class MapsJava011Snippet {
         // tag::maps-java-011[]
         // Render Google Maps through its JavaScript SDK on any platform with a browser:
         MapProviderRegistry.register(WebMapProvider.google("YOUR_MAPS_JS_API_KEY"));
+
+        // Registering only appends to the registry, and a build-injected native
+        // provider that is already there wins -- Apple Maps on iOS, for one. Ask
+        // for the web provider explicitly if that is the one you want everywhere.
+        MapProviderRegistry.setPreferredProvider("web");
+
         NativeMap map = new NativeMap(new LatLng(41.0, 13.0), 5);
         // end::maps-java-011[]
     }

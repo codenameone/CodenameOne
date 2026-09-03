@@ -88,7 +88,13 @@ class AiAndSpeechJava025Snippet {
         SecureStorage store = SecureStorage.getInstance();
         store.set("ai.session.token", sessionTokenFromServer);  // false when unsupported
 
+        // On a port with no secure storage the set fails and the get answers
+        // null, but the token just fetched is still perfectly good for this run
+        // -- fall back to it rather than building a client with no credential.
         String token = store.get("ai.session.token");           // null when absent
+        if (token == null) {
+            token = sessionTokenFromServer;
+        }
         LlmClient client = LlmClient.localOpenAiCompatible(
                 "https://api.example.com/ai/v1", token, "gpt-4o-mini");
         // end::ai-and-speech-java-025[]

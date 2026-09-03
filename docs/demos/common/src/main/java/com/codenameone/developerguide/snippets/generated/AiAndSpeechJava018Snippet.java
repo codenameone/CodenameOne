@@ -107,25 +107,30 @@ class AiAndSpeechJava018Snippet {
                 .build();
 
         openai.chat(req).ready(resp -> {
+            // The first response is the model asking for the tools, not the
+            // answer. Run every call it asked for, then send the conversation
+            // back once with a result for each: the assistant message names all
+            // of them, and a follow-up carrying only some is rejected as an
+            // incomplete tool-call sequence.
+            ChatRequest.Builder followUp = ChatRequest.builder()
+                    .model("gpt-4o-mini")
+                    .addMessage(ChatMessage.user("What is the weather in Tel Aviv?"))
+                    .addMessage(resp.getAssistantMessage());
             for (ToolCall call : resp.getToolCalls()) {
                 try {
                     String result = call.execute(Collections.singletonList(weather));
-                    // The first response is the model asking for the tool, not
-                    // the answer. Send the conversation back with the tool call
-                    // and its result appended, and the next response is the
-                    // reply the user asked for.
-                    ChatRequest followUp = ChatRequest.builder()
-                            .model("gpt-4o-mini")
-                            .addMessage(ChatMessage.user("What is the weather in Tel Aviv?"))
-                            .addMessage(resp.getAssistantMessage())
-                            .addMessage(ChatMessage.toolResult(call.getId(), result))
-                            .build();
-                    openai.chat(followUp).ready(answer -> Log.p(answer.getText()));
+                    followUp.addMessage(ChatMessage.toolResult(call.getId(), result));
                 } catch (Exception err) {
-                    // execute() runs your own handler, so it can fail for any reason,
-                    // and this callback has nowhere to propagate to.
+                    // execute() runs your own handler, so it can fail for any
+                    // reason, and this callback has nowhere to propagate to.
+                    // The turn still needs a result for this id.
                     Log.e(err);
+                    followUp.addMessage(ChatMessage.toolResult(call.getId(),
+                            "{\"error\": \"the tool failed\"}"));
                 }
+            }
+            if (!resp.getToolCalls().isEmpty()) {
+                openai.chat(followUp.build()).ready(answer -> Log.p(answer.getText()));
             }
         });
         // end::ai-and-speech-java-018[]

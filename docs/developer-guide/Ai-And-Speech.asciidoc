@@ -793,14 +793,13 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 
-This sample sends an image, so whichever model it reaches has to accept one.
-Under the simulator's redirect that's your local Ollama install, and its
-default there is a text-only model -- set `cn1.ai.ollamaModel` to a
-vision-capable model you have pulled before running this one.
+This sample sends an image, so whichever model the client reaches has to accept
+one. For a shipped app that's whatever your proxy is configured with. In the
+simulator the redirect points the client at your local Ollama install instead,
+and its default there is a text-only model, so set `cn1.ai.ollamaModel` to a
+vision-capable model you've pulled before running this one.
 
-The same code runs unchanged in the simulator, where the redirect points it at
-your local Ollama install, and on Android and iOS, where it calls the provider
-over HTTPS. Be clear with yourself about what that means on a device: the
-captured photo is uploaded to the provider. Nothing here runs a model on the
-phone, so cover that in your privacy policy, and keep the key off the device as
-the `SecureStorage` section above describes.
+The photo leaves the device either way. Nothing here runs a model on the phone,
+so cover that in your privacy policy -- and note that the client is the proxy
+client from the previous section, not `LlmClient.openai(apiKey)`, because that
+one needs the billable provider key to be present on the device.

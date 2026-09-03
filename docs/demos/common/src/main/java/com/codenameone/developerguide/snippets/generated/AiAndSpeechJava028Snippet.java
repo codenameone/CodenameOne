@@ -94,12 +94,10 @@ class AiAndSpeechJava028Snippet {
             ImagePart img = new ImagePart(bytes, "image/jpeg");
 
             ChatRequest req = ChatRequest.builder()
-                    // No model named here on purpose: a request that omits one
-                    // uses the client's default, which LlmClient#setDefaultModel
-                    // sets and the simulator's Ollama redirect sets for you.
-                    // That default has to be able to see: the redirect's own
-                    // default is a text-only model, so point cn1.ai.ollamaModel
-                    // at a vision-capable one before running this locally.
+                    // No model named here: the request uses the client's default,
+                    // which is your proxy's for a shipped build and the Ollama
+                    // redirect's in the simulator. Either way it has to be a model
+                    // that accepts images.
                     .addMessage(ChatMessage.userWithImage(
                         "Describe the photo in one sentence.", img))
                     .build();
@@ -108,7 +106,10 @@ class AiAndSpeechJava028Snippet {
             ChatBubble streaming = chatView.beginAssistantStream();
             StringBuilder full = new StringBuilder();
 
-            LlmClient.openai(apiKey).chatStream(req, new StreamingListener.Adapter() {
+            // The same proxy client as the credentials sample above: on a device
+            // LlmClient.openai(apiKey) would need the billable provider key to be
+            // present here, which is exactly what that section says not to do.
+            client.chatStream(req, new StreamingListener.Adapter() {
                 @Override public void onContentDelta(String d) {
                     full.append(d);
                     // Append to the bubble this capture opened: a second photo
@@ -126,5 +127,9 @@ class AiAndSpeechJava028Snippet {
     byte[] readAllBytes(String path) { return new byte[0]; }
 
 
+
+
+    LlmClient client = LlmClient.localOpenAiCompatible(
+            "https://api.example.com/ai/v1", "session-token", "your-vision-model");
 
 }
