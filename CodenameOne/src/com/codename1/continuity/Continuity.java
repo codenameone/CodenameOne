@@ -157,6 +157,17 @@ public final class Continuity {
     /// continuation without a word.
     private static final Map<String, Long> lastSeen = new LinkedHashMap<String, Long>();
 
+    /// The marks that are allowed to reach storage: states this device actually COMPLETED.
+    ///
+    /// Separate from `lastSeen`, which holds every state that was admitted, because those two
+    /// sets are not the same and writing the wrong one throws states away. A state admitted and
+    /// then failed -- a provider that threw, routes that could not be rebuilt -- stays in
+    /// lastSeen so it is not re-dispatched twice in this run, and must NOT become durable:
+    /// serializing the whole map meant an unrelated state completing later carried the failed
+    /// one to disk with it, and after a restart the relay's only usable copy was refused. That
+    /// is exactly the gating commit() performs, undone by the writer.
+    private static final Map<String, Long> durableSeen = new LinkedHashMap<String, Long>();
+
     // EDT-owned, like every field in this class. See the threading note on the class.
     private static StateProvider provider;
     private static StateRelay relay;
@@ -229,7 +240,9 @@ public final class Continuity {
         for (Map.Entry<String, Long> e : restored.entrySet()) {
             Long have = lastSeen.get(e.getKey());
             if (have == null || have.longValue() < e.getValue().longValue()) {
-                recordSeen(e.getKey(), e.getValue().longValue());
+                // Loaded marks describe states a previous run COMPLETED, so they are durable
+                // again as well as suppressing re-delivery in this one.
+                recordSeen(e.getKey(), e.getValue().longValue(), true);
             }
         }
         enabled = true;
@@ -888,6 +901,7 @@ public final class Continuity {
         // process can; what it can do is make sure nothing follows it.
         endRelaySession();
         lastSeen.clear();
+        durableSeen.clear();
         // The durable copy as well. Leaving it behind meant the marks of the account that just
         // signed out kept suppressing the NEXT account's deliveries -- a state silently never
         // arriving, which is harder to notice than one arriving twice.
@@ -1267,7 +1281,8 @@ public final class Continuity {
             // the same state.
             return;
         }
-        recordSeen(state.getDeviceId(), state.getSequence());
+        // Admission only: not durable until the state has actually been completed.
+        recordSeen(state.getDeviceId(), state.getSequence(), false);
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
@@ -1423,15 +1438,29 @@ public final class Continuity {
             // Our own work needs no mark: deliver() drops an echo on the device id alone.
             return;
         }
-        Long seen = lastSeen.get(from);
-        if (seen == null || seen.longValue() < state.getSequence()) {
-            recordSeen(from, state.getSequence());
+        long seq = state.getSequence();
+        Long inMemory = lastSeen.get(from);
+        if (inMemory == null || inMemory.longValue() < seq) {
+            recordSeen(from, seq, true);
+        } else {
+            // The in-memory mark already covers this state: admit() put it there on the way in,
+            // which is the ordinary case, so "only if higher" never fires and the DURABLE half
+            // would never be written. That is the same bug the note below describes, returned in
+            // a new shape once the durable set stopped being the in-memory one -- writing the
+            // whole of memory used to hide it.
+            //
+            // Marked only up to THIS state. If something newer from the same device has been
+            // admitted since, it has not been completed and must not be marked on this one's
+            // behalf.
+            Long durable = durableSeen.get(from);
+            if (durable == null || durable.longValue() < seq) {
+                recordDurable(from, seq);
+            }
         }
-        // ALWAYS, not only when the in-memory map moved. That condition was written when the
-        // durable copy tracked memory exactly; it no longer does -- the mark goes into memory at
-        // admission and reaches disk only when the state is acted on -- so by the time anything
-        // calls this, memory already holds the entry and "unchanged" meant "write nothing". Both
-        // acknowledge() and the restore path were silently persisting nothing at all.
+        // ALWAYS, not only when a map moved. The condition this replaced was written when the
+        // durable copy tracked memory exactly; it does not, and by the time anything calls this
+        // memory already holds the entry, so "unchanged" meant "write nothing" and both
+        // acknowledge() and the restore path silently persisted nothing at all.
         rememberSeen();
     }
 
@@ -1450,9 +1479,20 @@ public final class Continuity {
     /// Removed before it is put back, because the map keeps INSERTION order and a plain put()
     /// over an existing key leaves it where it first appeared -- so a device that has been active
     /// all along would still be evicted ahead of one that has said nothing since.
-    private static void recordSeen(String device, long sequence) {
+    private static void recordSeen(String device, long sequence, boolean durable) {
         lastSeen.remove(device);
         lastSeen.put(device, Long.valueOf(sequence));
+        if (durable) {
+            durableSeen.remove(device);
+            durableSeen.put(device, Long.valueOf(sequence));
+        }
+        trimSeen();
+    }
+
+    /// Marks a device durably without disturbing the in-memory dedup mark, which may be newer.
+    private static void recordDurable(String device, long sequence) {
+        durableSeen.remove(device);
+        durableSeen.put(device, Long.valueOf(sequence));
         trimSeen();
     }
 
@@ -1466,8 +1506,14 @@ public final class Continuity {
     /// The lowest sequences go: those are the devices that have been quiet longest, and losing a
     /// mark costs one duplicate delivery rather than anything durable.
     private static void trimSeen() {
-        while (lastSeen.size() > MAX_SEEN) {
-            Iterator<String> i = lastSeen.keySet().iterator();
+        trimTo(durableSeen);
+        trimTo(lastSeen);
+    }
+
+    /// Evicts the least recently seen entries from one map until it is inside MAX_SEEN.
+    private static void trimTo(Map<String, Long> map) {
+        while (map.size() > MAX_SEEN) {
+            Iterator<String> i = map.keySet().iterator();
             if (!i.hasNext()) {
                 break;
             }
@@ -1488,20 +1534,23 @@ public final class Continuity {
             if (raw == null || raw.length() == 0) {
                 return out;
             }
-            // "id|seq;id|seq". A device id is a UUID or a "cn1-" fallback, so neither separator
-            // can occur inside one -- and a malformed entry is skipped rather than throwing,
-            // because a corrupt preference must cost a duplicate delivery and not a launch.
+            // Split on UNESCAPED separators. The ids are not all ours: setDeviceId is public and
+            // a state arrives from whatever the relay was given, so an id may contain the very
+            // characters this format is delimited by. Unescaped, "phone|work" produced a sequence
+            // field that would not parse and a semicolon produced a whole second entry -- a mark
+            // written against an origin that never sent anything, which then suppresses that
+            // origin's real states for good.
             int from = 0;
-            while (from < raw.length()) {
-                int end = raw.indexOf(';', from);
+            while (from <= raw.length()) {
+                int end = indexOfUnescaped(raw, ';', from);
                 String entry = end < 0 ? raw.substring(from) : raw.substring(from, end);
-                int bar = entry.indexOf('|');
+                int bar = indexOfUnescaped(entry, '|', 0);
                 if (bar > 0 && bar < entry.length() - 1) {
                     try {
-                        out.put(entry.substring(0, bar),
+                        out.put(unescapeSeenKey(entry.substring(0, bar)),
                                 Long.valueOf(Long.parseLong(entry.substring(bar + 1))));
                     } catch (NumberFormatException ignored) {
-                        // Skipped, as above.
+                        // A corrupt entry costs one duplicate delivery, never a launch.
                     }
                 }
                 if (end < 0) {
@@ -1515,6 +1564,53 @@ public final class Continuity {
         return out;
     }
 
+    /// The index of the first `c` that is not preceded by an escape, or -1.
+    private static int indexOfUnescaped(String s, char c, int from) {
+        boolean escaped = false;
+        for (int i = from; i < s.length(); i++) {
+            char at = s.charAt(i);
+            if (escaped) {
+                escaped = false;
+            } else if (at == '\\') {
+                escaped = true;
+            } else if (at == c) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /// Escapes the two delimiters, and the escape itself.
+    private static String escapeSeenKey(String key) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < key.length(); i++) {
+            char c = key.charAt(i);
+            if (c == '\\' || c == '|' || c == ';') {
+                sb.append('\\');
+            }
+            sb.append(c);
+        }
+        return sb.toString();
+    }
+
+    /// Reverses escapeSeenKey.
+    private static String unescapeSeenKey(String key) {
+        StringBuilder sb = new StringBuilder();
+        boolean escaped = false;
+        for (int i = 0; i < key.length(); i++) {
+            char c = key.charAt(i);
+            if (escaped) {
+                sb.append(c);
+                escaped = false;
+            } else if (c == '\\') {
+                escaped = true;
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
     /// Writes the high-water marks, trimmed to MAX_SEEN.
     ///
     /// Called after a delivery is accepted, which is rare -- it takes another device publishing --
@@ -1525,13 +1621,13 @@ public final class Continuity {
         // the life of the process -- and made every acknowledgement copy the whole thing and scan
         // it back down to the cap, so a relay feeding many device ids cost memory and rising CPU
         // at once. The cap belongs where entries go IN.
-        Map<String, Long> copy = lastSeen;
+        Map<String, Long> copy = durableSeen;
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<String, Long> e : copy.entrySet()) {
             if (sb.length() > 0) {
                 sb.append(';');
             }
-            sb.append(e.getKey()).append('|').append(e.getValue().longValue());
+            sb.append(escapeSeenKey(e.getKey())).append('|').append(e.getValue().longValue());
         }
         // ONLY the write is wrapped. Iterating a generic map compiles to checkcasts, and a
         // catch(Throwable) around them is a handler ParparVM never runs -- its CHECKCAST expands
@@ -1659,6 +1755,7 @@ public final class Continuity {
     static void reset() {
         listeners.clear();
         lastSeen.clear();
+        durableSeen.clear();
         endRelaySession();
         provider = null;
         relay = null;

@@ -1665,6 +1665,74 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A state that was admitted but never completed must not become durable on the back of an
+     * unrelated one. lastSeen holds every admitted state so a run does not dispatch the same
+     * thing twice; serializing that whole map meant a later, successful state carried the failed
+     * one to disk, and after a restart the relay's only usable copy was refused -- undoing, from
+     * the writer, exactly the gating commit() performs.
+     */
+    @EdtTest
+    public void aFailedStateIsNotMadeDurableByAnUnrelatedSuccess() {
+        Continuity.setStateProvider(new StateProvider() {
+            public Map<String, Object> saveState() {
+                return new HashMap<String, Object>();
+            }
+
+            public void restoreState(Map<String, Object> payload) {
+                if (payload.containsKey("boom")) {
+                    throw new IllegalStateException("cannot apply this one");
+                }
+            }
+        });
+
+        // DELIVERED, not restored directly: admission is what puts the state in the in-memory
+        // dedup map, and that is the precondition -- a state sitting in memory, never completed.
+        // Restoring it by hand skips admit() entirely, so the map never holds it and the test
+        // asserts about a situation that cannot arise.
+        Map<String, Object> boom = new HashMap<String, Object>();
+        boom.put("boom", Boolean.TRUE);
+        AppState failing = new AppState().setPayload(boom).setDeviceId("device-b")
+                .setSequence(7L).setTimestamp(System.currentTimeMillis());
+        Continuity.deliver(failing);
+        flushSerialCalls();
+
+        // A, from another device, then completes normally and writes the marks out.
+        Continuity.deliver(fromElsewhere("fine", 3L));
+        flushSerialCalls();
+
+        Map<String, Long> persisted = Continuity.readSeenForTest();
+        assertTrue(persisted.containsKey("some-other-device"),
+                "the state that completed should have been marked");
+        assertFalse(persisted.containsKey("device-b"),
+                "a state that failed to apply was made durable by an unrelated success, so the "
+                        + "relay's only usable copy is refused after a restart");
+    }
+
+    /**
+     * Device ids are not all ours. setDeviceId is public and a state arrives carrying whatever
+     * the relay was given, so an id can contain the characters the persisted format is delimited
+     * by. Unescaped, "phone|work" produced a sequence field that would not parse, and a semicolon
+     * produced a whole second entry -- a mark against an origin that never sent anything, which
+     * then suppresses that origin's real states for good.
+     */
+    @EdtTest
+    public void aDeviceIdContainingTheDelimitersSurvivesARestart() {
+        Continuity.setStateProvider(new RecordingProvider());
+
+        String awkward = "phone|work;other";
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("note", "hello");
+        Continuity.restore(new AppState().setPayload(payload).setDeviceId(awkward)
+                .setSequence(12L).setTimestamp(System.currentTimeMillis()));
+
+        Map<String, Long> persisted = Continuity.readSeenForTest();
+        assertEquals(Long.valueOf(12L), persisted.get(awkward),
+                "the id did not round-trip through the persisted map: " + persisted.keySet());
+        assertFalse(persisted.containsKey("other"),
+                "the id's semicolon invented a mark for an origin that never sent anything");
+    }
+
+    /**
      * A checkpoint whose write failed is still owed. `dirty` is cleared on the way in, so leaving
      * it clear told the next suspend there was nothing to save -- a checkpoint lost to a full
      * disk was never retried and the app came back to the last write that had succeeded.
