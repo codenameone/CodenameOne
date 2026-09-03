@@ -165,9 +165,12 @@ public class ChatView extends Container {
 
     /// Replaces the stored message for a bubble whose text has changed, so
     /// `#getHistory` reflects a streamed reply rather than the empty
-    /// placeholder `#beginAssistantStream` created. Only a message that is a
-    /// single text part is rebuilt -- one carrying an image or a tool call is
-    /// left alone. Called on the EDT by [ChatBubble].
+    /// placeholder `#beginAssistantStream` created. Only the text is replaced:
+    /// a message may be a single text part and still carry tool calls, a
+    /// participant name or a tool call id, and dropping those breaks the replay
+    /// that a following tool result belongs to. A message whose content is not
+    /// a single text part -- one holding an image, say -- is left alone
+    /// entirely. Called on the EDT by [ChatBubble].
     void bubbleTextChanged(ChatBubble bubble, String text) {
         int i = bubbles.indexOf(bubble);
         if (i < 0 || i >= history.size()) {
@@ -179,7 +182,9 @@ public class ChatView extends Container {
             return;
         }
         history.set(i, new ChatMessage(existing.getRole(),
-                Arrays.<MessagePart>asList(new TextPart(text))));
+                Arrays.<MessagePart>asList(new TextPart(text)),
+                existing.getToolCalls(), existing.getName(),
+                existing.getToolCallId()));
     }
 
     public void setTypingIndicatorVisible(final boolean v) {

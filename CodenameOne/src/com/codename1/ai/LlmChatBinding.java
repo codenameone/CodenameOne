@@ -113,7 +113,7 @@ public final class LlmChatBinding {
 
                             @Override
                             public void onError(Throwable t) {
-                                assistant.appendText("\n\n[error: " + t.getMessage() + "]");
+                                assistant.appendAnnotation("\n\n[error: " + t.getMessage() + "]");
                             }
                         });
                 result.ready(new SuccessCallback<ChatResponse>() {

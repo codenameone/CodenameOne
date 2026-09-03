@@ -23,6 +23,10 @@
 package com.codename1.components;
 
 import com.codename1.ai.ChatMessage;
+import java.util.Arrays;
+import com.codename1.ai.ToolCall;
+import com.codename1.ai.TextPart;
+import com.codename1.ai.MessagePart;
 import com.codename1.ai.Role;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
@@ -54,6 +58,38 @@ class ChatViewTest extends UITestBase {
         List<ChatMessage> history = v.getHistory();
         assertEquals("Hello, world", history.get(history.size() - 1).getText());
         assertEquals(Role.ASSISTANT, history.get(history.size() - 1).getRole());
+    }
+
+    @FormTest
+    void annotationsAreShownButStayOutOfHistory() {
+        // LlmChatBinding appends "[error: ...]" to the bubble when a stream
+        // fails. That is for the reader, not for the model: replaying it would
+        // send a network failure back as if the assistant had written it.
+        ChatView v = new ChatView();
+        ChatBubble bubble = v.beginAssistantStream();
+        bubble.appendText("partial answer");
+        bubble.appendAnnotation("\n\n[error: connection reset]");
+        List<ChatMessage> history = v.getHistory();
+        assertEquals("partial answer", history.get(history.size() - 1).getText());
+    }
+
+    @FormTest
+    void replacingTheTextKeepsToolCallMetadata() {
+        // A message can be a single text part and still carry tool calls. The
+        // following tool result refers to their ids, so losing them makes the
+        // replay an incomplete sequence that a provider rejects.
+        ToolCall call = new ToolCall("call-1", "get_weather", "{}");
+        ChatMessage withCall = new ChatMessage(Role.ASSISTANT,
+                Arrays.<MessagePart>asList(new TextPart("")),
+                Arrays.asList(call), "assistant-1", null);
+        ChatView v = new ChatView();
+        ChatBubble bubble = v.addMessage(withCall);
+        bubble.appendText("checking the weather");
+        ChatMessage stored = v.getHistory().get(v.getHistory().size() - 1);
+        assertEquals("checking the weather", stored.getText());
+        assertEquals(1, stored.getToolCalls().size());
+        assertEquals("call-1", stored.getToolCalls().get(0).getId());
+        assertEquals("assistant-1", stored.getName());
     }
 
     @FormTest

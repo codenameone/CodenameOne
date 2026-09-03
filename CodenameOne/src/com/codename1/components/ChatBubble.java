@@ -43,6 +43,9 @@ public class ChatBubble extends Container {
     /// this is bookkeeping between ChatView and its bubbles, not API.
     ChatView owner;
 
+    /// True while an annotation is being appended, so it stays out of history.
+    private boolean annotating;
+
     private final TextArea body;
     private final ChatMessage message;
 
@@ -81,10 +84,31 @@ public class ChatBubble extends Container {
         // reply is otherwise only ever painted: the ChatMessage the view stored
         // when this bubble was created stays empty, and anything building a
         // request from getHistory() sends a blank assistant turn.
-        if (owner != null) {
+        if (owner != null && !annotating) {
             owner.bubbleTextChanged(this, body.getText());
         }
         revalidateLater();
+    }
+
+    /// Appends text that is shown but is not part of the conversation -- a
+    /// stream error, say. It reaches the bubble like `#appendText` and is
+    /// deliberately kept out of the owning view's history, so a later turn does
+    /// not replay a network failure back to the model as if the assistant had
+    /// written it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `note`: the annotation to show
+    public void appendAnnotation(final String note) {
+        if (note == null || note.length() == 0) {
+            return;
+        }
+        annotating = true;
+        try {
+            appendText(note);
+        } finally {
+            annotating = false;
+        }
     }
 
     /// Append a token-sized delta to the bubble's body. Used by
