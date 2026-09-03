@@ -30,6 +30,7 @@ import com.codename1.ui.CheckBox;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -260,7 +261,7 @@ final class ContactPickerSimulation {
             out.setAddresses(copyAddresses(source.getAddresses()));
         }
         if ((fields & ContactPicker.PHOTO) != 0) {
-            out.setPhoto(source.getPhoto());
+            out.setPhoto(copyPhoto(source.getPhoto()));
         }
         if ((fields & ContactPicker.BIRTHDAY) != 0) {
             out.setBirthday(source.getBirthday());
@@ -324,6 +325,35 @@ final class ContactPickerSimulation {
             }
         }
         return lowest == null ? null : String.valueOf(entries.get(lowest));
+    }
+
+    /**
+     * An independent copy of a simulated contact's photo.
+     *
+     * <p>Sharing the instance looked harmless and is not:
+     * {@link Image#getGraphics()} carries no mutability guard, and this port
+     * answers it with the backing {@code BufferedImage}'s own graphics. So
+     * drawing on a picked contact's photo would draw on the simulated address
+     * book, changing what every later pick and every broad read returned. A
+     * picked contact is documented as a snapshot, and Android and iOS both
+     * build a fresh image per pick.</p>
+     *
+     * @param photo the address book's image, which may be null
+     * @return an image nothing else holds, or null
+     */
+    private static Image copyPhoto(Image photo) {
+        if (photo == null) {
+            return null;
+        }
+        int width = photo.getWidth();
+        int height = photo.getHeight();
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        int[] rgb = photo.getRGB();
+        int[] copy = new int[rgb.length];
+        System.arraycopy(rgb, 0, copy, 0, rgb.length);
+        return Image.createImage(copy, width, height);
     }
 
     private static Hashtable copy(Hashtable source) {
