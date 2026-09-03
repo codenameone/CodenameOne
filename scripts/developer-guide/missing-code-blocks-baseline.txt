@@ -257,33 +257,6 @@ appendix_goal_generate_graphql.adoc	ends the stream:
 appendix_goal_generate_grpc.adoc	Call sites use the static factory:
 appendix_goal_generate_grpc.adoc	The `@GrpcClient` interface looks like:
 appendix_goal_generate_openapi.adoc	Call sites use the static factory:
-graphics.asciidoc	(that's: where the numbers appear), and the remaining marks (corresponding with seconds) will be short:
-graphics.asciidoc	3. Invert the translation performed in step 1:
-graphics.asciidoc	A `URLImage` can be created with a mask adapter to apply an effect to an image. This allows you to round downloaded images or apply any sort of masking for example: you can adapt the round mask code above as such:
-graphics.asciidoc	And you will translate it down slightly so that it overlaps the center. This translation will be performed on the `GeneralPath` object directly rather than through the `Graphics` context:
-graphics.asciidoc	Center:
-graphics.asciidoc	For example: a `pointerPressed()` callback method can look like this:
-graphics.asciidoc	The `animate()` method in the `AnalogClock` class:
-graphics.asciidoc	The code to instantiate the clock, and start the animation would be something like:
-graphics.asciidoc	The remaining drawing code is as follows:
-graphics.asciidoc	The simple use case is pretty trivial:
-graphics.asciidoc	To do this you can override:
-graphics.asciidoc	Top Left Corner:
-graphics.asciidoc	`ConicGradient` - following the same pattern as the `Shape` hierarchy:
-graphics.asciidoc	can override or augment whatever the default set:
-graphics.asciidoc	class is the most common option and accepts a list of color stops along a line:
-graphics.asciidoc	coordinates of the component. You therefore need to get the absolute clock center position to perform the rotation:
-graphics.asciidoc	for the images. The default is a scale adapter although you might change that to scale fill in the future:
-graphics.asciidoc	hook. Two ways to install one:
-graphics.asciidoc	https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html#isShapeSupported()[`Graphics.isShapeSupported()`] method. For example:
-graphics.asciidoc	it can be added to a form:
-graphics.asciidoc	mark at the 12 o'clock position:
-graphics.asciidoc	method to append curves to the drawing as follows:
-graphics.asciidoc	methods in the component as follows:
-graphics.asciidoc	name of icon to `icon_URLImage` then using this in the data:
-graphics.asciidoc	show this, try to place five of these components on a form inside a https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] and see how it looks:
-graphics.asciidoc	straight lines rather than curves might look like this:
-graphics.asciidoc	to draw each individual tick:
 io.asciidoc	A more advanced usage of the `FileSystemStorage` API can be a `FileSystemStorage` `Tree`:
 io.asciidoc	A simpler implementation could do something like this:
 io.asciidoc	Above, if you want to select the IDs of all players that are ranked in the top 2, you can use an expression like:
