@@ -10278,6 +10278,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     ///
     /// the clip, or null when the content produced no representation at all
     ClipData clipDataFor(ClipboardContent content) {
+        beginStagingClip();
         int sdk = android.os.Build.VERSION.SDK_INT;
         List<String> mimeTypes = new ArrayList<String>();
         List<ClipData.Item> items = new ArrayList<ClipData.Item>();
@@ -10952,16 +10953,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 html = item.getHtmlText();
             }
             if (plain == null) {
-                // Literally for an item that also carries a URI, and coerced otherwise.
-                // coerceToText *derives* text from whatever the item holds, which for a URI
-                // means going and reading the document behind it -- a different value
-                // altogether, and one this branch has no business producing. Where it does
-                // coerce, an empty answer means the item had nothing to give rather than that
-                // the source published nothing, so it does not stop the search.
-                CharSequence text = item.getUri() != null
-                        ? item.getText() : item.coerceToText(getContext());
-                if (text != null && text.length() > 0) {
-                    plain = text.toString();
+                // What the item literally carries first, and empty counts: getText answers
+                // null when the item holds no text at all, so anything else is what the
+                // source published -- the same reading getHtmlText gets above. Discarding an
+                // empty one left an advertised text/markdown with nothing to restore it
+                // from, and a target that took the hover on that type was refused the drop.
+                CharSequence literal = item.getText();
+                if (literal != null) {
+                    plain = literal.toString();
+                } else if (item.getUri() == null) {
+                    // Nothing literal, so it is derived -- and only for an item with no URI.
+                    // coerceToText on one of those goes and reads the document behind it,
+                    // which is a different value altogether and none of this branch's
+                    // business. An empty derivation means the item had nothing to give
+                    // rather than that the source published nothing, so it does not stop
+                    // the search.
+                    CharSequence derived = item.coerceToText(getContext());
+                    if (derived != null && derived.length() > 0) {
+                        plain = derived.toString();
+                    }
                 }
             }
         }
@@ -11012,10 +11022,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// being read as a file, which is what it was read as before any of this existed.
     /// It also names the file, because every one of these is a file this application wrote
     /// into its own cache and nothing else will ever come back for it. A clip that has been
-    /// replaced cannot be pasted, so when an entry falls off the end its file goes with it --
+    /// replaced cannot be pasted, so when one falls off the end its file goes with it --
     /// otherwise copying documents or images repeatedly leaves every one of them on disk for
     /// the life of the installation.
-    private static final int GENERATED_CLIP_URI_MEMORY = 64;
+    ///
+    /// Kept by the clip rather than one file at a time. A single payload can stage more files
+    /// than any per-file bound, and counting them individually deleted the earliest ones while
+    /// clipDataFor was still building the very clip that referenced them -- so the clip went
+    /// out pointing at files that were already gone. Whole clips are what is forgotten, never
+    /// the one being assembled.
+    private static final int GENERATED_CLIP_MEMORY = 8;
     private static final java.util.LinkedHashMap<String, StagedClipFile> STAGED_CLIP_FILES =
             new java.util.LinkedHashMap<String, StagedClipFile>();
 
@@ -11024,24 +11040,42 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static final class StagedClipFile {
         private final String path;
         private final boolean transport;
+        private final long clip;
 
-        StagedClipFile(String path, boolean transport) {
+        StagedClipFile(String path, boolean transport, long clip) {
             this.path = path;
             this.transport = transport;
+            this.clip = clip;
+        }
+    }
+
+    /// The clip being assembled. Incremented as each one starts, so everything staged for it
+    /// is recognisable as belonging together.
+    private static long stagingClip;
+
+    private static long beginStagingClip() {
+        synchronized (STAGED_CLIP_FILES) {
+            return ++stagingClip;
         }
     }
 
     private static void rememberStagedClipFile(Uri uri, File file, boolean transport) {
         synchronized (STAGED_CLIP_FILES) {
+            long clip = stagingClip;
             STAGED_CLIP_FILES.remove(uri.toString());
             STAGED_CLIP_FILES.put(uri.toString(),
-                    new StagedClipFile(file.getAbsolutePath(), transport));
-            java.util.Iterator<java.util.Map.Entry<String, StagedClipFile>> oldest =
+                    new StagedClipFile(file.getAbsolutePath(), transport, clip));
+            // Whole clips, and never the newest ones: the clip being built is still growing,
+            // and the one before it may be what the clipboard or a running drag is carrying.
+            long forgetBefore = clip - GENERATED_CLIP_MEMORY;
+            java.util.Iterator<java.util.Map.Entry<String, StagedClipFile>> entries =
                     STAGED_CLIP_FILES.entrySet().iterator();
-            while (STAGED_CLIP_FILES.size() > GENERATED_CLIP_URI_MEMORY && oldest.hasNext()) {
-                StagedClipFile evicted = oldest.next().getValue();
-                oldest.remove();
-                deleteStagedClipFile(evicted);
+            while (entries.hasNext()) {
+                StagedClipFile staged = entries.next().getValue();
+                if (staged.clip <= forgetBefore) {
+                    entries.remove();
+                    deleteStagedClipFile(staged);
+                }
             }
         }
     }
@@ -11208,7 +11242,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 content.setDataProvider(only, uriBytesProvider(unclaimed.get(0)));
             }
         }
-        if (plain != null && plain.length() > 0) {
+        if (plain != null) {
             for (int iter = 0; iter < unsatisfiedText.size(); iter++) {
                 // What is left: an Android clip carries a single text payload, and a text type
                 // no URI accounted for is another name for that payload -- which is exactly how
