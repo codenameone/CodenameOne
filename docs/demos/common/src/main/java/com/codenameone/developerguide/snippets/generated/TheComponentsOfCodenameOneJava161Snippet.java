@@ -101,6 +101,11 @@ class TheComponentsOfCodenameOneJava161Snippet {
         TextField num3 = new TextField("", "", 5, TextField.NUMERIC);
         TextField num4 = new TextField("", "", 5, TextField.NUMERIC);
         Button submit = new Button("Submit");
+        // the masking from the previous sample still applies to these fields
+        automoveToNext(num1, num2);
+        automoveToNext(num2, num3);
+        automoveToNext(num3, num4);
+        num4.setMaxSize(4);
 
         Validator v = new Validator();
         v.addConstraint(firstName, new LengthConstraint(2)).
@@ -124,5 +129,21 @@ class TheComponentsOfCodenameOneJava161Snippet {
 
 
 
+
+
+    private void automoveToNext(final TextField current, final TextField next) {
+        current.addDataChangedListener((type, index) -> {
+            String val = current.getText();
+            if(val.length() > 4) {
+                current.stopEditing();
+                current.setText(val.substring(0, 4));
+                String rest = val.substring(4);
+                next.setText(rest);
+                if(rest.length() <= 4) {
+                    next.startEditingAsync();
+                }
+            }
+        });
+    }
 
 }

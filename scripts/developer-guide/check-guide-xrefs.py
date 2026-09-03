@@ -197,9 +197,11 @@ def main() -> int:
     anchor_total = 0
 
     for name, attributes in BACKENDS:
-        rendered = render(root, attributes)
-        ids = set(ID_RE.findall(rendered))
-        markup = without_listings(rendered)
+        # Strip listings before anything is collected. Ids are read from the same
+        # stripped markup as the links: a sample containing id="x" would otherwise
+        # register x as a real anchor and let a dangling <<x>> through.
+        markup = without_listings(render(root, attributes))
+        ids = set(ID_RE.findall(markup))
         anchor_total = max(anchor_total, len(ids))
         for target in HREF_RE.findall(markup):
             if target not in ids:
