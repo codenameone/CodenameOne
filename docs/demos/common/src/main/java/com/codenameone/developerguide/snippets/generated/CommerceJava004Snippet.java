@@ -85,10 +85,16 @@ class CommerceJava004Snippet {
     
     void snippet() throws Exception {
         // tag::commerce-java-004[]
-        CN.callSerially(() -> {});                // (illustrative)
         new Thread(() -> {
             cm.refresh();
-            if (cm.isEntitled("pro")) { /* ... */ }
+            // refresh() returns on the worker thread. Reading the entitlement
+            // and unlocking the UI has to hop back to the event dispatch
+            // thread, because Codename One UI calls are only legal there.
+            CN.callSerially(() -> {
+                if (cm.isEntitled("pro")) {
+                    // unlock the paid features here
+                }
+            });
         }).start();
         // end::commerce-java-004[]
     }

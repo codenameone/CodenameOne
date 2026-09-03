@@ -88,7 +88,10 @@ class MonetizationJava033Snippet {
         ApplePromotionalOffer offer = new ApplePromotionalOffer();
         offer.setOfferIdentifier("my-intro-offer");
         offer.setKeyIdentifier("A1B2C3D4");
-        offer.setNonce(UUID.randomUUID().toString());
+        // The nonce is one of the values your server signs, so it has to be
+        // the very one that produced the signature below. A fresh value
+        // generated here would never validate.
+        offer.setNonce(nonceFromYourServer);
         offer.setSignature(signatureFromYourServer);
         offer.setTimestamp(timestampFromYourServer);
 
@@ -100,5 +103,6 @@ class MonetizationJava033Snippet {
     long timestampFromYourServer;
     static final String SKU_WORLD_MONTHLY = "com.example.world.monthly";
     String signatureFromYourServer = "signature";
+    String nonceFromYourServer = "nonce";
 
 }

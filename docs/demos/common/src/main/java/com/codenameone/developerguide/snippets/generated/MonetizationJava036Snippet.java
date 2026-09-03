@@ -98,10 +98,9 @@ class MonetizationJava036Snippet {
      receipts = new ArrayList<Receipt>();
      }
      // Check to see if this receipt already exists. That should not happen,
-     // but a store can resend one, and the transaction id may be null.
+     // but a store can resend one.
      for (Receipt r : receipts) {
-     if (Objects.equals(r.getStoreCode(), receipt.getStoreCode()) &&
-     Objects.equals(r.getTransactionId(), receipt.getTransactionId())) {
+     if (sameReceipt(r, receipt)) {
      // Already stored. Report success, or synchronizeReceipts() never finishes.
      callback.onSucess(Boolean.TRUE);
      return;
@@ -146,6 +145,26 @@ class MonetizationJava036Snippet {
      }
      // Make sure this is outside the synchronized block
      callback.onSucess(Boolean.TRUE);
+    }
+
+    // Two receipts are the same purchase when their transaction ids match. A
+    // null transaction id is not an identity, though: two distinct receipts
+    // can both carry one, so treating them as equal would silently drop the
+    // second purchase. Fall back to the fields that together identify a
+    // purchase -- the same comparison `Purchase.receiptsMatch()` makes.
+    private static boolean sameReceipt(Receipt a, Receipt b) {
+     String aTx = a.getTransactionId();
+     String bTx = b.getTransactionId();
+     if (aTx != null && bTx != null) {
+     return aTx.equals(bTx);
+     }
+     if (aTx != null || bTx != null) {
+     return false;
+     }
+     return Objects.equals(a.getSku(), b.getSku())
+     && Objects.equals(a.getStoreCode(), b.getStoreCode())
+     && Objects.equals(a.getPurchaseDate(), b.getPurchaseDate())
+     && Objects.equals(a.getOrderData(), b.getOrderData());
     }
     // end::monetization-java-036[]
     }
