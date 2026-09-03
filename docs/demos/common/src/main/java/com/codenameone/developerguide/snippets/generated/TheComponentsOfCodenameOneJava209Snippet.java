@@ -104,6 +104,9 @@ class TheComponentsOfCodenameOneJava209Snippet {
             cal.add(Calendar.DAY_OF_MONTH, 7);
             picker.setDate(cal.getTime());
         }, Picker.LightweightPopupButtonPlacement.BELOW_SPINNER);
+        Form hi = new Form("Picker", new BoxLayout(BoxLayout.Y_AXIS));
+        hi.add(picker);
+        hi.show();
         // end::the-components-of-codename-one-java-209[]
     }
 }

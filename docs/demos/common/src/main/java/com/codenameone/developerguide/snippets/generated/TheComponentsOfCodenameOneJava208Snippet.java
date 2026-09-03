@@ -100,6 +100,11 @@ class TheComponentsOfCodenameOneJava208Snippet {
                   return false;
               }
               String[] l = searchLocations(text);
+              if(!text.equals(getText())) {
+                  // the wait above pumps the EDT, so the field may have moved on
+                  // and a newer query may already have filled the model
+                  return false;
+              }
               if(l == null || l.length == 0) {
                   // otherwise the popup keeps showing the previous query's matches
                   options.removeAll();

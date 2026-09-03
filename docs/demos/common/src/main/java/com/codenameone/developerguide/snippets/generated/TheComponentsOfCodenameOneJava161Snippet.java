@@ -113,6 +113,11 @@ class TheComponentsOfCodenameOneJava161Snippet {
                 addConstraint(num4, new LengthConstraint(4));
 
         v.addSubmitButtons(submit);
+
+        Form hi = new Form("Validation", new BoxLayout(BoxLayout.Y_AXIS));
+        hi.add(firstName).add(surname).add(url).add(email).add(phone).
+                add(num1).add(num2).add(num3).add(num4).add(submit);
+        hi.show();
         // end::the-components-of-codename-one-java-161[]
     }
 
