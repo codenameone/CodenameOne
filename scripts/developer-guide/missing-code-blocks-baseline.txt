@@ -159,85 +159,9 @@ Notifications-And-Background-Execution.asciidoc	before; the bean has been extend
 Notifications-And-Background-Execution.asciidoc	then reference it from a notification with `setChannelId(...)`:
 Printing.asciidoc	`Printer.printImage(image, listener)` prints a `com.codename1.ui.Image` directly. The image is encoded to a temporary PNG file behind the scenes and the file is deleted once the print flow finishes:
 SVG-Transcoder.asciidoc	the generated class directly:
-The-Components-Of-Codename-One.asciidoc	A common source of confusion in the `MultiButton` is the difference between the icon and the emblem, since both may have an icon image associated with them. The icon is an image representing the entry while the emblem is an optional visual representation of the action that will be undertaken when the element is pressed. Both may be used simultaneously or individually of one another:
-The-Components-Of-Codename-One.asciidoc	A form is a container with a title, a content area, and an optional menu or menu-bar area. When you call methods such as `add` or `remove` on a form, you're invoking something that maps to this:
-The-Components-Of-Codename-One.asciidoc	A more practical "real world" example would be working with XML data. You can use something like this to show an XML `Tree`:
-The-Components-Of-Codename-One.asciidoc	A picker can work with your existing sample using code like this:
-The-Components-Of-Codename-One.asciidoc	A popup dialog is a common mobile paradigm showing a `Dialog` that points at a specific component. It's a standard `Dialog` that's shown in a unique way:
-The-Components-Of-Codename-One.asciidoc	And call its methods:
 The-Components-Of-Codename-One.asciidoc	Call the builder from a Maven plugin, an Ant task or a one-shot `main`:
-The-Components-Of-Codename-One.asciidoc	For example, if you wish to query a database or a web service you will need to derive the class and perform more advanced filtering by overriding the `filter` method:
-The-Components-Of-Codename-One.asciidoc	For example, suppose you want to pass a string with text to set in a textarea within the webpage. You can do something like:
-The-Components-Of-Codename-One.asciidoc	For example, this behavior might not be desired so to block that you can do:
-The-Components-Of-Codename-One.asciidoc	For example, to enclose the `CheckBox` components in a vertical `ComponentGroup` and the `RadioButton's` in a horizontal group, change the last line of the code above as such:
-The-Components-Of-Codename-One.asciidoc	For example, you can change the focus `Component` to have an icon:
-The-Components-Of-Codename-One.asciidoc	For example:
-The-Components-Of-Codename-One.asciidoc	For example: You might want to create a proxy for the https://developer.mozilla.org/en-You/docs/Web/API/Window/location[window.location] object so that you can access its properties more from Java:
-The-Components-Of-Codename-One.asciidoc	For example: the demo below uses the GRRM demo data from above to build a `ComboBox`:
-The-Components-Of-Codename-One.asciidoc	Here is a simple example of a `MultiList` containing a highly popular subject matter:
-The-Components-Of-Codename-One.asciidoc	Here is a simple example that also shows the difference between the `scale to fill` and `scale to fit` modes:
-The-Components-Of-Codename-One.asciidoc	If you add to the sample above a `Validator`:
-The-Components-Of-Codename-One.asciidoc	If you call `Display` directly instead of using `ShareButton`, pass the listener as the final argument to the new overload:
-The-Components-Of-Codename-One.asciidoc	In the sample below you fetch all the contacts from the device and enable search through them, notice it expects and image called `duke.png` which is the default Codename One icon renamed and placed in the src folder:
-The-Components-Of-Codename-One.asciidoc	It's also recommended to place the list in the `CENTER` location of a https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] to produce the most effective results. For example:
 The-Components-Of-Codename-One.asciidoc	Let start by exploring how you can achieve this UI that fetches data from a webservice:
-The-Components-Of-Codename-One.asciidoc	Masking allows you to accept partial input in one field and implicitly move to the next, this can be used to all types of complex input thanks to the text component API. E.g with the code above you can mask the credit card input so the cursor jumps to the next field implicitly using this code:
-The-Components-Of-Codename-One.asciidoc	NOTE: In all the sample code below, you can assume that variables named `bc` represent an instance of https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html[BrowserComponent]:
-The-Components-Of-Codename-One.asciidoc	Normally, to build the model for a renderer of this type, you use something like:
-The-Components-Of-Codename-One.asciidoc	Notice in the sample below that you associate all the radio buttons with a group but don't do anything with the group as the radio buttons keep the reference internally. You also show the opposite side functionality and icon behavior:
-The-Components-Of-Codename-One.asciidoc	Notice that this feature works with the on-top and permanent versions of the side menu and not with the legacy versions:
-The-Components-Of-Codename-One.asciidoc	Notice that when you work with numeric values or anything related to the types mentioned above your code must be aware of the typing. For example: in this case the type is `Double` and not `String`:
-The-Components-Of-Codename-One.asciidoc	Now look at a more advanced Renderer:
-The-Components-Of-Codename-One.asciidoc	Now make it a bit more useful:
-The-Components-Of-Codename-One.asciidoc	Now that you have a webservice lets proceed to create the UI. Check out the code annotations below:
-The-Components-Of-Codename-One.asciidoc	One of the features of label that moved into `SpanLabel` to some extent is the ability to position the icon. For example, unlike a `Label` the icon position is determined by the layout manager of the composite so `setIconPosition` accepts a `BorderLayout` constraint:
-The-Components-Of-Codename-One.asciidoc	Or synchronously:
-The-Components-Of-Codename-One.asciidoc	Simple usage of the `Calendar` class looks something like this:
-The-Components-Of-Codename-One.asciidoc	Simple usage of the `ToastBar` class looks something like this:
-The-Components-Of-Codename-One.asciidoc	The Renderer is a simple interface with 2 methods:
-The-Components-Of-Codename-One.asciidoc	The callbacks you pass to `execute()` and `executeAndWait()` are single-use callbacks. You can’t, for example, store the `callback` variable on the JavaScript side for later use (for example: to respond to a button click event). If you need a "multi-use" callback, you should use the `addJSCallback()` method instead. Its usage looks identical to `execute()`, the difference is that the callback will live on after its first use. For example: Consider the following code:
-The-Components-Of-Codename-One.asciidoc	The code below provides a brief overview of these options:
-The-Components-Of-Codename-One.asciidoc	The data of the `Tree` arrives from a model for example: this:
-The-Components-Of-Codename-One.asciidoc	The first step is creating the webservice call, you won't go into too much detail here as webservices & IO are discussed later in the guide:
-The-Components-Of-Codename-One.asciidoc	The https://www.codenameone.com/javadoc/com/codename1/ui/list/ListModel.html[ListModel] interface can be implemented by anyone in this case you did a stupid simple implementation:
-The-Components-Of-Codename-One.asciidoc	The model for the XML hierarchy is implemented as such:
-The-Components-Of-Codename-One.asciidoc	The most simple/naive implementation may choose to implement the renderer as follows:
-The-Components-Of-Codename-One.asciidoc	The old API provided a synchronous wrapper around an inherently asynchronous process, and made extensive use of `invokeAndBlock()` underneath the covers. This resulted in a nice API with high-level abstractions that played with a synchronous programming model, but it came with a price-tag in performance, complexity, and predictability. Let’s take a simple example, getting a reference to the "window" object:
-The-Components-Of-Codename-One.asciidoc	The screenshot above was produced using the following code:
-The-Components-Of-Codename-One.asciidoc	The split pane component is a bit desktop specific but works reasonably well on devices. To get the image below you changed `SalesDemo.java` in the kitchen sink by changing this:
-The-Components-Of-Codename-One.asciidoc	Then implement the method `automoveToNext` as:
-The-Components-Of-Codename-One.asciidoc	Then you can retrieve its properties using the `get()` method:
 The-Components-Of-Codename-One.asciidoc	This code should output "The result was 7" to the console. It's fully asynchronous, so you can include this code anywhere without worrying about it "bogging down" your code. The full signature of this form of the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute(java.lang.String,com.codename1.util.SuccessCallback)[execute()] method is:
-The-Components-Of-Codename-One.asciidoc	This sample below continues from the place where the <<text-component-sample-code,TextField sample above>> stopped by adding validation to that code:
-The-Components-Of-Codename-One.asciidoc	This swipe gesture is commonly used in touch interfaces to expose features such as delete, edit etc. It's trivial to use this component by determining the components placed on top and bottom (the revealed component):
-The-Components-Of-Codename-One.asciidoc	To make the code tighter, keep a reference to the `Component` or extend it as https://www.codenameone.com/javadoc/com/codename1/ui/list/DefaultListCellRenderer.html[DefaultListCellRenderer] does:
-The-Components-Of-Codename-One.asciidoc	Unlike the `InfiniteScrollAdapter` you can't use the `ContentPane` directly so you've to use a `BorderLayout` and place the `InfiniteContainer` there:
-The-Components-Of-Codename-One.asciidoc	Unlike the `MultiButton` it uses the `TextArea` internally to break lines seamlessly. The `SpanButton` is far simpler than the `MultiButton` and as a result isn't as configurable:
-The-Components-Of-Codename-One.asciidoc	What if you want componentName to be red? Just use:
-The-Components-Of-Codename-One.asciidoc	When using lightweight picker mode (`setUseLightweightPopup(true)`), you can add custom quick-action buttons to the popup. This is useful for actions like setting the date to "Today" or "+7 Days" without scrolling the wheels manually:
-The-Components-Of-Codename-One.asciidoc	With this:
-The-Components-Of-Codename-One.asciidoc	You can access JavaScript variables from the context by using code like this:
-The-Components-Of-Codename-One.asciidoc	You can also delay the showing of the status message using `showDelayed` as such:
-The-Components-Of-Codename-One.asciidoc	You can also query the context for objects and change their value for example:
-The-Components-Of-Codename-One.asciidoc	You can also set its properties:
-The-Components-Of-Codename-One.asciidoc	You can automatically clear a status message/progress after a timeout using the `setExpires` method as such:
-The-Components-Of-Codename-One.asciidoc	You can combine some demos above including the <<slider-stars-demo,Slider stars demo>> to rank GRRM's books in an interactive way:
-The-Components-Of-Codename-One.asciidoc	You can convert the sample above to use toggle buttons as such:
-The-Components-Of-Codename-One.asciidoc	You can dynamically download images directly into the `ImageViewer` with a custom list model like this:
-The-Components-Of-Codename-One.asciidoc	You can now replace the existing model by removing all the model related logic and changing the constructor call as such:
-The-Components-Of-Codename-One.asciidoc	You can show a progress indicator in the ToastBar like this:
-The-Components-Of-Codename-One.asciidoc	You can use the `ImageViewer` as a tool to view a single image which allows you to zoom in/out to that image as such:
-The-Components-Of-Codename-One.asciidoc	You can wrap a `TextField` with a clearable wrapper to get this effect on all platforms. For example: replace this:
-The-Components-Of-Codename-One.asciidoc	You need to change this code to use the `addJSCallback()` method as follows:
-The-Components-Of-Codename-One.asciidoc	You will need to define the following theme constants for the arrow to work:
-The-Components-Of-Codename-One.asciidoc	`ImageViewer` also supports optional side arrows (material font icons) and an optional thumbnail strip for direct image navigation:
-The-Components-Of-Codename-One.asciidoc	`InfiniteProgress` can be used in one of two ways either by embedding the component into the UI through something like this:
-The-Components-Of-Codename-One.asciidoc	`Label` text can be positioned in one of 4 locations as such:
-The-Components-Of-Codename-One.asciidoc	`Slider` is highly customizable for example: a slider can be used to replicate a 5-star rating widget as such. Notice that this slider will work when its given its preferred size otherwise more stars will appear. That's why you place it within a `FlowLayout`:
-The-Components-Of-Codename-One.asciidoc	`setRenderingPrototype` accepts a "fake" value that represents a reasonably large amount of data and it will be used to calculate the preferred size. For example: for a multiList that should render 2 lines of text with 20 characters and a 5mm square icon you can do something like this:
-The-Components-Of-Codename-One.asciidoc	app for specific examples, but here is a high-level view of some code that creates a Pie Chart:
-The-Components-Of-Codename-One.asciidoc	doing this, you need to define this entry for all entries, for example:
-The-Components-Of-Codename-One.asciidoc	or a go icon using a hint such as this:
 The-EDT---Event-Dispatch-Thread.asciidoc	A simplistic approach is to do something like this:
 The-EDT---Event-Dispatch-Thread.asciidoc	For example, instead of using operation names lets use a more "real world" example:
 The-EDT---Event-Dispatch-Thread.asciidoc	However, `updateUIWithContentOfFile` should be executed on the EDT and not on a random thread. The right way to do this would therefore be something like this:
