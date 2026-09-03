@@ -88,6 +88,11 @@ class GameBuilderJava002Snippet extends GameSceneView {
     // tag::game-builder-java-002[]
     @Override
     protected void onUpdate(double dt) {
+        // The generated companion switches the built-in arcade behaviour on, and
+        // that already patrols enemies and collects pickups. A scene doing the
+        // work itself calls setArcadeBehavior(false) in its constructor -- with
+        // both running, the built-in patrol and the step below cancel out and
+        // the slime stalls.
         GameInput in = getInput();
         Scene scene = getScene();
         // Backwards, because collecting a coin removes it from the scene and a
@@ -106,7 +111,7 @@ class GameBuilderJava002Snippet extends GameSceneView {
                 case "slime" -> s.setX(s.getX() + el.getDouble("speed", 60) * dt);
                 case "coin"  -> {
                     if (s.intersects(player)) {
-                        score += el.getInt("value", 10);
+                        addScore(el.getInt("value", 10));
                         scene.remove(s);   // consume it, or it scores again every frame
                     }
                 }
@@ -116,6 +121,5 @@ class GameBuilderJava002Snippet extends GameSceneView {
     // end::game-builder-java-002[]
 
     Sprite player;
-    int score;
 
 }

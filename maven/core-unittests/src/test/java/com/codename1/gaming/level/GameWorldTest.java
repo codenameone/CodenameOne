@@ -23,6 +23,23 @@ class GameWorldTest {
     }
 
     @Test
+    void registeringACustomMaterialKeepsTheBuiltIns() {
+        // The registry is process-wide with no reset, so this cannot force itself
+        // to be the first toucher. What it locks is the invariant that broke:
+        // register() seeds the built-ins itself, so a custom material can never
+        // suppress them whatever the order. Previously the defaults were installed
+        // only on the first *lookup*, guarded by "the map is empty" -- so an
+        // application that registered before looking anything up got a registry
+        // holding nothing but its own material, and every built-in resolved to the
+        // grey placeholder.
+        MaterialRegistry.register(new Material("basalt", "Basalt", 0x2b2b2b));
+        assertTrue(MaterialRegistry.contains(MaterialRegistry.GRASS));
+        assertTrue(MaterialRegistry.contains(MaterialRegistry.WATER));
+        assertEquals(0x3f7d3a, MaterialRegistry.get(MaterialRegistry.GRASS).getColor());
+        assertTrue(MaterialRegistry.get(MaterialRegistry.WATER).isSolid());
+    }
+
+    @Test
     void streamingTerrainAcrossChunksAndNegatives() {
         StreamingTerrain t = new StreamingTerrain();
         // a cell well inside one chunk and one across a chunk boundary into negative space

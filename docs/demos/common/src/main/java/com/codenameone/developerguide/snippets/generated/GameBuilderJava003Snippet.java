@@ -86,10 +86,13 @@ class GameBuilderJava003Snippet {
     void snippet() throws Exception {
         // tag::game-builder-java-003[]
         Form game = new Form("Play", new BorderLayout());
-        // The catalog travels with the app as a resource. StarterPacks lives in the
-        // Game Builder editor, so it is not on an application's classpath.
+        // The generated scene takes the catalog as a constructor argument, and
+        // neither the scaffold nor the build produces one: it is yours to supply.
+        // Bundle the pack JSON your level references as an app resource and load
+        // it here. StarterPacks, which the editor uses, ships with the editor and
+        // is not on an application's classpath.
         AssetCatalog catalog = AssetCatalog.load(
-                Display.getInstance().getResourceAsStream(Level1.class, "/packs.json"));
+                Display.getInstance().getResourceAsStream(Level1.class, "/my-packs.json"));
         Level1 scene = new Level1(catalog);
         game.add(BorderLayout.CENTER, scene);
         game.show();
