@@ -791,10 +791,24 @@ API_AVAILABLE(ios(11.0))
     return preview;
 }
 
+- (BOOL)dragInteraction:(UIDragInteraction *)interaction
+sessionAllowsMoveOperation:(id<UIDragSession>)session {
+    // What the operation actually permits. UIKit allows a move by default for a session that
+    // stays inside the application, and storing the mask for this framework's own drop delegate
+    // does not constrain a *different* UIDropInteraction here -- so a copy-only drag landing on
+    // one of those could be moved, didEndWithOperation: would report the move, and a source
+    // following the documented advice would delete data the operation had explicitly refused to
+    // allow moving.
+    //
+    // The mask belongs to the session this interaction started; see cn1OutgoingSession.
+    return (cn1SessionActions & CN1_DND_ACTION_MOVE) != 0;
+}
+
 - (void)dragInteraction:(UIDragInteraction *)interaction
                 session:(id<UIDragSession>)session
     didEndWithOperation:(UIDropOperation)operation {
     cn1DraggingOut = NO;
+    const int allowed = (cn1OutgoingSession == session) ? cn1SessionActions : CN1_DND_ACTION_NONE;
     if (cn1OutgoingSession == session) {
 #ifndef CN1_USE_ARC
         [cn1OutgoingSession release];
@@ -816,6 +830,12 @@ API_AVAILABLE(ios(11.0))
         action = CN1_DND_ACTION_COPY;
     } else if (operation == UIDropOperationMove) {
         action = CN1_DND_ACTION_MOVE;
+    }
+    // Never more than the source allowed. The refusal above is what should keep a move from
+    // being performed at all; this is the second half of it, because the cost of being wrong
+    // here is a source deleting data on the strength of an action it never offered.
+    if (allowed != CN1_DND_ACTION_NONE && (action & allowed) != action) {
+        action = CN1_DND_ACTION_NONE;
     }
     CN1NativeDragDeliverCompleted(action);
 }
