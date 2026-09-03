@@ -81,7 +81,6 @@ class GraphicsJava062Snippet {
     
     class Sample extends Component {
     // tag::graphics-java-062[]
-    Date currentTime = new Date();
     long lastRenderedTime = 0;
 
     @Override
@@ -96,4 +95,7 @@ class GraphicsJava062Snippet {
     }
     // end::graphics-java-062[]
     }
+
+    Date currentTime = new Date();
+
 }

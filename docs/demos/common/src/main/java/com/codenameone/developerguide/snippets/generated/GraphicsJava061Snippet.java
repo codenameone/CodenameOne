@@ -102,11 +102,11 @@ class GraphicsJava061Snippet {
         double minuteAngle = minute/60.0*2.0*Math.PI;
 
         // Rotate and draw the minute hand, keeping the caller's transform
-        Transform originalTransform = g.getTransform();
+        Transform beforeMinuteHand = g.getTransform();
         g.rotate((float)minuteAngle, (int)absCX, (int)absCY);
         g.setColor(0x000000);
         g.fillShape(translatedMinuteHand);
-        g.setTransform(originalTransform);
+        g.setTransform(beforeMinuteHand);
 
 
         // Draw the hour hand
