@@ -1875,6 +1875,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-03T00:01:21+00:00"
+      },
+      "devto": {
+        "id": 4567384,
+        "url": "https://dev.to/codenameone/app-intents-one-java-declaration-for-siri-spotlight-and-shortcuts-fdi",
+        "syndicated_at": "2026-09-03T17:05:39+00:00"
       }
     }
   }
