@@ -746,6 +746,45 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A relay answer fetched before a disable() must not be admitted after a re-enable.
+     * accountEra moves on clear() and setRelay() but NOT on disable(), so carrying only that
+     * generation let work started in the previous run restore into the new one -- precisely the
+     * rejection the lifecycle generation exists to perform.
+     */
+    @EdtTest
+    public void aStateFetchedBeforeADisableIsNotAdmittedAfterReEnable() {
+        Continuity.enable();
+        final int[] seen = new int[1];
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                seen[0]++;
+                return true;
+            }
+        });
+
+        // What a poll captured before the application switched continuity off and on again.
+        AppState inFlight = foreign("device-preexisting", 7);
+        Continuity.disable();
+        Continuity.enable();
+
+        // era 0 was this session's account era when the fetch started; the delivery generation
+        // has moved twice since.
+        Continuity.deliver(inFlight, 0L, 0L);
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(250);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+
+        assertEquals(0, seen[0],
+                "a state fetched before the disable was restored into the re-enabled run");
+    }
+
+    /**
      * An app that only registers a store listener keeps continuity OFF by design -- a key/value
      * store is not consent to broadcast a route stack. refreshBridge() tested `enabled` alone, so
      * the simulator's capability menu, which swaps the bridge and calls it, left the replacement

@@ -905,6 +905,21 @@ public final class Continuity {
     ///
     /// true when a form was shown, so the caller should not show its own
     public static boolean restore() {
+        final long account;
+        final long lifecycle;
+        synchronized (STATE_LOCK) {
+            // Captured BEFORE the state is retrieved and re-checked before anything is applied.
+            // This path takes framework-held state, so a clear() or disable() completing in
+            // between would otherwise apply the previous account's payload, navigation and
+            // durable mark after logout -- the queued inbound path is serialized against clear()
+            // and this one was not.
+            //
+            // A generation rather than COMMIT_LOCK, deliberately: restore() marshals to the EDT
+            // when called off it, and holding COMMIT_LOCK across that wait would deadlock against
+            // a checkpoint already running on the EDT and wanting the same lock.
+            account = accountEra;
+            lifecycle = lifecycleEra;
+        }
         AppState state = getRestorableState();
         if (state == null) {
             return false;
@@ -915,7 +930,7 @@ public final class Continuity {
         // relay retry was rejected after the next launch too. A state that was never restored
         // then could not be restored at all, which is the one outcome this feature exists to
         // prevent.
-        boolean shown = restore(state);
+        boolean shown = restoreValidated(state, account, lifecycle);
         if (shown) {
             synchronized (STATE_LOCK) {
                 // Compare-and-clear, not a blind clear. An off-EDT caller takes state A and waits
@@ -974,6 +989,15 @@ public final class Continuity {
     ///
     /// true when a form was shown
     public static boolean restore(final AppState state) {
+        // No generation: an application handing us a state of its own is making an explicit
+        // decision, and second-guessing it against a logout it may itself have just performed is
+        // not this method's business. The no-argument wrapper, which takes framework-held state,
+        // is the one that validates.
+        return restoreValidated(state, NO_ERA, NO_ERA);
+    }
+
+    private static boolean restoreValidated(final AppState state, final long account,
+            final long lifecycle) {
         if (state == null) {
             return false;
         }
@@ -986,16 +1010,31 @@ public final class Continuity {
             runOnEdt(new Runnable() {
                 @Override
                 public void run() {
-                    out[0] = restoreOnEdt(state);
+                    out[0] = restoreOnEdt(state, account, lifecycle);
                 }
             });
             return out[0];
         }
-        return restoreOnEdt(state);
+        return restoreOnEdt(state, account, lifecycle);
     }
 
-    private static boolean restoreOnEdt(AppState state) {
-        StateProvider p = provider;
+    private static boolean restoreOnEdt(AppState state, long account, long lifecycle) {
+        synchronized (STATE_LOCK) {
+            if ((account != NO_ERA && account != accountEra)
+                    || (lifecycle != NO_ERA && lifecycle != lifecycleEra)) {
+                // A clear() or a disable() landed between the retrieval and here. Applying now
+                // would put the previous account's work on screen and write its durable mark.
+                return false;
+            }
+        }
+        StateProvider p;
+        synchronized (STATE_LOCK) {
+            // Read under the lock, as captureOnEdt() already does. setStateProvider() is public
+            // and writes under STATE_LOCK from whatever thread the application uses, so an
+            // unguarded read here could hand a payload to a provider the app had just replaced,
+            // or observe the replacement without safe publication.
+            p = provider;
+        }
         if (p != null) {
             try {
                 // Before the routes, so a form the route table is about to build can read what
@@ -1156,6 +1195,7 @@ public final class Continuity {
     /// never the polling loop -- which is why the stand-down lives in the caller.
     private static void pollOnce() {
         final long era;
+        final long delivery;
         final StateRelay r;
         synchronized (STATE_LOCK) {
             // Relay and era read as a PAIR, on every attempt. The worker used to keep the relay
@@ -1164,6 +1204,12 @@ public final class Continuity {
             // answer with the new era -- which made the era check, whose whole job is to stop
             // exactly that, wave it through and restore the old endpoint's data.
             era = accountEra;
+            // The DELIVERY generation as well. accountEra moves on clear() and setRelay() but NOT
+            // on disable(), so an application that disabled and re-enabled while a fetch was in
+            // flight had the answer admitted into the new run: the account era still matched, and
+            // the admission then stamped it with the CURRENT deliveryEra -- which is precisely the
+            // rejection the lifecycle generation exists to perform.
+            delivery = deliveryEra;
             r = relay;
             if (r == null) {
                 return;
@@ -1183,7 +1229,7 @@ public final class Continuity {
         // landing between this line and the admission inside deliver() would otherwise rebrand the
         // previous account's response as a current-session arrival, and clear() has just emptied
         // lastSeen so nothing downstream would know better.
-        deliver(fetched, era);
+        deliver(fetched, era, delivery);
     }
 
     /// Forgets everything: the stored checkpoint, any parked arrival, the activity advertised to
@@ -1563,6 +1609,11 @@ public final class Continuity {
     /// it restored into the account that had just signed in. Passing it here puts the question in
     /// the same hold as the admission it governs.
     static void deliver(final AppState state, final long pollEra) {
+        deliver(state, pollEra, NO_ERA);
+    }
+
+    /// As above, also rejecting a state fetched in an earlier run of the framework.
+    static void deliver(final AppState state, final long pollEra, final long pollDelivery) {
         if (state == null) {
             return;
         }
@@ -1570,7 +1621,8 @@ public final class Continuity {
             if (!enabled) {
                 return;
             }
-            if (pollEra != NO_ERA && pollEra != accountEra) {
+            if ((pollEra != NO_ERA && pollEra != accountEra)
+                    || (pollDelivery != NO_ERA && pollDelivery != deliveryEra)) {
                 return;
             }
         }
@@ -1588,9 +1640,11 @@ public final class Continuity {
         }
         final long era;
         synchronized (STATE_LOCK) {
-            // Re-asked under the SAME hold that records the mark, so a logout between the check
-            // above and this one cannot slip a previous-account state past both.
-            if (pollEra != NO_ERA && pollEra != accountEra) {
+            // Re-asked under the SAME hold that records the mark, so a logout -- or a disable and
+            // re-enable -- between the check above and this one cannot slip an old state past
+            // both.
+            if ((pollEra != NO_ERA && pollEra != accountEra)
+                    || (pollDelivery != NO_ERA && pollDelivery != deliveryEra)) {
                 return;
             }
             Long seen = lastSeen.get(state.getDeviceId());
