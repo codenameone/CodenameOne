@@ -83,6 +83,11 @@ class IoJava037Snippet {
         hi.add("Pinpointing Location");
         Display.getInstance().callSerially(() -> {
             Location l = Display.getInstance().getLocationManager().getCurrentLocationSync();
+            if(l == null) {
+                hi.add("Location unavailable");
+                hi.revalidate();
+                return;
+            }
             ConnectionRequest request = new ConnectionRequest("https://maps.googleapis.com/maps/api/geocode/json", false) {
                 private String country;
                 private String region;
@@ -110,7 +115,7 @@ class IoJava037Snippet {
             };
             request.setContentType("application/json");
             request.addRequestHeader("Accept", "application/json");
-            request.addArgument("sensor", "true");
+            request.addArgument("key", googleApiKey);
             request.addArgument("latlng", l.getLatitude() + "," + l.getLongitude());
 
             NetworkManager.getInstance().addToQueue(request);
@@ -119,4 +124,7 @@ class IoJava037Snippet {
         /* omitted */
         // end::io-java-037[]
     }
+
+    String googleApiKey = "YOUR-API-KEY";
+
 }

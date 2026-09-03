@@ -65,7 +65,7 @@ class IoJava059Snippet {
         }
 
         public static String[] getBookPovCharacters(String bookName) {
-            // your code goes herenull
+            // your code goes here...
             return null;
         }
     }

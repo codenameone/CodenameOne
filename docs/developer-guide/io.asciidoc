@@ -907,11 +907,6 @@ To use the expression processor when calling a webservice, you could use somethi
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava119Snippet.java[tag=io-java-119,indent=0]
-----
-
-[source,java]
-----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava037Snippet.java[tag=io-java-037,indent=0]
 ----
 
@@ -1266,11 +1261,6 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 All you need to do is fill in the code, for this example you will implement the first method for simplicity:
-
-[source,java]
-----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava138Snippet.java[tag=io-java-138,indent=0]
-----
 
 [source,java]
 ----
