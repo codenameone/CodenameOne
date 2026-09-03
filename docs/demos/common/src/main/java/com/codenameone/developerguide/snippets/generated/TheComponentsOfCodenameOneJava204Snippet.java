@@ -93,7 +93,7 @@ class TheComponentsOfCodenameOneJava204Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-204[]
-        location.call("replace", new Object[]{"http://www.google.com"},
+        location.call("replace", new Object[]{"https://www.google.com"},
             res -> Log.p("Return value was "+res)
         );
         // end::the-components-of-codename-one-java-204[]

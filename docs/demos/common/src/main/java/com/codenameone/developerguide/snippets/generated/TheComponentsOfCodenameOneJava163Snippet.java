@@ -95,7 +95,7 @@ class TheComponentsOfCodenameOneJava163Snippet {
         try {
             ConnectionRequest r = new ConnectionRequest();
             r.setPost(false);
-            r.setUrl("http://api.nestoria.co.uk/api");
+            r.setUrl("https://api.nestoria.co.uk/api");
             r.addArgument("pretty", "0");
             r.addArgument("action", "search_listings");
             r.addArgument("encoding", "json");

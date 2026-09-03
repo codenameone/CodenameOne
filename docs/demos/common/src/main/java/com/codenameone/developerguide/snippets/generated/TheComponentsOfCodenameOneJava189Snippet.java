@@ -101,11 +101,11 @@ class TheComponentsOfCodenameOneJava189Snippet {
             private int selection;
             private final java.util.List<SelectionListener> selectionListeners = new ArrayList<>();
             private String[] imageURLs = {
-                "http://awoiaf.westeros.org/images/thumb/9/93/AGameOfThrones.jpg/300px-AGameOfThrones.jpg",
-                "http://awoiaf.westeros.org/images/thumb/3/39/AClashOfKings.jpg/300px-AClashOfKings.jpg",
-                "http://awoiaf.westeros.org/images/thumb/2/24/AStormOfSwords.jpg/300px-AStormOfSwords.jpg",
-                "http://awoiaf.westeros.org/images/thumb/a/a3/AFeastForCrows.jpg/300px-AFeastForCrows.jpg",
-                "http://awoiaf.westeros.org/images/7/79/ADanceWithDragons.jpg"
+                "https://awoiaf.westeros.org/images/thumb/9/93/AGameOfThrones.jpg/300px-AGameOfThrones.jpg",
+                "https://awoiaf.westeros.org/images/thumb/3/39/AClashOfKings.jpg/300px-AClashOfKings.jpg",
+                "https://awoiaf.westeros.org/images/thumb/2/24/AStormOfSwords.jpg/300px-AStormOfSwords.jpg",
+                "https://awoiaf.westeros.org/images/thumb/a/a3/AFeastForCrows.jpg/300px-AFeastForCrows.jpg",
+                "https://awoiaf.westeros.org/images/7/79/ADanceWithDragons.jpg"
             };
             private Image[] images;
             private EventDispatcher listeners = new EventDispatcher();

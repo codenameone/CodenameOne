@@ -93,7 +93,7 @@ class TheComponentsOfCodenameOneJava203Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-203[]
-        location.set("href", "http://www.google.com");
+        location.set("href", "https://www.google.com");
         // end::the-components-of-codename-one-java-203[]
     }
 
