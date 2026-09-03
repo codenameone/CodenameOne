@@ -994,12 +994,18 @@ public final class NativeDragAndDrop {
             currentAction = NativeDragOperation.ACTION_NONE;
             overDispatchPending = false;
             advertisedActions = NativeDragOperation.ACTION_NONE;
+            if (op != null) {
+                // Owed here, not in a second lock afterwards. Releasing the drag is what
+                // lets the next one start, and the event dispatch thread can start this
+                // very operation again in between: it would find nothing owed, reset the
+                // result, and the outcome recorded a moment later would then be reported
+                // during the session that had already begun -- an old move telling a
+                // source to delete what the new drag is carrying.
+                op.oweCompletion(performedAction);
+            }
         }
         if (op == null) {
             return;
-        }
-        synchronized (LOCK) {
-            op.oweCompletion(performedAction);
         }
         Display.getInstance().callSerially(new Runnable() {
             @Override

@@ -10905,7 +10905,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     if (clip == null || clip.getItemCount() == 0) {
                         return;
                     }
-                    ClipboardContent content = contentFromClip(clip);
+                    // With the description, exactly as a drop is read. Without it the only
+                    // types a paste could report were the ones an item produced by itself,
+                    // so another application's text published under a type of its own --
+                    // text/markdown, an application's own format -- arrived as nothing but
+                    // text/plain and the type it was published under was gone.
+                    ClipboardContent content = contentFromClip(clip, clip.getDescription());
                     String plain = content.getText(ClipboardContent.MIME_TEXT);
                     // What the clip actually holds, not how many types it happens to name.
                     // Counting worked only because every clip used to acquire a text/plain of
@@ -10942,7 +10947,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     ///
     /// the content, never null
     ClipboardContent contentFromClip(ClipData clip) {
-        return contentFromClip(clip, null);
+        return contentFromClip(clip, clip == null ? null : clip.getDescription());
     }
 
     /// Reads a clip, and where a description is given also honours the MIME types it
@@ -10955,13 +10960,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// item materializes as `MIME_FILE` alone. Nothing is invented here: an advertised type is
     /// only filled from a value the clip actually produced.
     ///
-    /// Paste passes no description, so it keeps reporting exactly what the clip contained.
+    /// A paste is read the same way, from the primary clip's own description. It used to pass
+    /// none, on the reasoning that a paste should report only what the clip produced -- but
+    /// the description *is* what the clip says it holds, and without it a type another
+    /// application published its text under was simply lost. What is filled from it is still
+    /// only ever a value the clip produced.
     ///
     /// #### Parameters
     ///
     /// - `clip`: the clip data, which may be null
     ///
-    /// - `description`: what the source advertised, or null to report only what was read
+    /// - `description`: what the source advertised, or null to report only what was read --
+    ///   which no caller does any more, though a port that has no description to offer
+    ///   still may
     ///
     /// #### Returns
     ///

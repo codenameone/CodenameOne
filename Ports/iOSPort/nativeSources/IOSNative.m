@@ -1415,8 +1415,14 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardFileUris___R_java_lang_
 #if TARGET_OS_OSX
     POOL_BEGIN();
     NSPasteboard* pb = [NSPasteboard generalPasteboard];
-    NSArray<NSURL *>* urls = [pb readObjectsForClasses:@[[NSURL class]]
-                                               options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}];
+    // Every URL, not only the ones naming files. A link is a URL the pasteboard is perfectly
+    // able to carry -- this port publishes them itself now -- and asking for file URLs only
+    // meant an https address written here could not be read back at all, so a paste after a
+    // restart, or of a link another application copied, reported nothing.
+    //
+    // Which of them are files is the Java side's question, and it asks it: the ones naming
+    // something on this device become MIME_FILE, and all of them the URI list.
+    NSArray<NSURL *>* urls = [pb readObjectsForClasses:@[[NSURL class]] options:@{}];
     NSString* joined = nil;
     if (urls.count > 0) {
         NSMutableArray* parts = [NSMutableArray array];
