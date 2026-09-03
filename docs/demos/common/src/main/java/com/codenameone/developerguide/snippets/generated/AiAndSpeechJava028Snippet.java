@@ -96,9 +96,10 @@ class AiAndSpeechJava028Snippet {
             ChatRequest req = ChatRequest.builder()
                     // No model named here on purpose: a request that omits one
                     // uses the client's default, which LlmClient#setDefaultModel
-                    // sets and the simulator's Ollama redirect sets for you. Name
-                    // one explicitly and the redirect cannot honour it, so the
-                    // sample stops running locally.
+                    // sets and the simulator's Ollama redirect sets for you.
+                    // That default has to be able to see: the redirect's own
+                    // default is a text-only model, so point cn1.ai.ollamaModel
+                    // at a vision-capable one before running this locally.
                     .addMessage(ChatMessage.userWithImage(
                         "Describe the photo in one sentence.", img))
                     .build();

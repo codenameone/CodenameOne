@@ -110,7 +110,17 @@ class AiAndSpeechJava018Snippet {
             for (ToolCall call : resp.getToolCalls()) {
                 try {
                     String result = call.execute(Collections.singletonList(weather));
-                    // Feed the tool result back as a new turn and call chat() again.
+                    // The first response is the model asking for the tool, not
+                    // the answer. Send the conversation back with the tool call
+                    // and its result appended, and the next response is the
+                    // reply the user asked for.
+                    ChatRequest followUp = ChatRequest.builder()
+                            .model("gpt-4o-mini")
+                            .addMessage(ChatMessage.user("What is the weather in Tel Aviv?"))
+                            .addMessage(resp.getAssistantMessage())
+                            .addMessage(ChatMessage.toolResult(call.getId(), result))
+                            .build();
+                    openai.chat(followUp).ready(answer -> Log.p(answer.getText()));
                 } catch (Exception err) {
                     // execute() runs your own handler, so it can fail for any reason,
                     // and this callback has nowhere to propagate to.

@@ -82,14 +82,18 @@ class AiAndSpeechJava025Snippet {
     
     void snippet() throws Exception {
         // tag::ai-and-speech-java-025[]
+        // Your server keeps the provider key and proxies the calls. The device
+        // holds only a short-lived, user-scoped token for your own endpoint, so
+        // a stolen one expires and can be revoked for that user alone.
         SecureStorage store = SecureStorage.getInstance();
-        store.set("openai.key", apiKeyFromServer);        // returns false when unsupported
+        store.set("ai.session.token", sessionTokenFromServer);  // false when unsupported
 
-        String key = store.get("openai.key");             // returns null when absent
-        LlmClient client = LlmClient.openai(key);
+        String token = store.get("ai.session.token");           // null when absent
+        LlmClient client = LlmClient.localOpenAiCompatible(
+                "https://api.example.com/ai/v1", token, "gpt-4o-mini");
         // end::ai-and-speech-java-025[]
     }
 
-    String apiKeyFromServer = "key";
+    String sessionTokenFromServer = "token";
 
 }

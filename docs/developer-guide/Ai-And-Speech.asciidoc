@@ -215,12 +215,19 @@ local model without any conditional wiring at the call site.
 
 ==== Storing the API key
 
-WARNING: Never hard-code a provider API key in source, ship it in a
-bundled resource, or commit it to git. Mobile binaries are trivially
-reverse-engineered; any key embedded in the app is a key your users
-can extract. Fetch the key from a server endpoint that the user
-authenticates against, then cache it locally with the non-prompting
-`SecureStorage` overloads:
+WARNING: Never put a provider API key on the device at all -- not
+hard-coded, not in a bundled resource, and not fetched at runtime and
+cached. Mobile binaries are trivially reverse-engineered, and a key the
+running app can read is a key its user can extract; `SecureStorage`
+protects data at rest and can't change that. A leaked provider key is
+billable by whoever holds it, against your account, with no way to scope
+the damage to one user.
+
+Keep the key on your server and proxy the provider calls through it. The
+device then authenticates to *your* endpoint with a short-lived,
+user-scoped token, which expires on its own and can be revoked for one
+user without touching anyone else. That token is worth caching with the
+non-prompting `SecureStorage` overloads:
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AiAndSpeechJava025Snippet.java[tag=ai-and-speech-java-025,indent=0]
@@ -785,6 +792,11 @@ and streams the same text into a `ChatView`:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AiAndSpeechJava028Snippet.java[tag=ai-and-speech-java-028,indent=0]
 ----
 
+
+This sample sends an image, so whichever model it reaches has to accept one.
+Under the simulator's redirect that's your local Ollama install, and its
+default there is a text-only model -- set `cn1.ai.ollamaModel` to a
+vision-capable model you have pulled before running this one.
 
 The same code runs unchanged in the simulator, where the redirect points it at
 your local Ollama install, and on Android and iOS, where it calls the provider
