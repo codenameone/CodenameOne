@@ -96,13 +96,18 @@ class AiAndSpeechJava017Snippet {
                 Log.e(t);
             }
         }).ready(resp -> {
-            Log.p("Total tokens: " + resp.getUsage().getTotalTokens());
+            // getUsage() is null when the provider omits token accounting, which
+            // OpenAI-compatible endpoints commonly do.
+            if (resp.getUsage() != null) {
+                Log.p("Total tokens: " + resp.getUsage().getTotalTokens());
+            }
         });
         // end::ai-and-speech-java-017[]
     }
 
     LlmClient openai = LlmClient.openai(apiKey);
     ChatView chatView = new ChatView();
-    ChatRequest req = ChatRequest.builder().model("gpt-4o-mini").build();
+    ChatRequest req = ChatRequest.builder().model("gpt-4o-mini")
+            .addMessage(ChatMessage.user("hi")).build();
 
 }

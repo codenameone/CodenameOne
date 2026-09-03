@@ -90,7 +90,13 @@ class AiAndSpeechJava018Snippet {
                     "\"required\":[\"city\"]}",
                 argumentsJson -> {
                     Map<String, Object> args = JSONParser.parseJSON(argumentsJson);
-                    return "{\"tempC\": 22, \"city\": \"" + args.get("city") + "\"}";
+                    // Serialize rather than concatenate: the city is a value the
+                    // model produced, and a quote or backslash in it would emit
+                    // malformed JSON that cannot be sent back as a tool result.
+                    Map<String, Object> result = new HashMap<String, Object>();
+                    result.put("tempC", Integer.valueOf(22));
+                    result.put("city", args.get("city"));
+                    return JSONParser.toJson(result);
                 });
 
         ChatRequest req = ChatRequest.builder()

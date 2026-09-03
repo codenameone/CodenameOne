@@ -94,17 +94,29 @@ class AiAndSpeechJava026Snippet {
             view.addMessage(ChatMessage.user(text));
             view.setTypingIndicatorVisible(true);
 
-            ChatBubble streaming = view.beginAssistantStream();
+            // Snapshot the history before opening the assistant bubble.
+            // beginAssistantStream() appends an empty assistant message, and
+            // sending that back replays a blank turn to the model on every
+            // subsequent request.
             ChatRequest req = ChatRequest.builder()
                     .model("gpt-4o-mini")
-                    .messages(view.getHistory())
+                    .messages(new ArrayList<ChatMessage>(view.getHistory()))
                     .build();
 
+            ChatBubble streaming = view.beginAssistantStream();
             LlmClient.openai(apiKey).chatStream(req, new StreamingListener.Adapter() {
                 @Override public void onContentDelta(String d) {
-                    view.appendToLastMessage(d);
+                    // Append to the bubble this send opened, not to whichever is
+                    // newest: a second send while this one is still streaming
+                    // would otherwise divert this response into that bubble.
+                    streaming.appendText(d);
                 }
-            }).ready(resp -> view.setTypingIndicatorVisible(false));
+            }).ready(resp -> view.setTypingIndicatorVisible(false))
+              .except(err -> {
+                  // Without this the indicator stays up for good on a failure.
+                  view.setTypingIndicatorVisible(false);
+                  Log.e(err);
+              });
         });
         chat.show();
         // end::ai-and-speech-java-026[]
