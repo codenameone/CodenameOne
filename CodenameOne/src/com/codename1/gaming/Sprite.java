@@ -102,9 +102,19 @@ public class Sprite implements PhysicsLinkable {
     public Rectangle getBounds() {
         float sw = getRenderWidth() * scaleX;
         float sh = getRenderHeight() * scaleY;
-        int bx = (int) Math.round(x - anchorX * sw);
-        int by = (int) Math.round(y - anchorY * sh);
-        return new Rectangle(bx, by, Math.round(sw), Math.round(sh));
+        // A flipped sprite carries a negative scale, and a bounding box with a
+        // negative extent is rejected by every Rectangle intersection test -- so a
+        // left-facing sprite silently stopped colliding with, and collecting,
+        // anything. Normalize to a positive box. The renderer mirrors the quad
+        // about the anchor (see SpriteRenderer#orthoMatrix), so the anchor
+        // reflects too, otherwise the box would sit on the wrong side.
+        float aw = Math.abs(sw);
+        float ah = Math.abs(sh);
+        double ax = sw < 0 ? 1 - anchorX : anchorX;
+        double ay = sh < 0 ? 1 - anchorY : anchorY;
+        int bx = (int) Math.round(x - ax * aw);
+        int by = (int) Math.round(y - ay * ah);
+        return new Rectangle(bx, by, Math.round(aw), Math.round(ah));
     }
 
     /// Returns true if this sprite's bounding box intersects the other's.
