@@ -78,6 +78,7 @@ class AdvertisingJava004Snippet {
     Container myForm;
     Component component;
     Button button;
+    Button levelComplete = new Button("Next level");
     MultiButton myMultiButton;
     Label label;
     BrowserComponent browserComponent;
@@ -95,10 +96,14 @@ class AdvertisingJava004Snippet {
         ad.load();
 
         // Show it where an ad belongs -- a natural break such as the end of a
-        // level -- and only if one is actually ready.
-        if (ad.isLoaded()) {
-            ad.show();
-        }
+        // level. Loading is asynchronous, so the readiness check belongs in the
+        // handler that runs at the break; straight after load() nothing is ready
+        // yet and the ad would never appear.
+        levelComplete.addActionListener(e -> {
+            if (ad.isLoaded()) {
+                ad.show();
+            }
+        });
         // end::advertising-java-004[]
     }
 }

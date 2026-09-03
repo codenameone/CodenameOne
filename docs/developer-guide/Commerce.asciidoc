@@ -17,7 +17,7 @@ An entitlement is active when *any* of its granting products is active. This mat
 
 === Client usage
 
-In your `Lifecycle.init` (or wherever you set up purchases):
+In your `Lifecycle.init` (or wherever you set up purchases). Installing a receipt store is part of the setup, not an optional extra: `Purchase` submits pending purchases and reloads its receipt list only when one is installed, so without it `refresh()` finds no receipts and no entitlement is ever granted. On iOS `isSubscriptionSupported()` returns false until one is installed, so subscriptions don't start at all. <<Monetization,The monetization chapter>> builds a store you can use here.
 
 [source,java]
 ----

@@ -96,8 +96,14 @@ class MonetizationJava035Snippet {
      Storage s = Storage.getInstance();
      Receipt[] found;
      synchronized(RECEIPTS_KEY) {
-     if (s.exists(RECEIPTS_KEY)) {
-     List<Receipt> receipts = (List<Receipt>)s.readObject(RECEIPTS_KEY);
+     // readObject() answers null when the entry cannot be read or
+     // deserialized, and Purchase calls this from inside loadReceipts(),
+     // so throwing here would leave synchronization marked in progress for
+     // the rest of the session. Treat anything unreadable as "nothing
+     // stored" and always complete the callback.
+     Object stored = s.exists(RECEIPTS_KEY) ? s.readObject(RECEIPTS_KEY) : null;
+     if (stored instanceof List) {
+     List<Receipt> receipts = (List<Receipt>)stored;
      found = receipts.toArray(new Receipt[receipts.size()]);
      } else {
      found = new Receipt[0];

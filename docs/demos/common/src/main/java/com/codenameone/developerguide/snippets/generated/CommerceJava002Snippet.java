@@ -87,9 +87,18 @@ class CommerceJava002Snippet {
         // tag::commerce-java-002[]
         CommerceManager cm = CommerceManager.getInstance();
         cm.setAppUserId(myAccountId);   // optional; a stable id for the signed-in user
+
+        // A receipt store is a prerequisite rather than an extra. Purchase only
+        // submits pending purchases and reloads its receipt list when one is
+        // installed, so without it refresh() finds nothing and no entitlement is
+        // ever granted. On iOS isSubscriptionSupported() is false outright,
+        // because it is defined as "a receipt store is installed". The
+        // Monetization chapter builds one.
+        Purchase.getInAppPurchase().setReceiptStore(myReceiptStore);
         // end::commerce-java-002[]
     }
 
     String myAccountId = "account-id";
+    ReceiptStore myReceiptStore;
 
 }
