@@ -13,6 +13,52 @@ New Maven projects enable CSS by default with `codename1.cssTheme=true` in `comm
 
 Once enabled your `theme.res` file will regenerate from a CSS file that resides under the `css` directory. Changes you make to the CSS file will instantly update the simulator as you save. But, there are some limits to this live update so sometimes a simulator restart would be necessary.
 
+[[OverlayThemes]]
+=== Layering one theme over another
+
+Compiling CSS in a Maven project rewrites the build's `theme.res` in place. The
+compiler reads `src/main/css`, merges in whatever CSS the project's dependencies
+contribute, and writes the result as the theme the app loads. What it doesn't do
+is keep an older Designer resource underneath: there's no second file and no
+overlay involved.
+
+Something does sit beneath the compiled styles, though. The `theme.css` a new
+project starts with sets `includeNativeBool: true`, and `UIManager` installs the
+platform's native theme before it applies the compiled one, so a property you
+leave out of CSS can still arrive from there.
+
+Layering is a separate mechanism that you ask for explicitly. A theme constant
+named `OverlayThemes` holds a comma-separated list of resource names, each
+without the `.res` extension.
+
+Write that name bare wherever you author it. The Designer's constant editor and
+a CSS `#Constants` block both add the `@` that theme constants are stored with,
+exactly as they do for `includeNativeBool` or `commandBehavior`, so typing
+`@OverlayThemes` in either place produces `@@OverlayThemes` and nothing ever
+reads it. The stored key is `@OverlayThemes`, which is what you see in the
+resource and what code setting the property directly has to use.
+
+In a CSS `#Constants` block, quote the value whenever you name more than one
+overlay. The compiler keeps only the first value it parses out of the
+declaration, so `OverlayThemes: base,extra;` loses `extra` without a word while
+`OverlayThemes: "base,extra";` keeps both.
+
+When `UIManager` finishes building a theme it reads that constant, opens each
+name in turn from the resource root and applies its properties over the ones
+already loaded, so a later overlay beats an earlier one and every overlay beats
+the theme that named them.
+
+Reach for it when you want to override a theme you don't own -- one shipped
+inside a cn1lib, for instance -- without editing the original. It's also what the
+Designer's CSS installer writes when it adds a stylesheet on top of an existing
+Designer theme, which is a migration path for older projects rather than the way
+a CSS project is built today.
+
+WARNING: An overlay is loaded by name from the resource root. A name the build
+doesn't produce is skipped with a message on the error stream and the app carries
+on with the theme it already has, so a typo shows up as styling that never
+applies rather than as a build failure.
+
 === Supported CSS selectors
 
 Since Codename One stylesheets are meant to be used with Codename One component hierarchies instead of XML/HTML documents, selectors work a little differently.
