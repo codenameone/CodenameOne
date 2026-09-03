@@ -462,10 +462,14 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 .Captured recordings in the demo
 image::img/capture-audio.png[Captured recordings in the demo,scaledwidth=20%]
 
-You can also record audio through the `Media`, `MediaManager` and
-`MediaRecorderBuilder` APIs, which give you more control over the recording than
-the `Capture` API does -- the recorder is built with an explicit path, MIME type,
-sample rate and bit rate rather than handed to the platform's own capture UI.
+You can also record audio through `MediaRecorderBuilder`, which describes a
+recording by path, MIME type, sample rate, bit rate and channel count instead of
+handing the job to the platform's own capture UI.
+
+Build it with `MediaRecorderBuilder.build()`, which passes the whole builder to
+the platform implementation. `MediaManager.createMediaRecorder(MediaRecorderBuilder)`
+accepts the same object but forwards only the path and the MIME type, so a sample
+rate or bit rate set on the builder is dropped and the platform's defaults apply.
 
 ==== Capture asynchronous API
 
