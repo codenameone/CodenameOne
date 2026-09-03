@@ -85,7 +85,24 @@ class AdvertisingJava007Snippet {
     
     void snippet() throws Exception {
         // tag::advertising-java-007[]
-        AdManager.enableAppOpenAds(new AppOpenAd("ca-app-pub-xxx/yyy"));
+        AppOpenAd appOpen = new AppOpenAd("ca-app-pub-xxx/yyy");
+        AdManager.enableAppOpenAds(appOpen);
+
+        // enableAppOpenAds() loads the ad and asks the provider to show it when
+        // the app returns to the foreground. Whether that happens is up to the
+        // provider's adapter, so if yours does not implement the hook, drive it
+        // from the lifecycle instead -- start() runs on every foreground:
+        //
+        //     public void start() {
+        //         if (appOpen.isLoaded()) {
+        //             appOpen.show();
+        //         } else {
+        //             appOpen.load();
+        //         }
+        //     }
+        //
+        // Do one or the other, not both, or a provider that honours the hook
+        // shows two ads.
         // end::advertising-java-007[]
     }
 }

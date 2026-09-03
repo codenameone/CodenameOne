@@ -109,7 +109,16 @@ class AppReviewJava002Snippet {
         // fallback dialog is a Sheet, which throws when no form is current. That
         // is exactly the state during init, so configure there and record the
         // session once a form is up.
-        form.addShowListener(e -> AppReview.getInstance().registerSession());
+        form.addShowListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                // Once per launch. registerSession() increments the launch
+                // counter, and a show listener fires again every time the user
+                // navigates back here -- which would reach the thresholds after
+                // a few screens rather than after the launches you configured.
+                form.removeShowListener(this);
+                AppReview.getInstance().registerSession();
+            }
+        });
         // end::app-review-java-002[]
     }
 }

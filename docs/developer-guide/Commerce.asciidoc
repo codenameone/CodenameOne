@@ -13,6 +13,8 @@ The core idea is the *entitlement*: an abstract access right such as `pro` or `r
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/CommerceJava001Snippet.java[tag=commerce-java-001,indent=0]
 ----
 
+`isEntitled` reads the answer the cloud last cached, so it's only as fresh as your last `refresh()`: before one completes the cache is empty and a paying subscriber reads as unentitled. It falls back to asking the store for a subscription named after the entitlement, and since the entitlement-to-SKU mapping lives in the cloud rather than on the device, that only matches when a product happens to share the id. Where the cloud can't answer -- commerce not enabled in the build, an offline start, a degraded account -- check the granting SKU yourself, as the post-purchase example below does. Don't do it when the cloud answered no: a refunded or revoked receipt still looks active on the device, and treating that as a grant unlocks the app after the server denied it.
+
 An entitlement is active when *any* of its granting products is active. This matters: a promotional grant and a paid subscription, or a sandbox and a production purchase, can both map to `pro` without one hiding the other. Access is decided by a single authoritative rule -- the latest expiry over the active grants, evaluated against a server timestamp -- so a tampered device clock can't extend it. Everything else (will-renew, billing stage, period type, family sharing) is advisory and never removes access on its own.
 
 === Client usage

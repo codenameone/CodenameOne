@@ -85,21 +85,7 @@ class CommerceJava001Snippet {
     
     void snippet() throws Exception {
         // tag::commerce-java-001[]
-        CommerceManager cm = CommerceManager.getInstance();
-        boolean pro = cm.isEntitled("pro");
-
-        // The cloud maps entitlements to SKUs and the device does not, so
-        // isEntitled's own fallback looks for a subscription named after the
-        // entitlement -- and this chapter sells pro_monthly, which never
-        // matches. Ask the store for the granting SKU only where the cloud had
-        // nothing to say. Never OR it into a cloud answer: a refunded or
-        // revoked receipt still looks active on the device, and that would
-        // unlock the app after the server denied it.
-        if (!pro && (!cm.isCloudEnabled() || cm.isDegraded())) {
-            pro = Purchase.getInAppPurchase().isSubscribed("pro_monthly");
-        }
-
-        if (pro) {
+        if (CommerceManager.getInstance().isEntitled("pro")) {
             // unlock pro features
         }
         // end::commerce-java-001[]
