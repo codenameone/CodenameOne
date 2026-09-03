@@ -521,12 +521,12 @@ public final class Continuity {
         if (!enabled) {
             return;
         }
-        boolean[] providerFailed = new boolean[1];
-        AppState state = capture(providerFailed);
+        boolean[] captureFailed = new boolean[1];
+        AppState state = capture(captureFailed);
         if (state == null) {
             return;
         }
-        if (providerFailed[0]) {
+        if (captureFailed[0]) {
             // The last payload is CARRIED FORWARD rather than replaced by nothing.
             //
             // A provider that throws leaves this state with no payload, and writing that over a
@@ -602,8 +602,13 @@ public final class Continuity {
         return capture(new boolean[1]);
     }
 
-    /// As above, reporting through `providerFailed` whether the provider threw.
-    private static AppState capture(boolean[] providerFailed) {
+    /// As above, reporting through `captureFailed` whether anything went wrong gathering the
+    /// state -- the provider throwing, or the sequence counter failing to reach disk.
+    ///
+    /// Named for the QUESTION rather than one of its causes. It began as "providerFailed" and
+    /// then acquired a second meaning, which is the sort of drift that makes a caller reason
+    /// about the wrong thing.
+    private static AppState capture(boolean[] captureFailed) {
         if (!enabled) {
             return null;
         }
@@ -626,7 +631,7 @@ public final class Continuity {
                 // draft that was safely stored a moment earlier, because of a failure that may
                 // well be transient.
                 Log.e(t);
-                providerFailed[0] = true;
+                captureFailed[0] = true;
             }
             if (payload != null) {
                 // NOT caught. An unrepresentable value is a programming error with exactly one
@@ -643,7 +648,12 @@ public final class Continuity {
         // a counter that only advanced durably on the checkpoint path restarted lower after a
         // relaunch -- so a receiver still holding the old high-water mark in lastSeen silently
         // ignored every state until the counter caught up.
-        rememberSequence(seq);
+        if (!rememberSequence(seq)) {
+            // Treated exactly like a provider that threw: the state is not durable, so the caller
+            // keeps the checkpoint owed and does not publish a sequence that this device cannot
+            // prove it will still be past after a restart.
+            captureFailed[0] = true;
+        }
         state.setDeviceId(getDeviceId())
                 .setSequence(seq)
                 .setTimestamp(System.currentTimeMillis())
@@ -1075,11 +1085,26 @@ public final class Continuity {
     }
 
     /// Writes the sequence counter so it keeps rising across a relaunch.
-    private static void rememberSequence(long seq) {
+    /// Persists the sequence counter, and says whether it is actually on disk.
+    ///
+    /// Read back rather than trusted. Preferences.set() returns void and swallows the underlying
+    /// Storage.writeObject() result, so a refused write -- a full disk is the ordinary cause --
+    /// looks exactly like a successful one from here. That silence is expensive on this
+    /// particular value: the counter reloads lower after a restart, and every receiving device
+    /// whose high-water mark already includes the higher number refuses this device's states
+    /// until the counter climbs past it again. States stop arriving, on the other device, with
+    /// nothing logged on either.
+    ///
+    /// #### Returns
+    ///
+    /// true when the counter can be read back
+    private static boolean rememberSequence(long seq) {
         try {
             Preferences.set(PREF_SEQUENCE, seq);
+            return Preferences.get(PREF_SEQUENCE, (long) 0) == seq;
         } catch (Throwable t) {
             Log.e(t);
+            return false;
         }
     }
 

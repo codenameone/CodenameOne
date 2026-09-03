@@ -51,6 +51,20 @@ public final class ContinuitySimulatorHooks {
     private ContinuitySimulatorHooks() {
     }
 
+    /*
+     * Each canned arrival above has its OWN origin id, and none of them is "simulated-device".
+     *
+     * That is the id LocalContinuityBridge.simulateArrival() stamps on the app's real checkpoint
+     * for "continue on this device", and these states carry a sequence of
+     * System.currentTimeMillis() -- around 1.7e12, against the small counter a real checkpoint
+     * uses. Sharing the id meant one click of any item here recorded a high-water mark that the
+     * genuine "Continue Here" could never beat, so it was silently refused as stale for the rest
+     * of the process, and for good once a canned state was durably acknowledged. The menu item
+     * that demonstrates the feature broke the menu item that demonstrates the feature.
+     *
+     * Separate origins rather than a shared counter: these are meant to look like different
+     * devices anyway, and nothing here needs them ordered against each other.
+     */
     private static LocalContinuityBridge bridge() {
         return JavaSEPort.getSimulatedContinuity();
     }
@@ -75,7 +89,7 @@ public final class ContinuitySimulatorHooks {
         List<String> routes = new ArrayList<String>();
         routes.add("/a-route-this-build-no-longer-has");
         state.setRoutes(routes)
-                .setDeviceId("simulated-device")
+                .setDeviceId("simulated-older-build")
                 .setSequence(System.currentTimeMillis())
                 .setTimestamp(System.currentTimeMillis())
                 .setTitle("From a older build");
@@ -93,7 +107,7 @@ public final class ContinuitySimulatorHooks {
         Map<String, Object> payload = new HashMap<String, Object>();
         payload.put("simulated", Boolean.TRUE);
         state.setPayload(payload)
-                .setDeviceId("simulated-device")
+                .setDeviceId("simulated-payload-only")
                 .setSequence(System.currentTimeMillis())
                 .setTimestamp(System.currentTimeMillis())
                 .setTitle("Payload only");
@@ -107,7 +121,7 @@ public final class ContinuitySimulatorHooks {
     public static void continueSomethingStale() {
         AppState state = new AppState();
         state.setRoutes(currentRoutes())
-                .setDeviceId("simulated-device")
+                .setDeviceId("simulated-yesterday")
                 .setSequence(System.currentTimeMillis())
                 .setTimestamp(System.currentTimeMillis() - 86400000L)
                 .setTitle("From yesterday");
