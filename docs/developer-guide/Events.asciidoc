@@ -82,12 +82,6 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 This will work great but you will still get the default error message from the EDT over that exception. To prevent the event from proceeding to the default error handling you can do this:
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava015Snippet.java[tag=events-java-015,indent=0]
-----
-
-
-[source,java]
-----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava004Snippet.java[tag=events-java-004,indent=0]
 ----
 
