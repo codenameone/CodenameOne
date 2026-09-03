@@ -98,6 +98,7 @@ def patched_elf64(**fields):
         "e_phentsize": (0x36, "<H"),
         "e_phnum": (0x38, "<H"),
         "p_type": (ELF64_HEADER + 0x00, "<I"),
+        "p_align": (ELF64_HEADER + 0x30, "<Q"),
     }
     for field, value in fields.items():
         offset, code = layout[field]
@@ -298,6 +299,22 @@ class MalformedElfHeadersAreReported(unittest.TestCase):
 
     def test_unknown_elf_class(self):
         self.assert_reported(patched_elf64(ei_class=7), "unknown ELF class")
+
+    def test_alignment_that_is_not_a_power_of_two(self):
+        # 0x4001 clears a minimum-only comparison but is not a value ELF
+        # permits, so accepting it would announce a library no loader would
+        # honour as compliant.
+        self.assert_reported(patched_elf64(p_align=0x4001),
+                             "p_align 0x4001 is not a power of two")
+        self.assert_reported(patched_elf64(p_align=0x6000),
+                             "is not a power of two")
+
+    def test_legal_alignments_above_the_minimum_are_accepted(self):
+        # Bigger powers of two are valid and compliant; the rule is a floor.
+        for value in [0x4000, 0x8000, 0x10000]:
+            failures, scanner = scan(ANDROID_64, patched_elf64(p_align=value))
+            self.assertEqual([], failures, hex(value))
+            self.assertEqual(1, scanner.libraries_scanned, hex(value))
 
     def test_no_load_segments(self):
         # A single PT_NOTE (4) and nothing to measure alignment against.

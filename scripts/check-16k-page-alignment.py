@@ -207,8 +207,18 @@ def read_load_alignments(data):
             raise MalformedElf(
                 "truncated: PT_LOAD segment ends at %d, past the %d-byte file"
                 % (p_offset + p_filesz, len(data)))
-        alignments.append(
-            struct.unpack_from(prefix + word, data, offset + palign_off)[0])
+        alignment = struct.unpack_from(
+            prefix + word, data, offset + palign_off)[0]
+        # ELF permits 0 and 1 ("no alignment required") or a power of two,
+        # and nothing else. Without this a malformed 0x4001 clears a
+        # minimum-only comparison and is announced as 16 KB compliant, which
+        # is the gate accepting a value no loader would honour. Reported as
+        # malformed rather than misaligned, because it is not a number a
+        # linker produces and "rebuild it aligned" is the wrong advice.
+        if alignment & (alignment - 1):
+            raise MalformedElf(
+                "PT_LOAD p_align 0x%x is not a power of two" % alignment)
+        alignments.append(alignment)
     if not alignments:
         raise MalformedElf("no PT_LOAD segments")
     return ei_class == ELFCLASS64, alignments
