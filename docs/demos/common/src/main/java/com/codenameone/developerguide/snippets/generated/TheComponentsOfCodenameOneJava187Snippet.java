@@ -91,6 +91,7 @@ class TheComponentsOfCodenameOneJava187Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-187[]
+        Image duke = FontImage.createMaterial(FontImage.MATERIAL_INFO, "Label", 3.0f);
         Form hi = new Form("ImageViewer", new BorderLayout());
         ImageViewer iv = new ImageViewer(duke);
         hi.add(BorderLayout.CENTER, iv);
@@ -98,6 +99,5 @@ class TheComponentsOfCodenameOneJava187Snippet {
         // end::the-components-of-codename-one-java-187[]
     }
 
-    Image duke;
 
 }

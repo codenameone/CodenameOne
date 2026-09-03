@@ -101,6 +101,9 @@ class TheComponentsOfCodenameOneJava165Snippet {
             @Override
             public Component[] fetchComponents(int index, int amount) {
                 java.util.List<Map<String, Object>> data = fetchPropertyData("Leeds");
+            if(data == null) { // the fetch failed, so there is nothing more to add
+                return null;
+            }
                 MultiButton[] cmps = new MultiButton[data.size()];
                 for(int iter = 0 ; iter < cmps.length ; iter++) {
                     Map<String, Object> currentListing = data.get(iter);

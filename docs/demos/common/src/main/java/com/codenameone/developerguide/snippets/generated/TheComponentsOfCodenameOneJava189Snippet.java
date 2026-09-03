@@ -91,6 +91,7 @@ class TheComponentsOfCodenameOneJava189Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-189[]
+        Style s = UIManager.getInstance().getComponentStyle("Label");
         Form hi = new Form("ImageViewer", new BorderLayout());
         final EncodedImage placeholder = EncodedImage.createFromImage(
                 FontImage.createMaterial(FontImage.MATERIAL_SYNC, s).
@@ -169,6 +170,5 @@ class TheComponentsOfCodenameOneJava189Snippet {
         // end::the-components-of-codename-one-java-189[]
     }
 
-    Style s = new Style();
 
 }

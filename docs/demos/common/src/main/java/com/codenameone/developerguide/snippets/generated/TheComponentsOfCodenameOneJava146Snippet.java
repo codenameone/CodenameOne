@@ -91,6 +91,8 @@ class TheComponentsOfCodenameOneJava146Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-146[]
+        Form hi = new Form("Label Position", new BoxLayout(BoxLayout.Y_AXIS));
+        Image icon = FontImage.createMaterial(FontImage.MATERIAL_INFO, "Label", 3.0f);
         Label left = new Label("Left", icon);
         left.setTextPosition(Component.LEFT);
         Label right = new Label("Right", icon);
@@ -103,6 +105,5 @@ class TheComponentsOfCodenameOneJava146Snippet {
         // end::the-components-of-codename-one-java-146[]
     }
 
-    Image icon;
 
 }

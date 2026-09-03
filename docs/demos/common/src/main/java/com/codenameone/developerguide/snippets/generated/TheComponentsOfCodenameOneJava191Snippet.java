@@ -91,6 +91,8 @@ class TheComponentsOfCodenameOneJava191Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-191[]
+        Style s = UIManager.getInstance().getComponentStyle("TitleCommand");
+        Image icon = FontImage.createMaterial(FontImage.MATERIAL_INFO, s);
         Toolbar.setGlobalToolbar(true);
 
         Form hi = new Form("Toolbar", new BoxLayout(BoxLayout.Y_AXIS));
@@ -102,6 +104,5 @@ class TheComponentsOfCodenameOneJava191Snippet {
         // end::the-components-of-codename-one-java-191[]
     }
 
-    Image icon;
 
 }

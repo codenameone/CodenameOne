@@ -78,7 +78,6 @@ class TheComponentsOfCodenameOneJava208Snippet {
     Graphics g;
     GraphicsDevice device;
     Form form;
-    Form hi;
     Container cnt;
     Container myForm;
     Component component;
@@ -89,6 +88,7 @@ class TheComponentsOfCodenameOneJava208Snippet {
     Resources theme;
     
     // tag::the-components-of-codename-one-java-208[]
+      Form hi = new Form("Autocomplete", new BoxLayout(BoxLayout.Y_AXIS));
     public void showForm() {
       final DefaultListModel<String> options = new DefaultListModel<>();
       AutoCompleteTextField ac = new AutoCompleteTextField(options) {
