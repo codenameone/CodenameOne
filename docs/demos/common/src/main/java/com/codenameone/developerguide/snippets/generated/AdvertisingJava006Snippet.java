@@ -108,6 +108,19 @@ class AdvertisingJava006Snippet {
                 // of a user who never asked for one.
                 watchForCoins.setEnabled(true);
             }
+
+            public void onDismissed() {
+                // A shown ad is spent and a session cannot be shown twice, so
+                // load the next one. Without this the offer is enabled once and
+                // never again.
+                ad.load();
+            }
+
+            public void onShowFailed(AdError error) {
+                // Nothing was consumed, so put the offer back rather than
+                // leaving it disabled for the rest of the screen.
+                ad.load();
+            }
         });
         ad.load();
         // end::advertising-java-006[]

@@ -85,12 +85,18 @@ class AppReviewJava002Snippet {
     
     void snippet() throws Exception {
         // tag::app-review-java-002[]
-        // When the native review prompt is unavailable the dialog falls back to
-        // opening this URL, so it has to be the listing for the store the app
-        // came from -- an Apple link sends Android users to the wrong place.
-        String storeUrl = "and".equals(CN.getPlatformName())
-                ? "https://play.google.com/store/apps/details?id=com.example.app"
-                : "https://apps.apple.com/app/id0000000000";
+        // When no native review prompt is available the dialog falls back to
+        // opening this URL, and that happens on the simulator, the desktop and
+        // the web target as well as on a device, so every target needs an answer
+        // rather than everything-except-Android getting the Apple listing.
+        String storeUrl;
+        if ("ios".equals(CN.getPlatformName())) {
+            storeUrl = "https://apps.apple.com/app/id0000000000";
+        } else if ("and".equals(CN.getPlatformName())) {
+            storeUrl = "https://play.google.com/store/apps/details?id=com.example.app";
+        } else {
+            storeUrl = "https://example.com/app";   // no store listing to send them to
+        }
 
         AppReview.getInstance()
                 .setMinimumLaunches(5)          // at least 5 launches
