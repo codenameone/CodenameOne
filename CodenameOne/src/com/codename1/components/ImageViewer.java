@@ -556,6 +556,87 @@ public class ImageViewer extends Component {
     }
 
     /// {@inheritDoc}
+    ///
+    /// A wheel pans a zoomed image, which is what a wheel over a picture means on a
+    /// desktop, and leaves an unzoomed one alone so the page it sits on scrolls instead.
+    /// Zoom is the wheel with a modifier, which the ports already deliver as a magnify
+    /// gesture -- see `#pinch(float)`.
+    @Override
+    protected boolean mouseWheel(com.codename1.ui.events.WheelEvent ev) {
+        if (getZoom() <= 1 || getWidth() <= 0 || getHeight() <= 0) {
+            return false;
+        }
+        // Per axis, because zoom is not the same question as overflow: a wide image at a
+        // small zoom can be taller than nothing and wider than the viewer, and moving the
+        // axis that already fits shifts a fully visible image instead of letting the page
+        // it sits on scroll. These are the same measurements paint() constrains against.
+        boolean pansX = imageDrawWidth > getInnerWidth();
+        boolean pansY = imageDrawHeight > getInnerHeight();
+        if (!pansX && !pansY) {
+            return false;
+        }
+        // Whose gesture is it? A trackpad swipe is never purely one axis, so an image that
+        // overflows sideways only would pan on the sideways jitter of a downward swipe and
+        // claim the whole event -- and the page under it would stop scrolling now and then
+        // for no reason the reader can see. The larger delta decides, which is how the drag
+        // above decides whether to keep the gesture or hand it to the scrollable ancestor.
+        //
+        // The whole event goes or stays: splitting it would mean handling one axis here and
+        // passing the other on, and the event carries no notion of a delta already spent.
+        boolean verticalGesture = Math.abs(ev.getDeltaY()) >= Math.abs(ev.getDeltaX());
+        if (verticalGesture ? !pansY : !pansX) {
+            return false;
+        }
+        float wasPanX = panPositionX;
+        float wasPanY = panPositionY;
+        int wasX = constrainedImageX();
+        int wasY = constrainedImageY();
+        // Divided by the viewer, not by the zoomed image, which is what the drag path does
+        // with the zoom cancelled out of it:
+        //
+        //     distanceX = (pressX - x) / getZoom(); distanceX /= getWidth();
+        //     panPositionX += distanceX * getZoom();      // == (pressX - x) / getWidth()
+        //
+        // So a gesture across the viewer travels the whole image whatever the zoom, and the
+        // painted distance per pixel of gesture grows with it. Reviewed as a bug -- pan
+        // should be normalised by the zoomed draw size so a notch moves a fixed number of
+        // painted pixels -- but that is this component's pan model, not an oversight in the
+        // wheel: changing it here alone would make the wheel and the finger disagree, and
+        // changing both would alter dragging on every touch device for everyone.
+        if (pansX) {
+            panPositionX = clampPan(panPositionX - ((float) ev.getDeltaX()) / ((float) getWidth()));
+        }
+        if (pansY) {
+            panPositionY = clampPan(panPositionY - ((float) ev.getDeltaY()) / ((float) getHeight()));
+        }
+        updatePositions();
+        // Judged on where the image is DRAWN, not on the pan position. The two are not the
+        // same range: an image a little larger than the viewer reaches its painted edge
+        // while the logical position still has most of its travel left, and counting that
+        // as movement swallows every further notch without anything moving -- the page it
+        // sits on could not scroll while the pointer stayed over a picture that had stopped.
+        // On the axis that owns the gesture, and only that one. A zoomed image that
+        // overflows both ways can be against its top or bottom edge while sideways jitter
+        // still nudges it, and counting that as movement means a downward swipe at the
+        // edge of the picture stays here instead of scrolling the page under it.
+        boolean moved = verticalGesture ? constrainedImageY() != wasY : constrainedImageX() != wasX;
+        if (!moved) {
+            // Put the logical position back too, or the pan drifts into the range that
+            // paints nothing and the next wheel the other way has to travel through it.
+            panPositionX = wasPanX;
+            panPositionY = wasPanY;
+            updatePositions();
+            return false;
+        }
+        repaint();
+        return true;
+    }
+
+    private static float clampPan(float value) {
+        return Math.min(1, Math.max(0, value));
+    }
+
+    /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
         if (pointerPressedAction != ACTION_NONE) {
@@ -675,6 +756,24 @@ public class ImageViewer extends Component {
         prefY = s.getPaddingTop() + (height - prefH) / 2;
     }
 
+    /// Where the image is actually drawn horizontally, which is not where panPositionX
+    /// says it is: the pan position spans the whole image while the drawing is clamped to
+    /// the part of it that can leave the viewport. An image barely larger than the viewer
+    /// reaches its painted edge within a fraction of the logical range.
+    private int constrainedImageX() {
+        if (imageDrawWidth > getInnerWidth()) {
+            return Math.max(Math.min(0, imageX), -imageDrawWidth + getInnerWidth());
+        }
+        return imageX;
+    }
+
+    private int constrainedImageY() {
+        if (imageDrawHeight > getInnerHeight()) {
+            return Math.max(Math.min(0, imageY), -imageDrawHeight + getInnerHeight());
+        }
+        return imageY;
+    }
+
     private void updatePositions() {
         if (zoom == 1) {
             imageAspectCalc(image);
@@ -729,22 +828,8 @@ public class ImageViewer extends Component {
         }
 
         // Apply the same constraints used in paint() method to ensure cropBox matches what's actually visible
-        int constrainedImageX = imageX;
-        int constrainedImageY = imageY;
-
-        if (imageDrawWidth > getInnerWidth()) {
-            constrainedImageX = Math.max(
-                    Math.min(0, imageX),
-                    -imageDrawWidth + getInnerWidth()
-            );
-        }
-
-        if (imageDrawHeight > getInnerHeight()) {
-            constrainedImageY = Math.max(
-                    Math.min(0, imageY),
-                    -imageDrawHeight + getInnerHeight()
-            );
-        }
+        int constrainedImageX = constrainedImageX();
+        int constrainedImageY = constrainedImageY();
 
         cropBox.set(-constrainedImageY / (double) imageDrawHeight, (constrainedImageX + imageDrawWidth - getWidth()) / (double) imageDrawWidth, (constrainedImageY + imageDrawHeight - getHeight()) / (double) imageDrawHeight, -constrainedImageX / (double) imageDrawWidth);
     }

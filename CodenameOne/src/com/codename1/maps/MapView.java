@@ -540,6 +540,43 @@ public class MapView extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    ///
+    /// A wheel pans the camera, and tells the listeners about it -- which is the half a
+    /// synthetic drag could never deliver, because the gesture it emulated had no end that
+    /// meant "the pan is finished".
+    @Override
+    protected boolean mouseWheel(com.codename1.ui.events.WheelEvent ev) {
+        if (ev.getDeltaX() == 0 && ev.getDeltaY() == 0) {
+            return false;
+        }
+        // Web Mercator stops at its latitude limits, and panPixels clamps the centre back
+        // to where it already was. Claiming the wheel for a pan that did not happen traps
+        // scrolling on a page that holds a map: what cannot move passes the wheel on, the
+        // same rule the scrollers and the image viewer follow.
+        //
+        // Judged on the axis with the larger delta, and only that one. A trackpad swipe
+        // always carries a little of the other axis, so a map held against the top of Web
+        // Mercator still drifts east or west under a downward swipe -- and counting that as
+        // a pan means the page under the map stops scrolling at exactly the latitude a
+        // reader is most likely to be at. The whole gesture goes or stays, so a centre that
+        // moved only on the subordinate axis is put back.
+        boolean verticalGesture = Math.abs(ev.getDeltaY()) >= Math.abs(ev.getDeltaX());
+        LatLng before = engine.getCenter();
+        engine.panPixels(ev.getDeltaX(), ev.getDeltaY());
+        LatLng after = engine.getCenter();
+        boolean moved = verticalGesture
+                ? Double.compare(before.getLatitude(), after.getLatitude()) != 0
+                : Double.compare(before.getLongitude(), after.getLongitude()) != 0;
+        if (!moved) {
+            engine.setCenter(before);
+            return false;
+        }
+        repaint();
+        fireCameraChanged();
+        return true;
+    }
+
+    /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
         int dx = x - lastX;

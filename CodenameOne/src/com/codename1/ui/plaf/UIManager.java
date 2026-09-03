@@ -109,10 +109,19 @@ public class UIManager {
         // from other projects that may be out of sync.  E.g. the Designer project
         // uses the "instance" property directly.  This should guarantee that
         // instance will be set
+        // current is assigned BEFORE this instance is published, not after. The publish
+        // above is what makes getInstance() hand this object out, and resetThemeProps()
+        // below reaches Font, Display and CN -- so anything down there that comes back
+        // through getInstance() would get an object whose getLookAndFeel() is null and
+        // die in Component.initLaf. One statement earlier and there is nothing to see.
+        //
+        // Not a locking question and deliberately unsynchronized: this is all on the EDT.
+        // Ordering it this way is free, and safe because the LookAndFeel constructor only
+        // stores the manager it is handed and cannot reach back through the static.
+        current = new DefaultLookAndFeel(this);
         if (instance == null) {
             instance = this;
         }
-        current = new DefaultLookAndFeel(this);
         resetThemeProps(null);
     }
 

@@ -186,11 +186,21 @@ public class MacOSBuildHints {
     }
 
     private static String entString(HintSource src, String suffix, String fallback) {
-        String v = src.get("macos.entitlements." + suffix, null);
-        if (v == null || v.length() == 0) {
-            v = src.get("macNative.entitlements." + suffix, null);
+        // Trimmed BEFORE each emptiness test, not after the winner is picked. A settings
+        // file keeps the whitespace around a value, so a modern key left as
+        // "macos.entitlements.apsEnvironment= " counted as present, shadowed the migrated
+        // macNative value that actually said something, and then normalised to nothing --
+        // a project reading its legacy hint lost the entitlement it asks for. Whitespace is
+        // not an answer, so it neither wins nor blocks the fallback.
+        String v = trimmedHint(src.get("macos.entitlements." + suffix, null));
+        if (v.length() == 0) {
+            v = trimmedHint(src.get("macNative.entitlements." + suffix, null));
         }
-        return v == null || v.length() == 0 ? fallback : v;
+        return v.length() == 0 ? fallback : v;
+    }
+
+    private static String trimmedHint(String value) {
+        return value == null ? "" : value.trim();
     }
 
     /**
@@ -1012,7 +1022,16 @@ public class MacOSBuildHints {
             this.location = location;
             this.calendars = calendars;
             this.filesDownloads = filesDownloads;
-            this.apsEnvironment = apsEnvironment;
+            // Trimmed once, here, so both readers below agree with everything else that
+            // reads this hint. A properties file keeps trailing whitespace, so
+            // "apsEnvironment= false " arrived as "false " and compared equal to neither
+            // false nor none: the build emitted the APNs entitlement for a project that
+            // had just turned it off, and getApsEnvironment() resolved " development " to
+            // production for the same reason. IPhoneBuilder normalises its own push hint
+            // with trim() before reading it, and the signing wizard reads the settings file
+            // trimmed, so an untrimmed comparison here is the one that disagrees. An
+            // all-whitespace value now reads as unset rather than as "some environment".
+            this.apsEnvironment = apsEnvironment == null ? null : apsEnvironment.trim();
         }
 
         /** The defaults, for a caller that has no hints to resolve against. */

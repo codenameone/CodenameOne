@@ -1,0 +1,113 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codenameone.developerguide.snippets.generated;
+
+import com.codename1.gpu.*;
+import com.codename1.ui.*;
+import com.codename1.ui.animations.*;
+import com.codename1.ui.events.*;
+import com.codename1.ui.geom.*;
+import com.codename1.ui.layouts.*;
+import com.codename1.ui.list.*;
+import com.codename1.ui.plaf.*;
+import com.codename1.ui.util.*;
+import com.codename1.components.*;
+import com.codename1.charts.models.*;
+import com.codename1.charts.renderers.*;
+import com.codename1.charts.views.*;
+import com.codename1.capture.*;
+import com.codename1.io.*;
+import com.codename1.l10n.*;
+import com.codename1.location.*;
+import com.codename1.maps.*;
+import com.codename1.media.*;
+import com.codename1.messaging.*;
+import com.codename1.payment.*;
+import com.codename1.processing.*;
+import com.codename1.properties.*;
+import com.codename1.push.*;
+import com.codename1.security.*;
+import com.codename1.social.*;
+import com.codename1.ui.spinner.*;
+import java.io.*;
+import com.codename1.components.ToastBar.Status;
+import com.codename1.maps.layers.*;
+import com.codename1.charts.*;
+import com.codename1.ui.validation.*;
+import com.codename1.xml.*;
+import com.codename1.charts.util.*;
+import com.codename1.javascript.*;
+import com.codename1.ui.tree.*;
+import com.codename1.ui.table.*;
+import com.codename1.contacts.*;
+import java.util.*;
+
+
+class TheComponentsOfCodenameOneJava160Snippet {
+
+
+    Object context;
+    Object url;
+    Object value;
+    Object body;
+    Object event;
+    String apiKey = "test-key";
+    String myHttpsURL = "https://example.com";
+    java.util.List<String> validKeysList = new java.util.ArrayList<>();
+    Image myImage;
+    Graphics graphics;
+    Graphics g;
+    GraphicsDevice device;
+    Form form;
+    Form hi;
+    Container cnt;
+    Container myForm;
+    Component component;
+    Button button;
+    MultiButton myMultiButton;
+    Label label;
+    BrowserComponent browserComponent;
+    Resources theme;
+    
+    void snippet() throws Exception {
+        // tag::the-components-of-codename-one-java-160[]
+        Form hi = new Form("SpanLabel", new BoxLayout(BoxLayout.Y_AXIS));
+        Image icon = FontImage.createMaterial(FontImage.MATERIAL_INFO, "Label", 3.0f);
+        SpanLabel d = new SpanLabel("Default SpanLabel that can seamlessly line break when the text is really long.");
+        d.setIcon(icon);
+        SpanLabel l = new SpanLabel("NORTH Positioned Icon SpanLabel that can seamlessly line break when the text is really long.");
+        l.setIcon(icon);
+        l.setIconPosition(BorderLayout.NORTH);
+        SpanLabel r = new SpanLabel("SOUTH Positioned Icon SpanLabel that can seamlessly line break when the text is really long.");
+        r.setIcon(icon);
+        r.setIconPosition(BorderLayout.SOUTH);
+        SpanLabel c = new SpanLabel("EAST Positioned Icon SpanLabel that can seamlessly line break when the text is really long.");
+        c.setIcon(icon);
+        c.setIconPosition(BorderLayout.EAST);
+        hi.add(d).add(l).add(r).add(c);
+        hi.show();
+        // end::the-components-of-codename-one-java-160[]
+    }
+
+
+}

@@ -4043,82 +4043,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final int dx = -(int)(ne.getPixelX() * getDevicePixelRatio() * wheelMultiplier());
         final int dy = -(int)(ne.getPixelY() * getDevicePixelRatio() * wheelMultiplier());
         //debugLog("dx="+dx+"; dy="+dy);
-        // Give mouse wheel listeners a chance to handle (and consume) the wheel before the default
-        // scroll gesture, so WheelEvent is the same universal scroll API used on desktop and mobile.
-        if (Display.getInstance().fireMouseWheelEvent(x, y, dx, dy, true, 0)) {
-            return;
-        }
-        Display.getInstance().callSerially(new Runnable() {
-            public void run() {
-                scrollWheeling = true;
-                Form f = getCurrentForm();
-                if(f != null){
-                    //Component cmp = f.getContentPane().getComponentAt(x, y);
-                    Component cmp = f.getComponentAt(x, y);
-                    if(cmp != null && cmp.isFocusable()) {
-                        cmp.setFocusable(false);
-                        f.pointerPressed(x, y);
-                        f.pointerDragged(x + dx, y + dy / 4);
-                        cmp.setFocusable(true);
-                    } else {
-                        f.pointerPressed(x, y);
-                        f.pointerDragged(x + dx, y + dy / 4);
-                    }
-                }
-            }
-        });
-        Display.getInstance().callSerially(new Runnable() {
-            public void run() {
-                Form f = getCurrentForm();
-                if(f != null){
-                    //Component cmp = f.getContentPane().getComponentAt(x, y);
-                    Component cmp = f.getComponentAt(x, y);
-                    if(cmp != null && cmp.isFocusable()) {
-                        cmp.setFocusable(false);
-                        f.pointerDragged(x + dx, y + dy / 4 * 2);
-                        cmp.setFocusable(true);
-                    } else {
-                        f.pointerDragged(x + dx, y + dy / 4 * 2);
-                    }
-                }
-            }
-        });
-        Display.getInstance().callSerially(new Runnable() {
-            public void run() {
-                Form f = getCurrentForm();
-                if(f != null){
-                    //Component cmp = f.getContentPane().getComponentAt(x, y);
-                    Component cmp = f.getComponentAt(x, y);
-                    if(cmp != null && cmp.isFocusable()) {
-                        cmp.setFocusable(false);
-                        f.pointerDragged(x + dx, y + dy / 4 * 3);
-                        cmp.setFocusable(true);
-                    } else {
-                        f.pointerDragged(x + dx, y + dy / 4 * 3);
-                    }
-                }
-            }
-        });
-        Display.getInstance().callSerially(new Runnable() {
-            public void run() {
-                Form f = getCurrentForm();
-                if(f != null){
-                    //Component cmp = f.getContentPane().getComponentAt(x, y);
-                    Component cmp = f.getComponentAt(x, y);
-                    if(cmp != null && cmp.isFocusable()) {
-                        cmp.setFocusable(false);
-                        f.pointerDragged(x + dx, y + dy);
-                        f.pointerReleased(x + dx, y + dy);
-                        cmp.setFocusable(true);
-                    } else {
-                        f.pointerDragged(x + dx, y + dy);
-                        f.pointerReleased(x + dx, y + dy);
-                    }
-                }
-                scrollWheeling = false;
-            }
-        });
-        
+        // The wheel is handled where it lands, and goes no further. This used to treat the
+        // dispatch above as a listener-only preflight and, whenever nothing consumed it,
+        // synthesise a press, three drags and a release at the cursor -- so a small trackpad
+        // delta over a button pressed the button, and a wheel at a page boundary ran a drag
+        // gesture nobody made. Display scrolls the component under the cursor itself now, so
+        // a false return means nothing there can move, not that the port should emulate one.
+        //
+        // Handed to the shared implementation rather than dispatched from here. This
+        // callback runs on a thread of its own -- the wheel listener above starts one per
+        // event -- and the dispatch now moves scroll positions, fires scroll listeners and
+        // repaints, so running it here mutates the component hierarchy off the event
+        // thread, racing layout and paint. Dispatching only listeners from this thread was
+        // survivable; scrolling from it is not.
+        //
+        // The inherited entry point marshals onto the event thread and owns the
+        // isScrollWheeling flag for the duration, which is the path every other port takes.
+        pointerWheelMoved(x, y, dx, dy, true, 0);
     }
     
     private void updateCanvasSize() {

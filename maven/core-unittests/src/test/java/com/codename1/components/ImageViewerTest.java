@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.components;
 
 import com.codename1.junit.FormTest;
@@ -9,6 +31,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.events.WheelEvent;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
 
@@ -286,6 +309,57 @@ class ImageViewerTest extends UITestBase {
     }
 
     @SuppressWarnings("unchecked")
+    @FormTest
+    void aWheelAgainstTheImageEdgeGoesToThePageEvenWhenTheOtherAxisCanMove() throws Exception {
+        // A zoomed image that overflows both ways, held against its top edge. The gesture
+        // belongs to whichever axis has the larger delta, and a trackpad swipe always
+        // carries a little of the other one -- so a downward swipe at the top of the
+        // picture must go to the page, even though its sideways jitter could still pan.
+        ImageViewer viewer = zoomedViewer();
+
+        // The setup means nothing unless the image can actually pan sideways here.
+        viewer.setZoom(6f, 0.5f, 0f);
+        // Negative deltaX: a positive one pans towards an edge the image is already
+        // against at this position, which would make the check below pass for the wrong
+        // reason -- nothing moving is exactly what the real assertion is looking for.
+        assertTrue(viewer.mouseWheel(wheel(viewer, -30, 5)),
+                "a sideways wheel has to pan the image, or this test proves nothing");
+
+        viewer.setZoom(6f, 0.5f, 0f);
+        float panXBefore = getPrivateField(viewer, "panPositionX", Float.class).floatValue();
+        assertFalse(viewer.mouseWheel(wheel(viewer, -12, 40)),
+                "a downward gesture against the top edge belongs to the page under the image");
+        assertEquals(panXBefore,
+                getPrivateField(viewer, "panPositionX", Float.class).floatValue(), 0.0001f,
+                "and the sideways jitter of a gesture it passed on must not move the image");
+    }
+
+    /// A viewer big enough to lay out, holding an image small enough that zooming it
+    /// overflows the viewer in both directions.
+    private ImageViewer zoomedViewer() {
+        Image image = Image.createImage(40, 40, 0xff112233);
+        ImageViewer viewer = new ImageViewer(image);
+        viewer.setAnimateZoom(false);
+        Form f = new Form(new BorderLayout());
+        f.add(BorderLayout.CENTER, viewer);
+        f.show();
+        f.setSize(new com.codename1.ui.geom.Dimension(240, 320));
+        f.layoutContainer();
+        f.revalidate();
+        DisplayTest.flushEdt();
+        // Sized explicitly, the way the drag tests above do: laying the form out does not
+        // leave the viewer with a size, and every measurement here is against its bounds.
+        viewer.setSize(new com.codename1.ui.geom.Dimension(240, 220));
+        viewer.setX(0);
+        viewer.setY(0);
+        return viewer;
+    }
+
+    private static WheelEvent wheel(ImageViewer viewer, int deltaX, int deltaY) {
+        return new WheelEvent(viewer, viewer.getAbsoluteX() + viewer.getWidth() / 2,
+                viewer.getAbsoluteY() + viewer.getHeight() / 2, deltaX, deltaY, false, 0);
+    }
+
     private <T> T getPrivateField(Object target, String name, Class<T> type) throws Exception {
         Field field = target.getClass().getDeclaredField(name);
         field.setAccessible(true);
