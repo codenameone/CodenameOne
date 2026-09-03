@@ -48,6 +48,7 @@ class AndroidWhisperAarProjectTest {
      */
     private static final long REQUIRED_PAGE_ALIGNMENT = 0x4000L;
 
+    private static final int ELFCLASS32 = 1;
     private static final int ELFCLASS64 = 2;
     private static final int PT_LOAD = 1;
 
@@ -132,7 +133,7 @@ class AndroidWhisperAarProjectTest {
                     continue;
                 }
                 byte[] elf = readFully(zip, entry);
-                long[] alignments = loadSegmentAlignments(elf);
+                long[] alignments = loadSegmentAlignments(entry.getName(), elf);
                 if (alignments == null) {
                     // A 32-bit slice, which the rule does not cover.
                     continue;
@@ -158,33 +159,73 @@ class AndroidWhisperAarProjectTest {
     }
 
     /**
-     * Reads the {@code p_align} of every {@code PT_LOAD} program header, or
-     * returns null when the bytes are not a 64-bit ELF.
+     * Reads the {@code p_align} of every {@code PT_LOAD} program header,
+     * returning null for a library that is genuinely 32-bit and so outside
+     * the rule.
+     *
+     * <p>Anything that does not parse fails the test rather than returning
+     * null. An entry this method could not read is one whose alignment nobody
+     * checked, which must not read the same as one checked and found
+     * compliant -- and a truncated 64-bit library still starts with the ELF
+     * magic, so treating unreadable bytes as "32-bit, exempt" would make the
+     * exemption reachable by corruption.</p>
      */
-    private static long[] loadSegmentAlignments(byte[] elf) {
-        if (elf.length < 64 || elf[0] != 0x7f || elf[1] != 'E' || elf[2] != 'L' || elf[3] != 'F') {
-            return null;
-        }
-        if ((elf[4] & 0xff) != ELFCLASS64) {
-            return null;
-        }
+    private static long[] loadSegmentAlignments(String name, byte[] elf) {
+        assertTrue(elf.length >= 5 && elf[0] == 0x7f && elf[1] == 'E'
+                        && elf[2] == 'L' && elf[3] == 'F',
+                name + " is not an ELF file");
+        int elfClass = elf[4] & 0xff;
+        assertTrue(elfClass == ELFCLASS32 || elfClass == ELFCLASS64,
+                name + " has unknown ELF class " + elfClass);
+        boolean is64 = elfClass == ELFCLASS64;
+
+        // The two program header layouts differ in field order, not only in
+        // width, so the offsets cannot be derived from the word size.
+        int headerSize = is64 ? 64 : 52;
+        int phoffOff = is64 ? 0x20 : 0x1C;
+        int phentsizeOff = is64 ? 0x36 : 0x2A;
+        int phnumOff = is64 ? 0x38 : 0x2C;
+        int minPhentsize = is64 ? 56 : 32;
+        int pOffsetOff = is64 ? 0x08 : 0x04;
+        int pFileszOff = is64 ? 0x20 : 0x10;
+        int pAlignOff = is64 ? 0x30 : 0x1C;
+
+        assertTrue(elf.length >= headerSize,
+                name + " is truncated: " + elf.length + " bytes, shorter than "
+                        + "the " + headerSize + "-byte ELF header");
         ByteBuffer buffer = ByteBuffer.wrap(elf);
         buffer.order((elf[5] & 0xff) == 1 ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
-        long phoff = buffer.getLong(0x20);
-        int phentsize = buffer.getShort(0x36) & 0xffff;
-        int phnum = buffer.getShort(0x38) & 0xffff;
-        assertTrue(phentsize >= 56 && phnum > 0
+        long phoff = is64 ? buffer.getLong(phoffOff)
+                : buffer.getInt(phoffOff) & 0xffffffffL;
+        int phentsize = buffer.getShort(phentsizeOff) & 0xffff;
+        int phnum = buffer.getShort(phnumOff) & 0xffff;
+        assertTrue(phentsize >= minPhentsize && phnum > 0 && phoff > 0
                         && phoff + (long) phnum * phentsize <= elf.length,
-                "Malformed ELF program header table");
+                name + " has a malformed ELF program header table");
+
         List<Long> alignments = new ArrayList<Long>();
         for (int i = 0; i < phnum; i++) {
             int offset = (int) (phoff + (long) i * phentsize);
             if (buffer.getInt(offset) != PT_LOAD) {
                 continue;
             }
-            alignments.add(Long.valueOf(buffer.getLong(offset + 0x30)));
+            long pOffset = is64 ? buffer.getLong(offset + pOffsetOff)
+                    : buffer.getInt(offset + pOffsetOff) & 0xffffffffL;
+            long pFilesz = is64 ? buffer.getLong(offset + pFileszOff)
+                    : buffer.getInt(offset + pFileszOff) & 0xffffffffL;
+            // Program headers sit near the front of the file, so they parse
+            // even when the segments they describe are not all there.
+            assertTrue(pOffset + pFilesz <= elf.length,
+                    name + " is truncated: a PT_LOAD segment ends at "
+                            + (pOffset + pFilesz) + ", past the " + elf.length
+                            + "-byte file");
+            alignments.add(Long.valueOf(is64 ? buffer.getLong(offset + pAlignOff)
+                    : buffer.getInt(offset + pAlignOff) & 0xffffffffL));
         }
-        assertTrue(!alignments.isEmpty(), "ELF has no PT_LOAD segments");
+        assertTrue(!alignments.isEmpty(), name + " has no PT_LOAD segments");
+        if (!is64) {
+            return null;
+        }
         long[] result = new long[alignments.size()];
         for (int i = 0; i < result.length; i++) {
             result[i] = alignments.get(i).longValue();

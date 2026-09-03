@@ -62,28 +62,57 @@ MAX_ARCHIVE_DEPTH = 3
 MIN_LIBRARIES_SCANNED = 1
 
 ELF_MAGIC = b"\x7fELF"
+ELFCLASS32 = 1
 ELFCLASS64 = 2
 ELFDATA2LSB = 1
 ELFDATA2MSB = 2
 PT_LOAD = 1
 
+# Per ELF class: header size, the offsets of e_phoff / e_phentsize / e_phnum,
+# the struct code for an address-sized word, the smallest legal program header
+# entry, and the offsets of p_offset / p_filesz / p_align inside one. The two
+# program header layouts differ in field order, not just in width, so the
+# offsets cannot be derived from the word size.
+ELF_LAYOUT = {
+    ELFCLASS64: (64, 0x20, 0x36, 0x38, "Q", 56, 0x08, 0x20, 0x30),
+    ELFCLASS32: (52, 0x1C, 0x2A, 0x2C, "I", 32, 0x04, 0x10, 0x1C),
+}
+
 
 class MalformedElf(Exception):
-    """The bytes start with the ELF magic but cannot be read as an ELF."""
+    """A `.so` payload that cannot be read as a well-formed ELF."""
 
 
-def load_segment_alignments(data):
-    """Return the `p_align` of every PT_LOAD segment of a 64-bit ELF.
+def read_load_alignments(data):
+    """Return `(is_64_bit, [p_align of every PT_LOAD segment])`.
 
-    Returns None when the bytes are not a 64-bit ELF -- a 32-bit library, or
-    something that merely happens to be named `.so`. Raises MalformedElf when
-    it claims to be one and then does not parse, because silently skipping
-    that would let a truncated artifact through.
+    Raises MalformedElf for anything that does not parse -- a truncated
+    library, a corrupted one, or a file that merely happens to be named
+    `.so`. Nothing is skipped: an entry this function could not read is an
+    entry whose alignment nobody checked, and that must not come out reading
+    the same as one checked and found compliant. Returning "exempt" for an
+    unreadable payload would also make the exemption reachable by corruption
+    -- a truncated 64-bit library starts with the ELF magic and would be
+    waved through as if it were a 32-bit slice.
+
+    32-bit libraries are parsed rather than waved past on the class byte
+    alone, for the same reason: `is_64_bit` is False only once the file has
+    been shown to really be a 32-bit ELF. The caller exempts it from the
+    alignment rule, which does not apply to 32-bit ABIs.
     """
-    if len(data) < 64 or data[:4] != ELF_MAGIC:
-        return None
-    if data[4] != ELFCLASS64:
-        return None
+    if len(data) < 5 or data[:4] != ELF_MAGIC:
+        raise MalformedElf("not an ELF file")
+
+    ei_class = data[4]
+    if ei_class not in ELF_LAYOUT:
+        raise MalformedElf("unknown ELF class 0x%02x" % ei_class)
+    (header_size, phoff_off, phentsize_off, phnum_off, word, min_phentsize,
+     poffset_off, pfilesz_off, palign_off) = ELF_LAYOUT[ei_class]
+
+    if len(data) < header_size:
+        raise MalformedElf(
+            "truncated: %d bytes, shorter than the %d-byte ELF header"
+            % (len(data), header_size))
 
     endian = data[5]
     if endian == ELFDATA2LSB:
@@ -93,14 +122,13 @@ def load_segment_alignments(data):
     else:
         raise MalformedElf("unknown ELF data encoding 0x%02x" % endian)
 
-    # 64-bit ELF header: e_phoff at 0x20 (8 bytes), e_phentsize at 0x36 and
-    # e_phnum at 0x38 (2 bytes each).
-    e_phoff = struct.unpack_from(prefix + "Q", data, 0x20)[0]
-    e_phentsize = struct.unpack_from(prefix + "H", data, 0x36)[0]
-    e_phnum = struct.unpack_from(prefix + "H", data, 0x38)[0]
+    e_phoff = struct.unpack_from(prefix + word, data, phoff_off)[0]
+    e_phentsize = struct.unpack_from(prefix + "H", data, phentsize_off)[0]
+    e_phnum = struct.unpack_from(prefix + "H", data, phnum_off)[0]
 
-    if e_phentsize < 56:
-        raise MalformedElf("program header entry size %d is too small" % e_phentsize)
+    if e_phentsize < min_phentsize:
+        raise MalformedElf(
+            "program header entry size %d is too small" % e_phentsize)
     if e_phoff == 0 or e_phnum == 0:
         raise MalformedElf("no program headers")
     if e_phoff + e_phnum * e_phentsize > len(data):
@@ -109,14 +137,25 @@ def load_segment_alignments(data):
     alignments = []
     for index in range(e_phnum):
         offset = e_phoff + index * e_phentsize
-        # 64-bit program header: p_type at 0x00, p_align at 0x30.
+        # p_type is the first word of a program header in both classes.
         p_type = struct.unpack_from(prefix + "I", data, offset)[0]
         if p_type != PT_LOAD:
             continue
-        alignments.append(struct.unpack_from(prefix + "Q", data, offset + 0x30)[0])
+        # A segment that claims to run past the end of the file is a
+        # truncated artifact. Its program headers can still parse -- they sit
+        # near the front -- so without this the alignment reads as correct on
+        # a library whose contents are simply not all there.
+        p_offset = struct.unpack_from(prefix + word, data, offset + poffset_off)[0]
+        p_filesz = struct.unpack_from(prefix + word, data, offset + pfilesz_off)[0]
+        if p_offset + p_filesz > len(data):
+            raise MalformedElf(
+                "truncated: PT_LOAD segment ends at %d, past the %d-byte file"
+                % (p_offset + p_filesz, len(data)))
+        alignments.append(
+            struct.unpack_from(prefix + word, data, offset + palign_off)[0])
     if not alignments:
         raise MalformedElf("no PT_LOAD segments")
-    return alignments
+    return ei_class == ELFCLASS64, alignments
 
 
 class Scanner(object):
@@ -125,23 +164,24 @@ class Scanner(object):
         self.failures = []
         self.libraries_scanned = 0
         self.skipped_32bit = 0
+        self.has_alignment_failure = False
 
     def check_library(self, label, data):
         try:
-            alignments = load_segment_alignments(data)
+            is_64_bit, alignments = read_load_alignments(data)
         except MalformedElf as error:
             self.failures.append("%s: %s" % (label, error))
             return
-        if alignments is None:
-            if data[:4] == ELF_MAGIC:
-                self.skipped_32bit += 1
-                if self.verbose:
-                    print("  32-bit (not subject to 16 KB pages): %s" % label)
+        if not is_64_bit:
+            self.skipped_32bit += 1
+            if self.verbose:
+                print("  32-bit (not subject to 16 KB pages): %s" % label)
             return
 
         self.libraries_scanned += 1
         worst = min(alignments)
         if worst < REQUIRED_ALIGNMENT:
+            self.has_alignment_failure = True
             self.failures.append(
                 "%s: PT_LOAD p_align 0x%x, needs 0x%x or more"
                 % (label, worst, REQUIRED_ALIGNMENT))
@@ -239,15 +279,21 @@ def main(argv):
         print("16 KB page alignment check failed:", file=sys.stderr)
         for failure in scanner.failures:
             print("  %s" % failure, file=sys.stderr)
-        print("", file=sys.stderr)
-        print("Rebuild them with NDK r28 or newer, which emits 16 KB aligned "
-              "libraries by default. On NDK r26/r27 pass both "
-              "-Wl,-z,max-page-size=16384 and -Wl,-z,common-page-size=16384, "
-              "and note that the NDK's own prebuilt libc++_shared.so and "
-              "libomp.so are 4 KB aligned there and cannot be fixed by a "
-              "linker flag.", file=sys.stderr)
-        print("See https://developer.android.com/guide/practices/page-sizes",
-              file=sys.stderr)
+        # Only offered when something was actually misaligned. A truncated or
+        # unreadable artifact is a different problem, and "rebuild with a
+        # newer NDK" would send the reader off in the wrong direction.
+        if scanner.has_alignment_failure:
+            print("", file=sys.stderr)
+            print("Rebuild the misaligned libraries with NDK r28 or newer, "
+                  "which emits 16 KB aligned libraries by default. On NDK "
+                  "r26/r27 pass both -Wl,-z,max-page-size=16384 and "
+                  "-Wl,-z,common-page-size=16384, and note that the NDK's own "
+                  "prebuilt libc++_shared.so and libomp.so are 4 KB aligned "
+                  "there and cannot be fixed by a linker flag.",
+                  file=sys.stderr)
+            print("See "
+                  "https://developer.android.com/guide/practices/page-sizes",
+                  file=sys.stderr)
         return 1
 
     print("check-16k-page-alignment: %d 64-bit native libraries aligned to "
