@@ -168,7 +168,7 @@ Mac Catalyst helped us get an iOS application onto macOS, but its desktop behavi
 
 A new Codename One port used to be headline news. This one landed in the same week as VPN, VoIP, OTP, billing, contacts, and a documentation rebuild. Apparently a new native platform is now just another Tuesday.
 
-The {{< post-link path="/blog/native-appkit-mac-port" text="AppKit article" >}} explains the rendering change, build targets, test evidence, and the accessibility work that remains.
+The {{< post-link path="/blog/native-appkit-mac-port" text="AppKit article" >}} explains the rendering change, build targets, test evidence, and the native accessibility bridge to VoiceOver.
 
 ## OTP without inbox permission
 
