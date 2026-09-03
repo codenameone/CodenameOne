@@ -68,8 +68,8 @@ import java.util.List;
 /// The view's accumulated history is replayed on every turn so the
 /// model has full conversation context. The original `baseRequest`
 /// is treated as a template -- its model, tools, temperature, etc.
-/// are preserved across turns; its messages are used only when the
-/// view's own history is empty (e.g. to seed a system prompt).
+/// are preserved across turns, and its messages lead every request as
+/// described above.
 public final class LlmChatBinding {
 
     private LlmChatBinding() {

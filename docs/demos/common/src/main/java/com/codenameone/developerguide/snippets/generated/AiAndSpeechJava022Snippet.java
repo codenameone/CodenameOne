@@ -82,7 +82,12 @@ class AiAndSpeechJava022Snippet {
     
     void snippet() throws Exception {
         // tag::ai-and-speech-java-022[]
-        ImageGenerator gen = ImageGenerator.openai(apiKey);
+        // Through your own endpoint, as the credentials section requires:
+        // ImageGenerator.openai(apiKey) would put the billable provider key on
+        // the device. ImageGenerator.onDevice() is the other option, and needs
+        // the cn1-ai-stablediffusion cn1lib.
+        ImageGenerator gen = ImageGenerator.openAiCompatible(
+                "https://api.example.com/ai/v1", sessionToken);
         GenerateImageRequest req = new GenerateImageRequest(
                 "A pastel watercolor of a Tel Aviv beach at sunset");
         req.setSize("1024x1024");
@@ -94,4 +99,7 @@ class AiAndSpeechJava022Snippet {
         });
         // end::ai-and-speech-java-022[]
     }
+
+    String sessionToken = "session-token";
+
 }

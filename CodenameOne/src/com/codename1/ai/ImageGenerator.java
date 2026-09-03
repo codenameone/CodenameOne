@@ -50,11 +50,33 @@ import java.util.Map;
 /// ```
 public abstract class ImageGenerator {
 
-    /// Creates an OpenAI image generator.
+    /// The public OpenAI endpoint root.
+    private static final String OPENAI_ROOT = "https://api.openai.com/v1";
+
+    /// Creates an OpenAI image generator talking to the public endpoint.
+    ///
+    /// Shipping this means the key travels with the app, and a key the running
+    /// app can read is one its user can extract. For a released build, put the
+    /// key on your server and point
+    /// [#openAiCompatible(String, String)] at it instead.
+    ///
     /// @param apiKey OpenAI API key
     /// @return configured generator
     public static ImageGenerator openai(String apiKey) {
-        return new OpenAiImageGenerator(apiKey);
+        return new OpenAiImageGenerator(apiKey, OPENAI_ROOT);
+    }
+
+    /// Creates a generator for any endpoint that speaks the OpenAI image
+    /// generation API -- most usefully your own server, holding the provider
+    /// key and proxying the call, so the device carries nothing more than a
+    /// short-lived token of yours.
+    ///
+    /// @param baseUrl endpoint root, for example `https://api.example.com/ai/v1`
+    /// @param apiKey credential for that endpoint, or empty when it needs none
+    /// @return configured generator
+    public static ImageGenerator openAiCompatible(String baseUrl, String apiKey) {
+        return new OpenAiImageGenerator(apiKey,
+                baseUrl == null || baseUrl.length() == 0 ? OPENAI_ROOT : baseUrl);
     }
 
     /// Replicate runs a wide catalog of third-party image models
@@ -97,9 +119,13 @@ public abstract class ImageGenerator {
 
     private static final class OpenAiImageGenerator extends ImageGenerator {
         private final String apiKey;
+        private final String baseUrl;
 
-        OpenAiImageGenerator(String apiKey) {
+        OpenAiImageGenerator(String apiKey, String baseUrl) {
             this.apiKey = apiKey == null ? "" : apiKey;
+            // Normalize so callers may pass the root with or without a slash.
+            this.baseUrl = baseUrl.endsWith("/")
+                    ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         }
 
         @Override
@@ -187,7 +213,7 @@ public abstract class ImageGenerator {
                     failOnEdt(result, OpenAiSseDecoder.mapErrorStatic(sc, bodyText));
                 }
             };
-            cr.setUrl("https://api.openai.com/v1/images/generations");
+            cr.setUrl(baseUrl + "/images/generations");
             cr.setPost(true);
             cr.setReadResponseForErrors(true);
             cr.setDuplicateSupported(true);
