@@ -20645,13 +20645,23 @@ static id cn1ContinuitySanitize(id value) {
 /// symptom of that is a setting that silently fails to follow the user.
 static NSUbiquitousKeyValueStore *cn1ContinuityStore(void) {
     static NSUbiquitousKeyValueStore *store = nil;
-    static dispatch_once_t cn1ContinuityStoreOnce;
-    // dispatch_once, not a resolved flag. The flag was set BEFORE the store was assigned, so a
-    // second thread arriving in that gap saw "resolved" and got nil back from a store that was
-    // perfectly available -- and two threads passing the check together installed the
-    // external-change observer twice, which delivers every remote change to the listener twice.
-    // A one-time initializer is exactly what this is, so it says so.
-    dispatch_once(&cn1ContinuityStoreOnce, ^{
+    static pthread_mutex_t cn1ContinuityStoreLock = PTHREAD_MUTEX_INITIALIZER;
+    // A mutex that latches SUCCESS only, not dispatch_once. Two things have to be true here and
+    // they pull in opposite directions.
+    //
+    // It must be serialized: an earlier version set a "resolved" flag BEFORE assigning the store,
+    // so a second thread arriving in that gap got nil back from a store that was perfectly
+    // available, and two threads passing together installed the external-change observer twice --
+    // every remote change delivered to the listener twice.
+    //
+    // But it must NOT latch failure. [s synchronize] is the probe for "is this store actually
+    // usable", and it answers NO for reasons that pass: an offline launch is the obvious one. A
+    // one-time initializer cached that NO for the life of the process, so an entitled app that
+    // happened to start without connectivity reported the synced store unsupported forever, with
+    // no observer, even once the network came back. Resolving again on the next call costs one
+    // synchronize; getting it permanently wrong costs the feature.
+    pthread_mutex_lock(&cn1ContinuityStoreLock);
+    if (store == nil) {
     @try {
         NSUbiquitousKeyValueStore *s = [NSUbiquitousKeyValueStore defaultStore];
         if (s != nil && [s synchronize]) {
@@ -20668,7 +20678,8 @@ static NSUbiquitousKeyValueStore *cn1ContinuityStore(void) {
     } @catch (NSException *e) {
         store = nil;
     }
-    });
+    }
+    pthread_mutex_unlock(&cn1ContinuityStoreLock);
     return store;
 }
 

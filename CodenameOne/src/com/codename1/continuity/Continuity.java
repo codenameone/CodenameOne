@@ -853,7 +853,18 @@ public final class Continuity {
                 // restore" while a perfectly valid local checkpoint sat in storage -- which is
                 // ordinary with automatic restore off and the user still navigating -- so a
                 // single restore() call told the application to show its initial screen instead.
-                setParked(null);
+                //
+                // Compare-and-clear, like the restore path. This can run on a worker, and a
+                // delivery can replace the slot with a NEWER state between the snapshot above and
+                // this line -- the unconditional clear then deleted that one, while its in-memory
+                // high-water mark stopped the relay offering it again for the rest of the
+                // process. Only the state actually inspected is discarded.
+                synchronized (STATE_LOCK) {
+                    if (isSameState(parked, waiting)) {
+                        parked = null;
+                        parkedEra = NO_ERA;
+                    }
+                }
             } else {
                 return waiting;
             }
