@@ -349,6 +349,24 @@ class CertificateWizardPushCapabilityTest {
     }
 
     @Test
+    void otherPeoplesMacIdentifiersAreNotARemedyForThisProjectHavingNone() throws Exception {
+        // The account holds Mac App IDs -- for other apps. The account-wide list is
+        // therefore not empty, and testing THAT skipped the whole remedy: the dialog listed
+        // other people's apps, offered no way to register this project's own Mac App ID,
+        // and the Bundle IDs page registers iOS identifiers only. What matters is whether
+        // this PROJECT has one the profile type can use.
+        final MockSigningService service = new MockSigningService();
+        final CertificateWizard[] app = launchBound(service, "com.example.brandnew", "");
+
+        openMacProfileDialog(app);
+
+        assertNotNull(find(app[0].getForm(), "pick.bundle.BID_MACONLY"),
+                "the account's other Mac App IDs are still listed");
+        assertNotNull(find(app[0].getForm(), "btn.profileNeedsBundle"),
+                "and this project is still offered a Mac App ID of its own");
+    }
+
+    @Test
     void appGroupsOnAMacRegistrationLookTheBundleUpOnItsOwnPlatform() throws Exception {
         // Registering from the Mac profile flow creates a MAC_OS App ID, and the App Groups
         // follow-up then looked the identifier back up as IOS. It found nothing and told the

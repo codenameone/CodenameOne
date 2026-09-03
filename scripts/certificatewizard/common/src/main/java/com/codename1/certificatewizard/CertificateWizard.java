@@ -1321,7 +1321,12 @@ public class CertificateWizard extends Lifecycle {
                 });
                 c.add(toggle);
             }
-            if (usableBundles.isEmpty()) {
+            // Whether THIS project has an App ID this profile type can use, not whether the
+            // account holds one for anybody. An account full of other apps' Mac App IDs
+            // makes the list non-empty while the project's own identifier is still missing
+            // from it, and the developer is then offered other people's apps and no way to
+            // register their own -- the Bundle IDs page registers iOS identifiers only.
+            if (ownBundles.isEmpty()) {
                 // Whether THIS identifier is already registered decides the remedy, not
                 // whether the account holds any bundle IDs at all. An account full of other
                 // apps' iOS App IDs says nothing about whether this one can be registered

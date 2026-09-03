@@ -553,11 +553,22 @@ public class MapView extends Container implements MapSurface {
         // to where it already was. Claiming the wheel for a pan that did not happen traps
         // scrolling on a page that holds a map: what cannot move passes the wheel on, the
         // same rule the scrollers and the image viewer follow.
+        //
+        // Judged on the axis with the larger delta, and only that one. A trackpad swipe
+        // always carries a little of the other axis, so a map held against the top of Web
+        // Mercator still drifts east or west under a downward swipe -- and counting that as
+        // a pan means the page under the map stops scrolling at exactly the latitude a
+        // reader is most likely to be at. The whole gesture goes or stays, so a centre that
+        // moved only on the subordinate axis is put back.
+        boolean verticalGesture = Math.abs(ev.getDeltaY()) >= Math.abs(ev.getDeltaX());
         LatLng before = engine.getCenter();
         engine.panPixels(ev.getDeltaX(), ev.getDeltaY());
         LatLng after = engine.getCenter();
-        if (Double.compare(before.getLatitude(), after.getLatitude()) == 0
-                && Double.compare(before.getLongitude(), after.getLongitude()) == 0) {
+        boolean moved = verticalGesture
+                ? Double.compare(before.getLatitude(), after.getLatitude()) != 0
+                : Double.compare(before.getLongitude(), after.getLongitude()) != 0;
+        if (!moved) {
+            engine.setCenter(before);
             return false;
         }
         repaint();
