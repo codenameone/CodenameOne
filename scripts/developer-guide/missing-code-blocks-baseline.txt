@@ -181,6 +181,32 @@ appendix_goal_generate_graphql.adoc	ends the stream:
 appendix_goal_generate_grpc.adoc	Call sites use the static factory:
 appendix_goal_generate_grpc.adoc	The `@GrpcClient` interface looks like:
 appendix_goal_generate_openapi.adoc	Call sites use the static factory:
+io.asciidoc	A more advanced usage of the `FileSystemStorage` API can be a `FileSystemStorage` `Tree`:
+io.asciidoc	A simpler implementation could do something like this:
+io.asciidoc	Above, if you want to select the IDs of all players that are ranked in the top 2, you can use an expression like:
+io.asciidoc	Above, you globally find a lastname element with a value of ‘Hewitt’, then grab the parent node of lastname which happens to be the player node, then grab the ID attribute from the player node. Or, you could get the same result from the following simpler statement:
+io.asciidoc	Above, you selected the IDs of all ranked players. Conversely, you can select the non-ranked players like this:
+io.asciidoc	After you do that once you can write/read contacts from storage if you so want:
+io.asciidoc	An `Externalizable` object *must* have a *default public constructor* and must implement the following 4 methods:
+io.asciidoc	And delete an entry using:
+io.asciidoc	And vice versa:
+io.asciidoc	Another approach is to use the `setFailSilently(true)` method on the `ConnectionRequest`. This will prevent the `ConnectionRequest` from displaying any errors to the user. It's a powerful strategy if you use the synchronous version of the APIs for example:
+io.asciidoc	As part of the premium cloud features it's possible to invoke Log.sendLog() to email a log directly to the developer account. Codename One can do that seamlessly based on changes printed into the log or based on exceptions that are uncaught or logged for example:
+io.asciidoc	Assuming you added a new date field to the object you can do the following. Notice that a `Date` is a `long` value in Java that can be null. For completeness the full class is presented below:
+io.asciidoc	Binding makes this all seamless. For example: the code above can be written as:
+io.asciidoc	By default `GZConnectionRequest` doesn't request gzipped data ( unzips it when its received) but its pretty easy to do so add the HTTP header `Accept-Encoding: gzip` for example:
+io.asciidoc	Codename One provides many tools to simplify the path between networking/IO & GUI. A common task of showing a wait dialog or progress sign while fetching network data can be simplified by using the https://www.codenameone.com/javadoc/com/codename1/components/InfiniteProgress.html[InfiniteProgress] class for example:
+io.asciidoc	Developers need to write the data of the object in the externalize method using the methods in the data output stream and read the data of the object in the internalize method for example:
+io.asciidoc	For a lot of REST requests this will fail because you need to add an HTTP header indicating that you accept JSON results. You have a special case support for that:
+io.asciidoc	For endpoints that return a list of DTOs, use `fetchAsMappedList`:
+io.asciidoc	For example, if you wish to have finer grained control over the submission process for example: for making a `HEAD` request you can do this with code like:
+io.asciidoc	For example: to block all network errors from showing anything to the user you could do something like this:
+io.asciidoc	For example: you can do something like this in your `init(Object)` method:
+io.asciidoc	For starters all the common methods of `Object` can be implemented with almost no code:
+io.asciidoc	If a document is ordered, you might want to select nodes by their position, for example:
+io.asciidoc	If you continue the example from above to show persistence to the SQL database you can do something like this:
+io.asciidoc	If you continue your example from above you can do something like this:
+io.asciidoc	Implementing the `Externalizable` interface is important when you want to store a proprietary object. In this case you must register the object with the `com.codename1.io.Util` class so the externalization algorithm will be able to recognize it by name by invoking:
 graphics.asciidoc	(that's: where the numbers appear), and the remaining marks (corresponding with seconds) will be short:
 graphics.asciidoc	3. Invert the translation performed in step 1:
 graphics.asciidoc	A `URLImage` can be created with a mask adapter to apply an effect to an image. This allows you to round downloaded images or apply any sort of masking for example: you can adapt the round mask code above as such:

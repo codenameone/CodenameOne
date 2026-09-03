@@ -50,6 +50,10 @@ later fill and draw operations. The
 https://www.codenameone.com/javadoc/com/codename1/ui/LinearGradientPaint.html[`LinearGradientPaint`]
 class is the most common option and accepts a list of color stops along a line:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava050Snippet.java[tag=graphics-java-050,indent=0]
+----
 
 The `fillLinearGradient()` convenience methods (with optional `repeat` flag)
 provide a shorthand when you need a two-color gradient without constructing
@@ -66,6 +70,10 @@ method that consumes a `Gradient` value object. `Gradient` is a `Paint`
 subclass with three concrete forms - `LinearGradient`, `RadialGradient`,
 `ConicGradient` - following the same pattern as the `Shape` hierarchy:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava051Snippet.java[tag=graphics-java-051,indent=0]
+----
 
 `Gradient` carries the cycle method (`CYCLE_NONE` / `CYCLE_REPEAT` /
 `CYCLE_REFLECT`) for repeating / reflected fills. Each port implements
@@ -180,6 +188,10 @@ a stroke of the appropriate width, and sets the color on the graphics context. T
 The addPoint method is designed to allow you to add points to the drawing. A simple implementation that uses
 straight lines rather than curves might look like this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava052Snippet.java[tag=graphics-java-052,indent=0]
+----
 
 You introduced a couple house-keeping member vars (`lastX` and `lastY`) to store the last point that was added
 that you know whether this is the first tap or a later tap. The first tap triggers a `moveTo()` call, whereas
@@ -208,6 +220,10 @@ See the https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.ht
 You will make use of the link:https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html#quadTo(float,float,float,float)[`quadTo()`]
 method to append curves to the drawing as follows:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava053Snippet.java[tag=graphics-java-053,indent=0]
+----
 
 This change should be straight forward except, perhaps, the business with the `odd` variable. Since
 quadratic curves require two points (also to the implied starting point), you can't take the last tap
@@ -229,6 +245,10 @@ The `DrawingCanvas` example is a bit naive in that it assumes that the device su
 expected to be drawn. You can fall back gracefully if you make use of the
 https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html#isShapeSupported()[`Graphics.isShapeSupported()`] method. For example:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava054Snippet.java[tag=graphics-java-054,indent=0]
+----
 
 === Transforms
 
@@ -317,12 +337,20 @@ The clock also exposes the following parameters to help customize how it's rende
  displayed at quarter points (that's: 12, 3, 6, and 9). Slightly shorter ticks will be displayed at the five-minute marks
  (that's: where the numbers appear), and the remaining marks (corresponding with seconds) will be short:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava055Snippet.java[tag=graphics-java-055,indent=0]
+----
 
 ==== Drawing the tick marks
 
 For the tick marks, you will use a single https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html[GeneralPath] object, making use of the `moveTo()` and `lineTo()` methods
 to draw each individual tick:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava056Snippet.java[tag=graphics-java-056,indent=0]
+----
 
 TIP: This example uses a little bit of trigonometry to calculate the `(x,y)` coordinates of the tick marks based on
 the angle and the radius. If math isn't your thing, don't worry. This example makes use of the identities: `x=r*cosθ` and `y=r*sinθ`.
@@ -343,6 +371,10 @@ For the purposes of this tutorial, you will use the following strategy. For each
 2. Draw number (using `drawString()`) at the clock's center. It should be rendered at the correct point due to your translation.
 3. Invert the translation performed in step 1:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava057Snippet.java[tag=graphics-java-057,indent=0]
+----
 
 NOTE: This example is, admittedly, a little contrived to allow for a demonstration of the `Graphics.translate()` method.
 You could have as passed the exact location of the number to `drawString()` rather than draw at the clock
@@ -369,9 +401,17 @@ for each hand. For the positioning/angle of each, use the following strategy:
 For the "second" hand, you will use a simple line from the clock center to the inside edge of the medium tick
 mark at the 12 o'clock position:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava058Snippet.java[tag=graphics-java-058,indent=0]
+----
 
 And you will translate it down slightly so that it overlaps the center. This translation will be performed on the `GeneralPath` object directly rather than through the `Graphics` context:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava059Snippet.java[tag=graphics-java-059,indent=0]
+----
 
 *Rotating the Second Hand:*:
 
@@ -382,9 +422,16 @@ which, in your case will be the clock center.
 WARNING: The rotation pivot point is expected to be in absolute screen coordinates rather than relative
 coordinates of the component. You therefore need to get the absolute clock center position to perform the rotation:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava060Snippet.java[tag=graphics-java-060,indent=0]
+----
 
-NOTE: Remember to call `resetAffine()` after you're done with the rotation, or you will see some unexpected
-results on your form.
+NOTE: Put the transform back when you're done with the rotation, or the drawing
+that follows uses your rotated coordinate system. Save it with `getTransform()`
+first and restore it with `setTransform()`, as the sample above does.
+`resetAffine()` looks like the way to do this and isn't: it clears the transform
+entirely, including one a parent set before your component was painted.
 
 *Drawing the Minute And Hour Hands*:
 
@@ -398,6 +445,10 @@ parameters. For example: The hour hand angle is informed by both the hour of the
 
 The remaining drawing code is as follows:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava061Snippet.java[tag=graphics-java-061,indent=0]
+----
 
 
 ==== The final result
@@ -421,6 +472,10 @@ To animate your clock so that it updates once per second, you need to do two thi
 
 The `animate()` method in the `AnalogClock` class:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava062Snippet.java[tag=graphics-java-062,indent=0]
+----
 
 This method will be invoked on each "pulse" of the EDT. It checks the last time the clock was rendered and returns
 `true` if the clock hasn't been rendered in the current "time second" interval. Otherwise it returns false. This
@@ -432,9 +487,17 @@ Animations can be started and stopped through the `Form.registerAnimated(compone
 `Form.deregisterAnimated(component)` methods. You chose to encapsulate these calls in `start()` and `stop()`
 methods in the component as follows:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava063Snippet.java[tag=graphics-java-063,indent=0]
+----
 
 The code to instantiate the clock, and start the animation would be something like:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava064Snippet.java[tag=graphics-java-064,indent=0]
+----
 
 === Shape clipping
 
@@ -547,13 +610,17 @@ transformations at the end of the method so that it doesn't pollute the renderin
 The behavior of this rotation will vary based on where the component is rendered on the screen. To
 show this, try to place five of these components on a form inside a https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] and see how it looks:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava065Snippet.java[tag=graphics-java-065,indent=0]
+----
 
 The result is as follows:
 
 .Rotating the rectangle
 image::img/rotation1.png[Rotating the rectangle,scaledwidth=20%]
 
-This may not be an intuitive outcome since you drew 10 rectangle components, but you see a portion of one
+This may not be an intuitive outcome since you drew five rectangle components, but you see a portion of one
 rectangle. The reason is that the `rotate(angle)` method uses the screen origin as the pivot point for the rotation.
 Components nearer to this pivot point will experience a less dramatic effect than components farther from it. In
 your case, the rotation has caused all rectangles except the first one to be rotated outside the bounds of their
@@ -563,12 +630,20 @@ Some possibilities would be:
 
 Top Left Corner:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava066Snippet.java[tag=graphics-java-066,indent=0]
+----
 
 .Rotating the rectangle with wrong pivot point
 image::img/rotation2.png[Rotating the rectangle with wrong pivot point,scaledwidth=20%]
 
 Center:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava067Snippet.java[tag=graphics-java-067,indent=0]
+----
 
 .Rotating the rectangle with the center pivot point
 image::img/rotation3.png[Rotating the rectangle with the center pivot point,scaledwidth=20%]
@@ -604,6 +679,10 @@ methods.
 
 For example: a `pointerPressed()` callback method can look like this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava068Snippet.java[tag=graphics-java-068,indent=0]
+----
 
 In this case you translated these points so that they would be relative to the origin of the parent component.
 This is because the `drawXXX()` methods for this component take coordinates relative to the parent component.
@@ -809,6 +888,10 @@ Once the image was fetched the `animate()` method returns true to refresh the UI
 
 The simple use case is pretty trivial:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava069Snippet.java[tag=graphics-java-069,indent=0]
+----
 
 Or you can use the similar `URLImage.createToFileSystem` method instead of the https://www.codenameone.com/javadoc/com/codename1/io/Storage.html[Storage] version.
 
@@ -831,6 +914,10 @@ rounded version of the downloaded image.
 
 To do this you can override:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava070Snippet.java[tag=graphics-java-070,indent=0]
+----
 
 In the adapter interface and return the processed encoded image. If you do heavy processing (for example: rounded edge images)
 you would need to convert the processed image back to an encoded image so it can be saved. You would then also want to show that this operation should run asynchronously through the appropriate method in the class.
@@ -844,6 +931,10 @@ The standard `createToStorage` path doesn't expose the underlying
 other custom header / cookie / timeout) requires the `RequestDecorator`
 hook. Two ways to install one:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava071Snippet.java[tag=graphics-java-071,indent=0]
+----
 
 For per-image overrides (for example one endpoint needs an extra API-version
 header on top of the global bearer token), use the
@@ -851,6 +942,17 @@ header on top of the global bearer token), use the
 overload. Per-instance decorators run *after* the global default so they
 can override or augment whatever the default set:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava072Snippet.java[tag=graphics-java-072,indent=0]
+----
+
+
+NOTE: Decorators reach the storage-backed images only. `URLImage.fetch()`
+downloads a file-system-backed image through `Util.downloadImageToFileSystem`,
+which takes neither the global default nor a per-image decorator, so an image
+created with `createToFileSystem` is fetched without your `Authorization`
+header. Use `createToStorage` when the endpoint needs one.
 
 When a decorator is installed (global or per-call), `URLImage` skips the
 default `Util.downloadImageToStorage` path and builds a
@@ -862,6 +964,15 @@ when no decorator is set.
 
 A `URLImage` can be created with a mask adapter to apply an effect to an image. This allows you to round downloaded images or apply any sort of masking for example: you can adapt the round mask code above as such:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava073Snippet.java[tag=graphics-java-073,indent=0]
+----
+
+NOTE: The adapter masks the image while resizing it to the placeholder, so a
+download that already matches the placeholder's dimensions is stored unmasked.
+Give the placeholder a size the source images don't already have when every
+image has to come out rounded.
 
 ===== URLImage in lists
 
@@ -871,12 +982,20 @@ https://www.codenameone.com/javadoc/java/util/List.html[List] & https://www.code
 `_URLImage` and give it an icon to use as the placeholder. This is easy to do in the multilist by changing the
 name of icon to `icon_URLImage` then using this in the data:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava074Snippet.java[tag=graphics-java-074,indent=0]
+----
 
 Make sure you also set a "real" icon to the entry in the GUI builder or in handcoded applications. This is important
 since the icon will be implicitly extracted and used as the placeholder value. Everything else should be handled
 automatically. You can use `setDefaultAdapter` & `setAdapter` on the generic list cell renderer to install adapters
 for the images. The default is a scale adapter although you might change that to scale fill in the future:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava075Snippet.java[tag=graphics-java-075,indent=0]
+----
 
 The `createListEntry` method then looks like this:
 
@@ -897,6 +1016,10 @@ chart view class, and wrapping it in a
 https://www.codenameone.com/javadoc/com/codename1/charts/ChartComponent.html[`ChartComponent`]
 it can be added to a form:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava076Snippet.java[tag=graphics-java-076,indent=0]
+----
 
 The following classes are available for different kinds of visualisations:
 
