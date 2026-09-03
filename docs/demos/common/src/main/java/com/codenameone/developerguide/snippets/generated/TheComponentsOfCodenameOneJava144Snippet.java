@@ -91,6 +91,7 @@ class TheComponentsOfCodenameOneJava144Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-144[]
+        Button showDialog = new Button("Show");
         Dialog d = new Dialog("Title");
         d.setLayout(new BorderLayout());
         d.add(BorderLayout.CENTER, new SpanLabel("Dialog Body", "DialogBody"));
@@ -98,6 +99,5 @@ class TheComponentsOfCodenameOneJava144Snippet {
         // end::the-components-of-codename-one-java-144[]
     }
 
-    Component showDialog = new Label();
 
 }

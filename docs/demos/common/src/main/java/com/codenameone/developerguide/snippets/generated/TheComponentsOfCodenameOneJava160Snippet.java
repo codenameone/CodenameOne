@@ -91,6 +91,8 @@ class TheComponentsOfCodenameOneJava160Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-160[]
+        Form hi = new Form("SpanLabel", new BoxLayout(BoxLayout.Y_AXIS));
+        Image icon = FontImage.createMaterial(FontImage.MATERIAL_INFO, "Label", 3.0f);
         SpanLabel d = new SpanLabel("Default SpanLabel that can seamlessly line break when the text is really long.");
         d.setIcon(icon);
         SpanLabel l = new SpanLabel("NORTH Positioned Icon SpanLabel that can seamlessly line break when the text is really long.");
@@ -106,6 +108,5 @@ class TheComponentsOfCodenameOneJava160Snippet {
         // end::the-components-of-codename-one-java-160[]
     }
 
-    Image icon;
 
 }

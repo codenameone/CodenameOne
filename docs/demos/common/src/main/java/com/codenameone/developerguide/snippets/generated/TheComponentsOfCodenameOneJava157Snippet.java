@@ -91,17 +91,18 @@ class TheComponentsOfCodenameOneJava157Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-157[]
+        Form hi = new Form("ComponentGroup", new BoxLayout(BoxLayout.Y_AXIS));
+        CheckBox cb1 = new CheckBox("CheckBox 1");
+        CheckBox cb2 = new CheckBox("CheckBox 2");
+        CheckBox cb3 = new CheckBox("CheckBox 3");
+        CheckBox cb4 = new CheckBox("CheckBox 4");
+        RadioButton rb1 = new RadioButton("Radio 1");
+        RadioButton rb2 = new RadioButton("Radio 2");
+        RadioButton rb3 = new RadioButton("Radio 3");
         hi.add(ComponentGroup.enclose(cb1, cb2, cb3, cb4)).
                 add(ComponentGroup.encloseHorizontal(rb1, rb2, rb3));
         // end::the-components-of-codename-one-java-157[]
     }
 
-    RadioButton rb2 = new RadioButton();
-    RadioButton rb1 = new RadioButton();
-    CheckBox cb2 = new CheckBox();
-    CheckBox cb1 = new CheckBox();
-    RadioButton rb3 = new RadioButton();
-    CheckBox cb3 = new CheckBox();
-    CheckBox cb4 = new CheckBox();
 
 }

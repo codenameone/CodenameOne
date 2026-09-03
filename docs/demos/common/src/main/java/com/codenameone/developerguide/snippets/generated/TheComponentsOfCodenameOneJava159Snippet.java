@@ -91,12 +91,13 @@ class TheComponentsOfCodenameOneJava159Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-159[]
+        Form hi = new Form("SpanButton", new BoxLayout(BoxLayout.Y_AXIS));
+        Image icon = FontImage.createMaterial(FontImage.MATERIAL_INFO, "Label", 3.0f);
         SpanButton sb = new SpanButton("SpanButton is a composite component (lead component) that looks/acts like a Button but can break lines rather than crop them when the text is very long.");
         sb.setIcon(icon);
         hi.add(sb);
         // end::the-components-of-codename-one-java-159[]
     }
 
-    Image icon;
 
 }

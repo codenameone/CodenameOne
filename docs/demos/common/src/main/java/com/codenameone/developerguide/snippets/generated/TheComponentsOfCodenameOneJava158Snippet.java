@@ -91,6 +91,9 @@ class TheComponentsOfCodenameOneJava158Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-158[]
+        Form hi = new Form("MultiButton", new BoxLayout(BoxLayout.Y_AXIS));
+        Image icon = FontImage.createMaterial(FontImage.MATERIAL_INFO, "Label", 3.0f);
+        Image emblem = FontImage.createMaterial(FontImage.MATERIAL_STAR, "Label", 2.0f);
         MultiButton twoLinesNoIcon = new MultiButton("MultiButton");
         twoLinesNoIcon.setTextLine2("Line 2");
         MultiButton oneLineIconEmblem = new MultiButton("Icon + Emblem");
@@ -127,7 +130,5 @@ class TheComponentsOfCodenameOneJava158Snippet {
         // end::the-components-of-codename-one-java-158[]
     }
 
-    Image icon;
-    Image emblem;
 
 }

@@ -91,6 +91,8 @@ class TheComponentsOfCodenameOneJava156Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-156[]
+        Form hi = new Form("RadioButton", new BoxLayout(BoxLayout.Y_AXIS));
+        Image icon = FontImage.createMaterial(FontImage.MATERIAL_INFO, "Label", 3.0f);
         CheckBox cb1 = CheckBox.createToggle("CheckBox No Icon");
         cb1.setSelected(true);
         CheckBox cb2 = CheckBox.createToggle("CheckBox With Icon", icon);
@@ -107,6 +109,5 @@ class TheComponentsOfCodenameOneJava156Snippet {
         // end::the-components-of-codename-one-java-156[]
     }
 
-    Image icon;
 
 }
