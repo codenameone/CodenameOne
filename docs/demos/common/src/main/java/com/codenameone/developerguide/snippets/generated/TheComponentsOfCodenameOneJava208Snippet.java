@@ -99,6 +99,8 @@ class TheComponentsOfCodenameOneJava208Snippet {
               }
               String[] l = searchLocations(text);
               if(l == null || l.length == 0) {
+                  // otherwise the popup keeps showing the previous query's matches
+                  options.removeAll();
                   return false;
               }
 
