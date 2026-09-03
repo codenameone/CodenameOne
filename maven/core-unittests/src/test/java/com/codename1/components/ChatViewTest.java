@@ -86,6 +86,21 @@ class ChatViewTest extends UITestBase {
     }
 
     @FormTest
+    void theBubblesOwnMessageTracksItsText() {
+        // getMessage() and getHistory() are two ways of asking the same
+        // question, so a streamed reply has to reach both.
+        ChatView v = new ChatView();
+        ChatBubble bubble = v.beginAssistantStream();
+        bubble.appendText("Hello");
+        assertEquals("Hello", bubble.getMessage().getText());
+        assertEquals("Hello", v.getHistory().get(v.getHistory().size() - 1).getText());
+
+        bubble.appendAnnotation(" [note]");
+        assertEquals("Hello", bubble.getMessage().getText(),
+                "an annotation is not part of the message either");
+    }
+
+    @FormTest
     void textAppendedAfterAnAnnotationDoesNotDragItIntoHistory() {
         // The annotation stays in the bubble, so deriving the conversation from
         // the rendered body folds it in on the very next delta -- excluding it

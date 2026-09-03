@@ -181,10 +181,15 @@ public class ChatView extends Container {
         if (parts == null || parts.size() != 1 || !(parts.get(0) instanceof TextPart)) {
             return;
         }
-        history.set(i, new ChatMessage(existing.getRole(),
+        ChatMessage replacement = new ChatMessage(existing.getRole(),
                 Arrays.<MessagePart>asList(new TextPart(text)),
                 existing.getToolCalls(), existing.getName(),
-                existing.getToolCallId()));
+                existing.getToolCallId());
+        history.set(i, replacement);
+        // The bubble hands the same message out through getMessage(), so it has
+        // to move too -- otherwise the two answers to "what does this bubble
+        // say" disagree the moment anything streams into it.
+        bubble.setMessage(replacement);
     }
 
     public void setTypingIndicatorVisible(final boolean v) {

@@ -48,7 +48,9 @@ public class ChatBubble extends Container {
     private String conversation = "";
 
     private final TextArea body;
-    private final ChatMessage message;
+    /// Not final: when the bubble's conversational text changes, the owning
+    /// view replaces this so getMessage() and ChatView#getHistory agree.
+    private ChatMessage message;
 
     public ChatBubble(ChatMessage message) {
         super(new BorderLayout());
@@ -163,6 +165,12 @@ public class ChatBubble extends Container {
 
     public ChatMessage getMessage() {
         return message;
+    }
+
+    /// Called by [ChatView] when it rebuilds this bubble's message after the
+    /// text changed, so the accessor never answers a stale one.
+    void setMessage(ChatMessage message) {
+        this.message = message;
     }
 
     public String getBubbleText() {
