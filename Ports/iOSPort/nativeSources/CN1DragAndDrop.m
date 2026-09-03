@@ -84,23 +84,26 @@ void CN1CancelNativeDrag(void) {
 /// points and the framework works in pixels, exactly as the touch path does.
 extern float scaleValue;
 
-/// The uniform type identifier under which this provider carries an actual document, or nil
-/// when it carries none.
+/// The file URL an item of type public.file-url carries, whichever way the provider hands it
+/// over.
 ///
-/// A provider built from a URL registers the document under its content type and a
-/// public.file-url beside it. That URL is not the document: loadFileRepresentation writes a copy
-/// of the data of the type it is given, and the data of type public.file-url is the URL itself,
-/// so asking for a file of *that* yields a temporary file containing a URL string. The content
-/// type is the one that yields the document, and a provider with nothing but the URL has no
-/// document to offer at all.
-static NSString* cn1DocumentUtiOf(NSItemProvider* provider) {
-    if (![provider hasItemConformingToTypeIdentifier:@"public.file-url"]) {
-        return nil;
+/// This is the representation, decoded -- not a file *of* it. loadFileRepresentation writes a
+/// copy of the data of the type it is given, and the data of type public.file-url is the URL
+/// itself, so asking for a file of that yields a temporary file whose contents are a URL
+/// string. Nor can the document be found by picking some other identifier the provider
+/// happens to register first: that may be a thumbnail or a fallback, and a provider offering
+/// nothing but the URL has no other identifier at all. The URL says where the document is,
+/// and it is the only thing that does.
+static NSURL* cn1FileUrlFromItem(id item) {
+    if ([item isKindOfClass:[NSURL class]]) {
+        return (NSURL*) item;
     }
-    for (NSString* uti in provider.registeredTypeIdentifiers) {
-        if (![uti isEqualToString:@"public.file-url"]) {
-            return uti;
-        }
+    if ([item isKindOfClass:[NSData class]]) {
+        // The bytes of a URL, which is what the type is.
+        return [NSURL URLWithDataRepresentation:(NSData*) item relativeToURL:nil];
+    }
+    if ([item isKindOfClass:[NSString class]]) {
+        return [NSURL URLWithString:(NSString*) item];
     }
     return nil;
 }
@@ -397,11 +400,7 @@ static NSString* cn1MimesForSession(id<UIDropSession> session) {
         // spellings of that, as the other two ports publish them: a component filtered to
         // MIME_URI_LIST refused an ordinary drag out of Files while the same component took
         // it from the Finder and from a file manager on Android.
-        //
-        // A provider offering nothing *but* a URL is not one of them: there is no document
-        // behind it to copy, and the drop says the same -- which is the agreement between the
-        // hover and the drop that everything here is built on.
-        if (cn1DocumentUtiOf(item.itemProvider) != nil) {
+        if ([item.itemProvider hasItemConformingToTypeIdentifier:@"public.file-url"]) {
             if (![mimes containsObject:@"application/x-file-list"]) {
                 [mimes addObject:@"application/x-file-list"];
             }
@@ -907,25 +906,18 @@ API_AVAILABLE(ios(11.0))
 
     for (UIDragItem* item in session.items) {
         NSItemProvider* provider = item.itemProvider;
-        // The document's own type, which is what has to be asked for. loadFileRepresentation
-        // writes a copy of the provider's data *of the type named*, and the data of type
-        // public.file-url is the URL -- so asking for a file of that produced a temporary file
-        // containing a URL string, and MIME_FILE pointed at that pointer instead of at the
-        // document. A provider built from a URL registers the document under its content type
-        // and the URL beside it; the content type is the one that yields the document.
-        NSString* documentUti = cn1DocumentUtiOf(provider);
-        // A provider offering nothing but a URL has no document to copy, so it is read the
-        // ordinary way below rather than treated as a file drag.
-        BOOL vendsFile = documentUti != nil;
+        BOOL vendsFile = [provider hasItemConformingToTypeIdentifier:@"public.file-url"];
         if (vendsFile) {
             // A document provider commonly offers both a file URL and the document's own
             // content type. Taking only the file made cn1MimesForSession advertise a type the
             // drop could not then produce, so a target filtered to it accepted the hover and
             // was refused the drop.
-            NSString* documentMime = cn1MimeForUti(documentUti);
             dispatch_group_enter(group);
-            [provider loadFileRepresentationForTypeIdentifier:documentUti
-                                           completionHandler:^(NSURL* url, NSError* error) {
+            // The item, not a file representation of it: see cn1FileUrlFromItem.
+            [provider loadItemForTypeIdentifier:@"public.file-url"
+                                        options:nil
+                              completionHandler:^(id<NSSecureCoding> item, NSError* error) {
+                NSURL* url = cn1FileUrlFromItem((id) item);
                 // The URL is only valid inside this handler, so the file is copied out before
                 // it is named to the application. A path handed over without copying is
                 // unreadable by the time the event dispatch thread sees it.
@@ -935,7 +927,15 @@ API_AVAILABLE(ios(11.0))
                 // and the hover has already promised those. Nesting the alternatives under
                 // this meant an unavailable file took every one of them with it and the
                 // target that accepted the drag got nothing at all.
+                //
+                // A document in another application's container is reachable only for as
+                // long as its security scope is held, and only some URLs have one -- the
+                // start call says which by its answer.
+                BOOL scoped = url != nil && [url startAccessingSecurityScopedResource];
                 NSString* target = url == nil ? nil : cn1CopyDroppedFile(url);
+                if (scoped) {
+                    [url stopAccessingSecurityScopedResource];
+                }
                 // The document's own location, which is what tells one of its other names
                 // apart from a representation of its own. Nil when there is no document.
                 NSString* documentPath = target == nil ? nil : url.path;
@@ -943,24 +943,13 @@ API_AVAILABLE(ios(11.0))
                     @synchronized (files) {
                         [files addObject:target];
                     }
-                    if (documentMime != nil) {
-                        // The document is that type as well as being a file, and this is the
-                        // copy of it -- so the loop below has nothing left to do for its own
-                        // identifier and skips it.
-                        NSString* charset = cn1CharsetNameForUti(documentUti);
-                        @synchronized (fileBacked) {
-                            [fileBacked addObject:@[documentMime, target,
-                                                    charset == nil ? @"" : charset]];
-                        }
-                    }
                 }
                 {
                     {
                         // Issued from in here, rather than beside the file load, so that the
                         // comparison above is possible at all.
                         for (NSString* uti in provider.registeredTypeIdentifiers) {
-                            if ([uti isEqualToString:@"public.file-url"]
-                                    || [uti isEqualToString:documentUti]) {
+                            if ([uti isEqualToString:@"public.file-url"]) {
                                 continue;
                             }
                             NSString* mime = cn1MimeForUti(uti);
