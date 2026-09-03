@@ -48,14 +48,6 @@ App-Review.asciidoc	Rather than picking the moment yourself, you can let `AppRev
 App-Review.asciidoc	The simplest usage is a single call at a moment that makes sense in your app -- typically right after the user completed something rewarding (finished a level, saved a document, completed an order):
 Apple-Wallet-Extension.asciidoc	In Java, publish the user's cards whenever they change (typically after login) and keep a fresh token published so Wallet can skip the login screen:
 Authentication-And-Identity.asciidoc	Firebase Auth isn't an OIDC provider -- it issues Google-Identity-Toolkit-style tokens via REST endpoints. `com.codename1.social.FirebaseAuth` wraps those endpoints:
-Authentication-And-Identity.asciidoc	For federated sign-in (Google / Apple / Microsoft as Firebase providers), first obtain an ID token via the matching `*Connect` class, then swap it for a Firebase session:
-Authentication-And-Identity.asciidoc	Or, if the provider exposes a discovery document:
-Authentication-And-Identity.asciidoc	Pseudo-code (the actual HTTP calls depend on your server library):
-Authentication-And-Identity.asciidoc	Refresh the Firebase session at app launch:
-Authentication-And-Identity.asciidoc	`OidcClient` saves the response under a per-issuer + per-client-ID key using `com.codename1.io.oidc.TokenStore.DefaultStorageTokenStore` (which serializes to `com.codename1.io.Storage`). To restore on next launch:
-Authentication-And-Identity.asciidoc	`com.codename1.social.FacebookConnect` exposes both the old SDK-based `doLogin()` and a new SDK-free `signIn(...)` that uses the system browser via `OidcClient`. Use the new method for the simulator, the web port, and for apps that don't want to bundle the Facebook SDK at all:
-Authentication-And-Identity.asciidoc	`com.codename1.social.GoogleConnect` now offers a modern `signIn(...)` method that runs entirely through `OidcClient`:
-Authentication-And-Identity.asciidoc	becomes:
 Commerce.asciidoc	After a purchase, or on app start, validate the device's receipts with the cloud and refresh the entitlement cache. `refresh()` makes a blocking network call, so run it off the EDT:
 Commerce.asciidoc	Drive purchases through the manager (these delegate to the `Purchase` API):
 Commerce.asciidoc	In your `Lifecycle.init` (or wherever you set up purchases):
@@ -186,28 +178,7 @@ io.asciidoc	Since you assume most developers reading this will be familiar with 
 io.asciidoc	That's what the new method of `URLImage` does:
 io.asciidoc	There are many methods of interest to keep an eye for:
 io.asciidoc	database by name:
-performance.asciidoc	All you need to do now is update the `lastScroll` variable whenever user interaction is in place. This works for user touches:
-performance.asciidoc	For example, Codename One annotates:
 performance.asciidoc	In the new Contacts demo you have a share button for each contact, the code for constructing a `ShareButton` looks like this:
-performance.asciidoc	Then you did this within the background loading thread:
 performance.asciidoc	These icons are in a shared resource file that you load and don't cache. The initial workaround was to cache this resource but a better solution was to convert this code:
-performance.asciidoc	This works for general scrolling:
-performance.asciidoc	`Simd` is accessed as a singleton:
-performance.asciidoc	method returns. This is what the `alloca*` family exposes:
-performance.asciidoc	the allocation helpers on `Simd`:
-security.asciidoc	Baking an API key (for example a Google Maps key) into your app is unsafe: anyone can extract it from the binary, and rotating it means shipping a new build. `com.codename1.security.Secrets` solves this. You define the secret once in the Codename One Cloud vault, and the app fetches it at runtime and caches it in `SecureStorage`:
-security.asciidoc	For HOTP, supply the counter explicitly and increment it after every successful authentication:
-security.asciidoc	For RSA-signed tokens (RS256/384/512) and ECDSA-signed tokens (ES256/384/512), pass the key to the dynamic overloads:
-security.asciidoc	Shared secrets are commonly distributed as Base32 strings (the format embedded in QR codes by authenticator apps). `com.codename1.security.Base32` handles the encoding:
-security.asciidoc	The runtime API is identical on both platforms -- request a token bound to a fresh server nonce, then POST it to your backend for verification:
 security.asciidoc	There are two simple methods in the `Util` class:
-security.asciidoc	This works through a new mechanism in storage where you can replace the storage instance with another instance using:
-security.asciidoc	To block copy & paste on a specific field do:
-security.asciidoc	To use a key that was generated outside the app, feed the DER bytes to the static factory methods:
 security.asciidoc	You can leverage that knowledge to change the encryption password on the encryption storage using pseudo-code like this:
-security.asciidoc	`com.codename1.components.OtpField` is a segmented input -- one box per character, that advances to the next box as the user types and steps back on backspace. This is the standard pattern for SMS confirmation and authenticator-app entry screens:
-security.asciidoc	`com.codename1.security.Cipher` also covers RSA encryption, and `com.codename1.security.Signature` covers digital signatures (RSA and ECDSA). Keys are represented by `com.codename1.security.PublicKey` and `com.codename1.security.PrivateKey`, which wrap X.509 SubjectPublicKeyInfo and PKCS#8 DER blobs respectively -- the same encodings used by OpenSSL:
-security.asciidoc	`com.codename1.security.Cipher` exposes AES through the platform's native AES implementation. AES-GCM is the recommended default because it's authenticated -- a single tag-mismatch failure detects any tampering of the ciphertext or the associated data:
-security.asciidoc	`com.codename1.security.Hash` implements MD5, SHA-1, SHA-224, SHA-256, SHA-384, and SHA-512. SHA-256 is the recommended default for new code; MD5 and SHA-1 are exposed only for compatibility with older protocols since both are broken for collision resistance:
-security.asciidoc	`com.codename1.security.Hmac` implements HMAC (RFC 2104) on top of any of the hash algorithms above. Use HMAC whenever a message authentication code is needed -- API request signing, session cookie tamper detection, JWT signing with the `HS` family, or TOTP token generation:
-security.asciidoc	`com.codename1.security.SecureStorage` keeps small string values in the operating system's secure keychain (iOS Keychain Services and the Android Keystore) so they're protected by the platform's secure enclave instead of being written to app storage. The quiet, no-prompt API is three calls:

@@ -75,6 +75,10 @@ This is useful for platform abstraction classes where one implementation is guar
 
 For example, Codename One annotates:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava011Snippet.java[tag=performance-java-011,indent=0]
+----
 
 NOTE: This hint is intended for ParparVM native translation and doesn't apply to the JavaScript back end.
 
@@ -227,6 +231,10 @@ speedup.
 
 `Simd` is accessed as a singleton:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava012Snippet.java[tag=performance-java-012,indent=0]
+----
 
 The returned object is safe to cache in a field as long as the cache is
 refreshed across simulator restarts (the simulator may swap the backing
@@ -246,6 +254,10 @@ arbitrary `new`-allocated arrays to `Simd` primitives.
 Every buffer used with a `Simd` primitive must so come from one of
 the allocation helpers on `Simd`:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava013Snippet.java[tag=performance-java-013,indent=0]
+----
 
 // vale-skip: write-good.TooWordy — 'minimum size' is a precise lower bound; 'least size' would be wrong.
 All three methods enforce a minimum size of 16 elements and throw
@@ -282,6 +294,10 @@ solution is to let the compiler place these buffers on the call stack
 where they cost nothing to create and are reclaimed automatically when the
 method returns. This is what the `alloca*` family exposes:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava014Snippet.java[tag=performance-java-014,indent=0]
+----
 
 On the simulator (and on Android) these behave like heap allocations with
 registration. On ParparVM the translator intercepts each `alloca*` call
@@ -560,6 +576,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 Then you did this within the background loading thread:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava017Snippet.java[tag=performance-java-017,indent=0]
+----
 
 This effectively sleeps when the user interacts with the UI and loads the images if the user hasn't touched the UI in a while.
 
@@ -567,8 +587,16 @@ Notice that you also check if the scroll changes, this allows you to notice case
 
 All you need to do now is update the `lastScroll` variable whenever user interaction is in place. This works for user touches:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava018Snippet.java[tag=performance-java-018,indent=0]
+----
 
 This works for general scrolling:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava019Snippet.java[tag=performance-java-019,indent=0]
+----
 
 NOTE: Due to technical constraints you can't use a lambda in this specific case...
