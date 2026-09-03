@@ -692,6 +692,11 @@ public final class Continuity {
                 // ordinary with automatic restore off and the user still navigating -- so a
                 // single restore() call told the application to show its initial screen instead.
                 parked = null;
+                // And the checkpoint that was waiting behind it goes out. The hold is there to
+                // protect the relay's only copy of a live arrival; this one has expired and will
+                // not be restored by anything, so holding a publication for it forever is just a
+                // checkpoint that never reaches the user's other devices.
+                startPublisher();
             } else {
                 return waiting;
             }
@@ -1622,6 +1627,15 @@ public final class Continuity {
             if (durable == null || durable.longValue() < seq) {
                 recordDurable(from, seq);
             }
+        }
+        if (isSameState(parked, state)) {
+            // The application has dealt with this arrival -- acknowledge() is the documented way
+            // to decline one -- so the slot must not go on offering it through
+            // getRestorableState(), and must not go on holding a checkpoint back either. The
+            // hold exists because a parked state's only copy is on the relay; an acknowledged
+            // state has a durable mark, so overwriting the relay's copy is now safe.
+            parked = null;
+            startPublisher();
         }
         // ALWAYS, not only when a map moved. The condition this replaced was written when the
         // durable copy tracked memory exactly; it does not, and by the time anything calls this

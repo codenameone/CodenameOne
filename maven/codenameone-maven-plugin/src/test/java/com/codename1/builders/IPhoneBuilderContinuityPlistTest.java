@@ -149,6 +149,26 @@ class IPhoneBuilderContinuityPlistTest {
         }
     }
 
+    /**
+     * A declaration of the wrong plist TYPE is refused rather than accepted. topLevelPlistString
+     * answers null for an array or a dict, which used to mean the value was left alone (something
+     * was declared) and ours was not added (the key was present) -- so the build succeeded and
+     * the delegate found a value that is not an NSString, treated it as absent, and let every
+     * continuation bypass the handler on a build that looked configured.
+     */
+    @Test
+    void aNonStringDeclarationIsRefused() {
+        String arrayValued = "<key>CN1ContinuityActivityType</key><array>"
+                + "<string>com.example.app.continuity</string></array>";
+
+        try {
+            IPhoneBuilder.withContinuityActivityType(arrayValued, CONTINUITY_TYPE);
+            fail("a non-string CN1ContinuityActivityType must not be accepted");
+        } catch (BuildException expected) {
+            assertTrue(expected.getMessage().contains("non-string"), expected.getMessage());
+        }
+    }
+
     // ------------------------------------------------------------------
     // Emitting the key
     // ------------------------------------------------------------------

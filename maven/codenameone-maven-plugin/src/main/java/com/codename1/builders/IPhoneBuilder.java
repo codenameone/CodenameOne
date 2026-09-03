@@ -11705,6 +11705,17 @@ public class IPhoneBuilder extends Executor {
         // because this is not a hint. An injected key naming a different type has the delegate
         // rejecting the application's own continuations while iOS goes on offering them.
         String injected = topLevelPlistString(inject, "CN1ContinuityActivityType");
+        if (injected == null && declaresTopLevelPlistKey(inject, "CN1ContinuityActivityType")) {
+            // Declared, but not as a string. topLevelPlistString answers null for an array, a
+            // dict or anything else, so this used to fall through both branches: the value was
+            // left alone because something was declared, and ours was not added because the key
+            // was present. The build then succeeded and the delegate found a value that is not an
+            // NSString, which it treats as absent -- so every continuation quietly bypassed the
+            // handler on a build that looked configured.
+            throw new BuildException("ios.plistInject declares CN1ContinuityActivityType with a "
+                    + "non-string value. It has to be the activity type this build publishes, '"
+                    + continuityType + "', or be left out so the build writes it.");
+        }
         if (injected != null && !injected.equals(continuityType)) {
             throw new BuildException("ios.plistInject sets CN1ContinuityActivityType to '"
                     + injected + "' while this build publishes '" + continuityType

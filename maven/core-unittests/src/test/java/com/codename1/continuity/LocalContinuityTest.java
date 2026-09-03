@@ -2143,6 +2143,96 @@ public class LocalContinuityTest extends UITestBase {
         }
     }
 
+    /**
+     * Declining an arrival with acknowledge() must release it. The state stays in the parked slot
+     * otherwise, so getRestorableState() goes on offering something the application has already
+     * dealt with -- and the checkpoint hold, which exists to protect a live arrival's only copy,
+     * goes on withholding publications for a state nobody will ever restore.
+     */
+    @EdtTest
+    public void acknowledgingAParkedArrivalReleasesItAndTheHeldPublication() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+        final GatedRelay r = new GatedRelay();
+        Continuity.setRelay(r);
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitEntered();
+            }
+        });
+        r.release();
+        pause(300L);
+        final int before = r.sent.size();
+
+        AppState arrival = fromElsewhere("the user says no", 101L);
+        Continuity.deliver(arrival);
+        flushSerialCalls();
+        Continuity.checkpoint();
+        pause(250L);
+        assertEquals(before, r.sent.size(), "the checkpoint should be held while it is parked");
+
+        Continuity.acknowledge(arrival);
+
+        // Identity, not null. getRestorableState() falls back to the LOCAL checkpoint when
+        // nothing is parked, and this test just wrote one -- so asserting null here fails on
+        // correct behaviour. What must not come back is the arrival that was acknowledged.
+        AppState left = Continuity.getRestorableState();
+        assertFalse(left != null && "some-other-device".equals(left.getDeviceId()),
+                "an acknowledged arrival is still being offered for restoration");
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitAnySince(before);
+            }
+        });
+        assertTrue(r.sent.size() > before,
+                "the checkpoint stayed held behind a state the application had acknowledged");
+    }
+
+    /**
+     * And an arrival that expires while parked releases the hold too. The hold protects the
+     * relay's only copy of a LIVE arrival; an expired one will never be restored by anything, so
+     * holding a checkpoint behind it just means it never reaches the user's other devices.
+     */
+    @EdtTest
+    public void anExpiredParkedArrivalReleasesTheHeldPublication() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+        final GatedRelay r = new GatedRelay();
+        Continuity.setRelay(r);
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitEntered();
+            }
+        });
+        r.release();
+        pause(300L);
+        final int before = r.sent.size();
+
+        Continuity.parkForTest(fromElsewhere("goes stale while waiting", 103L));
+        Continuity.setMaxAge(1L);
+        Continuity.checkpoint();
+        pause(250L);
+
+        // Asking is what discards the expired arrival, and the hold has to go with it. Checked
+        // by identity for the reason the sibling above gives: a local checkpoint is a legitimate
+        // answer here, the expired arrival is not.
+        AppState left = Continuity.getRestorableState();
+        assertFalse(left != null && "some-other-device".equals(left.getDeviceId()),
+                "an expired parked state was still offered");
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitAnySince(before);
+            }
+        });
+        assertTrue(r.sent.size() > before,
+                "the checkpoint stayed held behind an arrival that had already expired");
+        Continuity.setMaxAge(0L);
+    }
+
     /** Storage whose writes always fail, which is what a full disk looks like. */
     static class RefusingStorage extends Storage {
         @Override
@@ -2308,9 +2398,15 @@ public class LocalContinuityTest extends UITestBase {
         /// out), and an absence asserted too early is not evidence of anything: the publish simply
         /// had not happened yet. A bare sleep gave exactly that, so the test could pass without
         /// the code under it ever running.
-        /** Waits until more than `count` states have been sent. */
+        /**
+         * Waits until more than `count` states have been sent.
+         *
+         * Deliberately shorter than the harness's own 5s limit. At 5000 a regression raced it and
+         * the test reported "FormTest timed out" instead of the assertion that explains what
+         * broke -- a failure message that sends the next reader hunting a hung event thread.
+         */
         void awaitAnySince(int count) {
-            long deadline = System.currentTimeMillis() + 5000L;
+            long deadline = System.currentTimeMillis() + 2500L;
             while (System.currentTimeMillis() < deadline && sent.size() <= count) {
                 sleepBriefly();
             }
