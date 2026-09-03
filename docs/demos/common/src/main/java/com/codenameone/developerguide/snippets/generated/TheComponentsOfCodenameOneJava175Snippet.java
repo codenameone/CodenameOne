@@ -92,12 +92,8 @@ class TheComponentsOfCodenameOneJava175Snippet {
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-175[]
         focus.getAllStyles().setBgTransparency(100);
-        try {
-            focus.setIcon(Image.createImage("/duke.png"));
-            focus.setAlignment(Component.RIGHT);
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
+        focus.setIcon(FontImage.createMaterial(FontImage.MATERIAL_STAR, "Label", 3.0f));
+        focus.setAlignment(Component.RIGHT);
         // end::the-components-of-codename-one-java-175[]
     }
 

@@ -102,6 +102,7 @@ class TheComponentsOfCodenameOneJava157Snippet {
         RadioButton rb3 = RadioButton.createToggle("Radio 3", bg);
         hi.add(ComponentGroup.enclose(cb1, cb2, cb3, cb4)).
                 add(ComponentGroup.encloseHorizontal(rb1, rb2, rb3));
+        hi.show();
         // end::the-components-of-codename-one-java-157[]
     }
 

@@ -91,15 +91,10 @@ class TheComponentsOfCodenameOneJava192Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-192[]
-        Image duke;
-        try {
-            duke = Image.createImage("/duke.png");
-        } catch(IOException err) {
-            Log.e(err);
-            return; // without the icon there is nothing to show
-        }
         int fiveMM = Display.getInstance().convertToPixels(5);
-        final Image finalDuke = duke.scaledWidth(fiveMM);
+        // a material icon, so the sample needs no bundled asset
+        final Image finalDuke = FontImage.createMaterial(FontImage.MATERIAL_PORTRAIT, "Label", 3.0f)
+                .scaledWidth(fiveMM);
         Toolbar.setGlobalToolbar(true);
         Form hi = new Form("Search", BoxLayout.y());
         hi.add(new InfiniteProgress());

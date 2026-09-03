@@ -95,6 +95,8 @@ class TheComponentsOfCodenameOneJava208Snippet {
           @Override
           protected boolean filter(String text) {
               if(text.length() == 0) {
+                  // an emptied field must not keep showing the last query's matches
+                  options.removeAll();
                   return false;
               }
               String[] l = searchLocations(text);
