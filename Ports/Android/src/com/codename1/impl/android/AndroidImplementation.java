@@ -10361,7 +10361,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             com.codename1.io.Log.e(t);
         }
         try {
-            addPublishedUris(content, mimeTypes, items);
+            addPublishedUris(content, mimeTypes, items, clip);
         } catch (Throwable t) {
             com.codename1.io.Log.e(t);
         }
@@ -10588,8 +10588,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     ///
     /// One item per URI, because an item is a dragged object and a list of three links is
     /// three of them. The clip's text still rides on the first, as it does on a file.
-    private static void addPublishedUris(ClipboardContent content, List<String> mimeTypes,
-            List<ClipData.Item> items) {
+    private void addPublishedUris(ClipboardContent content, List<String> mimeTypes,
+            List<ClipData.Item> items, long clip) {
         String list = clipboardText(content, ClipboardContent.MIME_URI_LIST);
         if (list == null) {
             return;
@@ -10636,13 +10636,49 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (alreadyCarried.contains(publishedUriKey(line))) {
                 continue;
             }
-            items.add(new ClipData.Item(Uri.parse(line)));
+            Uri published = publishableUri(line, clip);
+            if (published == null) {
+                continue;
+            }
+            items.add(new ClipData.Item(published));
             any = true;
         }
         // Declared when the clip can produce one: the entries just added, the published files
         // a reader builds the list back out of, or both.
         if (any || carriesPublishedFile) {
             declareUriList(mimeTypes);
+        }
+    }
+
+    /// One entry of a URI list, in a form the clip may leave this process with, or null when
+    /// it cannot be published at all.
+    ///
+    /// A file: URI is the case that needs the work. Android refuses to let a clip carrying one
+    /// cross the application boundary -- prepareToLeaveProcess throws FileUriExposedException
+    /// from API 24 -- so a copy of a list naming a local document threw out of the UI thread it
+    /// was made on, and a global drag of one never started. It goes through the file provider
+    /// exactly as the file representation does, which is also what makes it *readable* by the
+    /// receiver rather than merely legal.
+    ///
+    /// Anything else -- an http address, a mailto:, another application's content URI -- is
+    /// already publishable and travels as it was written.
+    private Uri publishableUri(String line, long clip) {
+        if (!hasScheme(line, "file:")) {
+            return Uri.parse(line);
+        }
+        String path = Uri.parse(line).getPath();
+        if (path == null || path.length() == 0) {
+            return null;
+        }
+        try {
+            return shareableUriFor(new File(path),
+                    getContext().getPackageName() + ".provider", clip);
+        } catch (Throwable t) {
+            // Absent rather than advertised, as the file representation does it: a document
+            // outside the roots the provider was configured with cannot be handed over, and
+            // naming it anyway tells the receiver the clip holds something it will not get.
+            com.codename1.io.Log.e(t);
+            return null;
         }
     }
 

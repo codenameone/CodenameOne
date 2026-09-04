@@ -1208,11 +1208,14 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
                 // start call says which by its answer.
                 BOOL scoped = url != nil && [url startAccessingSecurityScopedResource];
                 NSString* target = url == nil ? nil : cn1CopyDroppedFile(url);
-                if (scoped) {
-                    [url stopAccessingSecurityScopedResource];
-                }
                 // The document's own type, which is what tells one of its other names apart
                 // from a representation of its own.
+                //
+                // Read while the security scope is still held. Asking a URL in another
+                // application's container for its metadata outside the scope answers nothing,
+                // and a nil type here is not harmless: the loop below then fails to recognize
+                // the document among its own representations and copies it a second time --
+                // the very duplication the type was read to prevent.
                 //
                 // By type rather than by path. loadFileRepresentation hands every
                 // representation over at a temporary URL of its own, so comparing paths
@@ -1225,6 +1228,9 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
                     id typeValue = nil;
                     [url getResourceValue:&typeValue forKey:NSURLTypeIdentifierKey error:nil];
                     documentUti = [typeValue isKindOfClass:[NSString class]] ? typeValue : nil;
+                }
+                if (scoped) {
+                    [url stopAccessingSecurityScopedResource];
                 }
                 if (target != nil) {
                     @synchronized (files) {
