@@ -2104,6 +2104,12 @@ public final class Continuity {
                 && waiting.getSequence() <= state.getSequence();
     }
 
+    /// Test seam: the inbound callback a port is given, so the decline-while-disabled answer can
+    /// be asked directly rather than through a platform.
+    static ContinuityCallback callbackForTest() {
+        return new Callback();
+    }
+
     /// Test seam: parks a state, as a cold-launch arrival with no form yet does.
     static void parkForTest(AppState state) {
         parked = state;
@@ -2538,11 +2544,27 @@ public final class Continuity {
             // Called on the platform's thread, and answered from the activity type ALONE. The
             // port needs a synchronous yes or no -- its answer decides whether the activity falls
             // through to another handler -- and the type is a pure function of the package name,
-            // so nothing here has to read framework state from a foreign thread. `enabled` is
-            // asked on the event thread, in admit(): an activity of this app's own type is
-            // ours to claim whether or not the framework happens to be on, and claiming it is what
-            // keeps it from being offered to a handler that would do nothing with it.
+            // so the FIRST question here reads no framework state from a foreign thread.
             if (activityType == null || !activityType.equals(getActivityType())) {
+                return false;
+            }
+            if (!enabled) {
+                // DECLINED while the framework is off, which is the answer the iOS port is built
+                // for: it holds a declined activity and offers it again the next time a callback
+                // is installed, and enable() installs one. Claiming it instead threw it away --
+                // admit() drops an arrival when the framework is disabled, so an application that
+                // registers a SyncedStore listener before enabling continuity, which installs
+                // this same callback, lost a cold-launch Handoff for good.
+                //
+                // The two sides disagreed rather than one being wrong: this claimed everything of
+                // its own type so no other handler could take it, while the port's retention was
+                // written for a decline that never came. Declining is strictly better, because
+                // nothing else answers to this app's own activity type anyway.
+                //
+                // `enabled` is read here from the platform's thread, which the rest of this
+                // method deliberately avoids. It is safe in the one direction that matters: a
+                // decline is RECOVERABLE -- the activity is retained and re-offered -- so losing
+                // the race can only delay the delivery, never lose it.
                 return false;
             }
             AppState state = StateCodec.fromMap(userInfo);

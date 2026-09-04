@@ -22,6 +22,7 @@
  */
 package com.codename1.continuity;
 
+import com.codename1.continuity.spi.ContinuityCallback;
 import com.codename1.continuity.sync.SyncedStore;
 import com.codename1.continuity.sync.SyncedStoreListener;
 import com.codename1.impl.continuity.LocalContinuityBridge;
@@ -3372,6 +3373,36 @@ public class LocalContinuityTest extends UITestBase {
         assertTrue(Continuity.isCheckpointPending(),
                 "clearing the back history scheduled no checkpoint, so the previous routes stay "
                         + "in storage and a process death restores what was just cleared");
+    }
+
+    /**
+     * A continuation arriving while continuity is off is DECLINED, so the port can hold it.
+     *
+     * <p>SyncedStore.addChangeListener() installs the same callback without enabling continuity --
+     * a key/value store is not consent to restore a route stack -- and on a cold launch that
+     * happens before the application's init() calls enable(). The iOS port holds a declined
+     * activity and offers it again when the next callback is installed; claiming it instead threw
+     * it away, because admit() drops an arrival while the framework is disabled. An application
+     * that registered a store listener first lost its Handoff for good.</p>
+     */
+    @EdtTest
+    public void aContinuationArrivingBeforeEnableIsDeclinedRatherThanSwallowed() {
+        // Deliberately NOT enabled: this is the window the port retains for.
+        Continuity.disable();
+        ContinuityCallback callback = Continuity.callbackForTest();
+
+        Map<String, Object> info = StateCodec.toMap(fromElsewhere("from the other device", 88L));
+        boolean claimed = callback.continuationReceived(Continuity.getActivityType(), info);
+
+        assertFalse(claimed,
+                "the callback claimed a continuation while continuity was disabled, so the port "
+                        + "discards it and the enable() moments later has nothing to deliver");
+
+        // And once enabled it IS claimed, or the decline above would just be a feature that never
+        // works.
+        Continuity.enable();
+        assertTrue(callback.continuationReceived(Continuity.getActivityType(), info),
+                "an enabled framework refused its own activity type");
     }
 
     /** Storage that refuses ONE name and passes everything else through. */
