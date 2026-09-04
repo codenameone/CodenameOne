@@ -11619,8 +11619,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (clip != 0 && draggingClip != clip) {
                 return;
             }
+            // Compared and cleared without letting go of the lock in between. A completion
+            // listener on the event dispatch thread can start the next drag at any moment, and
+            // it claims this slot: reading it, releasing the lock and then clearing it let go
+            // of a drag that had begun after the comparison said it was safe. The body is
+            // dragHolds(0) written out for that reason and nothing else.
+            draggingClip = 0;
+            reclaimStagedClipFiles();
         }
-        dragHolds(0);
     }
 
     /// Records the clip a drag is carrying, or zero once it has ended.
