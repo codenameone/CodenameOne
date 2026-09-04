@@ -36,11 +36,15 @@
   <polygon points="548,186 538,181 538,191" fill="#4a6fa5"/>
   <text x="379" y="178" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#4a6fa5">call, marshalled by the translator</text>
 
-  <line x1="548" y1="247" x2="212" y2="247" stroke="#7a5aa5" stroke-width="1.5"/>
-  <polygon points="212,247 222,242 222,252" fill="#7a5aa5"/>
-  <text x="380" y="240" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#7a5aa5">result, through a static method</text>
+  <line x1="548" y1="210" x2="212" y2="210" stroke="#7a5aa5" stroke-width="1.5"/>
+  <polygon points="212,210 222,205 222,215" fill="#7a5aa5"/>
+  <text x="380" y="203" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#7a5aa5">return value, marshalled straight back</text>
+
+  <line x1="548" y1="252" x2="212" y2="252" stroke="#7a5aa5" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <polygon points="212,252 222,247 222,257" fill="#7a5aa5"/>
+  <text x="380" y="245" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#7a5aa5">later result, into the static callback</text>
 
   <text x="380" y="306" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#666666">
-    An asynchronous SDK cannot return a value, so the native side calls back into a static Java method
+    A method that returns a supported type returns it directly; only work that finishes later needs the callback
   </text>
 </svg>

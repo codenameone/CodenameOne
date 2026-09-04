@@ -321,10 +321,11 @@ types listed above: primitives, strings, single dimension primitive arrays and
 .The native interface round trip
 image::img/native-interface-round-trip.svg[How a call crosses into native code and a result comes back,scaledwidth=70%]
 
-The return path is the part that catches people out. A native SDK whose work
-finishes later can't hand a value back through the interface, so the native
-side calls a `static` method on the Java class instead, and that method resolves
-whatever the caller was waiting on. <<Integrating Android 3rd party libraries & JNI>>
+A method that returns one of those types returns it directly -- the value is
+marshalled back the same way the arguments went out. The return path only gets
+interesting when the work finishes later: a native SDK that answers through its
+own callback has nothing to return by then, so it calls a `static` method on the
+Java class instead, and that method resolves whatever the caller was waiting on. <<Integrating Android 3rd party libraries & JNI>>
 covers bundling the vendor binary on Android, `ios.pods` does the same for iOS,
 and <<Libraries - cn1lib>> covers shipping the result as a library.
 
@@ -1265,6 +1266,27 @@ You can link an `aar` file by placing it under the native/android and the build 
 To link a Library project to your Codename One project open the Library project in Eclipse or Android Studio and make sure the project builds, after the project was built successfully remove the bin directory from the project and zip the whole project. +
 +
 Rename the extension from `.zip` to `.andlib` and place the andlib file under the `native/android` directory. The build server will pick it up and will link it to the project.
+
+
+=== Integrating iOS 3rd party libraries
+
+Reach for `ios.pods` first. CocoaPods resolves the dependency and its own
+dependencies for you, keeps the upload small, and is described in
+<<Using Cocoapods>>.
+
+Not every SDK is published as a pod, though, and a vendor shipping a static
+library and headers can't be installed that way. Those go into the `ios` native
+directory of your project as they come:
+
+* `.h` headers and `.a` static libraries are copied in directly.
+* `.bundle` resource directories are copied in directly.
+* A `.framework` has to be zipped first, keeping its name: `MyFramework.framework`
+  is placed as `MyFramework.framework.zip`.
+
+An SDK usually also expects a handful of the platform's own frameworks to be
+linked. Name those in the `ios.add_libs` build hint, separated by semicolons. A
+good many are linked by default already, so start with the vendor's list, build,
+and add only what the linker actually asks for.
 
 
 === Drag & drop
