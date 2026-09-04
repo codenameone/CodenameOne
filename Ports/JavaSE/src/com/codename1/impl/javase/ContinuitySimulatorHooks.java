@@ -147,6 +147,34 @@ public final class ContinuitySimulatorHooks {
             public boolean isSyncedStoreSupported() {
                 return false;
             }
+
+            // The OPERATIONS as well, not only the answer about them. The framework deliberately
+            // stopped gating store calls on isSyncedStoreSupported() -- on iOS the store is local
+            // and works whether or not this build is entitled to sync it -- so overriding the
+            // predicate alone left this simulation with a fully working store, and an application
+            // that ignores isSupported() kept its setting here while losing it on Android. That
+            // is the exact failure the menu item exists to reproduce.
+            //
+            // These are Android's answers, which is the platform being simulated: a write that
+            // does not happen, a read that finds nothing, and a removal with nothing to remove.
+            @Override
+            public boolean syncedStorePut(String key, String value) {
+                return false;
+            }
+
+            @Override
+            public String syncedStoreGet(String key) {
+                return null;
+            }
+
+            @Override
+            public void syncedStoreRemove(String key) {
+            }
+
+            @Override
+            public String[] syncedStoreKeys() {
+                return new String[0];
+            }
         });
     }
 

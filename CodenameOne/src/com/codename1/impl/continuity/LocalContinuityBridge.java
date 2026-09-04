@@ -56,6 +56,17 @@ public class LocalContinuityBridge implements ContinuityBridge {
     private static final String PREFIX = "CN1$SyncedStore$";
 
     /// The list of keys, kept beside them because the store is addressed by name only.
+    ///
+    /// A SEPARATE namespace from the values, which is what makes it safe: PREFIX ends in `$` and
+    /// this does not, so no application key can ever be written to this name. Review read
+    /// `PREFIX + "Keys"` as landing here -- it produces `CN1$SyncedStore$Keys`, which is a value
+    /// like any other -- and the reasoning behind the answer is worth more than the answer: for a
+    /// collision to exist INDEX would have to start with PREFIX, and it does not.
+    ///
+    /// That is the property to preserve. Dropping the `$` from PREFIX, or renaming this to
+    /// something under it, would make `put("Keys", ...)` overwrite the index and then be
+    /// overwritten by it -- reported as a successful write whose value reads back as the key
+    /// list.
     private static final String INDEX = "CN1$SyncedStoreKeys";
 
     // EDT-owned. Everything here runs on the Codename One event thread: the framework calls in
