@@ -681,8 +681,8 @@ public final class Continuity {
             // Carrying forward gives up neither -- the checkpoint keeps the newest routes and the
             // newest payload that ever read cleanly.
             AppState previous = readStored();
-            if (previous != null && !previous.getPayload().isEmpty()) {
-                state.setPayloadUnchecked(previous.getPayload());
+            if (previous != null && !previous.payloadRef().isEmpty()) {
+                state.setPayloadUnchecked(previous.payloadRef());
             }
         }
         // Owed while anything about this capture was not durable, so a later suspend retries it.
@@ -1008,7 +1008,7 @@ public final class Continuity {
                 p.restoreState(state.getPayload());
                 // An empty payload is not an application. It is what a route-only state carries,
                 // and counting it would make the question below answer yes for every state.
-                applied = !state.getPayload().isEmpty();
+                applied = !state.payloadRef().isEmpty();
             } catch (Throwable t) {
                 Log.e(t);
                 failed = true;

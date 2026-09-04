@@ -112,11 +112,64 @@ public final class AppState implements Externalizable {
 
     /// The application payload. Never null, possibly empty.
     ///
+    /// The view is unmodifiable ALL THE WAY DOWN. Wrapping only the outer map left every nested
+    /// List and Map mutable, which matters most for an arrival: the same AppState handed to a
+    /// listener or a provider is afterwards parked, persisted, acknowledged and published, so a
+    /// caller that consumed a nested list -- removing items as it applied them, which is an
+    /// ordinary way to write that loop -- changed the framework's own snapshot of what arrived.
+    /// setPayload() deep-copies on the way in for exactly this reason; the way out needed to
+    /// match.
+    ///
     /// #### Returns
     ///
     /// an unmodifiable view of the payload
     public Map<String, Object> getPayload() {
-        return Collections.unmodifiableMap(payload);
+        return unmodifiableValues(payload);
+    }
+
+    /// The payload itself, for framework code that only reads it. Wrapping is not free and the
+    /// callers inside this package are not the ones the wrapping protects against.
+    Map<String, Object> payloadRef() {
+        return payload;
+    }
+
+    /// `value`, with every List and Map inside it wrapped as unmodifiable.
+    private static Object unmodifiableValue(Object value) {
+        if (value instanceof List) {
+            List<?> in = (List<?>) value;
+            List<Object> out = new ArrayList<Object>();
+            for (Object element : in) {
+                out.add(unmodifiableValue(element));
+            }
+            return Collections.unmodifiableList(out);
+        }
+        if (value instanceof Map) {
+            // Never a cast to Map<String, Object>: on the iOS virtual machine a failed cast does
+            // not throw, so the guarded instanceof above is the only portable way to ask, and the
+            // wildcard read below is what the compiler can actually check.
+            return unmodifiableValues(castValues((Map<?, ?>) value));
+        }
+        // Everything else a payload may hold -- String, Integer, Long, Double, Boolean -- is
+        // immutable already.
+        return value;
+    }
+
+    private static Map<String, Object> unmodifiableValues(Map<String, Object> in) {
+        Map<String, Object> out = new HashMap<String, Object>();
+        for (Map.Entry<String, Object> e : in.entrySet()) {
+            out.put(e.getKey(), unmodifiableValue(e.getValue()));
+        }
+        return Collections.unmodifiableMap(out);
+    }
+
+    private static Map<String, Object> castValues(Map<?, ?> in) {
+        Map<String, Object> out = new HashMap<String, Object>();
+        for (Map.Entry<?, ?> e : in.entrySet()) {
+            if (e.getKey() instanceof String) {
+                out.put((String) e.getKey(), e.getValue());
+            }
+        }
+        return out;
     }
 
     /// Replaces the application payload.

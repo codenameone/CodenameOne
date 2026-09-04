@@ -89,7 +89,7 @@ public final class StateCodec {
     public static Map<String, Object> toMap(AppState state) {
         Map<String, Object> m = new HashMap<String, Object>();
         m.put(KEY_ROUTES, new ArrayList<String>(state.getRoutes()));
-        m.put(KEY_PAYLOAD, encode(state.getPayload()));
+        m.put(KEY_PAYLOAD, encode(state.payloadRef()));
         m.put(KEY_ENCODING, ENCODING_TAGGED);
         m.put(KEY_DEVICE, state.getDeviceId());
         if (state.getTitle() != null) {
@@ -315,8 +315,25 @@ public final class StateCodec {
         }
         List<?> list = (List<?>) routes;
         for (int i = 0; i < list.size(); i++) {
-            if (list.get(i) instanceof String) {
-                continue;
+            Object path = list.get(i);
+            if (path instanceof String) {
+                if (((String) path).length() > 0) {
+                    continue;
+                }
+                // An EMPTY string is a string, and it is not a route. It survives every check
+                // above, so the state is not empty and is not read as a tombstone -- and then
+                // restoreStack() skips the path, rebuilds nothing, and the arrival is classified
+                // as an attempt that failed: parked for ever, re-offered on every launch, with
+                // every relay publication held behind it.
+                //
+                // Refused rather than filtered, for the reason the refusal below gives: dropping
+                // the only route turns the document into an empty state, which means something
+                // else entirely. Nothing this framework writes produces one -- setRoutes() skips
+                // empty paths -- so no legitimate sender is refused.
+                throw new IOException("The continuity relay returned a document whose route at "
+                        + "index " + i + " is an empty string. It is not a path that can be "
+                        + "rebuilt, and keeping it would leave an arrival that can never be "
+                        + "applied and never be let go of.");
             }
             throw new IOException("The continuity relay returned a document whose route at index "
                     + i + " is not a string. Dropping it would leave a state with fewer routes "

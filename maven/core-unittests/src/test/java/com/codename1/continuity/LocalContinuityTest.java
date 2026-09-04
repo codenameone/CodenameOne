@@ -3656,6 +3656,91 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * An empty route string is a failed read, not an arrival that can never be applied.
+     *
+     * <p>It is a string, so it passes every type check, and the state is therefore not empty and
+     * not read as a tombstone. Then restoreStack() skips the path, rebuilds nothing, and the
+     * arrival is classified as an attempt that failed: parked for ever, re-offered on every
+     * launch, with every relay publication held behind it.</p>
+     *
+     * <p>Refused rather than filtered, because dropping the only route turns the document into an
+     * empty state -- which means the sending device cleared its work, something else entirely.
+     * Nothing this framework writes produces one: setRoutes() skips empty paths.</p>
+     */
+    @EdtTest
+    public void anEmptyRouteStringIsAFailedRead() throws Exception {
+        try {
+            AppState s = StateCodec.fromJson("{\"device\":\"d\",\"seq\":\"1\",\"routes\":[\"\"]}");
+            fail("an empty route string was accepted"
+                    + (s != null && !s.isEmpty()
+                            ? " -- and the state is NOT empty, so it is not a tombstone either: "
+                                    + "it can never be applied and is never let go of"
+                            : ""));
+        } catch (java.io.IOException expected) {
+            assertTrue(expected.getMessage().length() > 0, "the refusal explained nothing");
+        }
+
+        // A real route alongside one is refused too: the sender meant two screens, and quietly
+        // rebuilding one of them is not the same state.
+        try {
+            StateCodec.fromJson("{\"device\":\"d\",\"seq\":\"1\",\"routes\":[\"/a\",\"\"]}");
+            fail("an empty route beside a real one was accepted");
+        } catch (java.io.IOException expected) {
+            assertTrue(expected.getMessage().length() > 0, "the refusal explained nothing");
+        }
+    }
+
+    /**
+     * A nested collection in a delivered payload cannot be mutated by the application.
+     *
+     * <p>The outer map was unmodifiable and everything inside it was not. That matters most for
+     * an arrival: the same AppState handed to a listener or a provider is afterwards parked,
+     * persisted, acknowledged and published, so a provider that consumed a nested list -- removing
+     * items as it applied them, which is an ordinary way to write that loop -- changed the
+     * framework's own snapshot of what arrived. setPayload() deep-copies on the way in for
+     * exactly this reason; the way out had to match.</p>
+     */
+    @EdtTest
+    public void aNestedPayloadCollectionCannotBeMutatedByTheApplication() {
+        List<Object> items = new ArrayList<Object>();
+        items.add("first");
+        items.add("second");
+        Map<String, Object> nested = new HashMap<String, Object>();
+        nested.put("deeper", "value");
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("items", items);
+        payload.put("nested", nested);
+
+        AppState state = new AppState().setPayload(payload)
+                .setDeviceId("some-other-device").setSequence(210L)
+                .setTimestamp(System.currentTimeMillis());
+
+        Object handed = state.getPayload().get("items");
+        assertTrue(handed instanceof List, "the payload did not survive as a list");
+        try {
+            ((List<Object>) handed).remove(0);
+            fail("a nested list in the delivered payload was mutable, so an application that "
+                    + "consumes its items as it applies them rewrites the framework's snapshot -- "
+                    + "which is then parked, persisted, acknowledged and published");
+        } catch (UnsupportedOperationException expected) {
+            // What an unmodifiable view is for.
+        }
+
+        Object deep = state.getPayload().get("nested");
+        assertTrue(deep instanceof Map, "the payload did not survive as a map");
+        try {
+            ((Map<String, Object>) deep).put("deeper", "changed");
+            fail("a nested map in the delivered payload was mutable");
+        } catch (UnsupportedOperationException expected) {
+            // As above.
+        }
+
+        // And the state itself is untouched, which is the point of all of it.
+        assertEquals(2, ((List<?>) state.getPayload().get("items")).size(),
+                "the framework's snapshot changed");
+    }
+
+    /**
      * A login form a route FACTORY opened survives the undo.
      *
      * <p>The other half of the show-callback case, and the one the undo used to get wrong. The
