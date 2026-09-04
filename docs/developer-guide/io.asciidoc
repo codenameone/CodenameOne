@@ -1218,11 +1218,14 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 === Webservice wizard
 
-NOTE: The wizard that generated this code was part of the IDE plugin and is no
-longer available. `com.codename1.io.WebServiceProxyCall` is still in the
-framework, so an app that already has generated proxies keeps working, but there
-is nothing left to generate new ones with. For new work use <<Rest API>>, which
-needs no code generation and speaks a format every server already talks.
+NOTE: The right-click option this was driven from belonged to the IDE plugin and
+is gone. The generator itself survives in one place: Ant projects created from
+the old template still have a `webservice-wizard` target, which runs
+`com.codename1.ws.wizard.WSWizard` out of `CodeNameOneBuildClient.jar`. A Maven
+project has no equivalent. `com.codename1.io.WebServiceProxyCall` is still in the
+framework either way, so an app with generated proxies keeps working. For new
+work use <<Rest API>>, which needs no code generation and speaks a format every
+server already talks.
 
 The protocol it implements is a compact binary one. Method arguments were
 restricted to a small set of types, extended through object externalization, and
