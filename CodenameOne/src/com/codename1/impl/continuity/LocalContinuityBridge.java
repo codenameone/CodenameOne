@@ -216,10 +216,17 @@ public class LocalContinuityBridge implements ContinuityBridge {
                 //
                 // A failed write should leave nothing behind, which is the only answer that means
                 // one thing.
-                try {
-                    Storage.getInstance().deleteStorageFile(storageName(key));
-                } catch (Throwable t) {
-                    Log.e(t);
+                //
+                // VERIFIED, for the same reason syncedStoreRemove() verifies: an unchecked delete
+                // made the rollback claim a cleanup it had not performed. When it cannot be
+                // performed there is nothing further this simulation can do -- the index write
+                // that would have listed the value is the one that just failed -- so it is
+                // logged rather than passed over, because the store is then in the one state
+                // this class works to avoid.
+                if (!deleteValue(storageName(key))) {
+                    Log.p("Continuity synced store: the value for a key whose index write failed "
+                            + "could not be deleted either, so it stays readable through get() "
+                            + "while keys() does not list it: " + key);
                 }
                 return false;
             }
@@ -289,12 +296,37 @@ public class LocalContinuityBridge implements ContinuityBridge {
         return read(storageName(key));
     }
 
-    @Override
-    public void syncedStoreRemove(String key) {
+    /// Deletes one stored value and reports whether it is DEFINITELY gone.
+    ///
+    /// The index and the values are two writes, and every caller here has to know which of them
+    /// happened. Dropping the index entry for a value the delete failed to remove leaves the old
+    /// value readable through get() while keys() omits it and clearing the store cannot reach it
+    /// -- a value with no way to see it and no way to remove it.
+    ///
+    /// When the check itself fails the answer is "still there", which is the safe direction: an
+    /// index entry for a value that has gone shows up as a key whose get() answers the default,
+    /// and an application can see that and cope. The other way round is invisible.
+    private boolean deleteValue(String name) {
         try {
-            Storage.getInstance().deleteStorageFile(storageName(key));
+            Storage.getInstance().deleteStorageFile(name);
         } catch (Throwable t) {
             Log.e(t);
+        }
+        try {
+            return !Storage.getInstance().exists(name);
+        } catch (Throwable t) {
+            Log.e(t);
+            return false;
+        }
+    }
+
+    @Override
+    public void syncedStoreRemove(String key) {
+        if (!deleteValue(storageName(key))) {
+            // The value is still readable, so the index keeps its entry. Reporting a key whose
+            // value is still there is the truth; dropping it would hide a value that get() goes
+            // on returning.
+            return;
         }
         List<String> keys = indexKeys();
         if (keys.remove(key)) {

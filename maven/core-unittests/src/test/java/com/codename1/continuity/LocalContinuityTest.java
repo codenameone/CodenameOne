@@ -3653,6 +3653,140 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A synced-store value that would not delete keeps its index entry.
+     *
+     * <p>The two writes are the value and the index, and every caller has to know which of them
+     * happened. Dropping the index entry for a value the delete failed to remove left the old
+     * value readable through get() while keys() omitted it and clearing the store could not
+     * reach it -- a value with no way to see it and no way to remove it.</p>
+     *
+     * <p>put()'s rollback had the identical unchecked delete: when the index write fails it
+     * removes the value it just wrote, and claimed a cleanup it had not performed. That one came
+     * out of enumerating the file rather than from the report.</p>
+     */
+    @EdtTest
+    public void aValueThatWillNotDeleteKeepsItsIndexEntry() {
+        Storage real = Storage.getInstance();
+        try {
+            LocalContinuityBridge b = new LocalContinuityBridge();
+            assertTrue(b.syncedStorePut("theme", "dark"), "the fixture could not write a value");
+            assertTrue(java.util.Arrays.asList(b.syncedStoreKeys()).contains("theme"),
+                    "the fixture's own key is not listed, so this test is about nothing");
+
+            // A store whose delete does nothing at all, which is what a file the desktop cannot
+            // remove looks like from in here.
+            Storage.setStorageInstance(new UndeletableStorage(real));
+
+            b.syncedStoreRemove("theme");
+
+            assertEquals("dark", b.syncedStoreGet("theme"),
+                    "the fixture is wrong: the value did go away, so there is no divergence to "
+                            + "test");
+            assertTrue(java.util.Arrays.asList(b.syncedStoreKeys()).contains("theme"),
+                    "the index dropped a key whose value is still readable through get(), so "
+                            + "the value cannot be listed, cannot be found by a store-wide "
+                            + "cleanup, and cannot be removed");
+        } finally {
+            Storage.setStorageInstance(real);
+            new LocalContinuityBridge().syncedStoreRemove("theme");
+        }
+    }
+
+    /**
+     * A provider that signs out and then throws stops the restore before any route runs.
+     *
+     * <p>The guard sat on the normal-return path only, so a provider that called clear() and then
+     * failed -- cleanup breaking after it noticed an expired account -- was carried past it by
+     * the catch, and the route rebuild ran for the session that had just ended. The later
+     * lifecycle check does undo the stack, but only after that account's route factories, form
+     * constructors and show callbacks have run and put its data in front of the user.</p>
+     *
+     * <p>The same mistake capture() had, in the method that mirrors it. Found there first, and
+     * still here.</p>
+     */
+    @EdtTest
+    public void aProviderThatSignsOutAndThenThrowsStopsBeforeTheRoutes() {
+        final java.util.concurrent.atomic.AtomicInteger routesBuilt =
+                new java.util.concurrent.atomic.AtomicInteger();
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                routesBuilt.incrementAndGet();
+                Form f = new Form();
+                f.setTitle(url);
+                return f;
+            }
+        });
+        try {
+            Continuity.setStateProvider(new StateProvider() {
+                public Map<String, Object> saveState() {
+                    return new HashMap<String, Object>();
+                }
+
+                public void restoreState(Map<String, Object> payload) {
+                    // The documented answer to "this payload belongs to a signed-out account",
+                    // and then a failure on the way out of it.
+                    Continuity.clear();
+                    throw new IllegalStateException("the cleanup after the logout failed");
+                }
+            });
+            Continuity.setAutoRestore(false);
+
+            Map<String, Object> payload = new HashMap<String, Object>();
+            payload.put("account", "the previous one");
+            AppState arriving = new AppState()
+                    .setPayload(payload)
+                    .setRoutes(java.util.Arrays.asList("/orders", "/orders/17"))
+                    .setDeviceId("some-other-device")
+                    .setSequence(140L)
+                    .setTimestamp(System.currentTimeMillis());
+            Continuity.restore(arriving);
+            flushSerialCalls();
+
+            assertEquals(0, routesBuilt.get(),
+                    "the signed-out account's routes were dispatched anyway: its route factories, "
+                            + "form constructors and show callbacks all ran, and undoing the "
+                            + "stack afterwards cannot unrun them");
+        } finally {
+            Navigation.setDispatcher(null);
+        }
+    }
+
+    /**
+     * A listener that signs out and then throws is not followed by the next listener.
+     *
+     * <p>The check was after the {@code continue}, so a throw jumped straight past it and the
+     * next listener was handed the signed-out account's state. The check at the end of dispatch
+     * stops the restore, but it cannot undo what that listener did with the payload, or unsee
+     * it.</p>
+     */
+    @EdtTest
+    public void aListenerThatSignsOutAndThenThrowsStopsTheWalk() {
+        final java.util.concurrent.atomic.AtomicInteger secondSaw =
+                new java.util.concurrent.atomic.AtomicInteger();
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                Continuity.clear();
+                throw new IllegalStateException("the cleanup after the logout failed");
+            }
+        });
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                secondSaw.incrementAndGet();
+                return true;
+            }
+        });
+
+        Continuity.deliver(fromElsewhere("the previous account's work", 141L));
+        flushSerialCalls();
+
+        assertEquals(0, secondSaw.get(),
+                "the second listener was handed a state from a session the first had already "
+                        + "ended, and nothing afterwards can unsee it");
+    }
+
+    /**
      * A continuation arriving after an explicit disable() is DROPPED, not held for the next
      * enable().
      *

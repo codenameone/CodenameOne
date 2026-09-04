@@ -901,25 +901,33 @@ public final class Continuity {
         if (p != null) {
             try {
                 p.restoreState(state.getPayload());
-                if (lifecycle != lifecycleAtRestore) {
-                    // The provider called clear() or disable(), which is the documented answer to
-                    // "this payload belongs to a signed-out account". Everything below --
-                    // rebuilding routes, committing, persisting -- would act for a session that
-                    // no longer exists, and would write back the state clear() has just deleted.
-                    //
-                    // The listener callback got this guard already; the provider is the OTHER
-                    // application callback on this path and was missed. Both are places where an
-                    // application is entitled to end the session, so both have to be asked
-                    // afterwards whether it did.
-                    outFailed[0] = true;
-                    return false;
-                }
                 // An empty payload is not an application. It is what a route-only state carries,
-                // and counting it would make the question above answer yes for every state.
+                // and counting it would make the question below answer yes for every state.
                 applied = !state.getPayload().isEmpty();
             } catch (Throwable t) {
                 Log.e(t);
                 failed = true;
+            }
+            if (lifecycle != lifecycleAtRestore) {
+                // The provider called clear() or disable(), which is the documented answer to
+                // "this payload belongs to a signed-out account". Everything below --
+                // rebuilding routes, committing, persisting -- would act for a session that
+                // no longer exists, and would write back the state clear() has just deleted.
+                //
+                // The listener callback got this guard already; the provider is the OTHER
+                // application callback on this path and was missed. Both are places where an
+                // application is entitled to end the session, so both have to be asked
+                // afterwards whether it did.
+                //
+                // OUTSIDE the try, so the CATCH reaches it too. Sitting on the normal-return
+                // path only, it was skipped by a provider that signed out and then threw --
+                // cleanup breaking after it noticed an expired account -- and the route rebuild
+                // below ran for the session that had just ended. The later lifecycle check does
+                // undo the stack, but only after that account's route factories, form
+                // constructors and show callbacks have run and put its data on screen. The same
+                // mistake capture() had, in the method that mirrors it.
+                outFailed[0] = true;
+                return false;
             }
         }
         List<String> routes = usableRoutes(state.getRoutes());
@@ -1982,18 +1990,28 @@ public final class Continuity {
         // otherwise mutate the list being walked.
         List<ContinuityListener> snapshot = new ArrayList<ContinuityListener>(listeners);
         for (ContinuityListener l : snapshot) {
-            boolean accepted;
+            boolean accepted = false;
+            boolean threw = false;
             try {
                 accepted = l.stateReceived(state);
             } catch (Throwable t) {
                 Log.e(t);
-                continue;
+                threw = true;
             }
+            // clear() or disable() ran inside the callback. Everything after this point --
+            // asking the next listener, restoring, persisting, parking, marking -- would be
+            // acting for a session that no longer exists.
+            //
+            // ONE check, placed before the `continue`. It used to sit after it, so a listener
+            // that signed out and then THREW jumped straight past and the next listener was
+            // handed the signed-out account's state. The check at the bottom of this method
+            // stops the restore, but it cannot undo what that listener did with the payload, or
+            // unsee it.
             if (lifecycle != lifecycleAtDispatch) {
-                // clear() or disable() ran inside the callback. Everything after this point --
-                // restoring, persisting, parking, marking -- would be acting for a session that
-                // no longer exists.
                 return;
+            }
+            if (threw) {
+                continue;
             }
             if (!accepted) {
                 // Consumed by the listener: it either handled the state itself or decided the user
