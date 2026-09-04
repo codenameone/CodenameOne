@@ -1111,7 +1111,17 @@ public final class Continuity {
             // through Navigation, so it records nothing and checkpoints nothing.
             try {
                 com.codename1.ui.Form now = Display.getInstance().getCurrent();
-                if (beforeRestore != null && beforeRestore != now //NOPMD CompareObjectsWithEquals
+                // `shown` FIRST, and it closes the case the helper below used to get wrong.
+                // The restore only ever put a screen up when restoreStack() returned true; false
+                // means it installed nothing -- it aborted because a factory ended the session,
+                // found nothing to rebuild, or had show() throw and undid its own screen already.
+                // With nothing of the restore's on display there is nothing to take down, so
+                // anything showing that is not what we started on was put there by the
+                // application: a route factory that signed out and opened its own login form is
+                // the case, and it used to have that form replaced by the signed-out account's
+                // screen.
+                if (shown && beforeRestore != null
+                        && beforeRestore != now //NOPMD CompareObjectsWithEquals
                         && !applicationChoseTheScreen(beforeRestore, now)) {
                     beforeRestore.show();
                 }
@@ -2118,11 +2128,10 @@ public final class Continuity {
     /// application could have done that. If the session ended before the restore changed
     /// anything, whatever is up came from the restore and the undo is right.
     ///
-    /// One case is still read the wrong way: a route FACTORY that ends the session and shows its
-    /// own form, before the restore has installed anything. Its screen is then undone. That is
-    /// what this code always did and is much rarer than the show-callback case above, which is
-    /// the one being fixed; closing it as well would mean threading the form restoreStack showed
-    /// back out of it, and that is public API this does not need.
+    /// Only asked when the restore actually SHOWED something -- see the caller. A route factory
+    /// that ends the session and opens its own form does so before anything is installed, and
+    /// that case is settled there rather than here: with nothing of the restore's on display,
+    /// there is nothing to take down.
     private static boolean applicationChoseTheScreen(com.codename1.ui.Form beforeRestore,
             com.codename1.ui.Form now) {
         if (formAtSessionEnd == null) {

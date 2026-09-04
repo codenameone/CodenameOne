@@ -3656,6 +3656,53 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A login form a route FACTORY opened survives the undo.
+     *
+     * <p>The other half of the show-callback case, and the one the undo used to get wrong. The
+     * factory finds the account signed out, calls clear(), and opens its own login form -- all
+     * before the restore has installed anything, so sampling the display at the moment the
+     * session ended cannot separate the two. What settles it is that the restore never showed
+     * anything at all: with nothing of its own on display, there is nothing for the undo to take
+     * down.</p>
+     */
+    @EdtTest
+    public void aScreenARouteFactoryChoseSurvivesTheUndo() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+
+        Form dashboard = new Form("dashboard");
+        dashboard.show();
+        flushSerialCalls();
+
+        final Form login = new Form("login");
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                Continuity.clear();
+                login.show();
+                Form f = new Form();
+                f.setTitle(url);
+                return f;
+            }
+        });
+        try {
+            Continuity.restore(new AppState()
+                    .setRoutes(java.util.Arrays.asList("/orders/17"))
+                    .setDeviceId("some-other-device")
+                    .setSequence(200L)
+                    .setTimestamp(System.currentTimeMillis()));
+            flushSerialCalls();
+
+            assertTrue(login == Display.getInstance().getCurrent(),
+                    "the undo put the screen the restore started from back over the login form "
+                            + "the route factory had just chosen, so the user is returned to the "
+                            + "signed-out account's UI; showing "
+                            + Display.getInstance().getCurrent().getTitle());
+        } finally {
+            Navigation.setDispatcher(null);
+        }
+    }
+
+    /**
      * A factory that ends the session stops the rebuild instead of running the rest.
      *
      * <p>Every later factory would run for an account that has just signed out: constructing

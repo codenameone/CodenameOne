@@ -20849,9 +20849,15 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_la
         bytes += cn1ContinuityValueBytes([held objectForKey:existing]);
     }
     count++;
-    bytes += [k lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+    NSUInteger keyBytes = [k lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+    bytes += keyBytes;
     bytes += [v lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
-    if (count > 1024 || bytes > 1048576) {
+    // The PER-KEY maximum as well as the totals. Apple publishes 64 UTF-8 bytes for a key
+    // alongside the 1 MB and 1024-key figures, and only the two totals were being checked -- so
+    // a long key sailed through a nearly empty store, went to setString:forKey:, and left put()
+    // reporting a cross-device write it cannot deliver. The local readback below cannot see the
+    // difference, which is precisely why this check exists.
+    if (count > 1024 || bytes > 1048576 || keyBytes > 64) {
         // Refused rather than written. A value the store keeps and never propagates is the one
         // outcome an application cannot detect for itself, and it is exactly when it needs its
         // own fallback.
