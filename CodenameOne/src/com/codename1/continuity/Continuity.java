@@ -1046,6 +1046,30 @@ public final class Continuity {
         Display.getInstance().startThread(new Runnable() {
             @Override
             public void run() {
+                // The SAME preflight the publish worker does, and it was missing here. A worker
+                // is created on the event thread and runs later, so clear() or setRelay() can
+                // land in between: only the COMPLETION was rejected, after the read had already
+                // gone out. A custom relay that resolves authentication inside fetch() would
+                // therefore issue a request after logout, and could present the next account's
+                // credentials to the previous endpoint -- while clear() promises that only a
+                // request already on the wire survives it.
+                //
+                // Asked on the event thread because relaySession belongs to it, and blocking a
+                // worker on the EDT is the safe direction: the EDT never waits on a worker.
+                final boolean[] stillOurs = new boolean[1];
+                try {
+                    Display.getInstance().callSeriallyAndWait(new Runnable() {
+                        @Override
+                        public void run() {
+                            stillOurs[0] = session == relaySession;
+                        }
+                    });
+                } catch (Throwable t) {
+                    Log.e(t);
+                }
+                if (!stillOurs[0]) {
+                    return;
+                }
                 // Off the EDT because fetch() blocks, and touching NOTHING: the relay came in as
                 // a local and the answer goes back through the event queue.
                 AppState fetched = null;

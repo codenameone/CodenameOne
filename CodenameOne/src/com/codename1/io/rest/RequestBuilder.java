@@ -80,8 +80,11 @@ public class RequestBuilder {
     private ErrorCodeHandler<Map> jsonErrorCallback;
     private ErrorCodeHandler<String> stringErrorCallback;
 
-    /// Whether a redirect may be followed. True to match ConnectionRequest's own default.
-    private boolean followRedirects = true;
+    /// Whether a redirect may be followed, or NULL when the caller has not said.
+    ///
+    /// Three states rather than two: unspecified has to leave ConnectionRequest's global default
+    /// alone, and only an explicit call may override it -- in either direction.
+    private Boolean followRedirects;
     private ErrorCodeHandler<PropertyBusinessObject> propertyErrorCallback;
     private Class errorHandlerPropertyType;
     //private ActionListener<NetworkEvent> errorCallback;
@@ -443,7 +446,7 @@ public class RequestBuilder {
     /// RequestBuilder instance
     public RequestBuilder followRedirects(boolean follow) {
         checkFetched();
-        followRedirects = follow;
+        followRedirects = Boolean.valueOf(follow);
         return this;
     }
 
@@ -1071,8 +1074,13 @@ public class RequestBuilder {
             req.setContentType(contentType);
         }
         req.setFailSilently(hasErrorCodeHandler());
-        if (!followRedirects) {
-            req.setFollowRedirects(false);
+        if (followRedirects != null) {
+            // Only when the CALLER said so. Applying the field unconditionally would push this
+            // builder's default over ConnectionRequest.setDefaultFollowRedirects for every
+            // request that never asked, and testing it as a plain boolean made an explicit
+            // followRedirects(true) unreachable whenever the global default was false -- which is
+            // the opposite of a per-request setting.
+            req.setFollowRedirects(followRedirects.booleanValue());
         }
         if (cache != null) {
             req.setCacheMode(cache);

@@ -26,6 +26,7 @@ import com.codename1.continuity.spi.ContinuityCallback;
 import com.codename1.continuity.sync.SyncedStore;
 import com.codename1.continuity.sync.SyncedStoreListener;
 import com.codename1.impl.continuity.LocalContinuityBridge;
+import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Storage;
 import com.codename1.io.rest.RequestBuilder;
 import com.codename1.io.rest.Rest;
@@ -3257,18 +3258,55 @@ public class LocalContinuityTest extends UITestBase {
         RequestBuilder built = (RequestBuilder) auth.invoke(
                 relay, Rest.post("https://example.invalid/continuity"));
 
-        assertFalse(followsRedirects(built),
+        assertEquals(Boolean.FALSE, redirectSetting(built),
                 "the relay's requests follow redirects, so a 307 forwards the bearer token and "
                         + "the state to whatever host the endpoint names");
-        assertTrue(followsRedirects(Rest.post("https://example.invalid/continuity")),
-                "an ordinary request stopped following redirects, which is a change to every "
-                        + "caller rather than to this one");
+        // UNSPECIFIED, not "true". The setting is three-state on purpose: a request that never
+        // asked must leave ConnectionRequest's global default alone, in either direction, so
+        // asserting true here would have pinned the wrong contract -- an application that turned
+        // redirects off globally would still get them.
+        assertNull(redirectSetting(Rest.post("https://example.invalid/continuity")),
+                "an ordinary request now carries a redirect setting of its own, which overrides "
+                        + "whatever the application chose globally");
     }
 
-    private static boolean followsRedirects(RequestBuilder b) throws Exception {
+    /**
+     * An explicit followRedirects(true) reaches the request even when the global default is false.
+     *
+     * <p>Asserted on the built {@code ConnectionRequest}, not on the builder's own field: the
+     * field is recorded either way, and the defect was in applying it. A first version of this
+     * check read the builder and passed against the broken code, which is the same wrong-layer
+     * mistake the probe exists to catch.</p>
+     */
+    @EdtTest
+    public void anExplicitRedirectChoiceReachesTheRequest() throws Exception {
+        boolean previous = ConnectionRequest.isDefaultFollowRedirects();
+        ConnectionRequest.setDefaultFollowRedirects(false);
+        try {
+            assertTrue(builtFollowsRedirects(
+                    Rest.post("https://example.invalid/x").followRedirects(true)),
+                    "an explicit followRedirects(true) did not reach the request, so a per-request "
+                            + "setting cannot override the global one");
+            assertFalse(builtFollowsRedirects(Rest.post("https://example.invalid/x")),
+                    "a request that never asked stopped inheriting the global default");
+        } finally {
+            ConnectionRequest.setDefaultFollowRedirects(previous);
+        }
+    }
+
+    /// What the builder actually hands to the network layer.
+    private static boolean builtFollowsRedirects(RequestBuilder b) throws Exception {
+        java.lang.reflect.Method m =
+                RequestBuilder.class.getDeclaredMethod("createRequest", boolean.class);
+        m.setAccessible(true);
+        return ((ConnectionRequest) m.invoke(b, Boolean.FALSE)).isFollowRedirects();
+    }
+
+    /// The builder's redirect setting: TRUE, FALSE, or null for "the caller did not say".
+    private static Boolean redirectSetting(RequestBuilder b) throws Exception {
         java.lang.reflect.Field f = RequestBuilder.class.getDeclaredField("followRedirects");
         f.setAccessible(true);
-        return ((Boolean) f.get(b)).booleanValue();
+        return (Boolean) f.get(b);
     }
 
     /**
@@ -3553,6 +3591,51 @@ public class LocalContinuityTest extends UITestBase {
             Navigation.setDispatcher(null);
             Navigation.clearStack();
         }
+    }
+
+    /**
+     * A logout stops a fetch that has not reached the network yet.
+     *
+     * <p>The publish worker has confirmed its session on the event thread since the first round of
+     * this review; the poll worker never did, so only its COMPLETION was rejected -- after the
+     * read had gone out. A custom relay that resolves authentication inside fetch() would issue a
+     * request after logout, and could present the next account's credentials to the previous
+     * endpoint, while clear() promises that only a request already on the wire survives it.</p>
+     */
+    @EdtTest
+    public void aLogoutStopsAFetchThatHasNotReachedTheNetwork() {
+        Continuity.setStateProvider(new RecordingProvider());
+        final java.util.concurrent.atomic.AtomicInteger reads =
+                new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.CountDownLatch letGo =
+                new java.util.concurrent.CountDownLatch(1);
+
+        Continuity.setRelay(new StateRelay() {
+            public void publish(AppState state) {
+            }
+
+            public AppState fetch() {
+                // The worker reaches here only if the session check let it through. Waiting first
+                // so the test can log out while it is still queued.
+                try {
+                    letGo.await(5L, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+                reads.incrementAndGet();
+                return null;
+            }
+        });
+
+        // The worker is created and queued; the logout lands before it runs.
+        Continuity.clear();
+        letGo.countDown();
+        pause(500L);
+        flushSerialCalls();
+
+        assertEquals(0, reads.get(),
+                "a relay read went out after logout, so a relay that resolves its credentials "
+                        + "inside fetch() presents the next account's to the previous endpoint");
     }
 
     /** Storage that refuses ONE name and passes everything else through. */
