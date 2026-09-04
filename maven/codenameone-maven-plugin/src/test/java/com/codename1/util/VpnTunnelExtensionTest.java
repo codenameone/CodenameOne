@@ -105,6 +105,39 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
+    void aStartThatFailsGivesUpTheGlobal() {
+        String src = provider();
+        // A start that fails is torn down WITHOUT stopTunnelWithReason --
+        // the tunnel never started, so there is nothing for NE to stop --
+        // and the global went on naming the provider the start had
+        // published. Without ARC that is a bare pointer to an object the
+        // system may dispose, and the writer retains what it finds there
+        // before it looks at any generation, so the retain landed on freed
+        // memory.
+        assertTrue(src.contains("- (void)cn1ForgetIfCurrent {"),
+                "a failed start has to give up its claim");
+        assertTrue(src.contains("if (cn1tnProvider == self) {"),
+                "and clear only its own, never a newer start's");
+        // Every failure path, and each one before its handler: NE can
+        // dispose the provider inside that call, and clearing after it
+        // would be the same use-after-free one line further on.
+        int forgets = 0;
+        int at = src.indexOf("[self cn1ForgetIfCurrent];");
+        while (at >= 0) {
+            forgets++;
+            String after = src.substring(
+                    at + "[self cn1ForgetIfCurrent];".length());
+            assertTrue(after.trim().startsWith("completionHandler"),
+                "the clear comes before the handler it precedes");
+            at = src.indexOf("[self cn1ForgetIfCurrent];", at + 1);
+        }
+        // Unreadable setup, a settings error, stopped while the settings
+        // were pending, and a begin that refused.
+        assertEquals(4, forgets,
+                "every failure path after the publish");
+    }
+
+    @Test
     void aStopWhileStartingCannotBringTheTunnelUpAnyway() {
         String src = provider();
         // NE stops a provider whose start is still in flight -- a user
