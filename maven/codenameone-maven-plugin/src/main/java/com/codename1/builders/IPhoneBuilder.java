@@ -11521,6 +11521,34 @@ public class IPhoneBuilder extends Executor {
         String name = IOSVpnTunnelExtensionBuilder.EXTENSION_NAME;
         String displayName = request.getDisplayName() == null
                 ? name : request.getDisplayName();
+        // THE NAME HAS TO BE FREE. The ruby below is wrapped in "if the
+        // target does not exist", which is there so re-running the script
+        // cannot duplicate a target -- and which silently skips everything
+        // when the name is already taken. The host would still get the
+        // define, the entitlement and the provider identifier in its plist,
+        // so the build would finish and produce a project that advertises a
+        // packet tunnel and carries none.
+        //
+        // Two ways it can be taken, and both are checked where they can be
+        // seen rather than guessed at from Ruby: an application whose main
+        // class is literally CN1VpnTunnel, and a CN1VpnTunnel.ios.appext
+        // brought in with the project's resources, which is unpacked into
+        // the dist directory before this runs.
+        if (name.equals(request.getMainClass())) {
+            throw new BuildException("This app's main class is named " + name
+                    + ", which is the name the generated packet-tunnel target"
+                    + " uses. Xcode cannot hold two targets with one name, so"
+                    + " the extension could not be added. Rename the class, or"
+                    + " remove ios.vpn.tunnel to build without the tunnel.");
+        }
+        if (new File(distDir, name).isDirectory()) {
+            throw new BuildException("A " + name + " app extension was brought"
+                    + " in with this project's resources, and ios.vpn.tunnel"
+                    + " asks the build to generate one under the same name."
+                    + " Xcode cannot hold two targets with one name. Rename"
+                    + " the supplied extension, or remove ios.vpn.tunnel and"
+                    + " keep your own.");
+        }
         // The host's own versions: an embedded extension whose marketing or
         // build version differs from its containing app fails archive
         // validation.
