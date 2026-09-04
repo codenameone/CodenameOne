@@ -2339,6 +2339,48 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aStationaryPressKeepsItsStagingAgainstASecondFinger() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container pressed = new Container();
+            NativeDragOperation carried = new NativeDragOperation("the finger UIKit will lift");
+            pressed.setNativeDragOperation(carried);
+            Container touched = new Container();
+            touched.add(new Label("the other finger"));
+            touched.setNativeDragOperation(new NativeDragOperation("never dragged"));
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, pressed);
+            form.add(BorderLayout.NORTH, touched);
+            form.revalidate();
+
+            int x = pressed.getAbsoluteX() + 10;
+            int y = pressed.getAbsoluteY() + 10;
+            // Pressed and held. Nothing moves far enough to be a drag here, which is exactly
+            // what a platform that lifts an item out of a stationary long press looks like:
+            // the framework never offers the gesture, and the session begins on its own.
+            form.pointerPressed(x, y);
+
+            int tapX = touched.getAbsoluteX() + 5;
+            int tapY = touched.getAbsoluteY() + 5;
+            form.pointerPressed(tapX, tapY);
+            form.pointerReleased(tapX, tapY);
+
+            assertSame(carried, NativeDragAndDrop.dragSessionStarted(),
+                    "the second finger neither takes the staging slot nor ends it: the session "
+                            + "the first finger is about to become must carry its own payload");
+            assertSame(pressed, NativeDragAndDrop.getActiveDrag().getSource());
+        } finally {
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            NativeDragAndDrop.gestureCancelled();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void anOperationThatPermitsNothingNeverBecomesADrag() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

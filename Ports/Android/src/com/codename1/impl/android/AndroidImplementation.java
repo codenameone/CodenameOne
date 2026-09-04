@@ -11328,9 +11328,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (!fileUris.isEmpty()) {
             content.setFiles(fileUris.toArray(new String[fileUris.size()]));
         }
-        if (plain != null) {
+        // Not when the clip named exactly one type and it is not text/plain. That type is what
+        // the text *is*: another application publishing a direct item of its own format --
+        // application/json, say -- carries the value as the item's text, because an Android
+        // item has nowhere else to put a string. Calling it text/plain lost the name the clip
+        // gave it, and a target filtered to that name accepted the hover and was refused the
+        // drop; fillAdvertisedTypes below hands the value to the type instead.
+        if (plain != null && soleAdvertisedType(description) == null) {
             content.setData(ClipboardContent.MIME_TEXT, plain);
-        } else if (!content.hasMimeType(ClipboardContent.MIME_TEXT)
+        } else if (plain == null && !content.hasMimeType(ClipboardContent.MIME_TEXT)
                 && description != null && description.hasMimeType(ClipboardContent.MIME_TEXT)) {
             // The clip promised text and no item produced it, so the empty string keeps that
             // promise: a target that accepted the hover on text/plain would otherwise be
@@ -11918,7 +11924,34 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 // the exporter advertises a reading whose value *is* the carried text.
                 content.setData(unsatisfiedText.get(iter), plain);
             }
+            if (unsatisfiedText.isEmpty() && unsatisfiedBinary.size() == 1 && unclaimed.isEmpty()
+                    && !content.hasMimeType(ClipboardContent.MIME_TEXT)) {
+                // And a type that is not text, when it is the only thing left unaccounted for
+                // and the carried text was not published as text either -- which is the clip
+                // that named one format of its own and put the value in the item, and only
+                // that clip. The pairing cannot be anything else, the same reasoning the one
+                // unclaimed URI above is matched by.
+                content.setData(unsatisfiedBinary.get(0), plain);
+            }
         }
+    }
+
+    /// The one type a clip advertises when that is all it advertises and it is not plain
+    /// text, or null.
+    ///
+    /// A clip that names a single format of its own is the case where the item's text is that
+    /// format rather than a plain reading of it; anything advertising text/plain, or more than
+    /// one type, is read the way it always was.
+    private static String soleAdvertisedType(ClipDescription description) {
+        if (description == null || description.getMimeTypeCount() != 1) {
+            return null;
+        }
+        String mime = description.getMimeType(0);
+        if (mime == null) {
+            return null;
+        }
+        mime = asciiLower(mime);
+        return ClipboardContent.MIME_TEXT.equals(mime) ? null : mime;
     }
 
     /// The type an untyped content URI was published as, recovered from the name of the file it

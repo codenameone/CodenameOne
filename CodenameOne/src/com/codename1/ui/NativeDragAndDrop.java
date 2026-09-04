@@ -630,18 +630,24 @@ public final class NativeDragAndDrop {
     /// Installs what a press staged, or clears it when the press staged nothing. In one go
     /// rather than a clear followed by a fill, so that one press leaves one consistent state.
     ///
-    /// Refused for a *different* press once the gesture already staged has been offered to the
-    /// platform. On a platform whose own recognizer owns dragging, that offer is the whole
-    /// handover: the session begins later and takes whatever is staged, with no press of its
-    /// own to identify it by. A second finger pressing another drag source in that window
-    /// replaced both the operation and its source, so the drag the *first* finger had begun
-    /// exported the second component's payload -- and reported a move against it, which is the
-    /// word a source deletes its data on. The press that is not this gesture's leaves it alone;
-    /// the release that ends either gesture clears it, so nothing is stranded.
+    /// Refused for a press on a *different* component while something is staged. The gesture
+    /// that staged it may still be live -- and where the platform's own recognizer owns
+    /// dragging, that gesture can be about to become a session with no press of its own to
+    /// identify it by. A second finger pressing another drag source replaced both the operation
+    /// and its source, so the drag the *first* finger had begun exported the second component's
+    /// payload and reported a move against it, which is the word a source deletes its data on.
     ///
-    /// A press that lands with nothing offered still replaces what is staged, which is what a
-    /// gesture the platform dropped on the floor needs -- see
-    /// `#isStagedFor(java.lang.Object, int, int)` for the other half of that.
+    /// Not conditioned on the gesture having been offered to the platform. UIKit begins its
+    /// own drag from a long press that need never travel far enough for this framework to call
+    /// it a drag at all, so "offered" was true too late to protect the very case it was added
+    /// for.
+    ///
+    /// The same component may always restage: whichever press it belongs to, the drag is that
+    /// component's, and a gesture the platform dropped on the floor is inherited by the next
+    /// press on the same component rather than stranding it -- see
+    /// `#isStagedFor(java.lang.Object, int, int)` for the other half of that. What ends a
+    /// staging that nothing will use is the release of whichever gesture is really in
+    /// progress; see `#pointerReleased(java.lang.Object)`.
     ///
     /// #### Returns
     ///
@@ -649,7 +655,7 @@ public final class NativeDragAndDrop {
     private static boolean stage(NativeDragOperation op, Component source, Object token,
             int x, int y) {
         synchronized (LOCK) {
-            if (startOffered && pending != null) {
+            if (pending != null && source != pendingSource) { // NOPMD CompareObjectsWithEquals
                 // What the press claimed, given back. A source may hand one operation instance
                 // to every component it owns, so the press being refused here may have pointed
                 // that very instance at its own component a moment ago -- claiming the source
@@ -801,13 +807,13 @@ public final class NativeDragAndDrop {
 
     /// True when a release identified by this press token may end what is staged.
     ///
-    /// Only the offered case is protected, which is the one where the framework has handed a
-    /// gesture to the platform and is waiting to be told the session began. Everything else
-    /// clears as it always did: a staged gesture the platform has not been offered belongs to
-    /// whichever press is ending, and a release that arrives with no press in progress at all
-    /// -- the token is null, which is what a second release after the first has already
-    /// finished looks like -- is the backstop that keeps an offered slot from outliving every
-    /// gesture on the surface.
+    /// A release belonging to some other press leaves the staging alone: the gesture that
+    /// staged it may still be in progress, and on a platform whose recognizer owns dragging it
+    /// may be about to become a session. A release that arrives with no press in progress at
+    /// all -- the token is null, which is what a second release looks like once the first has
+    /// run its course -- clears it anyway, and that is the backstop that keeps a staging from
+    /// outliving every gesture on the surface: a single token per top level cannot name the
+    /// first finger once the second one's release has finished.
     ///
     /// #### Parameters
     ///
@@ -815,7 +821,7 @@ public final class NativeDragAndDrop {
     ///   or no press in progress
     private static boolean ownsStaging(Object token) {
         synchronized (LOCK) {
-            if (!startOffered || pending == null || token == null) {
+            if (pending == null || token == null) {
                 return true;
             }
             return token == pressToken; // NOPMD CompareObjectsWithEquals
