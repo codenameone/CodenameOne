@@ -112,6 +112,11 @@ void CN1DeclareNativeDragPayload(NSString* mimeType);
 /// `paths` is newline separated.
 void CN1AddNativeDragFiles(NSString* path);
 
+/// Adds one link a text/uri-list named to the drag being assembled, which becomes an item of
+/// its own so that each public.url a receiver reads is one URL. Skipped when the file
+/// representation already named the same document.
+void CN1AddNativeDragUrl(NSString* url);
+
 /// The uniform type identifier a MIME type travels under, which is also what a pasteboard
 /// item is keyed by. Falls back to the MIME type itself for a type nothing standard
 /// describes, which is exactly how an application's own format is carried.

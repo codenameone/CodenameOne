@@ -9366,7 +9366,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         /// This session's value for a type, produced once and remembered for as long as the
         /// session is readable -- a receiver that queries and then reads must not make the
         /// provider write its file twice.
-        Object produce(String mimeType) {
+        ///
+        /// Declared as throwing, rather than rethrowing the caught Throwable and letting the
+        /// compiler work out what it can be: this port is also built at source 1.6, which has
+        /// no precise rethrow, and there the bare rethrow does not compile at all. The one
+        /// caller catches Throwable either way.
+        Object produce(String mimeType) throws Throwable {
             // The provider runs inside the lock, not beside it. At most once per transfer
             // is what a provider is promised, and two readers that both miss an empty memo
             // would both run it -- writing the promised file twice and keeping one, which
@@ -9569,6 +9574,12 @@ public class IOSImplementation extends CodenameOneImplementation {
                     }
                     continue;
                 }
+                if (ClipboardContent.MIME_URI_LIST.equals(mime) && declareDraggedUrls(content)) {
+                    // Handed over as items rather than declared as a type: see
+                    // declareDraggedUrls. Declaring it as well would publish the list twice,
+                    // once as items and once as a lump.
+                    continue;
+                }
                 nativeInstance.declareNativeDragPayload(mime);
             }
         } catch (Throwable err) {
@@ -9585,6 +9596,44 @@ public class IOSImplementation extends CodenameOneImplementation {
         // A payload that declared nothing needs no such care: the answer is non-zero, UIKit
         // asks for the items, finds none, and completes the session itself.
         return op.getAllowedActions();
+    }
+
+    /// Hands each link of a text/uri-list to the session as an item of its own.
+    ///
+    /// Resolved here rather than promised, for the reason the file list is: UIKit fixes the
+    /// item count when the session begins, and a list of three links is three items. A
+    /// public.url representation is one URL, so registering the whole newline separated list
+    /// under that identifier gave every native receiver a single malformed address -- and
+    /// showed the user one item where there were three.
+    ///
+    /// #### Returns
+    ///
+    /// true when at least one link was handed over, in which case the type must not also be
+    /// declared as a representation of its own
+    private static boolean declareDraggedUrls(ClipboardContent content) {
+        Object value;
+        try {
+            value = content.getData(ClipboardContent.MIME_URI_LIST);
+        } catch (Throwable err) {
+            // A provider is permitted to fail, and the rest of the payload still travels.
+            com.codename1.io.Log.e(err);
+            return false;
+        }
+        if (!(value instanceof String)) {
+            return false;
+        }
+        boolean any = false;
+        String[] lines = ((String) value).split("\n");
+        for (int iter = 0; iter < lines.length; iter++) {
+            String line = lines[iter].trim();
+            // RFC 2483: a line opening with a hash is a comment rather than a URI.
+            if (line.length() == 0 || line.charAt(0) == '#') {
+                continue;
+            }
+            nativeInstance.addNativeDragUrl(line);
+            any = true;
+        }
+        return any;
     }
 
     /// Gives back a drag session the framework had already committed to and that UIKit is

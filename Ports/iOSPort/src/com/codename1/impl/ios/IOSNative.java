@@ -426,6 +426,18 @@ public final class IOSNative {
     /// - `paths`: newline separated file paths or `file:` URIs
     native void addNativeDragFiles(String path);
 
+    /// Adds one link a text/uri-list named, which becomes a drag item of its own.
+    ///
+    /// Resolved when the session begins for the reason the file list is: the item count is
+    /// fixed then, and a list of links is that many items. A public.url representation is
+    /// one URL, so the whole list registered as a single one reached every native receiver
+    /// as a malformed address.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: one entry of the list, a URL or a local path
+    native void addNativeDragUrl(String url);
+
     /// Drops whatever `#prepareNativeDrag(java.lang.String, int, byte[], int, int)` staged,
     /// because the press turned out to be a tap.
     native void cancelNativeDrag();

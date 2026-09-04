@@ -75,6 +75,9 @@ void CN1DeclareNativeDragPayload(NSString* mimeType) {
 void CN1AddNativeDragFiles(NSString* paths) {
 }
 
+void CN1AddNativeDragUrl(NSString* url) {
+}
+
 void CN1CancelNativeDrag(void) {
 }
 
@@ -144,6 +147,11 @@ static CGPoint cn1PreparedTouch;
 /// not their values, which are fetched only if a receiver reads them.
 static NSMutableArray* cn1DragMimes = nil;
 static NSMutableArray* cn1DragFileUrls = nil;
+
+/// The links a text/uri-list declared, one entry each. Kept apart from the files above
+/// because a link is not a document: it becomes an item that vends public.url and nothing
+/// else, while a file's item vends the document itself.
+static NSMutableArray* cn1DragUrls = nil;
 
 /// The framework's id for the session being built, captured by every load handler it registers
 /// so a late read resolves against its own operation and not the next drag's.
@@ -534,9 +542,11 @@ void CN1BeginNativeDragPayload(int sessionId) {
 #ifndef CN1_USE_ARC
     [cn1DragMimes release];
     [cn1DragFileUrls release];
+    [cn1DragUrls release];
 #endif
     cn1DragMimes = [[NSMutableArray alloc] init];
     cn1DragFileUrls = [[NSMutableArray alloc] init];
+    cn1DragUrls = [[NSMutableArray alloc] init];
     cn1DragSessionId = sessionId;
 }
 
@@ -555,28 +565,65 @@ void CN1DeclareNativeDragPayload(NSString* mimeType) {
 /// filename on Apple's filesystems, so a list split on newlines turned one such file into
 /// two paths that name nothing -- and the drag published neither the file the application
 /// asked for nor an error. Calling per file leaves nothing to be ambiguous about.
+/// The URL an entry names, whichever way it was spelled.
+///
+/// ClipboardContent's file representation permits a raw local path as well as a file: URI,
+/// and URLWithString: turns a path into a scheme-less relative URL that no receiver can open.
+/// An absolute path is obvious; a relative one -- exports/report.pdf -- looks enough like a
+/// URL to be parsed as one, and was then quietly dropped from the drag because an item
+/// provider cannot vend it. Anything that does not come back with a scheme is a path.
+static NSURL* cn1DragUrlFor(NSString* entry) {
+    if (entry == nil || entry.length == 0) {
+        return nil;
+    }
+    if ([entry hasPrefix:@"/"] || [entry hasPrefix:@"~"]) {
+        return [NSURL fileURLWithPath:[entry stringByExpandingTildeInPath]];
+    }
+    NSURL* url = [NSURL URLWithString:entry];
+    if (url == nil || url.scheme == nil) {
+        return [NSURL fileURLWithPath:entry];
+    }
+    return url;
+}
+
 void CN1AddNativeDragFiles(NSString* path) {
     if (path == nil || path.length == 0 || cn1DragFileUrls == nil) {
         return;
     }
-    // ClipboardContent's file representation permits a raw local path as well as a file:
-    // URI, and URLWithString: turns a path into a scheme-less relative URL that no receiver
-    // can open. An absolute path is obvious; a relative one -- exports/report.pdf -- looks
-    // enough like a URL to be parsed as one, and was then quietly dropped from the drag
-    // because an item provider cannot vend it. Anything that does not come back with a
-    // scheme is a path.
-    NSURL* url;
-    if ([path hasPrefix:@"/"] || [path hasPrefix:@"~"]) {
-        url = [NSURL fileURLWithPath:[path stringByExpandingTildeInPath]];
-    } else {
-        url = [NSURL URLWithString:path];
-        if (url == nil || url.scheme == nil) {
-            url = [NSURL fileURLWithPath:path];
-        }
-    }
+    NSURL* url = cn1DragUrlFor(path);
     if (url != nil) {
         [cn1DragFileUrls addObject:url];
     }
+}
+
+/// Adds one link from a text/uri-list to the drag being assembled.
+///
+/// One per call, as the files are, and for the same reason: the list is split where it is
+/// parsed rather than being handed over as text to be split again here.
+///
+/// A link the file representation already named is skipped. The two representations commonly
+/// spell the same document -- a path in one, a file: URI of it in the other -- and dragging
+/// it as two items is dragging it twice.
+void CN1AddNativeDragUrl(NSString* url) {
+    if (url == nil || url.length == 0 || cn1DragUrls == nil) {
+        return;
+    }
+    NSURL* parsed = cn1DragUrlFor(url);
+    if (parsed == nil) {
+        return;
+    }
+    NSString* key = parsed.absoluteURL.absoluteString;
+    for (NSURL* known in cn1DragFileUrls) {
+        if ([known.absoluteURL.absoluteString isEqualToString:key]) {
+            return;
+        }
+    }
+    for (NSURL* known in cn1DragUrls) {
+        if ([known.absoluteURL.absoluteString isEqualToString:key]) {
+            return;
+        }
+    }
+    [cn1DragUrls addObject:parsed];
 }
 
 void CN1CancelNativeDrag(void) {
@@ -911,6 +958,26 @@ API_AVAILABLE(ios(11.0))
             // two a receiver gets is NSItemProvider's choice rather than ours. Both are
             // honestly that type, so neither answer is wrong; there is simply no way to say
             // which was meant.
+            registerDeclared(provider);
+            declaredAttached = YES;
+        }
+        UIDragItem* item = [[UIDragItem alloc] initWithItemProvider:provider];
+        [items addObject:item];
+#ifndef CN1_USE_ARC
+        [provider release];
+        [item release];
+#endif
+    }
+    // Then the links, one item each. A public.url representation is *a* URL, so a list of
+    // three registered as one was read by every native receiver as a single malformed
+    // address -- and UIKit counted one item where the user was dragging three. The clipboard
+    // path has always written them one per item; this is the same rule for the drag.
+    for (NSURL* url in cn1DragUrls) {
+        NSItemProvider* provider = [[NSItemProvider alloc] initWithObject:url];
+        if (provider == nil) {
+            continue;
+        }
+        if (!declaredAttached) {
             registerDeclared(provider);
             declaredAttached = YES;
         }

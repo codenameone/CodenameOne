@@ -739,6 +739,36 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aSecondCopyAsksTheProvidersAgain() {
+        final int[] calls = {0};
+        ClipboardContent content = new ClipboardContent()
+                .setDataProvider(ClipboardContent.MIME_FILE, new ClipboardDataProvider() {
+                    public Object getClipboardData(String mimeType) {
+                        calls[0]++;
+                        return "/tmp/copy-" + calls[0] + ".pdf";
+                    }
+                });
+
+        Display.getInstance().copyToClipboard(content);
+        assertEquals("/tmp/copy-1.pdf", content.getFiles()[0]);
+        assertEquals("/tmp/copy-1.pdf", content.getFiles()[0],
+                "within one publication the provider is asked once, as it is within one drag");
+        assertEquals(1, calls[0]);
+
+        // The same content copied a second time, which an application that keeps one around
+        // for a Copy button does every time it is pressed.
+        Display.getInstance().copyToClipboard(content);
+        assertEquals("/tmp/copy-2.pdf", content.getFiles()[0],
+                "a copy is a transfer of its own: the file the first one wrote may be gone by "
+                        + "now, and republishing that path publishes nothing");
+        assertEquals(2, calls[0]);
+
+        // The other overload is the same publication and has to behave the same way.
+        Display.getInstance().copyToClipboard((Object) content);
+        assertEquals("/tmp/copy-3.pdf", content.getFiles()[0]);
+    }
+
+    @FormTest
     void aCompletionNamesTheComponentItsOwnDragBelongedTo() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

@@ -1114,6 +1114,13 @@ void com_codename1_impl_ios_IOSNative_addNativeDragFiles___java_lang_String(CN1_
     POOL_END();
 }
 
+void com_codename1_impl_ios_IOSNative_addNativeDragUrl___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT url) {
+    POOL_BEGIN();
+    // One link per call, as the files are; see CN1AddNativeDragUrl.
+    CN1AddNativeDragUrl(url == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG url));
+    POOL_END();
+}
+
 void com_codename1_impl_ios_IOSNative_cancelNativeDrag__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     dispatch_async(dispatch_get_main_queue(), ^{
         CN1CancelNativeDrag();

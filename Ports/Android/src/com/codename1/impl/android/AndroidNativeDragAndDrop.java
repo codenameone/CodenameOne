@@ -464,6 +464,17 @@ final class AndroidNativeDragAndDrop {
             String mime) {
         if (published == null || published.hasMimeType(mime)) {
             declare(content, mime);
+            return;
+        }
+        // A file the source published is a URI as well, and the drop says so: contentFromClip
+        // builds the list back out of the URIs the clip carried, so a component filtered to
+        // MIME_URI_LIST would have been refused the hover and then handed the very list it
+        // asked for -- and takes that drag on the other two ports. Not the other way round: a
+        // URI list may be nothing but links, and only the entries that name something local
+        // come back as files.
+        if (ClipboardContent.MIME_URI_LIST.equals(mime)
+                && published.hasMimeType(ClipboardContent.MIME_FILE)) {
+            declare(content, mime);
         }
     }
 
