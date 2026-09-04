@@ -193,12 +193,13 @@ extern int nextPowerOf2(int val);
         // always correct. A plain generation compare is used (no OS purgeable
         // probe) -- setPurgeableState on a texture already referenced by an
         // in-flight command buffer trips Metal's commit-time validation.
-        // A no-backing-copy image has nothing to re-decode FROM, and does not
-        // need to: its Java owner bumps a generation on suspend and builds a
-        // fresh image, peer and all, the next time the picture is asked for. So
-        // the recovery below is both impossible and unnecessary for it.
+        // Every peer recovers the same way now that the backing UIImage is kept:
+        // a stale generation drops the texture and it is rebuilt from that image.
+        // The no-backing-copy exemption that used to live here only made sense
+        // while the image was being released, and it left such a peer returning
+        // a texture the OS may already have discarded.
         int gen = CN1MetalTextureValidateGeneration();
-        if (mtlTextureGeneration != gen && !noBackingCopy) {
+        if (mtlTextureGeneration != gen) {
             mtlTextureGeneration = gen;
             [mtlTexture release];
             mtlTexture = nil;
@@ -210,15 +211,17 @@ extern int nextPowerOf2(int val);
     if (img == nil) return nil;
     mtlTexture = CN1MetalTextureFromUIImage(img);
     mtlTextureGeneration = CN1MetalTextureValidateGeneration();
-    if (noBackingCopy && mtlTexture != nil) {
-        // The pixels are on the GPU now. Letting the UIImage go takes
-        // CoreGraphics' decoded raster with it -- the second copy of this
-        // picture -- and the Java side is the recovery path.
-#ifndef CN1_USE_ARC
-        [img release];
-#endif
-        img = nil;
-    }
+    // The UIImage is NOT released here, even for a no-backing-copy image.
+    //
+    // Uploading the texture does not make the backing object redundant: the
+    // drawing operations read geometry straight off it -- DrawImage and
+    // TileImage both take their source size from [img getImage].size -- so a nil
+    // img gives them zero dimensions and they silently skip the draw. Dropping
+    // it rendered whole screens blank on the iOS and watchOS suites.
+    //
+    // Saving that second copy needs the size (and anything else the operations
+    // reach for) cached on the peer first, and every consumer moved onto it.
+    // Until that is done the copy stays.
     // Track every GPU-backed image (not just mutable render targets) so the
     // suspend backup can drop/rebuild its texture too (issue #5349). The weak
     // registry drops the entry automatically on dealloc.
