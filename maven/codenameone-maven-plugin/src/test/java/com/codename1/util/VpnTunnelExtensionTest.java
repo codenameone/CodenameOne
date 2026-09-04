@@ -105,6 +105,49 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
+    void aStopWhileStartingCannotBringTheTunnelUpAnyway() {
+        String src = provider();
+        // NE stops a provider whose start is still in flight -- a user
+        // toggling the switch back is enough. The settings completion used
+        // to run regardless: it built the tunnel, told Java to begin, armed
+        // a read and reported success, all after the stop, leaving a tunnel
+        // running with cn1tnProvider nil and every forwarded packet dropped.
+        int claimed = src.indexOf("int cn1tnStart =");
+        int settings = src.indexOf("setTunnelNetworkSettings");
+        assertTrue(claimed >= 0 && claimed < settings,
+                "the start has to be claimed before anything asynchronous");
+        assertTrue(src.contains("cn1tnStart != atomic_load(&cn1tnReadGeneration)"),
+                "the completion has to abandon a start that was stopped");
+        // The handler is still called exactly once, which NE requires.
+        assertTrue(src.contains("The tunnel was stopped before it started"));
+        // Armed with the generation this start claimed. Bumping again there
+        // would invalidate the very start the completion belongs to.
+        assertTrue(src.contains("[self cn1ReadPacketsForGeneration:cn1tnStart]"));
+    }
+
+    @Test
+    void aStopDuringDeliveryDoesNotLeaveAReadArmed() {
+        String src = provider();
+        // The handler checks its generation on entry and again before
+        // re-arming. Without the second check a stop that lands while the
+        // batch is being handed to Java left a read for a dead tunnel
+        // outstanding on the flow, and the next start's first batch could go
+        // to it and be dropped -- packets lost exactly when a tunnel comes
+        // up.
+        int body = src.indexOf("- (void)cn1ReadPacketsForGeneration:");
+        assertTrue(body >= 0);
+        int checks = 0;
+        int at = src.indexOf("generation != atomic_load(&cn1tnReadGeneration)",
+                body);
+        while (at >= 0) {
+            checks++;
+            at = src.indexOf("generation != atomic_load(&cn1tnReadGeneration)",
+                    at + 1);
+        }
+        assertEquals(2, checks, "entry and re-arm both have to check");
+    }
+
+    @Test
     void packetsGoIntoThePooledBuffer() {
         // An allocation and a second copy per packet, at line rate, in a
         // process with a hard memory cap -- in an API whose buffers are
