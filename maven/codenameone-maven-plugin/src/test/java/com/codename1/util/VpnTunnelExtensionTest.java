@@ -147,8 +147,10 @@ class VpnTunnelExtensionTest {
         int at = src.indexOf("[self cn1ForgetIfCurrent:");
         while (at >= 0) {
             forgets++;
-            String after = src.substring(
-                    at + "[self cn1ForgetIfCurrent:cn1tnStart];".length());
+            // From the end of THIS call, whatever it passes: the stop
+            // clears by the generation it is ending, the failure paths by
+            // the one they started.
+            String after = src.substring(src.indexOf(';', at) + 1);
             assertTrue(after.trim().startsWith("completionHandler"),
                 "the clear comes before the handler it precedes");
             at = src.indexOf("[self cn1ForgetIfCurrent:", at + 1);
@@ -263,9 +265,14 @@ class VpnTunnelExtensionTest {
         // CAPTURED at the bump, not loaded again. A stop preempted between
         // the two handed itself the restart's generation, and tore down the
         // tunnel that had replaced it.
-        assertTrue(method.contains("int cn1tnEnded =\n"
-                + "            atomic_fetch_add(&cn1tnReadGeneration, 1) + 1;"));
-        assertTrue(method.contains("[self cn1ForgetIfCurrent:cn1tnEnded];"));
+        assertTrue(method.contains("int cn1tnEnding =\n"
+                + "            atomic_fetch_add(&cn1tnReadGeneration, 1);"));
+        assertTrue(method.contains("int cn1tnEnded = cn1tnEnding + 1;"));
+        // The generation being ENDED clears the slot, and the watermark it
+        // leaves goes to Java. Passing the watermark to both compared N + 1
+        // against a slot holding N, so an ordinary stop cleared nothing and
+        // left the global naming a provider NE was about to release.
+        assertTrue(method.contains("[self cn1ForgetIfCurrent:cn1tnEnding];"));
     }
 
     @Test
