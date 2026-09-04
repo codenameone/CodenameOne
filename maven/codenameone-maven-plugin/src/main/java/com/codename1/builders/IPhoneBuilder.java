@@ -11767,6 +11767,15 @@ public class IPhoneBuilder extends Executor {
                     + "\"\n");
         }
         sb.append("}\nend\n");
+        // SAVED here, and not left to whatever runs next. The only
+        // unconditional save in this script belongs to the brought-in
+        // .ios.appext fragment and runs BEFORE this one; the matter, widget
+        // and document-provider helpers save after their own work. So a
+        // build whose only generated extension is the tunnel mutated the
+        // project in memory and wrote none of it -- no target, no
+        // dependency, no embed phase -- and the archive that followed was an
+        // app with no extension in it.
+        sb.append("xcproj.save(project_file)\n");
     }
 
     /**

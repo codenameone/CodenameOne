@@ -302,6 +302,29 @@ class VpnTunnelNativeBuilderTest {
     }
 
     @Test
+    void theGeneratedTargetIsWrittenToDisk() throws Exception {
+        // The only unconditional save in the schemes script belongs to the
+        // brought-in .ios.appext fragment and runs BEFORE the generated
+        // extensions; the matter, widget and document-provider helpers save
+        // after their own work. A build whose only generated extension is
+        // the tunnel therefore mutated the project in memory and wrote none
+        // of it -- no target, no dependency, no embed phase -- and shipped
+        // an app with no extension in it.
+        String source = new String(java.nio.file.Files.readAllBytes(
+                new File("src/main/java/com/codename1/builders/"
+                        + "IPhoneBuilder.java").toPath()),
+                java.nio.charset.StandardCharsets.UTF_8);
+        int method = source.indexOf(
+                "private void appendVpnTunnelExtensionTarget(StringBuilder sb,");
+        assertTrue(method > 0, "the tunnel target generator has to exist");
+        int next = source.indexOf("\n    /**", method);
+        assertTrue(next > method);
+        assertTrue(source.substring(method, next)
+                        .contains("xcproj.save(project_file)"),
+                "the fragment has to save the project it mutated");
+    }
+
+    @Test
     void theTargetIsBuiltAsAnAppExtension() {
         VpnTunnelNativeBuilder builder = new VpnTunnelNativeBuilder(null);
         BuildRequest request = request("true", "com.example.app.MyTunnel");
