@@ -722,8 +722,40 @@ public final class NativeDragAndDrop {
 
     /// Drops the operation prepared by a press that turned out to be a click. Called as the
     /// pointer is released.
-    static void pointerReleased() {
+    static void pointerReleased(Object token) {
+        if (!ownsStaging(token)) {
+            // A press that never owned the staging slot cannot end what does. The second
+            // finger of a two finger gesture is exactly that: it is refused the slot by
+            // stage() while the first finger's gesture is with the platform, and its release
+            // then arrived here and cancelled the drag the first finger had already been
+            // offered for -- so UIKit's session, when it finally began, found nothing staged
+            // and started no drag at all.
+            return;
+        }
         gestureCancelled();
+    }
+
+    /// True when a release identified by this press token may end what is staged.
+    ///
+    /// Only the offered case is protected, which is the one where the framework has handed a
+    /// gesture to the platform and is waiting to be told the session began. Everything else
+    /// clears as it always did: a staged gesture the platform has not been offered belongs to
+    /// whichever press is ending, and a release that arrives with no press in progress at all
+    /// -- the token is null, which is what a second release after the first has already
+    /// finished looks like -- is the backstop that keeps an offered slot from outliving every
+    /// gesture on the surface.
+    ///
+    /// #### Parameters
+    ///
+    /// - `token`: the press the release belongs to, or null when there is no top level to ask
+    ///   or no press in progress
+    private static boolean ownsStaging(Object token) {
+        synchronized (LOCK) {
+            if (!startOffered || pending == null || token == null) {
+                return true;
+            }
+            return token == pressToken; // NOPMD CompareObjectsWithEquals
+        }
     }
 
     /// Abandons whatever a press staged, because the gesture it belonged to is over or has

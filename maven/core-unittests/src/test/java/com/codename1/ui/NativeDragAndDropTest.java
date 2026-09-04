@@ -2059,6 +2059,51 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aSecondFingerReleasingDoesNotCancelTheOfferedGesture() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        // The port refuses to start: the platform's own recognizer owns the gesture and the
+        // session begins later, out of dragSessionStarted().
+        implementation.setNativeDragStartRefused(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container dragged = new Container();
+            NativeDragOperation carried = new NativeDragOperation("the finger that is dragging");
+            dragged.setNativeDragOperation(carried);
+            Container touched = new Container();
+            touched.add(new Label("pressed and released by the other finger"));
+            touched.setNativeDragOperation(new NativeDragOperation("never dragged"));
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, dragged);
+            form.add(BorderLayout.NORTH, touched);
+            form.revalidate();
+
+            int x = dragged.getAbsoluteX() + 10;
+            int y = dragged.getAbsoluteY() + 10;
+            form.pointerPressed(x, y);
+            drag(form, x + 200, y + 200);
+
+            // The other finger taps while the first one waits for the platform.
+            int tapX = touched.getAbsoluteX() + 5;
+            int tapY = touched.getAbsoluteY() + 5;
+            form.pointerPressed(tapX, tapY);
+            form.pointerReleased(tapX, tapY);
+
+            assertSame(carried, NativeDragAndDrop.dragSessionStarted(),
+                    "a press that was refused the staging slot must not end what owns it: the "
+                            + "drag the first finger had already been offered for would have "
+                            + "found nothing staged and never started");
+        } finally {
+            implementation.setNativeDragStartRefused(false);
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            NativeDragAndDrop.gestureCancelled();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void anOperationThatPermitsNothingNeverBecomesADrag() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

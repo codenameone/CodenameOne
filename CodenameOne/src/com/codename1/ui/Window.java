@@ -3409,7 +3409,7 @@ public class Window extends Container implements TopLevelContainer {
         // which a fresh press stages an operation of its own. Clearing afterwards threw
         // *that* gesture's staging away, and the drag it was about to become never
         // started.
-        NativeDragAndDrop.pointerReleased();
+        NativeDragAndDrop.pointerReleased(getCurrentPointerPress());
         if (Display.getInstance().isStylusPointer() && !gestureCancelled) {
             Component stylusCmp = resolveComponentAt(x, y);
             if (stylusCmp != null) {

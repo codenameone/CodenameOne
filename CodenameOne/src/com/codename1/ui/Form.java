@@ -4622,7 +4622,7 @@ public class Form extends Container implements TopLevelContainer {
         // open a nested event loop -- a dialog -- inside which a whole new press is
         // dispatched and stages an operation of its own. Clearing afterwards then threw the
         // *new* gesture's staging away, and the drag it was about to become never started.
-        NativeDragAndDrop.pointerReleased();
+        NativeDragAndDrop.pointerReleased(getCurrentPointerPress());
         if (Display.getInstance().isStylusPointer()) {
             Component stylusCmp = resolveInputComponent(x, y);
             if (stylusCmp != null) {
