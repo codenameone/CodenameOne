@@ -354,6 +354,30 @@ public final class NativeDragAndDrop {
         return op;
     }
 
+    /// Produces one representation of a drag for the session that is reading it, rather than
+    /// for whichever transfer armed the operation last.
+    ///
+    /// For a port whose platform keeps an older session readable while a newer one runs --
+    /// iOS does, for as long as a receiver holds one of its item providers -- and which
+    /// therefore keeps a memo of its own, one per session. Reading through the operation
+    /// instead would hand that receiver the newer drag's value, or produce a second one for
+    /// a drag that had already ended. Every other port reads through
+    /// `ClipboardContent#getData(java.lang.String)`, whose memory is the running transfer's
+    /// and is exactly right when only one session can be read at a time.
+    ///
+    /// #### Parameters
+    ///
+    /// - `op`: the operation the session is carrying, which may be null
+    ///
+    /// - `mimeType`: the representation being read
+    ///
+    /// #### Returns
+    ///
+    /// the value, or null when there is no such operation or representation
+    public static Object produceDragValue(NativeDragOperation op, String mimeType) {
+        return op == null ? null : op.produceData(mimeType);
+    }
+
     /// Returns the drag this application is currently running through the operating system, or
     /// null when it is not dragging. A drop target uses this to tell a drag it started itself
     /// from one that arrived from elsewhere, which `NativeDropEvent#isLocal()` reports.

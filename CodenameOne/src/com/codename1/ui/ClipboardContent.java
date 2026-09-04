@@ -118,6 +118,35 @@ public class ClipboardContent {
         return value;
     }
 
+    /// The value for a MIME type, produced now rather than taken from what a transfer
+    /// remembered.
+    ///
+    /// For a transfer that can outlive the one after it. iOS keeps a drag readable for as
+    /// long as a receiver holds one of its item providers, so an older session can be read
+    /// while a newer one is running -- and the memo below belongs to whichever transfer
+    /// armed the operation last, which would hand the older session the newer session's
+    /// value, or make it produce a second one. A port in that position keeps a memo of its
+    /// own, per session; see IOSImplementation.nativeDragResolveCallback.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mimeType`: the representation wanted
+    ///
+    /// #### Returns
+    ///
+    /// the value, or null when this content does not offer that type
+    Object produceData(String mimeType) {
+        int index = mimeTypes.indexOf(normalizeMimeType(mimeType));
+        if (index < 0) {
+            return null;
+        }
+        Object value = values.get(index);
+        if (value instanceof LazyValue) {
+            return ((LazyValue) value).produce(mimeTypes.get(index));
+        }
+        return value;
+    }
+
     /// Forgets every value a provider has produced, so the next transfer asks for it again.
     ///
     /// Resolving once is right *within* a transfer -- a drop queries and then reads, and the
@@ -161,6 +190,12 @@ public class ClipboardContent {
         synchronized void forget() {
             done = false;
             resolved = null;
+        }
+
+        /// Runs the provider without remembering the answer, for a caller that remembers
+        /// it somewhere of its own. See `ClipboardContent#produceData(java.lang.String)`.
+        Object produce(String mimeType) {
+            return provider.getClipboardData(mimeType);
         }
     }
 

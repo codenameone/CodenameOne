@@ -9310,8 +9310,48 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// CN1DragAndDrop.m gives every load handler a token for its session and calls
     /// #nativeDragPayloadReleasedCallback(int) when the last of them is released, so a payload
     /// is held for exactly as long as something can ask for it and no longer.
-    private static final java.util.Map<Integer, NativeDragOperation> exportedDrags =
-            new java.util.HashMap<Integer, NativeDragOperation>();
+    private static final java.util.Map<Integer, ExportedDrag> exportedDrags =
+            new java.util.HashMap<Integer, ExportedDrag>();
+
+    /// One drag this application is exporting, and the values its receivers have read.
+    ///
+    /// The values are kept per session rather than on the operation. A source offers the same
+    /// operation for every drag of its component, and UIKit keeps a session readable for as
+    /// long as a receiver holds one of its item providers -- so an older session can be read
+    /// while a newer one is running, and reading through what the operation remembers would
+    /// hand that receiver the newer drag's file, or make the provider produce a second one for
+    /// a drag that had already ended. Each session answers from what it produced itself.
+    private static final class ExportedDrag {
+        private final NativeDragOperation op;
+        private final java.util.Map<String, Object> produced =
+                new java.util.HashMap<String, Object>();
+
+        ExportedDrag(NativeDragOperation op) {
+            this.op = op;
+        }
+
+        /// This session's value for a type, produced once and remembered for as long as the
+        /// session is readable -- a receiver that queries and then reads must not make the
+        /// provider write its file twice.
+        Object produce(String mimeType) {
+            synchronized (produced) {
+                if (produced.containsKey(mimeType)) {
+                    return produced.get(mimeType);
+                }
+            }
+            // Outside the lock: it runs application code, which may block, and a second
+            // reader of the same type is rare enough that producing twice is better than
+            // holding a lock across it.
+            Object value = NativeDragAndDrop.produceDragValue(op, mimeType);
+            synchronized (produced) {
+                if (produced.containsKey(mimeType)) {
+                    return produced.get(mimeType);
+                }
+                produced.put(mimeType, value);
+            }
+            return value;
+        }
+    }
     private static int nextDragSessionId;
 
     /// The drop being assembled by CN1DragAndDrop.m, one representation at a time.
@@ -9431,7 +9471,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         int sessionId;
         synchronized (exportedDrags) {
             sessionId = ++nextDragSessionId;
-            exportedDrags.put(Integer.valueOf(sessionId), op);
+            exportedDrags.put(Integer.valueOf(sessionId), new ExportedDrag(op));
         }
         try {
             ClipboardContent content = op.getContent();
@@ -9510,20 +9550,22 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static byte[] nativeDragResolveCallback(String mimeType, int sessionId) {
         // Matched by session id, not simply the latest: a handler from an earlier drag must
         // answer for that drag or not at all. See the field.
-        NativeDragOperation op;
+        ExportedDrag drag;
         synchronized (exportedDrags) {
-            op = exportedDrags.get(Integer.valueOf(sessionId));
+            drag = exportedDrags.get(Integer.valueOf(sessionId));
         }
-        if (op == null || mimeType == null || mimeType.length() == 0) {
+        if (drag == null || mimeType == null || mimeType.length() == 0) {
             return null;
         }
         // Only the provider call is inside the broad catch: it runs application code, which may
         // throw anything. The casts below sit outside it deliberately -- a cast reached through
         // catch(Throwable) is exactly what ParparVM cannot report, since its CHECKCAST does not
         // throw and the handler would never run on iOS.
+        //
+        // Through this session's own memo, not the operation's: see ExportedDrag.
         Object value;
         try {
-            value = op.getContent().getData(mimeType);
+            value = drag.produce(mimeType);
         } catch (Throwable err) {
             com.codename1.io.Log.e(err);
             return null;

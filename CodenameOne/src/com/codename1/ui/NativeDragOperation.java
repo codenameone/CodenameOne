@@ -319,6 +319,20 @@ public class NativeDragOperation {
         performedAction = ACTION_NONE;
     }
 
+    /// The value for a MIME type, produced for one session rather than shared between them.
+    /// See `ClipboardContent#produceData(java.lang.String)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mimeType`: the representation wanted
+    ///
+    /// #### Returns
+    ///
+    /// the value, or null when this operation's content does not offer that type
+    Object produceData(String mimeType) {
+        return content.produceData(mimeType);
+    }
+
     /// Forgets the values this operation's providers produced for the drag before.
     ///
     /// The same instance is offered for every drag of the component that owns it, and a
