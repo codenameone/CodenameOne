@@ -115,9 +115,20 @@ class IOSContinuityBridge implements ContinuityBridge {
         }
     }
 
+    /// Gated on the PORT, not on the probe.
+    ///
+    /// isSyncedStoreSupported() answers whether this build is entitled to a store that follows
+    /// the user, which the native side learns from a synchronize. That is the right answer for
+    /// an application deciding whether to offer the feature, and the wrong gate for the calls
+    /// themselves: the store is a LOCAL persistent one, so reads and writes work and propagate
+    /// later, and refusing them here made the native side's retained store unreachable -- values
+    /// already cached were reported absent and writes were dropped, which is the whole of what
+    /// retaining it was for.
+    ///
+    /// The natives answer for themselves when there is no store at all.
     @Override
     public boolean syncedStorePut(String key, String value) {
-        if (!isSyncedStoreSupported()) {
+        if (!supported) {
             return false;
         }
         try {
@@ -130,7 +141,7 @@ class IOSContinuityBridge implements ContinuityBridge {
 
     @Override
     public String syncedStoreGet(String key) {
-        if (!isSyncedStoreSupported()) {
+        if (!supported) {
             return null;
         }
         try {
@@ -143,7 +154,7 @@ class IOSContinuityBridge implements ContinuityBridge {
 
     @Override
     public void syncedStoreRemove(String key) {
-        if (!isSyncedStoreSupported()) {
+        if (!supported) {
             return;
         }
         try {
@@ -155,7 +166,7 @@ class IOSContinuityBridge implements ContinuityBridge {
 
     @Override
     public String[] syncedStoreKeys() {
-        if (!isSyncedStoreSupported()) {
+        if (!supported) {
             return new String[0];
         }
         // The native call and the parse are what can fail, so they are what the handler covers.

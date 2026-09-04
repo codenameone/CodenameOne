@@ -136,6 +136,22 @@ public final class Navigation {
         return Collections.unmodifiableList(new ArrayList<NavigationEntry>(stack));
     }
 
+    /// Forgets the navigation history, leaving nothing to go back to.
+    ///
+    /// For a logout, which is the case that needs it: `Continuity.clear()` calls this, because a
+    /// route stack is the previous account's work as surely as a stored checkpoint is. Left in
+    /// place it kept two promises broken -- `Navigation#back()` reopened the signed-out account's
+    /// forms, and the next navigation checkpointed and republished a stack that still began with
+    /// their routes.
+    ///
+    /// The forms themselves are not touched: whatever is on screen stays there, and the caller
+    /// navigates wherever it means to go next. Nor does this notify continuity. Forgetting where
+    /// the user has been is not the user going somewhere, and a checkpoint here would write the
+    /// emptied stack straight back over the one just deleted.
+    public static void clearStack() {
+        stack.clear();
+    }
+
     /// Pop entries until `entry` is on top, then show its form via
     /// `Form#showBack`. Returns `true` when the entry was on the stack and
     /// we navigated back to it, `false` when the entry is not on the stack.

@@ -27,6 +27,8 @@ import com.codename1.continuity.sync.SyncedStoreListener;
 import com.codename1.impl.continuity.LocalContinuityBridge;
 import com.codename1.io.Storage;
 import com.codename1.junit.EdtTest;
+import com.codename1.router.Navigation;
+import com.codename1.router.RouteDispatcher;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.junit.UITestBase;
@@ -2020,7 +2022,15 @@ public class LocalContinuityTest extends UITestBase {
                         + "being asked about");
 
         // Answering releases it -- held, not dropped.
-        Continuity.restore();
+        //
+        // acknowledge(), not restore(). Both are decisions, and only one of them leaves the held
+        // checkpoint still true: restoring REPLACES the screen it describes, so sending it
+        // afterwards would put the superseded work over the relay's copy of the state just
+        // accepted, and it is dropped on purpose --
+        // aCheckpointQueuedBeforeARestoreIsNotPublishedAfterIt covers that. Acknowledging changes
+        // nothing on screen, so the work captured while the user was being asked is still what
+        // this device is doing, and it has to go out or the hold is a place things vanish into.
+        Continuity.acknowledge(Continuity.getRestorableState());
         awaitOffEdt(new Runnable() {
             public void run() {
                 r.awaitAnySince(before);
@@ -2486,9 +2496,20 @@ public class LocalContinuityTest extends UITestBase {
         pause(300L);
         flushSerialCalls();
 
+        // NOT the checkpoint captured before the restore: that one described the screen the
+        // restore replaced, and sending it would overwrite the relay's copy of the state just
+        // accepted. It is dropped on purpose. What has to work is the NEXT one -- if the hold
+        // had never been released, this would be held too and the arrival would keep every
+        // future checkpoint off the relay for good.
+        assertTrue(out.isEmpty(), "the stale pre-restore checkpoint was published after all");
+        provider.saved.put("after", "work done since the restore");
+        Continuity.checkpoint();
+        pause(300L);
+        flushSerialCalls();
+
         assertFalse(out.isEmpty(),
-                "a restore that applied the payload never released the hold, so this arrival "
-                        + "would keep every later checkpoint off the relay for good");
+                "a checkpoint made after the restore was still held, so the arrival keeps every "
+                        + "later checkpoint off the relay for good");
     }
 
     /**
@@ -2552,6 +2573,147 @@ public class LocalContinuityTest extends UITestBase {
                 "the tombstone was consumed without a durable mark, so after a restart an older "
                         + "state still in flight from that origin resurrects the work it cleared");
         assertEquals(77L, mark.longValue(), "the durable mark is not the tombstone's sequence");
+    }
+
+    /**
+     * A listener that acknowledges inside stateReceived and returns false leaves nothing parked.
+     *
+     * <p>That is the documented handle-it-yourself pattern, and it does both things: the
+     * acknowledgement runs first, while there is nothing parked for it to release, so parking
+     * afterwards left a finished arrival on offer for the rest of the process with every relay
+     * checkpoint held behind it -- the hold applied to work that was already done.</p>
+     */
+    @EdtTest
+    public void anArrivalAcknowledgedInsideTheListenerIsNotParked() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                Continuity.acknowledge(state);
+                return false;
+            }
+        });
+
+        Continuity.deliver(fromElsewhere("handled in the callback", 51L));
+        flushSerialCalls();
+
+        assertNull(Continuity.getRestorableState(),
+                "an arrival the listener had already acknowledged was parked anyway, so it stays "
+                        + "on offer and holds every later checkpoint off the relay");
+    }
+
+    /**
+     * A checkpoint queued before a restore is not sent afterwards.
+     *
+     * <p>A navigation while a relay GET is in flight leaves that checkpoint in the slot. If the
+     * GET brings back a state that is restored, the queued one describes a screen that no longer
+     * exists -- and sending it replaces the relay's copy of the state just accepted with the work
+     * the restore superseded.</p>
+     */
+    @EdtTest
+    public void aCheckpointQueuedBeforeARestoreIsNotPublishedAfterIt() {
+        final RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("screen", "one");
+        Continuity.setStateProvider(provider);
+
+        // A relay whose FIRST publish blocks. That is what leaves a second checkpoint sitting in
+        // the slot, which is the state this test is about -- and it is deterministic, unlike
+        // racing a relay GET: an earlier version timed the fetch and passed alone while failing
+        // in the suite, because the window it needed was never actually open.
+        final java.util.concurrent.CountDownLatch inPublish =
+                new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch release =
+                new java.util.concurrent.CountDownLatch(1);
+        Continuity.setRelay(new StateRelay() {
+            public void publish(AppState state) {
+                published.add(state);
+                if (inPublish.getCount() > 0) {
+                    inPublish.countDown();
+                    try {
+                        release.await(5L, java.util.concurrent.TimeUnit.SECONDS);
+                    } catch (InterruptedException ignored) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+
+            public AppState fetch() {
+                return null;
+            }
+        });
+
+        Continuity.checkpoint();
+        final boolean[] blocked = new boolean[1];
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                try {
+                    blocked[0] = inPublish.await(5L, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        assertTrue(blocked[0], "no publish is in flight, so nothing would queue behind it");
+
+        // Queued behind the worker: this is the checkpoint a restore is about to make stale.
+        provider.saved.put("stale", Boolean.TRUE);
+        Continuity.checkpoint();
+
+        // And the restore that supersedes it.
+        Continuity.deliver(fromElsewhere("what the other device was doing", 52L));
+        flushSerialCalls();
+        assertTrue(provider.restored != null && provider.restored.containsKey("note"),
+                "the arrival was not applied, so nothing superseded the queued checkpoint and "
+                        + "this test is about nothing");
+
+        release.countDown();
+        pause(400L);
+        flushSerialCalls();
+
+        boolean staleWentOut = false;
+        for (AppState sent : published) {
+            if (sent.getPayload().containsKey("stale")) {
+                staleWentOut = true;
+            }
+        }
+        assertFalse(staleWentOut,
+                "the checkpoint queued before the restore was published over the relay's copy of "
+                        + "the state that restore had just accepted");
+    }
+
+    /**
+     * Logout forgets the route history, not only the stored checkpoint.
+     *
+     * <p>A route stack is the previous account's work as surely as a checkpoint is. Leaving it
+     * kept two promises broken: back() reopened the signed-out account's forms, and the next
+     * navigation checkpointed and republished a stack that still began with their routes.</p>
+     */
+    @EdtTest
+    public void logoutForgetsTheRouteHistory() {
+        Continuity.setStateProvider(new RecordingProvider());
+        // Restored in the finally, because the dispatcher is global: a first version left one
+        // installed that answered EVERY path with a form, and the tests that run after it -- the
+        // ones about routes this build does not register -- then found every stale route
+        // perfectly dispatchable and failed on an assertion that had nothing to do with them.
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String path) {
+                return new Form(path);
+            }
+        });
+        try {
+            Navigation.navigate("/account/statement");
+            flushSerialCalls();
+            assertFalse(Navigation.getStack().isEmpty(),
+                    "nothing was navigated, so there is no history for logout to forget");
+
+            Continuity.clear();
+
+            assertTrue(Navigation.getStack().isEmpty(),
+                    "logout left the signed-out account's route history in place, so back() "
+                            + "reopens their forms and the next navigation republishes them");
+        } finally {
+            Navigation.setDispatcher(null);
+            Navigation.clearStack();
+        }
     }
 
     /** Storage that refuses ONE name and passes everything else through. */

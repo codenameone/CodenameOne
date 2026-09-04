@@ -1092,6 +1092,19 @@ public final class Continuity {
         // arriving, which is harder to notice than one arriving twice.
         rememberSeen();
         clearContinuation();
+        // The route history is the previous account's work as surely as the stored checkpoint is.
+        // Leaving it kept two promises broken: back() reopened the signed-out account's forms,
+        // and the next navigation checkpointed and republished a stack that still began with
+        // their routes -- so the state this method had just deleted went straight back out.
+        //
+        // Before the deletion below, and clearStack() deliberately does not notify continuity:
+        // either way round, a checkpoint here would write the emptied stack over what is being
+        // removed.
+        try {
+            Navigation.clearStack();
+        } catch (Throwable t) {
+            Log.e(t);
+        }
         try {
             if (Display.isInitialized() && Storage.getInstance().exists(STORAGE_KEY)) {
                 // Overwritten BEFORE it is deleted, and the overwrite is the part that is
@@ -1188,6 +1201,20 @@ public final class Continuity {
             // so it must go on being offered: acknowledging here loses the state in both
             // directions at once.
             return;
+        }
+        if (applied) {
+            // A checkpoint queued before this restore describes a screen that no longer exists.
+            // A navigation while a relay GET is in flight leaves one in the slot, and sending it
+            // afterwards replaces the relay's copy of the state just accepted with the work that
+            // restore superseded. Likeliest at startup, where setRelay() polls while the initial
+            // route is still being shown.
+            //
+            // Dropped rather than recaptured. What the screen shows now IS the state that
+            // arrived, so a fresh capture would publish the fetch straight back under this
+            // device's id -- an echo, and the start of the ping-pong applyingRestore exists to
+            // prevent. Nothing goes out until the user does something new.
+            pendingPublish = null;
+            publishRequested = false;
         }
         noteActedOn(state);
     }
@@ -1657,7 +1684,9 @@ public final class Continuity {
                 // Safe for the first meaning too: acknowledge() releases the slot, which is the
                 // call that meaning is documented to make. Whichever the application meant, the
                 // hold ends when it says so rather than being guessed at here.
-                parked = state;
+                if (!isAlreadyActedOn(state)) {
+                    parked = state;
+                }
                 return;
             }
         }
@@ -1676,6 +1705,23 @@ public final class Continuity {
         } else {
             parked = state;
         }
+    }
+
+    /// Whether this state has already been marked handled.
+    ///
+    /// Asked before a deferred arrival is parked, because the documented handle-it-yourself
+    /// pattern does BOTH: the listener calls acknowledge(state) and then returns false. That runs
+    /// noteActedOn() first, while there is nothing parked for it to release, and parking
+    /// afterwards left an acknowledged state on offer for the rest of the process with every
+    /// relay checkpoint held behind it -- the exact hold the parking was added to provide,
+    /// applied to work that was already finished.
+    ///
+    /// The in-memory durable map, not the stored one: recordDurable() fills it whether or not the
+    /// write to storage succeeded, and what is being asked here is what this process has done, not
+    /// what survived to disk.
+    private static boolean isAlreadyActedOn(AppState state) {
+        Long mark = durableSeen.get(state.getDeviceId());
+        return mark != null && mark.longValue() >= state.getSequence();
     }
 
     /// Holds a cold-launch arrival until the application has a form to restore into.
