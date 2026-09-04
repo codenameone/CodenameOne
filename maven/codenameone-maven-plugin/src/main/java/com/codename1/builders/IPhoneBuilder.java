@@ -1883,6 +1883,17 @@ public class IPhoneBuilder extends Executor {
                     VpnTunnelNativeBuilder.HINT_CLASS, "");
             tunnelClass = tunnelClass == null ? "" : tunnelClass.trim();
             if (tunnelClass.length() > 0) {
+                // EVERY ENCLOSING class as well, for a nested tunnel. A keep
+                // rule on com.example.Outer$Tunnel pins that class, and the
+                // generated stub has to name it the way java source does --
+                // com.example.Outer.Tunnel -- so Outer has to survive under
+                // its own name too or the stub will not compile. Each
+                // prefix is added in turn, which also covers a tunnel nested
+                // two deep.
+                for (int at = tunnelClass.indexOf('$'); at > 0;
+                        at = tunnelClass.indexOf('$', at + 1)) {
+                    keep.add(tunnelClass.substring(0, at));
+                }
                 keep.add(tunnelClass);
             }
         }
