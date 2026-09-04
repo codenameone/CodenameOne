@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const workerDir = fileURLToPath(new URL("..", import.meta.url));
 const localUrl = "http://127.0.0.1:8797";
+const wranglerVersion = process.env.WRANGLER_VERSION || "4.129.0";
 // How long the deployed route has to keep answering correctly before the
 // suite trusts it. Cloudflare propagation is per-request, not a switch.
 const ROUTE_SETTLE_MS = 10_000;
@@ -368,12 +369,17 @@ if (remoteUrl) {
   const wrangler = spawn(
     "npx",
     [
-      "--yes", "wrangler@4", "dev", "--env", "preview", "--local",
+      "--yes", `wrangler@${wranglerVersion}`, "dev", "--env", "preview", "--local",
       "--persist-to", persistPath, "--port", "8797", "--ip", "127.0.0.1",
     ],
     {
       cwd: workerDir,
       detached: process.platform !== "win32",
+      env: {
+        ...process.env,
+        npm_config_audit: "false",
+        npm_config_fund: "false",
+      },
       stdio: ["ignore", "pipe", "pipe"],
     },
   );

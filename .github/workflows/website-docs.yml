@@ -92,6 +92,12 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID }}
       CF_PAGES_PROJECT_NAME: ${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME || 'codenameone' }}
       CF_PAGES_PRODUCTION_BRANCH: ${{ vars.CLOUDFLARE_PAGES_PRODUCTION_BRANCH || 'main' }}
+      WRANGLER_VERSION: '4.129.0'
+      # `npx` installs Wrangler on a clean runner. An unavailable npm audit
+      # endpoint must not keep that install alive while the Worker test waits
+      # for a process that has not actually started yet.
+      npm_config_audit: 'false'
+      npm_config_fund: 'false'
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -123,6 +129,18 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '22'
+
+      - name: Prepare Wrangler
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if timeout 90s npx --yes "wrangler@${WRANGLER_VERSION}" --version; then
+              exit 0
+            fi
+            echo "::warning::Wrangler bootstrap attempt ${attempt} failed; retrying"
+          done
+          exit 1
 
       - name: Install Asciidoctor tooling
         run: |
@@ -238,7 +256,7 @@ jobs:
           set -euo pipefail
           PORT=8788
           cd docs/website
-          npx --yes wrangler@4 pages dev public \
+          npx --yes "wrangler@${WRANGLER_VERSION}" pages dev public \
             --port "${PORT}" \
             --ip 127.0.0.1 \
             --compatibility-date=2026-02-18 > /tmp/wrangler-pages-dev.log 2>&1 &
@@ -363,12 +381,12 @@ jobs:
           set -euo pipefail
           worker_name="cn1-exp004-pr-${PR_NUMBER}-${RUN_ID}-${RUN_ATTEMPT}"
           cleanup() {
-            npx --yes wrangler@4 delete "${worker_name}" --force >/dev/null 2>&1 || true
+            npx --yes "wrangler@${WRANGLER_VERSION}" delete "${worker_name}" --force >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
 
           deploy_log="$(mktemp)"
-          npx --yes wrangler@4 deploy --env preview --name "${worker_name}" 2>&1 | tee "${deploy_log}"
+          npx --yes "wrangler@${WRANGLER_VERSION}" deploy --env preview --name "${worker_name}" 2>&1 | tee "${deploy_log}"
           worker_url="$(grep -Eo 'https://[A-Za-z0-9._-]+\.workers\.dev' "${deploy_log}" | tail -n1 || true)"
           if [ -z "${worker_url}" ]; then
             echo "wrangler deployed the preview Worker but printed no workers.dev URL" >&2
@@ -391,7 +409,7 @@ jobs:
           # -e is intentionally off for the wrangler invocation so we can
           # report its exit status explicitly instead of exiting opaquely.
           deploy_log="$(mktemp)"
-          npx --yes wrangler@4 pages deploy docs/website/public \
+          npx --yes "wrangler@${WRANGLER_VERSION}" pages deploy docs/website/public \
             --project-name "${CF_PAGES_PROJECT_NAME}" \
             --branch "${PREVIEW_BRANCH}" 2>&1 | tee "${deploy_log}"
           wrangler_status="${PIPESTATUS[0]}"
@@ -567,7 +585,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx --yes wrangler@4 deploy --env production
+          npx --yes "wrangler@${WRANGLER_VERSION}" deploy --env production
           snapshot="$(curl --fail --silent --show-error --retry 6 --retry-delay 2 --retry-all-errors https://www.codenameone.com/api/exp004/snapshot)"
           node -e '
             const data = JSON.parse(process.argv[1]);
