@@ -2310,7 +2310,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     // accepts both on the drag side, and reading only the stream here left
                     // a PDF another Java application published on the clipboard stored
                     // under nothing at all.
-                    if (!content.hasMimeType(mime) && ((byte[]) out).length > 0) {
+                    // Length is not a test of presence: a representation another
+                    // application deliberately published empty is still one it published,
+                    // and ClipboardContent treats it that way -- as do the drag readers.
+                    if (!content.hasMimeType(mime)) {
                         content.setData(mime, out);
                     }
                     continue;
@@ -2327,7 +2330,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                     // arbitrary types; reading one had not caught up.
                     if (!content.hasMimeType(mime)) {
                         byte[] bytes = readClipboardStream((InputStream) out);
-                        if (bytes != null && bytes.length > 0) {
+                        if (bytes != null) {
+                            // Empty is present, as above. Null is the read that failed.
                             content.setData(mime, bytes);
                         }
                     }

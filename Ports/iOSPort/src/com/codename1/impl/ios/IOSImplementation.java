@@ -9342,7 +9342,21 @@ public class IOSImplementation extends CodenameOneImplementation {
             // Outside the lock: it runs application code, which may block, and a second
             // reader of the same type is rare enough that producing twice is better than
             // holding a lock across it.
-            Object value = NativeDragAndDrop.produceDragValue(op, mimeType);
+            Object value;
+            try {
+                value = NativeDragAndDrop.produceDragValue(op, mimeType);
+            } catch (Throwable err) {
+                // A provider that threw has answered: nothing, once. Leaving the failure
+                // unrecorded had the next reader of the same type run it again, which for
+                // a provider that writes a file means writing it twice -- the very thing
+                // resolving once per transfer exists to prevent.
+                synchronized (produced) {
+                    if (!produced.containsKey(mimeType)) {
+                        produced.put(mimeType, null);
+                    }
+                }
+                throw err;
+            }
             synchronized (produced) {
                 if (produced.containsKey(mimeType)) {
                     return produced.get(mimeType);

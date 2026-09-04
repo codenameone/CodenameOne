@@ -724,6 +724,40 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aCompletionListenerThatThrowsDoesNotWedgeEveryLaterDrag() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            NativeDragOperation op = new NativeDragOperation("reused")
+                    .setAllowedActions(NativeDragOperation.ACTION_MOVE);
+            op.addCompletionListener(e -> {
+                throw new IllegalStateException("a listener may do anything");
+            });
+
+            assertTrue(NativeDragAndDrop.startDrag(null, op));
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_MOVE);
+            // The owed completion is delivered from inside the next start, after the operation
+            // has been made active -- so a listener throwing there left a drag that never began
+            // looking like one still running.
+            assertTrue(NativeDragAndDrop.startDrag(null, op),
+                    "the drag still starts: application code that throws is logged, not allowed "
+                            + "to take the framework with it");
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+
+            NativeDragOperation next = new NativeDragOperation("after");
+            assertTrue(NativeDragAndDrop.startDrag(null, next),
+                    "and nothing is left active, so later drags are not refused for the life of "
+                            + "the process");
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+        } finally {
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void aSecondDragIsRefusedWhileOneIsStillRunning() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

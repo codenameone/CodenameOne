@@ -912,7 +912,17 @@ API_AVAILABLE(ios(11.0))
     [payloadToken release];
 #endif
     if (items.count == 0) {
+        // Nothing could be built -- a file provider that threw, or that named only paths
+        // no item provider can vend -- so UIKit begins no session. Everything this one
+        // installed goes back with it, exactly as didEndWithOperation: does for a session
+        // that ran: left behind, the retained session was compared against the *next*
+        // drag's and, being a different object, refused it a move its operation allowed.
         cn1DraggingOut = NO;
+#ifndef CN1_USE_ARC
+        [cn1OutgoingSession release];
+#endif
+        cn1OutgoingSession = nil;
+        cn1SessionActions = CN1_DND_ACTION_NONE;
         CN1NativeDragDeliverCompleted(CN1_DND_ACTION_NONE);
     }
     return items;

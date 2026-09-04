@@ -286,7 +286,17 @@ public final class NativeDragAndDrop {
             }
             action = op.takeOwedAction();
         }
-        op.fireCompleted(action);
+        try {
+            op.fireCompleted(action);
+        } catch (Throwable err) {
+            // A listener is application code and may throw anything. Letting it out of
+            // here was the worst possible moment for it: this is called from startDrag
+            // once the operation has been made active, so the exception left a drag that
+            // had never begun looking like one still running, and every drag after it was
+            // refused for the life of the process. The outcome has been taken by now, so
+            // it is reported once either way.
+            Log.e(err);
+        }
     }
 
     /// Reports that the platform started a drag session on its own, for the operation the press
