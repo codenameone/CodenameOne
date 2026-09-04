@@ -281,15 +281,26 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("// batch early and keep a dead read from re-arming, which\n");
         sb.append("// is work avoided rather than correctness.\n");
         sb.append("//\n");
-        sb.append("// What remains open is a start that loses its race with a\n");
-        sb.append("// stop: it can still build a tunnel object and report\n");
-        sb.append("// success to NE. That one is inert -- no read is armed\n");
-        sb.append("// for a live generation and no write is accepted -- and\n");
-        sb.append("// the next start replaces it. A lock is NOT the better\n");
-        sb.append("// trade for it: delivery runs the application's\n");
-        sb.append("// onPacket, and holding a lock across that would make\n");
-        sb.append("// stopTunnelWithReason wait behind user code for its\n");
-        sb.append("// completion handler, which NE kills a provider for.\n");
+        sb.append("// Two orderings carry the rest of it, and both are\n");
+        sb.append("// load-bearing. The provider pointer is published AFTER\n");
+        sb.append("// this counter is claimed, so a pointer a writer can see\n");
+        sb.append("// always belongs to a generation the writer can check;\n");
+        sb.append("// and the writer snapshots that pointer BEFORE it checks,\n");
+        sb.append("// so it can never use one that appeared later. On the\n");
+        sb.append("// Java side ExtensionTunnelHost.begin refuses a start\n");
+        sb.append("// older than the one already installed, under the lock\n");
+        sb.append("// that publishes it, so a completion that lost its race\n");
+        sb.append("// cannot replace a live tunnel with a cancelled one.\n");
+        sb.append("//\n");
+        sb.append("// What remains open is that such a completion still\n");
+        sb.append("// reports success to NE for a start that was already\n");
+        sb.append("// cancelled. Nothing follows from it: no host is\n");
+        sb.append("// installed, no read is armed for a live generation and\n");
+        sb.append("// no write is accepted. A lock is not the better trade\n");
+        sb.append("// for that last inch either -- delivery runs the\n");
+        sb.append("// application's onPacket, and holding a lock across it\n");
+        sb.append("// would make stopTunnelWithReason wait behind user code\n");
+        sb.append("// for a completion handler NE kills providers over.\n");
         sb.append("//\n");
         sb.append("// A lock is NOT the better trade here, and this is the\n");
         sb.append("// reason rather than an opinion. Delivery runs the\n");
@@ -321,7 +332,6 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("\n");
         sb.append("- (void)startTunnelWithOptions:(NSDictionary *)options\n");
         sb.append("        completionHandler:(void (^)(NSError *))completionHandler {\n");
-        sb.append("    cn1tnProvider = self;\n");
         sb.append("    // ONCE per process. The extension is started and\n");
         sb.append("    // stopped repeatedly within one process lifetime, and\n");
         sb.append("    // initialising the VM twice would reset every static\n");
@@ -356,6 +366,14 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("    // the previous tunnel.\n");
         sb.append("    int cn1tnStart =\n");
         sb.append("            atomic_fetch_add(&cn1tnReadGeneration, 1) + 1;\n");
+        sb.append("    // PUBLISHED AFTER the generation is claimed, and that\n");
+        sb.append("    // order is the whole of what makes the writer's check\n");
+        sb.append("    // sound. Set first, a restart made the new provider\n");
+        sb.append("    // visible while the counter still read the old\n");
+        sb.append("    // generation -- so a write from the old tunnel found a\n");
+        sb.append("    // generation that still matched and a provider that\n");
+        sb.append("    // was already the new one, and went out on its link.\n");
+        sb.append("    cn1tnProvider = self;\n");
         sb.append("    // The settings the system needs BEFORE any packet\n");
         sb.append("    // moves; see the note on this class.\n");
         sb.append("    NEPacketTunnelNetworkSettings *settings =\n");
@@ -565,7 +583,17 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "        CODENAME_ONE_THREAD_STATE, JAVA_INT generation,\n"
                 + "        JAVA_OBJECT packet, JAVA_INT offset,\n"
                 + "        JAVA_INT length) {\n"
-                + "    if (cn1tnProvider == nil || packet == JAVA_NULL\n"
+                + "    // SNAPSHOT FIRST, validate after. Read in this order\n"
+                + "    // the pointer can only be this generation's or an\n"
+                + "    // older one: anything installed by a later start is\n"
+                + "    // published after that start claimed its generation,\n"
+                + "    // so the check below sees the move and refuses. Read\n"
+                + "    // the other way round -- check, then dereference the\n"
+                + "    // global -- a restart landing in between handed this\n"
+                + "    // packet to the new provider, which is the crossing\n"
+                + "    // the generation exists to prevent.\n"
+                + "    CN1VpnTunnelProvider *flow = cn1tnProvider;\n"
+                + "    if (flow == nil || packet == JAVA_NULL\n"
                 + "            || length <= 0) {\n"
                 + "        return;\n"
                 + "    }\n"
@@ -592,7 +620,7 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "            ((unsigned char *)((JAVA_ARRAY)packet)->data)[offset];\n"
                 + "    NSNumber *family = [NSNumber numberWithInt:\n"
                 + "            ((first >> 4) == 6) ? AF_INET6 : AF_INET];\n"
-                + "    [cn1tnProvider.packetFlow\n"
+                + "    [flow.packetFlow\n"
                 + "            writePackets:[NSArray arrayWithObject:data]\n"
                 + "            withProtocols:[NSArray arrayWithObject:family]];\n"
                 + "}\n\n";

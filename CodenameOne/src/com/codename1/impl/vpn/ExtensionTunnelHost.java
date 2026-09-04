@@ -90,6 +90,21 @@ public final class ExtensionTunnelHost {
         ExtensionTransport t = new ExtensionTransport(mtu);
         TunnelHost h = new TunnelHost((VpnTunnel) tunnel, t);
         synchronized (ExtensionTunnelHost.class) {
+            if (startGeneration < generation) {
+                // A NEWER start already owns the extension. This one lost
+                // its race -- the provider checked the generation before
+                // building the tunnel and was preempted -- and installing it
+                // now would replace a live host with a cancelled one and set
+                // the generation backwards, so the running tunnel's reads
+                // would ask buffer() for a generation the statics no longer
+                // name and get null. A tunnel that carries nothing, from a
+                // start that was over before it finished.
+                //
+                // Committed under the SAME lock that publishes the fields,
+                // which is what makes it a decision rather than another
+                // check-then-act.
+                return;
+            }
             host = h;
             transport = t;
             generation = startGeneration;
