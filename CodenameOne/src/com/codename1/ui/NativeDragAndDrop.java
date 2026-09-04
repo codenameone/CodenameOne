@@ -129,6 +129,11 @@ public final class NativeDragAndDrop {
     private static int currentAction = NativeDragOperation.ACTION_NONE;
     private static boolean overDispatchPending;
 
+    /// Where the last drag event was, on the surface it was on. What tells a release that did
+    /// not move from one that landed somewhere else; see `#releasedWhereItHovered(int, int)`.
+    private static int hoverX;
+    private static int hoverY;
+
     /// Bumped whenever the target or the session changes.
     ///
     /// The callbacks below are queued onto the event dispatch thread, so one can still be
@@ -334,6 +339,11 @@ public final class NativeDragAndDrop {
             targetGeneration++;
             currentAction = NativeDragOperation.ACTION_NONE;
         }
+        // The component the staging names, said again here. An operation instance shared by
+        // several components can have been pointed at another one by a press that was then
+        // refused the staging slot, and this is the last moment before the session owns it --
+        // on a move, the operation's source is whose data is deleted when the drop lands.
+        op.setSource(source);
         // Now, not queued: this runs on the platform's own thread and the port reads the
         // payload the moment this returns -- through nativeDragSessionStartedCallback on
         // iOS -- so anything the previous drag's providers produced has to be forgotten
@@ -585,6 +595,16 @@ public final class NativeDragAndDrop {
             int x, int y) {
         synchronized (LOCK) {
             if (startOffered && pending != null) {
+                // What the press claimed, given back. A source may hand one operation instance
+                // to every component it owns, so the press being refused here may have pointed
+                // that very instance at its own component a moment ago -- claiming the source
+                // and claiming the slot cannot be one step, because rendering the preview
+                // happens between them and must not hold the lock. Left retargeted, the drag
+                // the first finger began completed against the second finger's component, and
+                // on a move that is whose data gets deleted.
+                if (pending == op) { // NOPMD CompareObjectsWithEquals
+                    pending.setSource(pendingSource);
+                }
                 return false;
             }
             pending = op;
@@ -836,6 +856,8 @@ public final class NativeDragAndDrop {
         int answer;
         synchronized (LOCK) {
             advertisedActions = allowedActions;
+            hoverX = x;
+            hoverY = y;
             previous = currentTarget;
             changed = previous != target; // NOPMD CompareObjectsWithEquals
             if (changed) {
@@ -1013,13 +1035,22 @@ public final class NativeDragAndDrop {
             // accepted it, so it is offered the drop rather than the payload being dropped
             // on the floor.
             //
-            // Only when the position resolves to nothing at all. Where it resolves to some
-            // *other* component the position wins, because a release that lands somewhere
-            // else is a release somewhere else -- and this cannot tell that apart from a
-            // tree that changed underneath a slow load. Position is what a drop means
-            // everywhere else in here, and one heuristic guessing against it would make
-            // the two disagree.
-            target = stillWillingHoverTarget(windowId, content, action);
+            // Only where the release did not move away from the hover. A release somewhere
+            // else is a release somewhere else, and position is what a drop means everywhere
+            // else in here -- so the pointer having travelled on to something that is not a
+            // target is not a tree that shifted, and restoring the old target there would
+            // hand the payload to a component the user let go somewhere away from.
+            //
+            // The comparison is with the last drag event's position rather than with what is
+            // under the release point now, which was the rule this said it applied and could
+            // not: a live surface answers its hit test with *something* for every point it
+            // is asked about -- the container itself where nothing else is there -- so
+            // "resolves to nothing" was a case that never arose, and the guard it described
+            // did not exist. Staying still and finding the target gone is exactly the tree
+            // moving under a slow load; moving and finding no target is the ordinary miss.
+            if (releasedWhereItHovered(x, y)) {
+                target = stillWillingHoverTarget(windowId, content, action);
+            }
         }
         synchronized (LOCK) {
             // What this drag advertised: the caller's answer where it has one, otherwise what
@@ -1211,6 +1242,18 @@ public final class NativeDragAndDrop {
     /// Asked only when the position no longer names anything. A component detached from its
     /// surface cannot be dropped on: it has no coordinates to speak of and nothing would
     /// repaint.
+    /// True when this release is at the point the drag last reported hovering.
+    ///
+    /// Within the same slop a press uses to become a drag, because the platform's release
+    /// point and its last hover update are rarely the same pixel and a rescue that needed
+    /// them to be would never fire on any real port.
+    private static boolean releasedWhereItHovered(int x, int y) {
+        int slop = dragThreshold();
+        synchronized (LOCK) {
+            return Math.abs(x - hoverX) <= slop && Math.abs(y - hoverY) <= slop;
+        }
+    }
+
     private static Component stillWillingHoverTarget(int windowId, ClipboardContent content,
             int actions) {
         Component hovered;

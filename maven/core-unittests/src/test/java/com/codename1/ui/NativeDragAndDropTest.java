@@ -1177,6 +1177,32 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aDropReleasedAwayFromTheHoverIsNotHandedToTheHoveredTarget() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder target = addTarget(form);
+        Container elsewhere = new Container();
+        elsewhere.add(new Label("not a drop target"));
+        form.add(BorderLayout.SOUTH, elsewhere);
+        form.revalidate();
+
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        // The pointer travels on to something that is not a target and is released there,
+        // with no drag event in between -- a flick, or a port that reports the hover sparsely.
+        NativeDragAndDrop.drop(0, elsewhere.getAbsoluteX() + 5, elsewhere.getAbsoluteY() + 5,
+                textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        assertFalse(target.events.contains("drop"),
+                "a release somewhere else is a release somewhere else: the recovery is for a "
+                        + "tree that moved under a slow load, not for a pointer that moved");
+        assertNull(target.dropped);
+    }
+
+    @FormTest
     void aTargetHiddenByItsAncestorIsNotHandedTheDelayedDrop() {
         Form form = Display.getInstance().getCurrent();
         Container holder = new Container(new BorderLayout());
@@ -1951,6 +1977,47 @@ class NativeDragAndDropTest extends UITestBase {
                             + "press's operation exports the wrong component's payload, and "
                             + "reports a move against it");
             assertSame(dragged, NativeDragAndDrop.getActiveDrag().getSource());
+        } finally {
+            implementation.setNativeDragStartRefused(false);
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            NativeDragAndDrop.gestureCancelled();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
+    void aRefusedPressDoesNotRetargetASharedOperation() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        implementation.setNativeDragStartRefused(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            // One operation, handed to both components -- which is what a source that owns a
+            // row of them does.
+            NativeDragOperation shared = new NativeDragOperation("one payload, two components");
+            Container dragged = new Container();
+            dragged.setNativeDragOperation(shared);
+            Container touched = new Container();
+            touched.add(new Label("pressed by the other finger"));
+            touched.setNativeDragOperation(shared);
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, dragged);
+            form.add(BorderLayout.NORTH, touched);
+            form.revalidate();
+
+            int x = dragged.getAbsoluteX() + 10;
+            int y = dragged.getAbsoluteY() + 10;
+            form.pointerPressed(x, y);
+            drag(form, x + 200, y + 200);
+            form.pointerPressed(touched.getAbsoluteX() + 5, touched.getAbsoluteY() + 5);
+
+            assertSame(shared, NativeDragAndDrop.dragSessionStarted());
+            assertSame(dragged, shared.getSource(),
+                    "the press that was refused the staging slot must not leave the operation "
+                            + "pointing at its own component: a move completes against whatever "
+                            + "the operation names, and that is whose data goes");
         } finally {
             implementation.setNativeDragStartRefused(false);
             NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
