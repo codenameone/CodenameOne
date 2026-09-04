@@ -251,6 +251,12 @@ public final class Navigation {
         // region has to contain only the call being guarded. check-cast-semantics.sh refuses the
         // other shape, correctly, and caught this exact line.
         Form top = rebuilt.get(rebuilt.size() - 1).getForm();
+        // What is DISPLAYED before the attempt, which is not the same thing as the stack.
+        // Display.setCurrentForm() installs the new form and only then runs onShowCompleted and
+        // the Show listeners, so a listener that throws leaves the failed form current -- and
+        // restoring the list alone left getCurrent() and Navigation.getCurrent() describing
+        // different screens.
+        Form displayed = Display.getInstance().getCurrent();
         try {
             // show(), not showBack(): the user is arriving, not going back, and showBack would
             // run the reverse transition into a screen they have not seen yet.
@@ -258,6 +264,18 @@ public final class Navigation {
         } catch (RuntimeException e) {
             stack.clear();
             stack.addAll(previous);
+            // And the screen with it. show() rather than showBack(): the user is not going back,
+            // an attempt that failed is being undone.
+            try {
+                Form now = Display.getInstance().getCurrent();
+                if (displayed != null && displayed != now) { //NOPMD CompareObjectsWithEquals
+                    displayed.show();
+                }
+            } catch (RuntimeException ignored) {
+                // The original failure is the one worth reporting; losing it to a second one
+                // while cleaning up would hide what actually went wrong.
+                com.codename1.io.Log.e(ignored);
+            }
             throw e;
         }
         stackChanged();

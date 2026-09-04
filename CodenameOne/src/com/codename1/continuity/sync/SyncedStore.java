@@ -108,7 +108,10 @@ public final class SyncedStore {
     ///
     /// true when the store holds the value afterwards; false when there is no store, or the
     /// platform would not take it -- a key count or a size past what it allows
-    /// Not gated on isSupported(), and that is the THIRD layer this was wrong in.
+    ///
+    /// #### Not gated on isSupported()
+    ///
+    /// That was the THIRD layer this was wrong in.
     ///
     /// isSupported() asks whether this build has a store that follows the user between devices,
     /// which is the right question for an application deciding whether to offer the feature and

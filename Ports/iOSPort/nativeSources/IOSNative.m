@@ -20793,6 +20793,41 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_la
     POOL_BEGIN();
     NSString *k = toNSString(CN1_THREAD_STATE_PASS_ARG key);
     NSString *v = toNSString(CN1_THREAD_STATE_PASS_ARG value);
+    // The QUOTA first, because past it the store keeps the value locally and simply declines to
+    // upload it -- the readback below then says yes to a write that will never reach another
+    // device, and SyncedStore.put documents the opposite: false when "a key count or a size past
+    // what it allows". Apple's published maxima for NSUbiquitousKeyValueStore are 1 MB in total
+    // and 1024 keys.
+    //
+    // The measurement is an APPROXIMATION and is deliberately generous: UTF-8 bytes of the keys
+    // and of the string values, which is what this store is for. Apple does not publish how it
+    // counts, so the risk to avoid is refusing a write the platform would have taken -- the check
+    // only fires past the documented maximum, not near it.
+    NSDictionary *held = [store dictionaryRepresentation];
+    NSUInteger bytes = 0;
+    NSUInteger count = 0;
+    for (NSString *existing in held) {
+        if ([existing isEqualToString:k]) {
+            // Replaced, not added: its current size does not count towards the new total.
+            continue;
+        }
+        count++;
+        bytes += [existing lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+        id value = [held objectForKey:existing];
+        if ([value isKindOfClass:[NSString class]]) {
+            bytes += [((NSString *)value) lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+        }
+    }
+    count++;
+    bytes += [k lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+    bytes += [v lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+    if (count > 1024 || bytes > 1048576) {
+        // Refused rather than written. A value the store keeps and never propagates is the one
+        // outcome an application cannot detect for itself, and it is exactly when it needs its
+        // own fallback.
+        POOL_END();
+        return JAVA_FALSE;
+    }
     [store setString:v forKey:k];
     // Asked for, not waited on and NOT reported. The system syncs on its own schedule and this
     // only moves it along; its answer is about the STORE -- whether this build is entitled to one
