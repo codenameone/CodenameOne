@@ -3656,6 +3656,111 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A route rebuild that THREW keeps the state pending, even when the payload applied.
+     *
+     * <p>A throw is a different thing from routes that would not rebuild, and the two were
+     * collapsed. The orderly case is safe to acknowledge -- this build no longer registers those
+     * routes, they will not start working next launch, and the payload already worked on this
+     * one. A throw is the transient breakage a provider that throws gets, and with the payload
+     * taken the failure branch did not fire at all: the state was persisted and acknowledged, so
+     * the relay's only other copy was released while the user is not on the restored screen, and
+     * the next navigation overwrites both.</p>
+     */
+    @EdtTest
+    public void aRouteRebuildThatThrewKeepsTheStatePendingEvenWhenThePayloadApplied() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        // The form's SHOW is what throws, not the dispatcher: restoreStack() catches a
+        // dispatcher failure per path and carries on, so a dispatcher that throws just leaves
+        // nothing to rebuild and returns false -- the orderly case, which is acknowledged on
+        // purpose. The throw that reaches capture()'s caller comes from show(), which
+        // restoreStack() deliberately rethrows after undoing the stack and the screen.
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                Form f = new Form();
+                f.setTitle(url);
+                f.addShowListener(new com.codename1.ui.events.ActionListener() {
+                    public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                        throw new IllegalStateException("the restored screen could not open");
+                    }
+                });
+                return f;
+            }
+        });
+        try {
+            Map<String, Object> payload = new HashMap<String, Object>();
+            payload.put("draft", "half a sentence");
+            AppState arriving = new AppState()
+                    .setPayload(payload)
+                    .setRoutes(java.util.Arrays.asList("/orders/17"))
+                    .setDeviceId("some-other-device")
+                    .setSequence(160L)
+                    .setTimestamp(System.currentTimeMillis());
+
+            assertFalse(Continuity.restore(arriving), "a rebuild that threw reported a shown form");
+            flushSerialCalls();
+
+            // The payload DID apply, which is the precondition: this is the combination that
+            // slipped past the failure branch.
+            assertNotNull(provider.restored, "the fixture never applied the payload");
+
+            assertNull(Continuity.readSeenForTest().get("some-other-device"),
+                    "a state whose route rebuild threw was acknowledged durably because its "
+                            + "payload applied, so the relay's only other copy is released while "
+                            + "the user is not on the restored screen");
+        } finally {
+            Navigation.setDispatcher(null);
+        }
+    }
+
+    /**
+     * An oversized title is refused at setTitle(), not at the next checkpoint.
+     *
+     * <p>capture() builds the AppState through the validating setter, and nothing catches what it
+     * throws: `dirty` is assigned after capture() returns, so it stayed set and every later
+     * navigation retried the same failing capture. Nothing was stored or published again, and the
+     * application was never told why.</p>
+     *
+     * <p>The same shape as a local route too long to store, which reaches capture() through the
+     * navigation stack and cannot be refused at Navigation -- a general routing API must not
+     * reject a path because continuity could not store it. That one is dropped by the same filter
+     * the inbound path uses, and the checkpoint still happens.</p>
+     */
+    @EdtTest
+    public void anOversizedTitleIsRefusedAtTheCallAndALongRouteDoesNotStopCheckpoints() {
+        Continuity.setStateProvider(new RecordingProvider());
+        StringBuilder huge = new StringBuilder();
+        for (int i = 0; i < 70000; i++) {
+            huge.append('x');
+        }
+        try {
+            Continuity.setTitle(huge.toString());
+            fail("an oversized title was accepted, so it surfaces from the next checkpoint "
+                    + "instead -- where nothing catches it and every later navigation retries "
+                    + "the same failing capture");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().length() > 0, "the refusal explained nothing");
+        }
+        assertNull(Continuity.getTitle(), "the refused title was stored anyway");
+
+        // And the route half, which has no earlier place to be refused.
+        Navigation.setDispatcher(new FakeLongPathDispatcher());
+        try {
+            Navigation.navigate("/" + huge);
+            Continuity.checkpoint();
+            flushSerialCalls();
+
+            AppState stored = Continuity.getRestorableState();
+            assertNotNull(stored,
+                    "a local route too long to store ended every checkpoint this process would "
+                            + "make: capture() threw, dirty stayed set, and nothing was written "
+                            + "or published again");
+        } finally {
+            Navigation.setDispatcher(null);
+        }
+    }
+
+    /**
      * A disable() before any enable() is still an answer, and an arrival during it is dropped.
      *
      * <p>The gap the previous fix left. An application that enables continuity only after a login
@@ -5469,6 +5574,15 @@ public class LocalContinuityTest extends UITestBase {
                 .setTimestamp(System.currentTimeMillis());
         bridge.simulateArrival(Continuity.getActivityType(), StateCodec.toMap(state));
         flushSerialCalls();
+    }
+
+    /** A dispatcher that answers any path with a form, however long the path is. */
+    static class FakeLongPathDispatcher implements RouteDispatcher {
+        public Form dispatch(String url) {
+            Form f = new Form();
+            f.setTitle("long");
+            return f;
+        }
     }
 
     static class RecordingProvider implements StateProvider {

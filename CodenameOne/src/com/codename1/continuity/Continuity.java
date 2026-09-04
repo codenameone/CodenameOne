@@ -467,7 +467,21 @@ public final class Continuity {
     /// #### Parameters
     ///
     /// - `t`: the label, or null for none
+    ///
+    /// #### Throws
+    ///
+    /// - `java.lang.IllegalArgumentException`: when the label is longer than a stored checkpoint
+    ///   can hold
     public static void setTitle(String t) {
+        if (t != null) {
+            // HERE, synchronously, because the alternative is not "it fails later" but "nothing
+            // works again". capture() builds the AppState through the validating setter, so an
+            // oversized label threw out of the next checkpoint -- which nothing catches: `dirty`
+            // is assigned after capture() returns, so it stayed set, and every later navigation
+            // retried the same failing capture. Nothing was stored or published again, and the
+            // application was never told why.
+            StateCodec.requireWritable(t, "title");
+        }
         title = t;
     }
 
@@ -690,7 +704,18 @@ public final class Continuity {
         int lifecycleAtCapture = lifecycle;
         StateProvider p = provider;
         AppState state = new AppState();
-        state.setRoutes(currentRoutes());
+        // usableRoutes(), the filter written for the INBOUND path, applied here for the same
+        // reason at the other end. Its own comment describes this exact failure -- a route past
+        // the stored-string limit throws out of capture(), leaves the pending flag set, and every
+        // later navigation retries the same throw while nothing is persisted or published -- and
+        // it prevented it only for routes that arrived from another device. A long deep link the
+        // application navigated to itself reaches the stack the same way and ends every
+        // checkpoint this process would ever make.
+        //
+        // Not stoppable earlier: Navigation is a general routing API and must not refuse a path
+        // because continuity could not store it. Dropping the route and saying so once is the
+        // lesser loss.
+        state.setRoutes(usableRoutes(currentRoutes()));
         if (p != null) {
             Map<String, Object> payload = null;
             try {
@@ -969,12 +994,14 @@ public final class Continuity {
         // cancelled restore left the signed-out account's SCREEN in front of the user.
         com.codename1.ui.Form beforeRestore = Display.getInstance().getCurrent();
         boolean shown;
+        boolean routesThrew = false;
         applyingRestore = true;
         try {
             shown = Navigation.restoreStack(routes);
         } catch (Throwable t) {
             Log.e(t);
             shown = false;
+            routesThrew = true;
         } finally {
             applyingRestore = false;
         }
@@ -1022,7 +1049,21 @@ public final class Continuity {
             outFailed[0] = true;
             return false;
         }
-        if (!shown && !applied) {
+        if (routesThrew) {
+            // A THROW, which is a different thing from routes that would not rebuild, and the two
+            // were collapsed here. The reasoning below is about the orderly case: this build no
+            // longer registers those routes, they will not start working on the next launch, and
+            // the payload already worked on this one. A throw says nothing of the kind -- it is
+            // the same transient breakage a provider that throws gets, a dependency not up yet on
+            // a cold launch, which this method already treats as retryable.
+            //
+            // Independent of `applied`, which is what let it through: with the payload taken the
+            // branch below did not fire, so a state whose route was never shown was persisted and
+            // ACKNOWLEDGED -- the relay's only other copy released while the user is not on the
+            // restored screen, and the next navigation overwriting both. Restoring twice is a
+            // smaller harm than losing the work.
+            failed = true;
+        } else if (!shown && !applied) {
             // Routes were named, none could be rebuilt, and nothing else in the state applied
             // either -- an attempt that failed outright, so it stays on the relay for a launch
             // that can use it.
@@ -2868,37 +2909,34 @@ public final class Continuity {
                 return false;
             }
             if (!enabled) {
-                if (applicationHasChosen) {
-                    // CLAIMED and dropped, because the application has said what it wants and
-                    // right now that is "off" -- rather than the window before it has said
-                    // anything at all. The retention described
-                    // below is what the two cases needed to be told apart for: declining here
-                    // parked the arrival with the port, and the next enable() -- installing a
-                    // callback is what makes the port re-offer it -- delivered a state from the
-                    // interval disable() documents as ignored, sometimes long afterwards.
-                    //
-                    // Claiming rather than declining is what discards it: the port lets go of an
-                    // activity that was handled. Nothing else answers to this application's own
-                    // activity type, so taking it costs no other handler anything.
-                    return true;
-                }
-                // DECLINED while the framework is off, which is the answer the iOS port is built
-                // for: it holds a declined activity and offers it again the next time a callback
-                // is installed, and enable() installs one. Claiming it instead threw it away --
-                // admit() drops an arrival when the framework is disabled, so an application that
+                // The answer is the application's own choice, and the two states that share
+                // `enabled == false` want opposite ones.
+                //
+                // TRUE -- claimed, and therefore dropped -- when the application has said what it
+                // wants and right now that is "off". The port lets go of an activity that was
+                // handled, and nothing else answers to this application's own activity type, so
+                // taking it costs no other handler anything. Declining here instead parked the
+                // arrival with the port, and the next enable() -- installing a callback is what
+                // makes the port re-offer it -- delivered a state from the interval disable()
+                // documents as ignored.
+                //
+                // FALSE -- declined, and therefore RETAINED -- while the application has said
+                // nothing at all. That is the answer the iOS port is built for: it holds a
+                // declined activity and offers it again the next time a callback is installed,
+                // and enable() installs one. Claiming it instead threw it away, because admit()
+                // drops an arrival while the framework is disabled -- so an application that
                 // registers a SyncedStore listener before enabling continuity, which installs
                 // this same callback, lost a cold-launch Handoff for good.
                 //
                 // The two sides disagreed rather than one being wrong: this claimed everything of
                 // its own type so no other handler could take it, while the port's retention was
-                // written for a decline that never came. Declining is strictly better, because
-                // nothing else answers to this app's own activity type anyway.
+                // written for a decline that never came.
                 //
-                // `enabled` is read here from the platform's thread, which the rest of this
+                // Both flags are read here from the platform's thread, which the rest of this
                 // method deliberately avoids. It is safe in the one direction that matters: a
                 // decline is RECOVERABLE -- the activity is retained and re-offered -- so losing
                 // the race can only delay the delivery, never lose it.
-                return false;
+                return applicationHasChosen;
             }
             AppState state = StateCodec.fromMap(userInfo);
             if (state == null) {
