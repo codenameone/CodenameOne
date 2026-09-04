@@ -669,13 +669,6 @@ public final class Continuity {
             Map<String, Object> payload = null;
             try {
                 payload = p.saveState();
-                if (lifecycle != lifecycleAtCapture) {
-                    // Same rule on the way OUT. A provider that ends the session while being
-                    // asked what to save must not then have that answer stored and published for
-                    // the account it just signed out of.
-                    sequenceFailed[0] = true;
-                    return null;
-                }
             } catch (Throwable t) {
                 // The provider is application code running on a housekeeping path. Its failure
                 // must not take down the navigation that triggered the checkpoint, so the routes
@@ -689,6 +682,15 @@ public final class Continuity {
                 // well be transient.
                 Log.e(t);
                 payloadFailed[0] = true;
+            }
+            if (lifecycle != lifecycleAtCapture) {
+                // Asked AFTER the try/catch, so both exits answer it. The check used to sit on
+                // the normal-return path only, so a provider that ended the session and THEN
+                // threw -- cleanup failing after it noticed an expired account -- carried on
+                // here and had its state persisted and advertised for the account that had just
+                // signed out.
+                sequenceFailed[0] = true;
+                return null;
             }
             if (payload != null) {
                 // NOT caught. An unrepresentable value is a programming error with exactly one
@@ -1226,7 +1228,19 @@ public final class Continuity {
         rememberSeen();
         try {
             if (Display.isInitialized() && Storage.getInstance().exists(PREF_SEEN)) {
+                // Blanked and CHECKED before the delete, exactly as the checkpoint below is, and
+                // for the reason written there: deleteStorageFile() returns void and the ports
+                // discard the answer they get, so a refused deletion is invisible. An unverified
+                // delete beside a verified one was the inconsistency -- if rememberSeen()'s write
+                // failed too, the signed-out account's marks stayed on disk and the next launch
+                // reloaded them, suppressing the next account's states from the same origins.
+                boolean blanked = Storage.getInstance().writeObject(PREF_SEEN, "");
                 Storage.getInstance().deleteStorageFile(PREF_SEEN);
+                if (!blanked && Storage.getInstance().exists(PREF_SEEN)) {
+                    Log.p("Continuity: the delivery marks could not be removed on logout, so the "
+                            + "previous account's origins may go on suppressing states after a "
+                            + "restart.");
+                }
             }
         } catch (Throwable t) {
             Log.e(t);

@@ -4063,6 +4063,62 @@ public class LocalContinuityTest extends UITestBase {
                 "an unknown field was refused, so a newer sender cannot talk to this build");
     }
 
+    /**
+     * A provider that ends the session and then throws stops the capture too.
+     *
+     * <p>The lifecycle check sat on the normal-return path only, so a provider that called
+     * clear() and then failed -- cleanup breaking after it noticed an expired account -- carried
+     * on and had its state persisted and advertised for the account that had just signed out.</p>
+     */
+    @EdtTest
+    public void aProviderThatLogsOutAndThenThrowsStopsTheCapture() {
+        Continuity.setStateProvider(new StateProvider() {
+            public Map<String, Object> saveState() {
+                Continuity.clear();
+                throw new IllegalStateException("cleanup failed after the logout");
+            }
+
+            public void restoreState(Map<String, Object> payload) {
+            }
+        });
+
+        Continuity.checkpoint();
+        flushSerialCalls();
+
+        assertNull(Continuity.getRestorableState(),
+                "a checkpoint was written for the account the provider had just signed out of");
+    }
+
+    /**
+     * A relay field that is present and null is a failed read.
+     *
+     * <p>The convenience parser drops null-valued fields before anything can look at them, so
+     * {@code {"payload":null}} arrived as an ABSENT payload -- and absent routes with an absent
+     * payload is an empty state, which the framework reads as a tombstone. The type checks added
+     * for {@code payload:[]} could not see it.</p>
+     */
+    @EdtTest
+    public void aRelayFieldThatIsPresentAndNullIsAFailedRead() throws Exception {
+        String[] nulls = {
+            "{\"device\":\"other\",\"seq\":\"10\",\"payload\":null}",
+            "{\"device\":\"other\",\"seq\":\"10\",\"routes\":null}",
+            "{\"device\":\"other\",\"seq\":null}",
+        };
+        for (int i = 0; i < nulls.length; i++) {
+            try {
+                AppState got = StateCodec.fromJson(nulls[i]);
+                fail("a null field was accepted: " + nulls[i]
+                        + (got != null && got.isEmpty() ? " -- as an empty state, a tombstone" : ""));
+            } catch (java.io.IOException expected) {
+                assertTrue(expected.getMessage().length() > 0, "the refusal explained nothing");
+            }
+        }
+
+        // Leaving the key OUT is how a sender says absent, and must still work.
+        assertNotNull(StateCodec.fromJson("{\"device\":\"other\",\"seq\":\"10\"}"),
+                "a document that simply omits a field was refused");
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;

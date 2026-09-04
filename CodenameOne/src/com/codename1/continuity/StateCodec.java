@@ -228,7 +228,14 @@ public final class StateCodec {
                     + "relay, because a truncated document is indistinguishable from one that "
                     + "says the other device has nothing.");
         }
-        Map<String, Object> parsed = JSONParser.parseJSON(json);
+        // Parsed with NULLS KEPT. The convenience parser drops a null-valued field before
+        // anything can look at it, so {"payload":null} reached the checks below as an ABSENT
+        // payload -- and absent routes plus an absent payload is an empty state, which this
+        // framework reads as a tombstone. A field that is present and null has to stay
+        // distinguishable from one that was never sent.
+        JSONParser parser = new JSONParser();
+        parser.setIncludeNullsInstance(true);
+        Map<String, Object> parsed = parser.parseJSON(new java.io.StringReader(json));
         requireKnownTypes(parsed);
         return fromMap(parsed);
     }
@@ -261,8 +268,18 @@ public final class StateCodec {
 
     private static void requireType(Map<String, Object> m, String key, Class<?> type, String what)
             throws IOException {
+        if (!m.containsKey(key)) {
+            return;
+        }
         Object value = m.get(key);
-        if (value == null || type.isInstance(value)) {
+        if (value == null) {
+            throw new IOException("The continuity relay returned a document whose \"" + key
+                    + "\" is null. A sender that means \"absent\" leaves the key out; a key that "
+                    + "is present and empty is a document this codec cannot read, and reading it "
+                    + "as absent would make it an empty state -- which means the sending device "
+                    + "cleared its work.");
+        }
+        if (type.isInstance(value)) {
             return;
         }
         throw new IOException("The continuity relay returned a document whose \"" + key
@@ -274,8 +291,11 @@ public final class StateCodec {
 
     /// seq and ts, which this codec writes as strings and older senders may write as numbers.
     private static void requireNumberLike(Map<String, Object> m, String key) throws IOException {
+        if (!m.containsKey(key)) {
+            return;
+        }
         Object value = m.get(key);
-        if (value == null || value instanceof Number) {
+        if (value instanceof Number) {
             return;
         }
         if (value instanceof String) {
