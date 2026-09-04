@@ -308,6 +308,20 @@ final class AndroidNativeDragAndDrop {
     }
 
     private static boolean drop(AndroidImplementation impl, DragEvent event) {
+        int decided = lastAction();
+        if (decided == NativeDragOperation.ACTION_NONE) {
+            // Refused while it hovered. Android delivers ACTION_DROP to a subscribed view even
+            // so, and substituting a default here is what turned a target's reject() back into
+            // a delivered drop. Reporting failure also makes ACTION_DRAG_ENDED report no action.
+            //
+            // Asked before the clip is read rather than after. Materializing it opens an
+            // external URI and reads the whole stream on Android's own UI thread, so a large
+            // image dropped on a component that had already said no stalled the application,
+            // or ran it out of memory, to produce a value the next line threw away. Nothing
+            // below is needed either: a drop nobody accepts needs no permission to read what
+            // it will not read.
+            return false;
+        }
         // A URI dropped by another application is only readable while this grant is held, and
         // the grant only exists from here on. Reading the content inside this method rather
         // than on the event dispatch thread is what keeps a dropped file readable.
@@ -323,13 +337,6 @@ final class AndroidNativeDragAndDrop {
         // the content the drop is filtered against -- otherwise a target that accepted the
         // hover on MIME_URI_LIST is refused the drop it was promised.
         ClipboardContent content = impl.contentFromClip(event.getClipData(), event.getClipDescription());
-        int decided = lastAction();
-        if (decided == NativeDragOperation.ACTION_NONE) {
-            // Refused while it hovered. Android delivers ACTION_DROP to a subscribed view even
-            // so, and substituting a default here is what turned a target's reject() back into
-            // a delivered drop. Reporting failure also makes ACTION_DRAG_ENDED report no action.
-            return false;
-        }
         int action = decided == UNDECIDED ? preferred(allowedActions()) : decided;
         int accepted = NativeDragAndDrop.drop(0, (int) event.getX(), (int) event.getY(), content, action);
         setLastAction(NativeDragOperation.ACTION_NONE);
