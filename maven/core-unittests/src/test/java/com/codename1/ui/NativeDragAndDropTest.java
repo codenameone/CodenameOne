@@ -687,6 +687,43 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aCompletionNamesTheComponentItsOwnDragBelongedTo() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container first = new Container();
+            Container second = new Container();
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.NORTH, first);
+            form.add(BorderLayout.SOUTH, second);
+            form.revalidate();
+
+            final List<Component> sources = new ArrayList<Component>();
+            NativeDragOperation op = new NativeDragOperation("reused")
+                    .setAllowedActions(NativeDragOperation.ACTION_MOVE);
+            op.addCompletionListener(e ->
+                    sources.add(((NativeDragOperation) e.getSource()).getSource()));
+
+            assertTrue(NativeDragAndDrop.startDrag(first, op));
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_MOVE);
+            // The same instance dragged from a different component before the completion has
+            // run, which is what a source sharing one operation between rows looks like.
+            assertTrue(NativeDragAndDrop.startDrag(second, op));
+
+            assertEquals(1, sources.size());
+            assertSame(first, sources.get(0),
+                    "a source told to delete its copy must be told which drag did it: reporting "
+                            + "the component now dragging would have the wrong one clean up");
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+        } finally {
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void aSecondDragIsRefusedWhileOneIsStillRunning() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

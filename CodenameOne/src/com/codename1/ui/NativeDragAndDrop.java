@@ -210,11 +210,13 @@ public final class NativeDragAndDrop {
             targetGeneration++;
             currentAction = NativeDragOperation.ACTION_NONE;
         }
-        op.setSource(source);
         // Whatever this operation still owes from its last session, paid before it is armed for
-        // this one. Already on the event dispatch thread here, which is where a completion
-        // belongs, so its listeners hear the drag that ended before the one beginning.
+        // this one -- and before the source is replaced, so a listener asking which component
+        // the drag it is being told about belonged to is answered with that one rather than
+        // the component starting a drag of its own now. Already on the event dispatch thread
+        // here, which is where a completion belongs.
         deliverCompletion(op);
+        op.setSource(source);
         op.resetPerformedAction();
         // Before the port is asked to start, which is when it reads the payload.
         op.resetProvidedValues();
@@ -429,6 +431,10 @@ public final class NativeDragAndDrop {
             op = null;
         }
         if (op != null) {
+            // As in startDrag: an operation its source reuses may still owe the outcome of the
+            // drag before, and its listeners have to hear it while getSource() is still the
+            // component that drag belonged to.
+            deliverCompletion(op);
             op.setSource(source);
             try {
                 if (needsGeneratedImage(op) && Display.impl.isNativeDragImageNeededOnPrepare()) {
