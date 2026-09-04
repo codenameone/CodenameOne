@@ -354,6 +354,12 @@ class VpnTunnelExtensionTest {
         assertTrue(method.contains("atomic_compare_exchange_strong(\n"
                 + "                    &cn1tnReadGeneration, &cn1tnExpected,\n"
                 + "                    cn1tnEnding + 1)"));
+        // GIVEN UP as it is read, so a stop delivered twice, or late,
+        // has nothing of its own to end -- and zero is the generation
+        // every check refuses.
+        assertTrue(method.contains("cn1tnEnding = cn1tnMine;\n"),
+                "the stop consumes its claim");
+        assertTrue(method.contains("cn1tnMine = 0;"));
         assertTrue(src.contains("cn1tnMine = cn1tnStart;"));
         // The generation being ENDED clears the slot, and the watermark it
         // leaves goes to Java. Passing the watermark to both compared N + 1
