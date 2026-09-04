@@ -1435,7 +1435,7 @@ public final class Display extends CN1Constants {
         // one was tearing down, and clearing the field unconditionally disowned that live
         // thread: isEdt() then answered false ON the event dispatch thread, so work meant to
         // run there was queued behind itself instead.
-        if (INSTANCE.edt == Thread.currentThread()) {
+        if (INSTANCE.edt == Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
             INSTANCE.edt = null;
         }
     }
