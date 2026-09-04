@@ -3912,6 +3912,116 @@ public class LocalContinuityTest extends UITestBase {
         }
     }
 
+    /**
+     * A navigation whose own show() ended the session does not checkpoint afterwards.
+     *
+     * <p>Navigation notifies continuity AFTER the route's form has been shown, and a show callback
+     * calling clear() on an expired login is the ordinary way to end a session. The notification
+     * then described a session that no longer existed, and checkpointing it captured whatever the
+     * provider still held for the account that had just signed out -- while clear() promises that
+     * nothing follows it.</p>
+     */
+    @EdtTest
+    public void aNavigationWhoseShowEndedTheSessionDoesNotCheckpoint() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("secret", "the previous account's work");
+        Continuity.setStateProvider(provider);
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String path) {
+                // Only the account screen discovers the expiry. An unconditional logout made the
+                // login navigation below end the session too, so the control could never pass --
+                // and a control that cannot pass is not a control.
+                if (!"/account/statement".equals(path)) {
+                    return new Form(path);
+                }
+                return new Form(path) {
+                    @Override
+                    public void show() {
+                        super.show();
+                        // "This login has expired."
+                        Continuity.clear();
+                    }
+                };
+            }
+        });
+        try {
+            Navigation.navigate("/account/statement");
+            flushSerialCalls();
+
+            assertFalse(Continuity.isCheckpointPending(),
+                    "the navigation that ended the session left a checkpoint owed, so the "
+                            + "signed-out account's payload is written back after logout");
+            assertNull(Continuity.getRestorableState(),
+                    "a checkpoint was written after the logout that cancelled it");
+
+            // And the NEXT navigation is ordinary: one notification is skipped, not a mode.
+            //
+            // Asserted on what was WRITTEN, not on the pending flag: the flush performs the
+            // checkpoint and checkpoint() clears that flag, so it reads false either way. That
+            // observable has now been the wrong one three times on this branch.
+            Navigation.navigate("/login");
+            flushSerialCalls();
+            assertNotNull(Continuity.getRestorableState(),
+                    "navigation stopped checkpointing altogether after a logout, so nothing is "
+                            + "ever stored again for the account that signs in next");
+        } finally {
+            Navigation.setDispatcher(null);
+            Navigation.clearStack();
+        }
+    }
+
+    /**
+     * A remote route this device cannot store never enters the navigation stack.
+     *
+     * <p>Decoding accepts a remote document's routes unchecked, deliberately -- another device's
+     * mistake must not throw here. But an accepted route reaches the live stack, and the next
+     * checkpoint reads that stack back through the validating setter: one route past this
+     * device's limit threw out of capture(), left the pending flag set, and every later
+     * navigation retried the same throw while nothing was persisted or published again.</p>
+     */
+    @EdtTest
+    public void aRemoteRouteThisDeviceCannotStoreNeverEntersTheStack() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(true);
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String path) {
+                return new Form(path);
+            }
+        });
+        try {
+            StringBuilder huge = new StringBuilder("/");
+            while (huge.length() <= 65535) {
+                huge.append('r');
+            }
+            AppState arrival = fromElsewhere("from a device with a longer limit", 55L);
+            List<String> routes = new ArrayList<String>();
+            routes.add(huge.toString());
+            routes.add("/account/statement");
+            // Unchecked, exactly as a relay document would arrive.
+            arrival.setRoutesUnchecked(routes);
+
+            Continuity.deliver(arrival);
+            flushSerialCalls();
+
+            // The usable route still restored; the impossible one did not come with it.
+            for (int i = 0; i < Navigation.getStack().size(); i++) {
+                assertTrue(Navigation.getStack().get(i).getPath().length() < 65535,
+                        "a route this device cannot store entered the navigation stack, so the "
+                                + "next checkpoint throws out of capture() for ever");
+            }
+
+            // And a checkpoint still works, which is what the stack poisoning prevented.
+            Continuity.checkpoint();
+            flushSerialCalls();
+            assertFalse(Continuity.isCheckpointPending(),
+                    "capture() could not complete, so nothing is persisted or published again");
+        } finally {
+            Navigation.setDispatcher(null);
+            Navigation.clearStack();
+        }
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;

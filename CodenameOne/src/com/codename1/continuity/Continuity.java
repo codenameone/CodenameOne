@@ -521,6 +521,25 @@ public final class Continuity {
             // account's payload after logout had removed it.
             return;
         }
+        if (endedDuringNavigation) {
+            // The session ended while this navigation was in flight -- a route's show() callback
+            // calling clear() on an expired login is the ordinary way. Navigation notifies AFTER
+            // that callback has run, so the notification describes a session that no longer
+            // exists, and checkpointing it captures whatever the provider still holds for the
+            // account that just signed out. clear() promises nothing follows it.
+            //
+            // One notification, not a mode: the navigation that was underway is skipped and the
+            // next one is ordinary. That is also the right outcome on its own terms, because the
+            // next navigation after a logout is the application going to its login screen.
+            //
+            // AFTER the clearingStack guard, which is not cosmetic. clear() empties the route
+            // stack itself, and that emptying notifies too -- so with this test first, clear()'s
+            // own notification consumed the flag and the outer navigation went on to checkpoint
+            // exactly as before. The guard has to let clear()'s internal notification be answered
+            // by its own check.
+            endedDuringNavigation = false;
+            return;
+        }
         dirty = true;
         if (!Display.isInitialized() || flushScheduled) {
             return;
@@ -904,7 +923,7 @@ public final class Continuity {
                 failed = true;
             }
         }
-        List<String> routes = state.getRoutes();
+        List<String> routes = usableRoutes(state.getRoutes());
         if (routes.isEmpty()) {
             // Payload-only restoration, which is what an app that does not use @Route gets. The
             // provider has been given everything there is, and false is deliberate: it is what
@@ -1186,6 +1205,9 @@ public final class Continuity {
     /// in this process can recall that. What this guarantees is that nothing follows it.
     public static void clear() {
         lifecycle++;
+        // Navigation notifies after the application code that may have called this, so the next
+        // notification -- if one is already on its way -- belongs to the session being ended.
+        endedDuringNavigation = true;
         parked = null;
         dirty = false;
         // The label goes with the work it describes. It is CONTENT, not configuration -- "Draft
@@ -1536,6 +1558,9 @@ public final class Continuity {
 
     /// True while clear() is emptying the route stack, so its notification is ignored.
     private static boolean clearingStack;
+
+    /// Set by clear() so the navigation it happened inside does not checkpoint afterwards.
+    private static boolean endedDuringNavigation;
 
     /// The parked state the publication hold has already been explained for, so it is said once.
     private static AppState heldFor;
@@ -2205,6 +2230,31 @@ public final class Continuity {
         return r != null && r == relay; //NOPMD CompareObjectsWithEquals
     }
 
+    /// The routes of a remote state that this device can actually keep.
+    ///
+    /// fromJson accepts a remote document's routes UNCHECKED, deliberately: another device's
+    /// mistake must not become an exception here. But an accepted route still ends up in the live
+    /// navigation stack, and the next checkpoint reads that stack back through the validating
+    /// setter -- so one route past this device's stored-string limit threw out of capture(), left
+    /// the pending flag set, and every later navigation retried the same throw while nothing was
+    /// persisted or published again.
+    ///
+    /// Dropped here instead, before it can enter the stack. A route that can never be
+    /// checkpointed has no business becoming the user's history, and saying so once is better
+    /// than a capture that fails for ever without explaining itself.
+    private static List<String> usableRoutes(List<String> routes) {
+        List<String> out = new ArrayList<String>();
+        for (String route : routes) {
+            if (route != null && !StateCodec.exceedsWritableLength(route)) {
+                out.add(route);
+                continue;
+            }
+            Log.p("Continuity: ignoring a route from another device that is longer than this "
+                    + "device can store. The rest of the state is restored.");
+        }
+        return out;
+    }
+
     /// Whether completing `state` also finishes whatever is parked.
     ///
     /// Not identity. A device can have two states in flight -- a continuation and a relay poll
@@ -2652,6 +2702,7 @@ public final class Continuity {
         lifecycle = 0;
         heldFor = null;
         clearingStack = false;
+        endedDuringNavigation = false;
     }
 
     /// The store notification, as a constant rather than an anonymous class per callback.
