@@ -133,6 +133,24 @@ public final class StateCodec {
         if (!recognized) {
             return null;
         }
+        try {
+            // HERE, not only in fromJson. A platform continuation -- an NSUserActivity, or
+            // anything a custom bridge hands over -- reaches this method DIRECTLY, so every
+            // schema check added for the relay wire was missing from the other way in. A
+            // continuation with a good origin and sequence but "routes" as a string dropped the
+            // field, produced an empty state, and admission consumed that as a tombstone and
+            // advanced the origin's durable high-water mark: the same harm, on the path that
+            // never touches JSON.
+            //
+            // NULL rather than an exception, because this is the answer every caller of this
+            // method already handles and the continuation callback is not a place to throw.
+            // fromJson keeps its own throwing check so a bad fetch is reported as a failed read
+            // rather than as an empty relay.
+            requireKnownTypes(m);
+        } catch (IOException malformed) {
+            Log.e(malformed);
+            return null;
+        }
         AppState state = new AppState();
         Object routes = m.get(KEY_ROUTES);
         if (routes instanceof List) {

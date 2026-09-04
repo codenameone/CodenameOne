@@ -221,11 +221,15 @@ public final class Continuity {
     /// delivering the previous account's state into the next account's screen.
     private static int relaySession;
 
-    /// Whether enable() has ever run in this process. It is NOT the negation of `enabled`: the
-    /// two states that share `enabled == false` -- never switched on yet, and switched off on
-    /// purpose -- want opposite answers for an arrival, and telling them apart is the whole
-    /// reason this exists.
-    private static boolean everEnabled;
+    /// Whether the application has said anything about continuity yet -- either enable() or
+    /// disable(). It is NOT the negation of `enabled`: the two states that share
+    /// `enabled == false` -- nothing said yet, and switched off on purpose -- want opposite
+    /// answers for an arrival, and telling them apart is the whole reason this exists.
+    ///
+    /// Set by disable() as well as enable(), because "no" is an answer. Reading it as
+    /// "enable() has run" left an application that only enables after a login treating its own
+    /// explicit disable() as though it had never spoken.
+    private static boolean applicationHasChosen;
 
     /// The relay session a framework worker is running for, bound for the length of its call
     /// into the relay and unbound afterwards. Null on the event thread and on any thread the
@@ -283,7 +287,7 @@ public final class Continuity {
             }
         }
         enabled = true;
-        everEnabled = true;
+        applicationHasChosen = true;
         ContinuityBridge b = bridgeInternal();
         if (b != null) {
             try {
@@ -298,6 +302,12 @@ public final class Continuity {
     /// arriving states are ignored. What is already in storage is left alone -- use `clear()` to
     /// remove it.
     public static void disable() {
+        // The CHOICE is recorded whether or not there was anything to turn off. An application
+        // that enables continuity only after a login and calls disable() while logged out was
+        // leaving this flag false, so an arrival during that interval was read as a pre-enable
+        // cold-launch arrival: declined, retained by the port, and delivered by the enable()
+        // that came with the login. Saying "no" before saying anything else is still saying it.
+        applicationHasChosen = true;
         if (!enabled) {
             return;
         }
@@ -2816,7 +2826,7 @@ public final class Continuity {
         bridge = null;
         bridgeOverridden = false;
         enabled = false;
-        everEnabled = false;
+        applicationHasChosen = false;
         autoRestore = true;
         flushScheduled = false;
         title = null;
@@ -2858,9 +2868,10 @@ public final class Continuity {
                 return false;
             }
             if (!enabled) {
-                if (everEnabled) {
-                    // CLAIMED and dropped, because this is an explicit disable() rather than the
-                    // window before the application's first enable(). The retention described
+                if (applicationHasChosen) {
+                    // CLAIMED and dropped, because the application has said what it wants and
+                    // right now that is "off" -- rather than the window before it has said
+                    // anything at all. The retention described
                     // below is what the two cases needed to be told apart for: declining here
                     // parked the arrival with the port, and the next enable() -- installing a
                     // callback is what makes the port re-offer it -- delivered a state from the

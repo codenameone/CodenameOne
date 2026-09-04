@@ -121,7 +121,7 @@ public final class Navigation {
             // this method has already queued, and restored after a process death. The flush reads
             // the stack when it runs, so putting it back is what makes that checkpoint describe
             // the truth.
-            rollBack(before, expected);
+            rollBack(before, expected, f);
             throw e;
         }
         return true;
@@ -145,7 +145,7 @@ public final class Navigation {
         try {
             back.showBack();
         } catch (RuntimeException e) {
-            rollBack(before, expected);
+            rollBack(before, expected, back);
             throw e;
         }
         return true;
@@ -178,8 +178,27 @@ public final class Navigation {
     /// deliberate change by code that ran later, and it wins. `NavigationEntry` does not override
     /// equals, so comparing the lists compares entry IDENTITY, which is what makes "still exactly
     /// what I left" mean what it says.
-    private static void rollBack(List<NavigationEntry> before, List<NavigationEntry> expected) {
+    private static void rollBack(List<NavigationEntry> before, List<NavigationEntry> expected,
+            Form intended) {
         if (!expected.equals(stack)) {
+            return;
+        }
+        if (Display.getInstance().getCurrent() == intended) { //NOPMD CompareObjectsWithEquals
+            // The form IS on screen. show() installs the form and only then runs onShowCompleted
+            // and the show listeners, so a throw from one of those is a failure that happened
+            // AFTER the navigation succeeded -- the entry describes the screen the user is
+            // looking at, and rolling it back would leave Navigation.getCurrent() disagreeing
+            // with Display.getCurrent(): back() would work on a stack whose top is not the
+            // visible form, and a checkpoint would persist a screen the user is not on.
+            //
+            // The rollback is for the other case, which is the one it was written for: show()
+            // threw BEFORE installing anything, so the entry is a screen nobody ever saw.
+            //
+            // Re-showing the previous form instead was the alternative, and it is worse: it runs
+            // a second full show cycle -- transitions, listeners, whatever they do -- as error
+            // handling, on a form the application has not asked to see again, and that cycle can
+            // throw in its turn. Leaving the stack agreeing with the display costs nothing and
+            // needs no application code to run.
             return;
         }
         stack.clear();
@@ -244,7 +263,7 @@ public final class Navigation {
         try {
             target.showBack();
         } catch (RuntimeException e) {
-            rollBack(before, expected);
+            rollBack(before, expected, target);
             throw e;
         }
         return true;

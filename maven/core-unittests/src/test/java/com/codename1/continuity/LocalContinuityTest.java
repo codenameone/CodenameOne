@@ -3634,8 +3634,11 @@ public class LocalContinuityTest extends UITestBase {
      */
     @EdtTest
     public void aContinuationArrivingBeforeEnableIsDeclinedRatherThanSwallowed() {
-        // Deliberately NOT enabled: this is the window the port retains for.
-        Continuity.disable();
+        // NOTHING SAID YET, which is the window the port retains for, and which the per-test
+        // reset() already gives. This used to call disable() to force the state -- harmless when
+        // disable() was a no-op before the first enable(), and wrong once it began recording the
+        // application's choice: an explicit "off" is a different answer from silence, and the
+        // sibling test below is about that one.
         ContinuityCallback callback = Continuity.callbackForTest();
 
         Map<String, Object> info = StateCodec.toMap(fromElsewhere("from the other device", 88L));
@@ -3650,6 +3653,65 @@ public class LocalContinuityTest extends UITestBase {
         Continuity.enable();
         assertTrue(callback.continuationReceived(Continuity.getActivityType(), info),
                 "an enabled framework refused its own activity type");
+    }
+
+    /**
+     * A disable() before any enable() is still an answer, and an arrival during it is dropped.
+     *
+     * <p>The gap the previous fix left. An application that enables continuity only after a login
+     * and calls disable() while logged out was leaving the flag unset, because disable() returned
+     * early when there was nothing to turn off -- so an arrival during that interval was read as
+     * a pre-enable cold-launch arrival: declined, retained by the port, and delivered by the
+     * enable() that came with the login. Saying "no" before saying anything else is still saying
+     * it.</p>
+     */
+    @EdtTest
+    public void aDisableBeforeAnyEnableStillDropsAnArrival() {
+        // Never enabled. This is the whole point: disable() has nothing to turn off here.
+        Continuity.disable();
+        ContinuityCallback callback = Continuity.callbackForTest();
+
+        Map<String, Object> info = StateCodec.toMap(fromElsewhere("during the logged-out spell", 92L));
+        assertTrue(callback.continuationReceived(Continuity.getActivityType(), info),
+                "the callback declined an arrival after an explicit disable() that happened to be "
+                        + "the application's FIRST word, so the port holds it and the enable() "
+                        + "that comes with the login restores it");
+
+        Continuity.enable();
+        assertNull(Continuity.getRestorableState(),
+                "the arrival from the disabled interval was delivered after all");
+    }
+
+    /**
+     * A platform continuation gets the same schema check the relay wire gets.
+     *
+     * <p>Continuity.Callback calls fromMap() DIRECTLY -- an NSUserActivity, or anything a custom
+     * bridge hands over, never touches fromJson -- so every check added for the relay was missing
+     * from the other way in. A continuation with a good origin and sequence but "routes" as a
+     * string dropped the field, produced an empty state, and admission consumed that as a
+     * tombstone and advanced the origin's durable high-water mark. Same harm, other path.</p>
+     */
+    @EdtTest
+    public void aMalformedPlatformContinuationIsNotConsumedAsATombstone() {
+        Continuity.enable();
+        Continuity.setStateProvider(new RecordingProvider());
+        ContinuityCallback callback = Continuity.callbackForTest();
+
+        Map<String, Object> malformed = new HashMap<String, Object>();
+        malformed.put("device", "bridge-sender");
+        malformed.put("seq", "10");
+        // A LIST is what this field is; a string here is the malformed case, and it used to be
+        // dropped in silence.
+        malformed.put("routes", "/orders,/orders/17");
+
+        assertFalse(callback.continuationReceived(Continuity.getActivityType(), malformed),
+                "a malformed continuation was claimed, so the framework took responsibility for "
+                        + "a document it could not read");
+        flushSerialCalls();
+
+        assertNull(Continuity.readSeenForTest().get("bridge-sender"),
+                "the malformed continuation was consumed as a tombstone and marked durably, so "
+                        + "the sender's correction is refused after a restart as already seen");
     }
 
     /**

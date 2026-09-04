@@ -24,6 +24,7 @@ package com.codename1.router;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 
 import java.util.HashMap;
@@ -149,6 +150,54 @@ class NavigationTest extends UITestBase {
                         + "never reached");
         assertSame(current, Navigation.getCurrent(),
                 "the failed navigation is reported as the current entry");
+    }
+
+    /**
+     * A form that DID get shown keeps its stack entry, so the stack and the display agree.
+     *
+     * <p>show() installs the form and only then runs onShowCompleted and the show listeners, so a
+     * throw from one of those is a failure that happened after the navigation succeeded. Rolling
+     * the entry back regardless left Navigation.getCurrent() disagreeing with
+     * Display.getCurrent(): back() worked on a stack whose top was not the visible form, and a
+     * checkpoint persisted a screen the user was not on.</p>
+     *
+     * <p>Not fixed by re-showing the previous form, which runs a second full show cycle --
+     * transitions, listeners, whatever they do -- as error handling, on a form the application
+     * has not asked to see again, and which can throw in its turn.</p>
+     */
+    @FormTest
+    void aFormThatWasShownKeepsItsEntryWhenItsListenerThrows() {
+        Navigation.setDispatcher(new FakeDispatcher().route("/a"));
+        Navigation.navigate("/a");
+        int before = baseline();
+
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                Form f = new Form();
+                f.setTitle(url);
+                f.addShowListener(new com.codename1.ui.events.ActionListener() {
+                    public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                        // The form is already installed by the time this runs.
+                        throw new IllegalStateException("the show listener failed");
+                    }
+                });
+                return f;
+            }
+        });
+        try {
+            Navigation.navigate("/shown-then-throws");
+            fail("the show listener did not throw, so this test is about nothing");
+        } catch (IllegalStateException expected) {
+            // The caller still sees it.
+        }
+
+        assertEquals(before + 1, baseline(),
+                "the entry for a form that IS on screen was rolled back, so the stack no longer "
+                        + "describes what the user is looking at");
+        assertSame(Display.getInstance().getCurrent(), Navigation.getCurrent().getForm(),
+                "Navigation.getCurrent() and Display.getCurrent() disagree, so back() works on a "
+                        + "stack whose top is not the visible form and a checkpoint persists a "
+                        + "screen the user is not on");
     }
 
     /**
