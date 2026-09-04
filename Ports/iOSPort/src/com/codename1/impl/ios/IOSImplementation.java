@@ -9130,7 +9130,22 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(bytes != null) {
                 // Empty is present, as everywhere else here: a representation published
                 // deliberately empty is one the source published.
-                content.setData(mime, bytes);
+                //
+                // A text type reads back as text. The pasteboard hands over bytes for
+                // everything, and copyToClipboard puts a custom String on it as UTF-8 -- so
+                // storing them as bytes broke this port's own round trip: getText on the
+                // type just pasted answered null, where a drop of the same type and every
+                // other port answer with the string. UTF-8 because that is what the copy
+                // above writes; a pasteboard type carries no charset to consult.
+                if(mime.startsWith("text/")) {
+                    try {
+                        content.setData(mime, new String(bytes, "UTF-8"));
+                    } catch(java.io.UnsupportedEncodingException err) {
+                        com.codename1.io.Log.e(err);
+                    }
+                } else {
+                    content.setData(mime, bytes);
+                }
             }
         }
         String files = nativeInstance.getClipboardFileUris();
