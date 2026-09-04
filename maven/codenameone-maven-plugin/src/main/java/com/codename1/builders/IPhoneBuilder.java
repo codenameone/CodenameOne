@@ -438,12 +438,23 @@ public class IPhoneBuilder extends Executor {
                 // what the native code reads and nothing else resolves it.
                 throw new BuildException("ios.plistInject sets " + key
                         + " to a <" + tag + "> value, but this key has to be"
-                        + " a <string> -- the generated Call Directory"
-                        + " extension resolves the same value and the two"
-                        + " have to agree. Remove the key from"
-                        + " ios.plistInject, or give it the string '"
-                        + value.trim() + "'.");
+                        + " a <string> -- the generated extension resolves"
+                        + " the same value and the two have to agree. Remove"
+                        + " the key from ios.plistInject, or give it the"
+                        + " string '" + value.trim() + "'.");
             }
+            // The VALUE is not compared here, and that is a real
+            // difference from the BuildDaemon twin rather than an oversight.
+            // An injected CN1VpnTunnelExtensionIdentifier or CN1CallAppGroup
+            // that disagrees with the generated one is two sources of truth
+            // -- the extension signs under the resolved value while the host
+            // names the injected one, so iOS finds no provider -- and the
+            // daemon refuses it. Refusing it here needs injectedPlistString
+            // and decodePlistText, which exist only in that copy: a plist
+            // reader written a second time, worse, to catch a
+            // hand-written-hint conflict in a local build the developer is
+            // sitting in front of. The cloud build, where the same project
+            // would ship, still refuses it.
             return inject;
         }
         return inject + "\n<key>" + key + "</key><string>"
@@ -3860,13 +3871,17 @@ public class IPhoneBuilder extends Executor {
         // Xcode and has no such product.
         vpnTunnelBuilder.parseHints(request, usesCustomTunnel);
         if (vpnTunnelBuilder.isEnabled()) {
-            vpnTunnelBuilder.verifyTunnelClass(classesDir, buildinRes);
-            // What the PORT contributed, recorded before the translation
+            vpnTunnelBuilder.verifyTunnelClass(classesDir);
+            // Everything HAND-WRITTEN, recorded before the translation
             // exists so the extension target can compile the translated
-            // program and leave the port out. See recordPortNatives: a
-            // hand-written list of "the sources that touch UIApplication"
-            // was not the same set, and the difference was a link error.
-            vpnTunnelBuilder.recordPortNatives(buildinRes);
+            // program and leave the rest out. Both roots the tunnel pass is
+            // given: the translator copies every non-class file it walks
+            // into the translation, so the app's own native sources arrive
+            // in the extension's tree exactly as the port's do. See
+            // recordHandWrittenNatives -- a hand-written list of "the
+            // sources that touch UIApplication" was not the same set, and
+            // the difference was a link error.
+            vpnTunnelBuilder.recordHandWrittenNatives(buildinRes, resDir);
             try {
                 vpnTunnelBuilder.writeStubSource(request, stubSource);
             } catch (IOException ex) {
@@ -3901,19 +3916,9 @@ public class IPhoneBuilder extends Executor {
             javacPath = "javac";
         }
         String[] stubSourceTarget = getStubCompileSourceTarget(javacPath);
-        // The application's classes, plus the archives a submitted library
-        // arrived in when this build generates a packet tunnel. A tunnel may
-        // be packaged in a cn1lib -- the class scanner already recognises
-        // that, and the translator already sees it -- and the generated stub
-        // constructs the class by name, so javac has to resolve it too.
-        // Additive and only then: without the hint this is exactly the
-        // classpath it has always been.
-        String stubCompileClasspath = vpnTunnelBuilder.isEnabled()
-                ? vpnTunnelBuilder.stubClasspath(classesDir, buildinRes)
-                : classesDir.getAbsolutePath();
         try {
             if (!execWithFiles(stubSource, stubSource, ".java", javacPath, "-source", stubSourceTarget[0], "-target", stubSourceTarget[1], "-classpath",
-                    stubCompileClasspath,
+                    classesDir.getAbsolutePath(),
                     "-d", classesDir.getAbsolutePath())) {
                 return false;
             }
@@ -5523,6 +5528,18 @@ public class IPhoneBuilder extends Executor {
                 }
                 enableFeatureDefine(buildinRes, "CN1_VPN_TUNNEL",
                         "com.codename1.vpn.tunnel");
+                // NO addLibs entry for NetworkExtension.framework here, and
+                // that is not an omission -- a review read it as one. The
+                // host links it from the PlatformFeatureCatalog entry for
+                // "com/codename1/vpn/tunnel/", which carries
+                // .iosFrameworks("NetworkExtension") of its own beside the
+                // profile package's entry; the accumulator's frameworks are
+                // appended to addLibs further down. A tunnel-only app links
+                // it without using com.codename1.vpn.profile at all, and
+                // adding it again here would only duplicate the flag. The
+                // extension target gets its own copy through
+                // add_system_framework -- a different target and a different
+                // link.
                 // The HOST carries the entitlement too, and this said the
                 // opposite until a review pointed at the API. The extension
                 // is not the only target that touches Network Extension: the

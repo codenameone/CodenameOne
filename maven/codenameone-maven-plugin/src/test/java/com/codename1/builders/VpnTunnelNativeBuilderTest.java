@@ -144,7 +144,7 @@ class VpnTunnelNativeBuilderTest {
             assertTrue(new File(portDir, name).createNewFile());
         }
         VpnTunnelNativeBuilder builder = new VpnTunnelNativeBuilder(null);
-        builder.recordPortNatives(portDir);
+        builder.recordHandWrittenNatives(portDir);
 
         assertTrue(builder.isExcluded("IOSNative.m"));
         assertTrue(builder.isExcluded("CodenameOne_GLAppDelegate.m"));
@@ -154,8 +154,19 @@ class VpnTunnelNativeBuilderTest {
         assertTrue(builder.isExcluded("CN1Vpn.m"));
         assertTrue(builder.isExcluded("CN1MetalShaders.metal"));
 
-        // The ParparVM runtime comes from the translator rather than the
-        // port, so it is not in that directory and is never excluded --
+        // The application's own natives arrive through a DIFFERENT root --
+        // the translator copies every non-class file it walks, and the
+        // tunnel pass is given the resource root too -- so both are
+        // recorded. A NativeInterface the tunnel never mentions would
+        // otherwise be compiled under APPLICATION_EXTENSION_API_ONLY and
+        // could fail a valid build on somebody else's UIKit call.
+        File appNatives = Files.createTempDirectory("cn1res").toFile();
+        assertTrue(new File(appNatives, "MyAppNative.m").createNewFile());
+        builder.recordHandWrittenNatives(portDir, appNatives);
+        assertTrue(builder.isExcluded("MyAppNative.m"));
+
+        // The ParparVM runtime comes from the translator rather than either
+        // root, so it is in neither directory and is never excluded --
         // which matters, because the extension is nothing without it.
         assertFalse(builder.isExcluded("cn1_globals.m"));
         assertFalse(builder.isExcluded("nativeMethods.m"));
@@ -172,7 +183,7 @@ class VpnTunnelNativeBuilderTest {
         // extension and fail at link.
         VpnTunnelNativeBuilder builder = new VpnTunnelNativeBuilder(null);
         BuildException refused = assertThrows(BuildException.class,
-                () -> builder.recordPortNatives(
+                () -> builder.recordHandWrittenNatives(
                         new File("no-such-directory-here")));
         assertTrue(refused.getMessage().contains("native"));
     }
@@ -224,36 +235,31 @@ class VpnTunnelNativeBuilderTest {
     }
 
     @Test
-    void aTunnelPackagedInALibraryIsAccepted() throws Exception {
-        // foldInCallAndVpnLibraryUsage already recognises a project whose
-        // only tunnel usage is inside a submitted library, so refusing that
-        // project because the class is not a loose file would reject a
-        // configuration the rest of the build supports.
+    void theTunnelClassHasToBeOneTheTranslatorParses() throws Exception {
+        // A LOOSE class file. This briefly accepted one inside a submitted
+        // jar, because foldInCallAndVpnLibraryUsage recognises library-only
+        // tunnel usage -- but ByteCodeTranslator.execute() parses *.class
+        // and COPIES every other file it walks, so a class that exists only
+        // inside an archive is never translated and the provider calls an
+        // allocator the extension has no definition of. Accepting it moved
+        // the failure from a sentence about the hint to a link error.
         File classes = Files.createTempDirectory("cn1classes").toFile();
-        File libs = Files.createTempDirectory("cn1libs").toFile();
-        File jar = new File(libs, "mylib.jar");
-        try (java.util.zip.ZipOutputStream zos =
-                new java.util.zip.ZipOutputStream(
-                        new java.io.FileOutputStream(jar))) {
-            zos.putNextEntry(new java.util.zip.ZipEntry(
-                    "com/example/lib/LibTunnel.class"));
-            zos.write(new byte[] {(byte) 0xCA, (byte) 0xFE});
-            zos.closeEntry();
-        }
+        File pkg = new File(classes, "com/example/app".replace('/',
+                File.separatorChar));
+        assertTrue(pkg.mkdirs());
+        assertTrue(new File(pkg, "MyTunnel.class").createNewFile());
 
-        VpnTunnelNativeBuilder builder = new VpnTunnelNativeBuilder(null);
-        builder.parseHints(request("true", "com.example.lib.LibTunnel"), true);
-        builder.verifyTunnelClass(classes, libs);
-        // ...and javac has to resolve it, or the generated stub fails on a
-        // class the build just said was there.
-        assertTrue(builder.stubClasspath(classes, libs)
-                .contains(jar.getAbsolutePath()));
+        VpnTunnelNativeBuilder loose = new VpnTunnelNativeBuilder(null);
+        loose.parseHints(request("true", "com.example.app.MyTunnel"), true);
+        loose.verifyTunnelClass(classes);
 
         VpnTunnelNativeBuilder missing = new VpnTunnelNativeBuilder(null);
-        missing.parseHints(request("true", "com.example.NotThere"), true);
-        assertTrue(assertThrows(BuildException.class,
-                () -> missing.verifyTunnelClass(classes, libs)).getMessage()
-                        .contains("com.example.NotThere"));
+        missing.parseHints(request("true", "com.example.lib.LibTunnel"), true);
+        BuildException refused = assertThrows(BuildException.class,
+                () -> missing.verifyTunnelClass(classes));
+        assertTrue(refused.getMessage().contains("com.example.lib.LibTunnel"));
+        assertTrue(refused.getMessage().contains("library jar"),
+                "the message has to say what to do about it");
     }
 
     @Test

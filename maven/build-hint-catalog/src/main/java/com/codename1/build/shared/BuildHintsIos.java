@@ -158,7 +158,10 @@ final class BuildHintsIos {
                         + "extension and fail at link on a symbol nobody wrote. The build checks the "
                         + "name against the compiled classes and refuses one it can't find, rather "
                         + "than letting the generated entry point fail javac on a source file the "
-                        + "developer never wrote."));
+                        + "developer never wrote. It has to be a class this project compiles: the "
+                        + "translator reads loose class files, so a tunnel that lives only inside a "
+                        + "submitted library jar is never translated and can't be the extension's "
+                        + "entry point."));
 
         h.add(new Hint("ios.call.appGroup")
                 .group(HintGroup.IOS)

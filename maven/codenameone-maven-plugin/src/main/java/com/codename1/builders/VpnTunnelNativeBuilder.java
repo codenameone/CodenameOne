@@ -148,8 +148,9 @@ class VpnTunnelNativeBuilder {
      * The iOS port's hand-written native sources, which the extension target
      * must not compile.
      *
-     * <p>Recorded from the directory the port was unzipped into rather than
-     * listed here, because a list is wrong in both directions. This started
+     * <p>Recorded from the directories hand-written sources are unzipped
+     * into rather than listed here, because a list is wrong in both
+     * directions. This started
      * as one -- the sources that call {@code UIApplicationMain} or
      * {@code [UIApplication sharedApplication]}, which an
      * {@code APPLICATION_EXTENSION_API_ONLY} target rejects -- and that list
@@ -170,43 +171,54 @@ class VpnTunnelNativeBuilder {
      * comes from the translator, not from the port, so it is never in this
      * set and is never excluded.</p>
      *
-     * <p>A native belonging to a submitted library sits in the same
-     * directory and is excluded with the rest. That is the documented
+     * <p>BOTH roots, not only the port's. The translator COPIES every
+     * non-class file it walks into each translation, and the tunnel pass is
+     * given the resource root as well as the library one -- so an
+     * application's own {@code NativeInterface} implementation lands in the
+     * tunnel's tree exactly as the port's natives do. A tunnel that never
+     * mentions that native would otherwise have had it compiled under
+     * {@code APPLICATION_EXTENSION_API_ONLY}, and a valid build could fail
+     * on somebody else's UIKit call.</p>
+     *
+     * <p>A native belonging to a submitted library or to the application is
+     * excluded with the rest. That is the documented
      * bargain rather than a gap: a tunnel gets nothing from the application
      * process, and one that calls a library's native fails the extension's
      * link naming the symbol -- which is the same report as reaching for any
      * other app-side class, and better than a tunnel that builds and finds
      * nothing there.</p>
      */
-    private final java.util.Set<String> portNatives =
+    private final java.util.Set<String> handWrittenNatives =
             new java.util.HashSet<String>();
 
     /**
-     * Records what the port contributed, so {@link #stageTranslation} can
-     * leave it out.
+     * Records what the port, the submitted libraries and the application
+     * hand-wrote, so {@link #stageTranslation} can leave it out.
      *
-     * <p>Called once the port has been unzipped and before the translation
-     * is staged. Cheap, and only for a build that generates the
-     * extension.</p>
+     * <p>Called once those have been unzipped and before the translation is
+     * staged. Cheap, and only for a build that generates the extension.</p>
      *
-     * @param portNativeDir the directory the iOS port's natives were
-     *                      unzipped into
+     * @param roots the directories the build unzipped hand-written sources
+     *              into: the library root and the resource root
      */
-    void recordPortNatives(File portNativeDir) {
-        File[] files = portNativeDir.listFiles();
-        if (files == null) {
-            // Refused rather than carried on with an empty set: an empty set
-            // means "exclude nothing", which is exactly the broken target
-            // this exists to prevent, and it would fail at link on a machine
-            // none of our tests run on.
-            throw new BuildException("Could not read the iOS port's native"
-                    + " sources at " + portNativeDir + ", so the packet"
-                    + " tunnel extension cannot know which sources belong to"
-                    + " the application rather than to it.");
-        }
-        for (File f : files) {
-            if (f.isFile()) {
-                portNatives.add(f.getName());
+    void recordHandWrittenNatives(File... roots) {
+        for (File root : roots) {
+            File[] files = root == null ? null : root.listFiles();
+            if (files == null) {
+                // Refused rather than carried on with a short set: a name
+                // this does not know is a source compiled into the
+                // extension, which is exactly the broken target this exists
+                // to prevent, and it would fail at link on a machine none of
+                // our tests run on.
+                throw new BuildException("Could not read the hand-written"
+                        + " native sources at " + root + ", so the packet"
+                        + " tunnel extension cannot know which sources belong"
+                        + " to the application rather than to it.");
+            }
+            for (File f : files) {
+                if (f.isFile()) {
+                    handWrittenNatives.add(f.getName());
+                }
             }
         }
     }
@@ -263,19 +275,24 @@ class VpnTunnelNativeBuilder {
     }
 
     /**
-     * Checks that the named tunnel class is actually in this build.
+     * Checks that the named tunnel class is one the translator will parse.
      *
      * <p>Checked HERE, against the compiled classes, rather than left to the
      * generated stub's javac. Both refuse, but this one can say which hint
      * was wrong; javac would report an unresolvable symbol inside a source
      * file the developer never wrote.</p>
      *
-     * <p>Looks where the TRANSLATOR looks, which is more than the
-     * application's own classes: a cn1lib can package a {@code VpnTunnel},
-     * and {@code foldInCallAndVpnLibraryUsage} already recognises a project
-     * whose only tunnel usage is inside a submitted library. Refusing that
-     * project because the class is not a loose file would reject a
-     * configuration the rest of the build supports.</p>
+     * <p><b>A LOOSE class file, and deliberately not one inside a jar.</b>
+     * This briefly accepted an archive, on the reasoning that
+     * {@code foldInCallAndVpnLibraryUsage} recognises tunnel usage inside a
+     * submitted library so the build should too. It cannot:
+     * {@code ByteCodeTranslator.execute()} parses {@code *.class} and COPIES
+     * every other file it walks, so a class that exists only inside an
+     * archive is never translated -- and the provider then calls an
+     * allocator and a constructor the extension has no definition of, which
+     * is a link error instead of a refusal. An accurate refusal is worth
+     * more than an acceptance the translator cannot honour, so this stays a
+     * loose-file check and the message says what to do about it.</p>
      *
      * <p>EXISTENCE only. Whether the class is a {@code VpnTunnel} and
      * whether it has a no-argument constructor are left to javac on the
@@ -287,111 +304,22 @@ class VpnTunnelNativeBuilder {
      * exactly.</p>
      *
      * @param classesDir the compiled application classes
-     * @param libsDir    where submitted libraries were unzipped
      */
-    void verifyTunnelClass(File classesDir, File libsDir) {
+    void verifyTunnelClass(File classesDir) {
         String entry = tunnelClass.replace('.', '/') + ".class";
         if (new File(classesDir, entry.replace('/', File.separatorChar)).isFile()) {
             return;
         }
-        if (containsClass(libsDir, entry)) {
-            return;
-        }
         throw new BuildException(HINT_CLASS + " names "
-                + tunnelClass + ", which is not in this application or in"
-                + " any library it submitted. The extension has to"
-                + " instantiate that class, so the name has to be the fully"
-                + " qualified one -- including the package, and with $ for a"
-                + " nested class -- of a VpnTunnel subclass this build"
-                + " compiles.");
-    }
-
-    /**
-     * Whether {@code entry} is in any archive or loose class file under
-     * {@code dir}.
-     *
-     * <p>jar, zip and loose {@code .class} -- the shapes
-     * {@code LibraryClassPrefixScan} walks, minus {@code .aar}. That one is
-     * deliberate: an Android archive is not something javac can put on a
-     * classpath, so accepting a tunnel found inside one would pass this
-     * check and then fail the generated stub's compile, which is the exact
-     * error this method exists to turn into a sentence about the hint.</p>
-     */
-    private static boolean containsClass(File dir, String entry) {
-        if (dir == null || !dir.isDirectory()) {
-            return false;
-        }
-        File[] children = dir.listFiles();
-        if (children == null) {
-            return false;
-        }
-        for (File child : children) {
-            if (child.isDirectory()) {
-                if (containsClass(child, entry)) {
-                    return true;
-                }
-                continue;
-            }
-            String name = child.getName().toLowerCase(java.util.Locale.ROOT);
-            if (name.endsWith(".jar") || name.endsWith(".zip")) {
-                java.util.zip.ZipFile zip = null;
-                try {
-                    zip = new java.util.zip.ZipFile(child);
-                    if (zip.getEntry(entry) != null) {
-                        return true;
-                    }
-                } catch (IOException unreadable) {
-                    // Not an archive this build can open. Skipped rather
-                    // than fatal: the translator will fail on it too, with a
-                    // better message than one about the tunnel class.
-                    continue;
-                } finally {
-                    if (zip != null) {
-                        try {
-                            zip.close();
-                        } catch (IOException ignored) {
-                            // Nothing to do; the file is only being read.
-                        }
-                    }
-                }
-            }
-        }
-        return new File(dir, entry.replace('/', File.separatorChar)).isFile();
-    }
-
-    /**
-     * The classpath the generated stubs are compiled against.
-     *
-     * <p>The application's classes plus the archives a submitted library
-     * arrived in, because {@link #verifyTunnelClass} accepts a tunnel from
-     * one and javac has to be able to resolve it. Additive: a build without
-     * a tunnel keeps exactly the classpath it had, and one with a tunnel
-     * only gains what the translator could already see.</p>
-     */
-    String stubClasspath(File classesDir, File libsDir) {
-        StringBuilder cp = new StringBuilder(classesDir.getAbsolutePath());
-        appendArchives(cp, libsDir);
-        return cp.toString();
-    }
-
-    private static void appendArchives(StringBuilder cp, File dir) {
-        if (dir == null || !dir.isDirectory()) {
-            return;
-        }
-        File[] children = dir.listFiles();
-        if (children == null) {
-            return;
-        }
-        for (File child : children) {
-            if (child.isDirectory()) {
-                appendArchives(cp, child);
-                continue;
-            }
-            String name = child.getName().toLowerCase(java.util.Locale.ROOT);
-            if (name.endsWith(".jar") || name.endsWith(".zip")) {
-                cp.append(File.pathSeparator).append(child.getAbsolutePath());
-            }
-        }
+                + tunnelClass + ", which is not among this application's"
+                + " compiled classes. The extension is translated from that"
+                + " class and the translator reads loose class files, so the"
+                + " name has to be the fully qualified one -- including the"
+                + " package, and with $ for a nested class -- of a VpnTunnel"
+                + " subclass this project compiles. A tunnel that lives only"
+                + " inside a submitted library jar is never translated and"
+                + " cannot be the extension's entry point; move it into the"
+                + " application.");
     }
 
     /**
@@ -629,15 +557,16 @@ class VpnTunnelNativeBuilder {
     }
 
     /**
-     * Whether a staged source belongs to the port rather than to the
-     * translated program.
+     * Whether a staged source was hand-written rather than emitted by the
+     * translator.
      *
-     * <p>Answers false for everything until {@link #recordPortNatives} has
-     * run, which is why that is not optional: an unrecorded build would
-     * compile the whole port into the extension and fail at link.</p>
+     * <p>Answers false for everything until
+     * {@link #recordHandWrittenNatives} has run, which is why that is not
+     * optional: an unrecorded build would compile the whole port into the
+     * extension and fail at link.</p>
      */
     boolean isExcluded(String name) {
-        return portNatives.contains(name);
+        return handWrittenNatives.contains(name);
     }
 
     /**
