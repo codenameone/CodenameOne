@@ -3638,6 +3638,67 @@ public class LocalContinuityTest extends UITestBase {
                         + "inside fetch() presents the next account's to the previous endpoint");
     }
 
+    /**
+     * A truncated relay document is a failed read, not an empty relay.
+     *
+     * <p>JSONParser does not throw on malformed input: it logs and returns the partial map it had
+     * built. A document cut off after "device" and "seq" therefore parsed into a state with no
+     * routes and no payload -- which this framework reads as a TOMBSTONE -- so the origin was
+     * recorded as having cleared its work, durably, while fetch() reported a successful read and
+     * released a queued POST over the relay's real document.</p>
+     */
+    @EdtTest
+    public void aTruncatedRelayDocumentIsAFailedReadNotAnEmptyRelay() {
+        String whole = StateCodec.toJson(fromElsewhere("what the other device was doing", 42L));
+        assertTrue(whole.length() > 20, "the fixture document is too short to truncate usefully");
+        String cut = whole.substring(0, whole.length() / 2);
+
+        // The control: the whole document still reads.
+        try {
+            assertNotNull(StateCodec.fromJson(whole), "a complete document failed to parse");
+        } catch (java.io.IOException e) {
+            fail("a complete document was refused: " + e.getMessage());
+        }
+
+        try {
+            AppState partial = StateCodec.fromJson(cut);
+            fail("a truncated document was accepted"
+                    + (partial != null && partial.isEmpty()
+                            ? " as an EMPTY state, which is read as a tombstone: the origin is "
+                                    + "recorded as having cleared its work and the relay's real "
+                                    + "document is then overwritten"
+                            : ""));
+        } catch (java.io.IOException expected) {
+            assertTrue(expected.getMessage().contains("complete JSON object"),
+                    expected.getMessage());
+        }
+    }
+
+    /**
+     * A simulated-store write that could not be indexed leaves nothing behind.
+     *
+     * <p>Returning false while the value stayed durable made the answer a lie in the other
+     * direction: the caller takes its documented fallback path while get() returns the value it
+     * was told had failed, keys() omits it, and clearing the store cannot reach it.</p>
+     */
+    @EdtTest
+    public void aStoreWriteThatCouldNotBeIndexedLeavesNothingBehind() {
+        Storage original = Storage.getInstance();
+        Storage.setStorageInstance(new RefusingOneStorage(original, "CN1$SyncedStoreKeys"));
+        boolean reported;
+        try {
+            reported = SyncedStore.put("draft", "half a sentence");
+        } finally {
+            Storage.setStorageInstance(original);
+        }
+
+        assertFalse(reported, "the write was reported as successful although the index refused");
+        assertEquals("missing", SyncedStore.get("draft", "missing"),
+                "the value the caller was told had FAILED is readable, so the application took "
+                        + "its fallback path over a value that is really there -- and keys() and "
+                        + "clearing cannot see it");
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;

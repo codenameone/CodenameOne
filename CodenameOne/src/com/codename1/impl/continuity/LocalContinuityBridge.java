@@ -208,9 +208,19 @@ public class LocalContinuityBridge implements ContinuityBridge {
         if (!keys.contains(key)) {
             keys.add(key);
             if (!writeIndex(keys)) {
-                // The value is stored and the index is not, so keys() would not list it. Reported
-                // rather than hidden: a caller told the write succeeded expects to find it again
-                // by enumeration as well as by name.
+                // The value is stored and the index is not, so keys() would not list it. Rolled
+                // BACK rather than merely reported: leaving it made "false" a lie in the other
+                // direction -- the caller takes its documented fallback path while get() returns
+                // the value it was told had failed, keys() omits it, and clearing the store
+                // cannot reach it.
+                //
+                // A failed write should leave nothing behind, which is the only answer that means
+                // one thing.
+                try {
+                    Storage.getInstance().deleteStorageFile(storageName(key));
+                } catch (Throwable t) {
+                    Log.e(t);
+                }
                 return false;
             }
         }

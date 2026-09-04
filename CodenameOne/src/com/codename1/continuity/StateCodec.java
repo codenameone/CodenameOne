@@ -209,7 +209,67 @@ public final class StateCodec {
         if (json == null || json.trim().length() == 0) {
             return null;
         }
+        if (!isCompleteObject(json)) {
+            // JSONParser does NOT throw on a malformed document: it logs the failure, closes the
+            // reader, and returns whatever partial map it had built. So a truncated relay response
+            // came back as a valid-looking state, and the shape it takes is the worst one -- a
+            // document cut off after "device" and "seq" has no routes and no payload, which is an
+            // EMPTY state, which this framework reads as a tombstone. The origin is then recorded
+            // as having cleared its work, durably, and fetch() reports a SUCCESSFUL read, which
+            // releases a queued POST over the relay's real document.
+            //
+            // So the check is here rather than left to the parser. Truncation is the corruption
+            // that actually happens on a network, and it is exactly what a structural scan
+            // catches: a document whose braces and brackets do not close, or that ends inside a
+            // string, was not received whole.
+            throw new IOException("The continuity relay returned a document that is not a "
+                    + "complete JSON object. Treated as a failed read rather than as an empty "
+                    + "relay, because a truncated document is indistinguishable from one that "
+                    + "says the other device has nothing.");
+        }
         return fromMap(JSONParser.parseJSON(json));
+    }
+
+    /// Whether `json` is one complete JSON object: it starts with `{`, ends with its match, and
+    /// closes every string, brace and bracket in between.
+    ///
+    /// Deliberately structural rather than a full parse. It has one job -- deciding whether the
+    /// whole document arrived -- and answering it does not need the values, so it cannot disagree
+    /// with the parser about what they mean.
+    static boolean isCompleteObject(String json) {
+        String trimmed = json.trim();
+        if (trimmed.length() < 2 || trimmed.charAt(0) != '{'
+                || trimmed.charAt(trimmed.length() - 1) != '}') {
+            return false;
+        }
+        int depth = 0;
+        boolean inString = false;
+        boolean escaped = false;
+        for (int i = 0; i < trimmed.length(); i++) {
+            char c = trimmed.charAt(i);
+            if (inString) {
+                if (escaped) {
+                    escaped = false;
+                } else if (c == '\\') {
+                    escaped = true;
+                } else if (c == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+            if (c == '"') {
+                inString = true;
+            } else if (c == '{' || c == '[') {
+                depth++;
+            } else if (c == '}' || c == ']') {
+                depth--;
+                if (depth < 0) {
+                    // A closer with nothing open: the document is not merely short, it is wrong.
+                    return false;
+                }
+            }
+        }
+        return depth == 0 && !inString;
     }
 
     /// Throws when any value in the map could not survive being written to a property list, sent
