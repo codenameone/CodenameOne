@@ -971,6 +971,18 @@ public final class Continuity {
         if (r == null || !Display.isInitialized()) {
             return;
         }
+        if (polling) {
+            // The one-fetch-at-a-time invariant, enforced where the fetch is STARTED rather than
+            // only at the call sites that remember to ask. Two overlapping GETs can return
+            // different documents -- the relay holds one per user and the other device may
+            // replace it between them -- and nothing downstream re-orders the answers, so the
+            // response that left first and arrived second puts the older screen over the newer.
+            //
+            // Remembered rather than dropped, exactly as the caller-side guard does: whoever
+            // wanted this read gets one when the outstanding fetch lands.
+            pollAgain = true;
+            return;
+        }
         final int session = relaySession;
         polling = true;
         Display.getInstance().startThread(new Runnable() {
@@ -1454,6 +1466,13 @@ public final class Continuity {
         if (pendingPublish == null) {
             return;
         }
+        if (polling) {
+            // A GET is outstanding. The relay holds ONE document per user, so a POST that lands
+            // before the answer overwrites the other device's state -- and the GET then reads back
+            // our own write, so the remote update is never seen. pollFinished() starts a publisher
+            // when the fetch is done.
+            return;
+        }
         if (fetchUnread) {
             // The last read of the relay FAILED, so what the document holds is unknown -- and
             // writing over it is only safe because a poll established that. A timeout establishes
@@ -1463,15 +1482,13 @@ public final class Continuity {
             // A fresh poll rather than a refusal: an application that goes on working while the
             // network is down must not stop publishing for the rest of the process, so the state
             // stays owed and the read is retried. Whichever poll succeeds releases it.
+            //
+            // BELOW the polling guard, which is where this branch belongs and did not start. A
+            // recovery read is still a read, so putting it first let a second checkpoint launch
+            // one while the first was in flight -- two overlapping GETs, which is precisely what
+            // the guard above forbids and for the reason it gives.
             publishRequested = true;
             startPoll();
-            return;
-        }
-        if (polling) {
-            // A GET is outstanding. The relay holds ONE document per user, so a POST that lands
-            // before the answer overwrites the other device's state -- and the GET then reads back
-            // our own write, so the remote update is never seen. pollFinished() starts a publisher
-            // when the fetch is done.
             return;
         }
         final StateRelay r = relay;

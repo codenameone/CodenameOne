@@ -3006,6 +3006,95 @@ public class LocalContinuityTest extends UITestBase {
                         + "state, so a third device continues into a screen this one has left");
     }
 
+    /**
+     * A recovery read after a failed fetch never overlaps another read.
+     *
+     * <p>The recovery branch was placed ABOVE the one-fetch-at-a-time guard, so a second
+     * checkpoint launched a second GET while the first was still in flight. Two overlapping reads
+     * can return different documents -- the relay holds one per user and the other device may
+     * replace it between them -- and nothing downstream re-orders the answers, so whichever
+     * finished first cleared {@code polling} and could release the publisher while the other was
+     * still outstanding.</p>
+     */
+    @EdtTest
+    public void aRecoveryReadNeverOverlapsAnotherRead() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+
+        final java.util.concurrent.atomic.AtomicInteger live =
+                new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicInteger mostAtOnce =
+                new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicInteger fetches =
+                new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.CountDownLatch inRecovery =
+                new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch release =
+                new java.util.concurrent.CountDownLatch(1);
+
+        Continuity.setRelay(new StateRelay() {
+            public void publish(AppState state) {
+                published.add(state);
+            }
+
+            public AppState fetch() throws java.io.IOException {
+                int now = live.incrementAndGet();
+                synchronized (mostAtOnce) {
+                    if (now > mostAtOnce.get()) {
+                        mostAtOnce.set(now);
+                    }
+                }
+                try {
+                    if (fetches.incrementAndGet() == 1) {
+                        // The first read fails, which is what arms the recovery path.
+                        throw new java.io.IOException("no network");
+                    }
+                    // Every later read is held open, so a checkpoint arriving now would start a
+                    // second one if anything still let it.
+                    inRecovery.countDown();
+                    release.await(5L, java.util.concurrent.TimeUnit.SECONDS);
+                    return null;
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                    return null;
+                } finally {
+                    live.decrementAndGet();
+                }
+            }
+        });
+        pause(300L);
+        flushSerialCalls();
+        assertEquals(1, fetches.get(), "the first read did not happen, so nothing armed recovery");
+
+        // Starts the recovery read, which then blocks.
+        Continuity.checkpoint();
+        final boolean[] recovering = new boolean[1];
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                try {
+                    recovering[0] = inRecovery.await(5L, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        assertTrue(recovering[0], "no recovery read started, so there is nothing to overlap");
+
+        // The second checkpoint, while that read is still outstanding.
+        provider.saved.put("more", "work done meanwhile");
+        Continuity.checkpoint();
+        pause(300L);
+
+        release.countDown();
+        pause(400L);
+        flushSerialCalls();
+
+        assertEquals(1, mostAtOnce.get(),
+                "two relay reads were in flight at once, so whichever answered first could "
+                        + "release a publish over a document the other had not seen");
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;
