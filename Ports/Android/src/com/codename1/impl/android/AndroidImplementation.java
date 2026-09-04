@@ -17419,8 +17419,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         public Object invoke(Object proxy, java.lang.reflect.Method method, Object[] args) {
                             try {
                                 Object response = args[0];
-                                String token = (String) responseClass.getMethod("token").invoke(response);
-                                result.complete(token);
+                                Object token = responseClass.getMethod("token").invoke(response);
+                                // Tested rather than cast into the catch below. ParparVM does
+                                // not throw for a failed cast, so a handler that expects to
+                                // catch one never runs -- and a reflective call's answer is
+                                // exactly the kind of value worth testing anyway.
+                                if (token instanceof String) {
+                                    result.complete((String) token);
+                                } else {
+                                    result.error(new IllegalStateException(
+                                            "integrity token was not a string"));
+                                }
                             } catch(Throwable t) {
                                 result.error(t);
                             }

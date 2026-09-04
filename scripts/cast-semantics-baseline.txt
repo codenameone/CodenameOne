@@ -56,7 +56,6 @@ com/codename1/impl/android/AndroidImplementation#signingCertificatesViaReflectio
 com/codename1/impl/android/AndroidImplementation#signingCertificatesViaReflection(Landroid/content/pm/PackageManager;Ljava/lang/String;)[Landroid/content/pm/Signature;|cast to java.lang.Boolean inside catch(java.lang.Throwable)
 com/codename1/impl/android/AndroidImplementation#vibrate(I)V|cast to android.os.Vibrator inside catch(java.lang.Throwable)
 com/codename1/impl/android/AndroidImplementation$46#onReceive(Landroid/content/Context;Landroid/content/Intent;)V|cast to android.content.ComponentName inside catch(java.lang.Throwable)
-com/codename1/impl/android/AndroidImplementation$63#invoke(Ljava/lang/Object;Ljava/lang/reflect/Method;[Ljava/lang/Object;)Ljava/lang/Object;|cast to java.lang.String inside catch(java.lang.Throwable)
 com/codename1/impl/android/AndroidImplementation$SetCurrentFormImpl#run()V|cast to [Ljava.lang.Class; inside catch(java.lang.Throwable)
 com/codename1/impl/android/AndroidImplementation$SetCurrentFormImpl#run()V|cast to [Ljava.lang.Object; inside catch(java.lang.Throwable)
 com/codename1/impl/android/AndroidImplementation$SetCurrentFormImpl#run()V|cast to android.graphics.Bitmap inside catch(java.lang.Throwable)
