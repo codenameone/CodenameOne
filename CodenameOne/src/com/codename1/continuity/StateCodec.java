@@ -507,6 +507,18 @@ public final class StateCodec {
             if (c == '"') {
                 return true;
             }
+            if (c < ' ') {
+                // JSON forbids an unescaped character below U+0020 inside a string, and this
+                // check accepted every one of them. It is not a formality: the framework parser
+                // appends a raw control byte to whatever it is building rather than stopping, so
+                // a document carrying a literal newline INSIDE a key -- "pay<LF>load" -- passed
+                // as valid and came out with a key that is not "payload". The field is then
+                // unknown and dropped, and a state with no payload and no routes is a tombstone:
+                // the sending device is read as having cleared its work.
+                //
+                // No conformant encoder emits one, so nothing legitimate is refused by this.
+                return false;
+            }
             if (c == '\\') {
                 if (at[0] >= s.length()) {
                     return false;

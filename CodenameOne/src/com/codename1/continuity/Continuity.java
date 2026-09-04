@@ -1938,12 +1938,24 @@ public final class Continuity {
             rememberSeen();
             return;
         }
+        // The generation as it stands at admission. `enabled` alone could not see a disable()
+        // and an enable() that BOTH ran before this runnable did -- two queued turns are enough,
+        // and the flag is true again by the time it is read -- so the arrival from before the
+        // disable was dispatched and restored after all. lastSeen still holds its sequence, so
+        // the supersession check below waves it through too. The generation is the field that
+        // remembers a session ended, which is what the promise is actually about.
+        final int lifecycleAtAdmission = lifecycle;
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
                 if (!enabled) {
                     // disable() between the two turns. Arriving states are ignored from the
                     // moment it is called, including the ones already admitted.
+                    return;
+                }
+                if (lifecycle != lifecycleAtAdmission) {
+                    // The session this arrival was admitted into has ended, whether or not one
+                    // has been started since.
                     return;
                 }
                 Long newest = lastSeen.get(state.getDeviceId());

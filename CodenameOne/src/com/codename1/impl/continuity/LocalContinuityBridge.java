@@ -329,15 +329,49 @@ public class LocalContinuityBridge implements ContinuityBridge {
             return;
         }
         List<String> keys = indexKeys();
-        if (keys.remove(key)) {
-            writeIndex(keys);
+        if (keys.remove(key) && !writeIndex(keys)) {
+            // The value is gone and the index still lists it. syncedStoreKeys() filters that out
+            // so keys() stays truthful for the rest of the process, and this says so once rather
+            // than leaving a durable index that disagrees with the store entirely unremarked.
+            Log.p("Continuity synced store: the value for \"" + key + "\" was removed but the "
+                    + "index could not be rewritten, so the stored index still lists it until a "
+                    + "later write succeeds.");
         }
     }
 
     @Override
     public String[] syncedStoreKeys() {
+        // FILTERED by what is actually stored, because the index is a second write and can be
+        // left describing a value that is not there: a delete that succeeded and an index write
+        // that then failed leaves the key listed while get() answers the default. The platform
+        // this simulates has no such gap -- NSUbiquitousKeyValueStore enumerates its own
+        // dictionary, so a phantom key cannot exist there -- and the simulation should not
+        // invent one.
+        //
+        // Only a POSITIVE absence removes a key. When the check cannot be made the entry stays,
+        // which is the same direction deleteValue() chose and for the same reason: a listed key
+        // whose get() answers the default is visible and survivable, and a value nothing lists
+        // is neither.
         List<String> keys = indexKeys();
-        return keys.toArray(new String[keys.size()]);
+        List<String> present = new ArrayList<String>();
+        for (String key : keys) {
+            if (definitelyAbsent(storageName(key))) {
+                continue;
+            }
+            present.add(key);
+        }
+        return present.toArray(new String[present.size()]);
+    }
+
+    /// Whether this storage name is known NOT to hold a value. False when it does, and false
+    /// when the question could not be answered.
+    private boolean definitelyAbsent(String name) {
+        try {
+            return !Storage.getInstance().exists(name);
+        } catch (Throwable t) {
+            Log.e(t);
+            return false;
+        }
     }
 
     /// Reports a change made "on another device", which the Simulate menu uses to exercise an

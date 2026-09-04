@@ -3653,6 +3653,111 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A raw control character inside a JSON string is a failed read, not a tombstone.
+     *
+     * <p>The grammar check accepted every unescaped character except quote and backslash, and
+     * JSON allows neither below U+0020. It is not a formality: the framework parser appends a
+     * raw control byte to whatever it is building rather than stopping, so a document carrying a
+     * literal newline inside a KEY -- "pay(LF)load" -- passed as valid and came out with a key
+     * that is not "payload". The field is unknown and dropped, and a state with no payload and
+     * no routes is a tombstone, which the sending device meant as nothing of the sort.</p>
+     */
+    @EdtTest
+    public void aRawControlCharacterInAStringIsRefused() throws Exception {
+        String withNewlineInAKey =
+                "{\"device\":\"other\",\"seq\":\"10\",\"pay\nload\":{\"a\":1}}";
+        try {
+            AppState s = StateCodec.fromJson(withNewlineInAKey);
+            fail("a raw newline inside a JSON string was accepted"
+                    + (s != null && s.isEmpty()
+                            ? " -- and as an EMPTY state, which is read as a tombstone: the "
+                                    + "sending device is told to have cleared its work"
+                            : ""));
+        } catch (java.io.IOException expected) {
+            assertTrue(expected.getMessage().length() > 0, "the refusal explained nothing");
+        }
+
+        // The ESCAPED form is the legitimate one and must still go through, or this guard would
+        // refuse every payload that contains a line break.
+        AppState fine = StateCodec.fromJson(
+                "{\"device\":\"other\",\"seq\":\"10\",\"enc\":\"1\","
+                        + "\"payload\":{\"note\":\"s:two\\nlines\"}}");
+        assertEquals("two\nlines", fine.getPayload().get("note"),
+                "an escaped newline was mangled, so the guard refuses legitimate documents");
+    }
+
+    /**
+     * An arrival admitted before disable() is not dispatched by an enable() that follows.
+     *
+     * <p>{@code enabled} alone could not see a disable() and an enable() that BOTH ran before the
+     * queued dispatch did -- two queued turns are enough, and the flag is true again by the time
+     * it is read -- so the arrival from before the disable was dispatched and restored after
+     * all. lastSeen still holds its sequence, so the supersession check waves it through too. The
+     * generation is the field that remembers a session ended, which is what disable() actually
+     * promises.</p>
+     */
+    @EdtTest
+    public void anArrivalAdmittedBeforeDisableIsNotDispatchedByALaterEnable() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(true);
+
+        // Admitted, which queues the dispatch for the next turn.
+        Continuity.deliver(fromElsewhere("the previous session's work", 150L));
+
+        // Both land BEFORE that queued turn runs, which is what the flag could not see.
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                Continuity.disable();
+                Continuity.enable();
+            }
+        });
+        flushSerialCalls();
+        flushSerialCalls();
+
+        assertNull(provider.restored,
+                "a state admitted before disable() was restored by the enable() that followed, "
+                        + "though disable() documents that arriving states are ignored from the "
+                        + "moment it is called, including the ones already admitted");
+    }
+
+    /**
+     * A key whose value is gone is not listed, even when the index still names it.
+     *
+     * <p>The sibling of the deletion-failure case, in the other direction: the value IS deleted
+     * and the index write then fails, so the stored index goes on naming a key whose get()
+     * answers the default. The platform being simulated has no such gap --
+     * NSUbiquitousKeyValueStore enumerates its own dictionary, so a phantom key cannot exist
+     * there -- and the simulation should not invent one.</p>
+     */
+    @EdtTest
+    public void aKeyWhoseValueIsGoneIsNotListed() {
+        Storage real = Storage.getInstance();
+        LocalContinuityBridge b = new LocalContinuityBridge();
+        try {
+            assertTrue(b.syncedStorePut("locale", "en"), "the fixture could not write a value");
+            assertTrue(java.util.Arrays.asList(b.syncedStoreKeys()).contains("locale"),
+                    "the fixture's own key is not listed, so this test is about nothing");
+
+            // The scenario itself rather than a hand-made facsimile of it: from here every write
+            // fails while deletes and reads still work, so the remove below deletes the value
+            // successfully and cannot rewrite the index.
+            Storage.setStorageInstance(new WriteRefusingStorage(real));
+            b.syncedStoreRemove("locale");
+            assertNull(b.syncedStoreGet("locale"),
+                    "the fixture is wrong: the value survived, so there is no phantom entry to "
+                            + "test");
+
+            assertFalse(java.util.Arrays.asList(b.syncedStoreKeys()).contains("locale"),
+                    "keys() named a key whose value is not there, so an application walking the "
+                            + "store reads the default for a key the store says it has");
+        } finally {
+            Storage.setStorageInstance(real);
+            new LocalContinuityBridge().syncedStoreRemove("locale");
+        }
+    }
+
+    /**
      * A synced-store value that would not delete keeps its index entry.
      *
      * <p>The two writes are the value and the index, and every caller has to know which of them
@@ -4479,6 +4584,11 @@ public class LocalContinuityTest extends UITestBase {
             // Long.MAX_VALUE" test compares equal and lets it through, to be clamped straight
             // back to Long.MAX_VALUE by the conversion.
             "{\"device\":\"other\",\"seq\":9223372036854775808}",
+            // A raw control character INSIDE a string. JSON forbids it unescaped, and the
+            // framework parser appends it rather than stopping -- so the key here is not
+            // "payload", the field is dropped as unknown, and what is left is a tombstone.
+            "{\"device\":\"other\",\"seq\":\"10\",\"pay\nload\":{\"a\":1}}",
+            "{\"device\":\"other\",\"seq\":\"10\",\"title\":\"two\u0000parts\"}",
         };
         for (int i = 0; i < wrong.length; i++) {
             try {
@@ -4556,6 +4666,36 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /** Storage that refuses ONE name and passes everything else through. */
+    /** Storage whose writes all fail while reads and deletes still work -- a full disk, from
+     * the point of view of code that has to keep two writes in step. */
+    static class WriteRefusingStorage extends Storage {
+        private final Storage delegate;
+
+        WriteRefusingStorage(Storage delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public boolean writeObject(String name, Object o) {
+            return false;
+        }
+
+        @Override
+        public Object readObject(String name) {
+            return delegate.readObject(name);
+        }
+
+        @Override
+        public boolean exists(String name) {
+            return delegate.exists(name);
+        }
+
+        @Override
+        public void deleteStorageFile(String name) {
+            delegate.deleteStorageFile(name);
+        }
+    }
+
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;
         private final String refused;
