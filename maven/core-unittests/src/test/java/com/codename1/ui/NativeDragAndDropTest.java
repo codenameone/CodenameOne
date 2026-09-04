@@ -1974,6 +1974,41 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aSourceThatStopsBeingOneIsNotDraggedAnyway() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container source = new Container();
+            source.setNativeDragOperation(new NativeDragOperation("no longer offered"));
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, source);
+            form.revalidate();
+
+            int x = source.getAbsoluteX() + 10;
+            int y = source.getAbsoluteY() + 10;
+            form.pointerPressed(x, y);
+            assertNotNull(implementation.getPreparedNativeDrag(), "the press staged one");
+
+            // What a press handler is entitled to do: setNativeDragOperation(null) is
+            // documented as stopping the component from being a drag source, and it runs after
+            // the press has already staged.
+            source.setNativeDragOperation(null);
+
+            drag(form, x + 200, y + 200);
+            assertNull(implementation.getStartedNativeDrag(),
+                    "a component that has just said it is not a drag source is not dragged");
+            assertNull(NativeDragAndDrop.dragSessionStarted(),
+                    "and a platform recognizer firing afterwards is told there is no session, "
+                            + "rather than being handed the operation that was withdrawn");
+        } finally {
+            NativeDragAndDrop.gestureCancelled();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void aClickOnANativeDragSourceDragsNothing() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

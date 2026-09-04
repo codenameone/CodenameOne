@@ -316,6 +316,17 @@ public final class NativeDragAndDrop {
     public static NativeDragOperation dragSessionStarted() {
         final NativeDragOperation op;
         final Component source;
+        Component staged;
+        synchronized (LOCK) {
+            staged = pendingSource;
+        }
+        if (!stillWillingSource(staged)) {
+            // The component disowned the drag after its press staged one. Nothing starts, and
+            // what was staged goes: the platform is about to be told there is no session, and
+            // leaving the operation behind would offer it to the next gesture instead.
+            gestureCancelled();
+            return null;
+        }
         synchronized (LOCK) {
             if (active != null) {
                 // A session is already running; see startDrag for why a second one must not
@@ -572,6 +583,29 @@ public final class NativeDragAndDrop {
         return root == null ? null : root.getCurrentPointerPress();
     }
 
+    /// Whether the component a gesture was staged for is still a drag source.
+    ///
+    /// A press stages before the component's own press handler runs, and that handler may
+    /// clear the operation or the drag source flag -- both documented as stopping the
+    /// component from being dragged. The setters only change the component's own fields, so
+    /// without this the stale operation was started by the next movement, and on a platform
+    /// whose recognizer owns the gesture it was handed to the session that began afterwards.
+    ///
+    /// Asked of both start paths rather than made the setters' business: a component can stop
+    /// being draggable in more ways than there are setters -- being disabled is one -- and the
+    /// question that matters is whether it is one *now*, at the moment something would begin.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the component the operation was staged for, or null for a drag begun in
+    ///   code, which has no component to ask
+    private static boolean stillWillingSource(Component source) {
+        if (source == null) {
+            return true;
+        }
+        return source.isNativeDragSource() && source.isEnabled();
+    }
+
     /// Installs what a press staged, or clears it when the press staged nothing. In one go
     /// rather than a clear followed by a fill, so that one press leaves one consistent state.
     ///
@@ -657,6 +691,15 @@ public final class NativeDragAndDrop {
             source = pendingSource;
             grabX = pressX;
             grabY = pressY;
+        }
+        if (!stillWillingSource(source)) {
+            // As in dragSessionStarted: the press staged this before the component's own press
+            // handler ran, and that handler is allowed to change its mind -- clearing the
+            // operation, or the drag source flag, is documented as stopping the component from
+            // being dragged. Starting the gesture anyway dragged a component that had just
+            // said it is not a drag source.
+            gestureCancelled();
+            return false;
         }
         if (needsGeneratedImage(op) && source != null) {
             try {
