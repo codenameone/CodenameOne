@@ -209,7 +209,7 @@ public final class StateCodec {
         if (json == null || json.trim().length() == 0) {
             return null;
         }
-        if (!isCompleteObject(json)) {
+        if (!isValidJsonObject(json)) {
             // JSONParser does NOT throw on a malformed document: it logs the failure, closes the
             // reader, and returns whatever partial map it had built. So a truncated relay response
             // came back as a valid-looking state, and the shape it takes is the worst one -- a
@@ -220,56 +220,241 @@ public final class StateCodec {
             //
             // So the check is here rather than left to the parser. Truncation is the corruption
             // that actually happens on a network, and it is exactly what a structural scan
-            // catches: a document whose braces and brackets do not close, or that ends inside a
-            // string, was not received whole.
+            // catches -- and so is a bad token, which a structural scan alone let through:
+            // {"device":"d","seq":"2","payload":tru} is balanced, quoted, and invalid.
             throw new IOException("The continuity relay returned a document that is not a "
-                    + "complete JSON object. Treated as a failed read rather than as an empty "
+                    + "valid JSON object. Treated as a failed read rather than as an empty "
                     + "relay, because a truncated document is indistinguishable from one that "
                     + "says the other device has nothing.");
         }
         return fromMap(JSONParser.parseJSON(json));
     }
 
-    /// Whether `json` is one complete JSON object: it starts with `{`, ends with its match, and
-    /// closes every string, brace and bracket in between.
+    /// Whether `json` is ONE syntactically valid JSON object and nothing else.
     ///
-    /// Deliberately structural rather than a full parse. It has one job -- deciding whether the
-    /// whole document arrived -- and answering it does not need the values, so it cannot disagree
-    /// with the parser about what they mean.
-    static boolean isCompleteObject(String json) {
-        String trimmed = json.trim();
-        if (trimmed.length() < 2 || trimmed.charAt(0) != '{'
-                || trimmed.charAt(trimmed.length() - 1) != '}') {
+    /// A real grammar check, because a structural one was not enough. Counting braces and closing
+    /// strings catches a document cut in half, and lets
+    /// `{"device":"d","seq":"2","payload":tru}` through -- balanced, quoted, and invalid. The
+    /// parser then logs the bad token and returns the map it had built up to that point, which is
+    /// a partial state with the same consequences as a truncated one.
+    ///
+    /// Nothing is built here and no value is interpreted: this answers only "is the whole of this
+    /// document well formed", so it cannot disagree with the parser about what anything MEANS.
+    /// The alternative was asking the parser, and it has no way to say -- its exception handler
+    /// logs, closes the reader, and returns the partial result.
+    static boolean isValidJsonObject(String json) {
+        String t = json.trim();
+        if (t.length() < 2 || t.charAt(0) != '{') {
             return false;
         }
-        int depth = 0;
-        boolean inString = false;
-        boolean escaped = false;
-        for (int i = 0; i < trimmed.length(); i++) {
-            char c = trimmed.charAt(i);
-            if (inString) {
-                if (escaped) {
-                    escaped = false;
-                } else if (c == '\\') {
-                    escaped = true;
-                } else if (c == '"') {
-                    inString = false;
-                }
-                continue;
+        int[] at = new int[1];
+        if (!scanValue(t, at)) {
+            return false;
+        }
+        skipWhitespace(t, at);
+        // Trailing content is not a second document, it is a broken one.
+        return at[0] == t.length();
+    }
+
+    private static void skipWhitespace(String s, int[] at) {
+        while (at[0] < s.length()) {
+            char c = s.charAt(at[0]);
+            if (c != ' ' && c != '\t' && c != '\n' && c != '\r') {
+                return;
             }
+            at[0]++;
+        }
+    }
+
+    private static boolean scanValue(String s, int[] at) {
+        skipWhitespace(s, at);
+        if (at[0] >= s.length()) {
+            return false;
+        }
+        char c = s.charAt(at[0]);
+        if (c == '{') {
+            return scanObject(s, at);
+        }
+        if (c == '[') {
+            return scanArray(s, at);
+        }
+        if (c == '"') {
+            return scanString(s, at);
+        }
+        if (c == 't') {
+            return scanLiteral(s, at, "true");
+        }
+        if (c == 'f') {
+            return scanLiteral(s, at, "false");
+        }
+        if (c == 'n') {
+            return scanLiteral(s, at, "null");
+        }
+        return scanNumber(s, at);
+    }
+
+    private static boolean scanObject(String s, int[] at) {
+        at[0]++;
+        skipWhitespace(s, at);
+        if (at[0] < s.length() && s.charAt(at[0]) == '}') {
+            at[0]++;
+            return true;
+        }
+        for (;;) {
+            skipWhitespace(s, at);
+            if (at[0] >= s.length() || s.charAt(at[0]) != '"' || !scanString(s, at)) {
+                return false;
+            }
+            skipWhitespace(s, at);
+            if (at[0] >= s.length() || s.charAt(at[0]) != ':') {
+                return false;
+            }
+            at[0]++;
+            if (!scanValue(s, at)) {
+                return false;
+            }
+            skipWhitespace(s, at);
+            if (at[0] >= s.length()) {
+                return false;
+            }
+            char c = s.charAt(at[0]);
+            at[0]++;
+            if (c == '}') {
+                return true;
+            }
+            if (c != ',') {
+                return false;
+            }
+        }
+    }
+
+    private static boolean scanArray(String s, int[] at) {
+        at[0]++;
+        skipWhitespace(s, at);
+        if (at[0] < s.length() && s.charAt(at[0]) == ']') {
+            at[0]++;
+            return true;
+        }
+        for (;;) {
+            if (!scanValue(s, at)) {
+                return false;
+            }
+            skipWhitespace(s, at);
+            if (at[0] >= s.length()) {
+                return false;
+            }
+            char c = s.charAt(at[0]);
+            at[0]++;
+            if (c == ']') {
+                return true;
+            }
+            if (c != ',') {
+                return false;
+            }
+        }
+    }
+
+    private static boolean scanString(String s, int[] at) {
+        at[0]++;
+        while (at[0] < s.length()) {
+            char c = s.charAt(at[0]);
+            at[0]++;
             if (c == '"') {
-                inString = true;
-            } else if (c == '{' || c == '[') {
-                depth++;
-            } else if (c == '}' || c == ']') {
-                depth--;
-                if (depth < 0) {
-                    // A closer with nothing open: the document is not merely short, it is wrong.
+                return true;
+            }
+            if (c == '\\') {
+                if (at[0] >= s.length()) {
+                    return false;
+                }
+                char e = s.charAt(at[0]);
+                at[0]++;
+                if (e == 'u') {
+                    if (at[0] + 4 > s.length()) {
+                        return false;
+                    }
+                    for (int i = 0; i < 4; i++) {
+                        if (hexValue(s.charAt(at[0] + i)) < 0) {
+                            return false;
+                        }
+                    }
+                    at[0] += 4;
+                } else if ("\"\\/bfnrt".indexOf(e) < 0) {
                     return false;
                 }
             }
         }
-        return depth == 0 && !inString;
+        return false;
+    }
+
+    private static int hexValue(char c) {
+        if (c >= '0' && c <= '9') {
+            return c - '0';
+        }
+        if (c >= 'a' && c <= 'f') {
+            return c - 'a' + 10;
+        }
+        if (c >= 'A' && c <= 'F') {
+            return c - 'A' + 10;
+        }
+        return -1;
+    }
+
+    private static boolean scanLiteral(String s, int[] at, String literal) {
+        if (!s.startsWith(literal, at[0])) {
+            return false;
+        }
+        at[0] += literal.length();
+        return true;
+    }
+
+    private static boolean scanNumber(String s, int[] at) {
+        int start = at[0];
+        if (at[0] < s.length() && s.charAt(at[0]) == '-') {
+            at[0]++;
+        }
+        // JSON's integer rule exactly: a single 0, or a non-zero digit and any digits after it.
+        // A permissive loop accepted "01", which is not JSON -- and being laxer than the grammar
+        // is the whole failure this validator exists to correct, so it does not get to make its
+        // own small version of it.
+        if (at[0] >= s.length()) {
+            return false;
+        }
+        char first = s.charAt(at[0]);
+        if (first == '0') {
+            at[0]++;
+        } else if (first >= '1' && first <= '9') {
+            while (at[0] < s.length() && s.charAt(at[0]) >= '0' && s.charAt(at[0]) <= '9') {
+                at[0]++;
+            }
+        } else {
+            return false;
+        }
+        if (at[0] < s.length() && s.charAt(at[0]) == '.') {
+            at[0]++;
+            int frac = 0;
+            while (at[0] < s.length() && s.charAt(at[0]) >= '0' && s.charAt(at[0]) <= '9') {
+                at[0]++;
+                frac++;
+            }
+            if (frac == 0) {
+                return false;
+            }
+        }
+        if (at[0] < s.length() && (s.charAt(at[0]) == 'e' || s.charAt(at[0]) == 'E')) {
+            at[0]++;
+            if (at[0] < s.length() && (s.charAt(at[0]) == '+' || s.charAt(at[0]) == '-')) {
+                at[0]++;
+            }
+            int exp = 0;
+            while (at[0] < s.length() && s.charAt(at[0]) >= '0' && s.charAt(at[0]) <= '9') {
+                at[0]++;
+                exp++;
+            }
+            if (exp == 0) {
+                return false;
+            }
+        }
+        return at[0] > start;
     }
 
     /// Throws when any value in the map could not survive being written to a property list, sent

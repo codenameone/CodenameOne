@@ -236,11 +236,30 @@ public final class Navigation {
         if (rebuilt.isEmpty()) {
             return false;
         }
+        // The PREVIOUS stack is kept until the new one is really on screen. show() runs
+        // application code -- the form's own show handling, and whatever listens to it -- and if
+        // that throws, the old form is still displayed while getCurrent(), back() and the next
+        // checkpoint would all be describing a stack the user never saw. A later navigation then
+        // persists a restoration that failed.
+        List<NavigationEntry> previous = new ArrayList<NavigationEntry>(stack);
         stack.clear();
         stack.addAll(rebuilt);
-        // show(), not showBack(): the user is arriving, not going back, and showBack would run
-        // the reverse transition into a screen they have not seen yet.
-        rebuilt.get(rebuilt.size() - 1).getForm().show();
+        // Resolved BEFORE the try, and that is not tidying. Reading from a generic list compiles
+        // to a checkcast, and this virtual machine's CHECKCAST expands to nothing -- so a failed
+        // cast hands the wrong object to the next instruction instead of throwing, and a handler
+        // that catches RuntimeException around it is a handler that can never run. The guarded
+        // region has to contain only the call being guarded. check-cast-semantics.sh refuses the
+        // other shape, correctly, and caught this exact line.
+        Form top = rebuilt.get(rebuilt.size() - 1).getForm();
+        try {
+            // show(), not showBack(): the user is arriving, not going back, and showBack would
+            // run the reverse transition into a screen they have not seen yet.
+            top.show();
+        } catch (RuntimeException e) {
+            stack.clear();
+            stack.addAll(previous);
+            throw e;
+        }
         stackChanged();
         return true;
     }

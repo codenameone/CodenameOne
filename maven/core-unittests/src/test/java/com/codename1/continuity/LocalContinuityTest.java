@@ -3669,7 +3669,7 @@ public class LocalContinuityTest extends UITestBase {
                                     + "document is then overwritten"
                             : ""));
         } catch (java.io.IOException expected) {
-            assertTrue(expected.getMessage().contains("complete JSON object"),
+            assertTrue(expected.getMessage().contains("valid JSON object"),
                     expected.getMessage());
         }
     }
@@ -3697,6 +3697,211 @@ public class LocalContinuityTest extends UITestBase {
                 "the value the caller was told had FAILED is readable, so the application took "
                         + "its fallback path over a value that is really there -- and keys() and "
                         + "clearing cannot see it");
+    }
+
+    /**
+     * A syntactically invalid document is refused even when its delimiters balance.
+     *
+     * <p>The first version of this guard counted braces and closed strings, which catches a
+     * document cut in half and lets a bad TOKEN through -- and the parser answers a bad token the
+     * same way it answers truncation: it logs, and returns the map it had built so far. A partial
+     * state that looks like a tombstone has the same consequences either way.</p>
+     */
+    @EdtTest
+    public void aSyntacticallyInvalidDocumentIsRefusedEvenWhenBalanced() throws Exception {
+        // Balanced braces, closed strings, invalid: "tru" is not a token.
+        String balancedButInvalid = "{\"device\":\"d\",\"seq\":\"2\",\"payload\":tru}";
+        assertFalse(StateCodec.isValidJsonObject(balancedButInvalid),
+                "a bad token passed the check, so the parser's partial map becomes a state");
+
+        // The shapes that must still be accepted, or the check is just breaking the feature.
+        assertTrue(StateCodec.isValidJsonObject(
+                StateCodec.toJson(fromElsewhere("a real one", 3L))),
+                "a document this codec itself wrote was refused");
+        assertTrue(StateCodec.isValidJsonObject("{}"), "an empty object was refused");
+        assertTrue(StateCodec.isValidJsonObject(
+                "{\"a\":[1,-2.5e3,true,null,{\"b\":\"\\u00e9\"}]}"),
+                "a valid nested document was refused");
+
+        // And the shapes that must not be.
+        assertFalse(StateCodec.isValidJsonObject("{\"a\":1,}"), "a trailing comma was accepted");
+        assertFalse(StateCodec.isValidJsonObject("{\"a\":1} junk"),
+                "trailing content after the object was accepted");
+        assertFalse(StateCodec.isValidJsonObject("{\"a\":\"unterminated}"),
+                "an unterminated string was accepted");
+        assertFalse(StateCodec.isValidJsonObject("{\"a\":01}"),
+                "a malformed number was accepted");
+        assertFalse(StateCodec.isValidJsonObject("{\"a\":\"\\uZZZZ\"}"),
+                "a bad unicode escape was accepted");
+    }
+
+    /**
+     * A tombstone does not release the publisher while a coalesced read is still owed.
+     *
+     * <p>pollFinished() clears {@code polling} before the tombstone is handled, so releasing here
+     * started the POST BEFORE the follow-up GET and then ran the two together -- against a relay
+     * that holds one document, which is exactly what the one-fetch-at-a-time rule exists to
+     * prevent. The remote update the second read was going to see is overwritten, and that read
+     * comes back with this device's own echo.</p>
+     */
+    @EdtTest
+    public void aTombstoneDoesNotReleaseThePublisherWhileAReadIsOwed() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+
+        // The tombstone arrives FROM the read, which is what makes this reachable: pollFinished()
+        // clears `polling` before handing the state to admit(), so the tombstone branch runs in a
+        // window where the publisher looks free while a coalesced read is still owed. A first
+        // version delivered the tombstone by hand while a fetch was blocked -- `polling` was
+        // still true, startPublisher() stopped at its own guard, and the test passed against the
+        // unfixed code.
+        final AppState tombstone = new AppState()
+                .setDeviceId("some-other-device")
+                .setSequence(41L)
+                .setTimestamp(System.currentTimeMillis());
+        final java.util.concurrent.atomic.AtomicInteger reads =
+                new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.CountDownLatch inTombstoneRead =
+                new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch releaseTombstone =
+                new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch releaseSecond =
+                new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.atomic.AtomicInteger publishedWhileReading =
+                new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicBoolean reading =
+                new java.util.concurrent.atomic.AtomicBoolean();
+
+        Continuity.setRelay(new StateRelay() {
+            public void publish(AppState state) {
+                if (reading.get()) {
+                    publishedWhileReading.incrementAndGet();
+                }
+                published.add(state);
+            }
+
+            public AppState fetch() {
+                int n = reads.incrementAndGet();
+                if (n == 1) {
+                    // setRelay() polls immediately. Answering nothing here leaves the arrival
+                    // below free to park -- returning the tombstone on this read admitted it
+                    // FIRST, so the seq-40 arrival was refused as already seen and there was
+                    // nothing to supersede.
+                    return null;
+                }
+                if (n == 2) {
+                    // Held so the test can ask for another read WHILE this one is in flight,
+                    // which is what sets pollAgain -- and then answers with the tombstone, so it
+                    // reaches admit() from pollFinished() with `polling` already cleared.
+                    inTombstoneRead.countDown();
+                    try {
+                        releaseTombstone.await(5L, java.util.concurrent.TimeUnit.SECONDS);
+                    } catch (InterruptedException ignored) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return tombstone;
+                }
+                // The coalesced follow-up, held open so an overlapping POST is observable.
+                reading.set(true);
+                try {
+                    releaseSecond.await(5L, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+                reading.set(false);
+                return null;
+            }
+        });
+
+        // An arrival parked, so the tombstone has something to supersede, and work owed to the
+        // relay so there is a POST to release.
+        Continuity.deliver(fromElsewhere("waiting on the user", 40L));
+        flushSerialCalls();
+        assertNotNull(Continuity.getRestorableState(), "nothing parked to supersede");
+        // Owed to the relay, and HELD by the parked arrival rather than sent.
+        Continuity.checkpoint();
+
+        // The read that will answer with the tombstone.
+        Continuity.pollRelay();
+        final boolean[] inRead = new boolean[1];
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                try {
+                    inRead[0] = inTombstoneRead.await(5L, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        assertTrue(inRead[0], "the tombstone read never started");
+        // Asked for WHILE that read is in flight, which is what sets pollAgain.
+        Continuity.pollRelay();
+        releaseTombstone.countDown();
+
+        pause(600L);
+        flushSerialCalls();
+        pause(400L);
+        flushSerialCalls();
+
+        assertTrue(reads.get() >= 2,
+                "the coalesced follow-up read never happened, so nothing could overlap: reads="
+                        + reads.get());
+        assertEquals(0, publishedWhileReading.get(),
+                "the tombstone released a POST while a coalesced read was still outstanding, so "
+                        + "the two ran together against a relay that holds one document");
+
+        releaseSecond.countDown();
+        pause(400L);
+        flushSerialCalls();
+    }
+
+    /**
+     * A restored stack that cannot be shown leaves the previous one in place.
+     *
+     * <p>show() runs application code. If it throws, the stack had already been replaced, so the
+     * old form stayed on screen while getCurrent(), back() and the next checkpoint all described
+     * a stack the user never saw -- and a later navigation persisted a restoration that failed.</p>
+     */
+    @EdtTest
+    public void aRestoredStackThatCannotBeShownLeavesThePreviousOne() {
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String path) {
+                if (path.startsWith("/explodes")) {
+                    return new Form(path) {
+                        @Override
+                        public void show() {
+                            throw new IllegalStateException("this screen cannot be shown");
+                        }
+                    };
+                }
+                return new Form(path);
+            }
+        });
+        try {
+            Navigation.navigate("/account/statement");
+            flushSerialCalls();
+            assertEquals(1, Navigation.getStack().size(), "the fixture stack was not established");
+
+            List<String> restored = new ArrayList<String>();
+            restored.add("/explodes");
+            try {
+                Navigation.restoreStack(restored);
+                fail("showing threw, so restoreStack must not report success");
+            } catch (IllegalStateException expected) {
+                assertEquals("this screen cannot be shown", expected.getMessage());
+            }
+
+            assertEquals(1, Navigation.getStack().size(),
+                    "the stack was replaced by a restoration that could not be shown, so back() "
+                            + "and the next checkpoint describe screens the user never saw");
+            assertEquals("/account/statement", Navigation.getStack().get(0).getPath(),
+                    "the previous stack was not the one that survived");
+        } finally {
+            Navigation.setDispatcher(null);
+            Navigation.clearStack();
+        }
     }
 
     /** Storage that refuses ONE name and passes everything else through. */

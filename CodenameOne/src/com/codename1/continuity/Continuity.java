@@ -1848,7 +1848,20 @@ public final class Continuity {
             if (waiting != null && state.getDeviceId().equals(waiting.getDeviceId())
                     && waiting.getSequence() <= state.getSequence()) {
                 parked = null;
-                startPublisher();
+                if (pollAgain) {
+                    // A coalesced read is still owed. pollFinished() has already cleared
+                    // `polling`, so releasing the publisher here would start the POST BEFORE that
+                    // follow-up GET and then run the two together -- against a relay that holds
+                    // one document, which is the situation the one-fetch-at-a-time rule exists
+                    // for. The remote update the second read was going to see gets overwritten,
+                    // and the read comes back with this device's own echo.
+                    //
+                    // Left owed instead: whoever finishes the coalesced read releases it, which
+                    // is the same path every other hold uses.
+                    publishRequested = true;
+                } else {
+                    startPublisher();
+                }
             }
             // Durably, and here rather than through commit(). Consuming a tombstone is the one
             // arrival that CANNOT fail -- there is no payload to hand over and no route to
