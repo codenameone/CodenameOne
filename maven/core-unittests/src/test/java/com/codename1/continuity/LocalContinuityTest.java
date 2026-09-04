@@ -44,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * The framework against the simulated platform every non-Apple port and the simulator use.
@@ -2192,6 +2193,216 @@ public class LocalContinuityTest extends UITestBase {
                 "capture() handed out a state whose sequence never reached storage, and the "
                         + "caller publishes it -- so the receiver's durable mark outlives the "
                         + "counter that produced it and later states are silently ignored");
+    }
+
+    /**
+     * A poll that brings back a state nobody has dealt with yet must not release a queued publish.
+     *
+     * <p>The publisher's hold on a parked arrival exists because a parked state's only copy is on
+     * the relay, and publishing replaces that single document. admit() deliberately queues the
+     * dispatch for a LATER turn -- that second turn is what lets an older state notice it was
+     * superseded -- so when the poll finished in the same turn, {@code parked} was still null and
+     * the hold had nothing to see. The worker it started never looks again.</p>
+     */
+    @EdtTest
+    public void aFetchedStateNobodyHasHandledYetHoldsTheQueuedPublish() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        // Nothing applies the arrival, so it parks -- the state the hold is for.
+        Continuity.setAutoRestore(false);
+
+        final AppState waiting = fromElsewhere("fetched, unhandled", 91L);
+        final java.util.concurrent.CountDownLatch inFetch =
+                new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch release =
+                new java.util.concurrent.CountDownLatch(1);
+        Continuity.setRelay(new StateRelay() {
+            public void publish(AppState state) {
+                published.add(state);
+            }
+
+            public AppState fetch() {
+                if (!served.getAndSet(false)) {
+                    return null;
+                }
+                // Held open so the checkpoint below is queued WHILE the poll is running, which is
+                // the situation the finding is about: work owed to the relay, and a state coming
+                // back that nobody has looked at yet.
+                inFetch.countDown();
+                try {
+                    release.await(2L, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+                return waiting;
+            }
+        });
+
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                try {
+                    inFetch.await(2L, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        // Owed while the poll is in flight, so pollFinished() is what releases it.
+        Continuity.checkpoint();
+        release.countDown();
+
+        // Two turns: the one pollFinished() runs in, and the one it queues the dispatch into.
+        pause(400L);
+        flushSerialCalls();
+        pause(200L);
+        flushSerialCalls();
+
+        assertNotNull(Continuity.getRestorableState(),
+                "the fetched state never parked, so this test is not about the hold at all");
+        assertTrue(published.isEmpty(),
+                "a checkpoint was published over the relay's only copy of a state the "
+                        + "application has not dealt with yet: published=" + published.size());
+
+        // And it was genuinely HELD, not simply never owed. Acknowledging the arrival is what
+        // releases the hold, so a publish arriving now is the proof that one was waiting -- and
+        // without it the assertion above would pass just as well on a relay nothing ever wanted
+        // to write to, which is how the first version of this test proved nothing.
+        Continuity.acknowledge(waiting);
+        pause(300L);
+        flushSerialCalls();
+        assertFalse(published.isEmpty(),
+                "no publish followed the acknowledgement, so nothing was ever owed to the relay "
+                        + "and the empty check above was vacuous");
+    }
+
+    /** What the fetch above hands over, once. */
+    private final java.util.concurrent.atomic.AtomicBoolean served =
+            new java.util.concurrent.atomic.AtomicBoolean(true);
+
+    /** What that relay was asked to publish. */
+    private final List<AppState> published =
+            java.util.Collections.synchronizedList(new ArrayList<AppState>());
+
+    /**
+     * Logout has to leave nothing restorable even when the port refuses to delete the file.
+     *
+     * <p>{@code deleteStorageFile} returns void and the ports behind it discard the answer they do
+     * get -- JavaSE ignores {@code File.delete()}'s boolean, Android ignores
+     * {@code Context.deleteFile()}'s -- so a refused deletion is invisible and leaves the
+     * signed-out account's routes and payload on disk, ready to be restored into the next
+     * login.</p>
+     */
+    @EdtTest
+    public void aLogoutLeavesNothingRestorableEvenWhenTheDeleteIsRefused() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("secret", "the previous account's work");
+        Continuity.setStateProvider(provider);
+        Continuity.checkpoint();
+        assertNotNull(Continuity.getRestorableState(),
+                "there is no checkpoint to lose, so the assertion below would pass on nothing");
+
+        Storage original = Storage.getInstance();
+        Storage.setStorageInstance(new UndeletableStorage(original));
+        try {
+            Continuity.clear();
+        } finally {
+            Storage.setStorageInstance(original);
+        }
+
+        assertNull(Continuity.getRestorableState(),
+                "logout left the previous account's checkpoint on disk, so a restart restores "
+                        + "one account's routes and payload into the next account's session");
+    }
+
+    /** Storage whose deleteStorageFile does nothing at all, silently, as a refusing port does. */
+    static class UndeletableStorage extends Storage {
+        private final Storage delegate;
+
+        UndeletableStorage(Storage delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void deleteStorageFile(String name) {
+            // Deliberately nothing. This is the port behaviour under test: the entry survives and
+            // the caller is told nothing, because the method cannot tell it anything.
+        }
+
+        @Override
+        public boolean writeObject(String name, Object o) {
+            return delegate.writeObject(name, o);
+        }
+
+        @Override
+        public Object readObject(String name) {
+            return delegate.readObject(name);
+        }
+
+        @Override
+        public boolean exists(String name) {
+            return delegate.exists(name);
+        }
+    }
+
+    /**
+     * A relay that is no longer installed refuses on the credential path, before it reads a token.
+     *
+     * <p>The publish worker confirms its session on the event thread before calling a relay, and
+     * that leaves one gap: the worker is a different thread, so between the confirmation and the
+     * relay reading its token a logout and a login can both have happened.
+     * {@code RestStateRelay.getToken()} is read at each request by design, so an object kept
+     * across both would answer with whoever is signed in NOW -- and the previous account's state
+     * would go out under the next account's credentials.</p>
+     *
+     * <p>What closes it is installing the new account's relay, which is the documented way to
+     * change accounts: the replaced object is refused for good. An application that instead keeps
+     * one relay and swaps the token inside it is beyond what any framework check can see, and
+     * getToken() says so.</p>
+     *
+     * <p>No server is involved: the refusal is the first thing {@code auth} does, so reaching the
+     * network at all would be the failure.</p>
+     */
+    @EdtTest
+    public void aRelayThatIsNoLongerInstalledRefusesBeforeReadingItsToken() {
+        final boolean[] tokenRead = new boolean[1];
+        RestStateRelay relay = new RestStateRelay("https://example.invalid/continuity") {
+            @Override
+            protected String getToken() {
+                tokenRead[0] = true;
+                return "the-next-account-token";
+            }
+        };
+
+        Continuity.setRelay(relay);
+        // The control: while it IS installed the guard must not fire, or the assertion below
+        // would pass against a relay that simply never works.
+        assertTrue(Continuity.isInstalledRelay(relay),
+                "the relay was not installed, so the refusal below proves nothing");
+
+        // REPLACED, not cleared. clear() is a logout and deliberately keeps the relay installed:
+        // the same endpoint usually serves the next account. What the framework can recognise is
+        // a relay that is no longer the installed one, which is why switching accounts means
+        // installing the new account's relay rather than swapping a token inside the old object.
+        Continuity.setRelay(new StateRelay() {
+            public void publish(AppState state) {
+            }
+
+            public AppState fetch() {
+                return null;
+            }
+        });
+
+        try {
+            relay.publish(new AppState().setDeviceId("previous-account").setSequence(1L));
+            fail("a relay that setRelay() replaced must not send anything");
+        } catch (java.io.IOException expected) {
+            assertTrue(expected.getMessage().contains("no longer installed"),
+                    expected.getMessage());
+        }
+        assertFalse(tokenRead[0],
+                "the token was read before the relay noticed it had been removed, which is the "
+                        + "credential the previous account's state would have gone out under");
     }
 
     /** Storage that refuses ONE name and passes everything else through. */

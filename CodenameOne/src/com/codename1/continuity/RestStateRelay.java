@@ -105,6 +105,16 @@ public class RestStateRelay implements StateRelay {
     /// #### Returns
     ///
     /// the token, or null for none
+    ///
+    /// #### Changing accounts
+    ///
+    /// Install a NEW relay for the new account -- `Continuity.setRelay(StateRelay)` -- rather than
+    /// returning a different account's token from the same object. A publish that was authorised
+    /// for the previous account can still be between the framework's last check and this read
+    /// when the switch happens, and the framework cannot bind a token it is not allowed to read.
+    /// What it can recognise is an object that is no longer installed, which it then refuses; an
+    /// object that quietly starts answering for someone else looks identical to one that
+    /// refreshed its own session.
     protected String getToken() {
         return null;
     }
@@ -139,7 +149,24 @@ public class RestStateRelay implements StateRelay {
         return StateCodec.fromJson(response.getResponseData());
     }
 
-    private RequestBuilder auth(RequestBuilder b) {
+    /// Adds the bearer token, refusing outright if this relay is no longer the installed one.
+    ///
+    /// The refusal is HERE, immediately before the token is read, because that is what makes it
+    /// worth anything. A worker that was started for one account and reaches the network after
+    /// the user has signed out and back in would otherwise send the first account's state
+    /// authenticated as the second: getToken() is read at each request, by design, so the same
+    /// relay object answers with whoever is signed in NOW.
+    ///
+    /// Continuity stops such a worker before it calls a relay at all. This is the second line for
+    /// the gap that check cannot cover -- it runs on the event thread, and the worker is not it.
+    /// Throwing rather than skipping quietly, so the framework records the publish as failed and
+    /// keeps owing it, and the state is republished once a relay is installed again.
+    private RequestBuilder auth(RequestBuilder b) throws IOException {
+        if (!Continuity.isInstalledRelay(this)) {
+            throw new IOException("This relay is no longer installed -- Continuity.clear() or "
+                    + "setRelay() replaced it. Refusing the request rather than sending one "
+                    + "account's state under another account's credentials.");
+        }
         String token = getToken();
         return token == null || token.length() == 0 ? b : b.bearer(token);
     }

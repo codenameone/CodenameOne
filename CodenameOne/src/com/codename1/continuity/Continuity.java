@@ -986,8 +986,10 @@ public final class Continuity {
             return;
         }
         polling = false;
+        boolean admitted = false;
         if (fetched != null) {
             admit(fetched);
+            admitted = true;
         }
         if (pollAgain) {
             pollAgain = false;
@@ -1001,7 +1003,27 @@ public final class Continuity {
             // establishes nothing, so anything owed waits for a read that succeeds.
             return;
         }
-        // Owed work goes out AFTER the fetch, never before it.
+        // Owed work goes out AFTER the fetch, never before it -- and after the fetched state has
+        // been DISPATCHED, not merely admitted.
+        //
+        // admit() only queues the dispatch for a later turn, on purpose: a second turn is what
+        // lets an older state notice it was superseded. So `parked` is still null here, and
+        // startPublisher()'s hold on a parked arrival -- the guard that stops a publish from
+        // overwriting the relay's only copy of a state nobody has dealt with yet -- had nothing
+        // to see. The worker it started never looks at `parked` again.
+        //
+        // Queued behind the dispatch rather than run beside it. Serial calls keep their order, so
+        // this runs after the turn that decides whether the arrival parks, and it then reads the
+        // answer instead of racing it.
+        if (admitted) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    startPublisher();
+                }
+            });
+            return;
+        }
         startPublisher();
     }
 
@@ -1046,7 +1068,26 @@ public final class Continuity {
         clearContinuation();
         try {
             if (Display.isInitialized() && Storage.getInstance().exists(STORAGE_KEY)) {
+                // Overwritten BEFORE it is deleted, and the overwrite is the part that is
+                // checked. deleteStorageFile() returns void, and the ports behind it discard the
+                // answer they do get -- JavaSE ignores File.delete()'s boolean, Android ignores
+                // Context.deleteFile()'s -- so a refused deletion is invisible here and leaves
+                // the signed-out account's routes and payload on disk, ready to be restored into
+                // the next login. That is the one thing logout must not do.
+                //
+                // The replacement is deliberately NOT an empty AppState: readStored() answers
+                // null for anything that is not an AppState, so a plain empty string leaves
+                // getRestorableState() null exactly as a successful delete would, while a blank
+                // state would have been offered for restoration instead.
+                boolean blanked = Storage.getInstance().writeObject(STORAGE_KEY, "");
                 Storage.getInstance().deleteStorageFile(STORAGE_KEY);
+                if (!blanked && Storage.getInstance().exists(STORAGE_KEY)) {
+                    // Both attempts refused, which is the only case the user can still be hurt
+                    // by. Said plainly, because the alternative is a silent logout that did not
+                    // take -- and there is nothing further this can do about it.
+                    Log.p("Continuity: the stored checkpoint could not be removed on logout, so "
+                            + "the previous account's state may be restored after a restart.");
+                }
             }
         } catch (Throwable t) {
             Log.e(t);
@@ -1730,6 +1771,28 @@ public final class Continuity {
         // memory already holds the entry, so "unchanged" meant "write nothing" and both
         // acknowledge() and the restore path silently persisted nothing at all.
         rememberSeen();
+    }
+
+    /// Whether `r` is still the relay this application has installed.
+    ///
+    /// Package visible for RestStateRelay, which asks it on the CREDENTIAL path -- the last place
+    /// a check can be put before a token is read. The publish worker already confirms its session
+    /// on the event thread before calling the relay, and that leaves one gap it cannot close: the
+    /// worker is a different thread, so between the confirmation returning and the relay reading
+    /// its token, a logout and a login can both have happened. getToken() is documented to be
+    /// read at each request precisely so a refreshed session is followed, which means the relay
+    /// would then authenticate the PREVIOUS account's state with the NEXT account's credentials.
+    ///
+    /// Not the same as the session check and not a replacement for it: that one stops the work,
+    /// this one stops the credentials. A check cannot be atomic with the read that follows it, so
+    /// what this buys is the distance between them -- instructions on one thread instead of an
+    /// unbounded wait on a queue. Closing it completely would mean binding the token inside the
+    /// confirmation, which no framework code can do: resolving credentials is the relay's own
+    /// business and the interface deliberately does not reach into it.
+    static boolean isInstalledRelay(StateRelay r) {
+        // IDENTITY, and the marker says so: two relays that considered themselves equal would
+        // still be two objects, and the one that was replaced is the one that must be refused.
+        return r != null && r == relay; //NOPMD CompareObjectsWithEquals
     }
 
     /// Test seam: parks a state, as a cold-launch arrival with no form yet does.
