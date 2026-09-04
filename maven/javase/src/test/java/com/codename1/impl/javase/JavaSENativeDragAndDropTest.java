@@ -621,6 +621,23 @@ class JavaSENativeDragAndDropTest {
     }
 
     @Test
+    void theDragPreviewHangsFromTheGrabPointRatherThanBesideIt() {
+        assertEquals(new java.awt.Point(-10, -20),
+                JavaSENativeDragAndDrop.awtDragImageAnchor(10, 20, 1),
+                "AWT is told where the image's corner is relative to the pointer, which is the "
+                        + "opposite of where the pointer is within the image");
+        assertEquals(new java.awt.Point(-5, -10),
+                JavaSENativeDragAndDrop.awtDragImageAnchor(10, 20, 2),
+                "and in points rather than in Codename One pixels");
+        assertEquals(new java.awt.Point(0, 0),
+                JavaSENativeDragAndDrop.awtDragImageAnchor(0, 0, 1),
+                "a drag grabbed at the corner hangs from the corner either way round");
+        assertEquals(new java.awt.Point(-10, -20),
+                JavaSENativeDragAndDrop.awtDragImageAnchor(10, 20, 0),
+                "a scale of zero is not something a coordinate can be divided by");
+    }
+
+    @Test
     void theDragPreviewIsScaledByTheSkinZoomAsWellAsTheDisplay() {
         assertEquals(2.0, JavaSENativeDragAndDrop.overlayScale(false, 2.0, 1), 0.0001,
                 "with no skin the backing scale is the whole of it");

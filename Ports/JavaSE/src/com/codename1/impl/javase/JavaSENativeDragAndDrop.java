@@ -142,9 +142,8 @@ final class JavaSENativeDragAndDrop {
         }
         final double scale = target.awtOverlayScale();
         final java.awt.Image dragImage = toAwtDragImage(op, scale);
-        final Point offset = new Point(
-                (int) (op.getDragImageOffsetX() / scale),
-                (int) (op.getDragImageOffsetY() / scale));
+        final Point offset = awtDragImageAnchor(op.getDragImageOffsetX(),
+                op.getDragImageOffsetY(), scale);
         setExporting(op);
         EventQueue.invokeLater(new Runnable() {
             @Override
@@ -196,6 +195,28 @@ final class JavaSENativeDragAndDrop {
         if (NativeDragAndDrop.getActiveDrag() == null) {
             setExporting(null);
         }
+    }
+
+    /// The anchor AWT wants for a drag image, from the grab point the framework records.
+    ///
+    /// The two are opposites. NativeDragOperation's offset is where the pointer sits *inside*
+    /// the image, which is also what Android's shadow metrics ask for; DragSource documents
+    /// its own as "the offset of the Image origin from the hotspot" -- the vector from the
+    /// pointer to the image's top left corner -- and TransferHandler hands what it is given
+    /// straight to it. Passing the grab point through unchanged pushed the preview down and
+    /// to the right by exactly that much, so the part of the component the user took hold of
+    /// was never the part under the pointer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offsetX`: the grab point within the image, in Codename One pixels
+    ///
+    /// - `offsetY`: the grab point within the image, in Codename One pixels
+    ///
+    /// - `scale`: Codename One pixels per AWT point; see `#overlayScale(boolean, double, float)`
+    static Point awtDragImageAnchor(int offsetX, int offsetY, double scale) {
+        double factor = scale > 0 ? scale : 1;
+        return new Point((int) (-offsetX / factor), (int) (-offsetY / factor));
     }
 
     /// Codename One pixels per AWT point over a canvas.
