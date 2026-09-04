@@ -1396,6 +1396,55 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
 #endif
 }
 
+/// The identifiers the system pasteboard is offering, in its own order.
+static NSArray* cn1ClipboardTypes(void) {
+#if TARGET_OS_OSX
+    return [[NSPasteboard generalPasteboard] types];
+#else
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+    return [UIPasteboard generalPasteboard].pasteboardTypes;
+#else
+    return nil;
+#endif
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getClipboardTypeCount___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    POOL_BEGIN();
+    JAVA_INT count = (JAVA_INT)cn1ClipboardTypes().count;
+    POOL_END();
+    return count;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardTypeAt___int_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT index) {
+    POOL_BEGIN();
+    NSArray* types = cn1ClipboardTypes();
+    NSString* mime = index >= 0 && index < (JAVA_INT)types.count
+            ? CN1MimeForUti([types objectAtIndex:index]) : nil;
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_STATE_PASS_ARG mime);
+    POOL_END();
+    return result;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardRepresentation___java_lang_String_R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType) {
+    POOL_BEGIN();
+    NSString* mime = mimeType == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG mimeType);
+    NSString* uti = mime == nil ? nil : CN1UtiForMime(mime);
+    NSData* data = nil;
+    if (uti != nil) {
+#if TARGET_OS_OSX
+        data = [[NSPasteboard generalPasteboard] dataForType:uti];
+#else
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+        data = [[UIPasteboard generalPasteboard] dataForPasteboardType:uti];
+#endif
+#endif
+    }
+    JAVA_OBJECT result = data == nil ? JAVA_NULL : nsDataToByteArr(data);
+    POOL_END();
+    return result;
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardImage___R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_OSX
     POOL_BEGIN();

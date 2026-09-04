@@ -351,6 +351,18 @@ public final class IOSNative {
     native void addClipboardRepresentation(String mimeType, byte[] value);
     native void setClipboardContent(String plain, String html, String rtf, String markdown, String asciidoc, byte[] image, String fileUris);
     native String getClipboardContent(String mimeType);
+
+    /// How many representations the system pasteboard is offering, so they can be read by
+    /// index rather than joined into one string -- see addNativeDragFiles for what a
+    /// separator costs.
+    native int getClipboardTypeCount();
+
+    /// The MIME type of one of them, or null for an identifier this framework has no
+    /// reading of.
+    native String getClipboardTypeAt(int index);
+
+    /// Its bytes, or null when the pasteboard no longer has it.
+    native byte[] getClipboardRepresentation(String mimeType);
     native byte[] getClipboardImage();
     native String getClipboardFileUris();
 

@@ -9115,6 +9115,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(image != null && image.length > 0) {
             content.setData(com.codename1.ui.ClipboardContent.MIME_PNG, image);
         }
+        // Everything else the pasteboard is offering. The reads above name the types the
+        // framework has constants for; a copy -- this application's own or another's -- may
+        // put any type at all on it, and one of those could be published and never read back,
+        // so a paste of an application's own format answered with null once the lightweight
+        // clipboard behind it was gone.
+        int offered = nativeInstance.getClipboardTypeCount();
+        for(int iter = 0 ; iter < offered ; iter++) {
+            String mime = nativeInstance.getClipboardTypeAt(iter);
+            if(mime == null || mime.length() == 0 || content.hasMimeType(mime)) {
+                continue;
+            }
+            byte[] bytes = nativeInstance.getClipboardRepresentation(mime);
+            if(bytes != null) {
+                // Empty is present, as everywhere else here: a representation published
+                // deliberately empty is one the source published.
+                content.setData(mime, bytes);
+            }
+        }
         String files = nativeInstance.getClipboardFileUris();
         if(files != null && files.length() > 0) {
             // The pasteboard's URLs, which are not all files: a link copied out of Safari is one
@@ -9649,8 +9667,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             // pasteboard nowhere else, so a copy of one published an empty pasteboard and
             // its provider was never even asked.
             String[] offered = content.getMimeTypes();
+            String published = firstImageMime(content);
             for(int iter = 0 ; iter < offered.length ; iter++) {
-                if(isNamedClipboardType(offered[iter])) {
+                if(isNamedClipboardType(offered[iter], published)) {
                     continue;
                 }
                 Object value = clipboardValue(content, offered[iter]);
@@ -9690,17 +9709,33 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     /// True when setClipboardContent already has an argument for this type, so it must not be
     /// published a second time beside itself.
-    private static boolean isNamedClipboardType(String mime) {
+    private static boolean isNamedClipboardType(String mime, String publishedImage) {
+        // Only the *one* image encoding the image argument carries. A content offering a PNG
+        // and a JPEG sends one of them there, and excluding every image type from the loop
+        // beside it dropped the other -- so a receiver asking for the encoding that was left
+        // out could not paste an image the content plainly advertised.
         return com.codename1.ui.ClipboardContent.MIME_TEXT.equals(mime)
                 || com.codename1.ui.ClipboardContent.MIME_HTML.equals(mime)
                 || com.codename1.ui.ClipboardContent.MIME_RTF.equals(mime)
                 || com.codename1.ui.ClipboardContent.MIME_MARKDOWN.equals(mime)
                 || com.codename1.ui.ClipboardContent.MIME_ASCIIDOC.equals(mime)
-                || com.codename1.ui.ClipboardContent.MIME_PNG.equals(mime)
-                || com.codename1.ui.ClipboardContent.MIME_JPEG.equals(mime)
-                || com.codename1.ui.ClipboardContent.MIME_GIF.equals(mime)
+                || (publishedImage != null && publishedImage.equals(mime))
                 || com.codename1.ui.ClipboardContent.MIME_FILE.equals(mime)
                 || com.codename1.ui.ClipboardContent.MIME_URI_LIST.equals(mime);
+    }
+
+    /// The image encoding clipboardImageBytes will send, or null when the content has none.
+    private static String firstImageMime(com.codename1.ui.ClipboardContent content) {
+        if(clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_PNG) != null) {
+            return com.codename1.ui.ClipboardContent.MIME_PNG;
+        }
+        if(clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_JPEG) != null) {
+            return com.codename1.ui.ClipboardContent.MIME_JPEG;
+        }
+        if(clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_GIF) != null) {
+            return com.codename1.ui.ClipboardContent.MIME_GIF;
+        }
+        return null;
     }
 
     /// Preferred image representation (PNG, then JPEG, then GIF bytes) for the pasteboard, or null.

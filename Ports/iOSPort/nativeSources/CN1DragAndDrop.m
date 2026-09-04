@@ -257,6 +257,11 @@ static NSString* cn1LegacyUtiForMime(NSString* mime) {
 }
 
 static NSString* cn1UtiForMime(NSString* mime);
+static NSString* cn1MimeForUti(NSString* uti);
+
+NSString* CN1MimeForUti(NSString* uti) {
+    return cn1MimeForUti(uti);
+}
 
 NSString* CN1UtiForMime(NSString* mime) {
     return cn1UtiForMime(mime);

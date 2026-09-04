@@ -117,6 +117,10 @@ void CN1AddNativeDragFiles(NSString* path);
 /// describes, which is exactly how an application's own format is carried.
 NSString* CN1UtiForMime(NSString* mime);
 
+/// The MIME type a uniform type identifier means, or nil for one this framework has no
+/// reading of.
+NSString* CN1MimeForUti(NSString* uti);
+
 /// Drops whatever CN1PrepareNativeDrag staged, because the press turned out to be a tap.
 void CN1CancelNativeDrag(void);
 
