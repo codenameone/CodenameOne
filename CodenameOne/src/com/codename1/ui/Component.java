@@ -8070,7 +8070,12 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// replaced by setScrollVisible to match the JavaBeans spec
     public void setIsScrollVisible(boolean isScrollVisible) {
-        this.isScrollVisible = isScrollVisible;
+        // Straight through, so this stays a true alias. Setting the field alone
+        // left no override bit, and initLaf() then restored the look-and-feel
+        // default over it the next time the component was shown -- the two
+        // methods stopped behaving the same, which is the one thing a deprecated
+        // alias must not do.
+        setScrollVisible(isScrollVisible);
     }
 
     void lockStyleImages(Style stl) {

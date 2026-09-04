@@ -27,6 +27,7 @@
 #import "CN1AppKitCompat.h"
 #import "CN1MacTextInput.h"
 #import "CN1Metalcompat.h"
+#include <stdatomic.h>
 #include "cn1_globals.h"
 
 /// Orthographic projection with the origin at the top left.
@@ -136,7 +137,12 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 
     /// Bumped whenever the surfaces are rebuilt, so a frame that was already in
     /// flight can tell that it belongs to the previous size.
-    int cn1PresentGeneration;
+    ///
+    /// ATOMIC because the two sides are different threads: the bump happens on
+    /// the thread that rebuilds the framebuffer, and the read happens in a Metal
+    /// completion callback on the queue's own thread. A plain int there is a
+    /// data race, and the callback would not be guaranteed to observe the bump.
+    _Atomic int cn1PresentGeneration;
 }
 
 @synthesize commandQueue;
@@ -462,7 +468,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         }
     }
     cn1PresentIndex = 0;
-    cn1PresentGeneration++;
+    atomic_fetch_add_explicit(&cn1PresentGeneration, 1, memory_order_release);
     NSDictionary *surfaceProps = @{
         (id)kIOSurfaceWidth:           @(pw),
         (id)kIOSurfaceHeight:          @(ph),
@@ -715,10 +721,10 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     // Captured by value; the block retains self until it runs, which is exactly
     // as long as the check needs it. No __weak here -- this port compiles
     // without ARC and __weak is not available.
-    int frameGeneration = cn1PresentGeneration;
+    int frameGeneration = atomic_load_explicit(&cn1PresentGeneration, memory_order_acquire);
     METALView *presentView = self;
     [self.commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
-        if (presentView->cn1PresentGeneration == frameGeneration) {
+        if (atomic_load_explicit(&presentView->cn1PresentGeneration, memory_order_acquire) == frameGeneration) {
             [CATransaction begin];
             [CATransaction setDisableActions:YES];
             // Re-assigned every frame: the assignment is what marks the layer
