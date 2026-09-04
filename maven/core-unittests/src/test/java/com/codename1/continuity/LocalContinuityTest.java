@@ -3405,6 +3405,56 @@ public class LocalContinuityTest extends UITestBase {
                 "an enabled framework refused its own activity type");
     }
 
+    /**
+     * The eviction order of the delivery marks survives a restart.
+     *
+     * <p>rememberSeen() writes durableSeen in its own order, least-recently-seen first, so the
+     * file carries the eviction order. Reading it back into a HashMap threw that away, and
+     * enable() replayed an arbitrary order into a map whose whole job is to evict the front -- so
+     * the next new origin could evict a device the user is actively using instead of the one
+     * quiet longest, and a delayed duplicate from the evicted device ran its side effects
+     * again.</p>
+     */
+    @EdtTest
+    public void theEvictionOrderOfTheMarksSurvivesARestart() {
+        Continuity.setStateProvider(new RecordingProvider());
+        // A full set, acknowledged oldest first, so "device-0" is the one quiet longest.
+        for (int i = 0; i < 64; i++) {
+            Map<String, Object> payload = new HashMap<String, Object>();
+            payload.put("note", "seen " + i);
+            Continuity.acknowledge(new AppState()
+                    .setPayload(payload)
+                    .setDeviceId("device-" + i)
+                    .setSequence(i + 1)
+                    .setTimestamp(System.currentTimeMillis()));
+        }
+        flushSerialCalls();
+        assertEquals(64, Continuity.readSeenForTest().size(), "the fixture is not a full set");
+
+        // The restart: memory forgotten, the file reloaded.
+        Continuity.reset();
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.enable();
+
+        // One more origin, which must evict the eldest and only the eldest.
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("note", "the new one");
+        Continuity.acknowledge(new AppState()
+                .setPayload(payload)
+                .setDeviceId("device-new")
+                .setSequence(99L)
+                .setTimestamp(System.currentTimeMillis()));
+        flushSerialCalls();
+
+        Map<String, Long> after = Continuity.readSeenForTest();
+        assertFalse(after.containsKey("device-0"),
+                "the eldest mark survived, so something else was evicted in its place");
+        assertTrue(after.containsKey("device-63"),
+                "the most recently seen device was evicted instead of the eldest, so a delayed "
+                        + "duplicate from it reaches the listeners and repeats its side effects");
+        assertTrue(after.containsKey("device-new"), "the new origin was not recorded at all");
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;

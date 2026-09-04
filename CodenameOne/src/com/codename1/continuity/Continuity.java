@@ -31,7 +31,6 @@ import com.codename1.router.Navigation;
 import com.codename1.ui.Display;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -2248,9 +2247,17 @@ public final class Continuity {
         }
     }
 
-    /// Reads the persisted high-water marks. Never null.
+    /// Reads the persisted high-water marks, in the order they were written. Never null.
+    ///
+    /// LinkedHashMap, and that is the point of it. rememberSeen() writes durableSeen in ITS order,
+    /// which is least-recently-seen first, so the file carries the eviction order -- and a
+    /// HashMap here threw that away on the way back in. enable() then replayed an arbitrary order
+    /// into a map whose whole job is to evict the front, so after a restart with a full set of
+    /// marks the next new origin could evict a device the user is actively using instead of the
+    /// one quiet longest, and a delayed duplicate from the evicted device ran its side effects
+    /// again.
     private static Map<String, Long> readSeen() {
-        Map<String, Long> out = new HashMap<String, Long>();
+        Map<String, Long> out = new LinkedHashMap<String, Long>();
         try {
             if (!Display.isInitialized() || !Storage.getInstance().exists(PREF_SEEN)) {
                 return out;
