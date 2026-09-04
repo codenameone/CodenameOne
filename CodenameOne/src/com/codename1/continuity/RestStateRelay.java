@@ -22,6 +22,8 @@
  */
 package com.codename1.continuity;
 
+import com.codename1.io.Log;
+import com.codename1.ui.Display;
 import com.codename1.io.rest.ErrorCodeHandler;
 import com.codename1.io.rest.RequestBuilder;
 import com.codename1.io.rest.Response;
@@ -188,10 +190,48 @@ public class RestStateRelay implements StateRelay {
         //
         // A relay that has moved should say so by being configured with its new URL, which is
         // the application's decision to make and not a header's.
+        //
+        // WHERE THE PLATFORM ALLOWS IT. On iOS and the native macOS port that inherits its
+        // networking, NSURLSession follows redirects inside the native stack before the framework
+        // sees the response -- ConnectionRequest.setFollowRedirects says so in as many words, and
+        // the port answers "cn1.nativeRedirects" with true. This flag is not a promise there, and
+        // saying nothing about that would have been a false assurance in the one place it matters
+        // most. Reported once per process, because an endpoint that redirects has to be fixed at
+        // the endpoint: nothing in this class can stop it.
+        warnIfRedirectsCannotBeRefused();
         RequestBuilder quiet = b.followRedirects(false).onErrorCodeString(SILENT);
         String token = getToken();
         return token == null || token.length() == 0 ? quiet : quiet.bearer(token);
     }
+
+    /// Says so, once, when the platform will follow redirects whatever this class asks.
+    ///
+    /// Not a workaround -- there is none from here. The redirect is taken inside the native
+    /// networking stack, so this code never sees the response that ordered it and cannot inspect
+    /// where the request actually went. What it can do is stop the guarantee from being silent,
+    /// so an endpoint that redirects is a thing somebody knows to fix rather than a token that
+    /// quietly went somewhere else.
+    private static void warnIfRedirectsCannotBeRefused() {
+        if (redirectWarningSaid) {
+            return;
+        }
+        redirectWarningSaid = true;
+        try {
+            if (!"true".equals(Display.getInstance().getProperty("cn1.nativeRedirects", "false"))) {
+                return;
+            }
+        } catch (Throwable t) {
+            Log.e(t);
+            return;
+        }
+        Log.p("Continuity: this platform follows HTTP redirects inside its native networking, so "
+                + "the relay cannot refuse them. A redirect from the relay endpoint would carry "
+                + "the bearer token to wherever it points. Make sure the endpoint answers "
+                + "directly rather than redirecting.");
+    }
+
+    /// So the warning above is said once rather than on every request.
+    private static boolean redirectWarningSaid;
 
     /// Registered on every request purely to make it silent. See auth().
     ///

@@ -3325,6 +3325,55 @@ public class LocalContinuityTest extends UITestBase {
                         + "restores on its next poll: published=" + published.size());
     }
 
+    /**
+     * Keys that Storage would fold together stay distinct in the simulated store.
+     *
+     * <p>Storage normalizes {@code /}, {@code %}, {@code ?}, {@code *}, {@code :} and {@code =}
+     * to {@code _} in a file name, so "a/b" and "a_b" addressed the same value: both writes
+     * reported success, the index listed both keys, and either read returned whichever was
+     * written last while removing one deleted the other. That arrived with the move off
+     * Preferences, which has no such rule -- a defect introduced while fixing a different one.</p>
+     */
+    @EdtTest
+    public void keysThatStorageWouldFoldTogetherStayDistinct() {
+        assertTrue(SyncedStore.put("a/b", "slash"), "the first key was refused");
+        assertTrue(SyncedStore.put("a_b", "underscore"), "the second key was refused");
+
+        assertEquals("slash", SyncedStore.get("a/b", "missing"),
+                "\"a/b\" reads back the value written under \"a_b\", so the two share a "
+                        + "storage name");
+        assertEquals("underscore", SyncedStore.get("a_b", "missing"),
+                "\"a_b\" lost its own value");
+
+        // And removing one must not take the other with it.
+        SyncedStore.remove("a/b");
+        assertEquals("missing", SyncedStore.get("a/b", "missing"), "the removal did not happen");
+        assertEquals("underscore", SyncedStore.get("a_b", "missing"),
+                "removing \"a/b\" deleted the value stored under \"a_b\"");
+    }
+
+    /**
+     * Forgetting the back history is a change worth checkpointing.
+     *
+     * <p>clearStack() stayed silent so that logout could call it without checkpointing the
+     * emptied stack back over the storage it was deleting -- which made it silent for every other
+     * caller too. An application that forgot its history and did not then navigate left the
+     * previous routes in the stored checkpoint, so a process death restored exactly what it had
+     * just cleared.</p>
+     */
+    @EdtTest
+    public void forgettingTheBackHistoryIsCheckpointed() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.checkpoint();
+        assertFalse(Continuity.isCheckpointPending(), "the fixture starts with nothing owed");
+
+        Navigation.clearStack();
+
+        assertTrue(Continuity.isCheckpointPending(),
+                "clearing the back history scheduled no checkpoint, so the previous routes stay "
+                        + "in storage and a process death restores what was just cleared");
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;

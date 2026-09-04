@@ -145,11 +145,18 @@ public final class Navigation {
     /// their routes.
     ///
     /// The forms themselves are not touched: whatever is on screen stays there, and the caller
-    /// navigates wherever it means to go next. Nor does this notify continuity. Forgetting where
-    /// the user has been is not the user going somewhere, and a checkpoint here would write the
-    /// emptied stack straight back over the one just deleted.
+    /// navigates wherever it means to go next.
+    ///
+    /// Continuity IS notified, because for every caller except a logout this is a real change to
+    /// where the user has been. It used to stay silent so that `Continuity.clear()` could call it
+    /// without checkpointing the emptied stack back over what it was deleting -- but that made
+    /// every other caller silent too: an application forgetting its back history and then not
+    /// navigating left the previous routes in the stored checkpoint, so a process death restored
+    /// exactly what it had just cleared. The logout path suppresses this at its own end, where
+    /// the reason to suppress it lives.
     public static void clearStack() {
         stack.clear();
+        stackChanged();
     }
 
     /// Pop entries until `entry` is on top, then show its form via

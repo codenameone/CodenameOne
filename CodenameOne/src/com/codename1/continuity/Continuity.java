@@ -515,6 +515,11 @@ public final class Continuity {
             return;
         }
         dirty = true;
+        if (clearingStack) {
+            // The logout emptying the stack, not the user going anywhere. Checkpointing it would
+            // write the emptied stack over the state clear() is in the middle of deleting.
+            return;
+        }
         if (!Display.isInitialized() || flushScheduled) {
             return;
         }
@@ -1139,9 +1144,16 @@ public final class Continuity {
         // either way round, a checkpoint here would write the emptied stack over what is being
         // removed.
         try {
+            // Suppressed HERE, not in Navigation. clearStack() notifies for every other caller,
+            // because forgetting the back history really is a change worth checkpointing -- it is
+            // only this one that must not, since a checkpoint would write the emptied stack
+            // straight back over the storage being deleted two lines down.
+            clearingStack = true;
             Navigation.clearStack();
         } catch (Throwable t) {
             Log.e(t);
+        } finally {
+            clearingStack = false;
         }
         try {
             if (Display.isInitialized() && Storage.getInstance().exists(STORAGE_KEY)) {
@@ -1424,6 +1436,9 @@ public final class Continuity {
     /// inside a listener is legitimate and must not abandon the dispatch that is running. This
     /// counts only the two calls that make everything after them meaningless.
     private static int lifecycle;
+
+    /// True while clear() is emptying the route stack, so its notification is ignored.
+    private static boolean clearingStack;
 
     /// The parked state the publication hold has already been explained for, so it is said once.
     private static AppState heldFor;
@@ -2501,6 +2516,7 @@ public final class Continuity {
         lastCompleted = null;
         lifecycle = 0;
         heldFor = null;
+        clearingStack = false;
     }
 
     /// The store notification, as a constant rather than an anonymous class per callback.

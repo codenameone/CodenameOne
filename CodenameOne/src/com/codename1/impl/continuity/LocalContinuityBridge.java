@@ -195,7 +195,7 @@ public class LocalContinuityBridge implements ContinuityBridge {
         // Same correction the sequence counter and the delivery marks already needed. The
         // simulation has to answer the question the device answers -- is the value there now --
         // and only a checked write can.
-        if (!write(PREFIX + key, value)) {
+        if (!write(storageName(key), value)) {
             return false;
         }
         List<String> keys = indexKeys();
@@ -209,6 +209,37 @@ public class LocalContinuityBridge implements ContinuityBridge {
             }
         }
         return true;
+    }
+
+    /// The storage name for an application key, encoded so that distinct keys cannot collide.
+    ///
+    /// Storage normalizes `/`, `\\`, `%`, `?`, `*`, `:` and `=` to `_` in a file name, so
+    /// "a/b" and "a_b" addressed the SAME value: both writes reported success, the index listed
+    /// both keys, and either read returned whichever was written last while removing one deleted
+    /// the other. That arrived with the move off Preferences -- which has no such rule -- so it
+    /// is a defect this class introduced while fixing a different one, not an old one.
+    ///
+    /// Every character Storage would rewrite is escaped as `$` and two hex digits, and `$` itself
+    /// with it, which makes the mapping reversible and therefore collision-free: two different
+    /// keys cannot produce one name. The keys themselves are unrestricted, exactly as the
+    /// platform store leaves them.
+    private static String storageName(String key) {
+        StringBuilder sb = new StringBuilder(PREFIX);
+        for (int i = 0; i < key.length(); i++) {
+            char c = key.charAt(i);
+            if (c == '/' || c == '\\' || c == '%' || c == '?' || c == '*' || c == ':'
+                    || c == '=' || c == '$') {
+                sb.append('$');
+                String hex = Integer.toHexString(c).toUpperCase();
+                if (hex.length() < 2) {
+                    sb.append('0');
+                }
+                sb.append(hex);
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 
     /// Writes one value, reporting whether it actually reached storage.
@@ -239,13 +270,13 @@ public class LocalContinuityBridge implements ContinuityBridge {
 
     @Override
     public String syncedStoreGet(String key) {
-        return read(PREFIX + key);
+        return read(storageName(key));
     }
 
     @Override
     public void syncedStoreRemove(String key) {
         try {
-            Storage.getInstance().deleteStorageFile(PREFIX + key);
+            Storage.getInstance().deleteStorageFile(storageName(key));
         } catch (Throwable t) {
             Log.e(t);
         }
