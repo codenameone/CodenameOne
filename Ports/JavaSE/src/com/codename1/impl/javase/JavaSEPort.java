@@ -2305,7 +2305,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 String mime = JavaSENativeDragAndDrop.asciiLower(
                         flavor.getPrimaryType() + "/" + flavor.getSubType());
-                if (!"text".equals(JavaSENativeDragAndDrop.asciiLower(flavor.getPrimaryType()))
+                // application/rtf is rich text under another name, and the branch at the
+                // end of this loop is what files it under the framework's own MIME_RTF.
+                // Claiming it here as arbitrary bytes -- which it is, in AWT's typing --
+                // took it away from that branch, so a target asking for MIME_RTF got
+                // nothing from a clipboard that plainly held rich text.
+                boolean richTextAlias = flavor.isMimeTypeEqual("application/rtf");
+                if (!richTextAlias
+                        && !"text".equals(JavaSENativeDragAndDrop.asciiLower(flavor.getPrimaryType()))
                         && out instanceof byte[]) {
                     // The other spelling AWT uses for the same thing: a flavor whose
                     // representation class is [B hands over the array itself. mimeFor()
@@ -2320,7 +2327,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                     continue;
                 }
-                if (!"text".equals(JavaSENativeDragAndDrop.asciiLower(flavor.getPrimaryType()))
+                if (!richTextAlias
+                        && !"text".equals(JavaSENativeDragAndDrop.asciiLower(flavor.getPrimaryType()))
                         && out instanceof InputStream) {
                     // A binary representation another application owns -- a PDF, an
                     // archive, an application's own format -- which AWT hands over as a

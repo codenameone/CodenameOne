@@ -11252,6 +11252,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     static void clipboardHolds(long clip) {
         synchronized (STAGED_CLIP_FILES) {
             clipboardClip = clip;
+            // Letting go is as good a moment to reconsider as staging is: a clip that was
+            // over the budget on its own could not be reclaimed while it was held, and
+            // nothing else would have looked at it again until some later transfer staged
+            // a file -- which for an application that drags one large payload and then
+            // stops is never.
+            reclaimStagedClipFiles(0);
         }
     }
 
@@ -11259,6 +11265,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     static void dragHolds(long clip) {
         synchronized (STAGED_CLIP_FILES) {
             draggingClip = clip;
+            reclaimStagedClipFiles(0);
         }
     }
 
@@ -11268,9 +11275,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             STAGED_CLIP_FILES.remove(uri.toString());
             STAGED_CLIP_FILES.put(uri.toString(),
                     new StagedClipFile(file.getAbsolutePath(), transport, clip, file.length()));
-            // Down to the budget, oldest first. Never the clip being assembled -- it is still
-            // growing -- and never the one the clipboard or a running drag is carrying, which
-            // are not superseded by anything however old they are.
+            reclaimStagedClipFiles(clip);
+        }
+    }
+
+    /// Reclaims staged files, oldest first, until what is left fits the budget.
+    ///
+    /// Never the clip being assembled -- it is still growing -- and never the one the
+    /// clipboard or a running drag is carrying, which are not superseded by anything
+    /// however old they are. Called when a file is staged and again when a hold is
+    /// released, because a clip too large for the budget on its own can only be reclaimed
+    /// once nothing holds it any more.
+    ///
+    /// #### Parameters
+    ///
+    /// - `assembling`: the clip being built, or zero when none is
+    private static void reclaimStagedClipFiles(long assembling) {
+        synchronized (STAGED_CLIP_FILES) {
             long held = 0;
             for (StagedClipFile staged : STAGED_CLIP_FILES.values()) {
                 held += staged.bytes;
@@ -11279,7 +11300,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     STAGED_CLIP_FILES.entrySet().iterator();
             while (held > GENERATED_CLIP_BUDGET && entries.hasNext()) {
                 StagedClipFile staged = entries.next().getValue();
-                if (staged.clip == clip || staged.clip == clipboardClip
+                if (staged.clip == assembling || staged.clip == clipboardClip
                         || staged.clip == draggingClip) {
                     continue;
                 }
