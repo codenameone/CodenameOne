@@ -195,6 +195,39 @@ class VpnTunnelNativeBuilderTest {
     }
 
     @Test
+    void aNameTheTranslatorAlsoEmitsIsDecidedByItsBytes() throws Exception {
+        // An application native may be called nativeMethods.m. The
+        // translator emits a file of that name itself, and the one that
+        // survives in the translation is the translator's -- the copy was
+        // overwritten. Excluded on the name alone, the extension was staged
+        // without a runtime source it has to link, and said so as a missing
+        // symbol on a machine none of our tests run on.
+        File root = Files.createTempDirectory("cn1natives").toFile();
+        File app = new File(root, "app");
+        assertTrue(app.mkdirs());
+        File theirs = new File(app, "nativeMethods.m");
+        write(theirs, "// the application's own\n");
+
+        VpnTunnelNativeBuilder builder = new VpnTunnelNativeBuilder(null);
+        builder.parseHints(request("true", "com.example.app.MyTunnel"), true);
+        builder.recordHandWrittenNatives(app);
+
+        // The name is recorded either way; the content decides.
+        assertTrue(builder.isExcluded("nativeMethods.m"),
+                "the basename is what narrows it");
+        File staged = new File(root, "nativeMethods.m");
+        write(staged, "// the translator's runtime\n");
+        assertFalse(builder.isExcluded(staged),
+                "a file the translator emitted has to reach the extension");
+        File copied = new File(root, "copy");
+        assertTrue(copied.mkdirs());
+        File same = new File(copied, "nativeMethods.m");
+        write(same, "// the application's own\n");
+        assertTrue(builder.isExcluded(same),
+                "and the application's own copy still does not");
+    }
+
+    @Test
     void anUnrecordedPortIsRefusedRatherThanCompiledIn() {
         // Answering "exclude nothing" would compile the whole port into the
         // extension and fail at link.
@@ -368,5 +401,15 @@ class VpnTunnelNativeBuilderTest {
         // translation just generated.
         assertTrue(settings.get("GCC_PREFIX_HEADER")
                 .contains(VpnTunnelNativeBuilder.SRC_DIR));
+    }
+
+    /** One small file, written whole. */
+    private static void write(File f, String text) throws Exception {
+        java.io.FileOutputStream out = new java.io.FileOutputStream(f);
+        try {
+            out.write(text.getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
     }
 }

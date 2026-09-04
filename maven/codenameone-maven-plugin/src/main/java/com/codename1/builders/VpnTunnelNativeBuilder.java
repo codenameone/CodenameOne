@@ -201,9 +201,22 @@ class VpnTunnelNativeBuilder {
      * link naming the symbol -- which is the same report as reaching for any
      * other app-side class, and better than a tunnel that builds and finds
      * nothing there.</p>
+     *
+     * <p>Keyed by basename because the translation FLATTENS what it copies
+     * -- a native two directories deep arrives beside the emitted sources
+     * with nothing left of its path -- and valued by the digests of the
+     * files that basename was recorded from. The digests are what tell a
+     * copied file from an emitted one: an application native called
+     * {@code nativeMethods.m} or {@code cn1_globals.m} shares its name with
+     * something the translator writes itself, and the file that survives in
+     * the translation is the translator's. Excluded on the name alone, the
+     * extension would have been staged without a runtime source it has to
+     * link, and the report would have been a missing symbol on a machine
+     * none of our tests run on.</p>
      */
-    private final java.util.Set<String> handWrittenNatives =
-            new java.util.HashSet<String>();
+    private final java.util.Map<String, java.util.Set<String>>
+            handWrittenNatives =
+            new java.util.HashMap<String, java.util.Set<String>>();
 
     /**
      * Records what the port, the submitted libraries and the application
@@ -261,7 +274,13 @@ class VpnTunnelNativeBuilder {
                 recordTree(f);
                 continue;
             }
-            handWrittenNatives.add(f.getName());
+            java.util.Set<String> digests =
+                    handWrittenNatives.get(f.getName());
+            if (digests == null) {
+                digests = new java.util.HashSet<String>();
+                handWrittenNatives.put(f.getName(), digests);
+            }
+            digests.add(digest(f));
         }
     }
 
@@ -588,7 +607,7 @@ class VpnTunnelNativeBuilder {
             // emits one, the undefined symbol at link is the report worth
             // getting.
             IPhoneBuilder.copy(f, new File(to, name));
-            if (source && !isExcluded(name)) {
+            if (source && !isExcluded(f)) {
                 compiled.add(name);
             }
         }
@@ -623,7 +642,54 @@ class VpnTunnelNativeBuilder {
      * extension and fail at link.</p>
      */
     boolean isExcluded(String name) {
-        return handWrittenNatives.contains(name);
+        return handWrittenNatives.containsKey(name);
+    }
+
+    /**
+     * Whether one staged file is a copy of something hand-written.
+     *
+     * <p>The name narrows it and the CONTENT decides it; see the field.
+     * A staged file whose basename was recorded but whose bytes match none
+     * of what was recorded under it is the translator's own, and belongs in
+     * the extension.</p>
+     *
+     * @param staged the file as the translation left it
+     */
+    boolean isExcluded(File staged) {
+        java.util.Set<String> digests =
+                handWrittenNatives.get(staged.getName());
+        return digests != null && digests.contains(digest(staged));
+    }
+
+    /** One file's SHA-1, as hex. */
+    private String digest(File f) {
+        try {
+            java.security.MessageDigest md =
+                    java.security.MessageDigest.getInstance("SHA-1");
+            java.io.InputStream in = new java.io.FileInputStream(f);
+            try {
+                byte[] buf = new byte[8192];
+                for (int r = in.read(buf); r > 0; r = in.read(buf)) {
+                    md.update(buf, 0, r);
+                }
+            } finally {
+                in.close();
+            }
+            StringBuilder hex = new StringBuilder();
+            for (byte b : md.digest()) {
+                hex.append(Character.forDigit((b >> 4) & 0xf, 16));
+                hex.append(Character.forDigit(b & 0xf, 16));
+            }
+            return hex.toString();
+        } catch (Exception err) {
+            // REFUSED rather than guessed. Guessing hand-written drops a
+            // source the extension may have to link; guessing emitted
+            // compiles a port native into an app extension. Both fail on a
+            // machine none of our tests run on, so this fails here instead.
+            throw new BuildException("Could not read " + f + " while deciding"
+                    + " whether it belongs to the packet-tunnel extension.",
+                    err);
+        }
     }
 
     /**

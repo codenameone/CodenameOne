@@ -440,6 +440,18 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("        // forward a packet, and a tunnel that forwards\n");
         sb.append("        // before the writer is installed drops it with\n");
         sb.append("        // nothing to say so.\n");
+        sb.append("        //\n");
+        sb.append("        // Installing before begin decides the winner is\n");
+        sb.append("        // safe because the install itself will not go\n");
+        sb.append("        // backwards: ExtensionTunnelHost.setWriter takes\n");
+        sb.append("        // the generation and ignores one older than the\n");
+        sb.append("        // writer already installed. A stale completion\n");
+        sb.append("        // resuming here therefore cannot leave the live\n");
+        sb.append("        // tunnel forwarding through a writer whose own\n");
+        sb.append("        // check rejects every packet -- raised in review\n");
+        sb.append("        // against this call, where the guard is not\n");
+        sb.append("        // visible, and it lives on the other side of the\n");
+        sb.append("        // boundary in the CodenameOne repository.\n");
         sb.append("        com_codename1_impl_ios_IOSExtensionTunnel_install___int(\n");
         sb.append("                threadStateData, cn1tnStart);\n");
         sb.append("        JAVA_OBJECT tunnel = __NEW_").append(mangled)
