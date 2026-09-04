@@ -159,18 +159,27 @@ public final class ExtensionTunnelHost {
     /// Stops the tunnel, with a `TunnelStopReason` ordinal.
     ///
     /// @hidden not part of the public API.
-    public static void end(int reasonOrdinal) {
+    public static void end(int reasonOrdinal, int invalidatedGeneration) {
         TunnelHost h;
         synchronized (ExtensionTunnelHost.class) {
             h = host;
             host = null;
             transport = null;
-            // Nothing belongs to a start that has ended. ZERO is safe as
-            // "none" because the extension counts starts from one -- its
-            // counter is fetch_add(1) + 1 -- so no reader can be carrying
-            // it, and every late buffer() and received() is dropped without
-            // this having to know which start replaced it.
-            generation = 0;
+            // The WATERMARK the stop moved to, not zero.
+            //
+            // Zeroing it looked safe -- no reader carries zero -- and left a
+            // hole that mattered: a settings completion that had already
+            // passed its own generation check could call begin() after the
+            // stop, and with the watermark at zero the guard in begin() had
+            // nothing to reject it with. It installed a host and ran the
+            // application's onStart for a tunnel that was already over, and
+            // no onStop would follow, because the stop it belonged to had
+            // been and gone.
+            //
+            // The extension passes the counter as the stop left it, which is
+            // one past every start that can still be in flight, so begin()
+            // rejects them all on the same comparison it already made.
+            generation = invalidatedGeneration;
         }
         if (h != null) {
             h.stop(reasonOrdinal);

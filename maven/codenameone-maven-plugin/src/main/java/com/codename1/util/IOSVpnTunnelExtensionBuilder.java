@@ -555,8 +555,15 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("    // stopped for a long time, and an outstanding read has\n");
         sb.append("    // no business surviving into whatever comes next.\n");
         sb.append("    atomic_fetch_add(&cn1tnReadGeneration, 1);\n");
-        sb.append("    com_codename1_impl_vpn_ExtensionTunnelHost_end___int(\n");
-        sb.append("            threadStateData, cn1tnReason(reason));\n");
+        sb.append("    // The counter as this stop left it, which is one\n");
+        sb.append("    // past every start still in flight -- so a settings\n");
+        sb.append("    // completion that already passed its own check and\n");
+        sb.append("    // reaches begin() after this is rejected there rather\n");
+        sb.append("    // than running the application's onStart for a tunnel\n");
+        sb.append("    // that is over.\n");
+        sb.append("    com_codename1_impl_vpn_ExtensionTunnelHost_end___int_int(\n");
+        sb.append("            threadStateData, cn1tnReason(reason),\n");
+        sb.append("            atomic_load(&cn1tnReadGeneration));\n");
         sb.append("    cn1tnProvider = nil;\n");
         sb.append("    completionHandler();\n");
         sb.append("}\n");

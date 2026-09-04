@@ -348,6 +348,21 @@ class VpnTunnelNativeBuilder {
      * @param classesDir the compiled application classes
      */
     void verifyTunnelClass(File classesDir) {
+        // A PACKAGE first. The stub is generated into the application's
+        // package, and java in a named package cannot name a class in the
+        // default one, so "Tunnel" would compile as <app package>.Tunnel and
+        // fail on a class the developer never wrote. Refused here rather than
+        // taught to the stub: the stub's package is also the folder
+        // isolateStub filters and part of what the translation is rooted at,
+        // and a default package tunnel is not worth three moving parts.
+        if (tunnelClass.indexOf('.') < 0) {
+            throw new RuntimeException(HINT_CLASS + " names " + tunnelClass
+                    + ", which has no package. The extension is compiled from"
+                    + " a generated class in the application's own package,"
+                    + " and java cannot reference a class in the default"
+                    + " package from a named one, so the tunnel has to live in"
+                    + " a package -- give it one and name it here in full.");
+        }
         String entry = tunnelClass.replace('.', '/') + ".class";
         if (new File(classesDir, entry.replace('/', File.separatorChar)).isFile()) {
             return;
@@ -433,7 +448,7 @@ class VpnTunnelNativeBuilder {
                 + "        com.codename1.impl.vpn.ExtensionTunnelHost"
                 + ".received(0, 0);\n"
                 + "        com.codename1.impl.vpn.ExtensionTunnelHost.end("
-                + "0);\n"
+                + "0, 0);\n"
                 + "    }\n"
                 + "}\n";
         OutputStream out = new java.io.FileOutputStream(

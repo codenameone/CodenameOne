@@ -100,7 +100,7 @@ cat > "$WORK/out/com_codename1_impl_vpn_ExtensionTunnelHost.h" <<'H'
 extern void com_codename1_impl_vpn_ExtensionTunnelHost_begin___java_lang_Object_java_lang_String_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_OBJECT, JAVA_INT);
 extern JAVA_OBJECT com_codename1_impl_vpn_ExtensionTunnelHost_buffer___int_int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_INT, JAVA_INT);
 extern void com_codename1_impl_vpn_ExtensionTunnelHost_received___int_int(CODENAME_ONE_THREAD_STATE, JAVA_INT, JAVA_INT);
-extern void com_codename1_impl_vpn_ExtensionTunnelHost_end___int(CODENAME_ONE_THREAD_STATE, JAVA_INT);
+extern void com_codename1_impl_vpn_ExtensionTunnelHost_end___int_int(CODENAME_ONE_THREAD_STATE, JAVA_INT, JAVA_INT);
 H
 cat > "$WORK/out/com_codename1_impl_ios_IOSExtensionTunnel.h" <<'H'
 #include "cn1_globals.h"

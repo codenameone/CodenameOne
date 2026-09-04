@@ -158,6 +158,31 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
+    void aCanceledStartCannotStillRunTheApplication() {
+        String src = provider();
+        // end() used to reset the Java watermark to zero, which read as
+        // "nothing has started" -- so a settings completion that had already
+        // passed its own generation check and then lost the race to the stop
+        // sailed through the guard in begin(), installed a host and ran the
+        // application's onStart for a tunnel that was already over. No onStop
+        // could follow it: the stop it belonged to had been and gone.
+        int stop = src.indexOf("- (void)stopTunnelWithReason:");
+        assertTrue(stop >= 0);
+        String method = src.substring(stop);
+        int bump = method.indexOf("atomic_fetch_add(&cn1tnReadGeneration");
+        int ended = method.indexOf("ExtensionTunnelHost_end___int_int");
+        assertTrue(bump >= 0 && ended > bump,
+                "the stop has to invalidate the generation it ends");
+        // The counter AS THE STOP LEFT IT, which is one past every start
+        // that can still be in flight, so begin() rejects them all on the
+        // comparison it already makes.
+        assertTrue(method.substring(ended).startsWith(
+                "ExtensionTunnelHost_end___int_int(\n"
+                + "            threadStateData, cn1tnReason(reason),\n"
+                + "            atomic_load(&cn1tnReadGeneration));"));
+    }
+
+    @Test
     void anOldTunnelCannotWriteOntoTheNewLink() {
         String src = provider();
         // A stopped tunnel's onPacket can still be running -- a callback
