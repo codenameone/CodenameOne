@@ -404,6 +404,21 @@ BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
 #undef CN1_VPN_TUNNEL
 #endif
 
+// The packet tunnel is not part of a Mac Catalyst slice, and Personal VPN
+// deliberately is: NEVPNManager works there, so CN1_INCLUDE_VPN is left
+// alone exactly as CallKit is.
+//
+// The tunnel is different because of what the BUILD does. Its extension
+// target is filtered to the iOS destination -- a packet-tunnel .appex is not
+// something the Catalyst archive can embed or sign, and the Mac entitlements
+// carry no Network Extension grant -- so a Catalyst app compiled with this
+// define would answer Tunnels.isSupported() with true and then have no
+// provider to start. Reporting the capability absent is the honest answer
+// for the slice that genuinely does not ship one.
+#if TARGET_OS_MACCATALYST
+#undef CN1_VPN_TUNNEL
+#endif
+
 // A packet tunnel needs the VPN bridge that starts it.
 #ifndef CN1_INCLUDE_VPN
 #undef CN1_VPN_TUNNEL
