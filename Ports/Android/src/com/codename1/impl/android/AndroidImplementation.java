@@ -10266,6 +10266,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         clipboardHolds(0);
                         clip = ClipData.newPlainText("Codename One", obj.toString());
                     }
+                    watchPrimaryClip(clipboard);
+                    clipboardPublishing();
                     clipboard.setPrimaryClip(clip);
                 }
             }
@@ -10493,6 +10495,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                     if (!mimeTypes.contains("text/uri-list")) {
                         mimeTypes.add("text/uri-list");
+                    }
+                    // And whatever the document actually is. A receiver in another application
+                    // reads the description and nothing else while the drag hovers, so a PDF
+                    // dragged out of here described only as a URI list was refused by every
+                    // target that filters on application/pdf -- the type was there for the
+                    // asking on the URI, and only this side can ask it in time. The alias the
+                    // hover adds locally cannot help them; it never leaves this process.
+                    //
+                    // Only a type the resolver actually knows. octet-stream is what a provider
+                    // answers when it has nothing to say, and advertising that would tell a
+                    // receiver the clip holds a type it cannot use.
+                    String resolved = bareMimeType(
+                            getContext().getContentResolver().getType(u));
+                    if (resolved != null && resolved.length() > 0
+                            && !"application/octet-stream".equals(resolved)
+                            && !mimeTypes.contains(resolved)) {
+                        mimeTypes.add(resolved);
                     }
                     items.add(new ClipData.Item(u));
                 } catch (Throwable t) {
@@ -11304,9 +11323,76 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static long clipboardClip;
     private static long draggingClip;
 
+    /// Changes to the primary clip this application is about to make itself, which the watcher
+    /// below hears about like any other and must not read as somebody else's copy.
+    ///
+    /// A count rather than a flag: a copy can be made while an earlier one's callback is still
+    /// queued, and a flag cleared by the first would have made the second look foreign.
+    private static int expectedClipChanges;
+
+    /// True once the primary clip watcher is installed, which happens the first time this
+    /// application puts anything on the clipboard.
+    private static boolean clipboardWatched;
+
     private static long beginStagingClip() {
         synchronized (STAGED_CLIP_FILES) {
             return ++stagingClip;
+        }
+    }
+
+    /// Starts listening for the primary clip being replaced, once.
+    ///
+    /// A clip this application published is exempt from reclamation for as long as the
+    /// clipboard holds it, and nothing but another copy of our own used to end that -- so a
+    /// copy made in *another* application left ours pinned for good, and an oversized one then
+    /// sat in the cache above the budget with nothing able to reclaim it.
+    ///
+    /// Called on the Android UI thread, from the copy that is about to pin something.
+    ///
+    /// Android only delivers these callbacks to an application that has focus, so a copy made
+    /// elsewhere while this one is in the background is still missed. That leaves the hold in
+    /// place until the next copy either application makes, which is the behaviour this
+    /// replaces rather than a new failure -- and the files are in the cache directory, which
+    /// the system reclaims under pressure whatever this bookkeeping believes.
+    private static void watchPrimaryClip(android.content.ClipboardManager clipboard) {
+        synchronized (STAGED_CLIP_FILES) {
+            if (clipboardWatched) {
+                return;
+            }
+            clipboardWatched = true;
+        }
+        try {
+            clipboard.addPrimaryClipChangedListener(
+                    new android.content.ClipboardManager.OnPrimaryClipChangedListener() {
+                @Override
+                public void onPrimaryClipChanged() {
+                    synchronized (STAGED_CLIP_FILES) {
+                        if (expectedClipChanges > 0) {
+                            // Our own copy, which has already said what it holds.
+                            expectedClipChanges--;
+                            return;
+                        }
+                    }
+                    // A clip somebody else published replaced ours, so what ours was carrying
+                    // is nobody's to paste any more.
+                    clipboardHolds(0);
+                }
+            });
+        } catch (Throwable t) {
+            // A device that will not register the listener keeps the old behaviour, which is
+            // a hold that outlives the clip rather than a crash on copy.
+            com.codename1.io.Log.e(t);
+            synchronized (STAGED_CLIP_FILES) {
+                clipboardWatched = false;
+            }
+        }
+    }
+
+    /// Records that this application is about to replace the primary clip, so the watcher does
+    /// not mistake its own callback for another application's copy.
+    private static void clipboardPublishing() {
+        synchronized (STAGED_CLIP_FILES) {
+            expectedClipChanges++;
         }
     }
 
