@@ -1275,13 +1275,20 @@ dependencies for you, keeps the upload small, and is described in
 <<Using Cocoapods>>.
 
 Not every SDK is published as a pod, though, and a vendor shipping a static
-library and headers can't be installed that way. Those go into the `ios` native
-directory of your project as they come:
+library and headers can't be installed that way. Those files go into the `ios`
+module, which packages two directories into the native archive: put anything you
+would compile or `#import` beside your own native sources in
+`ios/src/main/objectivec`, and the vendor's binaries in `ios/src/main/resources`.
 
-* `.h` headers and `.a` static libraries are copied in directly.
-* `.bundle` resource directories are copied in directly.
-* A `.framework` has to be zipped first, keeping its name: `MyFramework.framework`
-  is placed as `MyFramework.framework.zip`.
+* `.h` headers go with the sources, in `ios/src/main/objectivec`.
+* `.a` static libraries and `.bundle` resource directories go in
+  `ios/src/main/resources`.
+* A `.framework` has to be zipped first, keeping its name, so
+  `MyFramework.framework` is placed as
+  `ios/src/main/resources/MyFramework.framework.zip`.
+
+NOTE: Those are the Maven paths. A legacy Ant project put every one of those in
+`native/ios` instead, which is the layout older material refers to.
 
 An SDK usually also expects a handful of the platform's own frameworks to be
 linked. Name those in the `ios.add_libs` build hint, separated by semicolons. A
