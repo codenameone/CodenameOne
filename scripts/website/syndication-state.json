@@ -1896,6 +1896,19 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-04T00:01:37+00:00"
+      },
+      "devto": {
+        "id": 4576222,
+        "url": "https://dev.to/codenameone/one-app-more-than-one-native-window-3dm1",
+        "syndicated_at": "2026-09-04T16:51:47+00:00"
+      },
+      "foojay": {
+        "id": 125683,
+        "url": "https://foojay.io/wp-admin/post.php?post=125683&action=edit",
+        "preview_url": "https://foojay.io/?p=125683",
+        "featured_media_id": 125682,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-09-04T16:52:40+00:00"
       }
     }
   }
