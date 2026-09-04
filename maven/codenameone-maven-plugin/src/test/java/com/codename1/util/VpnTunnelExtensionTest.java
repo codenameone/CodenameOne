@@ -360,7 +360,15 @@ class VpnTunnelExtensionTest {
         assertTrue(method.contains("cn1tnEnding = cn1tnMine;\n"),
                 "the stop consumes its claim");
         assertTrue(method.contains("cn1tnMine = 0;"));
-        assertTrue(src.contains("cn1tnMine = cn1tnStart;"));
+        // AT THE CLAIM, not at the publish. A stop that arrived between
+        // the two found nothing claimed and left the counter where it was,
+        // so the start resumed, found its own generation still current, and
+        // brought up a tunnel the user had already cancelled.
+        int claimed = src.indexOf("cn1tnMine = cn1tnStart;");
+        int published = src.indexOf("cn1tnProviderGeneration = cn1tnStart;");
+        int settings = src.indexOf("setTunnelNetworkSettings");
+        assertTrue(claimed > 0 && claimed < published && claimed < settings,
+                "the claim is recorded before anything can stop it");
         // The generation being ENDED clears the slot, and the watermark it
         // leaves goes to Java. Passing the watermark to both compared N + 1
         // against a slot holding N, so an ordinary stop cleared nothing and

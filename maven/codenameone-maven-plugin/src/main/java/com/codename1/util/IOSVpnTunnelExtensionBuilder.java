@@ -401,8 +401,14 @@ public final class IOSVpnTunnelExtensionBuilder {
             sb.append("\n");
         }
         sb.append("@implementation CN1VpnTunnelProvider {\n");
-        sb.append("    /// Which start this provider published, or zero if it\n");
-        sb.append("    /// never got that far.\n");
+        sb.append("    /// Which start this provider CLAIMED, published or\n");
+        sb.append("    /// not, and zero once a stop has taken it.\n");
+        sb.append("    ///\n");
+        sb.append("    /// A claim, rather than a publication, because a stop\n");
+        sb.append("    /// arriving between the two still has to invalidate\n");
+        sb.append("    /// the generation that start is holding -- otherwise\n");
+        sb.append("    /// the start resumes, finds its own number still\n");
+        sb.append("    /// current, and brings up a tunnel the user cancelled.\n");
         sb.append("    ///\n");
         sb.append("    /// The stop needs the generation THIS object owns,\n");
         sb.append("    /// and the counter cannot tell it: a replacement that\n");
@@ -414,7 +420,11 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("    /// ONE claim, not a stack of them, because NE does not\n");
         sb.append("    /// overlap sessions on a provider: it calls\n");
         sb.append("    /// stopTunnelWithReason and waits for that completion\n");
-        sb.append("    /// handler before it starts another. Everything else\n");
+        sb.append("    /// handler before it starts another. A stop DURING a\n");
+        sb.append("    /// start is a different thing and does happen -- that\n");
+        sb.append("    /// is one session ending before it finished coming up,\n");
+        sb.append("    /// which is why the claim above is taken at the claim\n");
+        sb.append("    /// and not at the publish. Everything else\n");
         sb.append("    /// this file guards -- a settings completion resuming\n");
         sb.append("    /// after a stop, a read outstanding across a restart --\n");
         sb.append("    /// is OUR asynchrony inside one session, which the\n");
@@ -467,6 +477,18 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("    // the previous tunnel.\n");
         sb.append("    int cn1tnStart =\n");
         sb.append("            atomic_fetch_add(&cn1tnReadGeneration, 1) + 1;\n");
+        sb.append("    // RECORDED AT THE CLAIM, not at the publish below.\n");
+        sb.append("    // NE can stop a start that is still in flight -- a\n");
+        sb.append("    // user toggling the switch back is enough -- and a\n");
+        sb.append("    // stop that found nothing claimed here left the\n");
+        sb.append("    // counter where it was. This start would then resume,\n");
+        sb.append("    // find its own generation still current, publish,\n");
+        sb.append("    // apply its settings and run the application's onStart\n");
+        sb.append("    // after the stop had finished: a tunnel brought up by\n");
+        sb.append("    // a start the user had already cancelled.\n");
+        sb.append("    @synchronized ([CN1VpnTunnelProvider class]) {\n");
+        sb.append("        cn1tnMine = cn1tnStart;\n");
+        sb.append("    }\n");
         sb.append("    // PUBLISHED AFTER the generation is claimed, and that\n");
         sb.append("    // order is the whole of what makes the writer's check\n");
         sb.append("    // sound. Set first, a restart made the new provider\n");
@@ -493,7 +515,6 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("        if (cn1tnStart == atomic_load(&cn1tnReadGeneration)) {\n");
         sb.append("            cn1tnProvider = self;\n");
         sb.append("            cn1tnProviderGeneration = cn1tnStart;\n");
-        sb.append("            cn1tnMine = cn1tnStart;\n");
         sb.append("        }\n");
         sb.append("    }\n");
         sb.append("    // The settings the system needs BEFORE any packet\n");
