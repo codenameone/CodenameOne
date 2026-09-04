@@ -3842,6 +3842,13 @@ public class Window extends Container implements TopLevelContainer {
         pressedCmp = null;
         dragged = null;
         currentPointerPress = null;
+        // And what a press on this window staged for the operating system. This is the path a
+        // window being hidden, minimized or disposed takes, and it delivers no release -- so
+        // without it the gesture stayed staged on a window nobody can see, for the next press
+        // that never reaches initDragAndDrop, or the platform's own recognizer, to start a
+        // drag carrying its payload. cancelPointerGesture has always done this for the other
+        // kind of cancellation; this is the one for a window going away.
+        NativeDragAndDrop.topLevelInputCancelled(this);
         Display.getInstance().windowInputCancelled(this);
     }
 

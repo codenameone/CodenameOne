@@ -2776,7 +2776,7 @@ public class Form extends Container implements TopLevelContainer {
         // the release goes to the new form, and on a platform whose own recognizer starts the
         // session the drag begins later still. It would then have carried the hidden form's
         // payload, and reported its outcome to a component that is no longer anywhere.
-        NativeDragAndDrop.topLevelDeinitialized(this);
+        NativeDragAndDrop.topLevelInputCancelled(this);
         super.deinitializeImpl();
         animMananger.flush();
         componentsAwaitingRelease = null;

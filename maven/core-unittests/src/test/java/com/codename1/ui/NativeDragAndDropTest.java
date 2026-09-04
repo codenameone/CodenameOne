@@ -1668,6 +1668,48 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aWindowGivingUpItsInputTakesWhatItsPressStagedWithIt() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        implementation.setMultiWindowSupported(true);
+        // The port refuses to start, which is the case where a staged gesture outlives the
+        // press and waits for the platform's own recognizer.
+        implementation.setNativeDragStartRefused(true);
+        Window w = new Window("hidden while pressed");
+        try {
+            Container source = new Container();
+            source.setNativeDragOperation(new NativeDragOperation("on the window being hidden"));
+            w.setLayout(new BorderLayout());
+            w.add(BorderLayout.CENTER, source);
+            w.show();
+            flushSerialCalls();
+
+            int x = source.getAbsoluteX() + 10;
+            int y = source.getAbsoluteY() + 10;
+            w.pointerPressed(x, y);
+            assertNotNull(implementation.getPreparedNativeDrag(), "the press staged one");
+
+            // What hiding, minimizing or disposing the window does: no release is delivered
+            // for the gesture that was in flight.
+            w.cancelPendingInput();
+
+            assertNull(NativeDragAndDrop.dragSessionStarted(),
+                    "a recognizer firing afterwards must not start a drag carrying the payload "
+                            + "of a window the user can no longer see");
+        } finally {
+            implementation.setNativeDragStartRefused(false);
+            NativeDragAndDrop.gestureCancelled();
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            w.dispose();
+            flushSerialCalls();
+            implementation.setMultiWindowSupported(false);
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void aCancelledGestureDoesNotLeaveADragStaged() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

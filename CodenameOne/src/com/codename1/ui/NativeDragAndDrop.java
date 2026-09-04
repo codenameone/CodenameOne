@@ -822,21 +822,23 @@ public final class NativeDragAndDrop {
         }
     }
 
-    /// Abandons a staged gesture whose surface is going away.
+    /// Abandons a staged gesture whose surface has gone away or given up its input.
     ///
     /// A press stages an operation on the surface it landed on, and that surface can be
-    /// replaced before the gesture ends -- a press handler that shows another form does
-    /// exactly that. What it staged has nowhere left to go: the component is off screen, the
-    /// release will be dispatched to whatever replaced it, and a platform that starts the
-    /// session from its own recognizer would begin a drag carrying a hidden form's payload.
+    /// replaced or dismissed before the gesture ends -- a press handler that shows another
+    /// form does exactly that, and a window being hidden, minimized or disposed does it to
+    /// every gesture it was holding. What was staged has nowhere left to go: the component is
+    /// off screen, the release will be dispatched to whatever replaced it, and a platform that
+    /// starts the session from its own recognizer would begin a drag carrying the payload of
+    /// something the user can no longer see.
     ///
     /// Only what belongs to this surface, so one form going away does not cancel a gesture
     /// staged in a window that is still on screen.
     ///
     /// #### Parameters
     ///
-    /// - `root`: the top level being deinitialized
-    static void topLevelDeinitialized(Container root) {
+    /// - `root`: the top level being deinitialized, or whose pending input is being cancelled
+    static void topLevelInputCancelled(Container root) {
         Component source;
         synchronized (LOCK) {
             source = pendingSource;

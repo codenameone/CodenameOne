@@ -81,7 +81,7 @@ final class AndroidNativeDragAndDrop {
     /// no action, so this is the only place the true answer exists.
     private static int localDropAction = NativeDragOperation.ACTION_NONE;
 
-    /// How many accepted drops have been queued to their targets and not yet delivered.
+    /// The clips of accepted drops queued to their targets and not yet delivered.
     ///
     /// The drop is decided on the Android UI thread and delivered on the Codename One event
     /// dispatch thread, and the payload is read inside that callback -- lazily, from the
@@ -90,11 +90,15 @@ final class AndroidNativeDragAndDrop {
     /// read them: over the budget, they were deleted out from under a drop that had already
     /// been accepted, and on a move the source went on to delete its original as well.
     ///
-    /// A count rather than a flag. A callback that enters a nested event loop can let a whole
-    /// second drag run and drop inside it, and with one boolean the first callback's cleanup
-    /// spoke for both: the second session's ACTION_DRAG_ENDED then found nothing pending and
-    /// released the files its own target had still to read.
-    private static int pendingDropDispatches;
+    /// By clip rather than by a count, and a count rather than the flag before it. A callback
+    /// that enters a nested event loop can let a whole second drag run and drop inside it, so
+    /// more than one delivery can be owed at a time -- and they are owed for *different*
+    /// drags. One boolean had the first callback's cleanup speak for both, and a bare count
+    /// answered "something is pending" to a question that is always about one clip: a second
+    /// drag that ended without a local drop of its own was then never released at all, because
+    /// the first drop was still outstanding, and its files stayed pinned until some later drag
+    /// happened to take the slot.
+    private static final java.util.Set<Long> pendingDropClips = new java.util.HashSet<Long>();
 
     private static NativeDragOperation exporting() {
         synchronized (LOCK) {
@@ -120,23 +124,22 @@ final class AndroidNativeDragAndDrop {
         }
     }
 
-    private static boolean dropDispatchPending() {
+    /// True when this clip's drop is still on its way to its target.
+    private static boolean dropDispatchPending(long clip) {
         synchronized (LOCK) {
-            return pendingDropDispatches > 0;
+            return pendingDropClips.contains(Long.valueOf(clip));
         }
     }
 
-    private static void dropDispatchQueued() {
+    private static void dropDispatchQueued(long clip) {
         synchronized (LOCK) {
-            pendingDropDispatches++;
+            pendingDropClips.add(Long.valueOf(clip));
         }
     }
 
-    private static void dropDispatchDelivered() {
+    private static void dropDispatchDelivered(long clip) {
         synchronized (LOCK) {
-            if (pendingDropDispatches > 0) {
-                pendingDropDispatches--;
-            }
+            pendingDropClips.remove(Long.valueOf(clip));
         }
     }
 
@@ -321,7 +324,7 @@ final class AndroidNativeDragAndDrop {
                     // case the release is queued behind that callback and happens there. This
                     // event arrives immediately after the drop, long before the event dispatch
                     // thread has read anything.
-                    if (!dropDispatchPending()) {
+                    if (!dropDispatchPending(AndroidImplementation.draggingClip())) {
                         AndroidImplementation.dragHolds(0);
                     }
                     setLastAction(UNDECIDED);
@@ -413,19 +416,21 @@ final class AndroidNativeDragAndDrop {
             // A target that keeps the content and reads it later still outruns this, as it
             // outruns every bound here; what this covers is the ordinary target that reads
             // what it was given, which used to race a reclamation triggered by its own drop.
-            dropDispatchQueued();
             // The clip this drag is carrying, captured now. A callback that enters a nested
             // event loop can let another drag start before this runs, and clearing the shared
             // slot then released that one's hold instead -- its files reclaimable while it was
             // still going, and its receiver left with URIs it could no longer read.
             final long held = AndroidImplementation.draggingClip();
-            Display.getInstance().callSerially(new Runnable() {
-                @Override
-                public void run() {
-                    dropDispatchDelivered();
-                    AndroidImplementation.releaseDragHold(held);
-                }
-            });
+            if (held != 0) {
+                dropDispatchQueued(held);
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        dropDispatchDelivered(held);
+                        AndroidImplementation.releaseDragHold(held);
+                    }
+                });
+            }
         }
         return accepted != NativeDragOperation.ACTION_NONE;
     }
