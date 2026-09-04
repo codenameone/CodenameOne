@@ -77,18 +77,21 @@ public final class ExtensionTunnelHost {
     /// @param setupWire the record the app's `TunnelSetup` was encoded into
     ///
     /// @hidden not part of the public API.
-    public static void begin(Object tunnel, String setupWire,
+    /// @return whether this start committed. False means a newer start
+    ///         owns the extension, and the caller has nothing to arm a read
+    ///         for.
+    public static boolean begin(Object tunnel, String setupWire,
             int startGeneration) {
         // instanceof rather than a cast: ParparVM does not check CHECKCAST,
         // so a wrong type here would not throw, it would read a VpnTunnel's
         // fields out of whatever object the generated code passed.
         if (!(tunnel instanceof VpnTunnel)) {
-            return;
+            return false;
         }
         String[] fields = TunnelWire.split(setupWire == null ? "" : setupWire);
         int mtu = TunnelWire.mtu(fields);
-        ExtensionTransport t = new ExtensionTransport(mtu);
-        TunnelHost h = new TunnelHost((VpnTunnel) tunnel, t);
+        ExtensionTransport t;
+        TunnelHost h;
         synchronized (ExtensionTunnelHost.class) {
             if (startGeneration < generation) {
                 // A NEWER start already owns the extension. This one lost
@@ -103,14 +106,26 @@ public final class ExtensionTunnelHost {
                 // Committed under the SAME lock that publishes the fields,
                 // which is what makes it a decision rather than another
                 // check-then-act.
-                return;
+                return false;
             }
+            // BUILT under the lock, not before it. Constructed outside, the
+            // transport captured the writer through a second handshake of
+            // its own: an older completion that installed its writer after
+            // the newer one had installed and before the newer one got here
+            // handed this start the previous start's writer, and every
+            // packet the live tunnel forwarded then failed the check in
+            // writeNative and vanished. setWriter refuses to go backwards
+            // now, and the capture names the start it is for, so the two
+            // cannot disagree.
+            t = new ExtensionTransport(mtu, startGeneration);
+            h = new TunnelHost((VpnTunnel) tunnel, t);
             host = h;
             transport = t;
             generation = startGeneration;
         }
         h.start(TunnelWire.server(fields), TunnelWire.routes(fields),
                 TunnelWire.dnsServers(fields), mtu, TunnelWire.data(fields));
+        return true;
     }
 
     /// The pooled array the extension writes the next packet into.
@@ -203,19 +218,37 @@ public final class ExtensionTunnelHost {
 
     private static Writer writer;
 
+    /// Which start [#writer] belongs to.
+    private static int writerGeneration;
+
     /// Installs the platform's writer. The generated extension calls this
     /// before it starts the tunnel.
     ///
+    /// @param generation the start this writer belongs to
+    /// @param w the writer
+    ///
     /// @hidden not part of the public API.
-    public static void setWriter(Writer w) {
+    public static void setWriter(int generation, Writer w) {
         synchronized (ExtensionTunnelHost.class) {
+            if (generation < writerGeneration) {
+                // NEVER BACKWARDS. Two settings completions can overlap
+                // across a stop and a restart, and the older one resuming
+                // last used to leave its writer installed for the tunnel
+                // that is actually running -- which then tagged every packet
+                // with a generation writeNative rejects, so the tunnel came
+                // up and carried nothing.
+                return;
+            }
+            writerGeneration = generation;
             writer = w;
         }
     }
 
-    private static Writer writer() {
+    /// The writer installed for one start, or null if the one installed
+    /// belongs to another.
+    private static Writer writer(int startGeneration) {
         synchronized (ExtensionTunnelHost.class) {
-            return writer;
+            return writerGeneration == startGeneration ? writer : null;
         }
     }
 
@@ -244,11 +277,12 @@ public final class ExtensionTunnelHost {
         /// Whether the pooled buffer holds a packet the host has not taken.
         private boolean staged;
 
-        ExtensionTransport(int mtu) {
+        ExtensionTransport(int mtu, int startGeneration) {
             this.pool = new PacketBuffer[]{TunnelBuffers.allocate(mtu)};
-            // The provider installs the writer BEFORE it calls begin, so the
-            // one current here belongs to the start this transport is for.
-            this.sink = writer();
+            // NAMED, not "whatever is current". The provider installs the
+            // writer before it calls begin, but two completions can overlap,
+            // so the one current here is only this start's if it says so.
+            this.sink = writer(startGeneration);
         }
 
         /// The pooled buffer's array, grown for this packet.

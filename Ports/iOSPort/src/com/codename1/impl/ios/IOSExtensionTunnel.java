@@ -63,7 +63,8 @@ public final class IOSExtensionTunnel implements ExtensionTunnelHost.Writer {
     ///
     /// @hidden not part of the public API.
     public static void install(int generation) {
-        ExtensionTunnelHost.setWriter(new IOSExtensionTunnel(generation));
+        ExtensionTunnelHost.setWriter(generation,
+                new IOSExtensionTunnel(generation));
     }
 
     @Override

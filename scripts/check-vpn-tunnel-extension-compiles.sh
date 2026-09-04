@@ -97,7 +97,7 @@ JAVA
 # where it becomes a compile error instead.
 cat > "$WORK/out/com_codename1_impl_vpn_ExtensionTunnelHost.h" <<'H'
 #include "cn1_globals.h"
-extern void com_codename1_impl_vpn_ExtensionTunnelHost_begin___java_lang_Object_java_lang_String_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_OBJECT, JAVA_INT);
+extern JAVA_BOOLEAN com_codename1_impl_vpn_ExtensionTunnelHost_begin___java_lang_Object_java_lang_String_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_OBJECT, JAVA_INT);
 extern JAVA_OBJECT com_codename1_impl_vpn_ExtensionTunnelHost_buffer___int_int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_INT, JAVA_INT);
 extern void com_codename1_impl_vpn_ExtensionTunnelHost_received___int_int(CODENAME_ONE_THREAD_STATE, JAVA_INT, JAVA_INT);
 extern void com_codename1_impl_vpn_ExtensionTunnelHost_end___int_int(CODENAME_ONE_THREAD_STATE, JAVA_INT, JAVA_INT);

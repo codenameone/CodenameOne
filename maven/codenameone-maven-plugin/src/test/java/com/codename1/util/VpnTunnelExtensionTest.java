@@ -126,6 +126,31 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
+    void aStartBeginRefusesArmsNoRead() {
+        String src = provider();
+        // begin() is where the decision is made -- under the lock that
+        // publishes the host -- and the check at the top of the completion
+        // is only a first pass: a stop and a restart can land between them.
+        // The caller used to ignore the answer and arm a read regardless,
+        // putting a second reader on the flow for a tunnel that does not
+        // exist, which can take a batch the live tunnel was owed and drop it
+        // at its own generation check.
+        assertTrue(src.contains("JAVA_BOOLEAN cn1tnBegan =")
+                && src.contains("begin___java_lang_Object_java_lang_String_int_R_boolean"),
+                "the caller has to take begin's answer");
+        int refused = src.indexOf("if (!cn1tnBegan) {");
+        int armed = src.indexOf("[self cn1ReadPacketsForGeneration:cn1tnStart]");
+        assertTrue(refused > 0 && armed > refused);
+        // NE requires the handler exactly once, so the refusal reports an
+        // error rather than returning silently.
+        String branch = src.substring(refused, armed);
+        assertTrue(branch.contains("completionHandler([NSError"),
+                "the handler is still called exactly once");
+        assertTrue(branch.contains("return;"),
+                "and nothing is armed after it");
+    }
+
+    @Test
     void aStopDuringDeliveryDoesNotLeaveAReadArmed() {
         String src = provider();
         // The handler checks its generation on entry and again before
