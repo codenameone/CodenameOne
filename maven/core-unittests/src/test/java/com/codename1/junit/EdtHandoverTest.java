@@ -176,7 +176,7 @@ class EdtHandoverTest {
     }
 
     @Test
-    void anInitDuringTheOldEdtsTeardownStartsItsOwnDispatchThread() {
+    void anInitDuringTheOldEdtsTeardownWaitsForItAndThenStartsItsOwnDispatchThread() {
         BlockingDeinitImplementation blocking = new BlockingDeinitImplementation();
         startGeneration(blocking);
 
@@ -188,17 +188,22 @@ class EdtHandoverTest {
                 "the dispatch thread never reached the teardown, so the window this test is "
                         + "about was never opened and what follows would prove nothing");
 
-        try {
-            install(new TestCodenameOneImplementation());
-            Display.init(null);
+        install(new TestCodenameOneImplementation());
+        Thread init = initOnAnotherThread();
+        assertFalse(finishedWithin(init, 500L),
+                "init() ran to completion alongside a teardown that had not finished. The two "
+                        + "act on the same process wide state -- the impl slot, the "
+                        + "implementation's initialized flag, Desktop's window registry -- so "
+                        + "they have to be ordered, not interleaved");
 
-            assertTrue(dispatchWorks(),
-                    "init() adopted a thread that had already left the dispatch loop, so this "
-                            + "generation has no event dispatch: everything it queues waits for "
-                            + "ever, which is the display-not-initialized timeout CI reports");
-        } finally {
-            blocking.gate().release();
-        }
+        blocking.gate().release();
+        assertTrue(finishedWithin(init, DISPATCH_TIMEOUT),
+                "init() never came back after the teardown it was waiting for finished");
+
+        assertTrue(dispatchWorks(),
+                "init() adopted a thread that had already left the dispatch loop, so this "
+                        + "generation has no event dispatch: everything it queues waits for "
+                        + "ever, which is the display-not-initialized timeout CI reports");
     }
 
     /**
@@ -218,13 +223,12 @@ class EdtHandoverTest {
         assertTrue(blocking.gate().awaitEntered(), "the fixture never parked the departing thread");
 
         install(new TestCodenameOneImplementation());
-        Display.init(null);
-        assertTrue(dispatchThreadKnowsItself(),
-                "the successor has to be a recognised dispatch thread before it can be lost");
+        Thread init = initOnAnotherThread();
 
-        // Let the old thread run the rest of its teardown, which is where it used to clear the
-        // field the successor is recorded in.
+        // Let the old thread finish, which is where it used to clear the field the successor is
+        // recorded in, and only then let init() through.
         blocking.gate().release();
+        assertTrue(finishedWithin(init, DISPATCH_TIMEOUT), "init() never came back");
         assertTrue(awaitDeath(blocking.gate().parkedThread()),
                 "the departing thread never finished its teardown");
 
@@ -262,15 +266,13 @@ class EdtHandoverTest {
 
         TestCodenameOneImplementation successor = new TestCodenameOneImplementation();
         install(successor);
-        Display.init(null);
-        assertTrue(dispatchWorks(), "the successor generation has to be running to be damaged");
-        assertTrue(successor.isInitialized(), "the successor came up uninitialized on its own");
+        Thread init = initOnAnotherThread();
 
-        // Only now does the departing thread reach the read. The successor is already the
-        // current implementation, so a teardown that reads the slot picks it up.
         blocking.gate().release();
+        assertTrue(finishedWithin(init, DISPATCH_TIMEOUT), "init() never came back");
         assertTrue(awaitDeath(blocking.gate().parkedThread()),
                 "the departing thread never finished its teardown");
+        assertTrue(dispatchWorks(), "the successor generation never came up");
 
         assertFalse(blocking.isInitialized(),
                 "the departing generation's own implementation was left initialized, so the "
@@ -311,12 +313,13 @@ class EdtHandoverTest {
 
         // The SAME instance, which is what the harness does between test classes.
         install(shared);
-        Display.init(null);
-        assertTrue(dispatchWorks(), "the successor generation has to be running to be damaged");
+        Thread init = initOnAnotherThread();
 
         shared.gate().release();
+        assertTrue(finishedWithin(init, DISPATCH_TIMEOUT), "init() never came back");
         assertTrue(awaitDeath(shared.gate().parkedThread()),
                 "the departing thread never finished its teardown");
+        assertTrue(dispatchWorks(), "the successor generation never came up");
 
         assertTrue(shared.isInitialized(),
                 "the departing thread deinitialized the implementation its successor is running "
@@ -324,6 +327,34 @@ class EdtHandoverTest {
         assertTrue(Display.isInitialized(),
                 "the display is in the half torn down state every test in the next class "
                         + "reports as display-not-initialized");
+    }
+
+    /**
+     * Calls {@code Display.init(null)} on a thread of its own and hands the thread back.
+     *
+     * <p>Off the test thread because an init() that lands during a teardown WAITS for it. The
+     * blocking is the property under test, so the test needs to observe it rather than sit in
+     * it.</p>
+     */
+    private static Thread initOnAnotherThread() {
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                Display.init(null);
+            }
+        }, "edt-handover-init");
+        t.start();
+        return t;
+    }
+
+    /** Whether the thread finished within the given time. */
+    private static boolean finishedWithin(Thread t, long millis) {
+        try {
+            t.join(millis);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
+        return !t.isAlive();
     }
 
     /**

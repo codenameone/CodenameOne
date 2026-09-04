@@ -269,6 +269,16 @@ public final class Display extends CN1Constants {
     /// so a high/low FPS will have no effect then.
     private int framerateLock = 15;
     private boolean codenameOneRunning = false;
+    /// How long `init()` waits for a departing dispatch thread to finish its teardown.
+    ///
+    /// Bounded rather than indefinite because the teardown is the PORT's, and a port is
+    /// entitled to need a thread that may be the one calling `init()` -- the Android
+    /// implementation hands the tail of its teardown to the activity's UI thread, which is
+    /// also where `init()` is called from. Waiting for ever would turn a slow teardown into a
+    /// dead application. On expiry the two generations overlap exactly as they did before this
+    /// was here, which is what the guards in the teardown itself are for.
+    private static final long TEARDOWN_WAIT_MILLIS = 10000;
+
     /// This is the instance of the EDT used internally to indicate whether
     /// we are executing on the EDT or some arbitrary thread
     private Thread edt;
@@ -287,6 +297,24 @@ public final class Display extends CN1Constants {
     /// correct outcomes rather than a race. It is a plain boolean, read and written only inside
     /// that monitor.
     private boolean edtDispatching;
+
+    /// The dispatch thread running the teardown that follows its loop, or null when none is.
+    ///
+    /// Claimed inside the same monitor and at the same instant `edtDispatching` is renounced,
+    /// which is provably before any `init()` can have begun: `init()`'s first act is to set
+    /// `codenameOneRunning` true, and the renunciation happens with it false.
+    ///
+    /// `init()` waits on it, because the teardown and a new generation must not interleave.
+    /// Both act on state that is process wide rather than per generation -- the `impl` slot,
+    /// the implementation's own initialized flag (a port may hand out ONE implementation for
+    /// every generation; the Android factory does, and so does the unit test harness) and
+    /// `Desktop`'s single window registry. A teardown that lands mid-`init()` clears the flag
+    /// the successor just set, and `isInitialized()` is that flag AND `codenameOneRunning`, so
+    /// the display stays half up for ever: `init()` cannot repair it, because it guards on the
+    /// flag that is still true. No check the teardown can make closes that, because a check
+    /// and the call after it are two statements and the thread can be descheduled between them
+    /// -- which is this whole class of failure. So the two are ordered instead of guarded.
+    private Thread edtTearingDown;
 
     /// Contains animations that must be played in full by the EDT before anything further
     /// may be processed. This is useful for transitions/intro's etc... that animate without
@@ -454,8 +482,37 @@ public final class Display extends CN1Constants {
     /// #### Deprecated
     ///
     /// this method is invoked internally do not invoke it!
+    /// Waits for a departing dispatch thread to finish the teardown that follows its loop.
+    ///
+    /// This is what keeps two generations from overlapping. See `#edtTearingDown` for why
+    /// guarding the teardown instead cannot work, and `#TEARDOWN_WAIT_MILLIS` for why the wait
+    /// is bounded.
+    ///
+    /// The teardown's own thread is exempt. A port that reached back into `init()` from inside
+    /// its `deinitialize()` would otherwise wait for itself, and a self deadlock in `init()` is
+    /// a worse outcome than the overlap this exists to prevent.
+    private static void awaitPreviousTeardown() {
+        synchronized (lock) {
+            long deadline = System.currentTimeMillis() + TEARDOWN_WAIT_MILLIS;
+            while (INSTANCE.edtTearingDown != null
+                    && INSTANCE.edtTearingDown != Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    return;
+                }
+                try {
+                    lock.wait(remaining);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
+    }
+
     public static void init(Object m) {
         if (!INSTANCE.codenameOneRunning) {
+            awaitPreviousTeardown();
             INSTANCE.codenameOneRunning = true;
             INSTANCE.initialWindowSizeApplied = false;
             INSTANCE.pluginSupport = new PluginSupport();
@@ -1335,6 +1392,10 @@ public final class Display extends CN1Constants {
             // thread is alive and not dispatching -- exactly the window that must not read as a
             // working EDT.
             edtDispatching = false;
+            // Claimed in the same breath, so there is no instant in which this thread has
+            // renounced dispatching and not yet announced the teardown -- an init() landing in
+            // such an instant would neither adopt this thread nor wait for it.
+            edtTearingDown = Thread.currentThread();
             departing[0] = impl;
             return false;
         }
@@ -1343,8 +1404,10 @@ public final class Display extends CN1Constants {
     /// Whether this dispatch thread is still the one the display is recorded as running on.
     ///
     /// Asked by the teardown before each step it takes. A false answer means a successor
-    /// generation has started -- an `init()` that landed during this teardown -- and that
-    /// everything from here belongs to that generation rather than to this thread.
+    /// generation has started while this thread was tearing down, which `init()` waits to
+    /// avoid -- so in practice it only answers false after that wait expired. It is asked
+    /// anyway, because the alternative on that path is a teardown reaching into a live
+    /// generation, and because the answer is a lock and a comparison.
     ///
     /// #### Returns
     ///
@@ -1368,6 +1431,9 @@ public final class Display extends CN1Constants {
     /// So the question is whether it is IN SERVICE. Ours to release while we are still the
     /// recorded dispatch thread, or once a successor is running on a different implementation;
     /// never while the successor is running on this one.
+    ///
+    /// A successor cannot normally exist here at all, because `init()` waits for this teardown.
+    /// This is the guard for the case where that wait expired.
     ///
     /// #### Parameters
     ///
@@ -1491,6 +1557,11 @@ public final class Display extends CN1Constants {
                 // between the two sees a live thread still flagged as dispatching, adopts it and
                 // starts nothing. One call decides and renounces under one lock.
                 if (!keepDispatching(departing)) {
+                    // The claim keepDispatching() just took has to be given back here. This exit
+                    // runs no teardown at all -- the implementation threw on its way down -- and
+                    // an unreleased claim would make the next init() wait out its whole bound
+                    // for one that never starts.
+                    releaseTeardownClaim();
                     return;
                 }
                 Log.e(err);
@@ -1513,10 +1584,38 @@ public final class Display extends CN1Constants {
                 }
             }
         }
-        // Now that an init() during this teardown starts a dispatch thread of its own rather
-        // than adopting this one, the two generations overlap by design -- so each step below
-        // has to ask whether it has been superseded rather than read whatever the process-wide
-        // singletons name by now. Each asks as late as it can, immediately before it acts.
+        // The claim keepDispatching() took is held for the whole teardown and released in the
+        // finally, because an init() that lands here waits for it rather than racing it.
+        try {
+            runTeardown(departing[0]);
+        } finally {
+            releaseTeardownClaim();
+        }
+    }
+
+    /// Releases this thread's teardown claim and wakes any `init()` waiting on it.
+    private void releaseTeardownClaim() {
+        synchronized (lock) {
+            // Only if it is still OURS -- a claim can only be held by one thread, but an expired
+            // wait means an init() went ahead anyway and a successor may already have claimed
+            // its own teardown by the time this runs.
+            if (edtTearingDown == Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
+                edtTearingDown = null;
+            }
+            lock.notifyAll();
+        }
+    }
+
+    /// The teardown that follows the dispatch loop, run as the departing dispatch thread.
+    ///
+    /// `init()` waits for this rather than racing it, so in the ordinary case nothing here can
+    /// be observing a successor generation. The guards are for the case where that wait expired
+    /// -- see `#TEARDOWN_WAIT_MILLIS` -- which is the only way the two generations still overlap.
+    ///
+    /// #### Parameters
+    ///
+    /// - `departing`: the implementation this thread was the dispatch thread for
+    private void runTeardown(CodenameOneImplementation departing) {
         if (stillTheDispatchThread()) {
             // Dispose any window still open, on the EDT, before the implementation goes
             // away. Doing this from the static deinitialize() would run the teardown off
@@ -1534,8 +1633,8 @@ public final class Display extends CN1Constants {
             // reproduces in CI and never locally.
             Desktop.getInstance().disposeAll();
         }
-        if (mayDeinitialize(departing[0])) {
-            departing[0].deinitialize();
+        if (mayDeinitialize(departing)) {
+            departing.deinitialize();
         }
         //INSTANCE.impl = null;
         //INSTANCE.codenameOneGraphics = null;
