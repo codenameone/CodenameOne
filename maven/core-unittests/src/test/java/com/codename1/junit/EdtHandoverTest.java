@@ -23,16 +23,21 @@
 package com.codename1.junit;
 
 import com.codename1.impl.ImplementationFactory;
+import com.codename1.impl.WindowManager;
 import com.codename1.testing.TestCodenameOneImplementation;
+import com.codename1.testing.TestWindowManager;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Window;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A {@code Display.init()} that lands while the previous dispatch thread is tearing down must
- * start a dispatch thread of its own.
+ * start a dispatch thread of its own, and that thread's teardown must stay inside its own
+ * generation.
  *
  * <p>This is the bug behind the intermittent {@code FormTest timed out after 5000ms;
  * edt=display-not-initialized} that has failed a different test class each time it appeared, and
@@ -47,10 +52,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code codenameOneRunning} stays true -- a state {@code init()} cannot repair, because it
  * guards on that flag.</p>
  *
- * <p>Reproduced here rather than raced for. The window is only open while a loaded machine
- * happens to be descheduling the old thread, which is why this never failed locally; an
- * implementation that blocks inside {@code deinitialize()} holds it open instead, so the test
- * either passes or fails for the reason it names.</p>
+ * <p>Not starting a dispatch thread is only one of the two ways that ends in
+ * display-not-initialized, which is why the teardown is tested here as well. Once the adoption
+ * stops, the two generations overlap by design, and a teardown that reads the process-wide
+ * {@code impl} slot rather than its own generation deinitializes the SUCCESSOR -- the same
+ * symptom through the other door.</p>
+ *
+ * <p>Reproduced rather than raced for. The window is only open while a loaded machine happens to
+ * be descheduling the old thread, which is why this never failed locally; an implementation that
+ * parks the departing thread inside its teardown holds it open instead, so each test either
+ * passes or fails for the reason it names. Adjacency in the source is worth nothing here: every
+ * failure in this class is the departing thread being descheduled between two statements.</p>
  */
 class EdtHandoverTest {
 
@@ -58,71 +70,121 @@ class EdtHandoverTest {
     private static final long DISPATCH_TIMEOUT = 5000L;
 
     /**
+     * A one shot gate: a thread parks in it, the test observes that it arrived and lets it go.
+     *
+     * <p>The point of every fixture here is to hold the departing dispatch thread at a chosen
+     * point of its teardown for as long as the test needs, so the ordering under test is fixed
+     * rather than hoped for.</p>
+     */
+    private static final class Gate {
+        private boolean entered;
+        private boolean released;
+        private Thread parked;
+
+        /** Parks the calling thread until {@link #release()}, recording that it arrived. */
+        synchronized void park() {
+            entered = true;
+            parked = Thread.currentThread();
+            notifyAll();
+            long deadline = System.currentTimeMillis() + DISPATCH_TIMEOUT;
+            // Bounded on purpose. A blocked EDT that is never released would hang the whole
+            // suite rather than fail this one test, and the failure would then be reported
+            // against whichever class the runner happened to reach.
+            while (!released && System.currentTimeMillis() < deadline) {
+                try {
+                    wait(deadline - System.currentTimeMillis());
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
+
+        /** Whether a thread reached {@link #park()} within the timeout. */
+        synchronized boolean awaitEntered() {
+            long deadline = System.currentTimeMillis() + DISPATCH_TIMEOUT;
+            while (!entered && System.currentTimeMillis() < deadline) {
+                try {
+                    wait(deadline - System.currentTimeMillis());
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return entered;
+                }
+            }
+            return entered;
+        }
+
+        synchronized void release() {
+            released = true;
+            notifyAll();
+        }
+
+        /** The parked thread, so a test can wait for it to finish dying rather than sleep. */
+        synchronized Thread parkedThread() {
+            return parked;
+        }
+    }
+
+    /**
      * An implementation that parks the departing dispatch thread inside its teardown.
      *
      * <p>{@code mainEDTLoop} calls this after leaving the loop and before it stops being alive,
-     * so blocking here holds the thread in exactly the state the race produces, for as long as
-     * the test needs it.</p>
+     * so blocking here holds the thread in exactly the state the race produces.</p>
      */
-    private static final class BlockingDeinitImplementation extends TestCodenameOneImplementation {
-        private final Object gate = new Object();
-        private boolean entered;
-        private boolean released;
+    private static class BlockingDeinitImplementation extends TestCodenameOneImplementation {
+        private final Gate gate = new Gate();
 
         @Override
         public void deinitialize() {
-            synchronized (gate) {
-                entered = true;
-                gate.notifyAll();
-                long deadline = System.currentTimeMillis() + DISPATCH_TIMEOUT;
-                // Bounded on purpose. A blocked EDT that is never released would hang the whole
-                // suite rather than fail this one test, and the failure would then be reported
-                // against whichever class the runner happened to reach.
-                while (!released && System.currentTimeMillis() < deadline) {
-                    try {
-                        gate.wait(deadline - System.currentTimeMillis());
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-                }
-            }
+            gate.park();
             super.deinitialize();
         }
 
-        boolean awaitEntered() {
-            synchronized (gate) {
-                long deadline = System.currentTimeMillis() + DISPATCH_TIMEOUT;
-                while (!entered && System.currentTimeMillis() < deadline) {
-                    try {
-                        gate.wait(deadline - System.currentTimeMillis());
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        return entered;
-                    }
-                }
-                return entered;
+        Gate gate() {
+            return gate;
+        }
+    }
+
+    /**
+     * An implementation that parks the departing thread EARLIER in the same teardown: inside
+     * {@code Desktop.disposeAll()}, which runs before the implementation to deinitialize is
+     * read.
+     *
+     * <p>That difference is the whole point of the fixture. Parking inside {@code deinitialize()}
+     * cannot exercise a teardown that reads the wrong implementation, because the receiver of
+     * that call has already been resolved by the time the thread parks -- a test built on it
+     * passes whether the teardown is generation scoped or not.</p>
+     */
+    private static final class BlockingWindowDisposeImplementation extends TestCodenameOneImplementation {
+        private final Gate gate = new Gate();
+        private final WindowManager manager = new TestWindowManager() {
+            @Override
+            public void dispose(Object peer) {
+                gate.park();
+                super.dispose(peer);
             }
+        };
+
+        @Override
+        public WindowManager getWindowManager() {
+            return manager;
         }
 
-        void release() {
-            synchronized (gate) {
-                released = true;
-                gate.notifyAll();
-            }
+        Gate gate() {
+            return gate;
         }
     }
 
     @Test
     void anInitDuringTheOldEdtsTeardownStartsItsOwnDispatchThread() {
         BlockingDeinitImplementation blocking = new BlockingDeinitImplementation();
-        BlockingDeinitImplementation parked = startGeneration(blocking);
+        startGeneration(blocking);
 
         // Send the old generation into its teardown and wait until it is parked there: alive,
         // and no longer dispatching. This is the whole point of the fixture -- from here the
         // ordering is fixed rather than hoped for.
         Display.deinitialize();
-        assertTrue(parked.awaitEntered(),
+        assertTrue(blocking.gate().awaitEntered(),
                 "the dispatch thread never reached the teardown, so the window this test is "
                         + "about was never opened and what follows would prove nothing");
 
@@ -135,7 +197,7 @@ class EdtHandoverTest {
                             + "generation has no event dispatch: everything it queues waits for "
                             + "ever, which is the display-not-initialized timeout CI reports");
         } finally {
-            blocking.release();
+            blocking.gate().release();
         }
     }
 
@@ -153,7 +215,7 @@ class EdtHandoverTest {
         startGeneration(blocking);
 
         Display.deinitialize();
-        assertTrue(blocking.awaitEntered(), "the fixture never parked the departing thread");
+        assertTrue(blocking.gate().awaitEntered(), "the fixture never parked the departing thread");
 
         install(new TestCodenameOneImplementation());
         Display.init(null);
@@ -162,13 +224,106 @@ class EdtHandoverTest {
 
         // Let the old thread run the rest of its teardown, which is where it used to clear the
         // field the successor is recorded in.
-        blocking.release();
-        settle();
+        blocking.gate().release();
+        assertTrue(awaitDeath(blocking.gate().parkedThread()),
+                "the departing thread never finished its teardown");
 
         assertTrue(dispatchThreadKnowsItself(),
                 "the departing thread cleared the recorded dispatch thread on its way out, so "
                         + "isEdt() answers false ON the live dispatch thread and work meant for "
                         + "it is queued behind itself");
+    }
+
+    /**
+     * The departing thread must deinitialize the implementation IT served, not whichever one the
+     * static slot names by the time it gets there.
+     *
+     * <p>{@code impl} is a single slot that {@code init()} overwrites, and the teardown runs long
+     * after the successor may have replaced it. Reading it at the call site deinitialized the
+     * successor's implementation, which leaves {@code isInitialized()} false while
+     * {@code codenameOneRunning} stays true -- the same unrepairable state, and the same
+     * display-not-initialized timeout, as failing to start a dispatch thread at all. The harness
+     * already describes this failure in {@link UITestBase}: "the previous class's EDT calls
+     * impl.deinitialize() on its way out, on whatever implementation is current BY THEN".</p>
+     */
+    @Test
+    void aDepartingEdtDeinitializesItsOwnImplementationNotItsSuccessors() {
+        BlockingWindowDisposeImplementation blocking = new BlockingWindowDisposeImplementation();
+        startGeneration(blocking);
+        assertTrue(openWindow(),
+                "a window is what gives Desktop.disposeAll() something to park in, and without "
+                        + "the park the thread runs the whole teardown before the successor "
+                        + "exists -- which is the ordering that proves nothing");
+
+        Display.deinitialize();
+        assertTrue(blocking.gate().awaitEntered(),
+                "the departing thread never reached disposeAll(), so it never parked BEFORE the "
+                        + "implementation to tear down is read");
+
+        TestCodenameOneImplementation successor = new TestCodenameOneImplementation();
+        install(successor);
+        Display.init(null);
+        assertTrue(dispatchWorks(), "the successor generation has to be running to be damaged");
+        assertTrue(successor.isInitialized(), "the successor came up uninitialized on its own");
+
+        // Only now does the departing thread reach the read. The successor is already the
+        // current implementation, so a teardown that reads the slot picks it up.
+        blocking.gate().release();
+        assertTrue(awaitDeath(blocking.gate().parkedThread()),
+                "the departing thread never finished its teardown");
+
+        assertFalse(blocking.isInitialized(),
+                "the departing generation's own implementation was left initialized, so the "
+                        + "teardown tore down something else");
+        assertTrue(successor.isInitialized(),
+                "the departing thread deinitialized the SUCCESSOR's implementation: "
+                        + "Display.isInitialized() is now false with codenameOneRunning true, "
+                        + "which init() cannot repair because it guards on that flag");
+        assertTrue(Display.isInitialized(),
+                "the display is in the half torn down state every test in the next class "
+                        + "reports as display-not-initialized");
+    }
+
+    /**
+     * A departing thread must leave an implementation the successor is RUNNING ON alone, even
+     * though it is the very one it served itself.
+     *
+     * <p>Tearing down "the implementation this generation served" is not enough when the host
+     * hands out one implementation for every generation, which is exactly what the unit test
+     * harness does: {@link UITestBase} reuses {@code TestCodenameOneImplementation.getInstance()}
+     * from class to class. The departing thread and the successor then hold the same object, so
+     * a teardown scoped by identity still deinitializes the live one -- and the successor is
+     * permanently half up, because {@code isInitialized()} is the implementation's flag AND
+     * {@code codenameOneRunning}, and {@code init()} guards on the one that is still true.</p>
+     *
+     * <p>This is the shape the whole suite hits between classes, and it is why the question the
+     * teardown asks has to be "is it in service" rather than "is it mine".</p>
+     */
+    @Test
+    void aDepartingEdtLeavesAnImplementationItsSuccessorIsRunningOnAlone() {
+        BlockingWindowDisposeImplementation shared = new BlockingWindowDisposeImplementation();
+        startGeneration(shared);
+        assertTrue(openWindow(), "the fixture needs an open window to park the teardown in");
+
+        Display.deinitialize();
+        assertTrue(shared.gate().awaitEntered(),
+                "the departing thread never parked before the implementation is read");
+
+        // The SAME instance, which is what the harness does between test classes.
+        install(shared);
+        Display.init(null);
+        assertTrue(dispatchWorks(), "the successor generation has to be running to be damaged");
+
+        shared.gate().release();
+        assertTrue(awaitDeath(shared.gate().parkedThread()),
+                "the departing thread never finished its teardown");
+
+        assertTrue(shared.isInitialized(),
+                "the departing thread deinitialized the implementation its successor is running "
+                        + "on, because it was also the one it served itself");
+        assertTrue(Display.isInitialized(),
+                "the display is in the half torn down state every test in the next class "
+                        + "reports as display-not-initialized");
     }
 
     /**
@@ -179,7 +334,7 @@ class EdtHandoverTest {
      * a teardown -- so a thread with no form never reaches the state this test is about, and the
      * fixture silently proved nothing until it did.</p>
      */
-    private static BlockingDeinitImplementation startGeneration(BlockingDeinitImplementation impl) {
+    private static void startGeneration(TestCodenameOneImplementation impl) {
         install(impl);
         Display.deinitialize();
         Display.init(null);
@@ -199,7 +354,25 @@ class EdtHandoverTest {
                 break;
             }
         }
-        return impl;
+    }
+
+    /** Opens one window on the EDT and reports whether it reached the desktop registry. */
+    private static boolean openWindow() {
+        final boolean[] opened = new boolean[1];
+        final Object done = new Object();
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (done) {
+                    Window w = new Window("edt-handover-window");
+                    w.setWindowSize(320, 240);
+                    w.show();
+                    opened[0] = true;
+                    done.notifyAll();
+                }
+            }
+        });
+        return await(done, opened);
     }
 
     /**
@@ -222,18 +395,7 @@ class EdtHandoverTest {
                 }
             }
         });
-        synchronized (done) {
-            long deadline = System.currentTimeMillis() + DISPATCH_TIMEOUT;
-            while (!answer[0] && System.currentTimeMillis() < deadline) {
-                try {
-                    done.wait(deadline - System.currentTimeMillis());
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
-            return answer[0];
-        }
+        return await(done, answer);
     }
 
     /** Queues one runnable and reports whether a dispatch thread actually ran it. */
@@ -249,9 +411,14 @@ class EdtHandoverTest {
                 }
             }
         });
+        return await(done, ran);
+    }
+
+    /** Waits for a runnable queued on the EDT to report its answer. */
+    private static boolean await(Object done, boolean[] answer) {
         synchronized (done) {
             long deadline = System.currentTimeMillis() + DISPATCH_TIMEOUT;
-            while (!ran[0] && System.currentTimeMillis() < deadline) {
+            while (!answer[0] && System.currentTimeMillis() < deadline) {
                 try {
                     done.wait(deadline - System.currentTimeMillis());
                 } catch (InterruptedException ie) {
@@ -259,21 +426,28 @@ class EdtHandoverTest {
                     break;
                 }
             }
-            return ran[0];
+            return answer[0];
         }
     }
 
-    /** Gives the released thread a moment to finish dying before the state is read again. */
-    private static void settle() {
-        long deadline = System.currentTimeMillis() + 1000L;
-        while (System.currentTimeMillis() < deadline) {
-            try {
-                Thread.sleep(25L);
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-                return;
-            }
+    /**
+     * Waits for the released thread to finish dying.
+     *
+     * <p>Joined rather than slept on. The state these tests read is written by the last few
+     * statements that thread runs, so a fixed pause is either slower than it needs to be or
+     * short enough to read the state half written on a loaded machine -- which is the very
+     * failure mode the whole class is about.</p>
+     */
+    private static boolean awaitDeath(Thread t) {
+        if (t == null) {
+            return false;
         }
+        try {
+            t.join(DISPATCH_TIMEOUT);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
+        return !t.isAlive();
     }
 
     private static void install(final TestCodenameOneImplementation impl) {
