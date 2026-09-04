@@ -183,6 +183,44 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
+    void theWriterHoldsWhatItWritesThrough() {
+        String src = provider();
+        // WITHOUT ARC -- the translated sources cannot be built any other
+        // way -- the global is a bare pointer, and the stop clears it just
+        // before NE releases the provider. A write that overlapped a stop
+        // therefore snapshotted a pointer, passed its generation check and
+        // reached packetFlow on an object that had been deallocated in
+        // between. The generation check picked the right tunnel; nothing
+        // kept that tunnel alive.
+        assertTrue(src.contains("flow = [cn1tnProvider retain]"),
+                "the writer has to hold the provider it writes through");
+        assertTrue(src.contains("@synchronized ([CN1VpnTunnelProvider class]) {\n"
+                        + "        cn1tnProvider = nil;"),
+                "the stop has to clear under the lock the retain is taken under");
+        // BALANCED: every path out of the writer gives the retain back.
+        int writer = src.indexOf("IOSExtensionTunnel_writeNative");
+        assertTrue(writer >= 0);
+        String method = src.substring(writer);
+        int retains = 0;
+        int at = method.indexOf("[cn1tnProvider retain]");
+        while (at >= 0) {
+            retains++;
+            at = method.indexOf("[cn1tnProvider retain]", at + 1);
+        }
+        int releases = 0;
+        at = method.indexOf("[flow release]");
+        while (at >= 0) {
+            releases++;
+            at = method.indexOf("[flow release]", at + 1);
+        }
+        assertEquals(1, retains);
+        // THREE returns: nothing to write, a generation that has moved, and
+        // the write itself.
+        assertEquals(3, releases,
+                "every path out of the writer releases");
+    }
+
+    @Test
     void anOldTunnelCannotWriteOntoTheNewLink() {
         String src = provider();
         // A stopped tunnel's onPacket can still be running -- a callback

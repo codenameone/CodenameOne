@@ -17,7 +17,7 @@
 # Linux, so this is a check for a developer's Mac; a skip that failed the build
 # would only teach people to ignore it.
 #
-# Usage: ./.github/scripts/check-vpn-tunnel-extension-compiles.sh
+# Usage: ./scripts/check-vpn-tunnel-extension-compiles.sh
 set -e
 
 cd "$(dirname "$0")/.."

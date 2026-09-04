@@ -280,6 +280,21 @@ class VpnTunnelNativeBuilderTest {
     }
 
     @Test
+    void aTunnelInTheDefaultPackageIsRefused() {
+        // The stub is generated into the application's package, and java in
+        // a named package cannot name a class in the default one -- so
+        // "Tunnel" would compile as <app package>.Tunnel and fail on a class
+        // the developer never wrote. The refusal names the hint; the compile
+        // error would not have.
+        VpnTunnelNativeBuilder builder = new VpnTunnelNativeBuilder(null);
+        builder.parseHints(request("true", "Tunnel"), true);
+        BuildException refused = assertThrows(BuildException.class,
+                () -> builder.verifyTunnelClass(new File(".")));
+        assertTrue(refused.getMessage().contains("no package"),
+                refused.getMessage());
+    }
+
+    @Test
     void theHostEntitlementHasToCarryTheTunnelValue() {
         // The renderer splits an array-valued hint on newlines and trims, so
         // a project asking for two provider kinds writes two lines and must

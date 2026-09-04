@@ -356,7 +356,7 @@ class VpnTunnelNativeBuilder {
         // isolateStub filters and part of what the translation is rooted at,
         // and a default package tunnel is not worth three moving parts.
         if (tunnelClass.indexOf('.') < 0) {
-            throw new RuntimeException(HINT_CLASS + " names " + tunnelClass
+            throw new BuildException(HINT_CLASS + " names " + tunnelClass
                     + ", which has no package. The extension is compiled from"
                     + " a generated class in the application's own package,"
                     + " and java cannot reference a class in the default"

@@ -53,7 +53,7 @@ import java.util.Map;
  * CodenameOne repository -- neither runs an Objective-C compiler. The output
  * is checked instead by generating it and running clang against the real iOS
  * SDK with {@code -fapplication-extension}, which is what
- * {@code .github/scripts/check-vpn-tunnel-extension-compiles.sh} does on a
+ * {@code scripts/check-vpn-tunnel-extension-compiles.sh} does on a
  * machine that has Xcode; it skips where there is none. Run it after
  * changing this file: a forward-declaration break that would have failed the
  * generated target's first build was found sitting here exactly that way.</p>
@@ -373,7 +373,15 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("    // generation -- so a write from the old tunnel found a\n");
         sb.append("    // generation that still matched and a provider that\n");
         sb.append("    // was already the new one, and went out on its link.\n");
-        sb.append("    cn1tnProvider = self;\n");
+        sb.append("    // Under the lock the writer takes, which is what\n");
+        sb.append("    // lets it retain what it reads. This target compiles\n");
+        sb.append("    // without ARC -- the translated sources cannot be\n");
+        sb.append("    // built any other way -- so the global is a bare\n");
+        sb.append("    // pointer, and a bare pointer is no promise that the\n");
+        sb.append("    // object is still there.\n");
+        sb.append("    @synchronized ([CN1VpnTunnelProvider class]) {\n");
+        sb.append("        cn1tnProvider = self;\n");
+        sb.append("    }\n");
         sb.append("    // The settings the system needs BEFORE any packet\n");
         sb.append("    // moves; see the note on this class.\n");
         sb.append("    NEPacketTunnelNetworkSettings *settings =\n");
@@ -564,7 +572,15 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("    com_codename1_impl_vpn_ExtensionTunnelHost_end___int_int(\n");
         sb.append("            threadStateData, cn1tnReason(reason),\n");
         sb.append("            atomic_load(&cn1tnReadGeneration));\n");
-        sb.append("    cn1tnProvider = nil;\n");
+        sb.append("    // CLEARED BEFORE the handler, and under the lock.\n");
+        sb.append("    // NE releases the provider once this handler returns,\n");
+        sb.append("    // so a writer that got here first holds a retain and\n");
+        sb.append("    // one that arrives after finds nil. Cleared after the\n");
+        sb.append("    // handler instead, there is a window in which the\n");
+        sb.append("    // global names a deallocated object.\n");
+        sb.append("    @synchronized ([CN1VpnTunnelProvider class]) {\n");
+        sb.append("        cn1tnProvider = nil;\n");
+        sb.append("    }\n");
         sb.append("    completionHandler();\n");
         sb.append("}\n");
         sb.append("\n");
@@ -599,9 +615,21 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "    // global -- a restart landing in between handed this\n"
                 + "    // packet to the new provider, which is the crossing\n"
                 + "    // the generation exists to prevent.\n"
-                + "    CN1VpnTunnelProvider *flow = cn1tnProvider;\n"
+                + "    //\n"
+                + "    // RETAINED, not just read. Without ARC the global is\n"
+                + "    // a bare pointer and the stop clears it just before\n"
+                + "    // NE releases the provider, so a write that overlapped\n"
+                + "    // a stop could reach packetFlow on a deallocated\n"
+                + "    // object. The retain is taken under the lock the stop\n"
+                + "    // clears under, which is what makes it a retain of\n"
+                + "    // something still alive rather than a race of its own.\n"
+                + "    CN1VpnTunnelProvider *flow;\n"
+                + "    @synchronized ([CN1VpnTunnelProvider class]) {\n"
+                + "        flow = [cn1tnProvider retain];\n"
+                + "    }\n"
                 + "    if (flow == nil || packet == JAVA_NULL\n"
                 + "            || length <= 0) {\n"
+                + "        [flow release];\n"
                 + "        return;\n"
                 + "    }\n"
                 + "    if (generation != atomic_load(&cn1tnReadGeneration)) {\n"
@@ -615,6 +643,7 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "        // so one session's traffic could leave on\n"
                 + "        // another's tunnel. The generation travels with\n"
                 + "        // the writer, installed per start.\n"
+                + "        [flow release];\n"
                 + "        return;\n"
                 + "    }\n"
                 + "    NSData *data = [NSData dataWithBytes:\n"
@@ -630,6 +659,7 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "    [flow.packetFlow\n"
                 + "            writePackets:[NSArray arrayWithObject:data]\n"
                 + "            withProtocols:[NSArray arrayWithObject:family]];\n"
+                + "    [flow release];\n"
                 + "}\n\n";
     }
 
