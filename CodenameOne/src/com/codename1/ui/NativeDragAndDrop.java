@@ -1459,14 +1459,15 @@ public final class NativeDragAndDrop {
         if (root == null) {
             return null;
         }
-        Component cmp;
+        Component hit;
         try {
-            cmp = root.getComponentAt(x, y);
+            hit = root.getComponentAt(x, y);
         } catch (Throwable err) {
             // The tree can be mutated on the event dispatch thread while this walks it. A drag
             // event that lands mid-layout is not worth a crash; the next one resolves.
             return null;
         }
+        Component cmp = hit;
         while (cmp != null) {
             if (acceptsDrop(cmp, content, actions)) {
                 return cmp;
@@ -1485,8 +1486,17 @@ public final class NativeDragAndDrop {
         // After the walk rather than instead of it: where hit testing does answer with a
         // target, or with a child of one, that answer is the same component a press would
         // reach, and native drops and pointer events should not disagree about that.
+        //
+        // And inside what hit testing answered with, never beside it. Promotion returns an
+        // *ancestor* of the component deepest under the point, so that is the only place a
+        // hidden target can be. Searching the whole surface instead reached components the
+        // pointer cannot: a target behind an overlay -- a sheet, a pane put up to block input
+        // -- lit up and took the drop through the thing covering it.
+        if (!(hit instanceof Container)) {
+            return null;
+        }
         try {
-            return descendToTarget(root, x, y, content, actions);
+            return descendToTarget((Container) hit, x, y, content, actions);
         } catch (Throwable err) {
             // Mid-layout, as above.
             return null;

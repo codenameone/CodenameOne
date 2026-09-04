@@ -1262,6 +1262,34 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aTargetBehindAnOverlayIsNotReachedThroughIt() {
+        Form form = Display.getInstance().getCurrent();
+        form.setLayout(new com.codename1.ui.layouts.LayeredLayout());
+        DropRecorder target = new DropRecorder();
+        target.setNativeDropTarget(true);
+        form.add(target);
+        // Added afterwards, so it is the one in front -- a sheet, or a pane put up to block
+        // input. It is not a drop target and it is not transparent to the pointer either.
+        Container overlay = new Container();
+        overlay.add(new Label("in the way"));
+        form.add(overlay);
+        form.revalidate();
+
+        int x = overlay.getAbsoluteX() + 5;
+        int y = overlay.getAbsoluteY() + 5;
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+        NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        assertEquals("[]", target.events.toString(),
+                "the pointer cannot reach it, so neither can the drag: looking for a hidden "
+                        + "target means looking inside what hit testing answered with, not "
+                        + "behind it");
+        assertNull(target.dropped);
+    }
+
+    @FormTest
     void aTargetHiddenByItsAncestorIsNotHandedTheDelayedDrop() {
         Form form = Display.getInstance().getCurrent();
         Container holder = new Container(new BorderLayout());
