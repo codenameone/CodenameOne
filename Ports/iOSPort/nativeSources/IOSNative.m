@@ -1107,9 +1107,10 @@ void com_codename1_impl_ios_IOSNative_declareNativeDragPayload___java_lang_Strin
     POOL_END();
 }
 
-void com_codename1_impl_ios_IOSNative_addNativeDragFiles___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT paths) {
+void com_codename1_impl_ios_IOSNative_addNativeDragFiles___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
     POOL_BEGIN();
-    CN1AddNativeDragFiles(paths == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG paths));
+    // One file per call; see CN1AddNativeDragFiles for why there is no list here.
+    CN1AddNativeDragFiles(path == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG path));
     POOL_END();
 }
 

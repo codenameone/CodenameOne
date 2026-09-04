@@ -407,7 +407,7 @@ public final class IOSNative {
     /// #### Parameters
     ///
     /// - `paths`: newline separated file paths or `file:` URIs
-    native void addNativeDragFiles(String paths);
+    native void addNativeDragFiles(String path);
 
     /// Drops whatever `#prepareNativeDrag(java.lang.String, int, byte[], int, int)` staged,
     /// because the press turned out to be a tap.

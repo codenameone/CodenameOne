@@ -110,7 +110,7 @@ void CN1DeclareNativeDragPayload(NSString* mimeType);
 /// number of items when the session begins, and that is the number of files.
 ///
 /// `paths` is newline separated.
-void CN1AddNativeDragFiles(NSString* paths);
+void CN1AddNativeDragFiles(NSString* path);
 
 /// Drops whatever CN1PrepareNativeDrag staged, because the press turned out to be a tap.
 void CN1CancelNativeDrag(void);

@@ -528,32 +528,34 @@ void CN1DeclareNativeDragPayload(NSString* mimeType) {
     [cn1DragMimes addObject:mimeType];
 }
 
-void CN1AddNativeDragFiles(NSString* paths) {
-    if (paths == nil || paths.length == 0 || cn1DragFileUrls == nil) {
+/// Adds one file to the drag being assembled.
+///
+/// One per call, and deliberately: a list of paths joined by anything is ambiguous, because
+/// the only bytes a path may not contain are the separator and NUL. A newline is legal in a
+/// filename on Apple's filesystems, so a list split on newlines turned one such file into
+/// two paths that name nothing -- and the drag published neither the file the application
+/// asked for nor an error. Calling per file leaves nothing to be ambiguous about.
+void CN1AddNativeDragFiles(NSString* path) {
+    if (path == nil || path.length == 0 || cn1DragFileUrls == nil) {
         return;
     }
-    for (NSString* entry in [paths componentsSeparatedByString:@"\n"]) {
-        if (entry.length == 0) {
-            continue;
+    // ClipboardContent's file representation permits a raw local path as well as a file:
+    // URI, and URLWithString: turns a path into a scheme-less relative URL that no receiver
+    // can open. An absolute path is obvious; a relative one -- exports/report.pdf -- looks
+    // enough like a URL to be parsed as one, and was then quietly dropped from the drag
+    // because an item provider cannot vend it. Anything that does not come back with a
+    // scheme is a path.
+    NSURL* url;
+    if ([path hasPrefix:@"/"] || [path hasPrefix:@"~"]) {
+        url = [NSURL fileURLWithPath:[path stringByExpandingTildeInPath]];
+    } else {
+        url = [NSURL URLWithString:path];
+        if (url == nil || url.scheme == nil) {
+            url = [NSURL fileURLWithPath:path];
         }
-        // ClipboardContent's file representation permits a raw local path as well as a file:
-        // URI, and URLWithString: turns a path into a scheme-less relative URL that no receiver
-        // can open. An absolute path is obvious; a relative one -- exports/report.pdf -- looks
-        // enough like a URL to be parsed as one, and was then quietly dropped from the drag
-        // because an item provider cannot vend it. Anything that does not come back with a
-        // scheme is a path.
-        NSURL* url;
-        if ([entry hasPrefix:@"/"] || [entry hasPrefix:@"~"]) {
-            url = [NSURL fileURLWithPath:[entry stringByExpandingTildeInPath]];
-        } else {
-            url = [NSURL URLWithString:entry];
-            if (url == nil || url.scheme == nil) {
-                url = [NSURL fileURLWithPath:entry];
-            }
-        }
-        if (url != nil) {
-            [cn1DragFileUrls addObject:url];
-        }
+    }
+    if (url != nil) {
+        [cn1DragFileUrls addObject:url];
     }
 }
 

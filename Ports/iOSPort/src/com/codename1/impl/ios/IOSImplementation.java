@@ -9500,8 +9500,16 @@ public class IOSImplementation extends CodenameOneImplementation {
                         com.codename1.io.Log.e(err);
                         continue;
                     }
-                    if (files != null && files.length > 0) {
-                        nativeInstance.addNativeDragFiles(join(files));
+                    if (files != null) {
+                        // One call per file. Joined into one string they were split apart
+                        // again on the other side, and a newline is legal in a filename
+                        // here -- so one such file arrived as two paths naming nothing,
+                        // and the drag carried neither it nor a complaint.
+                        for (int file = 0; file < files.length; file++) {
+                            if (files[file] != null && files[file].length() > 0) {
+                                nativeInstance.addNativeDragFiles(files[file]);
+                            }
+                        }
                     }
                     continue;
                 }

@@ -11189,7 +11189,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// clipDataFor was still building the very clip that referenced them -- so the clip went
     /// out pointing at files that were already gone. Whole clips are what is forgotten, never
     /// the one being assembled.
-    private static final int GENERATED_CLIP_MEMORY = 8;
+    ///
+    /// Bounded by bytes rather than by a count of clips. A receiver may hold a content URI
+    /// this application handed it and read it much later -- a queued upload does exactly that,
+    /// and the grant stays valid -- so counting clips deleted a file somebody was still
+    /// entitled to as soon as eight more copies had been made, however small. What can
+    /// actually fill a device is bytes: a hundred staged text fragments cost nothing and all
+    /// survive, while a few videos are reclaimed as soon as they add up.
+    ///
+    /// There is no signal that says a receiver is finished with one, and inventing one would
+    /// be a new public API every application had to adopt to keep behaving as it does today.
+    /// The same reasoning, and the same budget, as the dropped copies on iOS.
+    private static final long GENERATED_CLIP_BUDGET = 64L * 1024 * 1024;
     private static final java.util.LinkedHashMap<String, StagedClipFile> STAGED_CLIP_FILES =
             new java.util.LinkedHashMap<String, StagedClipFile>();
 
@@ -11199,11 +11210,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private final String path;
         private final boolean transport;
         private final long clip;
+        /// What it occupies, for the budget above. Taken when it is staged, because by the
+        /// time it is reclaimed the file may be gone and a size of zero would make a large
+        /// clip look free.
+        private final long bytes;
 
-        StagedClipFile(String path, boolean transport, long clip) {
+        StagedClipFile(String path, boolean transport, long clip, long bytes) {
             this.path = path;
             this.transport = transport;
             this.clip = clip;
+            this.bytes = bytes;
         }
     }
 
@@ -11251,19 +11267,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         synchronized (STAGED_CLIP_FILES) {
             STAGED_CLIP_FILES.remove(uri.toString());
             STAGED_CLIP_FILES.put(uri.toString(),
-                    new StagedClipFile(file.getAbsolutePath(), transport, clip));
-            // Whole clips, and never the newest ones: the clip being built is still growing,
-            // and the one before it may be what the clipboard or a running drag is carrying.
-            long forgetBefore = clip - GENERATED_CLIP_MEMORY;
+                    new StagedClipFile(file.getAbsolutePath(), transport, clip, file.length()));
+            // Down to the budget, oldest first. Never the clip being assembled -- it is still
+            // growing -- and never the one the clipboard or a running drag is carrying, which
+            // are not superseded by anything however old they are.
+            long held = 0;
+            for (StagedClipFile staged : STAGED_CLIP_FILES.values()) {
+                held += staged.bytes;
+            }
             java.util.Iterator<java.util.Map.Entry<String, StagedClipFile>> entries =
                     STAGED_CLIP_FILES.entrySet().iterator();
-            while (entries.hasNext()) {
+            while (held > GENERATED_CLIP_BUDGET && entries.hasNext()) {
                 StagedClipFile staged = entries.next().getValue();
-                if (staged.clip <= forgetBefore && staged.clip != clipboardClip
-                        && staged.clip != draggingClip) {
-                    entries.remove();
-                    deleteStagedClipFile(staged);
+                if (staged.clip == clip || staged.clip == clipboardClip
+                        || staged.clip == draggingClip) {
+                    continue;
                 }
+                held -= staged.bytes;
+                entries.remove();
+                deleteStagedClipFile(staged);
             }
         }
     }

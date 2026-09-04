@@ -2257,6 +2257,26 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                     continue;
                 }
+                String mime = JavaSENativeDragAndDrop.asciiLower(
+                        flavor.getPrimaryType() + "/" + flavor.getSubType());
+                if (!"text".equals(JavaSENativeDragAndDrop.asciiLower(flavor.getPrimaryType()))
+                        && out instanceof InputStream) {
+                    // A binary representation another application owns -- a PDF, an
+                    // archive, an application's own format -- which AWT hands over as a
+                    // stream. Read as bytes and filed under its own type: passed through
+                    // the text path below it produced a string of mojibake at best, and
+                    // was stored under nothing at all, so a paste of a document the
+                    // clipboard plainly held answered with the text fallback or null.
+                    // Exporting one has been supported since this port learned to publish
+                    // arbitrary types; reading one had not caught up.
+                    if (!content.hasMimeType(mime)) {
+                        byte[] bytes = readClipboardStream((InputStream) out);
+                        if (bytes != null && bytes.length > 0) {
+                            content.setData(mime, bytes);
+                        }
+                    }
+                    continue;
+                }
                 String str = clipboardText(out);
                 if (str == null) {
                     continue;
@@ -2292,6 +2312,30 @@ public class JavaSEPort extends CodenameOneImplementation {
             return plain;
         }
         return super.getPasteDataFromClipboard();
+    }
+
+    /// Reads a clipboard flavor served as a stream, or null when it cannot be read.
+    ///
+    /// Bounded by nothing here on purpose: the clipboard is what the user put there, and a
+    /// paste that silently truncated a document would be worse than one that costs the
+    /// memory the document takes.
+    private static byte[] readClipboardStream(InputStream in) {
+        try {
+            try {
+                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = in.read(buffer)) > 0) {
+                    out.write(buffer, 0, read);
+                }
+                return out.toByteArray();
+            } finally {
+                in.close();
+            }
+        } catch (Throwable err) {
+            // One representation that would not read is not the whole clipboard.
+            return null;
+        }
     }
 
     /// Encodes an AWT clipboard image as PNG bytes so it can travel through the CN1 clipboard as an
