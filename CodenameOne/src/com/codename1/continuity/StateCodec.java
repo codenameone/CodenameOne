@@ -180,10 +180,24 @@ public final class StateCodec {
                             tagged ? decode(entry.getValue()) : entry.getValue());
                 }
             }
-            // Not validated on the way in. This map came from another device, and refusing it
-            // would turn that device's mistake into an exception on this one at a moment the user
-            // cannot connect to anything they did.
-            state.setPayloadUnchecked(copy);
+            // Validated, with the SAME check a locally built payload gets -- there is one
+            // definition of what a payload may hold and this is it. AppState documents the
+            // restriction and setPayload() enforced it, while a payload arriving from another
+            // device went in unchecked: a null nested in a list survived to the listeners and the
+            // provider, was acknowledged, and then met the iOS property-list sanitizer, which
+            // drops it and shifts every index after it. The application's data changes shape
+            // between one device and the next, silently.
+            //
+            // NULL rather than an exception, which is the same answer the field-type checks above
+            // give and the reason the old comment here gave for skipping this: a remote mistake
+            // must not become an exception on this device. It does not -- it becomes a failed
+            // read, so the document stays on the relay for a build that can use it.
+            try {
+                state.setPayload(copy);
+            } catch (IllegalArgumentException malformed) {
+                Log.e(malformed);
+                return null;
+            }
         }
         Object device = m.get(KEY_DEVICE);
         if (device instanceof String) {

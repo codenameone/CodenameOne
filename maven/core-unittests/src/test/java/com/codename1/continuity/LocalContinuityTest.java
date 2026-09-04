@@ -3656,6 +3656,43 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * Two keys differing only in case are two keys in the simulated store.
+     *
+     * <p>The default filesystems on macOS and Windows are case-insensitive, so "Theme" and
+     * "theme" resolved to one file: the second put() overwrote the first while the index listed
+     * both, both reads answered with one value, and removing either removed both. The store being
+     * simulated is case-sensitive, and a simulation that merges two keys is worse than no
+     * simulation -- it looks like it works.</p>
+     */
+    @EdtTest
+    public void twoKeysDifferingOnlyInCaseAreTwoKeys() {
+        // Through a storage that FOLDS CASE, which is what the default macOS and Windows
+        // filesystems do and what this test is about. The unit-test storage is case-sensitive, so
+        // a first version of this test passed against the unfixed code: it asserted nothing.
+        Storage real = Storage.getInstance();
+        Storage.setStorageInstance(new CaseFoldingStorage(real));
+        LocalContinuityBridge b = new LocalContinuityBridge();
+        try {
+            assertTrue(b.syncedStorePut("Theme", "upper"), "the fixture could not write a value");
+            assertTrue(b.syncedStorePut("theme", "lower"), "the fixture could not write a value");
+
+            assertEquals("upper", b.syncedStoreGet("Theme"),
+                    "the lowercase write overwrote the uppercase key's value, so two distinct "
+                            + "keys share one file");
+            assertEquals("lower", b.syncedStoreGet("theme"), "the lowercase value did not survive");
+
+            b.syncedStoreRemove("theme");
+            assertEquals("upper", b.syncedStoreGet("Theme"),
+                    "removing one key removed the other as well");
+            assertNull(b.syncedStoreGet("theme"), "the removed key still reads back");
+        } finally {
+            b.syncedStoreRemove("Theme");
+            b.syncedStoreRemove("theme");
+            Storage.setStorageInstance(real);
+        }
+    }
+
+    /**
      * A state a listener was holding is refused once the session it arrived in has ended.
      *
      * <p>Returning false to keep an arrival while prompting the user is documented behaviour, and
@@ -5280,6 +5317,40 @@ public class LocalContinuityTest extends UITestBase {
         @Override
         public void deleteStorageFile(String name) {
             delegate.deleteStorageFile(name);
+        }
+    }
+
+    /** Storage that folds every name to lower case before delegating, the way the default
+     * filesystems on macOS and Windows resolve paths. */
+    static class CaseFoldingStorage extends Storage {
+        private final Storage delegate;
+
+        CaseFoldingStorage(Storage delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public boolean writeObject(String name, Object o) {
+            return delegate.writeObject(fold(name), o);
+        }
+
+        @Override
+        public Object readObject(String name) {
+            return delegate.readObject(fold(name));
+        }
+
+        @Override
+        public boolean exists(String name) {
+            return delegate.exists(fold(name));
+        }
+
+        @Override
+        public void deleteStorageFile(String name) {
+            delegate.deleteStorageFile(fold(name));
+        }
+
+        private static String fold(String name) {
+            return name == null ? null : name.toLowerCase();
         }
     }
 

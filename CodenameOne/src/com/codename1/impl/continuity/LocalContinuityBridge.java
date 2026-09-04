@@ -250,7 +250,16 @@ public class LocalContinuityBridge implements ContinuityBridge {
         StringBuilder sb = new StringBuilder(PREFIX);
         for (int i = 0; i < key.length(); i++) {
             char c = key.charAt(i);
-            if (c == '/' || c == '\\' || c == '%' || c == '?' || c == '*' || c == ':'
+            // Uppercase letters are escaped along with the characters a path cannot carry,
+            // because the DEFAULT filesystems on macOS and Windows are case-insensitive: "Theme"
+            // and "theme" resolved to one file, so the second put() overwrote the first while the
+            // index listed both keys, both reads answered with one value, and removing either
+            // removed both. The store being simulated is case-sensitive, and a simulation that
+            // merges two keys is worse than no simulation -- it looks like it works.
+            if (c >= 'A' && c <= 'Z') {
+                sb.append('$');
+                sb.append(Integer.toHexString(c).toUpperCase());
+            } else if (c == '/' || c == '\\' || c == '%' || c == '?' || c == '*' || c == ':'
                     || c == '=' || c == '$') {
                 sb.append('$');
                 String hex = Integer.toHexString(c).toUpperCase();

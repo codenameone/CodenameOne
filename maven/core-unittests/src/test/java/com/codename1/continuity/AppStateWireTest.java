@@ -338,24 +338,56 @@ public class AppStateWireTest {
     }
 
     /**
-     * A payload arriving from another device is NOT validated.
+     * A payload arriving from another device gets the SAME check a local one gets, and a failure
+     * is a failed read rather than an exception.
      *
-     * <p>It was validated where it was produced. Refusing it here would turn a remote build's
-     * mistake into an exception on this device, at a moment the user cannot connect to anything
-     * they did.</p>
+     * <p>This test used to assert the opposite, on the reasoning that the payload was validated
+     * where it was produced and that refusing it here would turn a remote build's mistake into an
+     * exception on this device. The second half stopped being true when fromMap() began answering
+     * null for a bad field type: a refusal is a failed READ, so the document stays on the relay
+     * for a build that can use it and nothing is thrown at the user.</p>
+     *
+     * <p>The first half does not survive either. Accepting an unrepresentable value does not make
+     * it work -- it reaches the listeners and the provider, is acknowledged, and then throws out
+     * of externalize() when the checkpoint is written, which is the failure that leaves `dirty`
+     * set and retries for ever. A null nested in a list is worse than that: it survives to the
+     * iOS property-list sanitizer, which drops it and shifts every index after it, so the
+     * application's data quietly changes shape between one device and the next.</p>
      */
     @Test
-    public void anArrivingPayloadIsNotRevalidated() {
+    public void anArrivingPayloadIsCheckedLikeALocalOne() {
         Map<String, Object> wire = new HashMap<String, Object>();
         Map<String, Object> payload = new HashMap<String, Object>();
         payload.put("odd", new Object());
         wire.put("payload", payload);
         wire.put("device", "other");
 
-        AppState back = StateCodec.fromMap(wire);
+        assertNull(StateCodec.fromMap(wire),
+                "an unrepresentable value arrived intact, so it reaches the application and then "
+                        + "breaks the checkpoint that tries to store it");
 
-        assertNotNull(back);
+        // A null nested in a LIST, which is the shape the iOS sanitizer silently reindexes.
+        Map<String, Object> nulled = new HashMap<String, Object>();
+        Map<String, Object> withList = new HashMap<String, Object>();
+        withList.put("items", Arrays.asList("a", null, "b"));
+        nulled.put("payload", withList);
+        nulled.put("device", "other");
+        assertNull(StateCodec.fromMap(nulled),
+                "a null list element arrived intact, so the list is one shorter on an iPad than "
+                        + "on the device that sent it");
+
+        // What a conforming sender writes still goes through, or this guard would refuse every
+        // arrival there is.
+        Map<String, Object> fine = new HashMap<String, Object>();
+        Map<String, Object> goodPayload = new HashMap<String, Object>();
+        goodPayload.put("items", Arrays.asList("a", "b"));
+        goodPayload.put("n", Integer.valueOf(3));
+        fine.put("payload", goodPayload);
+        fine.put("device", "other");
+        AppState back = StateCodec.fromMap(fine);
+        assertNotNull(back, "a conforming payload was refused");
         assertEquals("other", back.getDeviceId());
+        assertEquals(Integer.valueOf(3), back.getPayload().get("n"));
     }
 
     @Test
