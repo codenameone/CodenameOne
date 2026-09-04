@@ -221,6 +221,16 @@ public final class Continuity {
     /// delivering the previous account's state into the next account's screen.
     private static int relaySession;
 
+    /// What was on screen at the instant the session last ended.
+    ///
+    /// The restore undo needs to tell "the restore put this signed-out screen up" from "the
+    /// application chose this screen when it signed out", and those happen in the same call:
+    /// clear() is reached from INSIDE Navigation.restoreStack(), through a route factory or a
+    /// show callback, so by the time restoreStack returns whatever the application did is already
+    /// current and looks exactly like what the restore did. Sampling the display at the moment
+    /// the session ended is the one point where the two are still distinguishable.
+    private static com.codename1.ui.Form formAtSessionEnd;
+
     /// Whether the application has said anything about continuity yet -- either enable() or
     /// disable(). It is NOT the negation of `enabled`: the two states that share
     /// `enabled == false` -- nothing said yet, and switched off on purpose -- want opposite
@@ -311,6 +321,9 @@ public final class Continuity {
         if (!enabled) {
             return;
         }
+        // Sampled with the bump, not read later: see formAtSessionEnd.
+        formAtSessionEnd = Display.isInitialized()
+                ? Display.getInstance().getCurrent() : null;
         lifecycle++;
         enabled = false;
         dirty = false;
@@ -1040,7 +1053,8 @@ public final class Continuity {
             // through Navigation, so it records nothing and checkpoints nothing.
             try {
                 com.codename1.ui.Form now = Display.getInstance().getCurrent();
-                if (beforeRestore != null && beforeRestore != now) { //NOPMD CompareObjectsWithEquals
+                if (beforeRestore != null && beforeRestore != now //NOPMD CompareObjectsWithEquals
+                        && !applicationChoseTheScreen(beforeRestore, now)) {
                     beforeRestore.show();
                 }
             } catch (Throwable t) {
@@ -1265,6 +1279,9 @@ public final class Continuity {
     /// One thing it cannot undo: a relay request already on the wire when this is called. Nothing
     /// in this process can recall that. What this guarantees is that nothing follows it.
     public static void clear() {
+        // Sampled with the bump, not read later: see formAtSessionEnd.
+        formAtSessionEnd = Display.isInitialized()
+                ? Display.getInstance().getCurrent() : null;
         lifecycle++;
         parked = null;
         dirty = false;
@@ -2018,6 +2035,38 @@ public final class Continuity {
                 dispatch(state);
             }
         });
+    }
+
+    /// Whether the screen now showing was picked by the APPLICATION when it ended the session,
+    /// rather than left there by the restore that is being undone.
+    ///
+    /// Both happen inside `Navigation.restoreStack()` -- a route factory or a show callback finds
+    /// the session expired, calls `clear()`, and may show a login form before returning -- so
+    /// from out here the two are the same observation: a form that is not the one we started on.
+    /// Re-showing the previous screen over the application's choice puts the user back on the
+    /// signed-out account's UI, which is the opposite of what the callback asked for.
+    ///
+    /// The instant the session ended is where they separate. If the restore had ALREADY changed
+    /// the screen by then, anything different showing now was put there afterwards, and only the
+    /// application could have done that. If the session ended before the restore changed
+    /// anything, whatever is up came from the restore and the undo is right.
+    ///
+    /// One case is still read the wrong way: a route FACTORY that ends the session and shows its
+    /// own form, before the restore has installed anything. Its screen is then undone. That is
+    /// what this code always did and is much rarer than the show-callback case above, which is
+    /// the one being fixed; closing it as well would mean threading the form restoreStack showed
+    /// back out of it, and that is public API this does not need.
+    private static boolean applicationChoseTheScreen(com.codename1.ui.Form beforeRestore,
+            com.codename1.ui.Form now) {
+        if (formAtSessionEnd == null) {
+            return false;
+        }
+        if (formAtSessionEnd == beforeRestore) { //NOPMD CompareObjectsWithEquals
+            // The session ended before the restore had put anything up, so what is showing came
+            // from the restore.
+            return false;
+        }
+        return now != formAtSessionEnd; //NOPMD CompareObjectsWithEquals
     }
 
     /// Applies an arrival: offers it to the listeners, then restores or parks it.
@@ -2868,6 +2917,7 @@ public final class Continuity {
         bridgeOverridden = false;
         enabled = false;
         applicationHasChosen = false;
+        formAtSessionEnd = null;
         autoRestore = true;
         flushScheduled = false;
         title = null;

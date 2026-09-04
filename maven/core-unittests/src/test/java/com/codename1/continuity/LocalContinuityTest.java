@@ -3656,6 +3656,97 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A login form the logout callback put up is not replaced by the screen the restore started
+     * from.
+     *
+     * <p>A restored route's show callback finds the session expired, calls clear(), and shows a
+     * login form before returning. The undo then re-showed the screen the restore had started
+     * from, which is the signed-out account's own UI -- the exact thing the callback replaced it
+     * to avoid. Both happen inside restoreStack(), so from outside they look identical; the
+     * instant the session ended is where they separate.</p>
+     */
+    @EdtTest
+    public void aScreenTheLogoutCallbackChoseSurvivesTheUndo() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+
+        final Form dashboard = new Form("dashboard");
+        dashboard.show();
+        flushSerialCalls();
+
+        final Form login = new Form("login");
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                Form f = new Form();
+                f.setTitle(url);
+                f.addShowListener(new com.codename1.ui.events.ActionListener() {
+                    public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                        // The session has expired. Sign out, and put the user where they now
+                        // belong -- which is the whole point of doing this from the callback.
+                        Continuity.clear();
+                        login.show();
+                    }
+                });
+                return f;
+            }
+        });
+        try {
+            Map<String, Object> payload = new HashMap<String, Object>();
+            payload.put("draft", "the previous account's");
+            Continuity.restore(new AppState()
+                    .setPayload(payload)
+                    .setRoutes(java.util.Arrays.asList("/orders/17"))
+                    .setDeviceId("some-other-device")
+                    .setSequence(170L)
+                    .setTimestamp(System.currentTimeMillis()));
+            flushSerialCalls();
+
+            assertTrue(login == Display.getInstance().getCurrent(),
+                    "the undo put the screen the restore started from back over the login form "
+                            + "the logout callback had just chosen, so the user is returned to "
+                            + "the signed-out account's UI; showing "
+                            + Display.getInstance().getCurrent().getTitle());
+        } finally {
+            Navigation.setDispatcher(null);
+        }
+    }
+
+    /**
+     * A document in an encoding this build does not know is a failed read, not untagged data.
+     *
+     * <p>An unknown encoding is not an unknown FIELD. A field this codec does not know is ignored
+     * on purpose -- that is how a newer sender goes on talking to this build. An encoding marker
+     * changes how the fields it does know must be read, so falling back to "untagged" handed the
+     * provider every encoded scalar as a raw string, and the state was then persisted and
+     * acknowledged: the origin's high-water mark advanced, so the correctly encoded document was
+     * never offered again, not even after the receiving app was upgraded to understand it.</p>
+     */
+    @EdtTest
+    public void aDocumentInAnUnknownEncodingIsAFailedRead() throws Exception {
+        try {
+            AppState s = StateCodec.fromJson("{\"device\":\"other\",\"seq\":\"10\","
+                    + "\"enc\":\"2\",\"payload\":{\"n\":\"i:5\"}}");
+            fail("a document in encoding \"2\" was read as untagged"
+                    + (s != null ? ", so the provider is handed " + s.getPayload().get("n")
+                            + " where the sender wrote the number 5" : ""));
+        } catch (java.io.IOException expected) {
+            assertTrue(expected.getMessage().length() > 0, "the refusal explained nothing");
+        }
+
+        // The two encodings this build DOES understand still work, or the guard would refuse
+        // every document there is.
+        AppState tagged = StateCodec.fromJson("{\"device\":\"other\",\"seq\":\"10\","
+                + "\"enc\":\"1\",\"payload\":{\"n\":\"i:5\"}}");
+        assertEquals(Integer.valueOf(5), tagged.getPayload().get("n"),
+                "a tagged document stopped decoding");
+        AppState legacy = StateCodec.fromJson("{\"device\":\"other\",\"seq\":\"10\","
+                + "\"payload\":{\"n\":\"plain\"}}");
+        assertEquals("plain", legacy.getPayload().get("n"),
+                "a document with no encoding marker was refused, so every older sender is cut off");
+    }
+
+    /**
      * A route rebuild that THREW keeps the state pending, even when the payload applied.
      *
      * <p>A throw is a different thing from routes that would not rebuild, and the two were

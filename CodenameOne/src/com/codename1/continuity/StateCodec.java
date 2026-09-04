@@ -279,6 +279,23 @@ public final class StateCodec {
         requireRouteStrings(m);
         requireType(m, KEY_PAYLOAD, Map.class, "an object");
         requireType(m, KEY_ENCODING, String.class, "a string");
+        Object encoding = m.get(KEY_ENCODING);
+        if (encoding != null && !ENCODING_TAGGED.equals(encoding)) {
+            // An unknown ENCODING is not an unknown field. A field this codec does not know is
+            // ignored on purpose -- that is how the format stays extensible and how a newer
+            // sender goes on talking to this build. An encoding marker changes how the fields it
+            // DOES know must be read, so falling back to "untagged" handed the provider every
+            // encoded scalar as a raw string, and the state was then persisted and acknowledged:
+            // the origin's high-water mark advanced, so the correctly encoded document was never
+            // offered again, not even after the receiving app was upgraded to understand it.
+            //
+            // A failed read instead, which is retryable and leaves the document on the relay.
+            throw new IOException("The continuity relay returned a document encoded as \""
+                    + encoding + "\", which this build cannot read -- it understands \""
+                    + ENCODING_TAGGED + "\" and documents with no encoding marker at all. "
+                    + "Treated as a failed read so the document stays where a build that "
+                    + "understands it can still use it.");
+        }
         requireType(m, KEY_DEVICE, String.class, "a string");
         requireType(m, KEY_TITLE, String.class, "a string");
         requireNumberLike(m, KEY_SEQUENCE);
