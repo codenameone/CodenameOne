@@ -28,6 +28,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.PointerEvent;
 import com.codename1.ui.layouts.BorderLayout;
 import org.junit.jupiter.api.Test;
 
@@ -487,6 +488,32 @@ class NativeDragAndDropTest extends UITestBase {
                 NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY));
         flushSerialCalls();
         assertTrue(target.events.contains("drop"));
+    }
+
+    @FormTest
+    void aTargetNarrowingItsActionsWhileHoveredIsAnsweredWithWhatItStillTakes() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder target = addTarget(form);
+        target.setAcceptedDropActions(NativeDragOperation.ACTION_MOVE);
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+        int both = NativeDragOperation.ACTION_COPY | NativeDragOperation.ACTION_MOVE;
+
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), both);
+        flushSerialCalls();
+        assertEquals(NativeDragOperation.ACTION_MOVE,
+                NativeDragAndDrop.plannedDropAction(0, x, y, textContent("hi"), both));
+
+        // The target changes its mind about what it will do, without the pointer moving.
+        target.setAcceptedDropActions(NativeDragOperation.ACTION_COPY);
+        NativeDragAndDrop.dragOver(0, x, y, textContent("hi"), both);
+        flushSerialCalls();
+
+        assertEquals(NativeDragOperation.ACTION_COPY,
+                NativeDragAndDrop.plannedDropAction(0, x, y, textContent("hi"), both),
+                "a target withdrawing an action is as much a withdrawal as the source doing it: "
+                        + "keeping the move advertised had the release refused outright rather "
+                        + "than settling for the copy the target still takes");
     }
 
     @FormTest
@@ -1711,6 +1738,110 @@ class NativeDragAndDropTest extends UITestBase {
         } finally {
             NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
             flushSerialCalls();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
+    void aReleaseDoesNotDiscardWhatAReentrantPressStaged() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        int pointerType = implementation.getPointerType();
+        try {
+            final Form form = Display.getInstance().getCurrent();
+            Container source = new Container();
+            source.setNativeDragOperation(new NativeDragOperation("dragged out"));
+            Container clicked = new Container();
+            clicked.add(new Label("release here"));
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, source);
+            form.add(BorderLayout.NORTH, clicked);
+            form.revalidate();
+
+            final int sx = source.getAbsoluteX() + 10;
+            final int sy = source.getAbsoluteY() + 10;
+            int cx = clicked.getAbsoluteX() + 5;
+            int cy = clicked.getAbsoluteY() + 5;
+            final boolean[] reentered = new boolean[1];
+
+            implementation.setPointerType(PointerEvent.TYPE_STYLUS);
+            clicked.addStylusListener(ev -> {
+                if (ev.getEventType() == ActionEvent.Type.PointerReleased) {
+                    // The stylus callback is application code and may open a nested event
+                    // loop -- a dialog -- inside which a whole new press is dispatched.
+                    reentered[0] = true;
+                    form.pointerPressed(sx, sy);
+                }
+            });
+
+            form.pointerPressed(cx, cy);
+            form.pointerReleased(cx, cy);
+
+            assertTrue(reentered[0], "the stylus release reached the listener");
+            assertTrue(NativeDragAndDrop.pointerDragged(sx + 200, sy + 200),
+                    "the release belongs to the press that is ending, not to the one that "
+                            + "started while its callback was running");
+            assertNotNull(implementation.getStartedNativeDrag(),
+                    "the new gesture keeps the operation its own press staged");
+            assertSame(source, implementation.getStartedNativeDrag().getSource());
+        } finally {
+            // The gesture above really started a session, so end it here or the next test's
+            // startDrag finds one already running.
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            NativeDragAndDrop.gestureCancelled();
+            implementation.setPointerType(pointerType);
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
+    void aWindowReleaseDoesNotDiscardWhatAReentrantPressStaged() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        implementation.setMultiWindowSupported(true);
+        int pointerType = implementation.getPointerType();
+        final Window w = new Window("holds a drag source");
+        try {
+            Container source = new Container();
+            source.setNativeDragOperation(new NativeDragOperation("dragged out"));
+            Container clicked = new Container();
+            clicked.add(new Label("release here"));
+            w.setLayout(new BorderLayout());
+            w.add(BorderLayout.CENTER, source);
+            w.add(BorderLayout.NORTH, clicked);
+            w.show();
+            flushSerialCalls();
+
+            final int sx = source.getAbsoluteX() + 10;
+            final int sy = source.getAbsoluteY() + 10;
+            int cx = clicked.getAbsoluteX() + 5;
+            int cy = clicked.getAbsoluteY() + 5;
+            final boolean[] reentered = new boolean[1];
+
+            implementation.setPointerType(PointerEvent.TYPE_STYLUS);
+            clicked.addStylusListener(ev -> {
+                if (ev.getEventType() == ActionEvent.Type.PointerReleased) {
+                    reentered[0] = true;
+                    w.pointerPressed(sx, sy);
+                }
+            });
+
+            w.pointerPressed(cx, cy);
+            w.pointerReleased(cx, cy);
+
+            assertTrue(reentered[0], "the stylus release reached the listener");
+            assertNotNull(implementation.getPreparedNativeDrag(),
+                    "the window keeps the operation the reentrant press staged, exactly as it "
+                            + "keeps that press's own teardown token");
+        } finally {
+            implementation.setPointerType(pointerType);
+            NativeDragAndDrop.gestureCancelled();
+            w.dispose();
+            flushSerialCalls();
+            implementation.setMultiWindowSupported(false);
             implementation.setNativeDragAndDropSupported(false);
             implementation.resetNativeDragState();
         }

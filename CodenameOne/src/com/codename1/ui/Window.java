@@ -3401,15 +3401,21 @@ public class Window extends Container implements TopLevelContainer {
         // a stylus press that puts a dialog up would have gone on stroking into the
         // dialog. Only the continuation is suppressed; the bookkeeping below still runs,
         // so the flags this gesture set are cleared as they always were.
+        // A press that never became a drag releases the operation the press staged, so a
+        // later gesture somewhere else cannot start the drag this one declined to.
+        //
+        // Before the stylus callback, for the same reason the teardown below carries a
+        // token: that callback is application code and may enter a nested event loop in
+        // which a fresh press stages an operation of its own. Clearing afterwards threw
+        // *that* gesture's staging away, and the drag it was about to become never
+        // started.
+        NativeDragAndDrop.pointerReleased();
         if (Display.getInstance().isStylusPointer() && !gestureCancelled) {
             Component stylusCmp = resolveComponentAt(x, y);
             if (stylusCmp != null) {
                 stylusCmp.fireStylusEvent(ActionEvent.Type.PointerReleased, x, y);
             }
         }
-        // A press that never became a drag releases the operation the press staged, so a
-        // later gesture somewhere else cannot start the drag this one declined to.
-        NativeDragAndDrop.pointerReleased();
         // The token identifying *this* gesture. A release handler may enter
         // invokeAndBlock, whose nested event loop can dispatch a fresh press in this
         // same window before the handler returns; tearing down unconditionally then

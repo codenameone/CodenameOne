@@ -4615,15 +4615,20 @@ public class Form extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
+        // A press that never became a drag releases the operation the press staged, so a
+        // later gesture somewhere else cannot start the drag this one declined to.
+        //
+        // Before the stylus callback, not after. That callback is application code and may
+        // open a nested event loop -- a dialog -- inside which a whole new press is
+        // dispatched and stages an operation of its own. Clearing afterwards then threw the
+        // *new* gesture's staging away, and the drag it was about to become never started.
+        NativeDragAndDrop.pointerReleased();
         if (Display.getInstance().isStylusPointer()) {
             Component stylusCmp = resolveInputComponent(x, y);
             if (stylusCmp != null) {
                 stylusCmp.fireStylusEvent(ActionEvent.Type.PointerReleased, x, y);
             }
         }
-        // A press that never became a drag releases the operation the press staged, so a
-        // later gesture somewhere else cannot start the drag this one declined to.
-        NativeDragAndDrop.pointerReleased();
         try {
             Component origPressedCmp = pressedCmp;
             setRippleMotion(null);

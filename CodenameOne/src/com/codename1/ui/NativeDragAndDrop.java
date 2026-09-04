@@ -824,10 +824,19 @@ public final class NativeDragAndDrop {
                         : preferredAction(allowedActions & target.getAcceptedDropActions());
             } else if (target != null) {
                 if (currentAction != NativeDragOperation.ACTION_NONE
-                        && (currentAction & allowedActions) == 0) {
+                        && (currentAction & allowedActions
+                                & target.getAcceptedDropActions()) == 0) {
                     // The permitted set changed while the pointer stayed put, which is what the
                     // desktop modifier does. An action agreed under the old set is no longer on
                     // offer, so keeping it told the platform something it had just withdrawn.
+                    //
+                    // Either side of it may have changed. A target narrowing its own accepted
+                    // actions -- setAcceptedDropActions while the pointer rests on it -- is
+                    // just as much a withdrawal as the source's modifier, and looking only at
+                    // the source's mask kept advertising a move the target had stopped
+                    // permitting: the release was then refused outright by the intersection
+                    // at the drop, rather than settling for the copy it would still have
+                    // taken.
                     //
                     // ACTION_NONE is excluded deliberately: it is a decision, not a stale value.
                     // Recomputing it here turned a target's refusal back into the default and
