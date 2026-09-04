@@ -72,6 +72,12 @@ public class LocalContinuityBridge implements ContinuityBridge {
     // EDT-owned. Everything here runs on the Codename One event thread: the framework calls in
     // from there, and the simulator's "Simulate ->" items reach this class through
     // SimulatorHookLoader, which dispatches every hook with Display.callSeriallyAndWait.
+    //
+    // The synced store below rests on the same assumption, and SyncedStore now says so where an
+    // application can read it: the key index is a second stored value, so two threads writing
+    // different new keys would each read it, add one key, and write it back over the other. That
+    // is answered by the toolkit's threading model rather than by a lock in it -- see the
+    // Threading section on SyncedStore.
     private ContinuityCallback callback;
     private String publishedType;
     private String publishedTitle;

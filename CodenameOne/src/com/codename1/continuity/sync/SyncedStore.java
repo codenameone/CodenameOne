@@ -63,6 +63,19 @@ import java.util.List;
 /// should not have to arrange an entitlement to get it. Where the platform has no such store --
 /// Android, desktop, the browser -- `isSupported()` is false and every call here is an inert
 /// no-op, so the sensible shape is a synced value with a local default behind it.
+/// #### Threading
+///
+/// Called on the event dispatch thread, like the rest of the toolkit. Codename One is single
+/// threaded by design -- one thread on each side of a native boundary, marshalled at the boundary
+/// rather than locked -- and this class follows that rule rather than making an exception to it.
+///
+/// It is worth stating because the simulation behind `isSupported() == true` on a desktop keeps
+/// its key index as a second stored value: two threads writing different NEW keys at once would
+/// each read that index, add their own key, and write it back, so one of them would vanish from
+/// `keys()` while its value stayed readable by name. The platform stores have no such structure
+/// and no such exposure. The answer is the toolkit's answer everywhere else -- call it from the
+/// event thread, and use `com.codename1.ui.Display#callSerially(Runnable)` if you are on another
+/// one -- not a lock inside a framework that does not have them.
 public final class SyncedStore {
     private static final List<SyncedStoreListener> listeners = new ArrayList<SyncedStoreListener>();
 

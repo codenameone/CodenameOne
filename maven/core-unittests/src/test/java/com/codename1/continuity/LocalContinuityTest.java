@@ -3512,6 +3512,49 @@ public class LocalContinuityTest extends UITestBase {
                         + "both hand the signed-out account's work to whoever signs in next");
     }
 
+    /**
+     * A route that logs out while being rebuilt stops the restore.
+     *
+     * <p>Rebuilding a stack runs application code -- the route factory, the form's constructor,
+     * its show callback -- and any of it may discover the session is over. Committing afterwards
+     * repopulates both the navigation stack and the stored checkpoint with the signed-out
+     * account's state.</p>
+     *
+     * <p>This is the indirect case. The framework never calls the route factory; Navigation does,
+     * on its behalf, which is why an enumeration of the callbacks the framework invokes directly
+     * did not find it.</p>
+     */
+    @EdtTest
+    public void aRouteThatLogsOutWhileBeingRebuiltStopsTheRestore() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(true);
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String path) {
+                // "The session behind this route has expired."
+                Continuity.clear();
+                return new Form(path);
+            }
+        });
+        try {
+            AppState arrival = fromElsewhere("the previous account's screen", 66L);
+            List<String> routes = new ArrayList<String>();
+            routes.add("/account/statement");
+            arrival.setRoutes(routes);
+
+            Continuity.deliver(arrival);
+            flushSerialCalls();
+
+            assertNull(Continuity.getRestorableState(),
+                    "the restore committed after the route logged out, so the signed-out "
+                            + "account's stack and checkpoint are back");
+            assertTrue(Navigation.getStack().isEmpty(),
+                    "the rebuilt stack survived the logout that happened while building it");
+        } finally {
+            Navigation.setDispatcher(null);
+            Navigation.clearStack();
+        }
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;

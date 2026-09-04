@@ -937,6 +937,34 @@ public final class Continuity {
         } finally {
             applyingRestore = false;
         }
+        if (lifecycle != lifecycleAtRestore) {
+            // Rebuilding a route stack RUNS APPLICATION CODE -- the route factory, the form's
+            // constructor, whatever its show callback does -- and any of it may discover that the
+            // session is over and call clear() or disable(). Committing after that repopulates
+            // both the navigation stack and the stored checkpoint with the signed-out account's
+            // state.
+            //
+            // The fourth site on this path, and the one the last round's enumeration missed: it
+            // listed the callbacks the framework invokes DIRECTLY -- the listener, restoreState,
+            // saveState -- and route dispatch reaches application code indirectly, through
+            // Navigation. Indirect is the same risk; the enumeration was of the wrong thing.
+            //
+            // The STACK is emptied again as well, which refusing to commit does not do on its
+            // own: restoreStack() had already rebuilt it before returning here, so the signed-out
+            // account's screens were back in the history even with nothing written to storage.
+            // Suppressed while doing it, or the emptying schedules a checkpoint of its own and
+            // recreates exactly what the logout removed.
+            try {
+                clearingStack = true;
+                Navigation.clearStack();
+            } catch (Throwable t) {
+                Log.e(t);
+            } finally {
+                clearingStack = false;
+            }
+            outFailed[0] = true;
+            return false;
+        }
         if (!shown && !applied) {
             // Routes were named, none could be rebuilt, and nothing else in the state applied
             // either -- an attempt that failed outright, so it stays on the relay for a launch
