@@ -4272,6 +4272,14 @@ public class Form extends Container implements TopLevelContainer {
         // disable the drag stop flag if we are dragging again
         boolean isScrollWheeling = Display.impl.isScrollWheeling();
         if (dragStopFlag) {
+            // The press this gesture really was, dispatched now and at *this* position. What
+            // the original press staged for the operating system goes first: it was staged
+            // where the finger landed, on a payload the component may pick per position, and
+            // the press about to run stages this gesture again from where it now is. Without
+            // that, the staging guard -- which refuses one press the slot another press owns --
+            // would keep the older one, and with it a drag origin two hundred pixels back that
+            // makes this very packet look like a drag.
+            NativeDragAndDrop.gestureCancelled();
             pointerPressed(x, y);
         }
         // A press that landed on a native drag source becomes an operating system drag here,
@@ -4364,6 +4372,14 @@ public class Form extends Container implements TopLevelContainer {
         // disable the drag stop flag if we are dragging again
         boolean isScrollWheeling = Display.impl.isScrollWheeling();
         if (dragStopFlag) {
+            // The press this gesture really was, dispatched now and at *this* position. What
+            // the original press staged for the operating system goes first: it was staged
+            // where the finger landed, on a payload the component may pick per position, and
+            // the press about to run stages this gesture again from where it now is. Without
+            // that, the staging guard -- which refuses one press the slot another press owns --
+            // would keep the older one, and with it a drag origin two hundred pixels back that
+            // makes this very packet look like a drag.
+            NativeDragAndDrop.gestureCancelled();
             pointerPressed(x, y);
         }
         // The same hook the scalar overload runs, and the one that matters: an ordinary

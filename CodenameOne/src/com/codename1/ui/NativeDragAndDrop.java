@@ -574,6 +574,18 @@ public final class NativeDragAndDrop {
         }
     }
 
+    /// True when a press identified this way is the one the staging belongs to.
+    ///
+    /// The token where there is one on both sides, which is what tells two fingers apart even
+    /// on one component. Where a top level did not mint one -- a component outside any -- the
+    /// component is all there is to go on.
+    private static boolean samePressAsStaged(Object token, Component source) {
+        if (token != null && pressToken != null) {
+            return token == pressToken; // NOPMD CompareObjectsWithEquals
+        }
+        return source == pendingSource; // NOPMD CompareObjectsWithEquals
+    }
+
     /// True when this exact press has already staged an operation.
     ///
     /// A top level primes drag and drop on the component under the pointer and then again on
@@ -642,12 +654,17 @@ public final class NativeDragAndDrop {
     /// it a drag at all, so "offered" was true too late to protect the very case it was added
     /// for.
     ///
-    /// The same component may always restage: whichever press it belongs to, the drag is that
-    /// component's, and a gesture the platform dropped on the floor is inherited by the next
-    /// press on the same component rather than stranding it -- see
-    /// `#isStagedFor(java.lang.Object, int, int)` for the other half of that. What ends a
-    /// staging that nothing will use is the release of whichever gesture is really in
-    /// progress; see `#pointerReleased(java.lang.Object)`.
+    /// By press rather than by component. A component may hand out a different operation for
+    /// every position -- `Component#createNativeDragOperation(int, int)` documents exactly
+    /// that, for a list handing out the row under the finger -- so a second finger elsewhere on
+    /// the *same* component restaged a different payload, and the session the first finger was
+    /// about to become would have carried it.
+    ///
+    /// Nothing is stranded by that. Every gesture ends in a release as far as this framework is
+    /// concerned: a platform that cancels a touch outright still delivers one -- the iOS
+    /// recognizer dispatches pointerReleased from touchesCancelled -- and a port that ends a
+    /// gesture any other way calls `#gestureCancelled()` itself. The release of the press that
+    /// owns the staging is what clears it; see `#pointerReleased(java.lang.Object)`.
     ///
     /// #### Returns
     ///
@@ -655,7 +672,7 @@ public final class NativeDragAndDrop {
     private static boolean stage(NativeDragOperation op, Component source, Object token,
             int x, int y) {
         synchronized (LOCK) {
-            if (pending != null && source != pendingSource) { // NOPMD CompareObjectsWithEquals
+            if (pending != null && !samePressAsStaged(token, source)) {
                 // What the press claimed, given back. A source may hand one operation instance
                 // to every component it owns, so the press being refused here may have pointed
                 // that very instance at its own component a moment ago -- claiming the source

@@ -1786,10 +1786,10 @@ class NativeDragAndDropTest extends UITestBase {
             int y = first.getAbsoluteY() + 10;
             form.pointerPressed(x, y);
 
-            // A second press at the very same pixel, with no release or cancellation between
-            // them to clear what the first staged -- which is what a platform that drops a
-            // gesture on the floor leaves behind. The component is given a different payload
-            // first: identified by position, the second press inherits the first one's.
+            // Released and pressed again at the very same pixel. The component is given a
+            // different payload in between: identified by position rather than by press, the
+            // second gesture would inherit the first one's.
+            form.pointerReleased(x, y);
             NativeDragOperation second = new NativeDragOperation("the second press");
             first.setNativeDragOperation(second);
             form.pointerPressed(x, y);
@@ -2371,6 +2371,45 @@ class NativeDragAndDropTest extends UITestBase {
                     "the second finger neither takes the staging slot nor ends it: the session "
                             + "the first finger is about to become must carry its own payload");
             assertSame(pressed, NativeDragAndDrop.getActiveDrag().getSource());
+        } finally {
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            NativeDragAndDrop.gestureCancelled();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
+    void aSecondFingerOnTheSameComponentDoesNotRestageIt() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            // What a list does: the row under the finger decides the payload, so one component
+            // hands out a different operation for every position.
+            final NativeDragOperation firstRow = new NativeDragOperation("the row pressed first");
+            final NativeDragOperation secondRow = new NativeDragOperation("the row pressed after");
+            Container rows = new Container() {
+                @Override
+                protected NativeDragOperation createNativeDragOperation(int x, int y) {
+                    return y < getAbsoluteY() + getHeight() / 2 ? firstRow : secondRow;
+                }
+            };
+            rows.setNativeDragSource(true);
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, rows);
+            form.revalidate();
+
+            int x = rows.getAbsoluteX() + 10;
+            form.pointerPressed(x, rows.getAbsoluteY() + 5);
+            // The other finger, lower down the same component, while the first is still held.
+            form.pointerPressed(x, rows.getAbsoluteY() + rows.getHeight() - 5);
+
+            assertSame(firstRow, NativeDragAndDrop.dragSessionStarted(),
+                    "the session belongs to the press that staged it: one component can hand "
+                            + "out a payload per position, so a second finger on it is a "
+                            + "different drag and must not replace the first");
         } finally {
             NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
             flushSerialCalls();
