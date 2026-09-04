@@ -314,8 +314,9 @@ IMPORTANT: Don't rely on pass by reference/value behavior since they vary betwee
 
 The shape is always the same, whether you are reaching one platform API or
 wrapping a whole third party SDK: portable Java on one side, the platform's own
-code on the other, and a narrow interface between them that carries only
-primitives and strings.
+code on the other, and a narrow interface between them that carries only the
+types listed above: primitives, strings, single dimension primitive arrays and
+`PeerComponent` values.
 
 .The native interface round trip
 image::img/native-interface-round-trip.svg[How a call crosses into native code and a result comes back,scaledwidth=70%]
