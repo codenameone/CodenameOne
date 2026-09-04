@@ -9334,36 +9334,32 @@ public class IOSImplementation extends CodenameOneImplementation {
         /// session is readable -- a receiver that queries and then reads must not make the
         /// provider write its file twice.
         Object produce(String mimeType) {
+            // The provider runs inside the lock, not beside it. At most once per transfer
+            // is what a provider is promised, and two readers that both miss an empty memo
+            // would both run it -- writing the promised file twice and keeping one, which
+            // is the contract broken in the way it most costs.
+            //
+            // Holding a lock across application code is worth saying out loud. The only
+            // thread it can block is one reading this same session, which is precisely the
+            // one that has to wait; and the resolutions arrive on the main queue anyway,
+            // dispatched there by the load handlers in CN1DragAndDrop.m, so they are
+            // already serialized and this is what keeps them so if that ever changes.
             synchronized (produced) {
                 if (produced.containsKey(mimeType)) {
                     return produced.get(mimeType);
                 }
-            }
-            // Outside the lock: it runs application code, which may block, and a second
-            // reader of the same type is rare enough that producing twice is better than
-            // holding a lock across it.
-            Object value;
-            try {
-                value = NativeDragAndDrop.produceDragValue(op, mimeType);
-            } catch (Throwable err) {
-                // A provider that threw has answered: nothing, once. Leaving the failure
-                // unrecorded had the next reader of the same type run it again, which for
-                // a provider that writes a file means writing it twice -- the very thing
-                // resolving once per transfer exists to prevent.
-                synchronized (produced) {
-                    if (!produced.containsKey(mimeType)) {
-                        produced.put(mimeType, null);
-                    }
-                }
-                throw err;
-            }
-            synchronized (produced) {
-                if (produced.containsKey(mimeType)) {
-                    return produced.get(mimeType);
+                Object value;
+                try {
+                    value = NativeDragAndDrop.produceDragValue(op, mimeType);
+                } catch (Throwable err) {
+                    // A provider that threw has answered: nothing, once. Leaving the
+                    // failure unrecorded had the next reader run it again.
+                    produced.put(mimeType, null);
+                    throw err;
                 }
                 produced.put(mimeType, value);
+                return value;
             }
-            return value;
         }
     }
     private static int nextDragSessionId;

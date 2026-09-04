@@ -2184,12 +2184,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         /// AWT something it does not expect from a Transferable, in the middle of a drag or a
         /// clipboard read it was performing on this application's behalf.
         private Object resolve(String mime) {
-            synchronized (produced) {
-                if (produced.containsKey(mime)) {
-                    return produced.get(mime);
-                }
-            }
-            // Outside the lock: it runs application code, which may block.
+            // The provider runs inside the lock. AWT asks a transferable for whatever it
+            // likes and promises nothing about threads -- the standard image flavor and the
+            // MIME specific stream behind it are one representation and can be asked for at
+            // once -- and two callers that both miss an empty memo would both run a
+            // provider promised at most once per transfer, writing the file twice and
+            // keeping one of them. The only thread this can block is one reading this same
+            // transferable, which is the one that has to wait.
             //
             // Produced for this transferable rather than read from the content's own
             // memory. A drag sharing this content fills that memory and then forgets it,
@@ -2197,21 +2198,22 @@ public class JavaSEPort extends CodenameOneImplementation {
             // drag's value on its first read -- for a provider that writes a file per
             // transfer, a path belonging to that drag, which its reclamation may since
             // have deleted. What this transferable publishes is its own from the start.
-            Object value;
-            try {
-                value = com.codename1.ui.NativeDragAndDrop.produceTransferValue(data, mime);
-            } catch (Throwable err) {
-                // A provider is permitted to fail; the flavor is simply unavailable. See
-                // clipboardValue, whose guard this mirrors.
-                value = null;
-            }
             synchronized (produced) {
                 if (produced.containsKey(mime)) {
                     return produced.get(mime);
                 }
+                Object value;
+                try {
+                    value = com.codename1.ui.NativeDragAndDrop.produceTransferValue(data, mime);
+                } catch (Throwable err) {
+                    // A provider is permitted to fail; the flavor is simply unavailable,
+                    // and having failed once it has answered. See clipboardValue, whose
+                    // guard this mirrors.
+                    value = null;
+                }
                 produced.put(mime, value);
+                return value;
             }
-            return value;
         }
 
         public Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException, IOException {
