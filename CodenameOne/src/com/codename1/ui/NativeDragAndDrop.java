@@ -462,6 +462,17 @@ public final class NativeDragAndDrop {
         if (op != null && op.getAllowedActions() == NativeDragOperation.ACTION_NONE) {
             op = null;
         }
+        synchronized (LOCK) {
+            if (op == active) { // NOPMD CompareObjectsWithEquals
+                // The instance this press would stage is the one a drag is running on --
+                // a second finger on another component whose source hands out the same
+                // operation. That drag cannot be started twice, so nothing is staged; and
+                // more to the point nothing below may touch it, because arming it changes
+                // the source the running drag will name when it completes, and a source
+                // told to delete its copy would delete the wrong component's.
+                op = null;
+            }
+        }
         if (op != null) {
             // As in startDrag: an operation its source reuses may still owe the outcome of the
             // drag before, and its listeners have to hear it while getSource() is still the

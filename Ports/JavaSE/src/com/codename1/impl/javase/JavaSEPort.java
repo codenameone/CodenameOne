@@ -2148,6 +2148,22 @@ public class JavaSEPort extends CodenameOneImplementation {
             return files.isEmpty() ? null : files;
         }
 
+        /// Adds one entry to a URI list, unless the same document is already in it.
+        ///
+        /// A file named both ways -- as a path under the file list and as a file: URI in the
+        /// list the source published -- is one document, and a receiver importing every line
+        /// would otherwise take it twice.
+        private static void appendUri(StringBuilder uris, java.util.List<String> seen,
+                String uri) {
+            java.io.File file = pathToFile(uri);
+            String key = file == null ? uri : file.getAbsolutePath();
+            if (seen.contains(key)) {
+                return;
+            }
+            seen.add(key);
+            uris.append(uri).append("\r\n");
+        }
+
         /// Accepts either a plain filesystem path or a `file:` URI and returns a `File`, or null.
         private static java.io.File pathToFile(String pathOrUri) {
             if (pathOrUri == null || pathOrUri.length() == 0) {
@@ -2241,15 +2257,31 @@ public class JavaSEPort extends CodenameOneImplementation {
             // Locale independent; see JavaSENativeDragAndDrop.asciiLower.
             String mime = JavaSENativeDragAndDrop.asciiLower(
                     flavor.getPrimaryType() + "/" + flavor.getSubType());
-            if (ClipboardContent.MIME_URI_LIST.equals(mime) && !data.hasMimeType(ClipboardContent.MIME_URI_LIST)) {
-                // Synthesized from the file list rather than stored, so a source only has to
-                // name its files once.
+            if (ClipboardContent.MIME_URI_LIST.equals(mime)) {
+                // The files and the list, not one or the other. The files are synthesized
+                // into it so a source only has to name them once -- and where the source
+                // also published a list of its own, both belong in the flavor a receiver
+                // asks for: choosing the explicit one wholesale handed a target that reads
+                // nothing but text/uri-list the links and none of the dragged files, though
+                // this very transferable advertises those files beside it.
+                StringBuilder uris = new StringBuilder();
+                java.util.List<String> seen = new java.util.ArrayList<String>();
                 java.util.List<java.io.File> files = fileList(data);
-                if (files != null) {
-                    StringBuilder uris = new StringBuilder();
-                    for (java.io.File f : files) {
-                        uris.append(f.toURI().toString()).append("\r\n");
+                for (int iter = 0; files != null && iter < files.size(); iter++) {
+                    appendUri(uris, seen, files.get(iter).toURI().toString());
+                }
+                Object published = resolve(ClipboardContent.MIME_URI_LIST);
+                if (published instanceof String) {
+                    String[] lines = ((String) published).split("\n");
+                    for (int iter = 0; iter < lines.length; iter++) {
+                        String line = lines[iter].trim();
+                        // RFC 2483: a line opening with a hash is a comment, not a URI.
+                        if (line.length() > 0 && line.charAt(0) != '#') {
+                            appendUri(uris, seen, line);
+                        }
                     }
+                }
+                if (uris.length() > 0) {
                     return uris.toString();
                 }
                 throw new UnsupportedFlavorException(flavor);

@@ -376,13 +376,17 @@ final class AndroidNativeDragAndDrop {
     /// drag from the MIME types, and the real content arrives on the drop.
     private static ClipboardContent describe(ClipDescription description) {
         NativeDragOperation op = exporting();
-        if (op != null) {
-            // This application's own drag, so there is nothing to infer: the operation says
-            // what it offers. Android has already built the whole clip by now, so handing the
-            // source's own content to the hover costs nothing and cannot disagree with the
-            // drop -- which is the failure every rule below is trying to avoid.
+        if (op != null && description == null) {
+            // This application's own drag and nothing else to go on: the operation says what
+            // it offers.
             return op.getContent();
         }
+        // Otherwise the description, even for a drag of our own. The clip is what will
+        // actually be delivered, and it can hold less than the content asked for: a
+        // provider that answered null or threw leaves its type out of the clip while the
+        // content still names it. Describing the hover from the content then promised a
+        // type the drop could not produce, so a target filtered to it lit up for the whole
+        // drag and was refused at the end -- the exact failure every rule below avoids.
         ClipboardContent content = new ClipboardContent();
         if (description == null) {
             return content;

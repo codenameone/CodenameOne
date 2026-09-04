@@ -363,6 +363,24 @@ class JavaSENativeDragAndDropTest {
                         + "this content happened to produce and may since have cleaned up");
     }
 
+    @Test
+    void aUriListCarriesTheFilesAndTheLinksBeside() throws Exception {
+        ClipboardContent content = new ClipboardContent()
+                .setData(ClipboardContent.MIME_FILE, "/tmp/report.pdf")
+                .setData(ClipboardContent.MIME_URI_LIST,
+                        "https://codenameone.com\r\n" + new File("/tmp/report.pdf").toURI());
+        Transferable t = new JavaSEPort.RichTransferable(content);
+
+        String list = (String) t.getTransferData(flavorFor(t, ClipboardContent.MIME_URI_LIST));
+        assertTrue(list.contains("https://codenameone.com"),
+                "the link the source published is in the list it published");
+        assertTrue(list.contains("report.pdf"),
+                "and so are the files, which this same transferable also advertises as a file "
+                        + "list -- a target reading nothing but text/uri-list gets both");
+        assertEquals(list.indexOf("report.pdf"), list.lastIndexOf("report.pdf"),
+                "and gets the document once, however many ways the source spelled it");
+    }
+
     /// A provider that fails, which ClipboardDataProvider explicitly permits.
     private static ClipboardDataProvider failing() {
         return new ClipboardDataProvider() {
