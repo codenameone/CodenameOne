@@ -221,6 +221,12 @@ public final class Continuity {
     /// delivering the previous account's state into the next account's screen.
     private static int relaySession;
 
+    /// Whether enable() has ever run in this process. It is NOT the negation of `enabled`: the
+    /// two states that share `enabled == false` -- never switched on yet, and switched off on
+    /// purpose -- want opposite answers for an arrival, and telling them apart is the whole
+    /// reason this exists.
+    private static boolean everEnabled;
+
     /// The relay session a framework worker is running for, bound for the length of its call
     /// into the relay and unbound afterwards. Null on the event thread and on any thread the
     /// application drives itself, which is how mayRelaySend() tells the two apart.
@@ -277,6 +283,7 @@ public final class Continuity {
             }
         }
         enabled = true;
+        everEnabled = true;
         ContinuityBridge b = bridgeInternal();
         if (b != null) {
             try {
@@ -2085,8 +2092,9 @@ public final class Continuity {
     /// Holds a cold-launch arrival until the application has a form to restore into.
     ///
     /// The waiter is a thread only because there is nothing on the EDT to wait on -- no form
-    /// exists yet, so there is no timer to bind to. It touches no field of this class: it sleeps,
-    /// and hands the decision back to the event thread.
+    /// exists yet, so there is no timer to bind to. It touches no field of this class and no UI
+    /// state: it sleeps, asks the event thread whether a window has appeared, and hands the
+    /// decision back to it.
     private static void park(AppState state) {
         parked = state;
         if (waitingForWindow) {
@@ -2097,25 +2105,62 @@ public final class Continuity {
             @Override
             public void run() {
                 long deadline = System.currentTimeMillis() + WINDOW_WAIT_MILLIS;
-                while (System.currentTimeMillis() < deadline) {
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException err) {
-                        Thread.currentThread().interrupt();
-                        break;
+                try {
+                    while (System.currentTimeMillis() < deadline) {
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException err) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                        if (haveWindow()) {
+                            break;
+                        }
                     }
-                    if (Display.getInstance().getCurrent() != null) {
-                        break;
-                    }
+                } finally {
+                    // ALWAYS, whatever happened above. waitingForWindow is what stops a second
+                    // waiter being started, so a throw that skipped this notification left it set
+                    // for the rest of the process: the arrival stays parked, and every later
+                    // arrival parks behind it without anything ever coming to look.
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            windowWaitFinished();
+                        }
+                    });
                 }
-                Display.getInstance().callSerially(new Runnable() {
-                    @Override
-                    public void run() {
-                        windowWaitFinished();
-                    }
-                });
             }
         }, "Continuity window wait").start();
+    }
+
+    /// Whether a form is on screen, asked ON THE EVENT THREAD from the cold-launch waiter.
+    ///
+    /// `Display.getCurrent()` is not a plain field read. When the current form is a disposed
+    /// dialog or a menu it walks `animationQueue` by index -- size taken first, then each
+    /// element -- and a cold launch is precisely when the event thread is building forms and
+    /// running transitions through that queue. Reading it from this worker could throw
+    /// IndexOutOfBoundsException, which is worse than it sounds: the exception left
+    /// `waitingForWindow` set, so the arrival stayed parked and no later arrival could start a
+    /// waiter either.
+    ///
+    /// Marshalled rather than guarded. This framework is single threaded on the event thread and
+    /// the UI belongs to it; the fix for touching it from elsewhere is to stop doing that, not to
+    /// put a lock around state that has no business being shared.
+    private static boolean haveWindow() {
+        final boolean[] present = new boolean[1];
+        try {
+            Display.getInstance().callSeriallyAndWait(new Runnable() {
+                @Override
+                public void run() {
+                    present[0] = Display.getInstance().getCurrent() != null;
+                }
+            });
+        } catch (Throwable t) {
+            // Answering "not yet" keeps the wait going, and the deadline still ends it. The
+            // caller's finally reports back either way.
+            Log.e(t);
+        }
+        return present[0];
     }
 
     /// The cold-launch wait is over. On the EDT.
@@ -2741,6 +2786,7 @@ public final class Continuity {
         bridge = null;
         bridgeOverridden = false;
         enabled = false;
+        everEnabled = false;
         autoRestore = true;
         flushScheduled = false;
         title = null;
@@ -2782,6 +2828,19 @@ public final class Continuity {
                 return false;
             }
             if (!enabled) {
+                if (everEnabled) {
+                    // CLAIMED and dropped, because this is an explicit disable() rather than the
+                    // window before the application's first enable(). The retention described
+                    // below is what the two cases needed to be told apart for: declining here
+                    // parked the arrival with the port, and the next enable() -- installing a
+                    // callback is what makes the port re-offer it -- delivered a state from the
+                    // interval disable() documents as ignored, sometimes long afterwards.
+                    //
+                    // Claiming rather than declining is what discards it: the port lets go of an
+                    // activity that was handled. Nothing else answers to this application's own
+                    // activity type, so taking it costs no other handler anything.
+                    return true;
+                }
                 // DECLINED while the framework is off, which is the answer the iOS port is built
                 // for: it holds a declined activity and offers it again the next time a callback
                 // is installed, and enable() installs one. Claiming it instead threw it away --

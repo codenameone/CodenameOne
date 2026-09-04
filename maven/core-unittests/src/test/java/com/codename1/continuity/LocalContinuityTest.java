@@ -3653,6 +3653,78 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A continuation arriving after an explicit disable() is DROPPED, not held for the next
+     * enable().
+     *
+     * <p>The sibling above is the other half, and the two want opposite answers from the same
+     * {@code enabled == false}. Declining is right before the application's first enable(),
+     * because the port holds a declined activity and offers it again when a callback is next
+     * installed -- which is exactly what recovers a cold-launch Handoff. After an explicit
+     * disable() that same retention delivered a state from the interval disable() documents as
+     * ignored, whenever the application switched continuity back on.</p>
+     *
+     * <p>Claiming is what discards it: the port lets go of an activity that was handled. Nothing
+     * else answers to this application's own activity type, so taking it costs no other handler
+     * anything.</p>
+     */
+    @EdtTest
+    public void aContinuationArrivingAfterDisableIsDroppedRatherThanHeld() {
+        Continuity.enable();
+        Continuity.disable();
+        ContinuityCallback callback = Continuity.callbackForTest();
+
+        Map<String, Object> info = StateCodec.toMap(fromElsewhere("during the off period", 91L));
+        assertTrue(callback.continuationReceived(Continuity.getActivityType(), info),
+                "the callback declined a continuation after an explicit disable(), so the port "
+                        + "holds it and the next enable() restores a state that arrived while "
+                        + "the application had said it wanted none");
+
+        // Dropped, not delivered: claiming must not become a back door into the disabled
+        // framework either.
+        Continuity.enable();
+        assertNull(Continuity.getRestorableState(),
+                "the arrival from the disabled interval was delivered after all");
+    }
+
+    /**
+     * The cold-launch waiter finishes, hands over, and leaves nothing set behind it.
+     *
+     * <p>The waiter asks the EVENT THREAD whether a window has appeared rather than reading
+     * Display.getCurrent() itself: that method is not a field read -- for a disposed dialog or a
+     * menu it walks animationQueue by index, size first and then each element -- and a cold
+     * launch is exactly when the event thread is building forms and running transitions through
+     * that queue. This test pins the behaviour the marshalling has to keep: the parked arrival is
+     * still handed over once a window exists, and {@code waitingForWindow} is left clear so a
+     * LATER arrival can start a waiter of its own. That second half is what a throw inside the
+     * old worker destroyed -- the flag stayed set for the rest of the process and every
+     * subsequent arrival parked behind it with nothing coming to look.</p>
+     */
+    @EdtTest
+    public void theColdLaunchWaiterHandsOverAndLeavesNothingSet() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+
+        Continuity.parkForTest(fromElsewhere("first cold-launch arrival", 120L));
+        Continuity.drainParkedForTest();
+        AppState first = Continuity.getRestorableState();
+        assertNotNull(first, "the first parked arrival was never handed over");
+        assertEquals(120L, first.getSequence(), "a different state was handed over");
+        Continuity.restore(first);
+
+        // The SECOND is the point. A waiter that did not report back leaves waitingForWindow set,
+        // and this one is then parked for ever behind it.
+        Continuity.parkForTest(fromElsewhere("second arrival, later in the run", 121L));
+        Continuity.drainParkedForTest();
+        AppState second = Continuity.getRestorableState();
+        assertNotNull(second,
+                "a second arrival was never handed over, which is what a waiter that failed to "
+                        + "report back leaves behind: waitingForWindow set for the rest of the "
+                        + "process and every later arrival parked behind it");
+        assertEquals(121L, second.getSequence(), "the second arrival was not the one offered");
+    }
+
+    /**
      * The eviction order of the delivery marks survives a restart.
      *
      * <p>rememberSeen() writes durableSeen in its own order, least-recently-seen first, so the
