@@ -10300,9 +10300,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // some other text representation -- markdown, AsciiDoc, a URI list -- that one is the
         // payload, since publishing an empty clip instead would lose it outright.
         String primaryTextMime = plain != null ? ClipboardContent.MIME_TEXT : null;
-        // Not when there is HTML: that is already the payload, and an item built with null text
-        // coerces to the HTML's own text, whereas handing it the raw markup as the plain text
-        // would give every receiver the tags as well.
+        // Not when there is HTML: that is already the payload, and the plain text beside it is
+        // derived from the markup below rather than searched for among the other
+        // representations, which would put an unrelated one under the HTML.
         if (plain == null && html == null) {
             String[] advertised = content.getMimeTypes();
             for (int iter = 0; iter < advertised.length && plain == null; iter++) {
@@ -10322,6 +10322,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // *and* a stray piece of text instead of choosing the best form of one thing. Where
         // the clip carries a URI, the text rides on it -- see attachCarriedText below.
         boolean carriesHtml = sdk >= 16 && html != null;
+        if (carriesHtml && plain == null) {
+            // Android *requires* it: ClipData.Item refuses HTML with no plain text beside it,
+            // and threw IllegalArgumentException out of the thread that was building the clip
+            // -- so content offering nothing but MIME_HTML crashed a copy and silently failed
+            // a drag. Rendered from the markup rather than being the markup, which would show
+            // every receiver the tags.
+            plain = htmlToPlainText(html);
+        }
         if (carriesHtml) {
             mimeTypes.add(ClipboardContent.MIME_TEXT);
             mimeTypes.add(ClipboardContent.MIME_HTML);
@@ -10519,6 +10527,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 // and the other representations with it.
                 com.codename1.io.Log.e(t);
             }
+        }
+    }
+
+    /// The text of an HTML fragment, for the plain text Android requires beside it.
+    ///
+    /// Empty rather than null when the markup renders to nothing: an item may carry empty text
+    /// with its HTML, and may not carry none.
+    private static String htmlToPlainText(String html) {
+        try {
+            CharSequence text = android.os.Build.VERSION.SDK_INT >= 24
+                    ? android.text.Html.fromHtml(html, android.text.Html.FROM_HTML_MODE_LEGACY)
+                    : android.text.Html.fromHtml(html);
+            return text == null ? "" : text.toString();
+        } catch (Throwable t) {
+            // Markup this platform will not parse still has to travel; the HTML is the payload
+            // and the text beside it is what Android asks for, not what the clip is for.
+            com.codename1.io.Log.e(t);
+            return "";
         }
     }
 
@@ -10727,28 +10753,41 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             throw new IOException("could not stage " + file + " for sharing");
         }
         File copy = new File(holder, file.getName());
-        InputStream in = new FileInputStream(file);
+        boolean staged = false;
         try {
-            OutputStream os = new FileOutputStream(copy);
+            InputStream in = new FileInputStream(file);
             try {
-                byte[] buffer = new byte[8192];
-                int read;
-                while ((read = in.read(buffer)) > 0) {
-                    os.write(buffer, 0, read);
+                OutputStream os = new FileOutputStream(copy);
+                try {
+                    byte[] buffer = new byte[8192];
+                    int read;
+                    while ((read = in.read(buffer)) > 0) {
+                        os.write(buffer, 0, read);
+                    }
+                } finally {
+                    os.close();
                 }
             } finally {
-                os.close();
+                in.close();
             }
+            staged = true;
         } finally {
-            in.close();
+            if (!staged) {
+                // A source that vanished, a read that failed, a disk that filled: the holder
+                // and whatever was written into it exist by now, and nothing has registered
+                // them for reclamation -- so every failed export left its partial copy in the
+                // cache for good. Registration happens below, on the path that succeeds.
+                copy.delete();
+                holder.delete();
+            }
         }
-        Uri staged = FileProvider.getUriForFile(getContext(), authority, copy);
-        getContext().grantUriPermission("android", staged,
+        Uri shared = FileProvider.getUriForFile(getContext(), authority, copy);
+        getContext().grantUriPermission("android", shared,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION);
         // Remembered so it is cleaned up, but not as transport: this is a file the source
         // published, and it has to read back as one.
-        rememberStagedClipFile(staged, copy, false, clip);
-        return staged;
+        rememberStagedClipFile(shared, copy, false, clip);
+        return shared;
     }
 
     /// Writes bytes somewhere the application's file provider can serve them from and returns
