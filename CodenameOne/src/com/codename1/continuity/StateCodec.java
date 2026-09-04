@@ -23,6 +23,7 @@
 package com.codename1.continuity;
 
 import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
 import com.codename1.io.JSONWriter;
 
 import java.io.IOException;
@@ -227,7 +228,70 @@ public final class StateCodec {
                     + "relay, because a truncated document is indistinguishable from one that "
                     + "says the other device has nothing.");
         }
-        return fromMap(JSONParser.parseJSON(json));
+        Map<String, Object> parsed = JSONParser.parseJSON(json);
+        requireKnownTypes(parsed);
+        return fromMap(parsed);
+    }
+
+    /// Refuses a document whose known fields carry the wrong kind of value.
+    ///
+    /// Valid syntax is not a valid STATE. `{"device":"other","seq":"10","payload":[]}` parses
+    /// cleanly, and fromMap then ignores the array where a payload belongs -- leaving routes and
+    /// payload both empty, which is an EMPTY state, which the framework reads as a tombstone. So
+    /// a relay serving one wrong type has the origin recorded as having cleared its work, marked
+    /// durably, and a queued publish released over the server's document. The same shape with
+    /// valid routes restores and acknowledges a state whose payload was silently dropped.
+    ///
+    /// Only fields that are PRESENT are checked, and only ones this codec knows. An absent field
+    /// is an older or smaller document, which is legitimate; an unknown field belongs to a
+    /// sender that knows something this build does not, and ignoring it is how the format stays
+    /// extensible. What is refused is a known field that cannot mean what it says.
+    private static void requireKnownTypes(Map<String, Object> m) throws IOException {
+        if (m == null) {
+            return;
+        }
+        requireType(m, KEY_ROUTES, List.class, "an array of route strings");
+        requireType(m, KEY_PAYLOAD, Map.class, "an object");
+        requireType(m, KEY_ENCODING, String.class, "a string");
+        requireType(m, KEY_DEVICE, String.class, "a string");
+        requireType(m, KEY_TITLE, String.class, "a string");
+        requireNumberLike(m, KEY_SEQUENCE);
+        requireNumberLike(m, KEY_TIMESTAMP);
+    }
+
+    private static void requireType(Map<String, Object> m, String key, Class<?> type, String what)
+            throws IOException {
+        Object value = m.get(key);
+        if (value == null || type.isInstance(value)) {
+            return;
+        }
+        throw new IOException("The continuity relay returned a document whose \"" + key
+                + "\" is not " + what + ". Treated as a failed read rather than as a state, "
+                + "because a field this codec cannot use is indistinguishable from one that is "
+                + "absent -- and an absent payload and routes make an empty state, which means "
+                + "the sending device cleared its work.");
+    }
+
+    /// seq and ts, which this codec writes as strings and older senders may write as numbers.
+    private static void requireNumberLike(Map<String, Object> m, String key) throws IOException {
+        Object value = m.get(key);
+        if (value == null || value instanceof Number) {
+            return;
+        }
+        if (value instanceof String) {
+            try {
+                Long.parseLong(((String) value).trim());
+                return;
+            } catch (NumberFormatException err) {
+                // Falls through to the refusal below: a string that is not a number cannot be a
+                // sequence, and asLong() would silently answer 0 -- which is a valid-looking
+                // sequence that every later state supersedes.
+                Log.e(err);
+            }
+        }
+        throw new IOException("The continuity relay returned a document whose \"" + key
+                + "\" is not a number. Read as zero it would be a sequence every later state "
+                + "supersedes, so it is refused instead.");
     }
 
     /// Whether `json` is ONE syntactically valid JSON object and nothing else.

@@ -521,25 +521,6 @@ public final class Continuity {
             // account's payload after logout had removed it.
             return;
         }
-        if (endedDuringNavigation) {
-            // The session ended while this navigation was in flight -- a route's show() callback
-            // calling clear() on an expired login is the ordinary way. Navigation notifies AFTER
-            // that callback has run, so the notification describes a session that no longer
-            // exists, and checkpointing it captures whatever the provider still holds for the
-            // account that just signed out. clear() promises nothing follows it.
-            //
-            // One notification, not a mode: the navigation that was underway is skipped and the
-            // next one is ordinary. That is also the right outcome on its own terms, because the
-            // next navigation after a logout is the application going to its login screen.
-            //
-            // AFTER the clearingStack guard, which is not cosmetic. clear() empties the route
-            // stack itself, and that emptying notifies too -- so with this test first, clear()'s
-            // own notification consumed the flag and the outer navigation went on to checkpoint
-            // exactly as before. The guard has to let clear()'s internal notification be answered
-            // by its own check.
-            endedDuringNavigation = false;
-            return;
-        }
         dirty = true;
         if (!Display.isInitialized() || flushScheduled) {
             return;
@@ -1205,9 +1186,6 @@ public final class Continuity {
     /// in this process can recall that. What this guarantees is that nothing follows it.
     public static void clear() {
         lifecycle++;
-        // Navigation notifies after the application code that may have called this, so the next
-        // notification -- if one is already on its way -- belongs to the session being ended.
-        endedDuringNavigation = true;
         parked = null;
         dirty = false;
         // The label goes with the work it describes. It is CONTENT, not configuration -- "Draft
@@ -1558,9 +1536,6 @@ public final class Continuity {
 
     /// True while clear() is emptying the route stack, so its notification is ignored.
     private static boolean clearingStack;
-
-    /// Set by clear() so the navigation it happened inside does not checkpoint afterwards.
-    private static boolean endedDuringNavigation;
 
     /// The parked state the publication hold has already been explained for, so it is said once.
     private static AppState heldFor;
@@ -2702,7 +2677,6 @@ public final class Continuity {
         lifecycle = 0;
         heldFor = null;
         clearingStack = false;
-        endedDuringNavigation = false;
     }
 
     /// The store notification, as a constant rather than an anonymous class per callback.

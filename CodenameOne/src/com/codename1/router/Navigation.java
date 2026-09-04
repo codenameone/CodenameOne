@@ -104,8 +104,14 @@ public final class Navigation {
             return false;
         }
         stack.add(new NavigationEntry(path, f));
-        f.show();
+        // BEFORE show(), which runs application code. The stack has already changed here, and
+        // that is what continuity records -- so notifying now means a show callback that ends the
+        // session (an expired login discovered on screen) is answered by clear() clearing the
+        // pending flag, and the flush queued a moment ago then finds nothing owed. Notifying
+        // afterwards described a session the callback had already ended, and checkpointed the
+        // signed-out account's payload.
         stackChanged();
+        f.show();
         return true;
     }
 
@@ -119,8 +125,9 @@ public final class Navigation {
         }
         stack.remove(stack.size() - 1);
         NavigationEntry now = stack.get(stack.size() - 1);
-        now.getForm().showBack();
+        // Before showBack(), for the reason navigate() gives.
         stackChanged();
+        now.getForm().showBack();
         return true;
     }
 
@@ -186,8 +193,9 @@ public final class Navigation {
         while (stack.size() > idx + 1) {
             stack.remove(stack.size() - 1);
         }
-        entry.getForm().showBack();
+        // Before showBack(), for the reason navigate() gives.
         stackChanged();
+        entry.getForm().showBack();
         return true;
     }
 

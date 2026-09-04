@@ -4022,6 +4022,47 @@ public class LocalContinuityTest extends UITestBase {
         }
     }
 
+    /**
+     * A relay field of the wrong type is a failed read, not an empty state.
+     *
+     * <p>Valid syntax is not a valid state. {@code {"device":"other","seq":"10","payload":[]}}
+     * parses cleanly and fromMap ignores the array where a payload belongs, leaving routes and
+     * payload both empty -- which is an EMPTY state, which the framework reads as a tombstone. One
+     * wrong type therefore records the origin as having cleared its work, marks it durably, and
+     * releases a queued publish over the server's document.</p>
+     */
+    @EdtTest
+    public void aRelayFieldOfTheWrongTypeIsAFailedRead() throws Exception {
+        // The control first: a document this codec writes must still read.
+        assertNotNull(StateCodec.fromJson(StateCodec.toJson(fromElsewhere("real", 4L))),
+                "a document this codec itself wrote was refused");
+
+        String[] wrong = {
+            "{\"device\":\"other\",\"seq\":\"10\",\"payload\":[]}",
+            "{\"device\":\"other\",\"seq\":\"10\",\"routes\":{}}",
+            "{\"device\":42,\"seq\":\"10\"}",
+            "{\"device\":\"other\",\"seq\":\"not a number\"}",
+            "{\"device\":\"other\",\"seq\":\"10\",\"title\":[1,2]}",
+        };
+        for (int i = 0; i < wrong.length; i++) {
+            try {
+                AppState s = StateCodec.fromJson(wrong[i]);
+                fail("a document with a wrong field type was accepted: " + wrong[i]
+                        + (s != null && s.isEmpty()
+                                ? " -- and as an EMPTY state, which is read as a tombstone"
+                                : ""));
+            } catch (java.io.IOException expected) {
+                assertTrue(expected.getMessage().length() > 0, "the refusal explained nothing");
+            }
+        }
+
+        // A field this codec does not know is NOT a failure: that is how the format stays
+        // extensible, and refusing it would break every sender that knows more than this build.
+        assertNotNull(StateCodec.fromJson(
+                "{\"device\":\"other\",\"seq\":\"10\",\"somethingNewer\":{\"a\":1}}"),
+                "an unknown field was refused, so a newer sender cannot talk to this build");
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;
