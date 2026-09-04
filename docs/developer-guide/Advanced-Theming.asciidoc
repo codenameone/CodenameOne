@@ -956,6 +956,23 @@ across screen sizes and platforms:
 .Component hierarchy and layouts
 image::img/psd2app-image2.png[Component hierarchy and layouts,scaledwidth=50%]
 
+Export the artwork the design needs before writing the code. This one needs
+three pieces: the header background, and the camera icon with the round button it
+sits on.
+
+[cols="1,1,1",frame=none,grid=none]
+|===
+a| .The header background
+image::img/background.jpg[The header background,scaledwidth=60%]
+a| .The camera icon
+image::img/camera.png[The camera icon,scaledwidth=20%]
+a| .The button behind it
+image::img/camera-button.png[The button behind it,scaledwidth=35%]
+|===
+
+Add them to the theme as multi-images so each screen density gets an
+appropriately sized file, which is what `theme.getImage` returns below.
+
 That hierarchy is ordinary component code. The code below builds the form,
 starting with a separator the design uses between fields:
 
