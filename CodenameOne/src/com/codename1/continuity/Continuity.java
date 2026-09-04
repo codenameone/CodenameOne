@@ -1647,7 +1647,25 @@ public final class Continuity {
         if (!enabled) {
             return;
         }
-        if (getDeviceId().equals(state.getDeviceId())) {
+        String origin = state.getDeviceId();
+        if (origin == null || origin.length() == 0) {
+            // ANONYMOUS, so it cannot take part in deduplication at all: every mark is keyed by
+            // origin and sequence, and an empty origin is one key shared by every producer that
+            // forgot to set one. Admitting it looked harmless and was not -- noteActedOn() has to
+            // refuse a state with no origin, so nothing was ever marked durably and the same
+            // state restored again after every restart, while a listener acknowledging it left it
+            // parked for the life of the process with relay publication held behind it.
+            //
+            // Nothing this framework produces is anonymous; capture() always sets the id. What
+            // reaches here is a custom StateRelay handing back a state it built itself, or a
+            // relay document with no "device" member, so it is said out loud rather than dropped
+            // in silence -- the integrator is the only one who can fix it.
+            Log.p("Continuity: ignoring a state with no device id. A relay must return states "
+                    + "that carry the id of the device they came from, or the same state is "
+                    + "offered again after every restart.");
+            return;
+        }
+        if (getDeviceId().equals(origin)) {
             // This device's own echo, which a relay returns as a matter of course.
             return;
         }

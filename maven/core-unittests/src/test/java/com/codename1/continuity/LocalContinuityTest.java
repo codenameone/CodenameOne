@@ -3095,6 +3095,46 @@ public class LocalContinuityTest extends UITestBase {
                         + "release a publish over a document the other had not seen");
     }
 
+    /**
+     * A state with no origin is refused rather than admitted.
+     *
+     * <p>Every mark is keyed by origin and sequence, so an empty origin is a single key shared by
+     * every producer that forgot to set one -- and noteActedOn() has to refuse such a state, which
+     * meant nothing was marked durably and the same state was restored again after every restart.
+     * Worse, a listener following the documented acknowledge() path left it parked for the life of
+     * the process, with relay publication held behind it.</p>
+     */
+    @EdtTest
+    public void aStateWithNoOriginIsRefused() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+        final int[] offered = new int[1];
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                offered[0]++;
+                return false;
+            }
+        });
+
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("note", "from nowhere in particular");
+        // No setDeviceId at all, which is what a hand-built relay state or a document with no
+        // "device" member produces.
+        Continuity.deliver(new AppState()
+                .setPayload(payload)
+                .setSequence(5L)
+                .setTimestamp(System.currentTimeMillis()));
+        flushSerialCalls();
+
+        assertEquals(0, offered[0],
+                "a state with no origin reached the application, and nothing can ever mark it "
+                        + "handled");
+        assertNull(Continuity.getRestorableState(),
+                "an origin-less state was parked, so it is offered for ever and every relay "
+                        + "checkpoint waits behind it");
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;
