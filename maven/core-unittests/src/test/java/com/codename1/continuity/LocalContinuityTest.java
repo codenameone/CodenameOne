@@ -2561,6 +2561,61 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A route array whose elements are not strings fails the fetch instead of arriving empty.
+     *
+     * <p>This is the whole chain, not just the codec: {@code {"routes":[1]}} passed the outer
+     * List check, the reader dropped the element it could not use, and what came back was an
+     * AppState with no routes and no payload. That is precisely a tombstone -- the shape this
+     * framework reads as "the origin cleared its work" -- so a document that merely had one bad
+     * element was consumed as an instruction to drop work, and it was marked durably so the
+     * correction could never be re-read.</p>
+     *
+     * <p>The observable here is that durable mark. A refused fetch is an IOException the poll
+     * reports, and nothing about the sender is remembered; an admitted tombstone always records
+     * one, which is what {@code aConsumedTombstoneIsMarkedDurably} pins down.</p>
+     */
+    @EdtTest
+    public void aFetchWithANonStringRouteIsNotConsumedAsATombstone() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+
+        // What the OLD code produced from this document, spelled out so the harm is not taken on
+        // trust: an empty state, which isEmpty() -- and therefore admission -- reads as a
+        // tombstone.
+        AppState routeless = new AppState()
+                .setDeviceId("bad-element-sender")
+                .setSequence(10L)
+                .setTimestamp(System.currentTimeMillis());
+        assertTrue(routeless.isEmpty(),
+                "an AppState with no routes and no payload is not empty here, so the tombstone "
+                        + "consequence this test is about does not exist");
+
+        final String[] doc = {
+            "{\"device\":\"bad-element-sender\",\"seq\":\"10\",\"routes\":[1]}"
+        };
+        Continuity.setRelay(new StateRelay() {
+            public void publish(AppState state) {
+                published.add(state);
+            }
+
+            public AppState fetch() throws java.io.IOException {
+                // Exactly what RestStateRelay does with the body it received.
+                return StateCodec.fromJson(doc[0]);
+            }
+        });
+        // setRelay() polls on a background thread, so a flush alone proves nothing: the first
+        // version of this test asserted before the fetch had run and passed against the unfixed
+        // code. Wait for the poll, then drain what it queued.
+        pause(300L);
+        flushSerialCalls();
+
+        assertNull(Continuity.readSeenForTest().get("bad-element-sender"),
+                "a document with a non-string route was admitted and marked durably, so a "
+                        + "malformed element was consumed as an instruction to drop work -- and "
+                        + "the mark means the sender's correction is refused as already seen");
+    }
+
+    /**
      * A consumed tombstone is marked durably.
      *
      * <p>It is the one arrival that cannot fail -- no payload to hand over, no route to rebuild --
@@ -4043,6 +4098,12 @@ public class LocalContinuityTest extends UITestBase {
             "{\"device\":42,\"seq\":\"10\"}",
             "{\"device\":\"other\",\"seq\":\"not a number\"}",
             "{\"device\":\"other\",\"seq\":\"10\",\"title\":[1,2]}",
+            // The array is an array; its CONTENTS are the door. Checking the container alone let
+            // these through, and the reader that drops what it cannot use turned each of them
+            // into a state with fewer routes than the sender meant.
+            "{\"device\":\"other\",\"seq\":\"10\",\"routes\":[1]}",
+            "{\"device\":\"other\",\"seq\":\"10\",\"routes\":[\"/a\",null]}",
+            "{\"device\":\"other\",\"seq\":\"10\",\"routes\":[\"/a\",{\"b\":1}]}",
         };
         for (int i = 0; i < wrong.length; i++) {
             try {

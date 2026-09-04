@@ -72,6 +72,134 @@ class NavigationTest extends UITestBase {
         return Navigation.getStack().size();
     }
 
+    /** A Form that refuses to be shown, the way application code reached from show() -- a
+     * showListener, or an overridden onShowCompleted -- can. Forward navigation and back
+     * navigation are separated because a stack cannot be built out of forms that refuse both. */
+    private static final class RefusingForm extends Form {
+        private final boolean refuseForward;
+
+        RefusingForm(String title, boolean refuseForward) {
+            setTitle(title);
+            this.refuseForward = refuseForward;
+        }
+
+        public void show() {
+            if (refuseForward) {
+                throw new IllegalStateException("this form refuses to be shown");
+            }
+            super.show();
+        }
+
+        public void showBack() {
+            if (!refuseForward) {
+                throw new IllegalStateException("this form refuses to be shown");
+            }
+            super.showBack();
+        }
+    }
+
+    /** A dispatcher that answers one path with a form that refuses, and every other path with an
+     * ordinary one. */
+    private static final class RefusingDispatcher implements RouteDispatcher {
+        private final String refusing;
+        private final boolean refuseForward;
+
+        RefusingDispatcher(String refusing, boolean refuseForward) {
+            this.refusing = refusing;
+            this.refuseForward = refuseForward;
+        }
+
+        public Form dispatch(String url) {
+            if (refusing.equals(url)) {
+                return new RefusingForm(url, refuseForward);
+            }
+            Form f = new Form();
+            f.setTitle(url);
+            return f;
+        }
+    }
+
+    /**
+     * A navigation whose show() throws leaves the stack as it was.
+     *
+     * <p>The stack-change notification moved BEFORE show() so a listener sees the entry it is
+     * about to record, which is what makes a checkpoint describe the screen the user is going
+     * to. The cost of that ordering is this case: show() runs application code and can throw
+     * before the form is ever installed, and the entry left behind was then a screen nobody ever
+     * saw -- persisted by the checkpoint already queued, and restored after a process death.</p>
+     */
+    @FormTest
+    void navigateRollsTheStackBackWhenShowThrows() {
+        Navigation.setDispatcher(new FakeDispatcher().route("/a"));
+        Navigation.navigate("/a");
+        int before = baseline();
+        NavigationEntry current = Navigation.getCurrent();
+
+        Navigation.setDispatcher(new RefusingDispatcher("/explodes", true));
+        try {
+            Navigation.navigate("/explodes");
+            fail("show() did not throw, so this test is about nothing");
+        } catch (IllegalStateException expected) {
+            // The caller sees the failure. What must not survive it is the stack entry.
+        }
+
+        assertEquals(before, baseline(),
+                "the entry for a screen that was never shown stayed on the stack, so a "
+                        + "checkpoint persists it and a cold start restores a screen the user "
+                        + "never reached");
+        assertSame(current, Navigation.getCurrent(),
+                "the failed navigation is reported as the current entry");
+    }
+
+    /**
+     * A back whose showBack() throws puts the popped entry back.
+     */
+    @FormTest
+    void backRestoresThePoppedEntryWhenShowThrows() {
+        Navigation.setDispatcher(new RefusingDispatcher("/refuses", false));
+        Navigation.navigate("/refuses");
+        Navigation.navigate("/top");
+        int before = baseline();
+        NavigationEntry top = Navigation.getCurrent();
+
+        try {
+            Navigation.back();
+            fail("showBack() did not throw, so this test is about nothing");
+        } catch (IllegalStateException expected) {
+            // As above.
+        }
+
+        assertEquals(before, baseline(),
+                "the entry was popped for a screen that never appeared, so the stack now "
+                        + "describes a place the user is not");
+        assertSame(top, Navigation.getCurrent(), "the failed back moved the current entry");
+    }
+
+    /**
+     * A popTo whose showBack() throws puts every popped entry back.
+     */
+    @FormTest
+    void popToRestoresEveryPoppedEntryWhenShowThrows() {
+        Navigation.setDispatcher(new RefusingDispatcher("/refuses", false));
+        Navigation.navigate("/refuses");
+        NavigationEntry target = Navigation.getCurrent();
+        Navigation.navigate("/mid");
+        Navigation.navigate("/top");
+        int before = baseline();
+        NavigationEntry top = Navigation.getCurrent();
+
+        try {
+            Navigation.popTo(target);
+            fail("showBack() did not throw, so this test is about nothing");
+        } catch (IllegalStateException expected) {
+            // As above.
+        }
+
+        assertEquals(before, baseline(),
+                "popTo dropped several entries for a screen that never appeared");
+        assertSame(top, Navigation.getCurrent(), "the failed popTo moved the current entry");
+    }
+
     @FormTest
     void navigateReturnsFalseWithoutDispatcher() {
         Navigation.setDispatcher(null);

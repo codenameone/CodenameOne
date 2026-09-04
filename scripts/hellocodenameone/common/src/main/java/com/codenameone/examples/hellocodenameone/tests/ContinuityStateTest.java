@@ -136,16 +136,36 @@ public class ContinuityStateTest extends BaseTest {
 
             // The synced store answers honestly on the ports that have none, and every call is
             // safe there. This is the ordinary case for Android, the desktop and the browser.
-            assertEqual("byName", SyncedStore.get("cn1ss.sortOrder", "byName"),
-                    "an absent synced value answers with the default");
-            boolean wrote = SyncedStore.put("cn1ss.sortOrder", "byDate");
-            assertEqual(synced, wrote, "a synced write succeeds exactly where a store exists");
-            if (wrote) {
-                assertEqual("byDate", SyncedStore.get("cn1ss.sortOrder", "byName"),
-                        "a synced value reads back");
-                SyncedStore.remove("cn1ss.sortOrder");
+            //
+            // A key of THIS RUN's own, removed first and cleaned up in a finally. A fixed key left
+            // behind by a run that was interrupted between the write and the removal made the
+            // absent-value assertion fail on every later run, permanently -- and on iOS the value
+            // can also arrive from another device, which no amount of local cleanup prevents.
+            String key = "cn1ss.sortOrder." + System.currentTimeMillis();
+            try {
+                SyncedStore.remove(key);
+                assertEqual("byName", SyncedStore.get(key, "byName"),
+                        "an absent synced value answers with the default");
+
+                // NOT asserted equal to isSupported(). They answer different questions on iOS by
+                // design: isSupported() reports whether the entitlement probe has established a
+                // store that follows the user, while put() writes to the local persistent store
+                // and succeeds even when that probe has not -- and a store at its quota refuses a
+                // write while remaining perfectly supported. Tying them together made this fail
+                // for a device that was merely offline, or whose store was full, with both APIs
+                // keeping their documented contracts.
+                boolean wrote = SyncedStore.put(key, "byDate");
+                if (wrote) {
+                    assertEqual("byDate", SyncedStore.get(key, "byName"),
+                            "a value the store accepted reads back");
+                } else {
+                    assertEqual("byName", SyncedStore.get(key, "byName"),
+                            "a write the store refused left nothing behind");
+                }
+                assertBool(SyncedStore.keys() != null, "the key list is never null");
+            } finally {
+                SyncedStore.remove(key);
             }
-            assertBool(SyncedStore.keys() != null, "the key list is never null");
 
             // Clearing must be safe everywhere, including twice and including when the platform
             // never advertised anything.

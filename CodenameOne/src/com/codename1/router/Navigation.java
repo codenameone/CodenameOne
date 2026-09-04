@@ -103,6 +103,7 @@ public final class Navigation {
         if (f == null) {
             return false;
         }
+        List<NavigationEntry> before = new ArrayList<NavigationEntry>(stack);
         stack.add(new NavigationEntry(path, f));
         // BEFORE show(), which runs application code. The stack has already changed here, and
         // that is what continuity records -- so notifying now means a show callback that ends the
@@ -111,7 +112,18 @@ public final class Navigation {
         // afterwards described a session the callback had already ended, and checkpointed the
         // signed-out account's payload.
         stackChanged();
-        f.show();
+        try {
+            f.show();
+        } catch (RuntimeException e) {
+            // The entry goes back. show() can throw before the form is ever installed, and the
+            // entry left behind was a screen the user never saw -- persisted by the checkpoint
+            // this method has already queued, and restored after a process death. The flush reads
+            // the stack when it runs, so putting it back is what makes that checkpoint describe
+            // the truth.
+            stack.clear();
+            stack.addAll(before);
+            throw e;
+        }
         return true;
     }
 
@@ -123,11 +135,19 @@ public final class Navigation {
         if (stack.size() <= 1) {
             return false;
         }
+        List<NavigationEntry> before = new ArrayList<NavigationEntry>(stack);
         stack.remove(stack.size() - 1);
         NavigationEntry now = stack.get(stack.size() - 1);
+        Form back = now.getForm();
         // Before showBack(), for the reason navigate() gives.
         stackChanged();
-        now.getForm().showBack();
+        try {
+            back.showBack();
+        } catch (RuntimeException e) {
+            stack.clear();
+            stack.addAll(before);
+            throw e;
+        }
         return true;
     }
 
@@ -190,12 +210,20 @@ public final class Navigation {
         if (idx == stack.size() - 1) {
             return true;
         }
+        List<NavigationEntry> before = new ArrayList<NavigationEntry>(stack);
         while (stack.size() > idx + 1) {
             stack.remove(stack.size() - 1);
         }
+        Form target = entry.getForm();
         // Before showBack(), for the reason navigate() gives.
         stackChanged();
-        entry.getForm().showBack();
+        try {
+            target.showBack();
+        } catch (RuntimeException e) {
+            stack.clear();
+            stack.addAll(before);
+            throw e;
+        }
         return true;
     }
 

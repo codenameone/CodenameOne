@@ -258,12 +258,36 @@ public final class StateCodec {
             return;
         }
         requireType(m, KEY_ROUTES, List.class, "an array of route strings");
+        requireRouteStrings(m);
         requireType(m, KEY_PAYLOAD, Map.class, "an object");
         requireType(m, KEY_ENCODING, String.class, "a string");
         requireType(m, KEY_DEVICE, String.class, "a string");
         requireType(m, KEY_TITLE, String.class, "a string");
         requireNumberLike(m, KEY_SEQUENCE);
         requireNumberLike(m, KEY_TIMESTAMP);
+    }
+
+    /// Every ELEMENT of the route array, not just the array.
+    ///
+    /// Checking the container alone left {"routes":[1]} passing: the list is a list, the loop
+    /// that reads it drops the element it cannot use, and what comes out has no routes and no
+    /// payload -- an empty state, which this framework reads as a tombstone. The same door as a
+    /// wrong payload type and a null field, one level further in.
+    private static void requireRouteStrings(Map<String, Object> m) throws IOException {
+        Object routes = m.get(KEY_ROUTES);
+        if (!(routes instanceof List)) {
+            return;
+        }
+        List<?> list = (List<?>) routes;
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i) instanceof String) {
+                continue;
+            }
+            throw new IOException("The continuity relay returned a document whose route at index "
+                    + i + " is not a string. Dropping it would leave a state with fewer routes "
+                    + "than the sender meant, and dropping the only one would make it an empty "
+                    + "state -- which means the sending device cleared its work.");
+        }
     }
 
     private static void requireType(Map<String, Object> m, String key, Class<?> type, String what)
