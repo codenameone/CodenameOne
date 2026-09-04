@@ -3693,6 +3693,89 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A route factory that throws fails the whole restore rather than skipping one screen.
+     *
+     * <p>Skipping it made a throwing factory the same as a route this build no longer registers:
+     * the failed screen was passed over, an EARLIER one was shown, and restoreStack() reported
+     * success -- so the state was persisted and acknowledged, the relay stopped offering it, and
+     * the user was left on the wrong screen with no copy left to retry from.</p>
+     *
+     * <p>An unregistered route answers null and is still skipped, which is the tolerance that was
+     * wanted: it will not start working on the next launch either.</p>
+     */
+    @EdtTest
+    public void aRouteFactoryThatThrowsFailsTheRestore() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                if ("/orders/17".equals(url)) {
+                    // The screen the user was actually on, and its dependency is not up yet.
+                    throw new IllegalStateException("the order screen could not be built");
+                }
+                Form f = new Form();
+                f.setTitle(url);
+                return f;
+            }
+        });
+        try {
+            Map<String, Object> payload = new HashMap<String, Object>();
+            payload.put("draft", "worth keeping");
+            AppState arriving = new AppState()
+                    .setPayload(payload)
+                    .setRoutes(java.util.Arrays.asList("/orders", "/orders/17"))
+                    .setDeviceId("some-other-device")
+                    .setSequence(250L)
+                    .setTimestamp(System.currentTimeMillis());
+
+            assertFalse(Continuity.restore(arriving),
+                    "the restore reported a shown form although the screen the user was on could "
+                            + "not be built");
+            flushSerialCalls();
+
+            assertNull(Continuity.readSeenForTest().get("some-other-device"),
+                    "the partial restore was acknowledged durably, so the relay stops offering "
+                            + "the state and there is nothing left to retry from -- while the "
+                            + "user sits on a screen they did not ask for");
+        } finally {
+            Navigation.setDispatcher(null);
+        }
+    }
+
+    /**
+     * A key ending in a dot is not the same key as one without it.
+     *
+     * <p>Windows normalises a trailing dot or space away, so "theme" and "theme." resolved to one
+     * value file while the index listed both: both reads answered with the last write, and
+     * removing either removed the other's value. The store being simulated is doing none of that.
+     * The sibling test covers case folding; this is the same class of collision through a
+     * different rule.</p>
+     */
+    @EdtTest
+    public void aKeyEndingInADotIsNotTheSameKey() {
+        Storage real = Storage.getInstance();
+        Storage.setStorageInstance(new SuffixTrimmingStorage(real));
+        LocalContinuityBridge b = new LocalContinuityBridge();
+        try {
+            assertTrue(b.syncedStorePut("theme", "plain"), "the fixture could not write a value");
+            assertTrue(b.syncedStorePut("theme.", "dotted"), "the fixture could not write a value");
+
+            assertEquals("plain", b.syncedStoreGet("theme"),
+                    "the dotted key overwrote the plain one, so two distinct keys share one file");
+            assertEquals("dotted", b.syncedStoreGet("theme."), "the dotted value did not survive");
+
+            b.syncedStoreRemove("theme.");
+            assertEquals("plain", b.syncedStoreGet("theme"),
+                    "removing one key removed the other as well");
+        } finally {
+            b.syncedStoreRemove("theme");
+            b.syncedStoreRemove("theme.");
+            Storage.setStorageInstance(real);
+        }
+    }
+
+    /**
      * An arrival queued behind a logout is not admitted into the session that follows it.
      *
      * <p>deliver() marshals from the platform's thread, so an arrival that a port handed over
@@ -5423,6 +5506,47 @@ public class LocalContinuityTest extends UITestBase {
 
         private static String fold(String name) {
             return name == null ? null : name.toLowerCase();
+        }
+    }
+
+    /** Storage that trims trailing dots and spaces from every name, the way Windows normalises
+     * a filename. */
+    static class SuffixTrimmingStorage extends Storage {
+        private final Storage delegate;
+
+        SuffixTrimmingStorage(Storage delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public boolean writeObject(String name, Object o) {
+            return delegate.writeObject(trim(name), o);
+        }
+
+        @Override
+        public Object readObject(String name) {
+            return delegate.readObject(trim(name));
+        }
+
+        @Override
+        public boolean exists(String name) {
+            return delegate.exists(trim(name));
+        }
+
+        @Override
+        public void deleteStorageFile(String name) {
+            delegate.deleteStorageFile(trim(name));
+        }
+
+        private static String trim(String name) {
+            if (name == null) {
+                return null;
+            }
+            int end = name.length();
+            while (end > 0 && (name.charAt(end - 1) == '.' || name.charAt(end - 1) == ' ')) {
+                end--;
+            }
+            return name.substring(0, end);
         }
     }
 

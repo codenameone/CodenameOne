@@ -260,7 +260,19 @@ public class LocalContinuityBridge implements ContinuityBridge {
                 sb.append('$');
                 sb.append(Integer.toHexString(c).toUpperCase());
             } else if (c == '/' || c == '\\' || c == '%' || c == '?' || c == '*' || c == ':'
-                    || c == '=' || c == '$') {
+                    || c == '=' || c == '$'
+                    // '.' and ' ' because Windows NORMALIZES them away at the end of a name, so
+                    // "theme" and "theme." resolved to one file: the index listed both keys, both
+                    // reads answered with the last write, and removing either removed the other's
+                    // value. Escaped everywhere rather than only at the end, because "a. b" and
+                    // "a.b " would otherwise need the rule applied twice to see they differ.
+                    //
+                    // '<', '>', '"' and '|' are not aliases -- Windows refuses them outright --
+                    // so a key holding one worked on macOS and failed on Windows. The store being
+                    // simulated accepts any string, and the simulation should not be the thing
+                    // that decides which keys an application may use.
+                    || c == '.' || c == ' '
+                    || c == '<' || c == '>' || c == '"' || c == '|') {
                 sb.append('$');
                 String hex = Integer.toHexString(c).toUpperCase();
                 if (hex.length() < 2) {

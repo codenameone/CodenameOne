@@ -290,6 +290,9 @@ public final class Navigation {
     /// #### Returns
     ///
     /// true when at least one frame was rebuilt and shown
+    /// A route factory that THROWS propagates, rather than being skipped: it is a failure the
+    /// caller can retry, not a route this build has stopped registering. A factory that answers
+    /// null is still skipped.
     public static boolean restoreStack(List<String> paths) {
         RouteDispatcher d = dispatcher;
         if (d == null || paths == null || paths.isEmpty()) {
@@ -309,13 +312,18 @@ public final class Navigation {
             if (path == null || path.length() == 0) {
                 continue;
             }
-            Form f;
-            try {
-                f = d.dispatch(path);
-            } catch (Throwable t) {
-                com.codename1.io.Log.e(t);
-                continue;
-            }
+            // NOT caught. A factory that THROWS is a different thing from a route this build no
+            // longer registers, and swallowing it made them the same: the failed screen was
+            // skipped, an earlier one was shown, and this method returned success -- so
+            // Continuity.restore() persisted and acknowledged a partial state, the relay stopped
+            // offering it, and the user was left on the wrong screen with no copy to retry from.
+            //
+            // An unregistered route answers null and is still skipped, which is the tolerance
+            // that was wanted: it will not start working on the next launch either. A throw is
+            // the transient breakage -- a dependency not up yet on a cold launch -- and letting
+            // it out is what makes the restore retryable. The method already propagates a throw
+            // from show() for the same reason.
+            Form f = d.dispatch(path);
             if (f != null) {
                 rebuilt.add(new NavigationEntry(path, f));
             }
