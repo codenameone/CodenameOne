@@ -3872,16 +3872,6 @@ public class IPhoneBuilder extends Executor {
         vpnTunnelBuilder.parseHints(request, usesCustomTunnel);
         if (vpnTunnelBuilder.isEnabled()) {
             vpnTunnelBuilder.verifyTunnelClass(classesDir);
-            // Everything HAND-WRITTEN, recorded before the translation
-            // exists so the extension target can compile the translated
-            // program and leave the rest out. Both roots the tunnel pass is
-            // given: the translator copies every non-class file it walks
-            // into the translation, so the app's own native sources arrive
-            // in the extension's tree exactly as the port's do. See
-            // recordHandWrittenNatives -- a hand-written list of "the
-            // sources that touch UIApplication" was not the same set, and
-            // the difference was a link error.
-            vpnTunnelBuilder.recordHandWrittenNatives(buildinRes, resDir);
             try {
                 vpnTunnelBuilder.writeStubSource(request, stubSource);
             } catch (IOException ex) {
@@ -6457,6 +6447,18 @@ public class IPhoneBuilder extends Executor {
                     tunnelCmd.set(tunnelOutIndex, tunnelOut.getAbsolutePath());
                     tunnelCmd.set(tunnelOutIndex + 1,
                             VpnTunnelNativeBuilder.translationRoot(request.getMainClass()));
+                    // Everything HAND-WRITTEN, recorded HERE rather than at
+                    // the stub stage. The translator copies every non-class
+                    // file it walks into the translation, so the extension's
+                    // tree gets the port's natives, a submitted library's
+                    // and the application's own -- and the set has to name
+                    // all of them or they are compiled into an app extension
+                    // that may not call what they call. Taken immediately
+                    // before the pass that reads these directories, which is
+                    // what makes it complete: an archive unpacked into them
+                    // later than this could not have reached the translation
+                    // either.
+                    vpnTunnelBuilder.recordHandWrittenNatives(buildinRes, resDir);
                     log("[vpnTunnel] Translating the packet tunnel from "
                             + vpnTunnelBuilder.getTunnelClass());
                     if (!exec(userDir, env, 600000, tunnelCmd.toArray(new String[0]))) {
@@ -11589,18 +11591,27 @@ public class IPhoneBuilder extends Executor {
                 .append("  added = vpn_target.source_build_phase.add_file_reference(ref)\n")
                 .append("  added.settings = vpn_app_flags[source_name].dup if added && vpn_app_flags[source_name]\n")
                 .append("end\n")
-                // The libraries the app target links, minus the ones that are
-                // the app's own. A translated program needs the same C runtime
-                // the app's does -- libz, libsqlite3, the system frameworks the
-                // translator puts in every project -- and listing them here
-                // would be a list that silently lags the translator's.
-                // libPods-*.a is excluded outright: it is built FOR the app
-                // target, and linking it here would pull the pods' UIKit code
-                // into an extension that may not call it.
+                // The SDK's own libraries, and only those. A translated
+                // program needs the same C runtime the app's does -- libz,
+                // libsqlite3, the system frameworks the translator puts in
+                // every project -- and enumerating them here would be a list
+                // that silently lags the translator's, so they are taken
+                // from the app target instead.
+                //
+                // SOURCE_TREE, not a name filter. Anything that is not under
+                // the SDK is the app's: a pods archive, a cn1lib's static
+                // library, a dynamic .framework the project bundles. None of
+                // it is referenced by a translation rooted at the tunnel, and
+                // linking it would give the extension a load dependency on
+                // code that was never built to be extension-safe -- which App
+                // Store validation checks. It is the same rule the source
+                // list follows one level down: the extension carries the
+                // translated program and what the SDK provides, and nothing
+                // anybody hand-wrote.
                 .append("vpn_app_target.frameworks_build_phase.files.to_a.each do |bf|\n")
                 .append("  ref = bf.file_ref\n")
                 .append("  next unless ref && ref.path\n")
-                .append("  next if File.basename(ref.path).start_with?('libPods')\n")
+                .append("  next unless ref.source_tree == 'SDKROOT'\n")
                 .append("  next if vpn_target.frameworks_build_phase.files_references.include?(ref)\n")
                 .append("  vpn_target.frameworks_build_phase.add_file_reference(ref)\n")
                 .append("end\n");
