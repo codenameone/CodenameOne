@@ -22,6 +22,7 @@
  */
 package com.codename1.continuity;
 
+import com.codename1.io.rest.ErrorCodeHandler;
 import com.codename1.io.rest.RequestBuilder;
 import com.codename1.io.rest.Response;
 import com.codename1.io.rest.Rest;
@@ -167,7 +168,31 @@ public class RestStateRelay implements StateRelay {
                     + "setRelay() replaced it. Refusing the request rather than sending one "
                     + "account's state under another account's credentials.");
         }
+        // SILENT, because these are housekeeping requests the user never asked for. A request
+        // builder sets failSilently only when an error-code handler is registered, and without it
+        // ConnectionRequest puts a Retry/Cancel dialog in front of the user for both a failure
+        // response and a connection exception. The 404 below is the DOCUMENTED answer for a relay
+        // that holds nothing yet, so a correctly implemented endpoint showed every user an error
+        // dialog on first run -- for the ordinary case, before this class could read the code and
+        // call it an empty relay.
+        //
+        // The handler itself does nothing on purpose: getAsString() builds its Response from the
+        // request's own code and body rather than from these callbacks, so publish() and fetch()
+        // still see 404, 204 and everything else exactly as before.
+        RequestBuilder quiet = b.onErrorCodeString(SILENT);
         String token = getToken();
-        return token == null || token.length() == 0 ? b : b.bearer(token);
+        return token == null || token.length() == 0 ? quiet : quiet.bearer(token);
     }
+
+    /// Registered on every request purely to make it silent. See auth().
+    ///
+    /// A constant rather than an anonymous class per request: it captures nothing, and an inner
+    /// class would hold its enclosing relay alive for no reason -- which SpotBugs reports as
+    /// SIC_INNER_SHOULD_BE_STATIC_ANON.
+    private static final ErrorCodeHandler<String> SILENT = new ErrorCodeHandler<String>() {
+        @Override
+        public void onError(Response<String> errorData) {
+            // Deliberately nothing. The caller reads the response code and decides there.
+        }
+    };
 }

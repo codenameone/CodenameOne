@@ -2390,6 +2390,15 @@ public class LocalContinuityTest extends UITestBase {
         assertTrue(Continuity.isInstalledRelay(relay),
                 "the relay was not installed, so the refusal below proves nothing");
 
+        // setRelay() starts a poll, and THAT read is entitled to a token -- the relay is
+        // installed. Let it finish and forget it, because the property under test is what happens
+        // after the relay is replaced. Without this the test raced its own fixture: the worker
+        // sometimes reached getToken() before the assertion and sometimes did not, so it passed
+        // for a timing reason rather than a behavioural one.
+        pause(300L);
+        flushSerialCalls();
+        tokenRead[0] = false;
+
         // REPLACED, not cleared. clear() is a logout and deliberately keeps the relay installed:
         // the same endpoint usually serves the next account. What the framework can recognise is
         // a relay that is no longer the installed one, which is why switching accounts means
