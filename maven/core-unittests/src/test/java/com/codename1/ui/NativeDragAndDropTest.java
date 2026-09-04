@@ -1916,6 +1916,52 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aSecondPressDoesNotStealAGestureThePlatformHasBeenOffered() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        // The port refuses to start, which is what a platform whose own recognizer owns the
+        // drag gesture looks like: the session begins later, out of that recognizer, and takes
+        // whatever is staged.
+        implementation.setNativeDragStartRefused(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container dragged = new Container();
+            NativeDragOperation carried = new NativeDragOperation("the finger that is dragging");
+            dragged.setNativeDragOperation(carried);
+            Container touched = new Container();
+            touched.add(new Label("pressed by the other finger"));
+            touched.setNativeDragOperation(new NativeDragOperation("never dragged"));
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, dragged);
+            form.add(BorderLayout.NORTH, touched);
+            form.revalidate();
+
+            int x = dragged.getAbsoluteX() + 10;
+            int y = dragged.getAbsoluteY() + 10;
+            form.pointerPressed(x, y);
+            drag(form, x + 200, y + 200);
+            assertNull(NativeDragAndDrop.getActiveDrag(), "the port refused, so nothing runs yet");
+
+            // A second finger comes down on another drag source while the first gesture waits
+            // for the platform's recognizer.
+            form.pointerPressed(touched.getAbsoluteX() + 5, touched.getAbsoluteY() + 5);
+
+            assertSame(carried, NativeDragAndDrop.dragSessionStarted(),
+                    "the session belongs to the gesture that was offered: taking the later "
+                            + "press's operation exports the wrong component's payload, and "
+                            + "reports a move against it");
+            assertSame(dragged, NativeDragAndDrop.getActiveDrag().getSource());
+        } finally {
+            implementation.setNativeDragStartRefused(false);
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            NativeDragAndDrop.gestureCancelled();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void anOperationThatPermitsNothingNeverBecomesADrag() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

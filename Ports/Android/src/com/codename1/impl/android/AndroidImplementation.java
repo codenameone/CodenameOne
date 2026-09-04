@@ -10306,7 +10306,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (plain == null && html == null) {
             String[] advertised = content.getMimeTypes();
             for (int iter = 0; iter < advertised.length && plain == null; iter++) {
-                if (ClipboardContent.MIME_FILE.equals(advertised[iter])) {
+                if (!advertised[iter].startsWith("text/")) {
+                    // Text types only, however the value happens to be carried. A String under
+                    // application/json -- or under an application's own type -- is that type's
+                    // encoding and not a reading the source offered as text, and publishing it
+                    // as the clip's text let a text-only application paste a representation
+                    // nobody advertised to it. Nothing is lost by refusing: a String under a
+                    // type that is not text travels as a typed content URI like any other
+                    // representation, under its own name. The file list is covered by the same
+                    // test, since that is not a text type either.
+                    //
+                    // The types getMimeTypes answers with are normalized to lower case, so this
+                    // is an ASCII comparison against an ASCII constant and no locale enters it.
                     continue;
                 }
                 String value = clipboardText(content, advertised[iter]);

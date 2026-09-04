@@ -489,7 +489,11 @@ public final class NativeDragAndDrop {
                 Log.e(err);
             }
         }
-        stage(op, source, token, x, y);
+        if (!stage(op, source, token, x, y)) {
+            // Another gesture owns the staging slot and has already been handed to the
+            // platform. Nothing to prepare: this press stages nothing at all.
+            return;
+        }
         if (op != null) {
             try {
                 Display.impl.prepareNativeDrag(op);
@@ -558,17 +562,38 @@ public final class NativeDragAndDrop {
         return root == null ? null : root.getCurrentPointerPress();
     }
 
-    /// Installs what a press staged, or clears it when the press staged nothing. Unconditional
+    /// Installs what a press staged, or clears it when the press staged nothing. In one go
     /// rather than a clear followed by a fill, so that one press leaves one consistent state.
-    private static void stage(NativeDragOperation op, Component source, Object token,
+    ///
+    /// Refused for a *different* press once the gesture already staged has been offered to the
+    /// platform. On a platform whose own recognizer owns dragging, that offer is the whole
+    /// handover: the session begins later and takes whatever is staged, with no press of its
+    /// own to identify it by. A second finger pressing another drag source in that window
+    /// replaced both the operation and its source, so the drag the *first* finger had begun
+    /// exported the second component's payload -- and reported a move against it, which is the
+    /// word a source deletes its data on. The press that is not this gesture's leaves it alone;
+    /// the release that ends either gesture clears it, so nothing is stranded.
+    ///
+    /// A press that lands with nothing offered still replaces what is staged, which is what a
+    /// gesture the platform dropped on the floor needs -- see
+    /// `#isStagedFor(java.lang.Object, int, int)` for the other half of that.
+    ///
+    /// #### Returns
+    ///
+    /// true when this press now owns the staging slot
+    private static boolean stage(NativeDragOperation op, Component source, Object token,
             int x, int y) {
         synchronized (LOCK) {
+            if (startOffered && pending != null) {
+                return false;
+            }
             pending = op;
             pendingSource = op == null ? null : source;
             pressToken = op == null ? null : token;
             pressX = x;
             pressY = y;
             startOffered = false;
+            return true;
         }
     }
 
