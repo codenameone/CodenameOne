@@ -2945,6 +2945,35 @@ public class LocalContinuityTest extends UITestBase {
                         + "not fit, so it stays on offer and holds every checkpoint off the relay");
     }
 
+    /**
+     * The simulated synced store reports a write that did not reach storage.
+     *
+     * <p>It used to persist through {@code Preferences}, whose {@code set()} fills an in-memory
+     * table and whose {@code save()} discards the write's result -- and whose {@code get()} reads
+     * that table. The read-back therefore consulted the cache it had just written and agreed with
+     * itself, so put() reported success for a value that vanishes at the next launch. The
+     * simulator and the desktop app are what applications develop against, so this taught them
+     * something false about the device.</p>
+     */
+    @EdtTest
+    public void theSimulatedStoreReportsAWriteThatDidNotReachStorage() {
+        // The control first: with storage working the same call must succeed, or an
+        // unconditional false would satisfy the assertion below and break the store.
+        assertTrue(SyncedStore.put("draft", "half a sentence"),
+                "the write failed with storage working, so the refusal below proves nothing");
+        assertEquals("half a sentence", SyncedStore.get("draft", "nothing"));
+
+        Storage original = Storage.getInstance();
+        Storage.setStorageInstance(new RefusingStorage());
+        try {
+            assertFalse(SyncedStore.put("draft", "a longer sentence"),
+                    "a write storage refused was reported as success, so the value is gone at the "
+                            + "next launch and the application was told it was saved");
+        } finally {
+            Storage.setStorageInstance(original);
+        }
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;

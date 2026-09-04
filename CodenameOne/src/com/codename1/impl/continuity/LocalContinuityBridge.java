@@ -25,7 +25,7 @@ package com.codename1.impl.continuity;
 import com.codename1.continuity.spi.ContinuityBridge;
 import com.codename1.continuity.spi.ContinuityCallback;
 import com.codename1.io.Log;
-import com.codename1.io.Preferences;
+import com.codename1.io.Storage;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,13 +43,19 @@ import java.util.Map;
 /// It keeps the last published activity in memory so the Simulate menu can show what the app is
 /// offering, and it can hand that activity straight back through `simulateArrival()` -- which is
 /// what "continue this on another device" is, minus the second device. The synced store is real
-/// within one machine: it is backed by `com.codename1.io.Preferences`, so it survives a simulator
+/// within one machine: it is backed by `com.codename1.io.Storage`, so it survives a simulator
 /// restart the way the platform store survives a device one.
+///
+/// Storage rather than Preferences, and not as a detail. Preferences.set() fills an in-memory
+/// table whose save() discards the write's result, and Preferences.get() reads that table -- so a
+/// value that never reached the disk reads back correctly right up until the next launch, and a
+/// simulation that reported success for it would be teaching an application something false about
+/// the device.
 public class LocalContinuityBridge implements ContinuityBridge {
-    /// Prefix for the simulated synced store's keys inside `Preferences`.
+    /// Prefix for the simulated synced store's keys inside `Storage`.
     private static final String PREFIX = "CN1$SyncedStore$";
 
-    /// The list of keys, kept beside them because `Preferences` cannot be enumerated.
+    /// The list of keys, kept beside them because the store is addressed by name only.
     private static final String INDEX = "CN1$SyncedStoreKeys";
 
     // EDT-owned. Everything here runs on the Codename One event thread: the framework calls in
@@ -167,25 +173,71 @@ public class LocalContinuityBridge implements ContinuityBridge {
 
     @Override
     public boolean syncedStorePut(String key, String value) {
-        Preferences.set(PREFIX + key, value);
+        // Storage, not Preferences, and the difference is the whole point of this method's
+        // return. Preferences.set() fills an in-memory table and its save() DISCARDS
+        // Storage.writeObject()'s result, so a write that never reached the disk leaves the new
+        // value in that table -- and Preferences.get() reads the table. The read-back below used
+        // to consult the cache it had just written and agree with itself, so put() reported
+        // success for a value that disappears when the simulator restarts. An oversized value
+        // makes it deterministic rather than a full-disk curiosity.
+        //
+        // Same correction the sequence counter and the delivery marks already needed. The
+        // simulation has to answer the question the device answers -- is the value there now --
+        // and only a checked write can.
+        if (!write(PREFIX + key, value)) {
+            return false;
+        }
         List<String> keys = indexKeys();
         if (!keys.contains(key)) {
             keys.add(key);
-            writeIndex(keys);
+            if (!writeIndex(keys)) {
+                // The value is stored and the index is not, so keys() would not list it. Reported
+                // rather than hidden: a caller told the write succeeded expects to find it again
+                // by enumeration as well as by name.
+                return false;
+            }
         }
-        // Read back rather than assume, so the simulation answers the same question the device
-        // does: is the value there now?
-        return value.equals(Preferences.get(PREFIX + key, null));
+        return true;
+    }
+
+    /// Writes one value, reporting whether it actually reached storage.
+    private boolean write(String name, String value) {
+        try {
+            return Storage.getInstance().writeObject(name, value);
+        } catch (Throwable t) {
+            Log.e(t);
+            return false;
+        }
+    }
+
+    /// Reads one value, or null for anything that is not a stored string.
+    private String read(String name) {
+        try {
+            if (!Storage.getInstance().exists(name)) {
+                return null;
+            }
+            Object o = Storage.getInstance().readObject(name);
+            // instanceof rather than a cast: a failed cast does not throw on the iOS virtual
+            // machine, and this class is compiled into every port.
+            return o instanceof String ? (String) o : null;
+        } catch (Throwable t) {
+            Log.e(t);
+            return null;
+        }
     }
 
     @Override
     public String syncedStoreGet(String key) {
-        return Preferences.get(PREFIX + key, null);
+        return read(PREFIX + key);
     }
 
     @Override
     public void syncedStoreRemove(String key) {
-        Preferences.delete(PREFIX + key);
+        try {
+            Storage.getInstance().deleteStorageFile(PREFIX + key);
+        } catch (Throwable t) {
+            Log.e(t);
+        }
         List<String> keys = indexKeys();
         if (keys.remove(key)) {
             writeIndex(keys);
@@ -214,7 +266,7 @@ public class LocalContinuityBridge implements ContinuityBridge {
 
     private List<String> indexKeys() {
         List<String> keys = new ArrayList<String>();
-        String raw = Preferences.get(INDEX, "");
+        String raw = read(INDEX);
         if (raw == null || raw.length() == 0) {
             return keys;
         }
@@ -276,7 +328,12 @@ public class LocalContinuityBridge implements ContinuityBridge {
         return sb.toString();
     }
 
-    private void writeIndex(List<String> keys) {
+    /// Writes the key index, reporting whether it reached storage.
+    ///
+    /// The answer is used rather than logged: a value stored under a key the index has lost is
+    /// findable by name and invisible to keys(), and a caller told its write succeeded has been
+    /// told something that is only half true.
+    private boolean writeIndex(List<String> keys) {
         StringBuilder sb = new StringBuilder();
         for (String key : keys) {
             if (sb.length() > 0) {
@@ -284,6 +341,6 @@ public class LocalContinuityBridge implements ContinuityBridge {
             }
             sb.append(escapeIndexEntry(key));
         }
-        Preferences.set(INDEX, sb.toString());
+        return write(INDEX, sb.toString());
     }
 }
