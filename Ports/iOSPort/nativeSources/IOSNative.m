@@ -20784,6 +20784,39 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStoreSupported__(C
     return (resolved != nil && cn1ContinuitySyncEntitled) ? JAVA_TRUE : JAVA_FALSE;
 }
 
+// The size of one value already in the store, whatever KIND of value it is.
+//
+// This class only ever writes strings, so the quota check used to count strings and skip
+// everything else -- which counts an NSData, an array or a dictionary as ZERO. The store is not
+// only ours: an application that used NSUbiquitousKeyValueStore before adopting this API, or a
+// container shared with an app extension, holds values of every plist kind. Skipping them made
+// the check pass on a store already over its limit, which is precisely the case it exists to
+// catch -- the write is kept locally, the readback says yes, and it never propagates.
+static NSUInteger cn1ContinuityValueBytes(id value) {
+    if (value == nil) {
+        return 0;
+    }
+    if ([value isKindOfClass:[NSString class]]) {
+        return [((NSString *)value) lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+    }
+    if ([value isKindOfClass:[NSData class]]) {
+        return [((NSData *)value) length];
+    }
+    if ([value isKindOfClass:[NSNumber class]] || [value isKindOfClass:[NSDate class]]) {
+        // A scalar, whose encoded size is a handful of bytes whatever it holds.
+        return 16;
+    }
+    // An array or a dictionary. Serializing is the only way to ask how big a nested plist is,
+    // and the alternative this replaces was to call it nothing. Wrapped in an array because a
+    // bare root is not a property list for every format.
+    NSData *encoded = [NSPropertyListSerialization
+            dataWithPropertyList:[NSArray arrayWithObject:value]
+                          format:NSPropertyListBinaryFormat_v1_0
+                         options:0
+                           error:NULL];
+    return encoded != nil ? [encoded length] : 0;
+}
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key, JAVA_OBJECT value) {
     NSUbiquitousKeyValueStore *store = cn1ContinuityStore();
     if (store == nil || key == JAVA_NULL || value == JAVA_NULL) {
@@ -20800,9 +20833,9 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_la
     // and 1024 keys.
     //
     // The measurement is an APPROXIMATION and is deliberately generous: UTF-8 bytes of the keys
-    // and of the string values, which is what this store is for. Apple does not publish how it
-    // counts, so the risk to avoid is refusing a write the platform would have taken -- the check
-    // only fires past the documented maximum, not near it.
+    // plus the size of every value the store already holds, of whatever plist kind. Apple does
+    // not publish how it counts, so the risk to avoid is refusing a write the platform would
+    // have taken -- the check only fires past the documented maximum, not near it.
     NSDictionary *held = [store dictionaryRepresentation];
     NSUInteger bytes = 0;
     NSUInteger count = 0;
@@ -20813,10 +20846,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_la
         }
         count++;
         bytes += [existing lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
-        id value = [held objectForKey:existing];
-        if ([value isKindOfClass:[NSString class]]) {
-            bytes += [((NSString *)value) lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
-        }
+        bytes += cn1ContinuityValueBytes([held objectForKey:existing]);
     }
     count++;
     bytes += [k lengthOfBytesUsingEncoding:NSUTF8StringEncoding];

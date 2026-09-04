@@ -320,6 +320,22 @@ public final class StateCodec {
         }
         Object value = m.get(key);
         if (value instanceof Number) {
+            // NOT just "a number". JSONParser answers a bare 1e100 with a Double, and asLong()
+            // then converts it to Long.MAX_VALUE -- so one such document raises this origin's
+            // durable high-water mark to the largest value there is, and every ordinary sequence
+            // it sends afterwards is refused as already seen, for the life of the installation.
+            // A fractional value is refused for the same reason in miniature: 5.7 becomes 5, and
+            // the sender's 5 is then indistinguishable from it.
+            double d = ((Number) value).doubleValue();
+            if (Double.isNaN(d) || Double.isInfinite(d)
+                    || d != Math.floor(d)
+                    || d < (double) Long.MIN_VALUE || d > (double) Long.MAX_VALUE) {
+                throw new IOException("The continuity relay returned a document whose \"" + key
+                        + "\" is " + value + ", which is not a whole number this device can "
+                        + "hold. Accepting it would clamp the value to the largest sequence "
+                        + "there is and refuse every later state from that device as already "
+                        + "seen.");
+            }
             return;
         }
         if (value instanceof String) {

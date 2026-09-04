@@ -164,11 +164,16 @@ public class RestStateRelay implements StateRelay {
     /// the gap that check cannot cover -- it runs on the event thread, and the worker is not it.
     /// Throwing rather than skipping quietly, so the framework records the publish as failed and
     /// keeps owing it, and the state is republished once a relay is installed again.
+    ///
+    /// It asks whether this relay may SEND, not merely whether it is installed. A logout keeps
+    /// the same relay object in place on purpose, so identity alone said yes to a worker whose
+    /// account had signed out between its preflight and this line.
     private RequestBuilder auth(RequestBuilder b) throws IOException {
-        if (!Continuity.isInstalledRelay(this)) {
-            throw new IOException("This relay is no longer installed -- Continuity.clear() or "
-                    + "setRelay() replaced it. Refusing the request rather than sending one "
-                    + "account's state under another account's credentials.");
+        if (!Continuity.mayRelaySend(this)) {
+            throw new IOException("This relay may not send: Continuity.setRelay() replaced it, "
+                    + "or Continuity.clear() ended the session this request belongs to. Refusing "
+                    + "the request rather than sending one account's state under another "
+                    + "account's credentials.");
         }
         // SILENT, because these are housekeeping requests the user never asked for. A request
         // builder sets failSilently only when an error-code handler is registered, and without it

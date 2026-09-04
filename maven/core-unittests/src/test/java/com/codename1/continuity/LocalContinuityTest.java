@@ -2420,7 +2420,7 @@ public class LocalContinuityTest extends UITestBase {
             relay.publish(new AppState().setDeviceId("previous-account").setSequence(1L));
             fail("a relay that setRelay() replaced must not send anything");
         } catch (java.io.IOException expected) {
-            assertTrue(expected.getMessage().contains("no longer installed"),
+            assertTrue(expected.getMessage().contains("may not send"),
                     expected.getMessage());
         }
         assertFalse(tokenRead[0],
@@ -2558,6 +2558,122 @@ public class LocalContinuityTest extends UITestBase {
         assertNull(Continuity.getRestorableState(),
                 "acknowledge() did not release the deferred state, which would hold every later "
                         + "checkpoint behind an arrival the application has finished with");
+    }
+
+    /**
+     * A logout refuses a worker that is already inside the relay, even though the relay stays
+     * installed.
+     *
+     * <p>This is the half the identity check could not see. {@code setRelay()} swaps the object,
+     * so a replaced relay was caught -- but {@code clear()} deliberately leaves the SAME relay in
+     * place, because the same endpoint usually serves the next account. A worker whose preflight
+     * passed a moment before the logout therefore found its relay still installed and sent the
+     * previous account's state anyway. With cookie or client-certificate authentication there is
+     * not even a token for getToken() to have stopped returning.</p>
+     *
+     * <p>Asked at the point {@code RestStateRelay.auth()} asks it, on the worker, inside the
+     * relay call -- which is the only place the window exists. The first answer is asserted too:
+     * a guard that refused every worker would pass the second half of this while breaking every
+     * ordinary publish.</p>
+     */
+    @EdtTest
+    public void aLogoutRefusesAWorkerAlreadyInsideTheRelay() {
+        final java.util.concurrent.atomic.AtomicInteger asked =
+                new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicBoolean beforeLogout =
+                new java.util.concurrent.atomic.AtomicBoolean();
+        final java.util.concurrent.atomic.AtomicBoolean afterLogout =
+                new java.util.concurrent.atomic.AtomicBoolean(true);
+        final java.util.concurrent.CountDownLatch inPublish =
+                new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch loggedOut =
+                new java.util.concurrent.CountDownLatch(1);
+        final StateRelay[] self = new StateRelay[1];
+
+        StateRelay relay = new StateRelay() {
+            public void publish(AppState state) {
+                // Exactly what RestStateRelay.auth() does, in the same place: on the worker,
+                // inside the relay call, immediately before the credentials would be read.
+                beforeLogout.set(Continuity.mayRelaySend(self[0]));
+                asked.incrementAndGet();
+                inPublish.countDown();
+                try {
+                    loggedOut.await(5, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                afterLogout.set(Continuity.mayRelaySend(self[0]));
+                asked.incrementAndGet();
+            }
+
+            public AppState fetch() {
+                return null;
+            }
+        };
+        self[0] = relay;
+
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+        Continuity.setRelay(relay);
+        Continuity.checkpoint();
+
+        // Pumped rather than blocked: the worker calls back onto the event thread to read the
+        // session, and this test IS the event thread. Blocking here would deadlock the very
+        // mechanism under test.
+        for (int i = 0; i < 40 && inPublish.getCount() > 0; i++) {
+            pause(50L);
+            flushSerialCalls();
+        }
+        assertEquals(0L, inPublish.getCount(),
+                "the publish worker never reached the relay, so this test asserts nothing");
+
+        Continuity.clear();
+        loggedOut.countDown();
+        for (int i = 0; i < 40 && asked.get() < 2; i++) {
+            pause(50L);
+            flushSerialCalls();
+        }
+        assertEquals(2, asked.get(), "the worker never asked again after the logout");
+
+        assertTrue(beforeLogout.get(),
+                "an ordinary worker was refused before any logout, which would stop every "
+                        + "publish this framework makes");
+        assertFalse(afterLogout.get(),
+                "clear() left the relay installed, so the worker was told it could still send -- "
+                        + "and the previous account's state goes out after the logout that "
+                        + "promised nothing would");
+    }
+
+    /**
+     * A sequence past the range of a long is a failed read, and an ordinary one still is not.
+     *
+     * <p>The pair matters: a guard that refused every numeric sequence would pass the first half
+     * of this and silently drop every sender that writes seq as a number rather than a string,
+     * which this codec has always accepted and still must.</p>
+     */
+    @EdtTest
+    public void anOutOfRangeSequenceIsRefusedAndAnOrdinaryOneIsNot() throws Exception {
+        AppState fine = StateCodec.fromJson("{\"device\":\"other\",\"seq\":10,\"ts\":99}");
+        assertNotNull(fine, "a sender writing seq as a plain number was refused");
+        assertEquals(10L, fine.getSequence(), "the numeric sequence did not survive");
+        assertEquals(99L, fine.getTimestamp(), "the numeric timestamp did not survive");
+
+        // The largest sequence a long holds is itself in range and must go through: the guard is
+        // about values OUTSIDE the type, not about large ones.
+        AppState edge = StateCodec.fromJson(
+                "{\"device\":\"other\",\"seq\":\"" + Long.MAX_VALUE + "\"}");
+        assertEquals(Long.MAX_VALUE, edge.getSequence(),
+                "a sequence written as the largest long there is was not preserved");
+
+        try {
+            StateCodec.fromJson("{\"device\":\"other\",\"seq\":1e100}");
+            fail("1e100 was accepted as a sequence -- clamped to Long.MAX_VALUE, it becomes this "
+                    + "origin's durable high-water mark and refuses everything it sends later");
+        } catch (java.io.IOException expected) {
+            assertTrue(expected.getMessage().length() > 0, "the refusal explained nothing");
+        }
     }
 
     /**
@@ -4104,6 +4220,16 @@ public class LocalContinuityTest extends UITestBase {
             "{\"device\":\"other\",\"seq\":\"10\",\"routes\":[1]}",
             "{\"device\":\"other\",\"seq\":\"10\",\"routes\":[\"/a\",null]}",
             "{\"device\":\"other\",\"seq\":\"10\",\"routes\":[\"/a\",{\"b\":1}]}",
+            // A sequence that is a NUMBER but not one this device can hold. asLong() clamps
+            // 1e100 to Long.MAX_VALUE, and once that is the durable high-water mark for this
+            // origin every ordinary sequence it sends afterwards is refused as already seen --
+            // for the life of the installation.
+            "{\"device\":\"other\",\"seq\":1e100}",
+            "{\"device\":\"other\",\"seq\":-1e100}",
+            "{\"device\":\"other\",\"seq\":10,\"ts\":1e300}",
+            // Fractional, which is the same harm in miniature: 5.7 becomes 5, so the sender's
+            // own 5 is then indistinguishable from it.
+            "{\"device\":\"other\",\"seq\":5.7}",
         };
         for (int i = 0; i < wrong.length; i++) {
             try {

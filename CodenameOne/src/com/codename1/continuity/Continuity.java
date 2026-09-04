@@ -221,6 +221,15 @@ public final class Continuity {
     /// delivering the previous account's state into the next account's screen.
     private static int relaySession;
 
+    /// The relay session a framework worker is running for, bound for the length of its call
+    /// into the relay and unbound afterwards. Null on the event thread and on any thread the
+    /// application drives itself, which is how mayRelaySend() tells the two apart.
+    ///
+    /// A thread local rather than a static, because two workers can be in flight at once: a poll
+    /// starts while a publish is on the wire -- startPoll() guards against a second READ, not
+    /// against a write -- so one field would answer for whichever worker wrote it last.
+    private static final ThreadLocal<Integer> RELAY_CALL_SESSION = new ThreadLocal<Integer>();
+
     private Continuity() {
     }
 
@@ -1097,6 +1106,7 @@ public final class Continuity {
                 // a local and the answer goes back through the event queue.
                 AppState fetched = null;
                 boolean failed = false;
+                RELAY_CALL_SESSION.set(Integer.valueOf(session));
                 try {
                     fetched = r.fetch();
                 } catch (Throwable t) {
@@ -1107,6 +1117,8 @@ public final class Continuity {
                     // that this device had never managed to read.
                     Log.e(t);
                     failed = true;
+                } finally {
+                    RELAY_CALL_SESSION.remove();
                 }
                 final AppState result = fetched;
                 final boolean fetchFailed = failed;
@@ -1708,11 +1720,14 @@ public final class Continuity {
                 // Off the EDT because publish() blocks, and touching NOTHING: the relay and the
                 // state came in as locals and the outcome goes back through the event queue.
                 boolean sent = true;
+                RELAY_CALL_SESSION.set(Integer.valueOf(session));
                 try {
                     r.publish(next);
                 } catch (Throwable t) {
                     Log.e(t);
                     sent = false;
+                } finally {
+                    RELAY_CALL_SESSION.remove();
                 }
                 final boolean ok = sent;
                 Display.getInstance().callSerially(new Runnable() {
@@ -2217,6 +2232,56 @@ public final class Continuity {
         // IDENTITY, and the marker says so: two relays that considered themselves equal would
         // still be two objects, and the one that was replaced is the one that must be refused.
         return r != null && r == relay; //NOPMD CompareObjectsWithEquals
+    }
+
+    /// Whether `r` may send RIGHT NOW: it is the installed relay, and the session its caller
+    /// belongs to has not ended.
+    ///
+    /// The identity half alone answered only one of the two questions. `setRelay()` swaps the
+    /// object, so a replaced relay is caught -- but `clear()` deliberately leaves the same relay
+    /// INSTALLED, because the same endpoint usually serves the next account. Its logout was
+    /// therefore invisible here: a worker whose preflight passed a moment before `clear()` ran
+    /// found its relay still installed and sent the previous account's state anyway, which is
+    /// exactly what `clear()` promises not to allow. Cookie or client-certificate authentication
+    /// makes that concrete -- there is no token for `getToken()` to have stopped returning.
+    ///
+    /// So the session is asked as well, and asked on the EVENT THREAD, because `relaySession`
+    /// belongs to it. Blocking a worker on the EDT is the safe direction: the EDT never waits on
+    /// a worker.
+    ///
+    /// Only a framework worker has a session bound to it. A relay the application drives itself
+    /// -- `RestStateRelay` is a public class and usable on its own -- has none, and gets the
+    /// identity answer it always got; refusing those would break a legitimate direct call for a
+    /// session it was never part of.
+    ///
+    /// What this still cannot close is the instant between this answer and the request that
+    /// follows it. That is instructions on one thread rather than an unbounded wait on a queue,
+    /// which is the whole of what a check placed here can buy.
+    static boolean mayRelaySend(final StateRelay r) {
+        if (r == null) {
+            return false;
+        }
+        Integer bound = RELAY_CALL_SESSION.get();
+        if (bound == null) {
+            return isInstalledRelay(r);
+        }
+        final int session = bound.intValue();
+        final boolean[] live = new boolean[1];
+        try {
+            Display.getInstance().callSeriallyAndWait(new Runnable() {
+                @Override
+                public void run() {
+                    live[0] = r == relay //NOPMD CompareObjectsWithEquals
+                            && session == relaySession;
+                }
+            });
+        } catch (Throwable t) {
+            // Refused, not allowed. Whatever stopped the event thread from answering, sending
+            // under an unknown session is the outcome this method exists to prevent.
+            Log.e(t);
+            return false;
+        }
+        return live[0];
     }
 
     /// The routes of a remote state that this device can actually keep.
