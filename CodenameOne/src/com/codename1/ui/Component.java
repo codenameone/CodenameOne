@@ -6663,6 +6663,12 @@ public class Component implements Animation, StyleListener, Editable {
     /// Restricts what this component will do with a drop -- a target that can only copy should
     /// not be offered a move, because the source deletes its data when a move completes.
     ///
+    /// Settled before a drag begins. Narrowing this while one is already hovering is honoured
+    /// from whichever drag event next reaches the framework -- the hover answers the platform
+    /// on the platform's own thread -- so a target changing its mind mid-drag should reject
+    /// from its drag over callback, which is ordered against the drag rather than against the
+    /// component.
+    ///
     /// #### Parameters
     ///
     /// - `acceptedDropActions`: any combination of `NativeDragOperation#ACTION_COPY`,

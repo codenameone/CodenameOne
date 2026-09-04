@@ -10753,7 +10753,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             throw new IOException("could not stage " + file + " for sharing");
         }
         File copy = new File(holder, file.getName());
-        boolean staged = false;
+        boolean registered = false;
         try {
             InputStream in = new FileInputStream(file);
             try {
@@ -10770,24 +10770,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } finally {
                 in.close();
             }
-            staged = true;
+            Uri shared = FileProvider.getUriForFile(getContext(), authority, copy);
+            getContext().grantUriPermission("android", shared,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            // Remembered so it is cleaned up, but not as transport: this is a file the source
+            // published, and it has to read back as one.
+            rememberStagedClipFile(shared, copy, false, clip);
+            registered = true;
+            return shared;
         } finally {
-            if (!staged) {
+            if (!registered) {
                 // A source that vanished, a read that failed, a disk that filled: the holder
                 // and whatever was written into it exist by now, and nothing has registered
                 // them for reclamation -- so every failed export left its partial copy in the
-                // cache for good. Registration happens below, on the path that succeeds.
+                // cache for good.
+                //
+                // Registration, not the copy, is what ends the window. Naming the file to the
+                // provider can fail on its own -- a path the manifest's roots do not cover is
+                // refused there and nowhere else -- and with the flag set at the end of the
+                // copy, that failure leaked exactly what this was written to prevent.
                 copy.delete();
                 holder.delete();
             }
         }
-        Uri shared = FileProvider.getUriForFile(getContext(), authority, copy);
-        getContext().grantUriPermission("android", shared,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        // Remembered so it is cleaned up, but not as transport: this is a file the source
-        // published, and it has to read back as one.
-        rememberStagedClipFile(shared, copy, false, clip);
-        return shared;
     }
 
     /// Writes bytes somewhere the application's file provider can serve them from and returns
@@ -10816,18 +10821,30 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         File file = File.createTempFile(
                 encoded == null ? CLIP_FILE_PREFIX : CLIP_FILE_PREFIX + encoded + "-",
                 "." + extension, dir);
-        OutputStream os = new FileOutputStream(file);
+        boolean registered = false;
         try {
-            os.write(bytes);
+            OutputStream os = new FileOutputStream(file);
+            try {
+                os.write(bytes);
+            } finally {
+                os.close();
+            }
+            Uri uri = FileProvider.getUriForFile(getContext(),
+                    getContext().getPackageName() + ".provider", file);
+            // Grant broadly so any paste or drop target can read the content:// URI
+            getContext().grantUriPermission("android", uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            rememberStagedClipFile(uri, file, true, clip);
+            registered = true;
+            return uri;
         } finally {
-            os.close();
+            if (!registered) {
+                // The file exists from createTempFile onwards, and reclamation only ever sees
+                // what was registered -- so a cache that fills mid-write, or a provider that
+                // refuses to name the file, left a partial cn1-clip- file behind that nothing
+                // would ever collect. The same window the published-file copy above closes.
+                file.delete();
+            }
         }
-        Uri uri = FileProvider.getUriForFile(getContext(),
-                getContext().getPackageName() + ".provider", file);
-        // Grant broadly so any paste or drop target can read the content:// URI
-        getContext().grantUriPermission("android", uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        rememberStagedClipFile(uri, file, true, clip);
-        return uri;
     }
 
     /// The name every generated clip file starts with, and the alphabet

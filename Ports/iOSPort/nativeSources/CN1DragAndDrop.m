@@ -333,7 +333,16 @@ static NSString* cn1LegacyMimeForUti(NSString* uti) {
 }
 
 static NSString* cn1MimeForUti(NSString* uti) {
+    // Every spelling of plain text, the UTF-16 ones included. They are what a document dragged
+    // out of some editors offers -- occasionally the only thing it offers -- and leaving them
+    // unnamed meant the session advertised no text/plain at all, so a text target refused the
+    // hover and the materialization loop skipped the representation. cn1TextFromData already
+    // decodes both through cn1CharsetNameForUti; naming them here is what it takes for either
+    // to reach it. The identifier does not survive into the MIME type, which is why the charset
+    // travels beside it.
     if ([uti isEqualToString:@"public.utf8-plain-text"] || [uti isEqualToString:@"public.plain-text"]
+            || [uti isEqualToString:@"public.utf16-plain-text"]
+            || [uti isEqualToString:@"public.utf16-external-plain-text"]
             || [uti isEqualToString:@"public.text"]) {
         return @"text/plain";
     }

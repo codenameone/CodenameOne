@@ -1236,6 +1236,21 @@ public final class NativeDragAndDrop {
     ///
     /// Runs on the native drag thread and reads the component tree without mutating it, which
     /// is the same thing the ports already do to route a native pointer press.
+    ///
+    /// Plain reads, and deliberately not published ones. The answer rests on the whole walk --
+    /// the hit test, the bounds and parent links it follows, isEnabled, and the target's own
+    /// canAcceptNativeDrop -- so marking the drop target fields volatile would not make this
+    /// see a consistent tree. It would only make three names look guarded while everything the
+    /// same answer depends on stayed exactly as it is, which is a worse account of what happens
+    /// here than the honest one. Component state is event dispatch thread state in this
+    /// framework, and this read cannot be marshalled onto that thread: the platform demands its
+    /// answer inline, and the event dispatch thread blocks on the platform's thread to paint --
+    /// the deadlock the class comment records.
+    ///
+    /// A target that has to change its mind while a drag is already in flight has the callback
+    /// for it: reject() from the drag over event, which is delivered on the event dispatch
+    /// thread and honoured from the next event onwards. The declarative fields read here are
+    /// what a target settles before a drag begins.
     /// #### Parameters
     ///
     /// - `actions`: the actions in play, so a target that can perform none of them is passed

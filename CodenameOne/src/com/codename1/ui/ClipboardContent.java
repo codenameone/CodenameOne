@@ -158,8 +158,7 @@ public class ClipboardContent {
     /// Called where an operation is armed for a new session; see
     /// `NativeDragOperation#resetProvidedValues()`.
     void resetProvidedValues() {
-        for (int iter = 0; iter < values.size(); iter++) {
-            Object value = values.get(iter);
+        for (Object value : values) {
             if (value instanceof LazyValue) {
                 ((LazyValue) value).forget();
             }
