@@ -15758,6 +15758,12 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetBottom___R_int(CN1_
     return getSafeBottom();
 }
 
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_getDisplayScale___R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    // scaleValue is [UIScreen mainScreen].scale captured for the main scene; the
+    // fallback matters only before it has been captured.
+    return (JAVA_FLOAT)(scaleValue > 0 ? scaleValue : [UIScreen mainScreen].scale);
+}
+
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayWidth___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return com_codename1_impl_ios_IOSNative_getDisplayWidth__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }

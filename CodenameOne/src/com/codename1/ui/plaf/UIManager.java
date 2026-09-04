@@ -2409,6 +2409,16 @@ public class UIManager {
         } else {
             this.styles.remove(id);
         }
+        // The prefixed cache too, or a re-parse of the same id is ignored.
+        //
+        // Parsing writes new values into themeProps and drops the plain entry so
+        // it rebuilds, but a prefixed style (pressed, disabled, a custom prefix)
+        // is cached under prefix + id and would keep answering with the prototype
+        // built from the PREVIOUS parse -- the replacement silently discarded.
+        // Cleared wholesale rather than per prefix: the key mixes the two, so
+        // there is no cheap way to select the affected ones, and this runs only
+        // when a style is actually parsed, not while styles are being read.
+        prefixedStyles.clear();
 
         return getComponentStyleImpl(originalId, selected, prefix);
 

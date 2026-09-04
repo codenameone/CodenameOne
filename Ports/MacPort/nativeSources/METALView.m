@@ -133,6 +133,10 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     IOSurfaceRef cn1PresentSurfaces[2];
     id<MTLTexture> cn1PresentTextures[2];
     int cn1PresentIndex;
+
+    /// Bumped whenever the surfaces are rebuilt, so a frame that was already in
+    /// flight can tell that it belongs to the previous size.
+    int cn1PresentGeneration;
 }
 
 @synthesize commandQueue;
@@ -458,6 +462,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         }
     }
     cn1PresentIndex = 0;
+    cn1PresentGeneration++;
     NSDictionary *surfaceProps = @{
         (id)kIOSurfaceWidth:           @(pw),
         (id)kIOSurfaceHeight:          @(ph),
@@ -701,13 +706,26 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     CALayer *presentLayer = self.layer;
     IOSurfaceRef presented = cn1PresentSurfaces[presentIdx];
     CFRetain(presented);
+    // The generation this frame was drawn for. A resize between the commit and
+    // the completion rebuilds the surfaces at the new size, and handing the
+    // layer this retained OLD one would show the previous frame stretched or
+    // cropped until something newer completed -- visible flicker while dragging
+    // a window edge. A superseded frame is simply dropped: the resize path has
+    // already installed the new surface for the layer to show.
+    // Captured by value; the block retains self until it runs, which is exactly
+    // as long as the check needs it. No __weak here -- this port compiles
+    // without ARC and __weak is not available.
+    int frameGeneration = cn1PresentGeneration;
+    METALView *presentView = self;
     [self.commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
-        [CATransaction begin];
-        [CATransaction setDisableActions:YES];
-        // Re-assigned every frame: the pointer does not change, but the
-        // assignment is what marks the layer dirty for the next composite.
-        presentLayer.contents = (id)presented;
-        [CATransaction commit];
+        if (presentView->cn1PresentGeneration == frameGeneration) {
+            [CATransaction begin];
+            [CATransaction setDisableActions:YES];
+            // Re-assigned every frame: the assignment is what marks the layer
+            // dirty for the next composite.
+            presentLayer.contents = (id)presented;
+            [CATransaction commit];
+        }
         CFRelease(presented);
     }];
     [self.commandBuffer commit];

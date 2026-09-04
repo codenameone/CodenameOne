@@ -5023,7 +5023,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private void trimSoftRefs() {
-        while (softRefBytes > SOFT_REF_BUDGET_BYTES && !softReferenceMap.isEmpty()) {
+        // size() > 1, not isEmpty(): a single value can be bigger than the whole
+        // budget on its own -- a 3840x2160 decoded image is about 32MB against a
+        // 24MB budget -- and evicting down to nothing threw away the entry
+        // createSoftWeakRef had just inserted, so its key never resolved again
+        // and the caller re-decoded the same image on every frame. Keeping the
+        // most recent entry means the cache can always produce a hit; the budget
+        // is a target for the SET of entries, not a hard cap on any one of them.
+        while (softRefBytes > SOFT_REF_BUDGET_BYTES && softReferenceMap.size() > 1) {
             java.util.Iterator it = softReferenceMap.entrySet().iterator();
             Map.Entry eldest = (Map.Entry) it.next();   // access-order: least recently used
             Long charged = (Long) softRefCharged.remove(eldest.getKey());
@@ -8978,25 +8985,18 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     private int dDensity = -1;
     
-    /// iOS renders at 1x, 2x or 3x and nothing else, so the scale follows directly from
-    /// the density bucket getDeviceDensity() already derives from the screen resolution.
+    /// The screen's own scale, asked of the platform rather than inferred.
     ///
-    /// The two must not be conflated: the buckets approximate DPI (a 460ppi phone lands in
-    /// DENSITY_560), while UIScreen.scale on that same phone is 3. A caller laying out in
-    /// iOS logical points that used the bucket would size everything 3.5/3 too large.
+    /// This used to map from getDeviceDensity(), which is wrong in both of that
+    /// method's modes: the density bucket approximates DPI and is picked from the
+    /// display RESOLUTION, so a 750x1334 2x phone lands in a bucket that implies
+    /// 3, and under ios.densityOld a Retina iPad can land in a bucket this had no
+    /// case for at all and answered 0. A caller converting platform-logical units
+    /// then sized everything by the ratio between the two.
     @Override
     public float getDevicePixelRatio() {
-        switch (getDeviceDensity()) {
-            case Display.DENSITY_560:
-            case Display.DENSITY_HD:
-                return 3f;
-            case Display.DENSITY_VERY_HIGH:
-                return 2f;
-            case Display.DENSITY_MEDIUM:
-                return 1f;
-            default:
-                return 0f;
-        }
+        float scale = nativeInstance.getDisplayScale();
+        return scale > 0 ? scale : super.getDevicePixelRatio();
     }
 
     @Override
@@ -13207,6 +13207,19 @@ public class IOSImplementation extends CodenameOneImplementation {
             });
         }
         instance.isActive = false;
+    }
+
+    /// A memory warning drops texture contents WITHOUT the app resigning active,
+    /// so the pairing above does not cover it.
+    ///
+    /// For an ordinary image that is harmless: the peer still holds its decoded
+    /// UIImage and rebuilds the texture from it. An image created through
+    /// createImageNoBackingCopy has released that copy deliberately, so once its
+    /// texture is gone it has no pixels anywhere -- and nothing was telling it to
+    /// rebuild, because only the NATIVE texture generation was bumped. It then
+    /// kept returning the discarded texture and drew corrupted.
+    public static void applicationDidReceiveMemoryWarning() {
+        com.codename1.ui.EncodedImage.invalidateDecodedImages();
     }
 
     public static void applicationWillResignActive() {

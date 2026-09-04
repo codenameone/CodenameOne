@@ -69,6 +69,13 @@ public final class IOSNative {
     native boolean isPainted();
     native int getDisplayWidth();
     native int getDisplayHeight();
+
+    /// The screen's scale factor -- 1, 2 or 3 on iOS -- straight from UIScreen,
+    /// NOT derived from the artwork density bucket. The two are different
+    /// questions: the bucket approximates DPI and is chosen from the display
+    /// resolution (and under ios.densityOld from the superclass's own resolution
+    /// rules), so a 2x phone can land in a bucket that implies 3.
+    native float getDisplayScale();
     native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine,
             int rows, int maxSize, int constraint, String text, boolean forceSlideUp,
             int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight,

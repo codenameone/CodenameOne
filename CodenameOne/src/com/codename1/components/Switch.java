@@ -392,6 +392,23 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
             new java.util.HashMap<String, Image>();
     private static int sharedArtGeneration = -1;
 
+    /// The default factory the cached artwork was built by. An app that installs a
+    /// new global factory does not advance the theme generation, so without this
+    /// a later switch matched an existing key and got an image the OLD factory
+    /// made -- and the new factory was never asked.
+    private static ImageFactory sharedArtFactory;
+
+    /// A ceiling on the shared artwork.
+    ///
+    /// The key carries the dimension, colour, inset and enabled state, so an app
+    /// that restyles a switch -- or makes many short-lived switches with
+    /// different colours -- generates a new entry each time, and each entry is a
+    /// mutable image holding a native texture. Bounded rather than reclaimable
+    /// because the whole point is to keep the six images a row of identical
+    /// switches shares; past the ceiling the artwork is still built, it is just
+    /// not remembered.
+    private static final int SHARED_ART_LIMIT = 64;
+
     /// The shared artwork cache for the CURRENT theme, or null when {@code context}
     /// carries a non-default ImageFactory (in which case the image is
     /// context-specific and must not be shared).
@@ -403,10 +420,12 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         if (ImageFactory.getImageFactory(context) != ImageFactory.getImageFactory(null)) { //NOPMD CompareObjectsWithEquals
             return null;
         }
+        ImageFactory defaultFactory = ImageFactory.getImageFactory(null);
         int gen = UIManager.getThemeGeneration();
-        if (gen != sharedArtGeneration) {
+        if (gen != sharedArtGeneration || defaultFactory != sharedArtFactory) { //NOPMD CompareObjectsWithEquals
             SHARED_ART.clear();
             sharedArtGeneration = gen;
+            sharedArtFactory = defaultFactory;
         }
         return SHARED_ART;
     }
@@ -423,7 +442,9 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         Image img = cache.get(key);
         if (img == null) {
             img = createRoundThumbImage(context, pxDim, color, shadowSpread, thumbInset);
-            cache.put(key, img);
+            if (cache.size() < SHARED_ART_LIMIT) {
+                cache.put(key, img);
+            }
         }
         return img;
     }
@@ -462,7 +483,9 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         Image img = cache.get(key);
         if (img == null) {
             img = createRoundRectTrackImage(context, width, height, color, alpha, thumbPadding, outlineColor, outlineWidth);
-            cache.put(key, img);
+            if (cache.size() < SHARED_ART_LIMIT) {
+                cache.put(key, img);
+            }
         }
         return img;
     }
