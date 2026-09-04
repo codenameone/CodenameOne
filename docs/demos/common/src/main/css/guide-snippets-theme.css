@@ -752,8 +752,18 @@ SpinnerStyle {
 TitleContainer {
     background-image: url(images/background.jpg);
     cn1-background-type: cn1-image-scaled-fill;
+    cn1-source-dpi: 320;
     padding: 8mm 3mm 2mm 3mm;
     margin: 0;
+}
+
+/* The camera artwork is fetched by name at runtime rather than set as a
+   background, so it needs a selector to get it into the theme at all. This one
+   is never applied to anything; naming the images here is what bundles them. */
+PsdImages {
+    background-image: url(images/camera.png),
+        url(images/camera-button.png);
+    cn1-source-dpi: 320;
 }
 
 Title {
@@ -818,7 +828,7 @@ CameraButton, CameraButton.pressed, CameraButton.selected {
 /* The separator is an empty Label, so the line is the style: a background
    colour and just enough padding to give it height. */
 Separator {
-    background-color: #4d606f;
+    background-color: #f5f5f5;
     padding: 0.2mm 0 0 0;
     margin: 1mm 0 1mm 0;
     border: none;

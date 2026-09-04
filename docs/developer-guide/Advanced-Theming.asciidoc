@@ -970,8 +970,11 @@ a| .The button behind it
 image::img/camera-button.png[The button behind it,scaledwidth=35%]
 |===
 
-Add them to the theme as multi-images so each screen density gets an
-appropriately sized file, which is what `theme.getImage` returns below.
+Only images a stylesheet names reach the compiled theme, and the camera pieces
+are fetched by name at runtime rather than used as a background, so the theme
+below carries a selector that exists purely to import them. Each is declared at
+its source density so the compiler produces a multi-image and every screen gets
+an appropriately sized file, which is what `theme.getImage` then returns.
 
 That hierarchy is ordinary component code. The code below builds the form,
 starting with a separator the design uses between fields:
