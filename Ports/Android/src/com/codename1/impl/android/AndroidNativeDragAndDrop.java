@@ -406,6 +406,15 @@ final class AndroidNativeDragAndDrop {
         if (description == null) {
             return content;
         }
+        // What the source of *our own* drag actually published, or null for a drag from
+        // another application. The aliases below are inferences, and an inference is only
+        // needed where the truth is unavailable: a clip this port assembled carries bytes on a
+        // transport URI it minted, and contentFromClip deliberately refuses to call one of
+        // those a file. Inferring one here anyway had a file-only target light up for the whole
+        // drag of an image and then be refused the drop -- the hover promising what the drop
+        // cannot keep, which is the one thing this method exists to avoid.
+        NativeDragOperation exported = exporting();
+        ClipboardContent published = exported == null ? null : exported.getContent();
         for (int iter = 0; iter < description.getMimeTypeCount(); iter++) {
             String mime = description.getMimeType(iter);
             if (mime == null) {
@@ -418,13 +427,14 @@ final class AndroidNativeDragAndDrop {
                 // Android carries a dragged file as a URI, which is what the framework calls a
                 // file list; advertise both so either kind of target matches.
                 //
-                // This is the one thing a hover cannot get right on Android. A file manager
-                // and a browser both describe themselves as text/uri-list, and the clip that
-                // would tell them apart -- content: against https: -- is withheld until the
-                // drop. Promising files is the useful way to be wrong: a link drag is then
-                // refused at the drop rather than never accepted at all.
-                declare(content, ClipboardContent.MIME_FILE);
-                declare(content, ClipboardContent.MIME_URI_LIST);
+                // This is the one thing a hover cannot get right for a drag from elsewhere. A
+                // file manager and a browser both describe themselves as text/uri-list, and the
+                // clip that would tell them apart -- content: against https: -- is withheld
+                // until the drop. Promising files is the useful way to be wrong: a link drag is
+                // then refused at the drop rather than never accepted at all. For a drag of our
+                // own there is nothing to guess, which is what declareAlias consults.
+                declareAlias(content, published, ClipboardContent.MIME_FILE);
+                declareAlias(content, published, ClipboardContent.MIME_URI_LIST);
                 continue;
             }
             declare(content, mime);
@@ -436,11 +446,25 @@ final class AndroidNativeDragAndDrop {
                 // alone, a target restricted to files refused every hover event, and the drop
                 // never happened -- while contentFromClip went on to call the very same URI a
                 // file.
-                declare(content, ClipboardContent.MIME_FILE);
-                declare(content, ClipboardContent.MIME_URI_LIST);
+                declareAlias(content, published, ClipboardContent.MIME_FILE);
+                declareAlias(content, published, ClipboardContent.MIME_URI_LIST);
             }
         }
         return content;
+    }
+
+    /// Declares one of the file aliases a URI item implies, unless the source is known and did
+    /// not publish it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `published`: the content behind a drag this application started, or null when the drag
+    ///   came from somewhere else and the alias has to be inferred
+    private static void declareAlias(ClipboardContent content, ClipboardContent published,
+            String mime) {
+        if (published == null || published.hasMimeType(mime)) {
+            declare(content, mime);
+        }
     }
 
     private static void declare(ClipboardContent content, String mime) {
