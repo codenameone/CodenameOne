@@ -55,7 +55,8 @@ SELF_CERTIFYING_RE = re.compile(
 )
 
 DEV_GUIDE_ANCHOR_LINK_RE = re.compile(
-    r"\]\(/developer-guide/#([A-Za-z0-9_.:-]+)(?:\s+[^)]*)?\)"
+    r"\]\((?:https?://(?:www\.)?codenameone\.com)?"
+    r"/developer-guide/#([A-Za-z0-9_.:-]+)(?:\s+[^)]*)?\)"
 )
 ASCIIDOC_HEADING_RE = re.compile(r"^(={1,6})\s+(.+?)\s*$", re.MULTILINE)
 ASCIIDOC_BLOCK_ID_RE = re.compile(

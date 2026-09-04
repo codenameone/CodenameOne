@@ -39,11 +39,31 @@ class DeveloperGuideAnchorTest(unittest.TestCase):
         text = "Read the [VPN chapter](/developer-guide/#_vpn).\n"
         self.assertEqual([], self.findings(text))
 
+    def test_accepts_existing_anchor_in_absolute_url(self):
+        text = (
+            "Read the [VPN chapter]"
+            "(https://www.codenameone.com/developer-guide/#_vpn).\n"
+        )
+        self.assertEqual([], self.findings(text))
+
     def test_rejects_missing_anchor(self):
         text = "Read the [VPN chapter](/developer-guide/#vpn).\n"
         findings = self.findings(text)
         self.assertEqual(1, len(findings))
         self.assertEqual("DeveloperGuideAnchor", findings[0]["signature"][1])
+
+    def test_rejects_missing_anchor_in_absolute_url(self):
+        text = (
+            "Read the [VPN chapter]"
+            "(https://www.codenameone.com/developer-guide/#vpn).\n"
+        )
+        findings = self.findings(text)
+        self.assertEqual(1, len(findings))
+        self.assertEqual("vpn", findings[0]["signature"][2])
+
+    def test_ignores_external_developer_guide_url(self):
+        text = "Read [another guide](https://example.com/developer-guide/#vpn).\n"
+        self.assertEqual([], self.findings(text))
 
     def test_matches_asciidoctor_default_ids(self):
         self.assertEqual(
