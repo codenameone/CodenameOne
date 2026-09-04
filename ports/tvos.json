@@ -1,36 +1,36 @@
 {
-  "commit": "134f6ec227792da11b595a77eda6c06d3c0a2b8f",
-  "generated_at": "2026-09-02T08:04:31Z",
+  "commit": "a93bcfba97087f343a1bc0d6aa17fc7b291f9f45",
+  "generated_at": "2026-09-04T04:58:34Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 557755000
+        "duration_ns": 442790000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 227456000
+        "duration_ns": 168982000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 223233000
+        "duration_ns": 207803000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 148001000
+        "duration_ns": 132864000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 667400000
+        "duration_ns": 483678000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 439851000
+        "duration_ns": 457368000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 1072486000
+        "duration_ns": 935413000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "tvos",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/33596029303",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/33801343237",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 174,
+    "pass": 175,
     "skip": 8
   },
   "tests": {
@@ -231,6 +231,10 @@
     },
     "ComponentReplaceSlideScreenshotTest": {
       "feature": "layout-animation",
+      "status": "pass"
+    },
+    "ContactPickerApiTest": {
+      "feature": "contact-picker",
       "status": "pass"
     },
     "CoverHorizontalTransitionTest": {
