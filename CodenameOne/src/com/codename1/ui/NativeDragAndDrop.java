@@ -851,6 +851,39 @@ public final class NativeDragAndDrop {
     /// the action actually accepted, or `NativeDragOperation#ACTION_NONE`
     public static int drop(int windowId, int x, int y, ClipboardContent content, int action,
             int advertisedActions, boolean local) {
+        return drop(windowId, x, y, content, action, advertisedActions, local, false);
+    }
+
+    /// Delivers a native drop whose action was already decided when the user released.
+    ///
+    /// For a port that assembles a drop asynchronously *and* keeps that session's decision
+    /// with the session -- iOS does both. The ordinary entry point prefers what the component
+    /// hovering said last, because a port's action is by construction one drag event behind;
+    /// but a drop that has been loading is no longer the hovering session, and the framework
+    /// keeps one hover state. Another drop hovering the same component in the meantime would
+    /// otherwise lend this one its decision: its rejection would discard a drop the user had
+    /// actually performed, and its acceptance would change the action this one reports.
+    ///
+    /// So the caller's action is taken as the answer here, narrowed only by what the target
+    /// still permits. The hover state is cleared as it is for any drop -- a component holding
+    /// a highlight for a drag that has moved on is sent an exit and re-entered by its next
+    /// update, which is a frame that repairs itself, where a discarded drop is work the user
+    /// did and lost.
+    ///
+    /// #### Parameters
+    ///
+    /// - `action`: the action this drop's own session settled on when it was released
+    ///
+    /// #### Returns
+    ///
+    /// the action actually accepted, or `NativeDragOperation#ACTION_NONE`
+    public static int deferredDrop(int windowId, int x, int y, ClipboardContent content,
+            int action, int advertisedActions, boolean local) {
+        return drop(windowId, x, y, content, action, advertisedActions, local, true);
+    }
+
+    private static int drop(int windowId, int x, int y, ClipboardContent content, int action,
+            int advertisedActions, boolean local, boolean actionAlreadyDecided) {
         // Nothing materialized. Every representation the platform offered failed to be read --
         // a transferable that threw, a one-shot stream already spent -- and an empty payload is
         // not a drop. A target that filters on a type refuses it anyway, but one that takes
@@ -891,7 +924,8 @@ public final class NativeDragAndDrop {
                 advertised = action;
             }
             previous = currentTarget;
-            if (target != null && target == currentTarget) { // NOPMD CompareObjectsWithEquals
+            if (!actionAlreadyDecided && target != null
+                    && target == currentTarget) { // NOPMD CompareObjectsWithEquals
                 // The target's own latest word, not a recomputation from the action the port
                 // supplied. That action is by construction one event behind -- it is what the
                 // last drag event answered -- so a target that rejected, or changed its mind,
@@ -937,6 +971,10 @@ public final class NativeDragAndDrop {
                 // A different component from the one the callbacks were about: the pointer
                 // moved between the last drag event and the drop, so there is no decision of
                 // its own to honour and the declarative answer is the right one.
+                //
+                // Or a caller that brought its own decision -- see deferredDrop -- in which
+                // case the hover state may belong to a different session entirely and this
+                // is the only answer that is about *this* drop.
                 accepted = target == null ? NativeDragOperation.ACTION_NONE
                         : preferredAction(action & target.getAcceptedDropActions());
             }

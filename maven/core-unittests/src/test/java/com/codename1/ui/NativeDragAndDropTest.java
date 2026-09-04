@@ -431,6 +431,40 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aDeferredDropIsNotJudgedByWhoeverIsHoveringNow() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder target = addTarget(form);
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+
+        // A second drop hovering the same component while the first is still loading, and
+        // refusing it. iOS supports exactly that overlap.
+        target.rejectAction = NativeDragOperation.ACTION_NONE;
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        // The ordinary entry point honours that refusal, which is right for the session doing
+        // the hovering.
+        assertEquals(NativeDragOperation.ACTION_NONE,
+                NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY));
+        flushSerialCalls();
+        assertFalse(target.events.contains("drop"));
+
+        // The loading one brought its own decision, taken when the user released it, and must
+        // not have it overruled by a drop that arrived since: the user performed this one.
+        target.events.clear();
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+        assertEquals(NativeDragOperation.ACTION_COPY,
+                NativeDragAndDrop.deferredDrop(0, x, y, textContent("hi"),
+                        NativeDragOperation.ACTION_COPY, NativeDragOperation.ACTION_COPY, false),
+                "a drop that has been loading is no longer the hovering session, and the hover "
+                        + "state it would be judged by may be another drop's entirely");
+        flushSerialCalls();
+        assertTrue(target.events.contains("drop"));
+    }
+
+    @FormTest
     void aTargetThatCannotPerformTheActionLetsAnAncestorHaveIt() {
         Form form = Display.getInstance().getCurrent();
         DropRecorder outer = addTarget(form);

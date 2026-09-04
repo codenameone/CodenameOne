@@ -9456,7 +9456,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         // What *this* drop was offering and where it came from, both taken by the native side
         // when the drop began. Asking now would ask about whichever drag is running by the time
         // a slow item provider finished loading, and that can be a different one.
-        return NativeDragAndDrop.drop(0, x, y, content, action, allowedActions, local);
+        // deferredDrop, not drop: this assembly has been loading, so the component
+        // hovering by now may belong to a drop that arrived since -- and the action
+        // below was taken from this session when the user released it.
+        return NativeDragAndDrop.deferredDrop(0, x, y, content, action, allowedActions, local);
     }
 
     /// Invoked from CN1DragAndDrop.m when UIKit starts a drag session. Hands the payload down
