@@ -10243,11 +10243,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 int sdk = android.os.Build.VERSION.SDK_INT;
                 if (sdk < 11) {
                     android.text.ClipboardManager clipboard = (android.text.ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
-                    clipboardHolds(0);
                     clipboard.setText(obj.toString());
+                    // Afterwards, as in the branch below: a clip that was never published has
+                    // not replaced the one the system is still holding, and unpinning that one
+                    // first left its files reclaimable while it was still there to be pasted.
+                    clipboardHolds(0);
                 } else {
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
                     android.content.ClipData clip;
+                    long staged = 0;
                     if (obj instanceof ClipboardContent) {
                         // Here, not only where the copy was asked for. The assembly happens on
                         // this thread rather than the caller's, so two copies of one content
@@ -10258,7 +10262,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         com.codename1.ui.NativeDragAndDrop.beginTransfer((ClipboardContent) obj);
                         AssembledClip assembled = clipDataFor((ClipboardContent) obj);
                         clip = assembled.getData();
-                        clipboardHolds(assembled.getClip());
+                        staged = assembled.getClip();
                         if (clip == null) {
                             // A copy of nothing is an empty clipboard, which is a thing the user
                             // asked for and can paste. A *drag* of nothing is not: there the null
@@ -10267,15 +10271,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             clip = ClipData.newPlainText("Codename One", "");
                         }
                     } else {
-                        // Nothing of ours is staged for a plain text clip, and it replaces
-                        // whatever was there: the clip the clipboard held is no longer the
-                        // clipboard's, so it stops being pinned.
-                        clipboardHolds(0);
+                        // Nothing of ours is staged for a plain text clip.
                         clip = ClipData.newPlainText("Codename One", obj.toString());
                     }
                     watchPrimaryClip(clipboard);
-                    clipboardPublishing();
-                    clipboard.setPrimaryClip(clip);
+                    // Pinned for the length of the call, held only if it returns. setPrimaryClip
+                    // can throw -- a payload past the Binder transaction limit is the usual way
+                    // -- and switching the hold beforehand handed the *old* clip's files to
+                    // reclamation while the system was still holding that clip, pinned the ones
+                    // that never reached the clipboard in their place, and left a callback
+                    // counted that would never arrive. The pin in between is what keeps the new
+                    // clip's own files from being reclaimed in the window this opens.
+                    clipboardPublishing(staged);
+                    boolean published = false;
+                    try {
+                        clipboard.setPrimaryClip(clip);
+                        published = true;
+                    } finally {
+                        clipboardPublished(staged, published);
+                    }
                 }
             }
         });
@@ -11366,6 +11380,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static long clipboardClip;
     private static long draggingClip;
 
+    /// The assembly a publication in progress is about to put on the clipboard, exempt from
+    /// reclamation until the attempt is over. Nothing holds it yet -- the clipboard has not
+    /// taken it -- and without this the window between assembling a clip and the system
+    /// accepting it was one in which its own files could be deleted.
+    private static long publishingClip;
+
     /// Changes to the primary clip this application is about to make itself, which the watcher
     /// below hears about like any other and must not read as somebody else's copy.
     ///
@@ -11434,8 +11454,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /// Records that this application is about to replace the primary clip, so the watcher does
-    /// not mistake its own callback for another application's copy.
-    private static void clipboardPublishing() {
+    /// not mistake its own callback for another application's copy, and pins what the clip is
+    /// about to carry for the length of the attempt.
+    ///
+    /// #### Parameters
+    ///
+    /// - `clip`: the assembly being published, or zero for a clip with nothing staged
+    private static void clipboardPublishing(long clip) {
         synchronized (STAGED_CLIP_FILES) {
             if (clipboardWatched) {
                 expectedClipChanges++;
@@ -11445,6 +11470,30 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // later copy did install the watcher, that phantom swallowed the first genuinely
             // foreign clipboard change: the clip stayed pinned and its files stayed out of
             // reach of the budget.
+            publishingClip = clip;
+        }
+    }
+
+    /// Ends a publication, either committing it or putting back what it had provisionally
+    /// taken.
+    ///
+    /// #### Parameters
+    ///
+    /// - `clip`: the assembly that was being published
+    ///
+    /// - `published`: true when setPrimaryClip returned
+    private static void clipboardPublished(long clip, boolean published) {
+        synchronized (STAGED_CLIP_FILES) {
+            publishingClip = 0;
+            if (!published && expectedClipChanges > 0) {
+                // No callback is coming for a clip that never reached the clipboard.
+                expectedClipChanges--;
+            }
+        }
+        if (published) {
+            // Now, and only now, is the clip the clipboard's -- which is also what stops the
+            // one it replaced from being pinned.
+            clipboardHolds(clip);
         }
     }
 
@@ -11506,7 +11555,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             while (held > GENERATED_CLIP_BUDGET && entries.hasNext()) {
                 StagedClipFile staged = entries.next().getValue();
                 if (staged.clip == assembling || staged.clip == clipboardClip
-                        || staged.clip == draggingClip) {
+                        || staged.clip == draggingClip || staged.clip == publishingClip) {
                     continue;
                 }
                 held -= staged.bytes;
