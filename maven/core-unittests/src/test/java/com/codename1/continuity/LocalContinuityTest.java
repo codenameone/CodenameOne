@@ -3693,6 +3693,78 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * Keys the host filesystem would merge stay distinct, whatever rule it merges them by.
+     *
+     * <p>The character list this replaces grew by one entry per review round and was wrong every
+     * time in a new way: case folding, a trimmed trailing dot, characters Windows refuses, and
+     * canonically equivalent Unicode. Each merged two distinct keys into one value file while the
+     * index listed both. The whitelist makes every name pure ASCII out of characters no
+     * filesystem rewrites, so the question is closed rather than answered once more.</p>
+     */
+    @EdtTest
+    public void keysTheFilesystemWouldMergeStayDistinct() {
+        // A storage that folds case, trims trailing dots and spaces, AND normalises accents --
+        // every rule a host has been observed to apply, at once. Nothing here should reach it in
+        // a form it can change.
+        Storage real = Storage.getInstance();
+        Storage.setStorageInstance(new HostileNamingStorage(real));
+        LocalContinuityBridge b = new LocalContinuityBridge();
+        String[] keys = {"theme", "Theme", "theme.", "theme ", "caf\u00e9", "cafe\u0301"};
+        try {
+            for (int i = 0; i < keys.length; i++) {
+                assertTrue(b.syncedStorePut(keys[i], "value" + i),
+                        "the fixture could not write " + keys[i]);
+            }
+            for (int i = 0; i < keys.length; i++) {
+                assertEquals("value" + i, b.syncedStoreGet(keys[i]),
+                        "key " + i + " reads back another key's value, so two distinct keys share "
+                                + "one file while the index lists both");
+            }
+            // And removing one leaves the rest alone.
+            b.syncedStoreRemove(keys[0]);
+            assertNull(b.syncedStoreGet(keys[0]), "the removed key still reads back");
+            for (int i = 1; i < keys.length; i++) {
+                assertEquals("value" + i, b.syncedStoreGet(keys[i]),
+                        "removing one key removed key " + i + " as well");
+            }
+        } finally {
+            for (int i = 0; i < keys.length; i++) {
+                b.syncedStoreRemove(keys[i]);
+            }
+            Storage.setStorageInstance(real);
+        }
+    }
+
+    /**
+     * An inbound title too long to store is dropped, and the state it came with is kept.
+     *
+     * <p>Carrying it was the worst of the three answers: commit() persists it through
+     * externalize(), which throws on the oversized string every time, so the arrival is parked,
+     * re-applied on every retry and holds every relay publication behind it -- after the provider
+     * and the route rebuild have already run. Refusing the whole document would cost the user
+     * their work over a label a receiving device may show.</p>
+     */
+    @EdtTest
+    public void anInboundTitleTooLongToStoreIsDroppedAndTheStateKept() throws Exception {
+        StringBuilder huge = new StringBuilder();
+        for (int i = 0; i < 70000; i++) {
+            huge.append('x');
+        }
+        Map<String, Object> wire = new HashMap<String, Object>();
+        wire.put("device", "some-other-device");
+        wire.put("seq", "260");
+        wire.put("routes", java.util.Arrays.asList("/orders"));
+        wire.put("title", huge.toString());
+
+        AppState back = StateCodec.fromMap(wire);
+        assertNotNull(back, "the whole document was refused over a label");
+        assertNull(back.getTitle(), "the oversized title was carried, so the checkpoint that "
+                + "tries to store it throws on every retry for ever");
+        assertEquals(java.util.Arrays.asList("/orders"), back.getRoutes(),
+                "the user's actual work did not survive");
+    }
+
+    /**
      * A route factory that throws fails the whole restore rather than skipping one screen.
      *
      * <p>Skipping it made a throwing factory the same as a route this build no longer registers:
@@ -5547,6 +5619,60 @@ public class LocalContinuityTest extends UITestBase {
                 end--;
             }
             return name.substring(0, end);
+        }
+    }
+
+    /** Storage that applies every name-mangling rule a host filesystem has been seen to apply:
+     * case folding, trailing dot and space trimming, and Unicode normalisation. */
+    static class HostileNamingStorage extends Storage {
+        private final Storage delegate;
+
+        HostileNamingStorage(Storage delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public boolean writeObject(String name, Object o) {
+            return delegate.writeObject(mangle(name), o);
+        }
+
+        @Override
+        public Object readObject(String name) {
+            return delegate.readObject(mangle(name));
+        }
+
+        @Override
+        public boolean exists(String name) {
+            return delegate.exists(mangle(name));
+        }
+
+        @Override
+        public void deleteStorageFile(String name) {
+            delegate.deleteStorageFile(mangle(name));
+        }
+
+        private static String mangle(String name) {
+            if (name == null) {
+                return null;
+            }
+            String out = name.toLowerCase();
+            int end = out.length();
+            while (end > 0 && (out.charAt(end - 1) == '.' || out.charAt(end - 1) == ' ')) {
+                end--;
+            }
+            out = out.substring(0, end);
+            // Composed and decomposed accents become one name, the way a normalising filesystem
+            // resolves them.
+            StringBuilder folded = new StringBuilder();
+            for (int i = 0; i < out.length(); i++) {
+                char c = out.charAt(i);
+                if (c == '\u00e9') {
+                    folded.append("e\u0301");
+                } else {
+                    folded.append(c);
+                }
+            }
+            return folded.toString();
         }
     }
 

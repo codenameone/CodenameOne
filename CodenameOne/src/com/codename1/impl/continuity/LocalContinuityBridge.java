@@ -242,48 +242,69 @@ public class LocalContinuityBridge implements ContinuityBridge {
     /// the other. That arrived with the move off Preferences -- which has no such rule -- so it
     /// is a defect this class introduced while fixing a different one, not an old one.
     ///
-    /// Every character Storage would rewrite is escaped as `$` and two hex digits, and `$` itself
-    /// with it, which makes the mapping reversible and therefore collision-free: two different
-    /// keys cannot produce one name. The keys themselves are unrestricted, exactly as the
-    /// platform store leaves them.
+    /// The storage name for one application key.
+    ///
+    /// A WHITELIST, not a list of characters to avoid. Everything outside `[a-z0-9_-]` becomes
+    /// `$` and four hex digits, so the name is pure ASCII made of characters no filesystem
+    /// rewrites -- and the simulation stops depending on which folding, normalisation or
+    /// reserved-name rules the host happens to apply.
+    ///
+    /// The list it replaces grew by one entry per review round and was wrong every time in a new
+    /// way: uppercase letters, because macOS and Windows fold case; a trailing dot or space,
+    /// because Windows trims them; `<`, `>`, `"` and `|`, because Windows refuses them; and then
+    /// canonically equivalent Unicode, because a decomposed and a precomposed accent can name one
+    /// file. Every one of those merged two distinct keys into a single value while the index went
+    /// on listing both -- both reads answering with the last write, and removing either removing
+    /// the other's value. A simulation that merges two keys is worse than no simulation: it looks
+    /// like it works. There is no reason to believe that list was finally complete, and with a
+    /// whitelist the question does not arise.
+    ///
+    /// The mapping is injective, which is what makes it collision-free: `$` is itself escaped, so
+    /// an escape group can never be produced by literal characters.
+    ///
+    /// PREFIX is left alone. It is a constant, identical in every name, so nothing about it can
+    /// distinguish one key from another -- and INDEX still cannot be reached from here, for the
+    /// reason its own comment gives.
     private static String storageName(String key) {
         StringBuilder sb = new StringBuilder(PREFIX);
         for (int i = 0; i < key.length(); i++) {
             char c = key.charAt(i);
-            // Uppercase letters are escaped along with the characters a path cannot carry,
-            // because the DEFAULT filesystems on macOS and Windows are case-insensitive: "Theme"
-            // and "theme" resolved to one file, so the second put() overwrote the first while the
-            // index listed both keys, both reads answered with one value, and removing either
-            // removed both. The store being simulated is case-sensitive, and a simulation that
-            // merges two keys is worse than no simulation -- it looks like it works.
-            if (c >= 'A' && c <= 'Z') {
-                sb.append('$');
-                sb.append(Integer.toHexString(c).toUpperCase());
-            } else if (c == '/' || c == '\\' || c == '%' || c == '?' || c == '*' || c == ':'
-                    || c == '=' || c == '$'
-                    // '.' and ' ' because Windows NORMALIZES them away at the end of a name, so
-                    // "theme" and "theme." resolved to one file: the index listed both keys, both
-                    // reads answered with the last write, and removing either removed the other's
-                    // value. Escaped everywhere rather than only at the end, because "a. b" and
-                    // "a.b " would otherwise need the rule applied twice to see they differ.
-                    //
-                    // '<', '>', '"' and '|' are not aliases -- Windows refuses them outright --
-                    // so a key holding one worked on macOS and failed on Windows. The store being
-                    // simulated accepts any string, and the simulation should not be the thing
-                    // that decides which keys an application may use.
-                    || c == '.' || c == ' '
-                    || c == '<' || c == '>' || c == '"' || c == '|') {
-                sb.append('$');
-                String hex = Integer.toHexString(c).toUpperCase();
-                if (hex.length() < 2) {
-                    sb.append('0');
-                }
-                sb.append(hex);
-            } else {
+            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-') {
                 sb.append(c);
+                continue;
             }
+            sb.append('$');
+            String hex = Integer.toHexString(c).toUpperCase();
+            for (int pad = hex.length(); pad < 4; pad++) {
+                sb.append('0');
+            }
+            sb.append(hex);
         }
-        return sb.toString();
+        if (sb.length() <= MAX_NAME_CHARS) {
+            return sb.toString();
+        }
+        // Escaping can multiply a key's length by five, and a filesystem will not take a name of
+        // any length. Truncated and then made unique again by a hash of the WHOLE key, so two
+        // long keys sharing a prefix still address different files.
+        return sb.substring(0, MAX_NAME_CHARS) + "$$" + hash(key);
+    }
+
+    /// The most characters a storage name may use before it is truncated and hashed. Well inside
+    /// what every filesystem this simulation runs on accepts.
+    private static final int MAX_NAME_CHARS = 120;
+
+    /// FNV-1a, 64 bit, as 16 hex digits. Only ever used to keep two truncated names apart.
+    private static String hash(String key) {
+        long h = 0xcbf29ce484222325L;
+        for (int i = 0; i < key.length(); i++) {
+            h ^= key.charAt(i);
+            h *= 0x100000001b3L;
+        }
+        StringBuilder out = new StringBuilder(Long.toHexString(h).toUpperCase());
+        while (out.length() < 16) {
+            out.insert(0, '0');
+        }
+        return out.toString();
     }
 
     /// Writes one value, reporting whether it actually reached storage.

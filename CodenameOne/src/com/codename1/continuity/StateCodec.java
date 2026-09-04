@@ -205,7 +205,22 @@ public final class StateCodec {
         }
         Object title = m.get(KEY_TITLE);
         if (title instanceof String) {
-            state.setTitleUnchecked((String) title);
+            String label = (String) title;
+            if (exceedsWritableLength(label)) {
+                // DROPPED, and only this field. A title is the label a receiving device may show
+                // before the user accepts -- losing it costs a nicety, while refusing the
+                // document costs the user their work. Carrying it was the worst of the three:
+                // commit() persists it through externalize(), which throws on the oversized
+                // string every time, so the arrival is parked, re-applied on every retry and
+                // holds every relay publication behind it -- after the provider and the route
+                // rebuild have already run.
+                //
+                // Nothing this framework sends produces one: setTitle() refuses it at the call.
+                Log.p("Continuity: dropping a continuation title longer than "
+                        + MAX_STRING_BYTES + " bytes. The state itself is kept.");
+            } else {
+                state.setTitleUnchecked(label);
+            }
         }
         state.setSequence(asLong(m.get(KEY_SEQUENCE)));
         state.setTimestamp(asLong(m.get(KEY_TIMESTAMP)));
