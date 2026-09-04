@@ -62,6 +62,7 @@ ASCIIDOC_BLOCK_ID_RE = re.compile(
     r"^\s*(?:\[\[([^,\]]+)(?:,[^\]]*)?\]\]|\[#([^\]]+)\])\s*$",
     re.MULTILINE,
 )
+ASCIIDOC_ATTRIBUTE_LIST_RE = re.compile(r"^\s*\[([^\]\n]+)\]\s*$", re.MULTILINE)
 
 
 # --------------------------------------------------------------------------- #
@@ -193,6 +194,53 @@ def asciidoc_default_anchor(heading):
     return f"_{normalized}" if normalized else ""
 
 
+def split_asciidoc_attributes(attributes):
+    """Split an attribute list without treating commas inside quotes as separators."""
+    fields = []
+    current = []
+    quote = None
+    escaped = False
+    for char in attributes:
+        if escaped:
+            current.append(char)
+            escaped = False
+            continue
+        if char == "\\" and quote:
+            current.append(char)
+            escaped = True
+            continue
+        if char in ('"', "'"):
+            if quote == char:
+                quote = None
+            elif quote is None:
+                quote = char
+            current.append(char)
+            continue
+        if char == "," and quote is None:
+            fields.append("".join(current))
+            current = []
+            continue
+        current.append(char)
+    fields.append("".join(current))
+    return fields
+
+
+def asciidoc_long_form_ids(source):
+    """Return id= values from AsciiDoc attribute lists."""
+    ids = []
+    for attribute_list in ASCIIDOC_ATTRIBUTE_LIST_RE.finditer(source):
+        for field in split_asciidoc_attributes(attribute_list.group(1)):
+            name, separator, raw_value = field.partition("=")
+            if not separator or name.strip().lower() != "id":
+                continue
+            value = raw_value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+                value = value[1:-1]
+            if value:
+                ids.append(value)
+    return ids
+
+
 def developer_guide_sources(repo_root, git_ref=None):
     """Yield (path, source) pairs from the worktree or a Git revision."""
     guide_root = os.path.join(repo_root, "docs", "developer-guide")
@@ -248,6 +296,7 @@ def developer_guide_anchors(repo_root, git_ref=None):
                 generated_counts[anchor] += 1
         for match in ASCIIDOC_BLOCK_ID_RE.finditer(source):
             anchors.add(match.group(1) or match.group(2))
+        anchors.update(asciidoc_long_form_ids(source))
     for anchor, count in generated_counts.items():
         anchors.add(anchor)
         for occurrence in range(2, count + 1):

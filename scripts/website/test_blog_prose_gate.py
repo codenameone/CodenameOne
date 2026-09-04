@@ -64,6 +64,11 @@ class DeveloperGuideAnchorTest(unittest.TestCase):
                     "= Codename One Developer Guide\n\n"
                     "= Core concepts\n\n"
                     "== Call Management\n\n"
+                    "[id=StructureOfForm, reftext={chapter}.{counter:figure}]\n"
+                    "image::structure.png[]\n\n"
+                    "[reftext=\"Troubleshooting, Build Errors\", "
+                    "id=\"troubleshooting\"]\n"
+                    "=== Troubleshooting build errors\n\n"
                     "==== Usage example\n\n"
                     "==== Usage example\n\n"
                     "==== Usage example\n"
@@ -73,6 +78,8 @@ class DeveloperGuideAnchorTest(unittest.TestCase):
 
         self.assertIn("_core_concepts", anchors)
         self.assertIn("_call_management", anchors)
+        self.assertIn("StructureOfForm", anchors)
+        self.assertIn("troubleshooting", anchors)
         self.assertIn("_usage_example", anchors)
         self.assertIn("_usage_example_2", anchors)
         self.assertIn("_usage_example_3", anchors)
