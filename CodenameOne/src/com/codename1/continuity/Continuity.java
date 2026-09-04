@@ -1238,6 +1238,19 @@ public final class Continuity {
             // prevent. Nothing goes out until the user does something new.
             pendingPublish = null;
             publishRequested = false;
+            // The ADVERTISED activity is stale in exactly the same way, and dropping only the
+            // queued publish left half the job done. The platform activity stays current until
+            // something replaces or withdraws it, and applyingRestore suppresses the checkpoint
+            // the rebuilt route stack would otherwise have triggered -- so this device went on
+            // offering the pre-restore screen to every Apple device around it until the user
+            // happened to navigate again, and a third device could continue into a screen this
+            // one had already moved off.
+            //
+            // Withdrawn rather than re-advertised with the restored state. The device this state
+            // CAME FROM is most likely still offering it, and two devices advertising the same
+            // continuation is a worse answer than a short gap: nothing false is offered, and the
+            // user's next action advertises the truth.
+            clearContinuation();
         }
         noteActedOn(state);
         return true;

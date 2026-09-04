@@ -2974,6 +2974,38 @@ public class LocalContinuityTest extends UITestBase {
         }
     }
 
+    /**
+     * Restoring a foreign state withdraws the activity this device was advertising.
+     *
+     * <p>The platform activity stays current until something replaces or withdraws it, and
+     * {@code applyingRestore} suppresses the checkpoint the rebuilt route stack would have
+     * triggered -- so the pre-restore screen went on being offered to every Apple device around
+     * until the user next navigated, and a third device could continue into a screen this one had
+     * already moved off.</p>
+     */
+    @EdtTest
+    public void restoringAForeignStateWithdrawsTheStaleAdvertisement() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("screen", "the one this device was on");
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(true);
+
+        // What this device is advertising before anything arrives.
+        Continuity.checkpoint();
+        flushSerialCalls();
+        assertNotNull(bridge.getPublishedType(),
+                "nothing was advertised, so there is no stale activity for the restore to leave");
+
+        Continuity.deliver(fromElsewhere("what the other device was doing", 91L));
+        flushSerialCalls();
+        assertNotNull(provider.restored,
+                "the arrival was not applied, so this test is about nothing");
+
+        assertNull(bridge.getPublishedType(),
+                "the pre-restore activity is still advertised after restoring somebody else's "
+                        + "state, so a third device continues into a screen this one has left");
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;
