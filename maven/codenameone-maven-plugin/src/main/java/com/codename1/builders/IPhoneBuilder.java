@@ -6489,6 +6489,23 @@ public class IPhoneBuilder extends Executor {
                     // The same three positional offsets the watch pass reads;
                     // everything before them is shared by construction.
                     int tunnelOutIndex = tunnelCmd.size() - 7;
+                    // THE APP PASS'S CLASSPATH, element for element, with
+                    // this translation's stub directory where the phone
+                    // stub's goes. That is the whole answer to what the
+                    // tunnel can reach: a class the application build can
+                    // translate, this can translate, because it is handed the
+                    // same roots.
+                    //
+                    // Raised in review as a gap -- a tunnel calling a helper
+                    // that ships only inside a submitted archive would fail
+                    // the extension's link -- with unpacking archives here as
+                    // the fix. It is not a gap in this pass: an archived class
+                    // is equally untranslated for the application, whose own
+                    // link would fail on it first, and unpacking for the
+                    // extension alone would give the tunnel a classpath the
+                    // app does not have. Where that is reported to a
+                    // developer is ClassClosureVerifier, before the build is
+                    // submitted at all.
                     tunnelCmd.set(tunnelOutIndex - 1, classesDir.getAbsolutePath() + ";"
                             + vpnTunnelStubDir.getAbsolutePath() + ";" + resDir.getAbsolutePath() + ";"
                             + buildinRes.getAbsolutePath());
