@@ -116,6 +116,19 @@ class VpnTunnelExtensionTest {
         // memory.
         assertTrue(src.contains("- (void)cn1ForgetIfCurrent:(int)generation {"),
                 "a failed start has to give up its claim");
+        // The SLOT's generation, not the counter's. A replacement start
+        // claims before it publishes, and in that window the counter
+        // answers for a provider that is not in the slot yet -- so a stop
+        // that asked it declined to clear and left its own provider named
+        // by the global for NE to release under the next writer.
+        assertTrue(src.contains("static int cn1tnProviderGeneration = 0;"),
+                "the slot carries the start that filled it");
+        assertTrue(src.contains("cn1tnProvider = self;\n"
+                        + "        cn1tnProviderGeneration = cn1tnStart;"),
+                "published together, under the one lock");
+        assertTrue(src.contains("if (cn1tnProvider == self\n"
+                        + "                && cn1tnProviderGeneration == generation) {"),
+                "and tested together");
         assertTrue(src.contains("if (cn1tnProvider == self"),
                 "and clear only its own, never a newer start's");
         // Every failure path, and each one before its handler: NE can
@@ -127,8 +140,7 @@ class VpnTunnelExtensionTest {
         // under the same self, so the running tunnel wrote through nil and
         // dropped every packet.
         assertTrue(src.contains("if (cn1tnProvider == self\n"
-                        + "                && generation\n"
-                        + "                        == atomic_load(&cn1tnReadGeneration)) {"),
+                        + "                && cn1tnProviderGeneration == generation) {"),
                 "the claim is this start's, not just this object's");
         assertTrue(src.contains("[self cn1ForgetIfCurrent:cn1tnStart];"));
         int forgets = 0;
