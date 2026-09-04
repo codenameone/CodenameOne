@@ -95,6 +95,18 @@ public final class SyncedStore {
     ///
     /// true when the store holds the value afterwards; false when there is no store, or the
     /// platform would not take it -- a key count or a size past what it allows
+    /// Not gated on isSupported(), and that is the THIRD layer this was wrong in.
+    ///
+    /// isSupported() asks whether this build has a store that follows the user between devices,
+    /// which is the right question for an application deciding whether to offer the feature and
+    /// the wrong gate for the calls themselves. On iOS the store is a LOCAL persistent one whose
+    /// cloud propagation is asynchronous, so reads and writes work and reach other devices later.
+    ///
+    /// The gate was on all three of IOSNative.m, IOSContinuityBridge and here. Removing it from
+    /// the first two changed nothing, because this one still made every call unreachable -- a fix
+    /// verified at one layer and dead at the next. Each bridge answers for itself when there is
+    /// no store: the Android one returns null and no-ops, the iOS one checks its own port flag,
+    /// and the simulation reads local preferences.
     public static boolean put(String key, String value) {
         requireKey(key);
         if (value == null) {
@@ -106,9 +118,6 @@ public final class SyncedStore {
             return false;
         }
         try {
-            if (!b.isSyncedStoreSupported()) {
-                return false;
-            }
             return b.syncedStorePut(key, value);
         } catch (Throwable t) {
             Log.e(t);
@@ -136,9 +145,6 @@ public final class SyncedStore {
             return def;
         }
         try {
-            if (!b.isSyncedStoreSupported()) {
-                return def;
-            }
             String value = b.syncedStoreGet(key);
             return value == null ? def : value;
         } catch (Throwable t) {
@@ -159,9 +165,7 @@ public final class SyncedStore {
             return;
         }
         try {
-            if (b.isSyncedStoreSupported()) {
-                b.syncedStoreRemove(key);
-            }
+            b.syncedStoreRemove(key);
         } catch (Throwable t) {
             Log.e(t);
         }
@@ -178,9 +182,6 @@ public final class SyncedStore {
             return new String[0];
         }
         try {
-            if (!b.isSyncedStoreSupported()) {
-                return new String[0];
-            }
             String[] k = b.syncedStoreKeys();
             return k == null ? new String[0] : k;
         } catch (Throwable t) {

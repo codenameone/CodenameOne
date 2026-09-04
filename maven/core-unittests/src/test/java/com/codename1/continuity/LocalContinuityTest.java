@@ -2716,6 +2716,103 @@ public class LocalContinuityTest extends UITestBase {
         }
     }
 
+    /**
+     * An automatic restore that FAILED leaves the arrival parked.
+     *
+     * <p>pollFinished() has already queued a publisher behind this dispatch, so with the slot
+     * empty it posts the pending local checkpoint over the relay's only copy of the state that
+     * just failed -- and the retry the failure is kept for has nothing left to retry. The
+     * deferred-listener branch beside it got this; the automatic one threw the answer away.</p>
+     */
+    @EdtTest
+    public void anAutomaticRestoreThatFailedKeepsTheArrivalParked() {
+        Continuity.setAutoRestore(true);
+        Continuity.setStateProvider(new StateProvider() {
+            public Map<String, Object> saveState() {
+                return new HashMap<String, Object>();
+            }
+
+            public void restoreState(Map<String, Object> payload) {
+                throw new IllegalStateException("the dependency this needs is not up yet");
+            }
+        });
+
+        Continuity.deliver(fromElsewhere("work worth keeping", 61L));
+        flushSerialCalls();
+
+        AppState offered = Continuity.getRestorableState();
+        assertNotNull(offered,
+                "an automatic restore that threw dropped the arrival, so a queued checkpoint can "
+                        + "replace the relay's only copy of it");
+        assertEquals(61L, offered.getSequence(), "a different state is on offer");
+    }
+
+    /**
+     * A checkpoint the storage refused keeps the parked state too.
+     *
+     * <p>commit() used to be void, so a refused write ended there silently: the restore reported
+     * no failure, the slot was released, and a pending publish could erase the relay copy of a
+     * state with no durable copy anywhere and no acknowledgement.</p>
+     */
+    @EdtTest
+    public void aRestoreWhoseCheckpointCannotBeStoredKeepsTheParkedState() {
+        Continuity.setAutoRestore(false);
+        Continuity.setStateProvider(new RecordingProvider());
+
+        AppState arrival = fromElsewhere("unstorable", 62L);
+        arrival.setRoutes(new ArrayList<String>());
+        Continuity.deliver(arrival);
+        flushSerialCalls();
+        assertNotNull(Continuity.getRestorableState(), "the arrival never parked");
+
+        Storage original = Storage.getInstance();
+        Storage.setStorageInstance(new RefusingOneStorage(original, Continuity.STORAGE_KEY));
+        try {
+            Continuity.restore();
+        } finally {
+            Storage.setStorageInstance(original);
+        }
+
+        AppState still = Continuity.getRestorableState();
+        assertNotNull(still,
+                "a restore whose checkpoint storage refused released the slot, so nothing "
+                        + "durable holds this state and a queued publish can erase the relay's "
+                        + "copy of it");
+        assertEquals(62L, still.getSequence(), "a different state is on offer");
+    }
+
+    /**
+     * The synced store reaches the platform without consulting the entitlement probe.
+     *
+     * <p>The gate was on three layers -- the native store, the iOS bridge and the public facade --
+     * and removing it from the first two changed nothing, because the third still made every call
+     * unreachable. This drives the facade, which is the layer an application actually touches, and
+     * is the check that was missing when the first two "fixes" were called done.</p>
+     */
+    @EdtTest
+    public void theSyncedStoreFacadeReachesTheBridgeWithoutTheProbe() {
+        // A bridge that reports the feature UNSUPPORTED while still holding values, which is
+        // exactly the iOS shape the fix is about: the entitlement probe has not succeeded, and
+        // the store underneath is a local one that works anyway.
+        Continuity.setBridge(new LocalContinuityBridge() {
+            @Override
+            public boolean isSyncedStoreSupported() {
+                return false;
+            }
+        });
+
+        assertFalse(SyncedStore.isSupported(),
+                "the fixture says the probe succeeded, so this proves nothing about the gate");
+        assertTrue(SyncedStore.put("draft", "half a sentence"),
+                "the facade refused a write on a bridge that would have taken it");
+        assertEquals("half a sentence", SyncedStore.get("draft", "nothing"),
+                "the facade refused to read a value the bridge is holding");
+
+        SyncedStore.remove("draft");
+        assertEquals("nothing", SyncedStore.get("draft", "nothing"),
+                "the facade did not reach the bridge to remove the key");
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;

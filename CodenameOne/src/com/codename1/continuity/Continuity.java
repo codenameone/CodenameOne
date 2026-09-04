@@ -885,8 +885,10 @@ public final class Continuity {
             // that way, and StateProvider.restoreState tells providers not to be. True would be
             // the worse failure of the two: a provider that only populates fields -- the
             // documented shape -- would leave the application on no screen at all.
-            commit(state, applied, failed);
-            outFailed[0] = failed;
+            // The COMMIT's answer, not just `failed`. A checkpoint storage refused leaves no
+            // durable copy and no acknowledgement, which is the same "keep holding it" as a
+            // provider that threw -- and reading only `failed` here let the slot go anyway.
+            outFailed[0] = !commit(state, applied, failed);
             return false;
         }
         // Applying a state is not the user navigating, and the difference is not cosmetic. The
@@ -919,8 +921,7 @@ public final class Continuity {
             // payload already worked on this one.
             failed = true;
         }
-        commit(state, applied || shown, failed);
-        outFailed[0] = failed;
+        outFailed[0] = !commit(state, applied || shown, failed);
         return shown;
     }
 
@@ -1189,18 +1190,24 @@ public final class Continuity {
     /// mark only re-prompts the user on every launch for ever. That distinction is why there are
     /// two flags and not one -- a single "did it apply" answers both questions and gets one of
     /// them wrong whichever way it is set.
-    private static void commit(AppState state, boolean applied, boolean failed) {
+    /// #### Returns
+    ///
+    /// true when the arrival is SETTLED -- marked handled and, where something applied, stored.
+    /// False is the caller's signal to keep holding it: void was the bug, because a checkpoint
+    /// that storage refused ended here silently and restore() then released the slot for a state
+    /// with no durable copy anywhere and no acknowledgement.
+    private static boolean commit(AppState state, boolean applied, boolean failed) {
         if (failed) {
             // An attempt was made and it did not work: a provider that threw, or routes that
             // could not be rebuilt. The relay's copy has to stay on offer for a launch that can
             // use it, so nothing is marked.
-            return;
+            return false;
         }
         if (applied && !persist(state)) {
             // Tried to store it and could not. The relay's copy is now the only one that exists,
             // so it must go on being offered: acknowledging here loses the state in both
             // directions at once.
-            return;
+            return false;
         }
         if (applied) {
             // A checkpoint queued before this restore describes a screen that no longer exists.
@@ -1217,6 +1224,7 @@ public final class Continuity {
             publishRequested = false;
         }
         noteActedOn(state);
+        return true;
     }
 
     /// Writes the checkpoint, and says whether it got there.
@@ -1701,7 +1709,19 @@ public final class Continuity {
             //
             // The in-memory mark still goes in at admission, which is what dedups within a run.
             // Durability is a separate question and has one owner.
-            restore(state);
+            boolean[] restoreFailed = new boolean[1];
+            restore(state, restoreFailed);
+            if (restoreFailed[0]) {
+                // PARKED, exactly as a deferred arrival is. An automatic restore that failed is
+                // an arrival nobody has dealt with: pollFinished() has already queued a publisher
+                // behind this dispatch, and with the slot empty it posts the pending local
+                // checkpoint over the relay's only copy of the state that just failed -- so the
+                // retry this failure is kept for has nothing left to retry.
+                //
+                // The answer was thrown away here. restore(state) has always known the
+                // difference; this call site simply did not ask.
+                parked = state;
+            }
         } else {
             parked = state;
         }
