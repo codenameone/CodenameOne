@@ -957,6 +957,14 @@ public final class Continuity {
         if (state == null) {
             return;
         }
+        if (isFromAnEndedSession(state)) {
+            // The same hold-it-and-come-back-later pattern restore() already refuses, arriving
+            // through the other door. Marking it would recreate a durable high-water mark for the
+            // signed-out account, so a state the NEXT account sends from that same device with a
+            // lower sequence is discarded as already handled -- and the stale acknowledgement
+            // would release a parked state belonging to an origin this session never heard from.
+            return;
+        }
         noteActedOn(state);
     }
 
@@ -976,6 +984,20 @@ public final class Continuity {
         return restore(state, new boolean[1]);
     }
 
+    /// Whether this state was DELIVERED in a session that has since ended.
+    ///
+    /// The only way an application is holding one is the documented prompt-then-come-back
+    /// pattern -- a listener returns false, keeps the state, and calls restore() or
+    /// acknowledge() when the user answers -- and clear() cannot reach into the application to
+    /// take the object away. So both doors ask.
+    ///
+    /// A state the application BUILT, or one read back from storage, carries -1 and is
+    /// unaffected: this is about the framework's own delivery outliving its session, not about
+    /// restricting what an application may ask for.
+    private static boolean isFromAnEndedSession(AppState state) {
+        return state.deliveredGeneration() >= 0 && state.deliveredGeneration() != lifecycle;
+    }
+
     /// As above, also reporting whether the attempt FAILED as opposed to having nothing to do.
     ///
     /// The public boolean answers "is a form showing", which is what a caller needs to decide
@@ -986,7 +1008,7 @@ public final class Continuity {
         if (state == null) {
             return false;
         }
-        if (state.deliveredGeneration() >= 0 && state.deliveredGeneration() != lifecycle) {
+        if (isFromAnEndedSession(state)) {
             // Delivered in a session that has since ended. The only way to be holding one of
             // these is the documented prompt-then-restore pattern -- a listener returns false,
             // keeps the state, and calls back when the user accepts -- and clear() cannot reach
@@ -1991,12 +2013,29 @@ public final class Continuity {
             parked = state;
             return;
         }
+        // The generation the arrival BELONGS to, read here rather than on the event thread,
+        // because here is where the arrival happens. A logout already queued ahead of this means
+        // admit() runs after clear() and reads the NEW generation, so every later check passes
+        // and the previous account's state is restored and persisted after the logout that
+        // promised nothing from before it survives. The second-turn dispatch had a generation and
+        // this first hop had none.
+        //
+        // Read from the platform's thread, which this method is documented to run on. An int read
+        // from another thread yields a value the event thread wrote at some point and never a
+        // future one, so the comparison can be stale-old but never stale-new: the worst it does
+        // is refuse an arrival that raced the logout exactly, which is the answer that side of
+        // the race wants anyway.
+        final int arrivedIn = lifecycle;
         // ALWAYS queued, even when the caller is already on the EDT. Admission and dispatch are
         // deliberately separate turns -- see admit() -- and running one caller's arrival inline
         // while another's is queued would put them in different orders depending on who called.
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
+                if (arrivedIn != lifecycle) {
+                    // clear() or disable() ran between the arrival and this turn.
+                    return;
+                }
                 admit(state);
             }
         });

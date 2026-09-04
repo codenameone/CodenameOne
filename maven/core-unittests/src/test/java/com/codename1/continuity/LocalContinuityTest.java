@@ -3693,6 +3693,78 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * An arrival queued behind a logout is not admitted into the session that follows it.
+     *
+     * <p>deliver() marshals from the platform's thread, so an arrival that a port handed over
+     * before the logout can find clear() already queued ahead of it. admit() then ran after
+     * clear(), read the NEW generation, and every later check passed: the previous account's
+     * state was restored and persisted after the logout that promises nothing from before it
+     * survives. The second-turn dispatch carried a generation and this first hop carried none.
+     */
+    @EdtTest
+    public void anArrivalQueuedBehindALogoutIsNotAdmitted() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(true);
+
+        // The order the bug needs: the arrival is handed over FIRST -- deliver() queues admit()
+        // -- and the logout is queued behind it... no: the logout must run BEFORE admit() does,
+        // which is what happens when the port delivers while a logout is already on the queue.
+        // Queued here in that order, then drained together.
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                Continuity.clear();
+            }
+        });
+        Continuity.deliver(fromElsewhere("the previous account's work", 230L));
+        flushSerialCalls();
+        flushSerialCalls();
+
+        assertNull(provider.restored,
+                "a state that arrived before the logout was admitted into the session after it, "
+                        + "and restored the previous account's work");
+        assertNull(Continuity.readSeenForTest().get("some-other-device"),
+                "it was marked durably too, so the origin's real states are refused as already "
+                        + "seen after a restart");
+    }
+
+    /**
+     * An acknowledgement from a session that has ended is refused, like a restore from one.
+     *
+     * <p>The same hold-it-and-come-back-later pattern arriving through the other door. Marking it
+     * recreates a durable high-water mark for the signed-out account, so a state the NEXT account
+     * sends from that same device with a lower sequence is discarded as already handled.</p>
+     */
+    @EdtTest
+    public void anAcknowledgementFromAnEndedSessionIsRefused() {
+        final AppState[] held = new AppState[1];
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                held[0] = state;
+                return false;
+            }
+        });
+
+        Continuity.deliver(fromElsewhere("the previous account's work", 240L));
+        flushSerialCalls();
+        assertNotNull(held[0], "the listener never got the arrival, so this test is about nothing");
+
+        Continuity.clear();
+        Continuity.enable();
+
+        // The prompt finishes late, after the logout.
+        Continuity.acknowledge(held[0]);
+        flushSerialCalls();
+
+        assertNull(Continuity.readSeenForTest().get("some-other-device"),
+                "the signed-out account's sequence became this session's durable high-water mark, "
+                        + "so a lower-numbered state the NEXT account sends from that same device "
+                        + "is discarded as already handled");
+    }
+
+    /**
      * A state a listener was holding is refused once the session it arrived in has ended.
      *
      * <p>Returning false to keep an arrival while prompting the user is documented behaviour, and
