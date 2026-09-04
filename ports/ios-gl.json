@@ -1,36 +1,36 @@
 {
-  "commit": "134f6ec227792da11b595a77eda6c06d3c0a2b8f",
-  "generated_at": "2026-09-02T08:50:45Z",
+  "commit": "a93bcfba97087f343a1bc0d6aa17fc7b291f9f45",
+  "generated_at": "2026-09-03T23:13:39Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 454691000
+        "duration_ns": 408567000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 34800000
+        "duration_ns": 23711000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 131058000
+        "duration_ns": 143476000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 79733000
+        "duration_ns": 86454000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 576188000
+        "duration_ns": 471453000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 151839000
+        "duration_ns": 154774000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 216655000
+        "duration_ns": 220454000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "ios-gl",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/33596029303",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/33801343237",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 178,
+    "pass": 179,
     "skip": 4
   },
   "tests": {
@@ -231,6 +231,10 @@
     },
     "ComponentReplaceSlideScreenshotTest": {
       "feature": "layout-animation",
+      "status": "pass"
+    },
+    "ContactPickerApiTest": {
+      "feature": "contact-picker",
       "status": "pass"
     },
     "CoverHorizontalTransitionTest": {
