@@ -1981,6 +1981,18 @@ public class JavaSEPort extends CodenameOneImplementation {
     static final class RichTransferable implements Transferable {
         private final ClipboardContent data;
         private final DataFlavor[] flavors;
+        /// What this transferable has already produced, kept here rather than left to the
+        /// content's own memory.
+        ///
+        /// One ClipboardContent can be both what the clipboard holds and what a component
+        /// drags, and arming a drag deliberately forgets what its providers produced for the
+        /// drag before. Sharing that memory, a copy that was never replaced started answering
+        /// a later paste with a value produced for a drag -- a different temporary file, or
+        /// bytes generated afresh -- although nothing had touched the clipboard. What this
+        /// transferable answered once, it goes on answering for as long as it owns the
+        /// clipboard.
+        private final java.util.Map<String, Object> produced =
+                new java.util.HashMap<String, Object>();
 
         RichTransferable(ClipboardContent data) {
             this.data = data;
@@ -2063,7 +2075,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         /// One source publishes; anything else -- a BMP, a TIFF, whatever a reader plugin adds --
         /// is tried afterwards, so the standard image flavor serves the same set of types
         /// `#hasImageReader(java.lang.String)` advertised it for.
-        private static java.awt.Image decodeImage(ClipboardContent data) {
+        private java.awt.Image decodeImage(ClipboardContent data) {
             java.awt.Image img = decodeImage(data, ClipboardContent.MIME_PNG);
             if (img == null) {
                 img = decodeImage(data, ClipboardContent.MIME_JPEG);
@@ -2090,12 +2102,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             return null;
         }
 
-        private static java.awt.Image decodeImage(ClipboardContent data, String mime) {
+        private java.awt.Image decodeImage(ClipboardContent data, String mime) {
             // Resolving the representation goes through clipboardValue, which is where a
             // provider is allowed to fail: one throwing on the PNG used to escape the whole
             // flavor, so a payload whose JPEG was perfectly good answered the standard image
             // flavor with an exception instead of the JPEG.
-            byte[] bytes = clipboardRepresentationBytes(data, mime);
+            Object raw = resolve(mime);
+            byte[] bytes = raw instanceof byte[] ? (byte[]) raw : null;
             if (bytes == null) {
                 return null;
             }
@@ -2110,12 +2123,12 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         /// Resolves the `application/x-file-list` representation (a single path/URI `String` or a
         /// `String[]` of them) to AWT `File` objects for the native file-list clipboard flavor.
-        private static java.util.List<java.io.File> fileList(ClipboardContent data) {
+        private java.util.List<java.io.File> fileList(ClipboardContent data) {
             // As decodeImage: a provider is permitted to fail, and a failure means this
             // flavor cannot be produced -- which getTransferData says with
             // UnsupportedFlavorException. Letting it out instead put an arbitrary exception
             // from application code into AWT's own drag machinery.
-            Object value = clipboardRepresentation(data, ClipboardContent.MIME_FILE);
+            Object value = resolve(ClipboardContent.MIME_FILE);
             String[] paths = null;
             if (value instanceof String[]) {
                 paths = (String[]) value;
@@ -2165,14 +2178,31 @@ public class JavaSEPort extends CodenameOneImplementation {
             return false;
         }
 
-        /// Every read in getTransferData goes through clipboardValue. A flavor whose value
-        /// will not resolve is a flavor this transferable cannot supply, which the method
-        /// already has a way of saying; throwing application code's own exception out of it
-        /// instead handed AWT something it does not expect from a Transferable, in the middle
-        /// of a drag or a clipboard read it was performing on this application's behalf.
+        /// Every read in getTransferData goes through this. A flavor whose value will not
+        /// resolve is a flavor this transferable cannot supply, which the method already has a
+        /// way of saying; throwing application code's own exception out of it instead handed
+        /// AWT something it does not expect from a Transferable, in the middle of a drag or a
+        /// clipboard read it was performing on this application's behalf.
+        private Object resolve(String mime) {
+            synchronized (produced) {
+                if (produced.containsKey(mime)) {
+                    return produced.get(mime);
+                }
+            }
+            // Outside the lock: it runs application code, which may block.
+            Object value = clipboardRepresentation(data, mime);
+            synchronized (produced) {
+                if (produced.containsKey(mime)) {
+                    return produced.get(mime);
+                }
+                produced.put(mime, value);
+            }
+            return value;
+        }
+
         public Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException, IOException {
             if (DataFlavor.stringFlavor.equals(flavor)) {
-                Object text = clipboardRepresentation(data, ClipboardContent.MIME_TEXT);
+                Object text = resolve(ClipboardContent.MIME_TEXT);
                 if (text instanceof String) {
                     return text;
                 }
@@ -2208,7 +2238,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 throw new UnsupportedFlavorException(flavor);
             }
-            Object value = clipboardRepresentation(data, mime);
+            Object value = resolve(mime);
             if (value instanceof String) {
                 if (InputStream.class.equals(flavor.getRepresentationClass())) {
                     return new ByteArrayInputStream(((String) value).getBytes("UTF-8"));

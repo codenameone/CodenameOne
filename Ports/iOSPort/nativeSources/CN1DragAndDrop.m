@@ -1293,9 +1293,12 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
                 }
             }
         }
-        if (ordered.count > 0) {
-            CN1NativeDragDeliverDropAdd(@"application/x-file-list",
-                                        [ordered componentsJoinedByString:@"\n"], nil);
+        // One call per file rather than one joined list: a newline is legal in a filename
+        // here, and the Java side had to split whatever it was given. See
+        // CN1AddNativeDragFiles, which stopped joining them on the way out for the same
+        // reason.
+        for (NSString* path in ordered) {
+            CN1NativeDragDeliverDropAdd(@"application/x-file-list", path, nil);
         }
         // The items' own URLs first, then anything a file-vending item offered as a list of
         // its own: one representation of one type, which is all the framework can hold.

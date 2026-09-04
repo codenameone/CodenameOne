@@ -311,6 +311,35 @@ class JavaSENativeDragAndDropTest {
         }
     }
 
+    @Test
+    void aTransferableGoesOnAnsweringWithWhatItFirstProduced() throws Exception {
+        final int[] calls = {0};
+        ClipboardContent content = new ClipboardContent()
+                .setDataProvider(ClipboardContent.MIME_TEXT, new ClipboardDataProvider() {
+                    @Override
+                    public Object getClipboardData(String mimeType) {
+                        calls[0]++;
+                        return "answer-" + calls[0];
+                    }
+                });
+        Transferable t = new JavaSEPort.RichTransferable(content);
+        assertEquals("answer-1", t.getTransferData(DataFlavor.stringFlavor));
+
+        // The same content is dragged, which deliberately forgets what its providers produced
+        // for the transfer before -- and must not disturb the clipboard nobody replaced.
+        // Reflectively because arming an operation is what calls this, and that needs a running
+        // implementation; the reset itself is what this test is about.
+        java.lang.reflect.Method forget =
+                ClipboardContent.class.getDeclaredMethod("resetProvidedValues");
+        forget.setAccessible(true);
+        forget.invoke(content);
+
+        assertEquals("answer-1", t.getTransferData(DataFlavor.stringFlavor),
+                "the clipboard still holds what it published: a paste after an unrelated drag "
+                        + "must not produce a second value from the same provider");
+        assertEquals(1, calls[0]);
+    }
+
     /// A provider that fails, which ClipboardDataProvider explicitly permits.
     private static ClipboardDataProvider failing() {
         return new ClipboardDataProvider() {

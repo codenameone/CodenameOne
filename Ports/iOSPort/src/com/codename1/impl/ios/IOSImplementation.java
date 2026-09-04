@@ -9376,7 +9376,20 @@ public class IOSImplementation extends CodenameOneImplementation {
             return;
         }
         if (ClipboardContent.MIME_FILE.equals(mimeType)) {
-            pendingDrop.setFiles(split(text));
+            // One path per call, appended. Delivered as one joined string they were split
+            // apart again here, and a newline is legal in a filename on this platform --
+            // so a dropped file whose name contained one arrived as two paths naming
+            // nothing. The outgoing side stopped joining them for the same reason.
+            if (text == null || text.length() == 0) {
+                return;
+            }
+            String[] known = pendingDrop.getFiles();
+            String[] grown = new String[known == null ? 1 : known.length + 1];
+            for (int iter = 0; known != null && iter < known.length; iter++) {
+                grown[iter] = known[iter];
+            }
+            grown[grown.length - 1] = text;
+            pendingDrop.setFiles(grown);
             return;
         }
         // Length is not a test of presence. A representation the drag advertised and that is

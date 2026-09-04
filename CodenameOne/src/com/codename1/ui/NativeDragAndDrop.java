@@ -916,7 +916,7 @@ public final class NativeDragAndDrop {
             // tree that changed underneath a slow load. Position is what a drop means
             // everywhere else in here, and one heuristic guessing against it would make
             // the two disagree.
-            target = stillWillingHoverTarget(content, action);
+            target = stillWillingHoverTarget(windowId, content, action);
         }
         synchronized (LOCK) {
             // What this drag advertised: the caller's answer where it has one, otherwise what
@@ -1100,10 +1100,18 @@ public final class NativeDragAndDrop {
     /// Asked only when the position no longer names anything. A component detached from its
     /// surface cannot be dropped on: it has no coordinates to speak of and nothing would
     /// repaint.
-    private static Component stillWillingHoverTarget(ClipboardContent content, int actions) {
+    private static Component stillWillingHoverTarget(int windowId, ClipboardContent content,
+            int actions) {
         Component hovered;
         synchronized (LOCK) {
             hovered = currentTarget;
+        }
+        // On the surface this drop was released on, not merely on some live surface. A tree
+        // rebuilt while the payload loaded can have moved the component to another window
+        // entirely, and delivering a drop released on one surface to a component now living
+        // on another is not a rescue -- it is a drop somewhere the user never released it.
+        if (hovered != null && TopLevelSupport.rootOf(hovered) != surfaceFor(windowId)) { // NOPMD CompareObjectsWithEquals
+            return null;
         }
         // Every test findTarget applies, including the one about pointer events: a
         // component that opted out of being pointed at between the hover and the drop is
