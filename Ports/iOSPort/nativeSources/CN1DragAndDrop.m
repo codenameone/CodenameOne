@@ -724,15 +724,38 @@ static NSString* cn1CopyDroppedFile(NSURL* url) {
 /// never reclaimed, whatever its size, since it is the one the application is working with.
 static NSMutableArray* cn1DroppedFileCopies = nil;
 
+/// The bytes one copied item occupies, following a directory into everything beneath it.
+///
+/// Files hands over folders as readily as documents, and copyItemAtURL: copies one whole.
+/// Weighing only the directory entry counted a folder of photographs as a few hundred
+/// bytes, so the budget never noticed them and nothing was ever reclaimed -- which is the
+/// unbounded growth the budget exists to stop.
+static long long cn1CopiedItemSize(NSString* path) {
+    NSFileManager* files = [NSFileManager defaultManager];
+    BOOL directory = NO;
+    if (![files fileExistsAtPath:path isDirectory:&directory]) {
+        return 0;
+    }
+    if (!directory) {
+        NSDictionary* attributes = [files attributesOfItemAtPath:path error:nil];
+        return attributes == nil ? 0 : (long long)[attributes fileSize];
+    }
+    long long total = 0;
+    NSDirectoryEnumerator* walk = [files enumeratorAtPath:path];
+    for (NSString* relative in walk) {
+        NSDictionary* attributes = [walk fileAttributes];
+        if (attributes != nil && [[attributes fileType] isEqualToString:NSFileTypeRegular]) {
+            total += (long long)[attributes fileSize];
+        }
+    }
+    return total;
+}
+
 /// The bytes a drop's copies occupy, for the budget above.
 static long long cn1DroppedFilesSize(NSArray* paths) {
     long long total = 0;
     for (NSString* path in paths) {
-        NSDictionary* attributes =
-                [[NSFileManager defaultManager] attributesOfItemAtPath:path error:nil];
-        if (attributes != nil) {
-            total += (long long)[attributes fileSize];
-        }
+        total += cn1CopiedItemSize(path);
     }
     return total;
 }

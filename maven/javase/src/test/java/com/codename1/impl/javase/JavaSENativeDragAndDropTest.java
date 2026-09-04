@@ -340,6 +340,29 @@ class JavaSENativeDragAndDropTest {
         assertEquals(1, calls[0]);
     }
 
+    @Test
+    void aTransferableProducesItsOwnValueEvenOnTheFirstRead() throws Exception {
+        final int[] calls = {0};
+        ClipboardContent content = new ClipboardContent()
+                .setDataProvider(ClipboardContent.MIME_FILE, new ClipboardDataProvider() {
+                    @Override
+                    public Object getClipboardData(String mimeType) {
+                        calls[0]++;
+                        return "/tmp/transfer-" + calls[0] + ".pdf";
+                    }
+                });
+        Transferable t = new JavaSEPort.RichTransferable(content);
+
+        // A drag of the same content resolves first and the clipboard has not been read yet.
+        // Its value is the drag's, and the drag's reclamation may delete that file.
+        assertEquals("/tmp/transfer-1.pdf", content.getFiles()[0]);
+
+        java.util.List<?> files = (java.util.List<?>) t.getTransferData(DataFlavor.javaFileListFlavor);
+        assertEquals("/tmp/transfer-2.pdf", ((java.io.File) files.get(0)).getAbsolutePath(),
+                "the clipboard publishes a value of its own, not whichever one a drag sharing "
+                        + "this content happened to produce and may since have cleaned up");
+    }
+
     /// A provider that fails, which ClipboardDataProvider explicitly permits.
     private static ClipboardDataProvider failing() {
         return new ClipboardDataProvider() {

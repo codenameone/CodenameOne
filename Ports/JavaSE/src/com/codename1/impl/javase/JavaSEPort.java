@@ -2190,7 +2190,21 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
             // Outside the lock: it runs application code, which may block.
-            Object value = clipboardRepresentation(data, mime);
+            //
+            // Produced for this transferable rather than read from the content's own
+            // memory. A drag sharing this content fills that memory and then forgets it,
+            // so a clipboard that had not yet resolved this type would have picked up the
+            // drag's value on its first read -- for a provider that writes a file per
+            // transfer, a path belonging to that drag, which its reclamation may since
+            // have deleted. What this transferable publishes is its own from the start.
+            Object value;
+            try {
+                value = com.codename1.ui.NativeDragAndDrop.produceTransferValue(data, mime);
+            } catch (Throwable err) {
+                // A provider is permitted to fail; the flavor is simply unavailable. See
+                // clipboardValue, whose guard this mirrors.
+                value = null;
+            }
             synchronized (produced) {
                 if (produced.containsKey(mime)) {
                     return produced.get(mime);

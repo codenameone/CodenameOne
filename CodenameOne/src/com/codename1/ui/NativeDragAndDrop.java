@@ -380,6 +380,28 @@ public final class NativeDragAndDrop {
         return op == null ? null : op.produceData(mimeType);
     }
 
+    /// The same, for a transfer that is not a drag: a clipboard a port keeps lazily, whose
+    /// content the application may also be dragging.
+    ///
+    /// A copy and a drag can share one `ClipboardContent`, and arming a drag forgets what
+    /// its providers produced. Reading the content's own memory then gave the clipboard
+    /// whatever the drag had most recently produced -- for a provider that writes a file
+    /// per transfer, a path belonging to that drag, which its cleanup may since have
+    /// deleted. A port in that position produces its own value and remembers it itself.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: the representations being transferred, which may be null
+    ///
+    /// - `mimeType`: the representation being read
+    ///
+    /// #### Returns
+    ///
+    /// the value, or null when there is no such representation
+    public static Object produceTransferValue(ClipboardContent content, String mimeType) {
+        return content == null ? null : content.produceData(mimeType);
+    }
+
     /// Returns the drag this application is currently running through the operating system, or
     /// null when it is not dragging. A drop target uses this to tell a drag it started itself
     /// from one that arrived from elsewhere, which `NativeDropEvent#isLocal()` reports.
