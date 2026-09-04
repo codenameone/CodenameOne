@@ -112,6 +112,11 @@ void CN1DeclareNativeDragPayload(NSString* mimeType);
 /// `paths` is newline separated.
 void CN1AddNativeDragFiles(NSString* path);
 
+/// The uniform type identifier a MIME type travels under, which is also what a pasteboard
+/// item is keyed by. Falls back to the MIME type itself for a type nothing standard
+/// describes, which is exactly how an application's own format is carried.
+NSString* CN1UtiForMime(NSString* mime);
+
 /// Drops whatever CN1PrepareNativeDrag staged, because the press turned out to be a tap.
 void CN1CancelNativeDrag(void);
 

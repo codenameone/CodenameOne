@@ -9643,6 +9643,31 @@ public class IOSImplementation extends CodenameOneImplementation {
             // data and not a promise this application has to still be running to keep -- a lazily
             // registered item pastes as nothing once the application is gone. The drag path is
             // where the laziness pays off, and it keeps it; see ClipboardDataProvider.
+            // Every other type the content offers, before the call that publishes the clip.
+            // The arguments below name the types the framework has constants for, and a
+            // content may offer any type at all -- an application's own format reached the
+            // pasteboard nowhere else, so a copy of one published an empty pasteboard and
+            // its provider was never even asked.
+            String[] offered = content.getMimeTypes();
+            for(int iter = 0 ; iter < offered.length ; iter++) {
+                if(isNamedClipboardType(offered[iter])) {
+                    continue;
+                }
+                Object value = clipboardValue(content, offered[iter]);
+                byte[] bytes = null;
+                if(value instanceof byte[]) {
+                    bytes = (byte[])value;
+                } else if(value instanceof String) {
+                    try {
+                        bytes = ((String)value).getBytes("UTF-8");
+                    } catch(java.io.UnsupportedEncodingException err) {
+                        com.codename1.io.Log.e(err);
+                    }
+                }
+                if(bytes != null) {
+                    nativeInstance.addClipboardRepresentation(offered[iter], bytes);
+                }
+            }
             nativeInstance.setClipboardContent(
                     clipboardText(content, com.codename1.ui.ClipboardContent.MIME_TEXT),
                     clipboardText(content, com.codename1.ui.ClipboardContent.MIME_HTML),
@@ -9661,6 +9686,21 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         nativeInstance.setClipboardString(null);
         super.copyToClipboard(obj);
+    }
+
+    /// True when setClipboardContent already has an argument for this type, so it must not be
+    /// published a second time beside itself.
+    private static boolean isNamedClipboardType(String mime) {
+        return com.codename1.ui.ClipboardContent.MIME_TEXT.equals(mime)
+                || com.codename1.ui.ClipboardContent.MIME_HTML.equals(mime)
+                || com.codename1.ui.ClipboardContent.MIME_RTF.equals(mime)
+                || com.codename1.ui.ClipboardContent.MIME_MARKDOWN.equals(mime)
+                || com.codename1.ui.ClipboardContent.MIME_ASCIIDOC.equals(mime)
+                || com.codename1.ui.ClipboardContent.MIME_PNG.equals(mime)
+                || com.codename1.ui.ClipboardContent.MIME_JPEG.equals(mime)
+                || com.codename1.ui.ClipboardContent.MIME_GIF.equals(mime)
+                || com.codename1.ui.ClipboardContent.MIME_FILE.equals(mime)
+                || com.codename1.ui.ClipboardContent.MIME_URI_LIST.equals(mime);
     }
 
     /// Preferred image representation (PNG, then JPEG, then GIF bytes) for the pasteboard, or null.

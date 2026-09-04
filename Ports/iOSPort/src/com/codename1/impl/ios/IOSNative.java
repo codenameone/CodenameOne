@@ -344,6 +344,11 @@ public final class IOSNative {
 
     native void setClipboardString(String s);
     native String getClipboardString();
+    /// Adds one further representation to the clip the next setClipboardContent publishes.
+    ///
+    /// The fixed arguments below name the types the framework has constants for; a content
+    /// may offer any type at all, and one of those reached the pasteboard nowhere else.
+    native void addClipboardRepresentation(String mimeType, byte[] value);
     native void setClipboardContent(String plain, String html, String rtf, String markdown, String asciidoc, byte[] image, String fileUris);
     native String getClipboardContent(String mimeType);
     native byte[] getClipboardImage();

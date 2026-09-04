@@ -1058,12 +1058,20 @@ public final class NativeDragAndDrop {
             overDispatchPending = false;
             currentAction = accepted;
         }
-        if (previous != null && previous != target) { // NOPMD CompareObjectsWithEquals
+        if (previous != null
+                && (previous != target // NOPMD CompareObjectsWithEquals
+                        || accepted == NativeDragOperation.ACTION_NONE)) {
             // A release that lands somewhere else -- a quick move and let go -- ends the drag
             // for the component it was over, and that component has to be told. Clearing the
             // target without it left the old hover highlight on for good: the drop goes to
             // somebody else, and the port's own end-of-session cleanup then finds the target
             // already cleared and has nothing left to deliver the exit to.
+            //
+            // And when the drop is refused, even though the component is the one that was
+            // hovering. It receives no drop, the hover state has just been cleared, and the
+            // port's cleanup will find nothing to tell -- so a component that clears its
+            // highlight from nativeDragExit or nativeDrop was left highlighted for good by
+            // a drop it had itself refused.
             dispatch(previous, ActionEvent.Type.NativeDragExit, content, x, y, action,
                     NativeDragOperation.ACTION_NONE, Boolean.valueOf(local));
         }

@@ -1204,6 +1204,28 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aRefusedDropTellsTheComponentTheDragLeftIt() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder target = addTarget(form);
+        target.rejectAction = NativeDragOperation.ACTION_NONE;
+
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+        assertEquals("[enter]", target.events.toString());
+
+        assertEquals(NativeDragOperation.ACTION_NONE,
+                NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY));
+        flushSerialCalls();
+
+        assertTrue(target.events.contains("exit"),
+                "it refused the drop, so it gets no drop callback -- and the hover state is "
+                        + "cleared here, so nothing later can tell it either: a component that "
+                        + "clears its highlight on exit or drop would stay highlighted for good");
+    }
+
+    @FormTest
     void aDropThatLandsElsewhereTellsTheComponentItLeft() {
         Form form = Display.getInstance().getCurrent();
         DropRecorder left = new DropRecorder();

@@ -256,6 +256,12 @@ static NSString* cn1LegacyUtiForMime(NSString* mime) {
     return [result hasPrefix:@"dyn."] ? nil : result;
 }
 
+static NSString* cn1UtiForMime(NSString* mime);
+
+NSString* CN1UtiForMime(NSString* mime) {
+    return cn1UtiForMime(mime);
+}
+
 static NSString* cn1UtiForMime(NSString* mime) {
     if ([mime isEqualToString:@"text/plain"]) {
         return @"public.utf8-plain-text";
@@ -695,6 +701,11 @@ static NSString* cn1CopyDroppedFile(NSURL* url) {
     if (![[NSFileManager defaultManager] copyItemAtURL:url
                                                  toURL:[NSURL fileURLWithPath:target]
                                                  error:&copyError]) {
+        // The holder exists by now, and a path nobody is given is a path the reclamation
+        // below never hears about -- so every failed drop, a cloud document that would not
+        // materialize or a full disk, left its directory and whatever reached it behind.
+        [[NSFileManager defaultManager] removeItemAtPath:target error:nil];
+        [[NSFileManager defaultManager] removeItemAtPath:holder error:nil];
         return nil;
     }
     return target;
@@ -1186,9 +1197,21 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
                 if (scoped) {
                     [url stopAccessingSecurityScopedResource];
                 }
-                // The document's own location, which is what tells one of its other names
-                // apart from a representation of its own. Nil when there is no document.
-                NSString* documentPath = target == nil ? nil : url.path;
+                // The document's own type, which is what tells one of its other names apart
+                // from a representation of its own.
+                //
+                // By type rather than by path. loadFileRepresentation hands every
+                // representation over at a temporary URL of its own, so comparing paths
+                // never matched the document -- and an ordinary Files document, which vends
+                // its own content type beside its file URL, was copied a second time under
+                // that type. Two copies of every document dropped, and twice the reading to
+                // make them.
+                NSString* documentUti = nil;
+                if (target != nil) {
+                    id typeValue = nil;
+                    [url getResourceValue:&typeValue forKey:NSURLTypeIdentifierKey error:nil];
+                    documentUti = [typeValue isKindOfClass:[NSString class]] ? typeValue : nil;
+                }
                 if (target != nil) {
                     @synchronized (files) {
                         [files replaceObjectAtIndex:slot withObject:target];
@@ -1206,6 +1229,17 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
                             if (mime == nil) {
                                 continue;
                             }
+                            if (documentUti != nil && [uti isEqualToString:documentUti]) {
+                                // The document under its own type: the copy already made is
+                                // that document, so it is named again rather than fetched
+                                // and copied a second time.
+                                NSString* charset = cn1CharsetNameForUti(uti);
+                                @synchronized (fileBacked) {
+                                    [fileBacked addObject:@[mime, target,
+                                                            charset == nil ? @"" : charset]];
+                                }
+                                continue;
+                            }
                             dispatch_group_enter(group);
                             // As a file rather than as data, deliberately: a representation
                             // that really is the document would otherwise be read whole into
@@ -1218,10 +1252,7 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
                             [provider loadFileRepresentationForTypeIdentifier:uti
                                                            completionHandler:^(NSURL* alt, NSError* altError) {
                                 if (alt != nil) {
-                                    NSString* altTarget = (documentPath != nil
-                                            && [alt.path isEqualToString:documentPath])
-                                            ? target             // another name for the document
-                                            : cn1CopyDroppedFile(alt);
+                                    NSString* altTarget = cn1CopyDroppedFile(alt);
                                     if (altTarget != nil) {
                                         NSString* charset = cn1CharsetNameForUti(uti);
                                         @synchronized (fileBacked) {

@@ -1240,6 +1240,26 @@ static NSString* cn1MacPasteboardImageType(NSData* data) {
 }
 #endif
 
+/// The representations setClipboardContent has still to publish, keyed by uniform type
+/// identifier: whatever the fixed arguments of that call have no room for.
+static NSMutableDictionary* cn1PendingClipboardExtras = nil;
+
+void com_codename1_impl_ios_IOSNative_addClipboardRepresentation___java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType, JAVA_OBJECT value) {
+    POOL_BEGIN();
+    NSString* mime = mimeType == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG mimeType);
+    NSData* data = value == JAVA_NULL ? nil : arrayToData(value);
+    if (mime.length > 0 && data != nil) {
+        NSString* uti = CN1UtiForMime(mime);
+        if (uti != nil) {
+            if (cn1PendingClipboardExtras == nil) {
+                cn1PendingClipboardExtras = [[NSMutableDictionary alloc] init];
+            }
+            [cn1PendingClipboardExtras setObject:data forKey:uti];
+        }
+    }
+    POOL_END();
+}
+
 void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT plain, JAVA_OBJECT html, JAVA_OBJECT rtf, JAVA_OBJECT markdown, JAVA_OBJECT asciidoc, JAVA_OBJECT image, JAVA_OBJECT fileUris) {
 #if TARGET_OS_OSX
     POOL_BEGIN();
@@ -1276,6 +1296,13 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
             }
         }
     }
+    for (NSString* uti in cn1PendingClipboardExtras) {
+        // Whatever the fixed arguments had no room for -- an application's own format, a
+        // type the framework has no constant for. Published beside them rather than
+        // instead: a content offering only such a type used to reach the pasteboard as
+        // nothing at all.
+        [pb setData:[cn1PendingClipboardExtras objectForKey:uti] forType:uti];
+    }
     if (fileUris != JAVA_NULL) {
         NSString* joined = toNSString(CN1_THREAD_STATE_PASS_ARG fileUris);
         NSMutableArray* urls = [NSMutableArray array];
@@ -1302,6 +1329,7 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
         // paste -- a URL string on the pasteboard is only text.
         if (urls.count > 0) [pb writeObjects:urls];
     }
+    [cn1PendingClipboardExtras removeAllObjects];
     POOL_END();
 #else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
@@ -1326,6 +1354,11 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
             NSString* imageUti = cn1PasteboardImageUti(imgData);
             [item setObject:imgData forKey:imageUti == nil ? @"public.png" : imageUti];
         }
+    }
+    for (NSString* uti in cn1PendingClipboardExtras) {
+        // As above: the types the fixed arguments cannot name travel on the same item as
+        // the rest, because they are alternative readings of one payload.
+        [item setObject:[cn1PendingClipboardExtras objectForKey:uti] forKey:uti];
     }
     NSMutableArray* items = [NSMutableArray array];
     if (fileUris != JAVA_NULL) {
@@ -1357,6 +1390,7 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
     // the content named no files at all.
     if ([item count] > 0) [items addObject:item];
     [UIPasteboard generalPasteboard].items = items;
+    [cn1PendingClipboardExtras removeAllObjects];
     POOL_END();
 #endif
 #endif
