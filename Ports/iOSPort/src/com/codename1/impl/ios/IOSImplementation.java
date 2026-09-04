@@ -9652,7 +9652,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             return false;
         }
         boolean any = false;
-        String[] lines = ((String) value).split("\n");
+        // Util.split, not String.split: ParparVM's java.lang.String has no split, so the
+        // translated call is an undeclared function and the app does not compile. The rest of
+        // this port splits with Util for the same reason.
+        String[] lines = Util.split((String) value, "\n");
         for (int iter = 0; iter < lines.length; iter++) {
             String line = lines[iter].trim();
             // RFC 2483: a line opening with a hash is a comment rather than a URI.
@@ -9857,7 +9860,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         String list = clipboardText(content, com.codename1.ui.ClipboardContent.MIME_URI_LIST);
         if(list != null) {
             // RFC 2483: CRLF separated, and a line opening with a hash is a comment.
-            String[] lines = list.split("\n");
+            // Util.split for the reason declareDraggedUrls gives: the VM's String has none.
+            String[] lines = Util.split(list, "\n");
             for(int i = 0 ; i < lines.length ; i++) {
                 String line = lines[i].trim();
                 if(line.length() > 0 && line.charAt(0) != '#') {
