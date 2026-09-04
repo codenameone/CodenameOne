@@ -160,6 +160,11 @@ open the connection. On Android it can -- the tunnel runs in your app's own
 process, where the implementation is installed -- so the same tunnel class is
 not equally useful on both. Write the relay behind an interface if you need
 one platform to do it and the other to fall back.
+
+A Mac Catalyst slice reports the tunnel unsupported, and that's deliberate:
+the extension target is built for the iOS destination only, so the Mac app
+has no provider to start. `Tunnels.isSupported()` answers false there, and
+the managed profile in `com.codename1.vpn.profile` still works.
 ====
 
 Which turns the advice below into a build error rather than a disappointment.
