@@ -11007,20 +11007,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     // overwriting it.
                     String type = bareMimeType(getContext().getContentResolver().getType(uri));
                     if (type != null && type.startsWith("image/")) {
-                        try {
-                            InputStream in = getContext().getContentResolver().openInputStream(uri);
-                            if (in != null) {
-                                try {
-                                    byte[] bytes = Util.readInputStream(in);
-                                    content.setData(imageMimeFor(type), bytes);
-                                } finally {
-                                    in.close();
-                                }
-                            }
-                        } catch (Throwable t) {
-                            // The bytes are one representation of this URI, not the whole of
-                            // it. A read that fails must still leave the file reference below.
-                            com.codename1.io.Log.e(t);
+                        // Promised, not read. Reading it here opened the URI and pulled the
+                        // whole image across on Android's own UI thread, before the drop was
+                        // even queued -- so a photo dropped on a target that wanted nothing
+                        // but getFiles() stalled the application, or ran it out of memory,
+                        // for bytes nobody asked for. The same promise the typed branch below
+                        // makes, and safe for the same reason: the grant this drop was given
+                        // lasts as long as the activity, so a read a moment later on the
+                        // event dispatch thread still succeeds. See uriBytesProvider.
+                        String imageMime = imageMimeFor(type);
+                        if (!content.hasMimeType(imageMime)) {
+                            content.setDataProvider(imageMime, uriBytesProvider(uri));
                         }
                     } else if (type != null && type.length() > 0
                             && !"application/octet-stream".equals(type)) {

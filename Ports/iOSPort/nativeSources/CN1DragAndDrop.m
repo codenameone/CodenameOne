@@ -1237,48 +1237,46 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
         }
         // The dragged URLs, in the order they were dragged. RFC 2483 separates them with
         // CRLF, which is what every other port here writes and reads.
-        NSMutableData* uriList = nil;
-        NSString* uriListUti = nil;
-        @synchronized (uriSlots) {
-            for (id entry in uriSlots) {
-                if (entry == [NSNull null]) {
-                    continue;
-                }
-                if (uriList == nil) {
-                    uriList = [NSMutableData dataWithData:[entry objectAtIndex:0]];
-                    uriListUti = [entry objectAtIndex:1];
-                } else {
-                    [uriList appendBytes:"\r\n" length:2];
-                    [uriList appendData:[entry objectAtIndex:0]];
-                }
-            }
-        }
-        if (uriList != nil) {
-            CN1NativeDragDeliverDropAdd(@"text/uri-list", cn1TextFromData(uriList, uriListUti),
-                                        nil);
-        }
-        // In the order the items were dragged, with the slots nothing filled left out: an
-        // item that vends no file, or one whose file would not materialize, is not a gap in
-        // the list the application is handed.
+        // One URI list for the whole drop, in the order the items were dragged: a file's URL
+        // where that item vended a file, the URL itself where it vended one. Built as two
+        // lists and published twice, the second replaced the first -- the framework's
+        // setData does -- so a selection of a document and a link arrived as the document
+        // alone and every link in it was gone.
+        //
+        // RFC 2483 separates them with CRLF, which is what the other ports write and read.
         NSMutableArray* ordered = [NSMutableArray array];
+        NSMutableString* uris = [NSMutableString string];
         @synchronized (files) {
-            for (id path in files) {
-                if (path != [NSNull null]) {
-                    [ordered addObject:path];
+            @synchronized (uriSlots) {
+                for (NSUInteger slot = 0; slot < files.count; slot++) {
+                    id path = [files objectAtIndex:slot];
+                    if (path != [NSNull null]) {
+                        // A file: its own path for the file list, its URL for the URI list.
+                        // The slots nothing filled are left out rather than left as gaps --
+                        // an item vending no file, or one that would not materialize, is
+                        // absent from the list rather than a hole in it.
+                        [ordered addObject:path];
+                        [uris appendString:[[NSURL fileURLWithPath:path] absoluteString]];
+                        [uris appendString:@"\r\n"];
+                        continue;
+                    }
+                    id entry = [uriSlots objectAtIndex:slot];
+                    if (entry != [NSNull null]) {
+                        NSString* text = cn1TextFromData([entry objectAtIndex:0],
+                                                         [entry objectAtIndex:1]);
+                        if (text.length > 0) {
+                            [uris appendString:text];
+                            [uris appendString:@"\r\n"];
+                        }
+                    }
                 }
             }
         }
         if (ordered.count > 0) {
             CN1NativeDragDeliverDropAdd(@"application/x-file-list",
                                         [ordered componentsJoinedByString:@"\n"], nil);
-            // The same files as a URI list, which is what the session advertised and so what
-            // a target filtered to it accepted the hover on. RFC 2483 separates them with
-            // CRLF, which is what the other ports write and read.
-            NSMutableString* uris = [NSMutableString string];
-            for (NSString* path in ordered) {
-                [uris appendString:[[NSURL fileURLWithPath:path] absoluteString]];
-                [uris appendString:@"\r\n"];
-            }
+        }
+        if (uris.length > 0) {
             CN1NativeDragDeliverDropAdd(@"text/uri-list", uris, nil);
         }
         // An assembly overtaken by a newer session still commits. The framework keeps one hover
