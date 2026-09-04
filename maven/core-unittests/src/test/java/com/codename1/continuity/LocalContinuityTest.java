@@ -3201,6 +3201,36 @@ public class LocalContinuityTest extends UITestBase {
                         + "moment it is called");
     }
 
+    /**
+     * Logout removes the delivery marks even when the write that empties them is refused.
+     *
+     * <p>rememberSeen() writes the emptied map, and a write storage refuses leaves the whole of
+     * the signed-out account's marks on disk for the next launch to reload. Which devices an
+     * account synced with, and how far, is that account's data as much as its routes are.</p>
+     */
+    @EdtTest
+    public void logoutRemovesTheDeliveryMarksEvenWhenTheWriteIsRefused() {
+        Continuity.setStateProvider(new RecordingProvider());
+        // An acknowledged arrival, so there is a durable mark to lose.
+        Continuity.acknowledge(fromElsewhere("dealt with", 9L));
+        flushSerialCalls();
+        assertFalse(Continuity.readSeenForTest().isEmpty(),
+                "no mark was written, so logout has nothing to remove and this proves nothing");
+
+        Storage original = Storage.getInstance();
+        Storage.setStorageInstance(new RefusingOneStorage(original, Continuity.PREF_SEEN));
+        try {
+            Continuity.clear();
+        } finally {
+            Storage.setStorageInstance(original);
+        }
+
+        assertTrue(Continuity.readSeenForTest().isEmpty(),
+                "the signed-out account's delivery marks are still on disk, so the next launch "
+                        + "reloads which devices it synced with and how far: "
+                        + Continuity.readSeenForTest());
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;

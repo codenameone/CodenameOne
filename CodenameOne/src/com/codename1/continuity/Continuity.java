@@ -1111,10 +1111,24 @@ public final class Continuity {
         // dealt with, and keeping it would let a state re-delivered to the next account be
         // treated as already handled.
         lastCompleted = null;
-        // The durable copy as well. Leaving it behind meant the marks of the account that just
-        // signed out kept suppressing the NEXT account's deliveries -- a state silently never
-        // arriving, which is harder to notice than one arriving twice.
+        // The durable copy as well, and DELETED rather than merely overwritten. Leaving it
+        // behind meant the marks of the account that just signed out kept suppressing the NEXT
+        // account's deliveries -- a state silently never arriving, which is harder to notice
+        // than one arriving twice.
+        //
+        // rememberSeen() alone was not enough: it writes the emptied map, and a write storage
+        // refuses leaves the whole of the previous account's marks on disk for the next launch to
+        // reload. Which devices an account synced with, and how far, is that account's data as
+        // much as its routes are -- so this gets the same treatment as the checkpoint below,
+        // rather than the weaker one it had because it happened to be written through a helper.
         rememberSeen();
+        try {
+            if (Display.isInitialized() && Storage.getInstance().exists(PREF_SEEN)) {
+                Storage.getInstance().deleteStorageFile(PREF_SEEN);
+            }
+        } catch (Throwable t) {
+            Log.e(t);
+        }
         clearContinuation();
         // The route history is the previous account's work as surely as the stored checkpoint is.
         // Leaving it kept two promises broken: back() reopened the signed-out account's forms,
