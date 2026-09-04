@@ -95,6 +95,10 @@ public final class NativeDropEvent extends ActionEvent {
     }
 
     /// Returns the dragged payload.
+    ///
+    /// Read from it while handling the drop. See
+    /// `Component#nativeDrop(com.codename1.ui.NativeDropEvent)` for what a representation
+    /// may be backed by, and for how long.
     public ClipboardContent getContent() {
         return content;
     }

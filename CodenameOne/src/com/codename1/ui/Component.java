@@ -6743,8 +6743,22 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     /// Callback invoked on the event dispatch thread when a native drag is dropped on this
-    /// component. `NativeDropEvent#getContent()` is fully materialized by this point, so the
-    /// bytes and file paths can be read here or kept for later.
+    /// component. `NativeDropEvent#getContent()` names everything the drop carries, and its
+    /// values are readable from here on.
+    ///
+    /// #### Reading it later
+    ///
+    /// Read what the drop is for while handling it. A representation may be backed by the
+    /// platform's own transfer rather than by bytes this application owns -- Android hands
+    /// over a content URI readable under a permission granted to the activity, and iOS
+    /// copies a dropped file into temporary storage -- so a value first asked for long
+    /// afterwards, and particularly after the activity that received the drop has gone,
+    /// may no longer be there.
+    ///
+    /// A value once read is kept, so reading here and holding the result is always safe.
+    /// Deliberately not read for you: a drop of a large document on a component that only
+    /// wants its path would otherwise pay for every byte of it, on the very thread the
+    /// platform is waiting on.
     ///
     /// #### Parameters
     ///

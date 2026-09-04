@@ -11383,7 +11383,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     ///
     /// The drag-and-drop permission this drop was granted lasts for the life of the activity --
     /// nothing calls release() on it -- so a read that happens a moment later on the event
-    /// dispatch thread still succeeds.
+    /// dispatch thread still succeeds. Once read the value is kept, so a target that reads
+    /// during the drop may hold the result for as long as it likes.
+    ///
+    /// What it does not survive is the activity: a representation *first* asked for after the
+    /// activity that received the drop has been destroyed reads through a grant that no
+    /// longer exists, and answers null. Copying every representation into this application's
+    /// own storage at drop time is the only way round that, and it is the wrong trade -- it
+    /// is the eager read that stalls the platform's thread with a document nobody asked for,
+    /// which is why this is a promise in the first place. Component.nativeDrop says so where
+    /// an application will read it.
     private ClipboardDataProvider uriBytesProvider(final Uri uri) {
         return new ClipboardDataProvider() {
             @Override
