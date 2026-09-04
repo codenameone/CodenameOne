@@ -2400,9 +2400,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
         if (content.getMimeTypes().length > (plain == null ? 0 : 1)) {
-            if (plain == null) {
-                content.setData(ClipboardContent.MIME_TEXT, "");
-            }
+            // Nothing is added for a clipboard that offered no text. Padding it with an
+            // empty text/plain told every reader the clipboard held text, and one that
+            // prefers text over an application's own type then chose the empty string and
+            // ignored the document beside it -- from a clipboard that never mentioned text.
             return content;
         }
         if (plain != null) {

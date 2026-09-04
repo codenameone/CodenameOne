@@ -462,23 +462,20 @@ public final class NativeDragAndDrop {
         if (op != null && op.getAllowedActions() == NativeDragOperation.ACTION_NONE) {
             op = null;
         }
-        synchronized (LOCK) {
-            if (op == active) { // NOPMD CompareObjectsWithEquals
-                // The instance this press would stage is the one a drag is running on --
-                // a second finger on another component whose source hands out the same
-                // operation. That drag cannot be started twice, so nothing is staged; and
-                // more to the point nothing below may touch it, because arming it changes
-                // the source the running drag will name when it completes, and a source
-                // told to delete its copy would delete the wrong component's.
+        if (op != null) {
+            // As in startDrag: an operation its source reuses may still owe the outcome of the
+            // drag before, and its listeners have to hear it while getSource() is still the
+            // component that drag belonged to. Delivering what is owed is right whether or
+            // not the claim below succeeds -- it is the previous session's outcome either
+            // way, and it was taken from the operation in one step.
+            deliverCompletion(op);
+            if (!claimSource(op, source)) {
+                // A drag is running on this very instance. Nothing is staged: it cannot be
+                // started twice, and this press must not point it at a different component.
                 op = null;
             }
         }
         if (op != null) {
-            // As in startDrag: an operation its source reuses may still owe the outcome of the
-            // drag before, and its listeners have to hear it while getSource() is still the
-            // component that drag belonged to.
-            deliverCompletion(op);
-            op.setSource(source);
             try {
                 if (needsGeneratedImage(op) && Display.impl.isNativeDragImageNeededOnPrepare()) {
                     // The platform asks for the preview from inside its own gesture callback,
@@ -499,6 +496,35 @@ public final class NativeDragAndDrop {
             } catch (Throwable err) {
                 Log.e(err);
             }
+        }
+    }
+
+    /// Points an operation at the component whose press staged it, unless a drag is already
+    /// running on that very instance.
+    ///
+    /// Both in one step, under the lock. A source may hand the same operation to every
+    /// component it owns, and a second finger can press one of them while the first is
+    /// dragging -- on iOS the session even begins on the platform's own thread, so the
+    /// answer can change between asking and acting. Testing first and assigning afterwards
+    /// left exactly that gap, and through it the running drag was pointed at the component
+    /// that had merely been touched: on a move, the source deletes the wrong one's data.
+    ///
+    /// #### Parameters
+    ///
+    /// - `op`: the operation the press produced
+    ///
+    /// - `source`: the component it was produced for
+    ///
+    /// #### Returns
+    ///
+    /// true when the operation is now this component's to stage
+    private static boolean claimSource(NativeDragOperation op, Component source) {
+        synchronized (LOCK) {
+            if (op == active) { // NOPMD CompareObjectsWithEquals
+                return false;
+            }
+            op.setSource(source);
+            return true;
         }
     }
 
