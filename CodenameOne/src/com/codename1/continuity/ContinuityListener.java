@@ -37,6 +37,21 @@ public interface ContinuityListener {
     /// that returns false has consumed the state: nothing is restored and no other listener is
     /// asked.
     ///
+    /// #### A false you will not come back from must acknowledge
+    ///
+    /// False keeps the state. It has to: the ordinary reason to return false is that you are
+    /// about to ask the user, and the arrival's only other copy may be on the relay -- so the
+    /// framework holds it, and holds this device's own checkpoints off the relay behind it, until
+    /// you say what happened. `Continuity.restore(AppState)` says accepted;
+    /// `Continuity.acknowledge(AppState)` says finished with.
+    ///
+    /// So a false that REJECTS -- the wrong account, older than the screen, anything you will
+    /// never restore -- must call `Continuity.acknowledge(AppState)`, or that hold never ends:
+    /// `Continuity.getRestorableState()` goes on offering the state you rejected, and this device
+    /// stops publishing to the relay for the rest of the process. The framework cannot tell a
+    /// rejection from a prompt that has not been answered yet, and guessing wrong in the other
+    /// direction loses work the user was about to accept.
+    ///
     /// Doing the work yourself and returning false is a supported pattern, and is how an app
     /// prompts before jumping: keep the state, return false, and call
     /// `Continuity.restore(AppState)` when the user accepts.

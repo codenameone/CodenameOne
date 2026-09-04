@@ -286,6 +286,7 @@ public final class Continuity {
         if (!enabled) {
             return;
         }
+        lifecycle++;
         enabled = false;
         dirty = false;
         parked = null;
@@ -1082,6 +1083,7 @@ public final class Continuity {
     /// One thing it cannot undo: a relay request already on the wire when this is called. Nothing
     /// in this process can recall that. What this guarantees is that nothing follows it.
     public static void clear() {
+        lifecycle++;
         parked = null;
         dirty = false;
         // The label goes with the work it describes. It is CONTENT, not configuration -- "Draft
@@ -1393,6 +1395,16 @@ public final class Continuity {
     /// read that succeeds.
     private static boolean fetchUnread;
 
+    /// Bumped whenever the application ends the current session -- clear() or disable().
+    ///
+    /// Separate from relaySession, which every setRelay() moves too: installing a relay from
+    /// inside a listener is legitimate and must not abandon the dispatch that is running. This
+    /// counts only the two calls that make everything after them meaningless.
+    private static int lifecycle;
+
+    /// The parked state the publication hold has already been explained for, so it is said once.
+    private static AppState heldFor;
+
     /// The most recently completed arrival, as an in-process fact rather than a stored one.
     ///
     /// One slot is the right size: the only reader asks immediately after the listeners for the
@@ -1452,6 +1464,21 @@ public final class Continuity {
             // Held rather than dropped. Whatever clears the slot -- the user accepting, the
             // application acknowledging, a logout, the state expiring -- calls back in here, and
             // an acknowledged state is safe to overwrite because the mark is already durable.
+            // IDENTITY: the same arrival, not an equal one. Explaining the hold once per
+            // arrival is the whole point, and two distinct states that considered themselves
+            // equal are still two things the developer needs telling about.
+            if (heldFor != awaitingDecision) { //NOPMD CompareObjectsWithEquals
+                // Once per arrival, not once per checkpoint. A hold that never ends is silent
+                // otherwise: this device simply stops publishing, and the cause -- a listener
+                // that returned false to REJECT a state and never acknowledged it -- is nowhere
+                // near the symptom. The framework cannot tell that from a prompt still waiting on
+                // the user, so it says what it is doing and names the way out.
+                heldFor = awaitingDecision;
+                Log.p("Continuity: holding checkpoints because an arrival is still undecided. "
+                        + "If a listener returned false to reject it, call "
+                        + "Continuity.acknowledge(state) -- otherwise nothing is published from "
+                        + "this device again.");
+            }
             publishRequested = true;
             return;
         }
@@ -1761,6 +1788,12 @@ public final class Continuity {
             park(state);
             return;
         }
+        // The lifecycle as it stands BEFORE any application code runs. A listener is entitled
+        // to call clear() or disable() -- discovering the arrival belongs to another account is
+        // exactly the decision this callback exists for -- and dispatch used to carry on
+        // regardless: it restored and PERSISTED the signed-out account's state after a logout had
+        // just deleted it, or re-parked it into a session that had been emptied.
+        int lifecycleAtDispatch = lifecycle;
         // A copy, because a listener that reacts by unregistering itself is ordinary and would
         // otherwise mutate the list being walked.
         List<ContinuityListener> snapshot = new ArrayList<ContinuityListener>(listeners);
@@ -1771,6 +1804,12 @@ public final class Continuity {
             } catch (Throwable t) {
                 Log.e(t);
                 continue;
+            }
+            if (lifecycle != lifecycleAtDispatch) {
+                // clear() or disable() ran inside the callback. Everything after this point --
+                // restoring, persisting, parking, marking -- would be acting for a session that
+                // no longer exists.
+                return;
             }
             if (!accepted) {
                 // Consumed by the listener: it either handled the state itself or decided the user
@@ -1791,6 +1830,10 @@ public final class Continuity {
                 }
                 return;
             }
+        }
+        if (lifecycle != lifecycleAtDispatch) {
+            // Checked again after the LAST listener as well, not only between them.
+            return;
         }
         if (autoRestore) {
             // The mark is written by restore(), through commit(), and ONLY when it committed
@@ -2433,6 +2476,8 @@ public final class Continuity {
         applyingRestore = false;
         storeCallbackInstalled = false;
         lastCompleted = null;
+        lifecycle = 0;
+        heldFor = null;
     }
 
     /// The store notification, as a constant rather than an anonymous class per callback.

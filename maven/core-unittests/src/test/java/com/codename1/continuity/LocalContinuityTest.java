@@ -3144,6 +3144,63 @@ public class LocalContinuityTest extends UITestBase {
                         + "checkpoint waits behind it");
     }
 
+    /**
+     * A listener that logs out mid-callback stops the dispatch it is inside.
+     *
+     * <p>Discovering that an arrival belongs to another account is exactly the decision this
+     * callback exists for, and calling clear() is the documented response. Dispatch carried on
+     * regardless: with automatic restore on it restored and PERSISTED the signed-out account's
+     * state, moments after logout had deleted it.</p>
+     */
+    @EdtTest
+    public void aListenerThatLogsOutStopsTheDispatchItIsInside() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(true);
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                // "This is not the account that is signed in" -- the documented reason to log out.
+                Continuity.clear();
+                return true;
+            }
+        });
+
+        Continuity.deliver(fromElsewhere("the previous account's work", 95L));
+        flushSerialCalls();
+
+        assertNull(provider.restored,
+                "the signed-out account's state was restored after clear(), so its work is back "
+                        + "on screen and back in storage moments after logout deleted it");
+        assertNull(Continuity.getRestorableState(),
+                "logout left something restorable behind");
+    }
+
+    /**
+     * And disable() inside the callback stops it too.
+     *
+     * <p>disable() documents that arriving states are ignored from the moment it is called, which
+     * has to include the one being dispatched when it is called.</p>
+     */
+    @EdtTest
+    public void aListenerThatDisablesStopsTheDispatchItIsInside() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(true);
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                Continuity.disable();
+                return true;
+            }
+        });
+
+        Continuity.deliver(fromElsewhere("arrived as it was switched off", 96L));
+        flushSerialCalls();
+
+        assertNull(provider.restored,
+                "a state was restored after disable(), which says arrivals are ignored from the "
+                        + "moment it is called");
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;
