@@ -1,7 +1,6 @@
 # Prose that promises a code block where none follows.
 # A ratchet: entries may be removed as holes are filled, never added.
 # Regenerate with check-missing-code-blocks.py --write-baseline.
-Advanced-Topics-Under-The-Hood.asciidoc	For the release build, you will also need to inject some proguard configuration so that important classes don't get stripped out at build time. The FreshDesk SDK instructions state:
 Advanced-Topics-Under-The-Hood.asciidoc	You can override these methods in the draggable components:
 Advertising.asciidoc	identifier. The recommended order is to initialize, gather consent, then load:
 Advertising.asciidoc	method that registers its provider with `AdManager`:
