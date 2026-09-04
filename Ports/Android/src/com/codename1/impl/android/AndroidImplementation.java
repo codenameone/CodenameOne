@@ -10538,24 +10538,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (list == null) {
             return;
         }
+        // The files the source published, which the clip is already carrying: each went onto
+        // it as a content URI this application minted, so the list's own spelling of the same
+        // document -- a path, or a file: URI of it -- would drag that document a second time.
+        //
+        // Compared against those paths rather than against the minted URIs, which are not
+        // equal to anything the source wrote. Entry by entry, too: returning on the first file
+        // threw away every *other* line, so a document published beside its own web address
+        // advertised text/uri-list and delivered the document alone.
+        List<String> alreadyCarried = new ArrayList<String>();
+        Object files = clipboardValue(content, ClipboardContent.MIME_FILE);
+        if (files instanceof String[]) {
+            String[] paths = (String[]) files;
+            for (int iter = 0; iter < paths.length; iter++) {
+                if (paths[iter] != null) {
+                    alreadyCarried.add(publishedUriKey(paths[iter]));
+                }
+            }
+        } else if (files instanceof String) {
+            alreadyCarried.add(publishedUriKey((String) files));
+        }
+        boolean carriesPublishedFile = false;
         for (int iter = 0; iter < items.size(); iter++) {
             Uri carried = items.get(iter).getUri();
+            // A *generated* URI is not one of the source's. It carries a representation's
+            // bytes -- an image, a document this application encoded -- and a reader filters
+            // it out precisely because the source never published it as a URI.
             if (carried != null && !isGeneratedClipFile(carried)) {
-                // The clip carries files the source published, which is what a list beside
-                // them names. Adding them again would drag every file twice, and they do not
-                // compare equal to the list's own entries either: what went onto the clip is
-                // a content URI this application minted for a path the source published.
-                // Naming the type is enough; the URIs the clip carries are what a reader
-                // builds the list back out of.
-                declareUriList(mimeTypes);
-                return;
+                carriesPublishedFile = true;
+                break;
             }
-            // A *generated* URI is not one of them. It carries a representation's bytes --
-            // an image, a document this application encoded -- and a reader filters it out
-            // precisely because the source never published it as a URI. Short-circuiting on
-            // one advertised text/uri-list for a clip whose only URI was that transport, so
-            // a payload of image bytes beside the image's own web address promised the
-            // address and delivered nothing.
         }
         boolean any = false;
         String[] lines = list.split("\n");
@@ -10565,12 +10577,30 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (line.length() == 0 || line.charAt(0) == '#') {
                 continue;
             }
+            if (alreadyCarried.contains(publishedUriKey(line))) {
+                continue;
+            }
             items.add(new ClipData.Item(Uri.parse(line)));
             any = true;
         }
-        if (any) {
+        // Declared when the clip can produce one: the entries just added, the published files
+        // a reader builds the list back out of, or both.
+        if (any || carriesPublishedFile) {
             declareUriList(mimeTypes);
         }
+    }
+
+    /// What two spellings of one file have in common.
+    ///
+    /// ClipboardContent's file representation permits a raw path, and a URI list beside it
+    /// commonly names the same document as a file: URI -- percent encoded, as a URI is. They
+    /// are one document, and putting both on the clip drags it twice.
+    private static String publishedUriKey(String value) {
+        if (hasScheme(value, "file:")) {
+            String path = Uri.parse(value).getPath();
+            return path == null ? value : path;
+        }
+        return value;
     }
 
     private static void declareUriList(List<String> mimeTypes) {
