@@ -216,9 +216,24 @@ final class AndroidNativeDragAndDrop {
         return true;
     }
 
-    /// Forgets a prepared operation because the press turned out to be a click.
+    /// Forgets what a press staged, because the press turned out to be a click.
+    ///
+    /// What the press staged, never what a session is carrying -- the distinction the iOS side
+    /// draws in CN1CancelNativeDrag. This port fills the export slot in startDrag and nowhere
+    /// else: priming a press stages nothing here, so while a drag is running the slot holds
+    /// that drag. A second press during one -- a second finger, or a press the platform
+    /// delivers alongside the drag -- stages an operation of its own, and releasing it reaches
+    /// this method with the drag untouched by any of it. Clearing the slot then
+    /// took the running drag's operation away, and with it the exporting() != null guard that
+    /// ACTION_DRAG_ENDED reports the outcome through -- so the framework's drag stayed active
+    /// for the life of the process and every drag after it was refused.
+    ///
+    /// Asking the framework whether a drag is running is what tells the two apart. A slot with
+    /// nothing running is a leftover and still goes.
     static void cancelDrag() {
-        setExporting(null);
+        if (NativeDragAndDrop.getActiveDrag() == null) {
+            setExporting(null);
+        }
     }
 
     // ------------------------------------------------------------------------------------
