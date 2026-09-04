@@ -455,8 +455,19 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("    // pointer, and a bare pointer is no promise that the\n");
         sb.append("    // object is still there.\n");
         sb.append("    @synchronized ([CN1VpnTunnelProvider class]) {\n");
-        sb.append("        cn1tnProvider = self;\n");
-        sb.append("        cn1tnProviderGeneration = cn1tnStart;\n");
+        sb.append("        // STILL THIS START'S to give. Claiming and\n");
+        sb.append("        // publishing are two steps, and a start suspended\n");
+        sb.append("        // between them used to resume long after a stop\n");
+        sb.append("        // and a restart had been and gone -- and put its\n");
+        sb.append("        // own stopped provider in the slot, over the one\n");
+        sb.append("        // the running tunnel had published. The writer\n");
+        sb.append("        // then found a provider whose generation nothing\n");
+        sb.append("        // compared, and the live tunnel's packets went out\n");
+        sb.append("        // on a link that was already down.\n");
+        sb.append("        if (cn1tnStart == atomic_load(&cn1tnReadGeneration)) {\n");
+        sb.append("            cn1tnProvider = self;\n");
+        sb.append("            cn1tnProviderGeneration = cn1tnStart;\n");
+        sb.append("        }\n");
         sb.append("    }\n");
         sb.append("    // The settings the system needs BEFORE any packet\n");
         sb.append("    // moves; see the note on this class.\n");
@@ -844,7 +855,14 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "    // something still alive rather than a race of its own.\n"
                 + "    CN1VpnTunnelProvider *flow;\n"
                 + "    @synchronized ([CN1VpnTunnelProvider class]) {\n"
-                + "        flow = [cn1tnProvider retain];\n"
+                + "        // THIS start's provider, named as such. The\n"
+                + "        // counter check below says the tunnel is still\n"
+                + "        // the current one; this says the provider in the\n"
+                + "        // slot is the one that tunnel published, which is\n"
+                + "        // a different question whenever the two steps of a\n"
+                + "        // start have been pulled apart.\n"
+                + "        flow = cn1tnProviderGeneration == generation\n"
+                + "                ? [cn1tnProvider retain] : nil;\n"
                 + "    }\n"
                 + "    if (flow == nil || packet == JAVA_NULL\n"
                 + "            || length <= 0) {\n"

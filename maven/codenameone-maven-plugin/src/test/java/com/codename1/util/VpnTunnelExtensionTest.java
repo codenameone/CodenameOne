@@ -134,6 +134,23 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
+    void aStartOvertakenBeforePublishingKeepsItsHandsOff() {
+        String src = provider();
+        // Claiming and publishing are two steps. A start suspended between
+        // them resumed long after a stop and a restart had been and gone,
+        // and put its own stopped provider in the slot over the one the
+        // running tunnel had published -- and the writer, which only asked
+        // whether the tunnel was current, sent that tunnel's packets out on
+        // a link already down.
+        assertTrue(src.contains("if (cn1tnStart == atomic_load(&cn1tnReadGeneration)) {\n"
+                        + "            cn1tnProvider = self;"),
+                "a start that lost its claim publishes nothing");
+        assertTrue(src.contains("flow = cn1tnProviderGeneration == generation\n"
+                        + "                ? [cn1tnProvider retain] : nil;"),
+                "and the writer takes only the provider its own start published");
+    }
+
+    @Test
     void theWriterIsInstalledBeforeTheTunnelIsConstructed() {
         String src = provider();
         int install = src.indexOf("IOSExtensionTunnel_install___int(");
@@ -180,8 +197,8 @@ class VpnTunnelExtensionTest {
         // by the global for NE to release under the next writer.
         assertTrue(src.contains("static int cn1tnProviderGeneration = 0;"),
                 "the slot carries the start that filled it");
-        assertTrue(src.contains("cn1tnProvider = self;\n"
-                        + "        cn1tnProviderGeneration = cn1tnStart;"),
+        assertTrue(src.contains("            cn1tnProvider = self;\n"
+                        + "            cn1tnProviderGeneration = cn1tnStart;"),
                 "published together, under the one lock");
         assertTrue(src.contains("if (cn1tnProvider == self\n"
                         + "                && cn1tnProviderGeneration == generation) {"),
@@ -345,7 +362,7 @@ class VpnTunnelExtensionTest {
         // reached packetFlow on an object that had been deallocated in
         // between. The generation check picked the right tunnel; nothing
         // kept that tunnel alive.
-        assertTrue(src.contains("flow = [cn1tnProvider retain]"),
+        assertTrue(src.contains("? [cn1tnProvider retain] : nil;"),
                 "the writer has to hold the provider it writes through");
         assertTrue(src.contains("- (void)cn1ForgetIfCurrent:(int)generation {\n"
                         + "    @synchronized ([CN1VpnTunnelProvider class]) {"),

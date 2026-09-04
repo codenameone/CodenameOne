@@ -25,6 +25,7 @@ package com.codename1.impl.vpn;
 import com.codename1.vpn.tunnel.PacketBuffer;
 import com.codename1.vpn.tunnel.TunnelBuffers;
 import com.codename1.vpn.tunnel.TunnelHost;
+import com.codename1.vpn.tunnel.TunnelStopReason;
 import com.codename1.vpn.tunnel.TunnelTransport;
 import com.codename1.vpn.tunnel.VpnTunnel;
 
@@ -92,6 +93,7 @@ public final class ExtensionTunnelHost {
         int mtu = TunnelWire.mtu(fields);
         ExtensionTransport t;
         TunnelHost h;
+        TunnelHost displaced;
         synchronized (ExtensionTunnelHost.class) {
             if (startGeneration < generation) {
                 // A NEWER start already owns the extension. This one lost
@@ -119,9 +121,26 @@ public final class ExtensionTunnelHost {
             // cannot disagree.
             t = new ExtensionTransport(mtu, startGeneration);
             h = new TunnelHost((VpnTunnel) tunnel, t);
+            // WHAT THIS REPLACES, kept rather than dropped. A stop preempted
+            // by this start has not run yet, and when it does it finds a
+            // generation newer than its own and leaves well alone -- so
+            // overwriting the only reference to the old host retired nobody:
+            // its tunnel never saw onStop, stayed attached to a transport
+            // that would never fill again, and kept whatever it had started
+            // running for the life of a process iOS caps at a few tens of
+            // megabytes.
+            displaced = host;
             host = h;
             transport = t;
             generation = startGeneration;
+        }
+        if (displaced != null) {
+            // BEFORE the new one starts, so an application sees the end of
+            // one tunnel before the beginning of the next. UNKNOWN because
+            // that is the truth: the platform replaced this tunnel without
+            // saying why, and TunnelHost.stop is idempotent, so the stop this
+            // start overtook may still deliver its own reason.
+            displaced.stop(TunnelStopReason.UNKNOWN.ordinal());
         }
         h.start(TunnelWire.server(fields), TunnelWire.routes(fields),
                 TunnelWire.dnsServers(fields), mtu, TunnelWire.data(fields));
