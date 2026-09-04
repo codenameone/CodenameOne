@@ -162,8 +162,25 @@ class VpnTunnelNativeBuilderTest {
         // could fail a valid build on somebody else's UIKit call.
         File appNatives = Files.createTempDirectory("cn1res").toFile();
         assertTrue(new File(appNatives, "MyAppNative.m").createNewFile());
+        // NESTED, because unzip keeps a submitted archive's directories and
+        // the translator descends into them and FLATTENS what it finds into
+        // the translation's output -- so a native two directories down
+        // arrives in the extension's tree beside the top-level ones.
+        File nested = new File(appNatives, "ios/src".replace('/',
+                File.separatorChar));
+        assertTrue(nested.mkdirs());
+        assertTrue(new File(nested, "DeepNative.m").createNewFile());
+        // ...and a .bundle is copied as a directory rather than flattened,
+        // so nothing inside one can become a source this target compiles.
+        File bundle = new File(appNatives, "Assets.bundle");
+        assertTrue(bundle.mkdirs());
+        assertTrue(new File(bundle, "inside.m").createNewFile());
+
         builder.recordHandWrittenNatives(portDir, appNatives);
         assertTrue(builder.isExcluded("MyAppNative.m"));
+        assertTrue(builder.isExcluded("DeepNative.m"));
+        assertFalse(builder.isExcluded("inside.m"),
+                "a .bundle's contents never become sources");
 
         // The ParparVM runtime comes from the translator rather than either
         // root, so it is in neither directory and is never excluded --

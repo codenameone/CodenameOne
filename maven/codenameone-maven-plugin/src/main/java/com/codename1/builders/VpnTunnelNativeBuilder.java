@@ -203,8 +203,7 @@ class VpnTunnelNativeBuilder {
      */
     void recordHandWrittenNatives(File... roots) {
         for (File root : roots) {
-            File[] files = root == null ? null : root.listFiles();
-            if (files == null) {
+            if (root == null || root.listFiles() == null) {
                 // Refused rather than carried on with a short set: a name
                 // this does not know is a source compiled into the
                 // extension, which is exactly the broken target this exists
@@ -215,11 +214,40 @@ class VpnTunnelNativeBuilder {
                         + " tunnel extension cannot know which sources belong"
                         + " to the application rather than to it.");
             }
-            for (File f : files) {
-                if (f.isFile()) {
-                    handWrittenNatives.add(f.getName());
+            recordTree(root);
+        }
+    }
+
+    /**
+     * Walks a root the way the translator walks it.
+     *
+     * <p>RECURSIVELY, because {@code Executor.unzip} keeps a submitted
+     * archive's subdirectories and {@code ByteCodeTranslator.execute()}
+     * descends into them and FLATTENS what it finds into the translation's
+     * output. A native two directories down therefore arrives in the
+     * extension's tree beside the top-level ones, and a snapshot of the
+     * root's immediate children would not have known its name.</p>
+     *
+     * <p>{@code .bundle} and {@code .xcdatamodeld} are skipped for the same
+     * reason the translator treats them apart: it copies those as
+     * directories rather than flattening them, so nothing inside one ever
+     * becomes a source the extension target could compile.</p>
+     */
+    private void recordTree(File dir) {
+        File[] files = dir.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (File f : files) {
+            if (f.isDirectory()) {
+                String name = f.getName();
+                if (name.endsWith(".bundle") || name.endsWith(".xcdatamodeld")) {
+                    continue;
                 }
+                recordTree(f);
+                continue;
             }
+            handWrittenNatives.add(f.getName());
         }
     }
 
