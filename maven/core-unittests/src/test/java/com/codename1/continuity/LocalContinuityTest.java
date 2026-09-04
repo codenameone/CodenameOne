@@ -3656,6 +3656,89 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A state a listener was holding is refused once the session it arrived in has ended.
+     *
+     * <p>Returning false to keep an arrival while prompting the user is documented behaviour, and
+     * the object handed back to restore() later carried nothing about the session it came from.
+     * A clear() while the prompt was up -- and a login for another account after it -- still
+     * restored the previous account's payload, routes and checkpoint. clear() cannot reach into
+     * the application to take the object away, so it is refused on the way back in.</p>
+     */
+    @EdtTest
+    public void aStateHeldAcrossALogoutIsRefusedWhenItComesBack() {
+        final AppState[] held = new AppState[1];
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                // "Keep it, I will prompt and call restore() when the user accepts."
+                held[0] = state;
+                return false;
+            }
+        });
+
+        Continuity.deliver(fromElsewhere("the previous account's work", 220L));
+        flushSerialCalls();
+        assertNotNull(held[0], "the listener never got the arrival, so this test is about nothing");
+
+        // The user signs out while the prompt is up, and signs in as somebody else.
+        Continuity.clear();
+        Continuity.enable();
+        Continuity.setStateProvider(provider);
+        provider.restored = null;
+
+        // ... and only then taps "continue".
+        assertFalse(Continuity.restore(held[0]),
+                "a state from the previous session reported a restored screen");
+        flushSerialCalls();
+
+        assertNull(provider.restored,
+                "the previous account's payload was restored into the next account's session, "
+                        + "after a clear() that promises nothing from before it survives");
+    }
+
+    /**
+     * A RestStateRelay the application drives itself is allowed to send.
+     *
+     * <p>The guard is about an object kept across a setRelay() and used afterwards, which would
+     * send one account's state under another account's credentials. A relay that was never
+     * installed has no session to confuse -- and asking only "is this the installed relay" made
+     * every publish() and fetch() on a standalone instance throw before issuing a request, for a
+     * public class with a public constructor.</p>
+     */
+    @EdtTest
+    public void aRelayTheApplicationDrivesItselfMaySend() {
+        // Nothing installed at all, which is how a standalone relay is used.
+        StateRelay standalone = new StateRelay() {
+            public void publish(AppState state) {
+            }
+
+            public AppState fetch() {
+                return null;
+            }
+        };
+        assertTrue(Continuity.mayRelaySend(standalone),
+                "a relay the framework was never given was refused, so an application using "
+                        + "RestStateRelay on its own cannot send anything");
+
+        // And the case the guard is actually for still refuses.
+        StateRelay installed = new StateRelay() {
+            public void publish(AppState state) {
+            }
+
+            public AppState fetch() {
+                return null;
+            }
+        };
+        Continuity.setRelay(installed);
+        assertFalse(Continuity.mayRelaySend(standalone),
+                "a relay that is not the installed one was allowed to send, so an object kept "
+                        + "across a setRelay() can still send the previous account's state");
+        assertTrue(Continuity.mayRelaySend(installed), "the installed relay was refused");
+    }
+
+    /**
      * An empty route string is a failed read, not an arrival that can never be applied.
      *
      * <p>It is a string, so it passes every type check, and the state is therefore not empty and

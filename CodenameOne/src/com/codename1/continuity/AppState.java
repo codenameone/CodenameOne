@@ -66,6 +66,14 @@ public final class AppState implements Externalizable {
 
     private List<String> routes = new ArrayList<String>();
     private Map<String, Object> payload = new HashMap<String, Object>();
+    /// The lifecycle generation this state was DELIVERED in, or -1 for one the application
+    /// built or read back from storage.
+    ///
+    /// Not part of the wire form and not part of the stored form: it describes a session of this
+    /// process, not the state, and a state that outlived the session it arrived in is exactly
+    /// what it exists to catch.
+    private int deliveredGeneration = -1;
+
     private String deviceId = "";
     private String title;
     private long sequence;
@@ -108,6 +116,16 @@ public final class AppState implements Externalizable {
             }
         }
         return this;
+    }
+
+    /// The generation this state was delivered in, or -1 when this framework never delivered it.
+    int deliveredGeneration() {
+        return deliveredGeneration;
+    }
+
+    /// Stamped by dispatch(), the one place a state is handed to the application.
+    void deliveredGeneration(int generation) {
+        deliveredGeneration = generation;
     }
 
     /// The application payload. Never null, possibly empty.

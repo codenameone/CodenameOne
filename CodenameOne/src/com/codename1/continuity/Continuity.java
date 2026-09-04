@@ -986,6 +986,21 @@ public final class Continuity {
         if (state == null) {
             return false;
         }
+        if (state.deliveredGeneration() >= 0 && state.deliveredGeneration() != lifecycle) {
+            // Delivered in a session that has since ended. The only way to be holding one of
+            // these is the documented prompt-then-restore pattern -- a listener returns false,
+            // keeps the state, and calls back when the user accepts -- and clear() cannot reach
+            // into the application to take it away. So it is refused here instead, which is the
+            // same promise every other path already keeps.
+            //
+            // A state the application BUILT, or one read back from storage, carries -1 and is
+            // unaffected: this is about the framework's own delivery outliving its session, not
+            // about restricting what an application may ask for.
+            Log.p("Continuity: refusing a state that was delivered before the session ended. "
+                    + "Continuity.clear() or disable() ran while it was being held.");
+            outFailed[0] = false;
+            return false;
+        }
         // Whether any part of this state actually reached the application. Nothing is written
         // or acknowledged until something has: a route-only state naming routes this build no
         // longer registers applies nothing at all, and replacing the stored checkpoint with it
@@ -2174,6 +2189,12 @@ public final class Continuity {
         // regardless: it restored and PERSISTED the signed-out account's state after a logout had
         // just deleted it, or re-parked it into a session that had been emptied.
         int lifecycleAtDispatch = lifecycle;
+        // Stamped on the STATE as well, because a listener may keep it. Returning false to hold
+        // an arrival while it prompts the user is documented behaviour, and the object the
+        // application hands back to restore() later carries nothing about the session it came
+        // from -- so a clear() while the prompt was up, and a login for another account after
+        // it, still restored the previous account's payload, routes and checkpoint.
+        state.deliveredGeneration(lifecycleAtDispatch);
         // A copy, because a listener that reacts by unregistering itself is ordinary and would
         // otherwise mutate the list being walked.
         List<ContinuityListener> snapshot = new ArrayList<ContinuityListener>(listeners);
@@ -2514,7 +2535,17 @@ public final class Continuity {
         }
         Integer bound = RELAY_CALL_SESSION.get();
         if (bound == null) {
-            return isInstalledRelay(r);
+            // Not a framework worker: the application is driving this relay itself. Refused only
+            // when a DIFFERENT relay is installed, which is the confusion this guards against --
+            // an object kept across a setRelay() and used afterwards, sending the previous
+            // account's state under the next account's credentials.
+            //
+            // isInstalledRelay() alone answered false for a relay that was never installed at
+            // all, so a RestStateRelay used on its own -- a public class with a public
+            // constructor -- had every publish() and fetch() throw before issuing a request. The
+            // comment here claimed that case worked; it did not, and there is no session for it
+            // to confuse.
+            return relay == null || r == relay; //NOPMD CompareObjectsWithEquals
         }
         final int session = bound.intValue();
         final boolean[] live = new boolean[1];
