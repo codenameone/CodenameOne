@@ -2290,6 +2290,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                 String mime = JavaSENativeDragAndDrop.asciiLower(
                         flavor.getPrimaryType() + "/" + flavor.getSubType());
                 if (!"text".equals(JavaSENativeDragAndDrop.asciiLower(flavor.getPrimaryType()))
+                        && out instanceof byte[]) {
+                    // The other spelling AWT uses for the same thing: a flavor whose
+                    // representation class is [B hands over the array itself. mimeFor()
+                    // accepts both on the drag side, and reading only the stream here left
+                    // a PDF another Java application published on the clipboard stored
+                    // under nothing at all.
+                    if (!content.hasMimeType(mime) && ((byte[]) out).length > 0) {
+                        content.setData(mime, out);
+                    }
+                    continue;
+                }
+                if (!"text".equals(JavaSENativeDragAndDrop.asciiLower(flavor.getPrimaryType()))
                         && out instanceof InputStream) {
                     // A binary representation another application owns -- a PDF, an
                     // archive, an application's own format -- which AWT hands over as a

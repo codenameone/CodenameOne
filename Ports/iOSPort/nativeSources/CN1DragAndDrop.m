@@ -661,6 +661,10 @@ static NSString* cn1TextFromData(NSData* data, NSString* uti) {
     return detected;
 }
 
+/// The name every directory a drop copies into begins with, so the reclamation below can
+/// tell one of ours from anything else that happens to sit in the temporary directory.
+#define CN1_DROP_COPY_PREFIX @"cn1-drop-"
+
 /// Copies a file a drop handed over into somewhere that outlives the handler, and returns the
 /// path -- or nil when the copy failed.
 ///
@@ -672,9 +676,21 @@ static NSString* cn1CopyDroppedFile(NSURL* url) {
     if (name == nil || name.length == 0) {
         name = @"dropped";
     }
-    NSString* target = [NSTemporaryDirectory() stringByAppendingPathComponent:
-                        [NSString stringWithFormat:@"cn1-drop-%@-%@",
-                         [[NSUUID UUID] UUIDString], name]];
+    // Its own directory, uniquely named, with the file keeping the name it was dragged
+    // under. Making the *file* unique instead showed the receiver cn1-drop-<uuid>-report.pdf
+    // where the user had dragged report.pdf -- and a name already near the filesystem's
+    // limit for one component grew past it, so the copy failed outright and a file-only
+    // drop materialized nothing at all.
+    NSString* holder = [NSTemporaryDirectory() stringByAppendingPathComponent:
+                        [NSString stringWithFormat:@"%@%@", CN1_DROP_COPY_PREFIX,
+                         [[NSUUID UUID] UUIDString]]];
+    if (![[NSFileManager defaultManager] createDirectoryAtPath:holder
+                                   withIntermediateDirectories:YES
+                                                    attributes:nil
+                                                         error:nil]) {
+        return nil;
+    }
+    NSString* target = [holder stringByAppendingPathComponent:name];
     NSError* copyError = nil;
     if (![[NSFileManager defaultManager] copyItemAtURL:url
                                                  toURL:[NSURL fileURLWithPath:target]
@@ -743,8 +759,15 @@ static void cn1RememberDroppedFiles(NSArray* paths) {
         for (NSUInteger iter = 1; iter < oldest.count; iter++) {
             // Best effort by design: a file that will not delete is one the system reclaims
             // when it next purges the directory, which is what the directory is for.
-            [[NSFileManager defaultManager] removeItemAtPath:[oldest objectAtIndex:iter]
-                                                       error:nil];
+            NSString* path = [oldest objectAtIndex:iter];
+            [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+            // And the directory it was given to itself, which is empty once its one file
+            // is gone. Only ours, tested by name: nothing else in the temporary directory
+            // is this code's to remove.
+            NSString* holder = [path stringByDeletingLastPathComponent];
+            if ([[holder lastPathComponent] hasPrefix:CN1_DROP_COPY_PREFIX]) {
+                [[NSFileManager defaultManager] removeItemAtPath:holder error:nil];
+            }
         }
         [cn1DroppedFileCopies removeObjectAtIndex:0];
     }
