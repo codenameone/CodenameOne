@@ -4991,6 +4991,18 @@ public class IOSImplementation extends CodenameOneImplementation {
             new java.util.LinkedHashMap(16, 0.75f, true);
     private long softRefBytes;
 
+    /// What each entry was charged, recorded when it went in.
+    ///
+    /// The size must NOT be recomputed at eviction. Measuring an Image means
+    /// asking it for its width, and a soft-referenced image is exactly the kind
+    /// that may have been disposed since -- its native peer is then null, and on
+    /// this VM reading a field through a null reference is a SIGSEGV, not a
+    /// catchable NullPointerException, so there is no defensive form of the
+    /// recompute. Observed as an EXC_BAD_ACCESS at 0x20 inside softRefSize while
+    /// a transition test scaled images.
+    private final java.util.HashMap<Object, Long> softRefCharged =
+            new java.util.HashMap<Object, Long>();
+
     /// A value's approximate retained size. Exact for the two kinds that
     /// dominate (bitmaps and pixel arrays) and a nominal charge for anything
     /// else, so an unrecognised value still counts towards the budget.
@@ -5014,11 +5026,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         while (softRefBytes > SOFT_REF_BUDGET_BYTES && !softReferenceMap.isEmpty()) {
             java.util.Iterator it = softReferenceMap.entrySet().iterator();
             Map.Entry eldest = (Map.Entry) it.next();   // access-order: least recently used
-            softRefBytes -= softRefSize(eldest.getValue());
+            Long charged = (Long) softRefCharged.remove(eldest.getKey());
+            softRefBytes -= charged == null ? 0 : charged.longValue();
             it.remove();
         }
         if (softReferenceMap.isEmpty()) {
             softRefBytes = 0;
+            softRefCharged.clear();
         }
     }
 
@@ -5026,6 +5040,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         IOSImplementation impl = instance;
         synchronized (impl.softReferenceMap) {
             impl.softReferenceMap.clear();
+            impl.softRefCharged.clear();
             impl.softRefBytes = 0;
         }
     }
@@ -5056,11 +5071,12 @@ public class IOSImplementation extends CodenameOneImplementation {
             return key;
         }
         synchronized (softReferenceMap) {
-            Object previous = softReferenceMap.put(key, o);
-            if (previous != null) {
-                softRefBytes -= softRefSize(previous);
-            }
-            softRefBytes += softRefSize(o);
+            // Measured HERE, while the caller still holds it and its peer is
+            // certainly alive, and remembered so eviction never has to ask again.
+            long charged = softRefSize(o);
+            softReferenceMap.put(key, o);
+            softRefCharged.put(key, Long.valueOf(charged));
+            softRefBytes += charged;
             trimSoftRefs();
         }
         return key;
