@@ -172,7 +172,13 @@ void CN1NativeDragDeliverDropAddFile(NSString* mimeType, NSString* path, NSStrin
 /// `allowedActions` is the mask this session offered and `local` whether the drag is one this
 /// application started -- both taken when the drop began rather than when its loads finished,
 /// because by then the drag the framework remembers may be another one.
-int CN1NativeDragDeliverDropCommit(int x, int y, int action, int allowedActions, BOOL local);
+int CN1NativeDragDeliverDropCommit(int x, int y, int action, int allowedActions, BOOL local,
+                                   int hoverGeneration);
+
+/// The framework's hover generation, taken as a drop begins loading and quoted back by the
+/// commit: it says whether the hover the recovery would fall back on still belongs to that
+/// drop, or to a session that arrived while its providers were loading.
+int CN1NativeDragDeliverHoverGeneration(void);
 
 /// Produces one representation of a drag on demand. Returns nil when the operation that
 /// session belongs to can no longer supply it.

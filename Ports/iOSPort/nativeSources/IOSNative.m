@@ -1177,10 +1177,16 @@ void CN1NativeDragDeliverPayloadReleased(int sessionId) {
             CN1_THREAD_GET_STATE_PASS_ARG sessionId);
 }
 
-int CN1NativeDragDeliverDropCommit(int x, int y, int action, int allowedActions, BOOL local) {
-    return (int)com_codename1_impl_ios_IOSImplementation_nativeDropCommitCallback___int_int_int_int_boolean_R_int(
+int CN1NativeDragDeliverDropCommit(int x, int y, int action, int allowedActions, BOOL local,
+                                   int hoverGeneration) {
+    return (int)com_codename1_impl_ios_IOSImplementation_nativeDropCommitCallback___int_int_int_int_boolean_int_R_int(
             CN1_THREAD_GET_STATE_PASS_ARG x, y, action, allowedActions,
-            local ? JAVA_TRUE : JAVA_FALSE);
+            local ? JAVA_TRUE : JAVA_FALSE, hoverGeneration);
+}
+
+int CN1NativeDragDeliverHoverGeneration(void) {
+    return (int)com_codename1_impl_ios_IOSImplementation_nativeDragHoverGenerationCallback___R_int(
+            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 int CN1NativeDragDeliverSessionStarted(void) {

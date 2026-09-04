@@ -1192,6 +1192,11 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
 #endif
     }
     [cn1LoadingDropSessions addObject:session];
+    // The hover this drop was released on, named by the number the framework moves on whenever
+    // something replaces it. Taken now, for the same reason the action and the mask are: by the
+    // time a slow provider has finished, the hover belongs to whatever session is over this
+    // surface then, and the recovery for a target that moved must not reach into that one's.
+    const int hoverGeneration = CN1NativeDragDeliverHoverGeneration();
     // Two different questions, and they were one answer.
     //
     // Whether the drag started inside this application is what the framework reports as
@@ -1499,7 +1504,8 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
                 [copied addObject:path];
             }
         }
-        int accepted = CN1NativeDragDeliverDropCommit(x, y, action, sessionActions, localAssembly);
+        int accepted = CN1NativeDragDeliverDropCommit(x, y, action, sessionActions,
+                                                     localAssembly, hoverGeneration);
         cn1RememberDroppedFiles(copied);
         // This session's own agreement, and only it: another drop hovering while this one
         // finished loading is still entitled to the action its target chose.

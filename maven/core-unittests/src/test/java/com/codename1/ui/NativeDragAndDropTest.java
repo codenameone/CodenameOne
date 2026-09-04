@@ -1350,6 +1350,50 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aDropAssembledLateDoesNotFallBackOnAnotherSessionsHover() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder mine = addTarget(form);
+        int x = mine.getAbsoluteX() + 5;
+        int y = mine.getAbsoluteY() + 5;
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+        // What the port takes when the user releases and this drop's providers start loading.
+        int generation = NativeDragAndDrop.hoverGeneration();
+
+        // A second session arrives over the same surface while those providers are still
+        // going, and hovers a target of its own at the very same place.
+        form.removeComponent(mine);
+        DropRecorder theirs = new DropRecorder();
+        theirs.setNativeDropTarget(true);
+        form.add(BorderLayout.CENTER, theirs);
+        form.revalidate();
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("theirs"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        // And the tree moves under *that* one, so the release point resolves to nothing while
+        // its target is still on the surface and still willing -- which is exactly the state
+        // the recovery was written for, belonging to the wrong session.
+        form.removeComponent(theirs);
+        Container filler = new Container();
+        form.add(BorderLayout.CENTER, filler);
+        form.revalidate();
+        form.add(BorderLayout.NORTH, theirs);
+        theirs.setPreferredSize(new com.codename1.ui.geom.Dimension(1, 1));
+        form.revalidate();
+
+        NativeDragAndDrop.deferredDrop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY,
+                NativeDragOperation.ACTION_COPY, false, generation);
+        flushSerialCalls();
+
+        assertFalse(theirs.events.contains("drop"),
+                "the hover this recovery reads belongs to the session that arrived since, and "
+                        + "the payload of the one still loading is not that session's to place");
+        assertNull(theirs.dropped);
+        NativeDragAndDrop.dragExit(0);
+        flushSerialCalls();
+    }
+
+    @FormTest
     void aTargetHiddenByItsAncestorIsNotHandedTheDelayedDrop() {
         Form form = Display.getInstance().getCurrent();
         Container holder = new Container(new BorderLayout());

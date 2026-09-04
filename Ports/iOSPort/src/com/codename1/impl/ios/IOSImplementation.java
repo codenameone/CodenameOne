@@ -9511,7 +9511,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// Invoked from CN1DragAndDrop.m once every representation has arrived. Returns the action
     /// accepted, or zero when nothing under the pointer took it.
     public static int nativeDropCommitCallback(int x, int y, int action, int allowedActions,
-            boolean local) {
+            boolean local, int hoverGeneration) {
         ClipboardContent content = pendingDrop == null ? new ClipboardContent() : pendingDrop;
         pendingDrop = null;
         // What *this* drop was offering and where it came from, both taken by the native side
@@ -9520,7 +9520,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         // deferredDrop, not drop: this assembly has been loading, so the component
         // hovering by now may belong to a drop that arrived since -- and the action
         // below was taken from this session when the user released it.
-        return NativeDragAndDrop.deferredDrop(0, x, y, content, action, allowedActions, local);
+        //
+        // The hover generation goes with it, taken by the native side at the same moment. The
+        // recovery for a target that moved reads the hover this drag left behind, and by now
+        // that hover can belong to a session which arrived while the providers were loading.
+        return NativeDragAndDrop.deferredDrop(0, x, y, content, action, allowedActions, local,
+                hoverGeneration);
+    }
+
+    /// Invoked from CN1DragAndDrop.m as a drop begins loading, so the commit that follows can
+    /// say whether the hover state it wants to fall back on is still its own.
+    public static int nativeDragHoverGenerationCallback() {
+        return NativeDragAndDrop.hoverGeneration();
     }
 
     /// Invoked from CN1DragAndDrop.m when UIKit starts a drag session. Hands the payload down
@@ -9533,9 +9544,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             return 0;
         }
         int sessionId;
+        ExportedDrag exported = new ExportedDrag(op);
         synchronized (exportedDrags) {
             sessionId = ++nextDragSessionId;
-            exportedDrags.put(Integer.valueOf(sessionId), new ExportedDrag(op));
+            exportedDrags.put(Integer.valueOf(sessionId), exported);
         }
         try {
             ClipboardContent content = op.getContent();
@@ -9574,7 +9586,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     }
                     continue;
                 }
-                if (ClipboardContent.MIME_URI_LIST.equals(mime) && declareDraggedUrls(content)) {
+                if (ClipboardContent.MIME_URI_LIST.equals(mime) && declareDraggedUrls(exported)) {
                     // Handed over as items rather than declared as a type: see
                     // declareDraggedUrls. Declaring it as well would publish the list twice,
                     // once as items and once as a lump.
@@ -9610,12 +9622,17 @@ public class IOSImplementation extends CodenameOneImplementation {
     ///
     /// true when at least one link was handed over, in which case the type must not also be
     /// declared as a representation of its own
-    private static boolean declareDraggedUrls(ClipboardContent content) {
+    private static boolean declareDraggedUrls(ExportedDrag exported) {
         Object value;
         try {
-            value = content.getData(ClipboardContent.MIME_URI_LIST);
+            // Through this session's own memo, so the resolution counts as *the* one for this
+            // drag. Reading it off the content instead ran the provider here and again when a
+            // receiver asked for the type, which is twice in one transfer -- and a provider
+            // that generates its value, or writes something, is entitled to be asked once.
+            value = exported.produce(ClipboardContent.MIME_URI_LIST);
         } catch (Throwable err) {
-            // A provider is permitted to fail, and the rest of the payload still travels.
+            // A provider is permitted to fail, and the rest of the payload still travels. The
+            // failure is remembered by the memo above, so nothing asks it again either.
             com.codename1.io.Log.e(err);
             return false;
         }

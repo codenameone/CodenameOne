@@ -1145,7 +1145,8 @@ public final class NativeDragAndDrop {
     /// the action actually accepted, or `NativeDragOperation#ACTION_NONE`
     public static int drop(int windowId, int x, int y, ClipboardContent content, int action,
             int advertisedActions, boolean local) {
-        return drop(windowId, x, y, content, action, advertisedActions, local, false);
+        return drop(windowId, x, y, content, action, advertisedActions, local, false,
+                NO_HOVER_GENERATION);
     }
 
     /// Delivers a native drop whose action was already decided when the user released.
@@ -1173,11 +1174,45 @@ public final class NativeDragAndDrop {
     /// the action actually accepted, or `NativeDragOperation#ACTION_NONE`
     public static int deferredDrop(int windowId, int x, int y, ClipboardContent content,
             int action, int advertisedActions, boolean local) {
-        return drop(windowId, x, y, content, action, advertisedActions, local, true);
+        return deferredDrop(windowId, x, y, content, action, advertisedActions, local,
+                NO_HOVER_GENERATION);
     }
 
+    /// The same, for a port that took a hover generation when the drop began.
+    ///
+    /// The recovery for a target whose position moved reads the hover the drag left behind, and
+    /// by the time a slow provider has finished that hover can belong to a session that arrived
+    /// since -- so the payload of one drop was handed to the target of another. A port that
+    /// quotes back what `#hoverGeneration()` answered when the user released tells this apart:
+    /// the hover is this drop's while the number still matches, and is somebody else's the
+    /// moment it does not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hoverGeneration`: what `#hoverGeneration()` answered when the drop began, or
+    ///   `#NO_HOVER_GENERATION` from a port that does not track it
+    public static int deferredDrop(int windowId, int x, int y, ClipboardContent content,
+            int action, int advertisedActions, boolean local, int hoverGeneration) {
+        return drop(windowId, x, y, content, action, advertisedActions, local, true,
+                hoverGeneration);
+    }
+
+    /// The generation of the hover state a drop assembled later can quote back; see
+    /// `#deferredDrop(int, int, int, com.codename1.ui.ClipboardContent, int, int, boolean, int)`.
+    public static int hoverGeneration() {
+        synchronized (LOCK) {
+            return targetGeneration;
+        }
+    }
+
+    /// What a port that does not track the hover generation passes, which asks for the
+    /// recovery to be attempted on whatever hover state is there -- the behaviour every port
+    /// had before one of them could tell.
+    public static final int NO_HOVER_GENERATION = -1;
+
     private static int drop(int windowId, int x, int y, ClipboardContent content, int action,
-            int advertisedActions, boolean local, boolean actionAlreadyDecided) {
+            int advertisedActions, boolean local, boolean actionAlreadyDecided,
+            int hoverGeneration) {
         // Nothing materialized. Every representation the platform offered failed to be read --
         // a transferable that threw, a one-shot stream already spent -- and an empty payload is
         // not a drop. A target that filters on a type refuses it anyway, but one that takes
@@ -1211,7 +1246,7 @@ public final class NativeDragAndDrop {
             // "resolves to nothing" was a case that never arose, and the guard it described
             // did not exist. Staying still and finding the target gone is exactly the tree
             // moving under a slow load; moving and finding no target is the ordinary miss.
-            if (releasedWhereItHovered(x, y)) {
+            if (releasedWhereItHovered(x, y) && hoverIsStill(hoverGeneration)) {
                 target = stillWillingHoverTarget(windowId, content, action);
             }
         }
@@ -1405,6 +1440,22 @@ public final class NativeDragAndDrop {
     /// Asked only when the position no longer names anything. A component detached from its
     /// surface cannot be dropped on: it has no coordinates to speak of and nothing would
     /// repaint.
+    /// True when the hover state still belongs to the drop asking about it.
+    ///
+    /// A drop assembled after its session ended quotes the generation it saw when the user
+    /// released. Anything that replaces the hover -- the first event of the next session over
+    /// this surface -- moves the number on, and the recovery is then reading somebody else's
+    /// target and somebody else's position. A port with nothing to quote gets what it always
+    /// got.
+    private static boolean hoverIsStill(int hoverGeneration) {
+        if (hoverGeneration == NO_HOVER_GENERATION) {
+            return true;
+        }
+        synchronized (LOCK) {
+            return targetGeneration == hoverGeneration;
+        }
+    }
+
     /// True when this release is at the point the drag last reported hovering.
     ///
     /// Within the same slop a press uses to become a drag, because the platform's release
