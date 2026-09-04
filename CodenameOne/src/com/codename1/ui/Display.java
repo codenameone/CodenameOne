@@ -491,29 +491,43 @@ public final class Display extends CN1Constants {
     /// The teardown's own thread is exempt. A port that reached back into `init()` from inside
     /// its `deinitialize()` would otherwise wait for itself, and a self deadlock in `init()` is
     /// a worse outcome than the overlap this exists to prevent.
+    ///
+    /// Called with `lock` HELD, so that the caller's claim of the generation is part of the same
+    /// critical section as the wait -- see `#init(Object)`.
     private static void awaitPreviousTeardown() {
-        synchronized (lock) {
-            long deadline = System.currentTimeMillis() + TEARDOWN_WAIT_MILLIS;
-            while (INSTANCE.edtTearingDown != null
-                    && INSTANCE.edtTearingDown != Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
-                long remaining = deadline - System.currentTimeMillis();
-                if (remaining <= 0) {
-                    return;
-                }
-                try {
-                    lock.wait(remaining);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
+        long deadline = System.currentTimeMillis() + TEARDOWN_WAIT_MILLIS;
+        while (INSTANCE.edtTearingDown != null
+                && INSTANCE.edtTearingDown != Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
+            long remaining = deadline - System.currentTimeMillis();
+            if (remaining <= 0) {
+                return;
+            }
+            try {
+                lock.wait(remaining);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                return;
             }
         }
     }
 
     public static void init(Object m) {
-        if (!INSTANCE.codenameOneRunning) {
+        boolean startNewGeneration;
+        synchronized (lock) {
+            // The wait and the claim are ONE critical section. A teardown releases every waiter
+            // with a single notifyAll, so two initializers parked here would both wake, both
+            // find codenameOneRunning false and both go on to build a generation -- overwriting
+            // each other's impl while each was midway through its own initImpl(), and leaving
+            // whichever EDT got started running against the half built one. Testing the flag
+            // and setting it apart from the wait is the same check-then-act this class of bug
+            // is made of; here it costs nothing to make it indivisible.
             awaitPreviousTeardown();
-            INSTANCE.codenameOneRunning = true;
+            startNewGeneration = !INSTANCE.codenameOneRunning;
+            if (startNewGeneration) {
+                INSTANCE.codenameOneRunning = true;
+            }
+        }
+        if (startNewGeneration) {
             INSTANCE.initialWindowSizeApplied = false;
             INSTANCE.pluginSupport = new PluginSupport();
             INSTANCE.displayInitTime = System.currentTimeMillis();
@@ -1594,6 +1608,22 @@ public final class Display extends CN1Constants {
     }
 
     /// Releases this thread's teardown claim and wakes any `init()` waiting on it.
+    ///
+    /// The claim covers `deinitialize()` RETURNING, not any work that call may have handed to
+    /// another thread, and deliberately so. A review asked for the latter, on the grounds that
+    /// `AndroidImplementation.deinitialize()` posts its destructive half -- the one that nulls
+    /// `relativeLayout` and `myView` -- to the activity's UI thread and returns. Waiting for
+    /// that would deadlock: `Display.init()` is called ON the UI thread during an activity
+    /// restart, so the thread parked in `awaitPreviousTeardown()` is the very thread the posted
+    /// cleanup needs in order to run. Only the bound above would break it, at ten seconds per
+    /// restart, and the cleanup would still land afterwards.
+    ///
+    /// It is also not needed. `AndroidImplementation.startContext()` drains that cleanup
+    /// SYNCHRONOUSLY before it initializes anything -- it waits out `deinitializingEdt`, then
+    /// calls `deinitialize()` again from the UI thread, where the same method runs its Runnable
+    /// inline rather than posting it -- and the posted copy then returns at its own
+    /// `if (!deinitializing)` guard. The port already orders what it defers; core waiting on it
+    /// would only take the ordering away.
     private void releaseTeardownClaim() {
         synchronized (lock) {
             // Only if it is still OURS -- a claim can only be held by one thread, but an expired
@@ -1627,10 +1657,14 @@ public final class Display extends CN1Constants {
             // the successor's dispatch thread. Windows left open pass to the successor, which
             // is what already happens to the current Form.
             //
-            // That this test sits one statement after the loop exit is not a reason to think it
-            // never fires. Everything in this class of failure is the departing thread being
-            // descheduled between two adjacent statements on a loaded machine -- that is why it
-            // reproduces in CI and never locally.
+            // This check is not atomic with the disposal it guards, and cannot be made so: the
+            // lock has to be released across disposeAll(), which runs application listeners and
+            // reaches into the port. A review asked for atomicity here; holding the display lock
+            // through that is how a port that reaches back into Display deadlocks. What makes
+            // the sequence safe is that init() WAITS for this teardown rather than racing it,
+            // so no successor exists to observe. The check is what remains for the one case the
+            // wait does not cover -- see TEARDOWN_WAIT_MILLIS -- where narrowing the window
+            // from the whole teardown to two adjacent statements is the most that is available.
             Desktop.getInstance().disposeAll();
         }
         if (mayDeinitialize(departing)) {
