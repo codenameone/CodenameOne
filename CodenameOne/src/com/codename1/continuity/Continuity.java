@@ -1093,6 +1093,10 @@ public final class Continuity {
         endRelaySession();
         lastSeen.clear();
         durableSeen.clear();
+        // Forgotten beside the marks it belongs with. It records what THIS account's session
+        // dealt with, and keeping it would let a state re-delivered to the next account be
+        // treated as already handled.
+        lastCompleted = null;
         // The durable copy as well. Leaving it behind meant the marks of the account that just
         // signed out kept suppressing the NEXT account's deliveries -- a state silently never
         // arriving, which is harder to notice than one arriving twice.
@@ -1154,6 +1158,10 @@ public final class Continuity {
         // A new session has read nothing yet, and owes nothing either: the slot was just emptied.
         // Carrying a failed read across would make the next checkpoint poll for no reason.
         fetchUnread = false;
+        // Deliberately NOT cleared here. Ending a relay session says nothing about what the
+        // application has already dealt with, and forgetting it would let an arrival that was
+        // acknowledged before the session changed be parked again afterwards. reset() clears it.
+
     }
 
     // ------------------------------------------------------------------
@@ -1359,6 +1367,15 @@ public final class Continuity {
     /// waits -- not for the next checkpoint, which is where the protection used to end, but for a
     /// read that succeeds.
     private static boolean fetchUnread;
+
+    /// The most recently completed arrival, as an in-process fact rather than a stored one.
+    ///
+    /// One slot is the right size: the only reader asks immediately after the listeners for the
+    /// state it is about to park, so the thing that can have completed in between is that state.
+    /// It exists because the durable map is bounded by what a single stored string can hold, and
+    /// an entry can be evicted on the way in -- which is a statement about persistence, not about
+    /// whether the application has dealt with the arrival.
+    private static AppState lastCompleted;
 
     private static boolean pollAgain;
 
@@ -1769,6 +1786,19 @@ public final class Continuity {
     /// write to storage succeeded, and what is being asked here is what this process has done, not
     /// what survived to disk.
     private static boolean isAlreadyActedOn(AppState state) {
+        // The in-process record FIRST, because durableSeen is bounded by what one stored string
+        // can hold and trimToWritable() can evict an entry the moment it goes in -- a device id
+        // long enough to blow the budget on its own does exactly that. Asking only the map then
+        // said a state acknowledged a microsecond earlier had not been acted on, and parked it:
+        // still offered, with every relay checkpoint held behind work that was already finished.
+        //
+        // Two fixes of mine meeting. Neither is wrong on its own; the map answers "what will the
+        // next launch know", and this question is "what has this process already done".
+        AppState done = lastCompleted;
+        if (done != null && done.getDeviceId().equals(state.getDeviceId())
+                && done.getSequence() >= state.getSequence()) {
+            return true;
+        }
         Long mark = durableSeen.get(state.getDeviceId());
         return mark != null && mark.longValue() >= state.getSequence();
     }
@@ -1893,6 +1923,9 @@ public final class Continuity {
             parked = null;
             startPublisher();
         }
+        // Recorded before the write, because it is not about the write. What this process has
+        // dealt with is true whether or not the mark reaches storage or survives the size budget.
+        lastCompleted = state;
         // ALWAYS, not only when a map moved. The condition this replaced was written when the
         // durable copy tracked memory exactly; it does not, and by the time anything calls this
         // memory already holds the entry, so "unchanged" meant "write nothing" and both
@@ -2351,6 +2384,7 @@ public final class Continuity {
         waitingForWindow = false;
         applyingRestore = false;
         storeCallbackInstalled = false;
+        lastCompleted = null;
     }
 
     /// The store notification, as a constant rather than an anonymous class per callback.

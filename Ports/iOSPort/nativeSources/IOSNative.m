@@ -20794,17 +20794,19 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_la
     NSString *k = toNSString(CN1_THREAD_STATE_PASS_ARG key);
     NSString *v = toNSString(CN1_THREAD_STATE_PASS_ARG value);
     [store setString:v forKey:k];
-    // synchronize is asked for rather than waited on -- the system syncs on its own schedule and
-    // this only moves it along -- but its answer is reported, because NO means the store is not
-    // usable and the application's write went nowhere.
-    BOOL synced = [store synchronize];
-    // Read back as well. synchronize answers about the STORE; it says nothing about whether this
-    // particular value was accepted, and a store at its key or size limit drops the write without
-    // reporting anything. What can be established here is whether the value is retrievable now.
-    // Whether iCloud goes on to propagate it is not knowable from inside this call, and the Java
-    // documentation says only what this actually checks.
+    // Asked for, not waited on and NOT reported. The system syncs on its own schedule and this
+    // only moves it along; its answer is about the STORE -- whether this build is entitled to one
+    // that follows the user -- which continuitySyncedStoreSupported reports and which this call
+    // is not being asked. ANDing it into the result here was the last place the entitlement probe
+    // still decided the fate of a local write: a transient NO made put() report failure for a
+    // value the store was holding and would have propagated later.
+    [store synchronize];
+    // The READBACK is the answer, and it is exactly what SyncedStore.put documents -- "true when
+    // the store holds the value afterwards". It is also the only part that can be established
+    // from in here: a store at its key or size limit drops the write while reporting nothing, and
+    // whether iCloud goes on to propagate it is not knowable from inside this call.
     NSString *back = [store stringForKey:k];
-    if (synced && back != nil && [back isEqualToString:v]) {
+    if (back != nil && [back isEqualToString:v]) {
         result = JAVA_TRUE;
     }
     POOL_END();

@@ -2899,6 +2899,52 @@ public class LocalContinuityTest extends UITestBase {
                         + "and the publication hold never lifts");
     }
 
+    /**
+     * A synchronous acknowledgement survives a device id too long to keep a durable mark for.
+     *
+     * <p>Two fixes meeting. The durable map is bounded by what one stored string can hold, so
+     * trimToWritable() can evict an entry the moment it goes in -- an id long enough to blow that
+     * budget on its own does exactly that. Asking only that map whether the arrival had been acted
+     * on then said no a microsecond after acknowledge() returned, and parked a finished state:
+     * still offered, with every relay checkpoint held behind it.</p>
+     *
+     * <p>Neither fix is wrong alone. The map answers what the next launch will know; this question
+     * is what this process has already done.</p>
+     */
+    @EdtTest
+    public void aSynchronousAcknowledgementSurvivesAnIdTooLongToStore() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                Continuity.acknowledge(state);
+                return false;
+            }
+        });
+
+        // Exactly at the limit an AppState accepts for a device id, which is one byte per
+        // character here -- so the id is legal, and the MARK for it is not: the entry costs the
+        // id plus its separators and sequence, which is past what a single stored string holds,
+        // and the size budget evicts it the instant it goes in. A shorter id would fit and prove
+        // nothing; a longer one is refused by setDeviceId before this test begins, which is how
+        // the first version of it failed.
+        StringBuilder id = new StringBuilder("device-");
+        while (id.length() < 65535) {
+            id.append('d');
+        }
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("note", "handled in the callback");
+        Continuity.deliver(new AppState()
+                .setPayload(payload)
+                .setDeviceId(id.toString())
+                .setSequence(81L)
+                .setTimestamp(System.currentTimeMillis()));
+        flushSerialCalls();
+
+        assertNull(Continuity.getRestorableState(),
+                "an arrival the listener had acknowledged was parked because its durable mark did "
+                        + "not fit, so it stays on offer and holds every checkpoint off the relay");
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;
