@@ -330,6 +330,51 @@ class EdtHandoverTest {
     }
 
     /**
+     * Interrupting a thread that is waiting for a teardown must not let it past the wait.
+     *
+     * <p>An interrupt is not a reason to start building a generation while the previous one is
+     * still tearing down -- that is the very interleaving the wait exists to prevent, and it
+     * would be reached by a route nothing else in the display can see. The interrupt is not
+     * swallowed either: it is restored once the wait is over, so the caller still learns about
+     * it.</p>
+     */
+    @Test
+    void anInterruptDoesNotLetAnInitPastTheTeardownWait() {
+        BlockingDeinitImplementation blocking = new BlockingDeinitImplementation();
+        startGeneration(blocking);
+
+        Display.deinitialize();
+        assertTrue(blocking.gate().awaitEntered(), "the fixture never parked the departing thread");
+
+        install(new TestCodenameOneImplementation());
+        final boolean[] interruptSurvived = new boolean[1];
+        Thread init = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                Display.init(null);
+                interruptSurvived[0] = Thread.currentThread().isInterrupted();
+            }
+        }, "edt-handover-interrupted-init");
+        init.start();
+
+        // Give it a moment to actually reach the wait, then interrupt it there.
+        finishedWithin(init, 250L);
+        init.interrupt();
+
+        assertFalse(finishedWithin(init, 500L),
+                "an interrupt let init() out of the teardown wait, so it went on to claim a "
+                        + "generation while the previous one was still tearing down -- the "
+                        + "ordering this class is about, undone by a route nothing checks");
+
+        blocking.gate().release();
+        assertTrue(finishedWithin(init, DISPATCH_TIMEOUT),
+                "init() never came back after the teardown finished");
+        assertTrue(interruptSurvived[0],
+                "the interrupt was swallowed rather than restored once the wait was over");
+        assertTrue(dispatchWorks(), "the successor generation never came up");
+    }
+
+    /**
      * Calls {@code Display.init(null)} on a thread of its own and hands the thread back.
      *
      * <p>Off the test thread because an init() that lands during a teardown WAITS for it. The

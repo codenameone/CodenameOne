@@ -496,17 +496,34 @@ public final class Display extends CN1Constants {
     /// critical section as the wait -- see `#init(Object)`.
     private static void awaitPreviousTeardown() {
         long deadline = System.currentTimeMillis() + TEARDOWN_WAIT_MILLIS;
-        while (INSTANCE.edtTearingDown != null
-                && INSTANCE.edtTearingDown != Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
-            long remaining = deadline - System.currentTimeMillis();
-            if (remaining <= 0) {
-                return;
+        boolean interrupted = false;
+        try {
+            while (INSTANCE.edtTearingDown != null
+                    && INSTANCE.edtTearingDown != Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    return;
+                }
+                try {
+                    lock.wait(remaining);
+                } catch (InterruptedException ie) {
+                    // Remembered rather than acted on, which is the opposite of what the rest of
+                    // this class does with an interrupt -- and has to be. Returning here would
+                    // hand the caller a generation to build while the previous one is still
+                    // tearing down, so an interrupt would silently undo the ordering this method
+                    // exists to impose. The deadline still bounds the wait, so a thread someone
+                    // is trying to stop waits no longer than any other.
+                    //
+                    // Re-arming the flag here rather than on the way out would be worse than
+                    // returning: wait() clears the interrupted status when it throws, so a
+                    // restored flag makes the NEXT wait() throw immediately and the loop spins
+                    // out the whole deadline instead of sleeping through it.
+                    interrupted = true;
+                }
             }
-            try {
-                lock.wait(remaining);
-            } catch (InterruptedException ie) {
+        } finally {
+            if (interrupted) {
                 Thread.currentThread().interrupt();
-                return;
             }
         }
     }
