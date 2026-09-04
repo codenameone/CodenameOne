@@ -229,6 +229,7 @@ def developer_guide_sources(repo_root, git_ref=None):
 def developer_guide_anchors(repo_root, git_ref=None):
     """Collect generated and explicit IDs from the single-page developer guide."""
     anchors = set()
+    generated_counts = collections.Counter()
     guide_entry = "docs/developer-guide/developer-guide.asciidoc"
     for rel_path, source in developer_guide_sources(repo_root, git_ref):
         normalized_rel_path = rel_path.replace(os.sep, "/")
@@ -244,9 +245,13 @@ def developer_guide_anchors(repo_root, git_ref=None):
                 continue
             anchor = asciidoc_default_anchor(match.group(2))
             if anchor:
-                anchors.add(anchor)
+                generated_counts[anchor] += 1
         for match in ASCIIDOC_BLOCK_ID_RE.finditer(source):
             anchors.add(match.group(1) or match.group(2))
+    for anchor, count in generated_counts.items():
+        anchors.add(anchor)
+        for occurrence in range(2, count + 1):
+            anchors.add(f"{anchor}_{occurrence}")
     return anchors
 
 

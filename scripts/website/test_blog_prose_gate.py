@@ -63,13 +63,20 @@ class DeveloperGuideAnchorTest(unittest.TestCase):
                 guide.write(
                     "= Codename One Developer Guide\n\n"
                     "= Core concepts\n\n"
-                    "== Call Management\n"
+                    "== Call Management\n\n"
+                    "==== Usage example\n\n"
+                    "==== Usage example\n\n"
+                    "==== Usage example\n"
                 )
 
             anchors = blog_prose_gate.developer_guide_anchors(repo_root)
 
         self.assertIn("_core_concepts", anchors)
         self.assertIn("_call_management", anchors)
+        self.assertIn("_usage_example", anchors)
+        self.assertIn("_usage_example_2", anchors)
+        self.assertIn("_usage_example_3", anchors)
+        self.assertNotIn("_usage_example_4", anchors)
         self.assertNotIn("_codename_one_developer_guide", anchors)
 
     @mock.patch.object(blog_prose_gate, "_git")
