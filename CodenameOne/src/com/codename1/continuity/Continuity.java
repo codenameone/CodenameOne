@@ -789,7 +789,7 @@ public final class Continuity {
         // `failed` is the distinction `shown` cannot make. False means both "there was no form to
         // show, and that is success" and "this did not work", which need opposite handling here --
         // the same conflation that put two flags in capture() and in checkpoint().
-        if (isSameState(parked, state)) {
+        if (supersedesParked(state)) {
             parked = null;
             // The slot is what holds a publication back; the decision has been made, so anything
             // waiting on it can go out now.
@@ -1013,6 +1013,11 @@ public final class Continuity {
             return;
         }
         polling = false;
+        // Recorded, because `polling` stops being true the moment this returns and the hold below
+        // would then last only until the next checkpoint -- which is not what "anything owed
+        // waits for a read that succeeds" says. The comment was making a promise the code kept
+        // for exactly one caller.
+        fetchUnread = fetchFailed;
         boolean admitted = false;
         if (fetched != null) {
             admit(fetched);
@@ -1146,6 +1151,9 @@ public final class Continuity {
         polling = false;
         pollAgain = false;
         publishRequested = false;
+        // A new session has read nothing yet, and owes nothing either: the slot was just emptied.
+        // Carrying a failed read across would make the next checkpoint poll for no reason.
+        fetchUnread = false;
     }
 
     // ------------------------------------------------------------------
@@ -1344,6 +1352,14 @@ public final class Continuity {
     /// True while a relay fetch is out; `pollAgain` records a poll asked for during one.
     private static boolean polling;
 
+    /// Whether the last relay read FAILED, so what the document holds is unknown.
+    ///
+    /// Publishing replaces the relay's single document, and that is only safe because a poll
+    /// established what was there. A read that timed out established nothing, so anything owed
+    /// waits -- not for the next checkpoint, which is where the protection used to end, but for a
+    /// read that succeeds.
+    private static boolean fetchUnread;
+
     private static boolean pollAgain;
 
     /// True when a publisher was wanted while one was already out.
@@ -1406,6 +1422,19 @@ public final class Continuity {
             return;
         }
         if (pendingPublish == null) {
+            return;
+        }
+        if (fetchUnread) {
+            // The last read of the relay FAILED, so what the document holds is unknown -- and
+            // writing over it is only safe because a poll established that. A timeout establishes
+            // nothing, and the protection used to end at the next checkpoint rather than at a
+            // successful read.
+            //
+            // A fresh poll rather than a refusal: an application that goes on working while the
+            // network is down must not stop publishing for the rest of the process, so the state
+            // stays owed and the read is retried. Whichever poll succeeds releases it.
+            publishRequested = true;
+            startPoll();
             return;
         }
         if (polling) {
@@ -1829,20 +1858,6 @@ public final class Continuity {
         }
     }
 
-    /// Whether two states are the same one: same origin device, same sequence.
-    ///
-    /// The pair that identifies a state throughout this class. Neither half alone will do --
-    /// sequences restart at zero on a device whose preferences were cleared, and one device
-    /// publishes many.
-    private static boolean isSameState(AppState a, AppState b) {
-        if (a == null || b == null) {
-            return false;
-        }
-        String left = a.getDeviceId();
-        String right = b.getDeviceId();
-        return left != null && left.equals(right) && a.getSequence() == b.getSequence();
-    }
-
     /// Records that `state` has been acted on, durably.
     private static void noteActedOn(AppState state) {
         String from = state.getDeviceId();
@@ -1869,7 +1884,7 @@ public final class Continuity {
                 recordDurable(from, seq);
             }
         }
-        if (isSameState(parked, state)) {
+        if (supersedesParked(state)) {
             // The application has dealt with this arrival -- acknowledge() is the documented way
             // to decline one -- so the slot must not go on offering it through
             // getRestorableState(), and must not go on holding a checkpoint back either. The
@@ -1905,6 +1920,26 @@ public final class Continuity {
         // IDENTITY, and the marker says so: two relays that considered themselves equal would
         // still be two objects, and the one that was replaced is the one that must be refused.
         return r != null && r == relay; //NOPMD CompareObjectsWithEquals
+    }
+
+    /// Whether completing `state` also finishes whatever is parked.
+    ///
+    /// Not identity. A device can have two states in flight -- a continuation and a relay poll
+    /// routinely carry different sequences -- so sequence N can be parked while N+1 from the same
+    /// origin is admitted and restored. Asking only "is this the same state" left N in the slot:
+    /// getRestorableState() went on offering work the origin had already moved past, restoring it
+    /// would have walked the user and the stored checkpoint BACKWARDS, and the publication hold
+    /// never lifted.
+    ///
+    /// The same rule the tombstone path applies, for the same reason: an origin telling us where
+    /// it is now settles everything of its own that came before. A state from a DIFFERENT origin
+    /// settles nothing here, which is what keeps this device's own checkpoint from releasing a
+    /// hold that belongs to somebody else's arrival.
+    private static boolean supersedesParked(AppState state) {
+        AppState waiting = parked;
+        return waiting != null
+                && waiting.getDeviceId().equals(state.getDeviceId())
+                && waiting.getSequence() <= state.getSequence();
     }
 
     /// Test seam: parks a state, as a cold-launch arrival with no form yet does.

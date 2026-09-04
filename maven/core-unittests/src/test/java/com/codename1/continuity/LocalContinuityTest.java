@@ -2813,6 +2813,92 @@ public class LocalContinuityTest extends UITestBase {
                 "the facade did not reach the bridge to remove the key");
     }
 
+    /**
+     * A failed relay read holds the publication until a read SUCCEEDS, not until the next
+     * checkpoint.
+     *
+     * <p>Writing over the relay's single document is only safe because a poll established what
+     * was there; a timeout establishes nothing. The hold used to end the moment pollFinished()
+     * cleared {@code polling}, so the very next checkpoint published over a document this device
+     * had never managed to read.</p>
+     */
+    @EdtTest
+    public void aFailedReadHoldsThePublicationUntilAReadSucceeds() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+
+        final java.util.concurrent.atomic.AtomicInteger fetches =
+                new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicBoolean readWorks =
+                new java.util.concurrent.atomic.AtomicBoolean(false);
+        Continuity.setRelay(new StateRelay() {
+            public void publish(AppState state) {
+                published.add(state);
+            }
+
+            public AppState fetch() throws java.io.IOException {
+                fetches.incrementAndGet();
+                if (!readWorks.get()) {
+                    throw new java.io.IOException("no network");
+                }
+                return null;
+            }
+        });
+        pause(300L);
+        flushSerialCalls();
+        assertTrue(fetches.get() > 0, "the relay was never read, so no read has failed yet");
+        published.clear();
+
+        // The checkpoint that used to go out on the strength of a read that never happened.
+        provider.saved.put("after", "work done while offline");
+        Continuity.checkpoint();
+        pause(300L);
+        flushSerialCalls();
+        assertTrue(published.isEmpty(),
+                "a checkpoint was published over a relay document this device has never managed "
+                        + "to read: published=" + published.size());
+
+        // And it is a hold, not a refusal: the work is still owed, and a read that succeeds
+        // releases it. Without that this test would pass on a relay that had simply stopped.
+        readWorks.set(true);
+        Continuity.checkpoint();
+        pause(500L);
+        flushSerialCalls();
+        assertFalse(published.isEmpty(),
+                "the state stayed owed for ever once a read had failed, so this device never "
+                        + "publishes again for the life of the process");
+    }
+
+    /**
+     * Completing a newer state from an origin releases an older one parked from the same origin.
+     *
+     * <p>A device can have two states in flight -- a continuation and a relay poll routinely carry
+     * different sequences -- so N can be parked while N+1 is admitted and restored. An identity
+     * comparison left N in the slot: it was still offered, restoring it would have walked the user
+     * and the stored checkpoint backwards, and the publication hold never lifted.</p>
+     */
+    @EdtTest
+    public void completingANewerStateReleasesAnOlderOneFromTheSameOrigin() {
+        Continuity.setAutoRestore(false);
+        Continuity.setStateProvider(new RecordingProvider());
+
+        Continuity.deliver(fromElsewhere("the older screen", 70L));
+        flushSerialCalls();
+        AppState older = Continuity.getRestorableState();
+        assertNotNull(older, "nothing parked, so there is no predecessor to strand");
+        assertEquals(70L, older.getSequence(), "a different state parked");
+
+        // The same origin, further along. Acknowledging it is the origin saying where it is now.
+        Continuity.acknowledge(fromElsewhere("the newer screen", 71L));
+        flushSerialCalls();
+
+        AppState stranded = Continuity.getRestorableState();
+        assertTrue(stranded == null || stranded.getSequence() != 70L,
+                "the superseded state is still on offer, so restoring it walks the user backwards "
+                        + "and the publication hold never lifts");
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;
