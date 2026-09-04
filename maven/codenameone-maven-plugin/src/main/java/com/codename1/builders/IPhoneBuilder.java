@@ -11550,6 +11550,65 @@ public class IPhoneBuilder extends Executor {
         // unlike the cloud builder's copy: that indirection exists to stop an
         // archive's global signing flags clobbering an extension, and this
         // copy hands the project to a local Xcode with no such flags.
+        // An overridden entitlements FILE is the project's, but it still
+        // has to carry the value that makes this bundle a tunnel. iOS starts
+        // a packet-tunnel provider on the strength of
+        // packet-tunnel-provider being in its entitlements; signed without
+        // it the extension is installed, never started, and nothing in the
+        // build or on the device says why. The profile preflight cannot
+        // stand in for this either -- it asks what the PROFILE grants, not
+        // what the extension is signed with.
+        //
+        // Read rather than refused, because an override is a legitimate
+        // thing to do: an extension may want an App Group or keychain
+        // sharing alongside. Where the file cannot be read from here -- an
+        // Xcode-relative path this build never resolves -- the project owns
+        // it, and saying so is the whole of what this can do.
+        for (String settingKey : buildSettingsMap.keySet()) {
+            if (!settingKey.startsWith("CODE_SIGN_ENTITLEMENTS")) {
+                continue;
+            }
+            String path = buildSettingsMap.get(settingKey);
+            if (path == null || path.equals(IOSVpnTunnelExtensionBuilder.EXTENSION_NAME
+                    + "/" + IOSVpnTunnelExtensionBuilder.EXTENSION_NAME
+                    + ".entitlements")) {
+                // The generated one, which carries the value by
+                // construction.
+                continue;
+            }
+            File overridden = new File(path);
+            if (!overridden.isAbsolute()) {
+                overridden = new File(distDir, path);
+            }
+            String declared = null;
+            if (overridden.isFile()) {
+                try {
+                    declared = readFileToString(overridden);
+                } catch (Exception unreadable) {
+                    declared = null;
+                }
+            }
+            if (declared == null) {
+                log("[vpnTunnel] NOTE: ios.vpn.tunnel.buildSettings."
+                        + settingKey + " points at " + path + ", which this"
+                        + " build cannot read, so it cannot check it. That"
+                        + " file has to declare"
+                        + " com.apple.developer.networking.networkextension"
+                        + " with packet-tunnel-provider: signed without it"
+                        + " the extension installs and iOS never starts it.");
+            } else if (declared.indexOf("packet-tunnel-provider") < 0) {
+                throw new RuntimeException("ios.vpn.tunnel.buildSettings."
+                        + settingKey + " replaces the extension's"
+                        + " entitlements with " + path + ", which does not"
+                        + " declare packet-tunnel-provider. That value is"
+                        + " what makes this bundle a packet tunnel -- signed"
+                        + " without it the extension is installed and never"
+                        + " started, with nothing on the device to say why."
+                        + " Add it to that file, or remove the override and"
+                        + " let the build supply the entitlements.");
+            }
+        }
+
         // A CONDITIONAL name or identifier is refused, not resolved.
         //
         // Xcode honours PRODUCT_NAME[sdk=iphoneos*] over the plain setting

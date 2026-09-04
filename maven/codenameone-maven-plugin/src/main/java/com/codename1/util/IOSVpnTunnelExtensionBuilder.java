@@ -406,6 +406,17 @@ public final class IOSVpnTunnelExtensionBuilder {
                 .append("(threadStateData);\n");
         sb.append("        ").append(mangled)
                 .append("___INIT____(threadStateData, tunnel);\n");
+        sb.append("        // fromNSString is the TRANSLATOR's, not the\n");
+        sb.append("        // port's -- cn1_globals.m defines it under\n");
+        sb.append("        // #if defined(__APPLE__) && defined(__OBJC__),\n");
+        sb.append("        // and IOSNative.m only extern-declares it, as\n");
+        sb.append("        // CN1Vpn.m and a dozen other port sources do. It\n");
+        sb.append("        // therefore arrives with the translation and is\n");
+        sb.append("        // compiled into this target, which is why the\n");
+        sb.append("        // extension can leave every port native out and\n");
+        sb.append("        // still convert a string. (Raised as a link error\n");
+        sb.append("        // in review on the premise that it was the\n");
+        sb.append("        // port's; it is not.)\n");
         sb.append("        com_codename1_impl_vpn_ExtensionTunnelHost_begin___java_lang_Object_java_lang_String(\n");
         sb.append("                threadStateData, tunnel,\n");
         sb.append("                fromNSString(threadStateData, wire));\n");

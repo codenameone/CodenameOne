@@ -180,11 +180,28 @@ public final class ExtensionTunnelHost {
     private static final class ExtensionTransport implements TunnelTransport {
         private final PacketBuffer[] pool;
 
+        /// The writer THIS start installed, captured rather than looked up
+        /// when a packet is sent.
+        ///
+        /// Resolving the global at send time undid the generation the
+        /// writer carries: a tunnel that is over can be inside forward()
+        /// when a stop and a restart install a new writer, and the old
+        /// transport then reached for it, passed the CURRENT generation to
+        /// writeNative and had its guard wave the packet through -- one
+        /// session's traffic leaving on another's link, which is exactly
+        /// what tagging the writer was meant to stop. Held here, an old
+        /// transport keeps an old writer and the guard sees a generation
+        /// that has moved.
+        private final Writer sink;
+
         /// Whether the pooled buffer holds a packet the host has not taken.
         private boolean staged;
 
         ExtensionTransport(int mtu) {
             this.pool = new PacketBuffer[]{TunnelBuffers.allocate(mtu)};
+            // The provider installs the writer BEFORE it calls begin, so the
+            // one current here belongs to the start this transport is for.
+            this.sink = writer();
         }
 
         /// The pooled buffer's array, grown for this packet.
@@ -220,9 +237,10 @@ public final class ExtensionTunnelHost {
             if (packet == null || packet.getLength() <= 0) {
                 return;
             }
-            Writer w = writer();
-            if (w != null) {
-                w.write(packet.getData(), packet.getOffset(),
+            // THIS start's writer; see the field. Null when nothing installed
+            // one, which is the same silence as before.
+            if (sink != null) {
+                sink.write(packet.getData(), packet.getOffset(),
                         packet.getLength());
             }
         }
