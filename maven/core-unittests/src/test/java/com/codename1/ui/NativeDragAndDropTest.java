@@ -1320,6 +1320,36 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void theDeeperTargetWinsEvenWhenItsFocusableParentIsOneToo() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder holder = new DropRecorder();
+        holder.setLayout(new BorderLayout());
+        holder.setNativeDropTarget(true);
+        // Focusable, so hit testing answers with the holder rather than the child under the
+        // pointer -- and the holder is a target as well, so the walk outwards would stop at it.
+        holder.setFocusable(true);
+        DropRecorder target = new DropRecorder();
+        target.setNativeDropTarget(true);
+        target.setPreferredSize(new com.codename1.ui.geom.Dimension(40, 40));
+        holder.add(BorderLayout.CENTER, target);
+        form.setLayout(new BorderLayout());
+        form.add(BorderLayout.CENTER, holder);
+        form.revalidate();
+
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+        NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        assertTrue(target.events.contains("drop"),
+                "the drag belongs to the innermost target under the pointer; which of its "
+                        + "ancestors happens to take the focus does not decide that");
+        assertFalse(holder.events.contains("drop"));
+    }
+
+    @FormTest
     void aTargetHiddenByItsAncestorIsNotHandedTheDelayedDrop() {
         Form form = Display.getInstance().getCurrent();
         Container holder = new Container(new BorderLayout());

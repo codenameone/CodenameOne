@@ -10252,10 +10252,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
                     android.content.ClipData clip;
                     long staged = 0;
+                    boolean assembled = false;
                     if (obj instanceof ClipboardContent) {
-                        AssembledClip assembled = clipDataFor((ClipboardContent) obj);
-                        clip = assembled.getData();
-                        staged = assembled.getClip();
+                        AssembledClip built = clipDataFor((ClipboardContent) obj);
+                        clip = built == null ? null : built.getData();
+                        staged = built == null ? 0 : built.getClip();
+                        assembled = true;
                         if (clip == null) {
                             // A copy of nothing is an empty clipboard, which is a thing the user
                             // asked for and can paste. A *drag* of nothing is not: there the null
@@ -10282,6 +10284,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         published = true;
                     } finally {
                         clipboardPublished(staged, published);
+                        if (assembled) {
+                            // Taken over by the clipboard, or given up on. Either way this
+                            // assembly is no longer one nothing has claimed.
+                            endStagingClip(staged);
+                        }
                     }
                 }
             }
@@ -11442,9 +11449,38 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// application puts anything on the clipboard.
     private static boolean clipboardWatched;
 
+    /// The assemblies that have begun and whose caller has not yet taken them over.
+    ///
+    /// An assembly is exempt from reclamation while it is being built -- its files are being
+    /// referenced by a clip that does not exist yet -- and stays exempt until whoever asked for
+    /// it has put it on the clipboard or handed it to a drag. Exempting only the clip currently
+    /// growing was not enough: a copy assembles on Android's UI thread while a drag assembles
+    /// on the event dispatch thread, so one could finish and be waiting for its caller to claim
+    /// it while the other's staging triggered a reclamation that deleted its files. The caller
+    /// then published, or dragged, a clip of dead URIs.
+    private static final java.util.Set<Long> ASSEMBLING_CLIPS = new java.util.HashSet<Long>();
+
     private static long beginStagingClip() {
         synchronized (STAGED_CLIP_FILES) {
-            return ++stagingClip;
+            long clip = ++stagingClip;
+            ASSEMBLING_CLIPS.add(Long.valueOf(clip));
+            return clip;
+        }
+    }
+
+    /// Ends an assembly's exemption, because its caller has taken it over -- or has given up on
+    /// it, which is the same thing as far as its files are concerned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `clip`: the assembly, or zero when there was none
+    static void endStagingClip(long clip) {
+        if (clip == 0) {
+            return;
+        }
+        synchronized (STAGED_CLIP_FILES) {
+            ASSEMBLING_CLIPS.remove(Long.valueOf(clip));
+            reclaimStagedClipFiles();
         }
     }
 
@@ -11556,7 +11592,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // nothing else would have looked at it again until some later transfer staged
             // a file -- which for an application that drags one large payload and then
             // stops is never.
-            reclaimStagedClipFiles(0);
+            reclaimStagedClipFiles();
         }
     }
 
@@ -11591,7 +11627,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     static void dragHolds(long clip) {
         synchronized (STAGED_CLIP_FILES) {
             draggingClip = clip;
-            reclaimStagedClipFiles(0);
+            reclaimStagedClipFiles();
         }
     }
 
@@ -11601,22 +11637,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             STAGED_CLIP_FILES.remove(uri.toString());
             STAGED_CLIP_FILES.put(uri.toString(),
                     new StagedClipFile(file.getAbsolutePath(), transport, clip, file.length()));
-            reclaimStagedClipFiles(clip);
+            reclaimStagedClipFiles();
         }
     }
 
     /// Reclaims staged files, oldest first, until what is left fits the budget.
     ///
-    /// Never the clip being assembled -- it is still growing -- and never the one the
-    /// clipboard or a running drag is carrying, which are not superseded by anything
-    /// however old they are. Called when a file is staged and again when a hold is
-    /// released, because a clip too large for the budget on its own can only be reclaimed
+    /// Never an assembly whose caller has yet to take it over -- it is still growing, or
+    /// waiting to be handed to a clipboard or a drag -- and never the one the clipboard, a
+    /// running drag or a publication in progress is carrying, none of which are superseded by
+    /// anything however old they are. Called when a file is staged and again when any of those
+    /// is released, because a clip too large for the budget on its own can only be reclaimed
     /// once nothing holds it any more.
-    ///
-    /// #### Parameters
-    ///
-    /// - `assembling`: the clip being built, or zero when none is
-    private static void reclaimStagedClipFiles(long assembling) {
+    private static void reclaimStagedClipFiles() {
         synchronized (STAGED_CLIP_FILES) {
             long held = 0;
             for (StagedClipFile staged : STAGED_CLIP_FILES.values()) {
@@ -11626,8 +11659,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     STAGED_CLIP_FILES.entrySet().iterator();
             while (held > GENERATED_CLIP_BUDGET && entries.hasNext()) {
                 StagedClipFile staged = entries.next().getValue();
-                if (staged.clip == assembling || staged.clip == clipboardClip
-                        || staged.clip == draggingClip || staged.clip == publishingClip) {
+                if (ASSEMBLING_CLIPS.contains(Long.valueOf(staged.clip))
+                        || staged.clip == clipboardClip || staged.clip == draggingClip
+                        || staged.clip == publishingClip) {
                     continue;
                 }
                 held -= staged.bytes;

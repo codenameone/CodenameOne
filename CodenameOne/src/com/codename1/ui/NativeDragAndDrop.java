@@ -1469,6 +1469,36 @@ public final class NativeDragAndDrop {
             // event that lands mid-layout is not worth a crash; the next one resolves.
             return null;
         }
+        // Inside what hit testing answered with, before the answer itself. getComponentAt
+        // reports where a *pointer press* would go, and it promotes a focusable container over
+        // a child that is not focusable; being a native drop target has no say in it, since
+        // respondsToPointerEvents knows nothing about that. The walk below then starts above
+        // the component the pointer is really over, so a target inside a focusable container
+        // -- a scrollable one, among plenty of others -- was passed over entirely, and where
+        // the container was a target too it took the drop meant for its child. This walk goes
+        // outwards from the deepest target, and promotion is the one thing that can make it
+        // start in the wrong place.
+        //
+        // Inside it, never beside it: promotion returns an *ancestor* of the component deepest
+        // under the point, so that subtree is the only place a hidden target can be. Searching
+        // the whole surface reached components the pointer cannot -- a target behind an
+        // overlay lit up and took the drop through the thing covering it.
+        if (hit instanceof Container) {
+            // Cast outside the try. ParparVM does not throw for a failed cast, so a cast under
+            // catch(Throwable) is one whose failure could never be reported there -- and the
+            // gate that says so does not read an instanceof above it as covering it.
+            Container inside = (Container) hit;
+            Component deeper;
+            try {
+                deeper = descendToTarget(inside, x, y, content, actions);
+            } catch (Throwable err) {
+                // Mid-layout, as above.
+                deeper = null;
+            }
+            if (deeper != null) {
+                return deeper;
+            }
+        }
         Component cmp = hit;
         while (cmp != null) {
             if (acceptsDrop(cmp, content, actions)) {
@@ -1476,37 +1506,7 @@ public final class NativeDragAndDrop {
             }
             cmp = cmp.getParent();
         }
-        // Nothing on the path hit testing answered with -- and that answer is not always the
-        // component deepest under the point. getComponentAt reports where a *pointer press*
-        // would go, and it promotes a focusable container over a child that is not focusable;
-        // being a native drop target has no say in it, since respondsToPointerEvents knows
-        // nothing about that. A target inside a focusable container -- a scrollable one, among
-        // plenty of others -- was therefore never examined at all: no enter, no drop, while the
-        // same component took the drag when its parent was plain. So the descent is made here
-        // instead, looking for what the pointer is actually over.
-        //
-        // After the walk rather than instead of it: where hit testing does answer with a
-        // target, or with a child of one, that answer is the same component a press would
-        // reach, and native drops and pointer events should not disagree about that.
-        //
-        // And inside what hit testing answered with, never beside it. Promotion returns an
-        // *ancestor* of the component deepest under the point, so that is the only place a
-        // hidden target can be. Searching the whole surface instead reached components the
-        // pointer cannot: a target behind an overlay -- a sheet, a pane put up to block input
-        // -- lit up and took the drop through the thing covering it.
-        if (!(hit instanceof Container)) {
-            return null;
-        }
-        // Cast before the try, not inside it. ParparVM does not throw for a failed cast, so a
-        // cast under catch(Throwable) is one whose failure could never be reported there --
-        // and the gate that says so does not read the guard above as covering it.
-        Container inside = (Container) hit;
-        try {
-            return descendToTarget(inside, x, y, content, actions);
-        } catch (Throwable err) {
-            // Mid-layout, as above.
-            return null;
-        }
+        return null;
     }
 
     /// The topmost native drop target under a point, searched for directly.

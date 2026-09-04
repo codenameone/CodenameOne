@@ -206,13 +206,19 @@ final class AndroidNativeDragAndDrop {
         }
         final AndroidImplementation.AssembledClip assembled = toClipData(impl, op.getContent());
         final ClipData clip = assembled == null ? null : assembled.getData();
+        final long staged = assembled == null ? 0 : assembled.getClip();
         if (clip == null) {
+            // Nothing to drag, and nothing will claim what was staged for it either.
+            AndroidImplementation.endStagingClip(staged);
             return false;
         }
         // The drag holds this clip until it ends, and copies made while it runs must not age
         // its files out from under the receiver. The assembly's own id, not the latest one:
         // a clipboard copy on the Android UI thread can have begun since.
         AndroidImplementation.dragHolds(assembled.getClip());
+        // The drag holds it from here, so the assembly's own exemption is no longer what keeps
+        // it: one claim replaces the other, in that order, so there is no moment in between.
+        AndroidImplementation.endStagingClip(staged);
         setExporting(op);
         setLastAction(UNDECIDED);
         setLocalDropAction(NativeDragOperation.ACTION_NONE);
@@ -299,7 +305,14 @@ final class AndroidNativeDragAndDrop {
                     return true;
                 case DragEvent.ACTION_DROP:
                     return drop(impl, event);
-                case DragEvent.ACTION_DRAG_ENDED:
+                case DragEvent.ACTION_DRAG_ENDED: {
+                    // The clip *this* session was carrying, read before anything is queued to
+                    // the event dispatch thread. dragCompleted queues the source's completion
+                    // listener, and that listener can start the next drag -- which claims the
+                    // slot -- before this thread gets back here. Reading the slot afterwards
+                    // then let go of a drag that had only just begun, whose files a cache over
+                    // budget could delete before its receiver read them.
+                    final long ending = AndroidImplementation.draggingClip();
                     // Whatever happened, nothing is hovered any more. Android delivers this to
                     // every subscribed view, and it is the only event that arrives on the paths
                     // that otherwise clear nothing: a drop the target refused returns before
@@ -324,12 +337,13 @@ final class AndroidNativeDragAndDrop {
                     // case the release is queued behind that callback and happens there. This
                     // event arrives immediately after the drop, long before the event dispatch
                     // thread has read anything.
-                    if (!dropDispatchPending(AndroidImplementation.draggingClip())) {
-                        AndroidImplementation.dragHolds(0);
+                    if (!dropDispatchPending(ending)) {
+                        AndroidImplementation.releaseDragHold(ending);
                     }
                     setLastAction(UNDECIDED);
                     setLocalDropAction(NativeDragOperation.ACTION_NONE);
                     return true;
+                }
                 default:
                     return false;
             }
