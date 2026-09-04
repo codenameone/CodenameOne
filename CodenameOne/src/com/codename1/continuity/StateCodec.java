@@ -422,6 +422,19 @@ public final class StateCodec {
     /// at the limit, so a huge string costs the limit rather than its own length, and the running
     /// total cannot overflow.
     static boolean exceedsWritableLength(String s) {
+        return writableLength(s) > MAX_STRING_BYTES;
+    }
+
+    /// The number of bytes `s` occupies in the modified UTF-8 a stored string is written as.
+    ///
+    /// Counted rather than approximated from `length()`, because the limit is on BYTES and a
+    /// string of accented or CJK characters reaches it at a third of the character count.
+    ///
+    /// Stops counting once past the limit, so a huge string costs the limit rather than its own
+    /// length and the running total cannot overflow. Callers may therefore read the answer as
+    /// "this many bytes, or more than the limit" -- which is all either of them needs, one to
+    /// refuse the string and the other to budget for it.
+    static int writableLength(String s) {
         int len = 0;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
@@ -433,10 +446,10 @@ public final class StateCodec {
                 len += 2;
             }
             if (len > MAX_STRING_BYTES) {
-                return true;
+                return len;
             }
         }
-        return false;
+        return len;
     }
 
     private static void check(Object value, String path, int depth) {

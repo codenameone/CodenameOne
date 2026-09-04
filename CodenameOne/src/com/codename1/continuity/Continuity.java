@@ -1811,6 +1811,47 @@ public final class Continuity {
     private static void trimSeen() {
         trimTo(durableSeen);
         trimTo(lastSeen);
+        // durableSeen only: lastSeen is never written anywhere, so no byte budget applies to it.
+        trimToWritable(durableSeen);
+    }
+
+    /// Evicts the eldest durable marks until the whole map still fits in one stored string.
+    ///
+    /// MAX_SEEN bounds the COUNT, which is not the same bound. The marks go to storage as a single
+    /// string, and a stored string is written as modified UTF-8 with a length that stops at
+    /// 65535 bytes -- while a device id is only checked against that limit ONE AT A TIME, on its
+    /// way into an AppState. Ids arrive from other devices, so a single maximum-length one already
+    /// makes the combined string too long on its own, and a few merely large ones do it together.
+    ///
+    /// The write then fails every time, and the failure is the quiet kind: this run still
+    /// acknowledges correctly from memory, and nothing is durable, so after every restart the
+    /// relay can offer an already-applied state again and its side effects run a second time.
+    ///
+    /// Evicting is the same trade the count cap already makes, and the same victims: the eldest
+    /// go, and losing a mark costs one duplicate delivery rather than the durability of all of
+    /// them. An id so long that it does not fit beside anything is evicted by the same loop.
+    private static void trimToWritable(Map<String, Long> map) {
+        int total = 0;
+        for (Map.Entry<String, Long> e : map.entrySet()) {
+            total += seenEntryLength(e.getKey(), e.getValue().longValue());
+        }
+        Iterator<Map.Entry<String, Long>> i = map.entrySet().iterator();
+        while (total > StateCodec.MAX_STRING_BYTES && i.hasNext()) {
+            Map.Entry<String, Long> e = i.next();
+            total -= seenEntryLength(e.getKey(), e.getValue().longValue());
+            i.remove();
+        }
+    }
+
+    /// What one mark costs in the stored string, separators included.
+    ///
+    /// The trailing separator is counted for every entry including the last, which over-counts by
+    /// one byte. That is the safe direction for a budget and it keeps the sum independent of
+    /// which entry happens to be last, so removing one from the front never invalidates the rest.
+    private static int seenEntryLength(String device, long sequence) {
+        return StateCodec.writableLength(escapeSeenKey(device))
+                + StateCodec.writableLength(Long.toString(sequence))
+                + 2;
     }
 
     /// Evicts the least recently seen entries from one map until it is inside MAX_SEEN.

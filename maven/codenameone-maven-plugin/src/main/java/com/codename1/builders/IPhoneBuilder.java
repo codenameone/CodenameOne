@@ -12005,8 +12005,35 @@ public class IPhoneBuilder extends Executor {
         return plistIndexOfLive(arrayText, "<string>" + value + "</string>", 0) >= 0;
     }
 
-    static String mergeUserActivityTypes(String inject, List<Map<String, Object>> intents) {
+    static String mergeUserActivityTypes(String inject, List<Map<String, Object>> intents)
+            throws BuildException {
         return mergeUserActivityTypes(inject, intents, null);
+    }
+
+    /// Refuses a build whose continuity type has nowhere to go.
+    ///
+    /// Returning the fragment untouched is the right answer for the intents-only merge -- writing
+    /// a SECOND NSUserActivityTypes key produces a plist iOS reads unpredictably, which is worse
+    /// than the ids being absent -- but it is the wrong answer once a continuity type depends on
+    /// that array. The caller has already seen the key and so writes no array of its own, so the
+    /// type reaches no array at all: the build succeeds, CN1ContinuityActivityType is present,
+    /// and Handoff is never advertised, with nothing anywhere saying so.
+    ///
+    /// The declaration is malformed either way -- iOS requires an array here -- so this is not
+    /// this build's failure to report in general, and an intents-only project keeps the behaviour
+    /// it has today. It is reported when continuity depends on it, for the same reason
+    /// withContinuityActivityType refuses a CN1ContinuityActivityType that is not a string: a
+    /// feature that is silently inert on the device is the one outcome worth failing a build for.
+    private static void requireArrayForContinuity(String continuityType, String what)
+            throws BuildException {
+        if (continuityType == null || continuityType.length() == 0) {
+            return;
+        }
+        throw new BuildException("ios.plistInject declares NSUserActivityTypes with a value that "
+                + what + ". This build publishes the continuity activity type '" + continuityType
+                + "', which iOS only reads from an <array> under that key. Declare it as an "
+                + "array -- the build adds the type to an array it can find -- or leave the key "
+                + "out so the build writes the whole array itself.");
     }
 
     /// The same merge, adding the continuity activity type alongside the intent ids.
@@ -12017,7 +12044,7 @@ public class IPhoneBuilder extends Executor {
     /// - `intents`: the app's intent declarations, possibly empty
     /// - `continuityType`: this app's continuity activity type, or null when it uses none
     static String mergeUserActivityTypes(String inject, List<Map<String, Object>> intents,
-            String continuityType) {
+            String continuityType) throws BuildException {
         // The same structural reading the rest of the plist parsing uses: this walks a
         // fragment the application supplied, so "<array >" and "</array >" are shapes it
         // has to accept. Found by enumerating every literal closing tag left in this
@@ -12034,10 +12061,12 @@ public class IPhoneBuilder extends Executor {
         // documented behaviour for "no array here" is to return the fragment untouched.
         int open = immediateValueIndex(inject, key);
         if (open < 0 || !inject.startsWith("<array", open)) {
+            requireArrayForContinuity(continuityType, "is not an array");
             return inject;
         }
         int close = plistCloseElementIndex(inject, "array", open);
         if (close < 0) {
+            requireArrayForContinuity(continuityType, "opens an array that is never closed");
             return inject;
         }
         String existing = inject.substring(open, close);

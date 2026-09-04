@@ -169,6 +169,62 @@ class IPhoneBuilderContinuityPlistTest {
         }
     }
 
+    /**
+     * A NSUserActivityTypes whose value is not an array is refused once a continuity type depends
+     * on it.
+     *
+     * <p>The caller has already seen the key, so it writes no array of its own, and the merge's
+     * documented answer for "no array here" is to return the fragment untouched -- which is right
+     * for the intents-only merge, because a SECOND NSUserActivityTypes key is a plist iOS reads
+     * unpredictably. Together they mean the continuity type reaches no array at all: the build
+     * succeeds, CN1ContinuityActivityType is present, and Handoff is never advertised.</p>
+     */
+    @Test
+    void aNonArrayActivityTypesDeclarationIsRefusedWhenContinuityNeedsIt() throws BuildException {
+        String inject = "<key>NSUserActivityTypes</key><string>com.example.app.other</string>";
+
+        try {
+            IPhoneBuilder.mergeUserActivityTypes(inject, noIntents(), CONTINUITY_TYPE);
+            fail("a NSUserActivityTypes that is not an array must not be silently accepted");
+        } catch (BuildException expected) {
+            assertTrue(expected.getMessage().contains("NSUserActivityTypes"),
+                    expected.getMessage());
+            assertTrue(expected.getMessage().contains(CONTINUITY_TYPE), expected.getMessage());
+        }
+    }
+
+    /**
+     * An array that is opened and never closed is refused for the same reason: the merge cannot
+     * find where to insert, so it returns the fragment untouched and the type goes nowhere.
+     */
+    @Test
+    void anUnclosedActivityTypesArrayIsRefusedWhenContinuityNeedsIt() throws BuildException {
+        String inject = "<key>NSUserActivityTypes</key><array><string>a</string>";
+
+        try {
+            IPhoneBuilder.mergeUserActivityTypes(inject, noIntents(), CONTINUITY_TYPE);
+            fail("an unterminated NSUserActivityTypes array must not be silently accepted");
+        } catch (BuildException expected) {
+            assertTrue(expected.getMessage().contains("never closed"), expected.getMessage());
+        }
+    }
+
+    /**
+     * The refusal is scoped to builds that need the array. An intents-only project with the same
+     * malformed declaration keeps the behaviour it has today: its plist is wrong either way -- iOS
+     * requires an array here -- and failing those builds is not this feature's change to make.
+     *
+     * <p>This is the half that keeps the two tests above honest. A refusal that fired
+     * unconditionally would satisfy both of them and break every existing project.</p>
+     */
+    @Test
+    void theSameDeclarationIsLeftAloneWhenNoContinuityTypeNeedsIt() throws BuildException {
+        String inject = "<key>NSUserActivityTypes</key><string>com.example.app.other</string>";
+
+        assertEquals(inject, IPhoneBuilder.mergeUserActivityTypes(inject, noIntents(), null));
+        assertEquals(inject, IPhoneBuilder.mergeUserActivityTypes(inject, noIntents()));
+    }
+
     // ------------------------------------------------------------------
     // Emitting the key
     // ------------------------------------------------------------------
@@ -234,7 +290,7 @@ class IPhoneBuilderContinuityPlistTest {
      * not advertised -- the same failure the commented-out KEY case has one level up.
      */
     @Test
-    void aCommentedOutEntryDoesNotSuppressTheType() {
+    void aCommentedOutEntryDoesNotSuppressTheType() throws BuildException {
         String inject = "<key>NSUserActivityTypes</key><array>"
                 + "<!-- <string>" + CONTINUITY_TYPE + "</string> -->"
                 + "<string>com.example.app.other</string></array>";
@@ -252,7 +308,7 @@ class IPhoneBuilderContinuityPlistTest {
      * the merge decided the value was not an array and dropped every activity type.
      */
     @Test
-    void aProcessingInstructionBetweenKeyAndArrayIsSteppedOver() {
+    void aProcessingInstructionBetweenKeyAndArrayIsSteppedOver() throws BuildException {
         String inject = "<key>NSUserActivityTypes</key><?note valid?><array/>";
 
         String merged = IPhoneBuilder.mergeUserActivityTypes(
@@ -333,7 +389,7 @@ class IPhoneBuilderContinuityPlistTest {
 
     /** The merge follows the same rule, or it rewrites an array the detection branch ignored. */
     @Test
-    void theMergeTargetsTheRootArrayNotANestedOne() {
+    void theMergeTargetsTheRootArrayNotANestedOne() throws BuildException {
         String both = "<key>MyFeature</key><dict>"
                 + "<key>NSUserActivityTypes</key><array>"
                 + "<string>com.example.app.nested</string></array></dict>"
@@ -364,7 +420,7 @@ class IPhoneBuilderContinuityPlistTest {
     // ------------------------------------------------------------------
 
     @Test
-    void continuityMergesIntoAnArrayTheApplicationDeclared() {
+    void continuityMergesIntoAnArrayTheApplicationDeclared() throws BuildException {
         String inject = "<key>NSUserActivityTypes</key><array>"
                 + "<string>com.example.app.legacyHandoff</string></array>";
 
@@ -376,7 +432,7 @@ class IPhoneBuilderContinuityPlistTest {
     }
 
     @Test
-    void intentsAndContinuityBothMergeIntoOneSuppliedArray() {
+    void intentsAndContinuityBothMergeIntoOneSuppliedArray() throws BuildException {
         String inject = "<key>NSUserActivityTypes</key><array>"
                 + "<string>com.example.app.legacyHandoff</string></array>";
 
@@ -394,7 +450,7 @@ class IPhoneBuilderContinuityPlistTest {
      * A project that already named the continuity type itself gets it once, not twice.
      */
     @Test
-    void anAlreadyDeclaredContinuityTypeIsNotDuplicated() {
+    void anAlreadyDeclaredContinuityTypeIsNotDuplicated() throws BuildException {
         String inject = "<key>NSUserActivityTypes</key><array>"
                 + "<string>" + CONTINUITY_TYPE + "</string></array>";
 
@@ -403,19 +459,27 @@ class IPhoneBuilderContinuityPlistTest {
         assertEquals(1, occurrences(merged, "<string>" + CONTINUITY_TYPE + "</string>"), merged);
     }
 
+    /**
+     * Returning the fragment unchanged is still the answer when nothing depends on the array.
+     *
+     * <p>This test used to pass a continuity type and assert the same thing, which is the
+     * behaviour that shipped the feature inert: the caller sees the key and writes no array, this
+     * writes nothing into the one that is there, and the type ends up in no array at all. Its
+     * real subject -- that a value which is not an array is never edited -- is unchanged and now
+     * asked without a continuity type; the refusal has tests of its own above.</p>
+     */
     @Test
-    void aFragmentWhoseArrayCannotBeFoundIsReturnedUnchanged() {
+    void aFragmentWhoseArrayCannotBeFoundIsReturnedUnchanged() throws BuildException {
         String inject = "<key>NSUserActivityTypes</key><string>not an array</string>";
 
-        assertEquals(inject,
-                IPhoneBuilder.mergeUserActivityTypes(inject, noIntents(), CONTINUITY_TYPE));
+        assertEquals(inject, IPhoneBuilder.mergeUserActivityTypes(inject, noIntents(), null));
     }
 
     /**
      * The parser has to accept the shapes a hand-written fragment really carries.
      */
     @Test
-    void aSpacedClosingTagIsStillMergedInto() {
+    void aSpacedClosingTagIsStillMergedInto() throws BuildException {
         String inject = "<key>NSUserActivityTypes</key><array >"
                 + "<string>com.example.app.legacyHandoff</string></array >";
 
@@ -436,7 +500,7 @@ class IPhoneBuilderContinuityPlistTest {
      * than a duplicate key, because nothing says so until Handoff does not work on a device.
      */
     @Test
-    void aSelfClosingArrayIsExpandedSoTheMergeCanSeeIt() {
+    void aSelfClosingArrayIsExpandedSoTheMergeCanSeeIt() throws BuildException {
         String inject = "<key>NSUserActivityTypes</key><array/>";
 
         String expanded = IPhoneBuilder.expandEmptyUserActivityArray(inject);
@@ -447,7 +511,7 @@ class IPhoneBuilderContinuityPlistTest {
     }
 
     @Test
-    void aSelfClosingArrayWithWhitespaceAndASpacedTagIsStillExpanded() {
+    void aSelfClosingArrayWithWhitespaceAndASpacedTagIsStillExpanded() throws BuildException {
         String inject = "<key>NSUserActivityTypes</key>\n   <array />";
 
         String merged = IPhoneBuilder.mergeUserActivityTypes(
@@ -517,7 +581,7 @@ class IPhoneBuilderContinuityPlistTest {
      * without the continuity type and Handoff was never advertised.
      */
     @Test
-    void aCommentedDeclarationAboveALiveOneIsNotTheOneMergedInto() {
+    void aCommentedDeclarationAboveALiveOneIsNotTheOneMergedInto() throws BuildException {
         String inject = "<!-- <key>NSUserActivityTypes</key><array>"
                 + "<string>com.example.app.old</string></array> -->"
                 + "<key>NSUserActivityTypes</key><array>"
@@ -566,7 +630,7 @@ class IPhoneBuilderContinuityPlistTest {
      * self-closing, and the merge then found no closing tag and added nothing.
      */
     @Test
-    void aCommentBetweenTheKeyAndItsArrayIsSteppedOver() {
+    void aCommentBetweenTheKeyAndItsArrayIsSteppedOver() throws BuildException {
         String inject = "<key>NSUserActivityTypes</key><!-- why we declare this --><array/>";
 
         String merged = IPhoneBuilder.mergeUserActivityTypes(
@@ -577,19 +641,31 @@ class IPhoneBuilderContinuityPlistTest {
     }
 
     /**
-     * The documented behaviour when this key's value is not an array is to return the fragment
-     * untouched. An unbounded search instead reached past it and inserted the ids into a LATER
-     * key's array, corrupting a property this code was never asked about.
+     * When this key's value is not an array, the ids never reach a LATER key's array. An unbounded
+     * search reached past it and inserted them into the next array it found, corrupting a property
+     * this code was never asked about.
+     *
+     * <p>Asked both ways, because the refusal must not be mistaken for the guarantee. Without a
+     * continuity type the fragment comes back untouched, which is what proves nothing was
+     * borrowed; with one the build is refused, and the refusal has to happen INSTEAD of the
+     * corruption rather than after it -- so the unrelated array is checked in the message-free
+     * path where it could actually have been edited.</p>
      */
     @Test
-    void aNonArrayValueDoesNotBorrowALaterKeysArray() {
+    void aNonArrayValueDoesNotBorrowALaterKeysArray() throws BuildException {
         String inject = "<key>NSUserActivityTypes</key><string>not an array</string>"
                 + "<key>SomethingElse</key><array><string>keep</string></array>";
 
-        String merged = IPhoneBuilder.mergeUserActivityTypes(inject, intents("logWorkout"),
-                CONTINUITY_TYPE);
+        assertEquals(inject,
+                IPhoneBuilder.mergeUserActivityTypes(inject, intents("logWorkout"), null),
+                "an unrelated array was edited");
 
-        assertEquals(inject, merged, "an unrelated array was edited");
+        try {
+            IPhoneBuilder.mergeUserActivityTypes(inject, intents("logWorkout"), CONTINUITY_TYPE);
+            fail("a continuity type with nowhere to go must not be accepted");
+        } catch (BuildException expected) {
+            assertFalse(expected.getMessage().contains("SomethingElse"), expected.getMessage());
+        }
     }
 
     @Test
@@ -621,7 +697,7 @@ class IPhoneBuilderContinuityPlistTest {
      * activity type -- while the branch that decided to merge had resolved the key correctly.
      */
     @Test
-    void aCommentInsideTheKeyDoesNotEndItEarly() {
+    void aCommentInsideTheKeyDoesNotEndItEarly() throws BuildException {
         String inject = "<key><!-- </key> -->NSUserActivityTypes</key><array/>";
 
         String merged = IPhoneBuilder.mergeUserActivityTypes(
@@ -631,7 +707,7 @@ class IPhoneBuilderContinuityPlistTest {
     }
 
     @Test
-    void nothingToAddLeavesTheFragmentAlone() {
+    void nothingToAddLeavesTheFragmentAlone() throws BuildException {
         String inject = "<key>NSUserActivityTypes</key><array>"
                 + "<string>com.example.app.legacyHandoff</string></array>";
 

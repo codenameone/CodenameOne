@@ -1575,6 +1575,55 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * The marks stay writable when the device ids are long.
+     *
+     * <p>MAX_SEEN bounds the COUNT, and that is not the bound storage imposes. The whole map goes
+     * out as ONE string, written as modified UTF-8 with a length that stops at 65535 bytes, while
+     * a device id is only checked against that limit one at a time on its way into an AppState --
+     * and ids arrive from other devices. A handful of large ones therefore make a combined string
+     * no write can hold.</p>
+     *
+     * <p>The failure is the quiet kind, which is why it is asserted on the PERSISTED map rather
+     * than the live one: this run keeps acknowledging correctly from memory, and nothing reaches
+     * the disk, so after every restart the relay offers an already-applied state again and its
+     * side effects run a second time.</p>
+     */
+    @EdtTest
+    public void longDeviceIdsDoNotStopTheMarksFromBeingStored() {
+        // A provider and a payload, because a mark only becomes durable once the state has been
+        // APPLIED -- commit() writes nothing for a state that restored nothing. A first version
+        // of this test delivered bare states and asserted on a file nothing had written yet, and
+        // it failed identically with SHORT ids, which is what showed the fixture was wrong rather
+        // than the code under test.
+        Continuity.setStateProvider(new RecordingProvider());
+
+        StringBuilder pad = new StringBuilder();
+        for (int i = 0; i < 4000; i++) {
+            pad.append('d');
+        }
+        // Forty of these is roughly 160KB of ids, so the combined string is far past what one
+        // stored string can hold while every id on its own is comfortably legal.
+        String newest = null;
+        for (int i = 0; i < 40; i++) {
+            newest = "device-" + i + "-" + pad;
+            Map<String, Object> payload = new HashMap<String, Object>();
+            payload.put("note", "from " + i);
+            Continuity.deliver(new AppState()
+                    .setPayload(payload)
+                    .setDeviceId(newest)
+                    .setSequence(i + 1)
+                    .setTimestamp(System.currentTimeMillis()));
+            flushSerialCalls();
+        }
+
+        Map<String, Long> persisted = Continuity.readSeenForTest();
+        assertTrue(persisted.containsKey(newest),
+                "the marks could not be written once the ids were long, so the most recent "
+                        + "acknowledgement is not durable and that state will be offered again "
+                        + "after a restart; persisted=" + persisted.size());
+    }
+
+    /**
      * A provider that throws is an attempt that FAILED, not an absence of work. It happens
      * transiently -- a dependency that is not up yet on a cold launch is the ordinary cause --
      * and marking the state handled with none of its payload applied and nothing stored left the
