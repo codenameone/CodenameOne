@@ -142,6 +142,26 @@ extension may not touch -- so a target carrying the application's translation
 couldn't be built. Rooted at the tunnel it carries what the tunnel reaches,
 and the application shell is simply not in it.
 
+[IMPORTANT]
+====
+*The extension has no networking stack.* It carries the translated program
+and the virtual machine, and nothing else -- so `com.codename1.io.Socket`,
+`ConnectionRequest` and everything else that reaches
+`Util.getImplementation()` finds nothing there. ParparVM's `java.net` is URI
+and URL; there are no sockets in it either.
+
+What an iOS tunnel can do, then, is everything that happens *on the device*:
+see every packet, inspect it, rewrite it, drop it, answer it with `forward`.
+That covers filtering, local DNS, per-destination decisions and anything else
+your own code can decide from the packet and from `TunnelSetup.data`.
+
+What it can't do is *relay* to a remote VPN server, because it has no way to
+open the connection. On Android it can -- the tunnel runs in your app's own
+process, where the implementation is installed -- so the same tunnel class is
+not equally useful on both. Write the relay behind an interface if you need
+one platform to do it and the other to fall back.
+====
+
 Which turns the advice below into a build error rather than a disappointment.
 Write the tunnel as though it ran in a process of its own, because it does:
 no statics you set, no `Display`, no open connections, and the tunnel

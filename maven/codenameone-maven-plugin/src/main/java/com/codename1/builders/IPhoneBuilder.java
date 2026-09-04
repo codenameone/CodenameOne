@@ -5587,6 +5587,23 @@ public class IPhoneBuilder extends Executor {
                 }
                 log("[vpnTunnel] Packet-tunnel extension enabled; the"
                         + " extension will run " + vpnTunnelBuilder.getTunnelClass());
+                // SAID AT BUILD TIME, because it is the one thing about this
+                // feature a developer cannot discover from the API. The
+                // extension carries the translated program and the VM and no
+                // networking stack: com.codename1.io.Socket reaches
+                // Util.getImplementation() and finds nothing, and ParparVM's
+                // java.net is URI and URL. A tunnel that inspects, rewrites,
+                // drops and forwards works; one that relays to a server does
+                // not, and would fail on a device with a null implementation
+                // rather than at any point this build can see.
+                log("[vpnTunnel] NOTE: the extension has no networking stack."
+                        + " com.codename1.io.Socket and ConnectionRequest do"
+                        + " not work inside it -- there is no implementation"
+                        + " installed and ParparVM's java.net has no sockets."
+                        + " An iOS tunnel can inspect, rewrite, drop and"
+                        + " forward packets; it cannot open a connection to a"
+                        + " remote VPN server. On Android the same tunnel"
+                        + " can, because it runs in the app's own process.");
             }
             // VPN configuration management.
             //

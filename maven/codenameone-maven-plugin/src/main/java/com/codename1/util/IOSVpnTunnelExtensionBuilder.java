@@ -376,8 +376,8 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("        // forward a packet, and a tunnel that forwards\n");
         sb.append("        // before the writer is installed drops it with\n");
         sb.append("        // nothing to say so.\n");
-        sb.append("        com_codename1_impl_ios_IOSExtensionTunnel_install__(\n");
-        sb.append("                threadStateData);\n");
+        sb.append("        com_codename1_impl_ios_IOSExtensionTunnel_install___int(\n");
+        sb.append("                threadStateData, cn1tnStart);\n");
         sb.append("        JAVA_OBJECT tunnel = __NEW_").append(mangled)
                 .append("(threadStateData);\n");
         sb.append("        ").append(mangled)
@@ -502,11 +502,25 @@ public final class IOSVpnTunnelExtensionBuilder {
      */
     static String writerSource() {
         return "void com_codename1_impl_ios_IOSExtensionTunnel_writeNative"
-                + "___byte_1ARRAY_int_int(\n"
-                + "        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT packet,\n"
-                + "        JAVA_INT offset, JAVA_INT length) {\n"
+                + "___int_byte_1ARRAY_int_int(\n"
+                + "        CODENAME_ONE_THREAD_STATE, JAVA_INT generation,\n"
+                + "        JAVA_OBJECT packet, JAVA_INT offset,\n"
+                + "        JAVA_INT length) {\n"
                 + "    if (cn1tnProvider == nil || packet == JAVA_NULL\n"
                 + "            || length <= 0) {\n"
+                + "        return;\n"
+                + "    }\n"
+                + "    if (generation != atomic_load(&cn1tnReadGeneration)) {\n"
+                + "        // A write from a tunnel that is over. Its\n"
+                + "        // onPacket can still be running -- a callback\n"
+                + "        // cannot be retracted, and the inbound checks\n"
+                + "        // only stop packets before they enter Java -- and\n"
+                + "        // ExtensionTunnelHost.end clears the host and the\n"
+                + "        // transport but not the writer. Without this the\n"
+                + "        // packet went out on whatever link was current,\n"
+                + "        // so one session's traffic could leave on\n"
+                + "        // another's tunnel. The generation travels with\n"
+                + "        // the writer, installed per start.\n"
                 + "        return;\n"
                 + "    }\n"
                 + "    NSData *data = [NSData dataWithBytes:\n"

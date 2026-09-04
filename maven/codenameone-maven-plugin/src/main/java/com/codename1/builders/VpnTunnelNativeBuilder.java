@@ -76,6 +76,20 @@ import java.util.Map;
  * entitlement and not the reason it appeared. The hint is the project saying
  * it holds the grant; a class reference alone must never be enough.</p>
  *
+ * <p><b>On the start/stop window.</b> The generated provider claims a
+ * generation before anything asynchronous and re-checks it in the settings
+ * completion, but a stop can still land between that check and the calls
+ * after it -- a check-then-act window no amount of re-checking closes. It is
+ * left open deliberately rather than serialised with a lock, because what
+ * survives it is inert: the read is armed for a generation the stop has
+ * already moved past, so nothing is delivered and nothing is re-armed, and
+ * the writer is installed for that same generation, so nothing is written.
+ * What remains is a Java tunnel object the next start replaces, and a
+ * success reported to NE for a start it had already cancelled. A lock around
+ * the completion and the stop would improve neither, and could not touch the
+ * case that actually mattered -- an application callback already running,
+ * which is why the WRITER carries its generation instead.</p>
+ *
  * <p>Every change here is additive: without the hint no stub is written, no
  * second translation runs, no target is created and the iOS build is
  * byte-for-byte what it was. Keep this file in sync with the
@@ -399,7 +413,7 @@ class VpnTunnelNativeBuilder {
                 + "        // class -- and its native declaration -- are in"
                 + " the tree at all.\n"
                 + "        com.codename1.impl.ios.IOSExtensionTunnel"
-                + ".install();\n"
+                + ".install(0);\n"
                 + "        // The application's tunnel. A DIRECT constructor"
                 + " call: the provider\n"
                 + "        // reaches it through the translated allocator,"

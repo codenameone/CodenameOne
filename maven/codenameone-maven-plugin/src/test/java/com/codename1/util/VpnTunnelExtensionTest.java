@@ -79,7 +79,7 @@ class VpnTunnelExtensionTest {
     @Test
     void theWriterIsInstalledBeforeTheTunnelIsConstructed() {
         String src = provider();
-        int install = src.indexOf("IOSExtensionTunnel_install__(");
+        int install = src.indexOf("IOSExtensionTunnel_install___int(");
         // The CONSTRUCTION, not the extern that declares the allocator: the
         // extern necessarily comes first, and matching it made this compare
         // the wrong two positions and pass whatever the order really was.
@@ -136,13 +136,18 @@ class VpnTunnelExtensionTest {
         // up.
         int body = src.indexOf("- (void)cn1ReadPacketsForGeneration:");
         assertTrue(body >= 0);
+        // BOUNDED to this method. The writer carries the same check, and an
+        // unbounded scan counted it too -- so the assertion below would have
+        // been satisfied by a guard somewhere else entirely.
+        int end = src.indexOf("- (void)stopTunnelWithReason:", body);
+        assertTrue(end > body);
+        String method = src.substring(body, end);
         int checks = 0;
-        int at = src.indexOf("generation != atomic_load(&cn1tnReadGeneration)",
-                body);
+        int at = method.indexOf("generation != atomic_load(&cn1tnReadGeneration)");
         while (at >= 0) {
             checks++;
-            at = src.indexOf("generation != atomic_load(&cn1tnReadGeneration)",
-                    at + 1);
+            at = method.indexOf(
+                    "generation != atomic_load(&cn1tnReadGeneration)", at + 1);
         }
         // THREE: on entry, before each packet, and before re-arming.
         // The middle one is what stops a batch captured on the old link
@@ -150,6 +155,24 @@ class VpnTunnelExtensionTest {
         // delivered.
         assertEquals(3, checks,
                 "entry, every packet and the re-arm all have to check");
+    }
+
+    @Test
+    void anOldTunnelCannotWriteOntoTheNewLink() {
+        String src = provider();
+        // A stopped tunnel's onPacket can still be running -- a callback
+        // cannot be retracted, and the inbound checks only stop packets
+        // BEFORE they enter Java. ExtensionTunnelHost.end clears the host
+        // and the transport but not the writer, so a late forward reached
+        // whatever provider was current: one session's packet leaving on
+        // another's link.
+        assertTrue(src.contains("JAVA_INT generation"),
+                "the writer takes the generation it was installed for");
+        assertTrue(src.contains("generation != atomic_load(&cn1tnReadGeneration)"),
+                "...and refuses a write from a start that is over");
+        // Installed PER START, with the generation this start claimed.
+        assertTrue(src.contains(
+                "IOSExtensionTunnel_install___int(\n                threadStateData, cn1tnStart)"));
     }
 
     @Test

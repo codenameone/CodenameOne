@@ -46,6 +46,18 @@ package com.codename1.vpn.tunnel;
 /// all, and reaching for the app's own classes drags them into the
 /// extension's translation, where the ones backed by UIKit fail its link.
 ///
+/// #### What is not there, on iOS
+///
+/// The extension carries the translated program and the virtual machine and
+/// no networking stack. [com.codename1.io.Socket], `ConnectionRequest` and
+/// anything else that reaches the implementation find nothing there, and
+/// ParparVM's `java.net` is URI and URL -- there are no sockets in it
+/// either. So an iOS tunnel inspects, rewrites, drops and [#forward]s
+/// packets; it cannot open a connection to a remote server. On Android it
+/// can, because it runs in the app's own process. A tunnel that needs to
+/// relay is not the same class on both platforms, and the difference is
+/// worth an interface rather than a surprise.
+///
 /// #### Constructing it
 ///
 /// On Android the app constructs the tunnel and hands it to

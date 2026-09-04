@@ -104,7 +104,7 @@ extern void com_codename1_impl_vpn_ExtensionTunnelHost_end___int(CODENAME_ONE_TH
 H
 cat > "$WORK/out/com_codename1_impl_ios_IOSExtensionTunnel.h" <<'H'
 #include "cn1_globals.h"
-extern void com_codename1_impl_ios_IOSExtensionTunnel_install__(CODENAME_ONE_THREAD_STATE);
+extern void com_codename1_impl_ios_IOSExtensionTunnel_install___int(CODENAME_ONE_THREAD_STATE, JAVA_INT);
 H
 # cn1_globals.h includes the per-project class index, which only a translation
 # produces. Empty is right: nothing the provider writes needs a class id.
