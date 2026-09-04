@@ -10253,13 +10253,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     android.content.ClipData clip;
                     long staged = 0;
                     if (obj instanceof ClipboardContent) {
-                        // Here, not only where the copy was asked for. The assembly happens on
-                        // this thread rather than the caller's, so two copies of one content
-                        // made in quick succession both reset before either assembled, and the
-                        // second then published what the first assembly had just cached: the
-                        // clipboard ended up holding the earlier copy's values, and for a
-                        // provider that writes a temporary file, a path that was already gone.
-                        com.codename1.ui.NativeDragAndDrop.beginTransfer((ClipboardContent) obj);
                         AssembledClip assembled = clipDataFor((ClipboardContent) obj);
                         clip = assembled.getData();
                         staged = assembled.getClip();
@@ -10314,11 +10307,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // remaining files under the other's id, which split one clip across two and left
         // the half nobody pinned free to be deleted while the clip still referenced it.
         final long clip = beginStagingClip();
+        // Every read this assembly makes goes through here; see Assembly for why it is not the
+        // content's own memory of what its providers produced.
+        Assembly assembly = new Assembly(content);
         int sdk = android.os.Build.VERSION.SDK_INT;
         List<String> mimeTypes = new ArrayList<String>();
         List<ClipData.Item> items = new ArrayList<ClipData.Item>();
-        String plain = clipboardText(content, ClipboardContent.MIME_TEXT);
-        String html = clipboardText(content, ClipboardContent.MIME_HTML);
+        String plain = assembly.text(ClipboardContent.MIME_TEXT);
+        String html = assembly.text(ClipboardContent.MIME_HTML);
         // A clip carries one text payload. Where the content has no text/plain but does have
         // some other text representation -- markdown, AsciiDoc, a URI list -- that one is the
         // payload, since publishing an empty clip instead would lose it outright.
@@ -10343,7 +10339,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     // is an ASCII comparison against an ASCII constant and no locale enters it.
                     continue;
                 }
-                String value = clipboardText(content, advertised[iter]);
+                String value = assembly.text(advertised[iter]);
                 if (value != null) {
                     plain = value;
                     primaryTextMime = advertised[iter];
@@ -10377,17 +10373,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // the two after it as well, so a clip whose image could not be written went out
         // without the document and the typed representations it also had.
         try {
-            addBinaryContent(content, mimeTypes, items, clip);
+            addBinaryContent(assembly, mimeTypes, items, clip);
         } catch (Throwable t) {
             com.codename1.io.Log.e(t);
         }
         try {
-            addPublishedUris(content, mimeTypes, items, clip);
+            addPublishedUris(assembly, mimeTypes, items, clip);
         } catch (Throwable t) {
             com.codename1.io.Log.e(t);
         }
         try {
-            addRemainingRepresentations(content, plain, mimeTypes, items, clip);
+            addRemainingRepresentations(assembly, plain, mimeTypes, items, clip);
         } catch (Throwable t) {
             com.codename1.io.Log.e(t);
         }
@@ -10470,7 +10466,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * the ClipData from the union of everything collected here and the text types, because
      * ClipData.addItem cannot widen a description that already exists.
      */
-    private void addBinaryContent(ClipboardContent content, List<String> mimeTypes,
+    private void addBinaryContent(Assembly assembly, List<String> mimeTypes,
             List<ClipData.Item> items, long clip) throws IOException {
         String authority = getContext().getPackageName() + ".provider";
 
@@ -10486,7 +10482,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // It is also what puts the carried text on the document rather than on the thumbnail.
 
         // File references: MIME_FILE may be a single String or a String[]
-        Object fileData = clipboardValue(content, ClipboardContent.MIME_FILE);
+        Object fileData = assembly.value(ClipboardContent.MIME_FILE);
         if (fileData != null) {
             String[] paths;
             if (fileData instanceof String[]) {
@@ -10547,17 +10543,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         String imageMime = null;
         byte[] imageBytes = null;
         String imageExt = null;
-        imageBytes = clipboardBytes(content, ClipboardContent.MIME_PNG);
+        imageBytes = assembly.bytes(ClipboardContent.MIME_PNG);
         if (imageBytes != null) {
             imageMime = ClipboardContent.MIME_PNG;
             imageExt = "png";
         } else {
-            imageBytes = clipboardBytes(content, ClipboardContent.MIME_JPEG);
+            imageBytes = assembly.bytes(ClipboardContent.MIME_JPEG);
             if (imageBytes != null) {
                 imageMime = ClipboardContent.MIME_JPEG;
                 imageExt = "jpg";
             } else {
-                imageBytes = clipboardBytes(content, ClipboardContent.MIME_GIF);
+                imageBytes = assembly.bytes(ClipboardContent.MIME_GIF);
                 if (imageBytes != null) {
                     imageMime = ClipboardContent.MIME_GIF;
                     imageExt = "gif";
@@ -10609,9 +10605,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     ///
     /// One item per URI, because an item is a dragged object and a list of three links is
     /// three of them. The clip's text still rides on the first, as it does on a file.
-    private void addPublishedUris(ClipboardContent content, List<String> mimeTypes,
+    private void addPublishedUris(Assembly assembly, List<String> mimeTypes,
             List<ClipData.Item> items, long clip) {
-        String list = clipboardText(content, ClipboardContent.MIME_URI_LIST);
+        String list = assembly.text(ClipboardContent.MIME_URI_LIST);
         if (list == null) {
             return;
         }
@@ -10624,7 +10620,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // threw away every *other* line, so a document published beside its own web address
         // advertised text/uri-list and delivered the document alone.
         List<String> alreadyCarried = new ArrayList<String>();
-        Object files = clipboardValue(content, ClipboardContent.MIME_FILE);
+        Object files = assembly.value(ClipboardContent.MIME_FILE);
         if (files instanceof String[]) {
             String[] paths = (String[]) files;
             for (int iter = 0; iter < paths.length; iter++) {
@@ -10752,9 +10748,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// one text payload, so advertising a second, different reading of it would tell a receiver
     /// the clip holds something it cannot then produce, and a Codename One target would accept
     /// the hover and be refused at the drop.
-    private void addRemainingRepresentations(ClipboardContent content, String carriedText,
+    private void addRemainingRepresentations(Assembly assembly, String carriedText,
             List<String> mimeTypes, List<ClipData.Item> items, long clip) throws IOException {
-        String[] advertised = content.getMimeTypes();
+        String[] advertised = assembly.content().getMimeTypes();
         for (int iter = 0; iter < advertised.length; iter++) {
             String mime = advertised[iter];
             if (mimeTypes.contains(mime) || ClipboardContent.MIME_FILE.equals(mime)) {
@@ -10762,13 +10758,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             // Each representation on its own: a provider that throws is one type absent, not
             // every type after it. ClipboardDataProvider permits it to fail.
-            Object value;
-            try {
-                value = content.getData(mime);
-            } catch (Throwable t) {
-                com.codename1.io.Log.e(t);
-                continue;
-            }
+            Object value = assembly.value(mime);
             byte[] bytes = null;
             if (value instanceof String) {
                 if (carriedText != null && carriedText.equals(value)) {
@@ -10879,6 +10869,61 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 copy.delete();
                 holder.delete();
             }
+        }
+    }
+
+    /// One clip assembly's reading of a content, kept to itself.
+    ///
+    /// A representation registered as a provider is resolved once per transfer, and the memory
+    /// of that lives on the ClipboardContent -- which is fine for a transfer that owns it and
+    /// wrong for two that overlap. A copy assembles on Android's UI thread and a drag on the
+    /// event dispatch thread, so one could reset the shared memo halfway through the other and
+    /// hand it a value produced for a different transfer: a clip built from two generations of
+    /// a payload that changes.
+    ///
+    /// So an assembly reads through this instead. The provider is asked at most once per type
+    /// *per assembly*, which is what the promise actually is, and neither assembly can disturb
+    /// the other because neither touches the content's own memory.
+    private static final class Assembly {
+        private final ClipboardContent content;
+        private final Map<String, Object> produced = new HashMap<String, Object>();
+
+        Assembly(ClipboardContent content) {
+            this.content = content;
+        }
+
+        ClipboardContent content() {
+            return content;
+        }
+
+        Object value(String mimeType) {
+            if (content == null || mimeType == null) {
+                return null;
+            }
+            if (produced.containsKey(mimeType)) {
+                return produced.get(mimeType);
+            }
+            Object value = null;
+            try {
+                value = com.codename1.ui.NativeDragAndDrop.produceTransferValue(content, mimeType);
+            } catch (Throwable err) {
+                // A provider that fails is one type absent, not a clip abandoned -- and the
+                // failure is remembered like any other answer, so a second read of the same
+                // type does not run it again. Same rule as clipboardValue.
+                com.codename1.io.Log.e(err);
+            }
+            produced.put(mimeType, value);
+            return value;
+        }
+
+        String text(String mimeType) {
+            Object value = value(mimeType);
+            return value instanceof String ? (String) value : null;
+        }
+
+        byte[] bytes(String mimeType) {
+            Object value = value(mimeType);
+            return value instanceof byte[] ? (byte[]) value : null;
         }
     }
 
@@ -11221,7 +11266,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     // The two are told apart by the exporter's own record of what it minted,
                     // not by anything about the URI or its name -- an application may publish a
                     // file called anything at all.
-                    if (!isGeneratedClipFile(uri)) {
+                    if (!isGeneratedClipFile(uri) && mayCarryAcrossApplications(uri)) {
                         publishedUris.add(uri.toString());
                         if (namesALocalFile(uri)) {
                             fileUris.add(uri.toString());
@@ -11515,6 +11560,33 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    /// The clip a drag is carrying right now, so a release queued for one drag can tell
+    /// whether it is still the drag whose hold it is about to end.
+    static long draggingClip() {
+        synchronized (STAGED_CLIP_FILES) {
+            return draggingClip;
+        }
+    }
+
+    /// Ends the hold on one drag's clip, and only that one.
+    ///
+    /// A drop's release is queued onto the event dispatch thread, and a callback that enters a
+    /// nested event loop can let another drag start before it runs. Clearing the shared slot
+    /// unconditionally then let go of the *new* drag's clip, whose files a cache over budget
+    /// could delete while the receiving application was still to read them.
+    ///
+    /// #### Parameters
+    ///
+    /// - `clip`: the clip whose drag has finished, or zero to release whatever is held
+    static void releaseDragHold(long clip) {
+        synchronized (STAGED_CLIP_FILES) {
+            if (clip != 0 && draggingClip != clip) {
+                return;
+            }
+        }
+        dragHolds(0);
+    }
+
     /// Records the clip a drag is carrying, or zero once it has ended.
     static void dragHolds(long clip) {
         synchronized (STAGED_CLIP_FILES) {
@@ -11591,6 +11663,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             StagedClipFile staged = STAGED_CLIP_FILES.get(uri.toString());
             return staged != null && staged.transport;
         }
+    }
+
+    /// True when a URI another application put on a clip is one this application may carry.
+    ///
+    /// A file: URI, or a bare path, is not. Android has refused to let a clip carrying one
+    /// cross an application boundary since API 24 -- prepareToLeaveProcess throws for exactly
+    /// that -- so one arriving here was never published by a well behaved application, and it
+    /// comes with no grant that would make it readable in the first place. Taking it at its
+    /// word is worse than useless: the path is read with *this* application's permissions, and
+    /// republishing it -- a copy, a drag onward -- would hand somebody else a file the sender
+    /// could not open, named by the sender. A content: URI carries a grant and is the only
+    /// spelling a clip is entitled to use for a document; everything remote is carried as a
+    /// URI and never opened as a path.
+    ///
+    /// This is about what *arrives*. What the application itself publishes through
+    /// `ClipboardContent#setFiles(java.lang.String...)` is its own file and is unaffected.
+    private static boolean mayCarryAcrossApplications(Uri uri) {
+        String scheme = uri.getScheme();
+        if (scheme == null) {
+            return false;
+        }
+        return !"file".equalsIgnoreCase(scheme);
     }
 
     /// True when this URI names something on this device rather than somewhere on the web.

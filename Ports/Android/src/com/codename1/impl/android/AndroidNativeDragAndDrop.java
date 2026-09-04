@@ -401,11 +401,16 @@ final class AndroidNativeDragAndDrop {
             // outruns every bound here; what this covers is the ordinary target that reads
             // what it was given, which used to race a reclamation triggered by its own drop.
             setDropDispatchPending(true);
+            // The clip this drag is carrying, captured now. A callback that enters a nested
+            // event loop can let another drag start before this runs, and clearing the shared
+            // slot then released that one's hold instead -- its files reclaimable while it was
+            // still going, and its receiver left with URIs it could no longer read.
+            final long held = AndroidImplementation.draggingClip();
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
                     setDropDispatchPending(false);
-                    AndroidImplementation.dragHolds(0);
+                    AndroidImplementation.releaseDragHold(held);
                 }
             });
         }

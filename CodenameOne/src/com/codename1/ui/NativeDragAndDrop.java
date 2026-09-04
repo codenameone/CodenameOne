@@ -436,10 +436,10 @@ public final class NativeDragAndDrop {
     /// `ClipboardContent#setDataProvider(java.lang.String, com.codename1.ui.ClipboardDataProvider)`
     /// is resolved once per transfer and remembered, so a consumer that asks twice does not
     /// make the provider write its file twice. `Display#copyToClipboard(ClipboardContent)`
-    /// calls this as the copy is asked for; a port whose publication really happens later --
-    /// Android assembles the clip on its own UI thread -- calls it again there, because two
-    /// copies asked for in quick succession would otherwise both reset first and the second
-    /// would then publish what the first one's assembly had just cached.
+    /// calls this as a copy is asked for. A port that assembles later, or on another thread,
+    /// needs more than this -- two overlapping transfers of one content would share the memory
+    /// this resets -- and reads through a memo of its own instead; see the Android port's
+    /// clip assembly.
     ///
     /// #### Parameters
     ///
@@ -1495,8 +1495,12 @@ public final class NativeDragAndDrop {
         if (!(hit instanceof Container)) {
             return null;
         }
+        // Cast before the try, not inside it. ParparVM does not throw for a failed cast, so a
+        // cast under catch(Throwable) is one whose failure could never be reported there --
+        // and the gate that says so does not read the guard above as covering it.
+        Container inside = (Container) hit;
         try {
-            return descendToTarget((Container) hit, x, y, content, actions);
+            return descendToTarget(inside, x, y, content, actions);
         } catch (Throwable err) {
             // Mid-layout, as above.
             return null;
@@ -1515,14 +1519,22 @@ public final class NativeDragAndDrop {
             if (child == null || !child.isVisible() || !child.contains(x, y)) {
                 continue;
             }
-            if (child instanceof Container) {
-                Component found = descendToTarget((Container) child, x, y, content, actions);
-                if (found != null) {
-                    return found;
-                }
+            Component found = child instanceof Container
+                    ? descendToTarget((Container) child, x, y, content, actions) : null;
+            if (found != null) {
+                return found;
             }
-            if (acceptsDrop(child, content, actions)) {
-                return child;
+            if (!child.isIgnorePointerEvents()) {
+                // The frontmost thing the pointer can reach here, so it decides: either it is
+                // the target or there is none. Nothing painted beneath it is reachable, and
+                // carrying on to the lower siblings is how a target came out from under the
+                // very component covering it -- an overlay inside a focus promoted container
+                // is exactly that.
+                //
+                // A component that has opted out of pointer events is not that: it is
+                // transparent, so what is behind it is what the user is pointing at, and the
+                // loop goes on to look.
+                return acceptsDrop(child, content, actions) ? child : null;
             }
         }
         return null;

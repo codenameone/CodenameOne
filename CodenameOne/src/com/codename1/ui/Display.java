@@ -5567,9 +5567,6 @@ public final class Display extends CN1Constants {
 
     /// Ends the previous transfer's memory of what its providers produced.
     ///
-    /// Also done by a port whose publication happens later than this call; see
-    /// `NativeDragAndDrop#beginTransfer(ClipboardContent)`.
-    ///
     /// A representation registered through
     /// `ClipboardContent#setDataProvider(java.lang.String, com.codename1.ui.ClipboardDataProvider)`
     /// is resolved once per transfer and remembered, so a consumer that asks twice does not
@@ -5579,9 +5576,7 @@ public final class Display extends CN1Constants {
     /// writes a temporary file is a path that may no longer exist. A drag already does this
     /// when the session is armed.
     private static void forgetProvidedValues(ClipboardContent content) {
-        if (content != null) {
-            content.resetProvidedValues();
-        }
+        NativeDragAndDrop.beginTransfer(content);
     }
 
     /// Returns the current content of the clipboard

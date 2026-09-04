@@ -1290,6 +1290,36 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aTargetBehindAnOverlayInsideAFocusableContainerIsNotReachedEither() {
+        Form form = Display.getInstance().getCurrent();
+        // Focusable, so hit testing answers with the holder and the search for a target it
+        // may have hidden begins inside it -- where the overlay is too.
+        Container holder = new Container(new com.codename1.ui.layouts.LayeredLayout());
+        holder.setFocusable(true);
+        DropRecorder target = new DropRecorder();
+        target.setNativeDropTarget(true);
+        holder.add(target);
+        Container overlay = new Container();
+        overlay.add(new Label("in the way"));
+        holder.add(overlay);
+        form.setLayout(new BorderLayout());
+        form.add(BorderLayout.CENTER, holder);
+        form.revalidate();
+
+        int x = overlay.getAbsoluteX() + 5;
+        int y = overlay.getAbsoluteY() + 5;
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+        NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        assertEquals("[]", target.events.toString(),
+                "the search stops at the frontmost child the pointer can reach, wherever it "
+                        + "starts from");
+        assertNull(target.dropped);
+    }
+
+    @FormTest
     void aTargetHiddenByItsAncestorIsNotHandedTheDelayedDrop() {
         Form form = Display.getInstance().getCurrent();
         Container holder = new Container(new BorderLayout());
