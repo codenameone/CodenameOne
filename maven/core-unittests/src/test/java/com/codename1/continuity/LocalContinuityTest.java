@@ -3656,6 +3656,120 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A factory that ends the session stops the rebuild instead of running the rest.
+     *
+     * <p>Every later factory would run for an account that has just signed out: constructing
+     * forms, and whatever they query or write on the way. The lifecycle check in restore() runs
+     * only after restoreStack() has returned, so it can empty the stack afterwards and undoes
+     * none of that.</p>
+     */
+    @EdtTest
+    public void aFactoryThatEndsTheSessionStopsTheRebuild() {
+        final List<String> built = new ArrayList<String>();
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                built.add(url);
+                if ("/orders".equals(url)) {
+                    // The account is signed out. This is the decision a route factory is
+                    // entitled to make, and the reason the lifecycle machinery exists.
+                    Continuity.clear();
+                }
+                Form f = new Form();
+                f.setTitle(url);
+                return f;
+            }
+        });
+        try {
+            Continuity.restore(new AppState()
+                    .setRoutes(java.util.Arrays.asList("/orders", "/orders/17", "/orders/17/pay"))
+                    .setDeviceId("some-other-device")
+                    .setSequence(190L)
+                    .setTimestamp(System.currentTimeMillis()));
+            flushSerialCalls();
+
+            assertEquals(1, built.size(),
+                    "the rebuild ran " + built + " -- every factory after the one that signed out "
+                            + "was invoked for that account, and emptying the stack afterwards "
+                            + "undoes none of what they did");
+        } finally {
+            Navigation.setDispatcher(null);
+        }
+    }
+
+    /**
+     * A route this device cannot store is dropped from what gets COMMITTED too, not only from
+     * what gets rebuilt.
+     *
+     * <p>usableRoutes() filtered the copy handed to restoreStack() and left the oversized route in
+     * the state, so commit() went on to persist the original and externalize() threw on it every
+     * time. The arrival stayed parked -- re-applied on every retry, with every relay publication
+     * held behind it -- for ever.</p>
+     */
+    @EdtTest
+    public void aRouteTooLongToStoreIsDroppedFromWhatIsCommitted() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+        Navigation.setDispatcher(new FakeLongPathDispatcher());
+        try {
+            StringBuilder huge = new StringBuilder("/");
+            for (int i = 0; i < 70000; i++) {
+                huge.append('x');
+            }
+            Map<String, Object> payload = new HashMap<String, Object>();
+            payload.put("draft", "worth keeping");
+            AppState arriving = new AppState()
+                    .setPayload(payload)
+                    .setDeviceId("some-other-device")
+                    .setSequence(191L)
+                    .setTimestamp(System.currentTimeMillis());
+            // Unchecked, because a remote document is accepted unchecked on purpose -- which is
+            // exactly how an unstorable route reaches this device in the first place.
+            arriving.setRoutesUnchecked(java.util.Arrays.asList("/orders", huge.toString()));
+
+            Continuity.restore(arriving);
+            flushSerialCalls();
+
+            assertNotNull(Continuity.readSeenForTest().get("some-other-device"),
+                    "the arrival was never acknowledged, so commit() failed on the route that "
+                            + "usableRoutes() had already dropped: it stays parked, is re-applied "
+                            + "on every retry, and holds every relay publication behind it");
+        } finally {
+            Navigation.setDispatcher(null);
+        }
+    }
+
+    /**
+     * A cold-launch arrival the port is already holding is dropped by the first disable().
+     *
+     * <p>iOS parks a Handoff before init() runs and hands it over when a callback is next
+     * installed. An application that is logged out at launch, calls disable(), and enables after
+     * the login had that parked activity drained by the enable() -- when `enabled` is true again,
+     * so the callback delivered it. The choice flag never got a look in: it is read inside the
+     * callback, and no callback existed for the port to offer the arrival to.</p>
+     */
+    @EdtTest
+    public void aParkedArrivalIsDroppedByAFirstDisable() {
+        HoldingBridge holding = new HoldingBridge();
+        holding.pending = StateCodec.toMap(fromElsewhere("parked before init()", 180L));
+        Continuity.setBridge(holding);
+
+        // Never enabled: logged out at launch, and saying so.
+        Continuity.disable();
+        assertNull(holding.pending,
+                "the port is still holding the arrival, so nothing has asked it for one and the "
+                        + "enable() after the login will drain it");
+
+        Continuity.enable();
+        flushSerialCalls();
+        assertNull(Continuity.getRestorableState(),
+                "the arrival the port was holding through an explicit disable() was restored by "
+                        + "the enable() that followed it");
+    }
+
+    /**
      * A login form the logout callback put up is not replaced by the screen the restore started
      * from.
      *
@@ -5673,6 +5787,28 @@ public class LocalContinuityTest extends UITestBase {
             Form f = new Form();
             f.setTitle("long");
             return f;
+        }
+    }
+
+    /** A bridge that behaves the way the iOS port does: it holds an activity that arrived before
+     * anything was listening, and offers it the moment a callback is installed, letting go only
+     * if the callback claims it. LocalContinuityBridge has no such retention, so the case cannot
+     * be reached through it. */
+    static class HoldingBridge extends LocalContinuityBridge {
+        Map<String, Object> pending;
+
+        @Override
+        public void setCallback(ContinuityCallback c) {
+            super.setCallback(c);
+            if (c == null || pending == null) {
+                return;
+            }
+            Map<String, Object> offered = pending;
+            if (c.continuationReceived(Continuity.getActivityType(), offered)) {
+                // Claimed, so the port lets go of it. Declined, and it stays for the next
+                // callback -- which is the whole behaviour being relied on.
+                pending = null;
+            }
         }
     }
 

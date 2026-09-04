@@ -241,6 +241,9 @@ public final class Continuity {
     /// explicit disable() as though it had never spoken.
     private static boolean applicationHasChosen;
 
+    /// Whether the port already holds this framework's callback.
+    private static boolean callbackInstalled;
+
     /// The relay session a framework worker is running for, bound for the length of its call
     /// into the relay and unbound afterwards. Null on the event thread and on any thread the
     /// application drives itself, which is how mayRelaySend() tells the two apart.
@@ -298,13 +301,28 @@ public final class Continuity {
         }
         enabled = true;
         applicationHasChosen = true;
+        installCallback();
+    }
+
+    /// Hands the port a callback, once. Installing it is what makes a port offer an arrival it
+    /// has been holding, so both enable() and disable() do it -- the two answers differ in what
+    /// the callback then says, not in whether it exists.
+    ///
+    /// Only from those two, so a build that merely LINKS this class -- because something else in
+    /// the framework mentions it -- never installs a callback or touches storage.
+    private static void installCallback() {
+        if (callbackInstalled) {
+            return;
+        }
         ContinuityBridge b = bridgeInternal();
-        if (b != null) {
-            try {
-                b.setCallback(new Callback());
-            } catch (Throwable t) {
-                Log.e(t);
-            }
+        if (b == null) {
+            return;
+        }
+        try {
+            b.setCallback(new Callback());
+            callbackInstalled = true;
+        } catch (Throwable t) {
+            Log.e(t);
         }
     }
 
@@ -319,6 +337,20 @@ public final class Continuity {
         // that came with the login. Saying "no" before saying anything else is still saying it.
         applicationHasChosen = true;
         if (!enabled) {
+            // A callback is installed even though nothing is being turned off, and it is the only
+            // way to reach an arrival that is already waiting. iOS parks a cold-launch Handoff
+            // before init() runs and hands it over when a callback is next installed -- so an
+            // application that is logged out at launch, calls disable(), and enables after the
+            // login had that parked activity drained by the enable(), when `enabled` is true
+            // again and the callback delivers it. The applicationHasChosen flag never got a look
+            // in: it is read inside the callback, and no callback existed for the port to offer
+            // the arrival to.
+            //
+            // Installed here, the port hands it over now, while `enabled` is false and the choice
+            // is recorded -- so the callback claims and drops it, which is what disable() says
+            // happens to arriving states. Same route as the one already taken by a state that
+            // arrives after this returns, rather than a second mechanism doing the same job.
+            installCallback();
             return;
         }
         // Sampled with the bump, not read later: see formAtSessionEnd.
@@ -551,6 +583,31 @@ public final class Continuity {
     // ------------------------------------------------------------------
     // Saving
     // ------------------------------------------------------------------
+
+    /// Internal. Called by `com.codename1.router.Navigation` between the route factories of a
+    /// restore, and again before it shows the rebuilt screen. True once a factory has ended the
+    /// session -- so the rebuild stops instead of running every remaining factory against an
+    /// account that has just signed out.
+    ///
+    /// The lifecycle check in `restore()` runs only after `restoreStack()` has returned, which is
+    /// far too late for this: by then those factories have constructed their forms, and whatever
+    /// they queried or wrote for the signed-out account is done. Emptying the stack afterwards
+    /// undoes none of it.
+    ///
+    /// A direct call for the reason `routeStackChanged()` gives: it answers false immediately
+    /// unless a restore is actually in progress, and a listener registry here would be public API
+    /// earned by one internal caller.
+    ///
+    /// #### Returns
+    ///
+    /// true when the session that the restore in progress began in has ended
+    public static boolean restoreSessionEnded() {
+        return applyingRestore && lifecycle != lifecycleAtRestoreStart;
+    }
+
+    /// The lifecycle generation the restore in progress began in. Only meaningful while
+    /// `applyingRestore` is true.
+    private static int lifecycleAtRestoreStart;
 
     /// Internal. Called by `com.codename1.router.Navigation` after every change to the navigation
     /// stack; schedules a checkpoint rather than taking one, so a burst of navigations costs a
@@ -1009,6 +1066,7 @@ public final class Continuity {
         boolean shown;
         boolean routesThrew = false;
         applyingRestore = true;
+        lifecycleAtRestoreStart = lifecycleAtRestore;
         try {
             shown = Navigation.restoreStack(routes);
         } catch (Throwable t) {
@@ -1062,6 +1120,15 @@ public final class Continuity {
             }
             outFailed[0] = true;
             return false;
+        }
+        if (routes.size() != state.getRoutes().size()) {
+            // The FILTERED set is what gets committed. usableRoutes() dropped a route this device
+            // cannot store, and only the copy handed to restoreStack() had it removed -- so
+            // commit() went on to persist the original, externalize() threw on the oversized
+            // string every time, and the arrival stayed parked: re-applied on every retry, with
+            // every relay publication held behind it, for ever. Unchecked because these routes
+            // have already passed the very check that produced this list.
+            state.setRoutesUnchecked(routes);
         }
         if (routesThrew) {
             // A THROW, which is a different thing from routes that would not rebuild, and the two
@@ -2917,6 +2984,7 @@ public final class Continuity {
         bridgeOverridden = false;
         enabled = false;
         applicationHasChosen = false;
+        callbackInstalled = false;
         formAtSessionEnd = null;
         autoRestore = true;
         flushScheduled = false;

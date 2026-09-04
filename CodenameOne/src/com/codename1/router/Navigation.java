@@ -297,6 +297,15 @@ public final class Navigation {
         }
         List<NavigationEntry> rebuilt = new ArrayList<NavigationEntry>();
         for (String path : paths) {
+            if (sessionEnded()) {
+                // A factory ended the continuity session -- it found the account signed out,
+                // which is exactly the decision a route factory is entitled to make. Every later
+                // factory would run for that account: constructing forms, and whatever they query
+                // or write on the way. The lifecycle check in Continuity.restore() happens after
+                // this method returns and can only empty the stack afterwards, which undoes none
+                // of it.
+                return false;
+            }
             if (path == null || path.length() == 0) {
                 continue;
             }
@@ -311,7 +320,10 @@ public final class Navigation {
                 rebuilt.add(new NavigationEntry(path, f));
             }
         }
-        if (rebuilt.isEmpty()) {
+        if (rebuilt.isEmpty() || sessionEnded()) {
+            // Asked again, because the loop tests before each factory and the LAST one has no
+            // "next" iteration to be stopped by. Showing here would put the signed-out account's
+            // screen in front of the user.
             return false;
         }
         // The PREVIOUS stack is kept until the new one is really on screen. show() runs
@@ -358,6 +370,22 @@ public final class Navigation {
         }
         stackChanged();
         return true;
+    }
+
+    /// Whether a continuity restore in progress has had its session ended underneath it.
+    ///
+    /// Answers false for every application that does not use continuity, and for every navigation
+    /// that is not a restore, which is why it can sit in this loop.
+    private static boolean sessionEnded() {
+        try {
+            return com.codename1.continuity.Continuity.restoreSessionEnded();
+        } catch (Throwable t) {
+            // Carrying on is the answer that keeps ordinary navigation working; this guard exists
+            // for the signed-out case, not to gate the routing API on the continuity framework
+            // being answerable.
+            com.codename1.io.Log.e(t);
+            return false;
+        }
     }
 
     /// Tells the continuity framework that the stack moved, so it can checkpoint.
