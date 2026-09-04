@@ -152,6 +152,47 @@ class NavigationTest extends UITestBase {
     }
 
     /**
+     * A stack the show callback CLEARED is not resurrected by the rollback.
+     *
+     * <p>The rollback exists so a screen the user never saw does not stay on the stack. But
+     * show() runs application code, and that code can navigate: the case that matters is a show
+     * listener discovering the session has expired, logging out -- which empties this stack on
+     * purpose -- and then throwing on the way out. Restoring unconditionally handed the
+     * signed-out account's forms straight back, reachable through getStack() and back(), and
+     * persisted by the next checkpoint. The rollback meant to help undid the one thing the
+     * logout existed to do.</p>
+     */
+    @FormTest
+    void aStackClearedByTheShowCallbackIsNotResurrected() {
+        Navigation.setDispatcher(new FakeDispatcher().route("/a").route("/b"));
+        Navigation.navigate("/a");
+        Navigation.navigate("/b");
+        assertTrue(baseline() >= 2, "the fixture did not build a stack to lose");
+
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                return new Form() {
+                    public void show() {
+                        // A logout discovered on screen, and then a failure on the way out.
+                        Navigation.clearStack();
+                        throw new IllegalStateException("the session had expired");
+                    }
+                };
+            }
+        });
+        try {
+            Navigation.navigate("/whatever");
+            fail("show() did not throw, so this test is about nothing");
+        } catch (IllegalStateException expected) {
+            // The caller sees it, as it must.
+        }
+
+        assertEquals(0, baseline(),
+                "the rollback put the cleared stack back, so the signed-out account's forms are "
+                        + "reachable through back() again and the next checkpoint persists them");
+    }
+
+    /**
      * A back whose showBack() throws puts the popped entry back.
      */
     @FormTest

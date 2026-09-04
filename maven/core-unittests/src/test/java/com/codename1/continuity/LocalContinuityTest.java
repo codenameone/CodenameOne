@@ -2561,6 +2561,34 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A tagged boolean the encoder never wrote keeps its text instead of becoming false.
+     *
+     * <p>Boolean.valueOf answers false for every string that is not "true", so "b:unknown"
+     * arrived as a confident false -- application data changed in transit, restored, and
+     * acknowledged, with nothing said. Every other tag in this codec already preserves a body it
+     * cannot parse; this one did not.</p>
+     */
+    @EdtTest
+    public void aTaggedBooleanThatWillNotParseIsNotSilentlyFalse() throws Exception {
+        AppState real = StateCodec.fromJson(
+                "{\"device\":\"other\",\"seq\":\"3\",\"enc\":\"1\","
+                        + "\"payload\":{\"on\":\"b:true\",\"off\":\"b:false\"}}");
+        assertEquals(Boolean.TRUE, real.getPayload().get("on"),
+                "the encoder's own true did not survive the round trip");
+        assertEquals(Boolean.FALSE, real.getPayload().get("off"),
+                "the encoder's own false did not survive the round trip");
+
+        AppState odd = StateCodec.fromJson(
+                "{\"device\":\"other\",\"seq\":\"3\",\"enc\":\"1\","
+                        + "\"payload\":{\"enabled\":\"b:unknown\"}}");
+        Object kept = odd.getPayload().get("enabled");
+        assertEquals("b:unknown", kept,
+                "a boolean body this codec cannot read became " + kept + " instead of keeping "
+                        + "its text, so the application is handed a value the sender never sent "
+                        + "-- and the state is acknowledged, so the sender never learns of it");
+    }
+
+    /**
      * A logout refuses a worker that is already inside the relay, even though the relay stays
      * installed.
      *
@@ -2666,6 +2694,16 @@ public class LocalContinuityTest extends UITestBase {
                 "{\"device\":\"other\",\"seq\":\"" + Long.MAX_VALUE + "\"}");
         assertEquals(Long.MAX_VALUE, edge.getSequence(),
                 "a sequence written as the largest long there is was not preserved");
+
+        try {
+            StateCodec.fromJson("{\"device\":\"other\",\"seq\":9223372036854775808}");
+            fail("2^63 was accepted as a sequence. It is the same double as (double) "
+                    + "Long.MAX_VALUE, so a range test written against that constant compares "
+                    + "equal and clamps it back to Long.MAX_VALUE -- the exact poisoning the "
+                    + "1e100 guard was added to stop, one value past where it looks.");
+        } catch (java.io.IOException expected) {
+            assertTrue(expected.getMessage().length() > 0, "the refusal explained nothing");
+        }
 
         try {
             StateCodec.fromJson("{\"device\":\"other\",\"seq\":1e100}");
@@ -4230,6 +4268,11 @@ public class LocalContinuityTest extends UITestBase {
             // Fractional, which is the same harm in miniature: 5.7 becomes 5, so the sender's
             // own 5 is then indistinguishable from it.
             "{\"device\":\"other\",\"seq\":5.7}",
+            // 2^63, one past the range. It is the SAME double as (double) Long.MAX_VALUE --
+            // that constant is not representable and rounds up to this -- so a "greater than
+            // Long.MAX_VALUE" test compares equal and lets it through, to be clamped straight
+            // back to Long.MAX_VALUE by the conversion.
+            "{\"device\":\"other\",\"seq\":9223372036854775808}",
         };
         for (int i = 0; i < wrong.length; i++) {
             try {

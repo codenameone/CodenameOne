@@ -326,10 +326,31 @@ public final class StateCodec {
             // it sends afterwards is refused as already seen, for the life of the installation.
             // A fractional value is refused for the same reason in miniature: 5.7 becomes 5, and
             // the sender's 5 is then indistinguishable from it.
+            if (value instanceof Long || value instanceof Integer
+                    || value instanceof Short || value instanceof Byte) {
+                // Already a whole number inside the range, by its own type. Routing these
+                // through a double would REJECT a perfectly good Long near the top of the
+                // range, because that is precisely the region a double cannot represent.
+                // JSONParser answers with Long rather than Double when useLongs is on, which
+                // any code in the process can turn on through the static setter.
+                return;
+            }
             double d = ((Number) value).doubleValue();
+            // The upper bound is >= and is written against MIN_VALUE, which is the only one of
+            // the two a double holds exactly. Long.MAX_VALUE is not representable: (double)
+            // Long.MAX_VALUE rounds UP to 2^63, so a sender's 9223372036854775808 -- one past
+            // the range -- compares equal to it and a "> (double) Long.MAX_VALUE" test let it
+            // through, to be clamped back to Long.MAX_VALUE by the conversion. -(double)
+            // Long.MIN_VALUE is exactly 2^63, and a double is convertible to a long precisely
+            // when it is at least -2^63 and strictly below 2^63.
+            //
+            // This does refuse a sender that writes Long.MAX_VALUE itself as a bare NUMBER,
+            // and there is no way not to: no double distinguishes it from the value one past
+            // the range. This codec writes seq as a STRING for exactly that reason, and the
+            // string path parses it exactly.
             if (Double.isNaN(d) || Double.isInfinite(d)
                     || d != Math.floor(d)
-                    || d < (double) Long.MIN_VALUE || d > (double) Long.MAX_VALUE) {
+                    || d < (double) Long.MIN_VALUE || d >= -((double) Long.MIN_VALUE)) {
                 throw new IOException("The continuity relay returned a document whose \"" + key
                         + "\" is " + value + ", which is not a whole number this device can "
                         + "hold. Accepting it would clamp the value to the largest sequence "
@@ -738,7 +759,18 @@ public final class StateCodec {
                 return Double.valueOf(Double.parseDouble(body));
             }
             if (tag == 'b') {
-                return Boolean.valueOf(body);
+                // The EXACT bodies the encoder writes, and nothing else. Boolean.valueOf answers
+                // false for every string that is not "true", so "b:unknown" arrived as a
+                // confident false: application data changed in transit, restored, and
+                // acknowledged, with nothing said. Every other tag here already preserves a body
+                // it cannot parse -- the number tags do it through the catch below -- and this
+                // one now falls through to the same answer.
+                if ("true".equals(body)) {
+                    return Boolean.TRUE;
+                }
+                if ("false".equals(body)) {
+                    return Boolean.FALSE;
+                }
             }
         } catch (NumberFormatException malformed) {
             // A tag whose body will not parse came from somewhere this build does not control.

@@ -112,6 +112,7 @@ public final class Navigation {
         // afterwards described a session the callback had already ended, and checkpointed the
         // signed-out account's payload.
         stackChanged();
+        List<NavigationEntry> expected = new ArrayList<NavigationEntry>(stack);
         try {
             f.show();
         } catch (RuntimeException e) {
@@ -120,8 +121,7 @@ public final class Navigation {
             // this method has already queued, and restored after a process death. The flush reads
             // the stack when it runs, so putting it back is what makes that checkpoint describe
             // the truth.
-            stack.clear();
-            stack.addAll(before);
+            rollBack(before, expected);
             throw e;
         }
         return true;
@@ -141,11 +141,11 @@ public final class Navigation {
         Form back = now.getForm();
         // Before showBack(), for the reason navigate() gives.
         stackChanged();
+        List<NavigationEntry> expected = new ArrayList<NavigationEntry>(stack);
         try {
             back.showBack();
         } catch (RuntimeException e) {
-            stack.clear();
-            stack.addAll(before);
+            rollBack(before, expected);
             throw e;
         }
         return true;
@@ -161,6 +161,29 @@ public final class Navigation {
     /// the call do not affect it.
     public static List<NavigationEntry> getStack() {
         return Collections.unmodifiableList(new ArrayList<NavigationEntry>(stack));
+    }
+
+    /// Undoes a navigation whose show() threw -- but only if nothing else touched the stack
+    /// while it ran.
+    ///
+    /// `show()` runs application code, and that code can navigate. The case that matters is
+    /// `Continuity.clear()`: a show listener discovers the session has expired, logs out --
+    /// which empties this stack on purpose -- and then throws on the way out. Restoring
+    /// unconditionally handed the signed-out account's forms straight back, reachable through
+    /// `getStack()` and `back()` and persisted by the next checkpoint. That is the one thing the
+    /// logout existed to prevent, undone by the rollback meant to help it.
+    ///
+    /// So the rollback applies only when the stack is still exactly what this method left it as.
+    /// Anything else -- a logout, or a show listener that navigated somewhere of its own -- is a
+    /// deliberate change by code that ran later, and it wins. `NavigationEntry` does not override
+    /// equals, so comparing the lists compares entry IDENTITY, which is what makes "still exactly
+    /// what I left" mean what it says.
+    private static void rollBack(List<NavigationEntry> before, List<NavigationEntry> expected) {
+        if (!expected.equals(stack)) {
+            return;
+        }
+        stack.clear();
+        stack.addAll(before);
     }
 
     /// Forgets the navigation history, leaving nothing to go back to.
@@ -217,11 +240,11 @@ public final class Navigation {
         Form target = entry.getForm();
         // Before showBack(), for the reason navigate() gives.
         stackChanged();
+        List<NavigationEntry> expected = new ArrayList<NavigationEntry>(stack);
         try {
             target.showBack();
         } catch (RuntimeException e) {
-            stack.clear();
-            stack.addAll(before);
+            rollBack(before, expected);
             throw e;
         }
         return true;
