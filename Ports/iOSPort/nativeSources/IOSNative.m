@@ -15759,9 +15759,13 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetBottom___R_int(CN1_
 }
 
 JAVA_FLOAT com_codename1_impl_ios_IOSNative_getDisplayScale___R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    // scaleValue is [UIScreen mainScreen].scale captured for the main scene; the
-    // fallback matters only before it has been captured.
-    return (JAVA_FLOAT)(scaleValue > 0 ? scaleValue : [UIScreen mainScreen].scale);
+    // scaleValue, and nothing else: this file is shared with the Mac port, where
+    // there is no UIScreen at all (it is NSScreen, whose scale is
+    // backingScaleFactor). scaleValue is already the captured screen scale on
+    // every Apple target, so there is nothing to fall back TO -- 0 means "not
+    // captured yet", which the Java caller answers by deferring to the portable
+    // implementation.
+    return (JAVA_FLOAT)scaleValue;
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayWidth___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {

@@ -2733,19 +2733,34 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         // Clearing threadActive is what makes the thread parkable, and it is
         // needed only because pthread_mutex_lock below can BLOCK -- a thread
         // that blocks while the collector believes it is running would stop the
-        // mark from completing. A trylock that succeeds never blocks, so there
-        // is nothing to announce and nothing to wait out afterwards. Going
-        // through the parking path anyway made every synchronized call made
-        // while a mark was in flight wait for the handshake to clear, at the
-        // usleep's 100us granularity: measured at 8.7ms of blocked event
-        // dispatch thread per launch, all of it uncontended, entirely in
-        // Matrix.Factory.getDefault and IOSImplementation.extractHardRef.
+        // mark from completing. A trylock that succeeds never blocks, so it does
+        // not have to announce a park it never performs: going through the
+        // parking path anyway made every uncontended synchronized call made
+        // while a mark was in flight wait out the handshake at the usleep's
+        // 100us granularity, measured at 8.7ms of blocked event dispatch thread
+        // per launch.
         //
-        // Returning without parking is the same shape as the reentrant case
-        // just above, which has always returned this way.
+        // But it is STILL A SAFEPOINT, and that is not optional. monitorEnter is
+        // one of the few places a long-running loop is guaranteed to reach, so a
+        // loop whose only safepoints are non-reentrant synchronized blocks would
+        // otherwise run forever while a stop-the-world collector waited for it --
+        // allocation stalls behind the collector and the application hangs with
+        // no output at all. So the fast path skips the ANNOUNCEMENT, never the
+        // handshake: if one is already pending it parks exactly as the blocking
+        // path below does, and the common case (no collection in flight) is a
+        // single relaxed read.
         if (pthread_mutex_trylock(&data->__codenameOneMutex) == 0) {
             data->counter++;
             data->ownerThread = own;
+            if (threadStateData->threadBlockedByGC) {
+                threadStateData->threadActive = JAVA_FALSE;
+                CN1_STALL_T0(__stallTry);
+                while (threadStateData->threadBlockedByGC) {
+                    usleep(100);
+                }
+                CN1_STALL_ADD(__stallTry, CN1_STALL_HANDSHAKE, threadStateData);
+                threadStateData->threadActive = JAVA_TRUE;
+            }
             return;
         }
         threadStateData->threadActive = JAVA_FALSE;
