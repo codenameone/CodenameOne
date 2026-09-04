@@ -54,6 +54,16 @@ public final class ExtensionTunnelHost {
 
     private static TunnelHost host;
 
+    /// Which start [#host] and [#transport] belong to.
+    ///
+    /// Delivery used to resolve them from these statics at call time, so a
+    /// read handler that had already passed its own generation check could
+    /// hand a packet captured on the old link to a tunnel that started while
+    /// it was being delivered. The extension passes the generation it is
+    /// reading for, and a mismatch is dropped -- the inbound half of the
+    /// same rule the writer follows outbound.
+    private static int generation;
+
     private static ExtensionTransport transport;
 
     private ExtensionTunnelHost() {
@@ -67,7 +77,8 @@ public final class ExtensionTunnelHost {
     /// @param setupWire the record the app's `TunnelSetup` was encoded into
     ///
     /// @hidden not part of the public API.
-    public static void begin(Object tunnel, String setupWire) {
+    public static void begin(Object tunnel, String setupWire,
+            int startGeneration) {
         // instanceof rather than a cast: ParparVM does not check CHECKCAST,
         // so a wrong type here would not throw, it would read a VpnTunnel's
         // fields out of whatever object the generated code passed.
@@ -81,6 +92,7 @@ public final class ExtensionTunnelHost {
         synchronized (ExtensionTunnelHost.class) {
             host = h;
             transport = t;
+            generation = startGeneration;
         }
         h.start(TunnelWire.server(fields), TunnelWire.routes(fields),
                 TunnelWire.dnsServers(fields), mtu, TunnelWire.data(fields));
@@ -99,10 +111,12 @@ public final class ExtensionTunnelHost {
     /// @return the array to write into, or null when no tunnel is running
     ///
     /// @hidden not part of the public API.
-    public static byte[] buffer(int capacity) {
+    public static byte[] buffer(int capacity, int forGeneration) {
         ExtensionTransport t;
         synchronized (ExtensionTunnelHost.class) {
-            t = transport;
+            // The transport AND the start it belongs to, read together under
+            // the lock. Taken apart they could disagree.
+            t = forGeneration == generation ? transport : null;
         }
         return t == null ? null : t.backing(capacity);
     }
@@ -110,12 +124,15 @@ public final class ExtensionTunnelHost {
     /// Delivers the packet just written into [#buffer].
     ///
     /// @hidden not part of the public API.
-    public static void received(int length) {
+    public static void received(int length, int forGeneration) {
         TunnelHost h;
         ExtensionTransport t;
         synchronized (ExtensionTunnelHost.class) {
-            h = host;
-            t = transport;
+            // Both, or neither: a packet belongs to the start whose buffer it
+            // was written into, and delivering it to a tunnel that replaced
+            // that start is the crossing this exists to stop.
+            h = forGeneration == generation ? host : null;
+            t = forGeneration == generation ? transport : null;
         }
         if (h == null || t == null || length <= 0) {
             return;
@@ -133,6 +150,12 @@ public final class ExtensionTunnelHost {
             h = host;
             host = null;
             transport = null;
+            // Nothing belongs to a start that has ended. ZERO is safe as
+            // "none" because the extension counts starts from one -- its
+            // counter is fetch_add(1) + 1 -- so no reader can be carrying
+            // it, and every late buffer() and received() is dropped without
+            // this having to know which start replaced it.
+            generation = 0;
         }
         if (h != null) {
             h.stop(reasonOrdinal);

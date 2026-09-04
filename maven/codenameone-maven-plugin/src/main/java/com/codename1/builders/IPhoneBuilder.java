@@ -1866,7 +1866,27 @@ public class IPhoneBuilder extends Executor {
      */
     @Override
     protected java.util.List<String> extraKeepClasses(BuildRequest request) {
-        return watchEntryKeepClasses(request);
+        java.util.List<String> keep =
+                new ArrayList<String>(watchEntryKeepClasses(request));
+        // The packet tunnel's entry class, for the reason the watch's is
+        // kept: hardening rewrites the submitted archive before the build
+        // runs, so a renaming harden.level would take the class
+        // ios.vpn.tunnel.class names out from under everything after it --
+        // the check that it exists, the generated stub that constructs it,
+        // and the allocator symbol the provider mangles from it.
+        //
+        // Read from the REQUEST, because hardening runs before parseHints
+        // and there is nothing to ask yet.
+        if ("true".equals(request.getArg(VpnTunnelNativeBuilder.HINT_ENABLED,
+                "false"))) {
+            String tunnelClass = request.getArg(
+                    VpnTunnelNativeBuilder.HINT_CLASS, "");
+            tunnelClass = tunnelClass == null ? "" : tunnelClass.trim();
+            if (tunnelClass.length() > 0) {
+                keep.add(tunnelClass);
+            }
+        }
+        return keep;
     }
 
     /** True when this build ships a watchOS slice (watchNative.enabled or a watchMain entry point). */
