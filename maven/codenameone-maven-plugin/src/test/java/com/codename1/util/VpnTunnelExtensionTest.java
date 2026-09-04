@@ -144,7 +144,12 @@ class VpnTunnelExtensionTest {
             at = src.indexOf("generation != atomic_load(&cn1tnReadGeneration)",
                     at + 1);
         }
-        assertEquals(2, checks, "entry and re-arm both have to check");
+        // THREE: on entry, before each packet, and before re-arming.
+        // The middle one is what stops a batch captured on the old link
+        // being pumped into a tunnel that started while it was being
+        // delivered.
+        assertEquals(3, checks,
+                "entry, every packet and the re-arm all have to check");
     }
 
     @Test
