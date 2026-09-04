@@ -15,6 +15,7 @@ only responsible for not adding new problems; the backlog stays grandfathered.
 Checks:
   * Vale          (subprocess; uses docs/website/.vale.ini)
   * Paragraph cap (in-process; check_paragraph_capitalization.find_lowercase_paragraphs)
+  * Guide anchors (in-process; validates /developer-guide/#... against AsciiDoc IDs)
   * LanguageTool  (in-process; render_blog_prose_html + run_languagetool;
                    skipped automatically if language_tool_python is unavailable)
 
@@ -51,6 +52,15 @@ SELF_CERTIFYING_RE = re.compile(
     r"|\b(?:to be honest|in all honesty|the truth is|to tell the truth|"
     r"to be transparent|in all candor)\b",
     re.IGNORECASE,
+)
+
+DEV_GUIDE_ANCHOR_LINK_RE = re.compile(
+    r"\]\(/developer-guide/#([A-Za-z0-9_.:-]+)(?:\s+[^)]*)?\)"
+)
+ASCIIDOC_HEADING_RE = re.compile(r"^={2,6}\s+(.+?)\s*$", re.MULTILINE)
+ASCIIDOC_BLOCK_ID_RE = re.compile(
+    r"^\s*(?:\[\[([^,\]]+)(?:,[^\]]*)?\]\]|\[#([^\]]+)\])\s*$",
+    re.MULTILINE,
 )
 
 
@@ -176,6 +186,51 @@ def run_self_certifying_language(text, rel):
     return out
 
 
+def asciidoc_default_anchor(heading):
+    """Return the default Asciidoctor section ID for a heading."""
+    plain = re.sub(r"[`*_#]", "", heading).lower()
+    normalized = re.sub(r"[^a-z0-9]+", "_", plain).strip("_")
+    return f"_{normalized}" if normalized else ""
+
+
+def developer_guide_anchors(repo_root):
+    """Collect generated and explicit IDs from the single-page developer guide."""
+    guide_root = os.path.join(repo_root, "docs", "developer-guide")
+    anchors = set()
+    for root, _dirs, files in os.walk(guide_root):
+        for name in files:
+            if not name.endswith((".asciidoc", ".adoc")):
+                continue
+            with open(os.path.join(root, name), "r", encoding="utf-8") as fh:
+                source = fh.read()
+            for match in ASCIIDOC_HEADING_RE.finditer(source):
+                anchor = asciidoc_default_anchor(match.group(1))
+                if anchor:
+                    anchors.add(anchor)
+            for match in ASCIIDOC_BLOCK_ID_RE.finditer(source):
+                anchors.add(match.group(1) or match.group(2))
+    return anchors
+
+
+def run_developer_guide_anchor_links(text, rel, anchors):
+    """Find links into the developer guide whose fragment does not exist."""
+    out = []
+    for match in DEV_GUIDE_ANCHOR_LINK_RE.finditer(text):
+        anchor = match.group(1)
+        if anchor in anchors:
+            continue
+        out.append({
+            "signature": ("link", "DeveloperGuideAnchor", anchor),
+            "file": rel,
+            "line": text.count("\n", 0, match.start()) + 1,
+            "message": (
+                "DeveloperGuideAnchor: "
+                f"/developer-guide/#{anchor} does not match a guide section ID"
+            ),
+        })
+    return out
+
+
 def _lt_module():
     """Import run_languagetool lazily; return None if unavailable."""
     try:
@@ -298,7 +353,7 @@ def build_accept_file(repo_root):
     return path
 
 
-def gate_file(path, base_sha, repo_root, lt_ctx):
+def gate_file(path, base_sha, repo_root, lt_ctx, guide_anchors):
     head = head_content(path, repo_root)
     base = base_content(base_sha, path, repo_root)
     new = []
@@ -307,6 +362,10 @@ def gate_file(path, base_sha, repo_root, lt_ctx):
     new += net_new(
         run_self_certifying_language(head, path),
         run_self_certifying_language(base, path),
+    )
+    new += net_new(
+        run_developer_guide_anchor_links(head, path, guide_anchors),
+        run_developer_guide_anchor_links(base, path, guide_anchors),
     )
     if lt_ctx:
         head_lt = lt_findings(head, path, lt_ctx)
@@ -339,11 +398,14 @@ def main():
         return 0
 
     accept_path = build_accept_file(repo_root)
+    guide_anchors = developer_guide_anchors(repo_root)
     lt_ctx = None if args.no_languagetool else make_lt_context(accept_path)
     try:
         all_new = []
         for path in posts:
-            all_new.extend(gate_file(path, base_sha, repo_root, lt_ctx))
+            all_new.extend(
+                gate_file(path, base_sha, repo_root, lt_ctx, guide_anchors)
+            )
     finally:
         if lt_ctx:
             try:

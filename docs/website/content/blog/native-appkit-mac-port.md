@@ -77,7 +77,7 @@ Use `ios-source` for a local Xcode project or `ios-device` for a build-server bu
 
 ## A port is a contract, not a screenshot
 
-The pull request ran the full native screenshot suite, 324 cases at merge time, plus platform and input tests. The same window layouts are captured at several aspect ratios. Text input, mouse routing, focus, resizing, modality, and screen scale have dedicated coverage.
+The pull request ran the full native screenshot suite plus platform and input tests. The same window layouts are captured at several aspect ratios. Text input, mouse routing, focus, resizing, modality, and screen scale have dedicated coverage.
 
 Accessibility follows the window model too. `IOSNative.updateAccessibilityTree()` sends the framework semantics tree to `CN1MacAccessibilityUpdateTree()`, which installs a hierarchy of `NSAccessibilityElement` children on the relevant window. Roles, labels, values, states, standard and custom actions, and live-region announcements reach VoiceOver through AppKit instead of stopping at the portable tree.
 

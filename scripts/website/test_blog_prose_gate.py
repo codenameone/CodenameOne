@@ -26,5 +26,28 @@ class SelfCertifyingLanguageTest(unittest.TestCase):
         self.assertEqual(2, findings[0]["line"])
 
 
+class DeveloperGuideAnchorTest(unittest.TestCase):
+    def findings(self, text):
+        return blog_prose_gate.run_developer_guide_anchor_links(
+            text, "post.md", {"_call_management", "_vpn"}
+        )
+
+    def test_accepts_existing_anchor(self):
+        text = "Read the [VPN chapter](/developer-guide/#_vpn).\n"
+        self.assertEqual([], self.findings(text))
+
+    def test_rejects_missing_anchor(self):
+        text = "Read the [VPN chapter](/developer-guide/#vpn).\n"
+        findings = self.findings(text)
+        self.assertEqual(1, len(findings))
+        self.assertEqual("DeveloperGuideAnchor", findings[0]["signature"][1])
+
+    def test_matches_asciidoctor_default_ids(self):
+        self.assertEqual(
+            "_call_management",
+            blog_prose_gate.asciidoc_default_anchor("Call Management"),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

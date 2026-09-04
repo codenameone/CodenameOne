@@ -17,6 +17,6 @@ Codename One now marks an input as a one-time code on iOS, Android, and the web.
 
 The visual OTP boxes now share one underlying editor. The old one-editor-per-box design truncated a six-digit autofill value at the focused box. One editor makes typing, paste, deletion, accessibility, and autofill behave as one input.
 
-No SMS permission, entitlement, native library, or build hint is added. Secure-by-default work often looks like subtraction.
+No SMS permission, entitlement, native library, or build hint is added. The safer implementation also has the smaller permission surface.
 
 {{canonical}}

@@ -11,7 +11,7 @@ series: ["release-2026-09-04"]
 
 ![A modal dialog above a native desktop window](/blog/dialogs-in-native-windows.jpg)
 
-Last week's native-window release could open an editor, inspector, and tool palette as separate operating-system windows. Then an ordinary `Dialog.show()` inside the inspector looked for the current `Form` and appeared on the wrong surface.
+Last week's [native-window release](/blog/native-desktop-windows/) could open an editor, inspector, and tool palette as separate operating-system windows. Then an ordinary `Dialog.show()` inside the inspector looked for the current `Form` and appeared on the wrong surface.
 
 That bug exposed every component that treated “top level” and “form” as synonyms. [PR #5624](https://github.com/codenameone/CodenameOne/pull/5624) fixes those assumptions and adds something more visible: a `Dialog` can now become a real modal desktop window.
 
@@ -19,21 +19,27 @@ For VoIP, VPN, the AppKit port, OTP, contacts, and the rest of this release, rea
 
 ## Two useful kinds of dialog
 
-The default remains a lightweight dialog painted inside its owner's layered pane. It matches Codename One styling and works on every port. A desktop application can opt one instance into an operating-system window:
+The default remains a lightweight dialog painted inside its owner's layered pane. It matches Codename One styling and works on every port. A desktop application can make ordinary confirmation dialogs native windows while keeping the familiar static API:
 
 ```java
-Dialog confirm = new Dialog("Confirm");
-confirm.add(new Label("Delete the document?"));
-confirm.setNativeWindowMode(true);
+Dialog.setDefaultNativeWindowMode(true);
 
-Command result = confirm.showDialog();
+boolean delete = Dialog.show(
+        "Confirm deletion",
+        "Delete Quarterly report.pdf?",
+        "Delete",
+        "Cancel");
+
+if (delete) {
+    deleteDocument();
+}
 ```
 
-![A Codename One dialog dimming its owning AppKit window](/blog/dialogs-in-native-windows/appkit-dialog.png)
+![A themed Codename One confirmation dialog in its own macOS window](/blog/dialogs-in-native-windows/native-modal-dialog.png)
 
-_The same Dialog API rendered inside its AppKit owner. Native-window mode moves the dialog into its own operating-system window._
+_An actual JavaSE desktop capture on macOS. The title bar belongs to a separate operating-system window; the body and actions use the application's Codename One theme._
 
-An application can set the default globally with `Dialog.setDefaultNativeWindowMode(true)`, or through the `defaultNativeWindowModeBool` theme constant. The instance setting wins over the static default, which wins over the theme. On a port without native windows, the dialog stays lightweight. There is no second code path to maintain.
+The `defaultNativeWindowModeBool` theme constant provides the same application-wide setting without a startup call. For a single custom dialog, call `setNativeWindowMode(true)` on that instance. The instance setting wins over the static default, which wins over the theme. On a port without native windows, the dialog stays lightweight. There is no second code path to maintain.
 
 Native-window mode is useful when the dialog must participate in desktop window ordering, focus, or task switching. Lightweight mode is usually better for a small prompt that should inherit the exact visual treatment of its owner.
 
@@ -77,10 +83,6 @@ inspectorWindow.setContent(nextPanel, CommonTransitions.createFade(250));
 Those limits are explicit because a fake cross-window animation would be less predictable than no animation.
 
 ## The same contract on Windows and Mac
-
-![A Codename One dialog dimming its owning native Windows window](/blog/dialogs-in-native-windows/windows-dialog.png)
-
-_Native Windows runs the same dialog conformance case._
 
 The test suite opens the same controls in 400 by 300, 900 by 700, and 1000 by 400 windows. The wide case catches code that still reads the main display width. Modal cases verify that the owner is blocked while other event-dispatch work can continue.
 

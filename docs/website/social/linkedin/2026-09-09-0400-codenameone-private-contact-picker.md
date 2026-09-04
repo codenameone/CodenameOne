@@ -19,6 +19,6 @@ The result is a snapshot, not a standing token for future address-book queries. 
 
 The builder also learned the difference between using a Contact value returned by the picker and calling a broad contact reader. A narrow Java API would be meaningless if packaging added the broad permission anyway.
 
-The easiest path now asks for the smallest useful slice of data.
+A narrow feature now has a narrow permission surface.
 
 {{canonical}}

@@ -21,13 +21,13 @@ Codename One has a secret weapon for that problem: builders.
 
 Builders already assemble the native product, so they can change its shape based on the Java packages the application actually uses. They link frameworks, inject permissions and background modes, generate native delegates and services, and create extension targets when needed. Leave a package out and its native machinery stays out too.
 
-[PR #5604](https://github.com/codenameone/CodenameOne/pull/5604) is where we crossed that old line. It adds first-class call management, VoIP push handling, managed VPN, and raw packet tunneling on Android and iOS. The Java API is the visible result. The bigger change is that builders assemble the system integration around it without turning every application team into the maintainer of two native build projects.
+[PR #5604](https://github.com/codenameone/CodenameOne/pull/5604) is where we crossed that old line. It introduced first-class call management, VoIP push handling, managed VPN, and the packet-tunnel API and Android host. [PR #5693](https://github.com/codenameone/CodenameOne/pull/5693) completes the iOS path by generating a separately translated and signed Network Extension. The Java API is the visible result. The bigger change is that builders assemble the system integration around it without turning every application team into the maintainer of two native build projects.
 
 ## TL;DR
 
 - [`Calls`](#a-call-is-a-system-session-before-it-is-a-media-session) connects application call state to CallKit on iOS and self-managed `ConnectionService` on Android. Your media and signaling stack remain yours.
 - [`Vpn`](#managed-vpn-with-an-important-platform-boundary) installs and controls managed IKEv2 profiles on iOS and Android. iOS also supports managed IPsec profiles.
-- [`VpnTunnel`](#the-packet-tunnel-boundary) exposes raw packets for an application-implemented tunnel on Android and iOS. On iOS, the builder generates and signs a separate Network Extension containing the translated Java tunnel.
+- [`VpnTunnel`](#the-packet-tunnel-boundary) exposes raw packets for an application-implemented tunnel on Android and iOS. [The iOS builder work](https://github.com/codenameone/CodenameOne/pull/5693) generates and signs a separate Network Extension containing the translated Java tunnel.
 - {{< post-link path="/blog/dialogs-in-native-windows" text="Dialogs and secondary windows" >}} now work together, including an opt-in native modal window.
 - {{< post-link path="/blog/native-appkit-mac-port" text="The new AppKit port" >}} builds a real Mac application instead of presenting an iOS application through Catalyst.
 - {{< post-link path="/blog/sms-otp-autofill" text="SMS one-time-code autofill" >}} fills a verification code without asking to read the inbox.
@@ -111,34 +111,40 @@ iOS and Android 11 or newer support managed IKEv2. iOS also supports managed IPs
 
 ### The packet tunnel boundary
 
-For protocols that do not fit a managed VPN profile, `VpnTunnel` lets application code receive raw IP packets and forward them through its own transport:
+For work that does not fit a managed VPN profile, `VpnTunnel` lets application code inspect raw IP packets and decide whether to forward or drop them:
 
 ```java
-public final class AcmeTunnel extends VpnTunnel {
+public final class LocalTunnel extends VpnTunnel {
+    public LocalTunnel() {
+    }
+
     protected void onStart(TunnelConfiguration configuration) {
-        transport.connect(configuration);
     }
 
     protected void onPacket(PacketBuffer packet) {
-        transport.forward(packet);
+        if (packet.getFamily() == PacketBuffer.FAMILY_IPV4) {
+            forward(packet);
+        }
     }
 
     protected void onStop(TunnelStopReason reason) {
-        transport.close();
     }
 }
 ```
 
-The same Java packet loop runs on Android and iOS, but the process boundary is different. Android hosts it in a `VpnService` inside the application process. iOS requires a `NEPacketTunnelProvider` Network Extension: a separate executable with its own bundle identifier, provisioning profile, memory limit, and translated VM. The builder creates that target, includes the selected `VpnTunnel` implementation, adds the framework and entitlements, and embeds the signed extension in the application.
+The same Java packet loop runs on Android and iOS, but the process boundary is different. Android hosts it in a `VpnService` inside the application process. iOS requires a `NEPacketTunnelProvider` Network Extension: a separate executable with its own bundle identifier, provisioning profile, memory limit, and translated VM. The builder work in [PR #5693](https://github.com/codenameone/CodenameOne/pull/5693) creates that target, translates from the selected `VpnTunnel` class instead of the UIKit application shell, adds the framework and entitlements, and embeds the signed extension in the application.
+
+The iOS extension contains the translated tunnel and VM, but not the Codename One networking stack. It can inspect, rewrite, drop, and `forward` packets on the device. It cannot open a remote connection through `com.codename1.io.Socket`, `ConnectionRequest`, or ParparVM's `java.net`. Android can relay packets because its tunnel runs in the application process. A protocol that needs a remote relay should put that transport behind a platform-specific interface instead of assuming the two hosts are identical.
 
 Apple grants the Network Extension entitlement case by case, so the target is deliberately opt-in. Once the App ID has that entitlement, name the tunnel class in `codenameone_settings.properties`:
 
 ```properties
 codename1.arg.ios.vpn.tunnel=true
-codename1.arg.ios.vpn.tunnel.class=com.acme.AcmeTunnel
+codename1.arg.ios.vpn.tunnel.class=com.acme.LocalTunnel
+codename1.arg.ios.appext.CN1VpnTunnel.provisioningURL=https://example.com/CN1VpnTunnel.mobileprovision
 ```
 
-The extension starts fresh. It cannot see application statics, `Display`, or connections opened by the main application. Pass everything it needs through `TunnelSetup.data`, then initialize the transport from `VpnTunnel.onStart()`. This is a real cross-platform API without pretending the two operating systems have the same lifecycle.
+Both the host application and `<packageName>.vpntunnel` App IDs need Apple's Network Extension entitlement. The extension also needs its own provisioning profile. It starts fresh, requires an accessible no-argument constructor, and cannot see application statics or `Display`. Pass local configuration through `TunnelSetup.data` and read it in `VpnTunnel.onStart()`. This is a real cross-platform API without pretending the two operating systems have the same lifecycle or networking facilities.
 
 ## The builder is part of the runtime contract
 
@@ -160,15 +166,17 @@ Dependency injection cannot do this work. The builder can add a service that mus
 
 ## Dialog can become a native modal window
 
-Last week's native-window release named several components that still assumed every top level was a `Form`. [PR #5624](https://github.com/codenameone/CodenameOne/pull/5624) closes most of that list. `Dialog`, `Sheet`, `ToastBar`, combo-box popups, floating-action submenus, progress overlays, tooltips, and `HTMLComponent` now resolve the window that contains them. Accessibility state is tracked per window as well.
+Last week's [native-window release](/blog/native-desktop-windows/) named several components that still assumed every top level was a `Form`. [PR #5624](https://github.com/codenameone/CodenameOne/pull/5624) closes most of that list. `Dialog`, `Sheet`, `ToastBar`, combo-box popups, floating-action submenus, progress overlays, tooltips, and `HTMLComponent` now resolve the window that contains them. Accessibility state is tracked per window as well.
 
 A dialog can remain a lightweight overlay inside its owner, or opt into a real operating-system window:
 
 ```java
-Dialog confirm = new Dialog("Confirm");
-confirm.add(new Label("Delete the document?"));
-confirm.setNativeWindowMode(true);
-Command result = confirm.showDialog();
+Dialog.setDefaultNativeWindowMode(true);
+boolean delete = Dialog.show(
+        "Confirm deletion",
+        "Delete Quarterly report.pdf?",
+        "Delete",
+        "Cancel");
 ```
 
 The {{< post-link path="/blog/dialogs-in-native-windows" text="window follow-up" >}} covers precedence, fallback behavior, anchored popups, and the remaining limits.
@@ -178,8 +186,6 @@ The {{< post-link path="/blog/dialogs-in-native-windows" text="window follow-up"
 Mac Catalyst helped us get an iOS application onto macOS, but its desktop behavior remained bounded by UIKit. It could not supply several ordinary window operations, and a secondary 4K surface could require roughly 33 MB for each intermediate frame before the image was copied into place.
 
 [PR #5601](https://github.com/codenameone/CodenameOne/pull/5601) replaces the default Mac native path with AppKit. The generated application now owns `NSApplication`, `NSWindow`, `NSMenu`, `NSScreen`, and a `CAMetalLayer` per window. Always-on-top, utility windows, minimize, restore, maximize, native modality, and independent dirty-region painting are real desktop operations.
-
-A new Codename One port used to be headline news. This one landed in the same week as VPN, VoIP, OTP, billing, contacts, and a documentation rebuild. Apparently a new native platform is now just another Tuesday.
 
 The {{< post-link path="/blog/native-appkit-mac-port" text="AppKit article" >}} explains the rendering change, build targets, test evidence, and the native accessibility bridge to VoiceOver.
 
@@ -216,7 +222,7 @@ The task does not make a notice true, and it does not replace platform tests. It
 
 [PR #5634](https://github.com/codenameone/CodenameOne/pull/5634) fixes display width, height, and millimeter conversion when the browser device-pixel ratio is neither one nor two. A viewport that is 390 CSS pixels wide at a ratio of three now reports 1,170 device pixels.
 
-This can change layout and screenshot results in existing JavaScript applications. Use `browser.window.devicePixelRatio` when a breakpoint genuinely needs CSS pixels.
+This can change layout and screenshot results in existing JavaScript applications. Read `CN.getProperty("browser.window.devicePixelRatio", "1")` when a breakpoint genuinely needs CSS pixels.
 
 ### The mouse wheel is no longer a fake drag
 
@@ -244,9 +250,9 @@ Documentation drift is now a failing build instead of a cleanup project for some
 
 This week stretches Codename One in both directions. Calls, VPN profiles, AppKit windows, contact selection, and OTP reach deeper into each operating system. Package-triggered builders keep that reach narrow. An application does not receive VoIP background execution because another product needed it. It does not receive broad contacts access to pick one person. It does not gain a message-reading permission to fill six digits.
 
-That is the security lead we are building: small public APIs, generated native integration, explicit platform limits, and fewer opportunities to turn a convenience feature into permanent access. You still own the application UI and the protocol choices. The builders absorb the native product plumbing needed to ship them.
+Secure-by-default programming depends on small public APIs, generated native integration, explicit platform limits, and fewer opportunities to turn a convenience feature into permanent access. You still own the application UI and the protocol choices. The builders absorb the native product plumbing needed to ship them.
 
-Start with the [Call Management](/developer-guide/#call-management) or [VPN](/developer-guide/#vpn) chapter, then test the failure path in the simulator before sending a native build.
+Start with the [Call Management](/developer-guide/#_call_management) or [VPN](/developer-guide/#_vpn) chapter, then test the failure path in the simulator before sending a native build.
 
 ---
 

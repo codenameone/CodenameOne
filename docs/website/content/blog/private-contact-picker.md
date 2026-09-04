@@ -101,7 +101,7 @@ The security gain is concrete, but the product flow improves too. There is no pr
 
 This week's {{< post-link path="/blog/sms-otp-autofill" text="OTP support" >}} follows the same rule by accepting one code without reading the inbox. Call and VPN packages activate only their own native services. Builders inspect what the application uses and keep everything else out.
 
-Codename One's security lead grows through these unremarkable defaults. The easiest API asks for the smallest useful slice of data. A developer must make a deliberate choice to widen access.
+Secure defaults grow through choices this ordinary. The easiest API asks for the smallest useful slice of data. A developer must make a deliberate choice to widen access.
 
 ---
 

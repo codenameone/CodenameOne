@@ -1,5 +1,5 @@
 ---
-title: "A new native platform became another Tuesday"
+title: "Why the Mac port moved from Catalyst to AppKit"
 slug: 2026-09-06-1200-shai-native-appkit-mac-port
 platform: linkedin
 account: shai
@@ -21,8 +21,6 @@ The existing Mac build targets keep their names. Applications that depend on Cat
 
 The framework semantics tree is published as a per-window hierarchy of `NSAccessibilityElement` children, so VoiceOver receives roles, labels, values, states, actions, and live-region announcements through AppKit.
 
-A new Codename One port used to be headline news. This one arrived in the same week as VoIP, VPN, OTP, contacts, native dialogs, billing, and a developer-guide rebuild.
-
-A new native platform is apparently just another Tuesday now.
+The migration keeps the existing Mac build targets while replacing the native foundation underneath them. Applications that need Catalyst can still opt into it; everyone else gets a desktop port built around desktop primitives.
 
 {{canonical}}
