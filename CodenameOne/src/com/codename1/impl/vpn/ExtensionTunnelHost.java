@@ -177,6 +177,16 @@ public final class ExtensionTunnelHost {
     public static void end(int reasonOrdinal, int invalidatedGeneration) {
         TunnelHost h;
         synchronized (ExtensionTunnelHost.class) {
+            if (invalidatedGeneration < generation) {
+                // A NEWER start already owns the extension. This stop was
+                // preempted between invalidating its own generation and
+                // getting here, and tearing down now would stop the tunnel
+                // that replaced it -- clearing the host and the transport of
+                // a tunnel that is running and reporting a stop its
+                // application never asked for. The start it belonged to is
+                // over either way; there is nothing left for it to do.
+                return;
+            }
             h = host;
             host = null;
             transport = null;

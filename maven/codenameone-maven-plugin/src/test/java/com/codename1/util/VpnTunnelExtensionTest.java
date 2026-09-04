@@ -114,27 +114,37 @@ class VpnTunnelExtensionTest {
         // system may dispose, and the writer retains what it finds there
         // before it looks at any generation, so the retain landed on freed
         // memory.
-        assertTrue(src.contains("- (void)cn1ForgetIfCurrent {"),
+        assertTrue(src.contains("- (void)cn1ForgetIfCurrent:(int)generation {"),
                 "a failed start has to give up its claim");
-        assertTrue(src.contains("if (cn1tnProvider == self) {"),
+        assertTrue(src.contains("if (cn1tnProvider == self"),
                 "and clear only its own, never a newer start's");
         // Every failure path, and each one before its handler: NE can
         // dispose the provider inside that call, and clearing after it
         // would be the same use-after-free one line further on.
+        // The GENERATION as well as the pointer: NE may hand a restart
+        // to the same provider object, and then identity alone says yes to
+        // a stale completion -- clearing the slot the newer start published
+        // under the same self, so the running tunnel wrote through nil and
+        // dropped every packet.
+        assertTrue(src.contains("if (cn1tnProvider == self\n"
+                        + "                && generation\n"
+                        + "                        == atomic_load(&cn1tnReadGeneration)) {"),
+                "the claim is this start's, not just this object's");
+        assertTrue(src.contains("[self cn1ForgetIfCurrent:cn1tnStart];"));
         int forgets = 0;
-        int at = src.indexOf("[self cn1ForgetIfCurrent];");
+        int at = src.indexOf("[self cn1ForgetIfCurrent:");
         while (at >= 0) {
             forgets++;
             String after = src.substring(
-                    at + "[self cn1ForgetIfCurrent];".length());
+                    at + "[self cn1ForgetIfCurrent:cn1tnStart];".length());
             assertTrue(after.trim().startsWith("completionHandler"),
                 "the clear comes before the handler it precedes");
-            at = src.indexOf("[self cn1ForgetIfCurrent];", at + 1);
+            at = src.indexOf("[self cn1ForgetIfCurrent:", at + 1);
         }
         // Unreadable setup, a settings error, stopped while the settings
         // were pending, and a begin that refused.
-        assertEquals(4, forgets,
-                "every failure path after the publish");
+        assertEquals(5, forgets,
+                "every failure path after the publish, and the stop");
     }
 
     @Test
@@ -237,7 +247,13 @@ class VpnTunnelExtensionTest {
         assertTrue(method.substring(ended).startsWith(
                 "ExtensionTunnelHost_end___int_int(\n"
                 + "            threadStateData, cn1tnReason(reason),\n"
-                + "            atomic_load(&cn1tnReadGeneration));"));
+                + "            cn1tnEnded);"));
+        // CAPTURED at the bump, not loaded again. A stop preempted between
+        // the two handed itself the restart's generation, and tore down the
+        // tunnel that had replaced it.
+        assertTrue(method.contains("int cn1tnEnded =\n"
+                + "            atomic_fetch_add(&cn1tnReadGeneration, 1) + 1;"));
+        assertTrue(method.contains("[self cn1ForgetIfCurrent:cn1tnEnded];"));
     }
 
     @Test
@@ -252,8 +268,8 @@ class VpnTunnelExtensionTest {
         // kept that tunnel alive.
         assertTrue(src.contains("flow = [cn1tnProvider retain]"),
                 "the writer has to hold the provider it writes through");
-        assertTrue(src.contains("@synchronized ([CN1VpnTunnelProvider class]) {\n"
-                        + "        cn1tnProvider = nil;"),
+        assertTrue(src.contains("- (void)cn1ForgetIfCurrent:(int)generation {\n"
+                        + "    @synchronized ([CN1VpnTunnelProvider class]) {"),
                 "the stop has to clear under the lock the retain is taken under");
         // BALANCED: every path out of the writer gives the retain back.
         int writer = src.indexOf("IOSExtensionTunnel_writeNative");
