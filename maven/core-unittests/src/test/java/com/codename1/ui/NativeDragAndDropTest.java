@@ -2501,6 +2501,46 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void anOperationSwitchedOffByItsOwnCompletionDoesNotStart() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            final NativeDragOperation op = new NativeDragOperation("reused, and then retired")
+                    .setAllowedActions(NativeDragOperation.ACTION_COPY);
+            op.addCompletionListener(new com.codename1.ui.events.ActionListener() {
+                public void actionPerformed(ActionEvent ev) {
+                    // What a source that keeps one instance does when it is done with it. This
+                    // runs from inside the *next* startDrag, which delivers what the previous
+                    // session still owed.
+                    op.setAllowedActions(NativeDragOperation.ACTION_NONE);
+                }
+            });
+
+            assertTrue(NativeDragAndDrop.startDrag(null, op), "the first drag is fine");
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_COPY);
+            // Forget the first drag, so what the port is asked to start below is only what
+            // this second call asks of it.
+            implementation.resetNativeDragState();
+            implementation.setNativeDragAndDropSupported(true);
+
+            assertFalse(NativeDragAndDrop.startDrag(null, op),
+                    "the completion delivered from inside this call said nothing may be done "
+                            + "with the operation any more, and a session nothing may be done "
+                            + "with is one no target can accept");
+            assertNull(implementation.getStartedNativeDrag(),
+                    "so the platform is never asked to start it");
+            assertNull(NativeDragAndDrop.getActiveDrag(),
+                    "and the framework does not think one is running, which would refuse every "
+                            + "drag after it");
+        } finally {
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+        }
+    }
+
+    @FormTest
     void anOperationThatPermitsNothingNeverBecomesADrag() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

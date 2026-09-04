@@ -1178,10 +1178,14 @@ void CN1NativeDragDeliverPayloadReleased(int sessionId) {
 }
 
 int CN1NativeDragDeliverDropCommit(int x, int y, int action, int allowedActions, BOOL local,
-                                   int hoverGeneration) {
-    return (int)com_codename1_impl_ios_IOSImplementation_nativeDropCommitCallback___int_int_int_int_boolean_int_R_int(
+                                   int hoverGeneration, int dropId) {
+    return (int)com_codename1_impl_ios_IOSImplementation_nativeDropCommitCallback___int_int_int_int_boolean_int_int_R_int(
             CN1_THREAD_GET_STATE_PASS_ARG x, y, action, allowedActions,
-            local ? JAVA_TRUE : JAVA_FALSE, hoverGeneration);
+            local ? JAVA_TRUE : JAVA_FALSE, hoverGeneration, dropId);
+}
+
+void com_codename1_impl_ios_IOSNative_dropDeliveryFinished___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT dropId) {
+    CN1DropDeliveryFinished((int)dropId);
 }
 
 int CN1NativeDragDeliverHoverGeneration(void) {

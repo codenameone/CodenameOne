@@ -796,6 +796,10 @@ static NSString* cn1CopyDroppedFile(NSURL* url) {
 /// never reclaimed, whatever its size, since it is the one the application is working with.
 static NSMutableArray* cn1DroppedFileCopies = nil;
 
+/// The identity given to the last drop's copies, so the delivery that finishes can name which
+/// drop it was.
+static int cn1LastDropId = 0;
+
 /// The bytes one copied item occupies, following a directory into everything beneath it.
 ///
 /// Files hands over folders as readily as documents, and copyItemAtURL: copies one whole.
@@ -833,25 +837,30 @@ static long long cn1DroppedFilesSize(NSArray* paths) {
 }
 
 /// Records the copies one drop made, and reclaims the oldest while the budget is exceeded.
-static void cn1RememberDroppedFiles(NSArray* paths) {
-    if (paths.count == 0) {
-        return;
-    }
-    if (cn1DroppedFileCopies == nil) {
-        cn1DroppedFileCopies = [[NSMutableArray alloc] init];
-    }
-    NSMutableArray* entry = [NSMutableArray arrayWithObject:@(cn1DroppedFilesSize(paths))];
-    [entry addObjectsFromArray:paths];
-    [cn1DroppedFileCopies addObject:entry];
+/// Reclaims down to the budget, oldest first, skipping any drop that has not been delivered.
+///
+/// A commit only *queues* the target's callback, and the payload is read inside it. Two large
+/// drops committing before the event dispatch thread has run the first callback -- it may be
+/// busy, or that callback may itself be sitting in a nested event loop -- had the first drop's
+/// copies deleted before its target ever opened them, and on a local move the source went on to
+/// delete the original as well. So a drop is reclaimable only once its delivery is over; see
+/// CN1DropDeliveryFinished.
+static void cn1TrimDroppedFileCopies(void) {
     long long held = 0;
     for (NSArray* drop in cn1DroppedFileCopies) {
         held += [[drop objectAtIndex:0] longLongValue];
     }
-    // Down to the budget, oldest first, and never the last entry -- that is this drop.
-    while (held > CN1_DROP_COPY_BUDGET && cn1DroppedFileCopies.count > 1) {
-        NSArray* oldest = [cn1DroppedFileCopies objectAtIndex:0];
+    NSUInteger index = 0;
+    while (held > CN1_DROP_COPY_BUDGET && index < cn1DroppedFileCopies.count) {
+        NSArray* oldest = [cn1DroppedFileCopies objectAtIndex:index];
+        if ([[oldest objectAtIndex:2] boolValue]) {
+            // Still owed to its target. Skipped rather than waited for: the drops after it may
+            // be reclaimable, and this one becomes so the moment its callback returns.
+            index++;
+            continue;
+        }
         held -= [[oldest objectAtIndex:0] longLongValue];
-        for (NSUInteger iter = 1; iter < oldest.count; iter++) {
+        for (NSUInteger iter = 3; iter < oldest.count; iter++) {
             // Best effort by design: a file that will not delete is one the system reclaims
             // when it next purges the directory, which is what the directory is for.
             NSString* path = [oldest objectAtIndex:iter];
@@ -864,8 +873,39 @@ static void cn1RememberDroppedFiles(NSArray* paths) {
                 [[NSFileManager defaultManager] removeItemAtPath:holder error:nil];
             }
         }
-        [cn1DroppedFileCopies removeObjectAtIndex:0];
+        [cn1DroppedFileCopies removeObjectAtIndex:index];
     }
+}
+
+/// Records what one drop copied out, as owed to its target until its callback has run, and
+/// answers the identity that callback quotes back.
+static int cn1RememberDroppedFiles(NSArray* paths) {
+    if (paths.count == 0) {
+        return 0;
+    }
+    if (cn1DroppedFileCopies == nil) {
+        cn1DroppedFileCopies = [[NSMutableArray alloc] init];
+    }
+    int dropId = ++cn1LastDropId;
+    NSMutableArray* entry = [NSMutableArray arrayWithObjects:@(cn1DroppedFilesSize(paths)),
+                             @(dropId), @YES, nil];
+    [entry addObjectsFromArray:paths];
+    [cn1DroppedFileCopies addObject:entry];
+    cn1TrimDroppedFileCopies();
+    return dropId;
+}
+
+void CN1DropDeliveryFinished(int dropId) {
+    if (dropId == 0) {
+        return;
+    }
+    for (NSMutableArray* entry in cn1DroppedFileCopies) {
+        if ([[entry objectAtIndex:1] intValue] == dropId) {
+            [entry replaceObjectAtIndex:2 withObject:@NO];
+            break;
+        }
+    }
+    cn1TrimDroppedFileCopies();
 }
 
 API_AVAILABLE(ios(11.0))
@@ -1504,9 +1544,13 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
                 [copied addObject:path];
             }
         }
+        // Recorded before the commit, not after it: the commit queues the target's callback
+        // onto the event dispatch thread, and that thread can run it -- and report the delivery
+        // finished -- before this one gets back here. Recording afterwards left that report
+        // with nothing to find, and the copies owed to a target for good.
+        const int dropId = cn1RememberDroppedFiles(copied);
         int accepted = CN1NativeDragDeliverDropCommit(x, y, action, sessionActions,
-                                                     localAssembly, hoverGeneration);
-        cn1RememberDroppedFiles(copied);
+                                                     localAssembly, hoverGeneration, dropId);
         // This session's own agreement, and only it: another drop hovering while this one
         // finished loading is still entitled to the action its target chose.
         cn1ForgetDropAction(session);

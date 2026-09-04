@@ -173,7 +173,11 @@ void CN1NativeDragDeliverDropAddFile(NSString* mimeType, NSString* path, NSStrin
 /// application started -- both taken when the drop began rather than when its loads finished,
 /// because by then the drag the framework remembers may be another one.
 int CN1NativeDragDeliverDropCommit(int x, int y, int action, int allowedActions, BOOL local,
-                                   int hoverGeneration);
+                                   int hoverGeneration, int dropId);
+
+/// Reports that a drop's target callback has run, so what that drop copied out may be reclaimed
+/// like any older drop's. Until then it is owed to a target that has not read it yet.
+void CN1DropDeliveryFinished(int dropId);
 
 /// The framework's hover generation, taken as a drop begins loading and quoted back by the
 /// commit: it says whether the hover the recovery would fall back on still belongs to that

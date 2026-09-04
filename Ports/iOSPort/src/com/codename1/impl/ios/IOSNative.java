@@ -426,6 +426,14 @@ public final class IOSNative {
     /// - `paths`: newline separated file paths or `file:` URIs
     native void addNativeDragFiles(String path);
 
+    /// Reports that a drop's target callback has run, so the files it copied out are no longer
+    /// owed to anybody and may be reclaimed with the rest.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dropId`: the drop, as the commit named it
+    native void dropDeliveryFinished(int dropId);
+
     /// Adds one link a text/uri-list named, which becomes a drag item of its own.
     ///
     /// Resolved when the session begins for the reason the file list is: the item count is

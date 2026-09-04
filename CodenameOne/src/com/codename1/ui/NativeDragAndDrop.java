@@ -221,6 +221,22 @@ public final class NativeDragAndDrop {
         // the component starting a drag of its own now. Already on the event dispatch thread
         // here, which is where a completion belongs.
         deliverCompletion(op);
+        if (op.getAllowedActions() == NativeDragOperation.ACTION_NONE) {
+            // A listener is allowed to say what it likes about the operation it is being told
+            // about, including that nothing may be done with it any more -- a source that
+            // reuses one instance turns it off that way. Read before the completion, that
+            // answer was the previous session's; the port is about to be asked to start a
+            // session on it, and a session nothing may be done with is one no target can
+            // accept and the platform should never have been offered. Given back rather than
+            // started, exactly as a refusal from the port is.
+            synchronized (LOCK) {
+                if (active == op) { // NOPMD CompareObjectsWithEquals
+                    active = null;
+                    targetGeneration++;
+                }
+            }
+            return false;
+        }
         op.setSource(source);
         op.resetPerformedAction();
         // Before the port is asked to start, which is when it reads the payload.

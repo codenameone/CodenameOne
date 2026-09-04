@@ -9511,7 +9511,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// Invoked from CN1DragAndDrop.m once every representation has arrived. Returns the action
     /// accepted, or zero when nothing under the pointer took it.
     public static int nativeDropCommitCallback(int x, int y, int action, int allowedActions,
-            boolean local, int hoverGeneration) {
+            boolean local, int hoverGeneration, final int dropId) {
         ClipboardContent content = pendingDrop == null ? new ClipboardContent() : pendingDrop;
         pendingDrop = null;
         // What *this* drop was offering and where it came from, both taken by the native side
@@ -9524,8 +9524,20 @@ public class IOSImplementation extends CodenameOneImplementation {
         // The hover generation goes with it, taken by the native side at the same moment. The
         // recovery for a target that moved reads the hover this drag left behind, and by now
         // that hover can belong to a session which arrived while the providers were loading.
-        return NativeDragAndDrop.deferredDrop(0, x, y, content, action, allowedActions, local,
-                hoverGeneration);
+        int accepted = NativeDragAndDrop.deferredDrop(0, x, y, content, action, allowedActions,
+                local, hoverGeneration);
+        // Queued behind the callback the line above queued, because callSerially is first in
+        // first out: what this drop copied out is owed to its target until that callback has
+        // read it, and the copies are reclaimable only afterwards. Queued whatever the answer
+        // was -- a drop nobody took has nothing left to read either, and an entry never
+        // released would hold its files for the life of the process.
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                nativeInstance.dropDeliveryFinished(dropId);
+            }
+        });
+        return accepted;
     }
 
     /// Invoked from CN1DragAndDrop.m as a drop begins loading, so the commit that follows can
