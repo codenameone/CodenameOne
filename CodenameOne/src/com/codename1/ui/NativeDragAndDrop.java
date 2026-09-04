@@ -1104,6 +1104,7 @@ public final class NativeDragAndDrop {
         // not a target any more, and the walk has already skipped it -- so restoring it
         // here was the one way it could still be dropped on.
         if (hovered == null || TopLevelSupport.rootOf(hovered) == null
+                || !visibleInHierarchy(hovered)
                 || !hovered.isNativeDropTarget() || hovered.isIgnorePointerEvents()
                 || !hovered.isEnabled()
                 || (actions & hovered.getAcceptedDropActions()) == 0) {
@@ -1115,6 +1116,20 @@ public final class NativeDragAndDrop {
             Log.e(err);
             return null;
         }
+    }
+
+    /// True when this component and every ancestor above it is visible, which is what hit
+    /// testing means by visible: getComponentAt does not descend into a container that is
+    /// not, so a component hidden by an ancestor is unreachable by position even though its
+    /// own flag says otherwise. The fallback has to agree with the walk about that, or a
+    /// drop the user can no longer see is delivered to something they cannot see it land on.
+    private static boolean visibleInHierarchy(Component cmp) {
+        for (Component above = cmp; above != null; above = above.getParent()) {
+            if (!above.isVisible()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Resolves the deepest component under the pointer that is willing to take this content.

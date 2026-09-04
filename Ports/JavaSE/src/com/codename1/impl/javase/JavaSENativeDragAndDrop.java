@@ -152,6 +152,12 @@ final class JavaSENativeDragAndDrop {
                 try {
                     TransferHandler handler = target.getTransferHandler();
                     if (handler == null) {
+                        // Staged and then abandoned, so what was staged goes back -- as the
+                        // failure below does it. Left set, the operation went on describing
+                        // every drag that arrived afterwards as this application's own,
+                        // with its content and its action mask, until some later outbound
+                        // drag happened to overwrite it.
+                        setExporting(null);
                         NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
                         return;
                     }

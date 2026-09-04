@@ -1054,6 +1054,36 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aTargetHiddenByItsAncestorIsNotHandedTheDelayedDrop() {
+        Form form = Display.getInstance().getCurrent();
+        Container holder = new Container(new BorderLayout());
+        DropRecorder target = new DropRecorder();
+        target.setNativeDropTarget(true);
+        target.setPreferredSize(new com.codename1.ui.geom.Dimension(40, 40));
+        holder.add(BorderLayout.CENTER, target);
+        form.setLayout(new BorderLayout());
+        form.add(BorderLayout.CENTER, holder);
+        form.revalidate();
+
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+        assertEquals("[enter]", target.events.toString());
+
+        // Hidden by an ancestor while a slow provider was still loading. Its own flag still says
+        // visible, so only walking up finds out.
+        holder.setVisible(false);
+        NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        assertFalse(target.events.contains("drop"),
+                "hit testing does not descend into a hidden container, and the fallback has to "
+                        + "agree with it: a drop the user can no longer see must not land");
+        assertNull(target.dropped);
+    }
+
+    @FormTest
     void aTargetThatStoppedTakingPointerEventsIsNotHandedTheDelayedDrop() {
         Form form = Display.getInstance().getCurrent();
         DropRecorder target = addTarget(form);
