@@ -328,7 +328,7 @@ class VpnTunnelExtensionTest {
         int stop = src.indexOf("- (void)stopTunnelWithReason:");
         assertTrue(stop >= 0);
         String method = src.substring(stop);
-        int bump = method.indexOf("atomic_fetch_add(&cn1tnReadGeneration");
+        int bump = method.indexOf("atomic_compare_exchange_strong(");
         int ended = method.indexOf("ExtensionTunnelHost_end___int_int");
         assertTrue(bump >= 0 && ended > bump,
                 "the stop has to invalidate the generation it ends");
@@ -342,9 +342,19 @@ class VpnTunnelExtensionTest {
         // CAPTURED at the bump, not loaded again. A stop preempted between
         // the two handed itself the restart's generation, and tore down the
         // tunnel that had replaced it.
-        assertTrue(method.contains("int cn1tnEnding =\n"
-                + "            atomic_fetch_add(&cn1tnReadGeneration, 1);"));
-        assertTrue(method.contains("int cn1tnEnded = cn1tnEnding + 1;"));
+        // THIS PROVIDER's generation, taken from the object rather
+        // than from the counter. A replacement that has already claimed and
+        // published leaves the counter reading its own number, and a stop
+        // that took it invalidated the live tunnel's reads and told Java to
+        // tear down the host that had replaced its own.
+        assertTrue(method.contains("cn1tnEnding = cn1tnMine;"));
+        // Invalidated only while the counter is still this start's. An
+        // overtaken stop invalidates nothing: the start that overtook it
+        // already did, for itself.
+        assertTrue(method.contains("atomic_compare_exchange_strong(\n"
+                + "                    &cn1tnReadGeneration, &cn1tnExpected,\n"
+                + "                    cn1tnEnding + 1)"));
+        assertTrue(src.contains("cn1tnMine = cn1tnStart;"));
         // The generation being ENDED clears the slot, and the watermark it
         // leaves goes to Java. Passing the watermark to both compared N + 1
         // against a slot holding N, so an ordinary stop cleared nothing and
@@ -549,7 +559,7 @@ class VpnTunnelExtensionTest {
         assertTrue(guard < rearm,
                 "and before re-arming, or the stale reader lives for ever");
 
-        // Bumped on BOTH sides. Only on start, a read outstanding across a
+        // Moved on BOTH sides. Only on start, a read outstanding across a
         // long stop would still be live when the next start bumped it -- but
         // nothing would have stopped it in between, and it would deliver into
         // whatever the process did next.
@@ -559,8 +569,12 @@ class VpnTunnelExtensionTest {
         assertTrue(src.substring(start, stop)
                         .contains("atomic_fetch_add(&cn1tnReadGeneration, 1)"),
                 "a start claims its own generation");
+        // CONDITIONALLY on the stop side: a stop that has been overtaken
+        // invalidates nothing, because the start that overtook it already
+        // did, for itself -- and bumping there would have invalidated the
+        // live tunnel's reads instead of its own.
         assertTrue(src.substring(stop)
-                        .contains("atomic_fetch_add(&cn1tnReadGeneration, 1)"),
+                        .contains("atomic_compare_exchange_strong("),
                 "and a stop invalidates the one it is ending");
     }
 
