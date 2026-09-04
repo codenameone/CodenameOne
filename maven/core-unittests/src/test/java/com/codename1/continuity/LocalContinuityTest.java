@@ -3455,6 +3455,63 @@ public class LocalContinuityTest extends UITestBase {
         assertTrue(after.containsKey("device-new"), "the new origin was not recorded at all");
     }
 
+    /**
+     * Logout leaves nothing owed, so a later flush cannot rebuild what it deleted.
+     *
+     * <p>clear() empties the navigation stack, and that emptying set the pending flag before the
+     * guard that was meant to suppress it. A flush queued earlier -- or Android's next suspend --
+     * then performed the checkpoint, rebuilding the deleted state from the still-installed
+     * provider and publishing the signed-out account's payload after logout had removed it.</p>
+     */
+    @EdtTest
+    public void logoutLeavesNothingOwedForALaterFlushToRebuild() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("secret", "the previous account's work");
+        Continuity.setStateProvider(provider);
+        Continuity.checkpoint();
+
+        Continuity.clear();
+
+        assertFalse(Continuity.isCheckpointPending(),
+                "logout left a checkpoint owed, so the next flush writes the signed-out "
+                        + "account's payload back over the state it just deleted");
+        // And nothing a later flush could do brings it back.
+        flushSerialCalls();
+        assertNull(Continuity.getRestorableState(),
+                "a flush after logout restored the deleted checkpoint");
+    }
+
+    /**
+     * A provider that ends the session while restoring stops the restoration.
+     *
+     * <p>Detecting that a payload belongs to a signed-out account is exactly what this callback is
+     * for, and clear() is the documented response. Restoration carried on regardless: it rebuilt
+     * the routes and committed, persisting the state clear() had just deleted. The listener
+     * callback had this guard; the provider is the other application callback on the path.</p>
+     */
+    @EdtTest
+    public void aProviderThatLogsOutWhileRestoringStopsTheRestore() {
+        Continuity.setAutoRestore(true);
+        Continuity.setStateProvider(new StateProvider() {
+            public Map<String, Object> saveState() {
+                return new HashMap<String, Object>();
+            }
+
+            public void restoreState(Map<String, Object> payload) {
+                // "This payload is not the account that is signed in."
+                Continuity.clear();
+            }
+        });
+
+        Continuity.deliver(fromElsewhere("the previous account's work", 77L));
+        flushSerialCalls();
+
+        assertNull(Continuity.getRestorableState(),
+                "the arrival the provider logged out over is still on offer -- either persisted "
+                        + "past the clear() or parked back into the session it just emptied, and "
+                        + "both hand the signed-out account's work to whoever signs in next");
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;

@@ -513,12 +513,15 @@ public final class Continuity {
             // state it applied.
             return;
         }
-        dirty = true;
         if (clearingStack) {
-            // The logout emptying the stack, not the user going anywhere. Checkpointing it would
-            // write the emptied stack over the state clear() is in the middle of deleting.
+            // The logout emptying the stack, not the user going anywhere. BEFORE the dirty flag,
+            // not after it: marking it and then returning left a checkpoint owed, which a flush
+            // queued earlier -- or Android's next suspend -- then performed, rebuilding the
+            // deleted checkpoint from the still-installed provider and publishing the signed-out
+            // account's payload after logout had removed it.
             return;
         }
+        dirty = true;
         if (!Display.isInitialized() || flushScheduled) {
             return;
         }
@@ -658,6 +661,7 @@ public final class Continuity {
         if (!enabled) {
             return null;
         }
+        int lifecycleAtCapture = lifecycle;
         StateProvider p = provider;
         AppState state = new AppState();
         state.setRoutes(currentRoutes());
@@ -665,6 +669,13 @@ public final class Continuity {
             Map<String, Object> payload = null;
             try {
                 payload = p.saveState();
+                if (lifecycle != lifecycleAtCapture) {
+                    // Same rule on the way OUT. A provider that ends the session while being
+                    // asked what to save must not then have that answer stored and published for
+                    // the account it just signed out of.
+                    sequenceFailed[0] = true;
+                    return null;
+                }
             } catch (Throwable t) {
                 // The provider is application code running on a housekeeping path. Its failure
                 // must not take down the navigation that triggered the checkpoint, so the routes
@@ -867,10 +878,24 @@ public final class Continuity {
         // payload applied and nothing stored -- so the relay's remaining copy was refused after
         // the next launch and the state was gone.
         boolean failed = false;
+        int lifecycleAtRestore = lifecycle;
         StateProvider p = provider;
         if (p != null) {
             try {
                 p.restoreState(state.getPayload());
+                if (lifecycle != lifecycleAtRestore) {
+                    // The provider called clear() or disable(), which is the documented answer to
+                    // "this payload belongs to a signed-out account". Everything below --
+                    // rebuilding routes, committing, persisting -- would act for a session that
+                    // no longer exists, and would write back the state clear() has just deleted.
+                    //
+                    // The listener callback got this guard already; the provider is the OTHER
+                    // application callback on this path and was missed. Both are places where an
+                    // application is entitled to end the session, so both have to be asked
+                    // afterwards whether it did.
+                    outFailed[0] = true;
+                    return false;
+                }
                 // An empty payload is not an application. It is what a route-only state carries,
                 // and counting it would make the question above answer yes for every state.
                 applied = !state.getPayload().isEmpty();
@@ -1885,6 +1910,17 @@ public final class Continuity {
             // Durability is a separate question and has one owner.
             boolean[] restoreFailed = new boolean[1];
             restore(state, restoreFailed);
+            if (lifecycle != lifecycleAtDispatch) {
+                // The PROVIDER ended the session while restoring. Parking below would put the
+                // arrival back into a session that has just been cleared -- getRestorableState()
+                // would go on offering the signed-out account's work, which is the thing logout
+                // exists to prevent.
+                //
+                // Third place the same question had to be asked: after the listeners, inside
+                // restore() around the provider, and here. Each is a point where application code
+                // has just run and may have ended everything.
+                return;
+            }
             if (restoreFailed[0]) {
                 // PARKED, exactly as a deferred arrival is. An automatic restore that failed is
                 // an arrival nobody has dealt with: pollFinished() has already queued a publisher
