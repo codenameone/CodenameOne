@@ -1230,9 +1230,28 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
                 CN1NativeDragDeliverDropAdd(mime, nil, data);
             }
         }
+        // A uri-list among them is merged below rather than published here. It is the same
+        // MIME type as the list assembled from the items, and the framework's setData replaces
+        // rather than merges -- so whichever went second erased the other, and a payload
+        // carrying a document beside its own web address lost one of them. Read rather than
+        // referenced: a URI list is a few lines of text, and it has to be text to be merged.
+        NSMutableString* fileBackedUris = [NSMutableString string];
         for (NSArray* named in fileBacked) {
+            NSString* mime = [named objectAtIndex:0];
+            if ([mime isEqualToString:@"text/uri-list"]) {
+                NSString* text = [NSString stringWithContentsOfFile:[named objectAtIndex:1]
+                                                           encoding:NSUTF8StringEncoding
+                                                              error:nil];
+                if (text.length > 0) {
+                    [fileBackedUris appendString:text];
+                    if (![text hasSuffix:@"\n"]) {
+                        [fileBackedUris appendString:@"\r\n"];
+                    }
+                }
+                continue;
+            }
             NSString* charset = [named objectAtIndex:2];
-            CN1NativeDragDeliverDropAddFile([named objectAtIndex:0], [named objectAtIndex:1],
+            CN1NativeDragDeliverDropAddFile(mime, [named objectAtIndex:1],
                                             charset.length == 0 ? nil : charset);
         }
         // The dragged URLs, in the order they were dragged. RFC 2483 separates them with
@@ -1275,6 +1294,11 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
         if (ordered.count > 0) {
             CN1NativeDragDeliverDropAdd(@"application/x-file-list",
                                         [ordered componentsJoinedByString:@"\n"], nil);
+        }
+        // The items' own URLs first, then anything a file-vending item offered as a list of
+        // its own: one representation of one type, which is all the framework can hold.
+        if (fileBackedUris.length > 0) {
+            [uris appendString:fileBackedUris];
         }
         if (uris.length > 0) {
             CN1NativeDragDeliverDropAdd(@"text/uri-list", uris, nil);
