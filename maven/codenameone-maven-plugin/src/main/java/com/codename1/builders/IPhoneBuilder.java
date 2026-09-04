@@ -11533,6 +11533,26 @@ public class IPhoneBuilder extends Executor {
         // unlike the cloud builder's copy: that indirection exists to stop an
         // archive's global signing flags clobbering an extension, and this
         // copy hands the project to a local Xcode with no such flags.
+        // A CONDITIONAL PRODUCT_NAME is refused, not resolved. Xcode
+        // honours PRODUCT_NAME[sdk=iphoneos*] over the plain setting for a
+        // device build, so the target would produce CustomTunnel.appex while
+        // the embed phase below still referenced the unqualified name -- an
+        // archive that fails on a file nobody wrote. Evaluating the
+        // condition means reimplementing Xcode's setting evaluation, which
+        // this builder declines to do for $(...) a few lines on and for the
+        // same reason: getting it subtly wrong produces the identical
+        // failure with no hint that a condition was involved.
+        for (String settingKey : buildSettingsMap.keySet()) {
+            if (settingKey.startsWith("PRODUCT_NAME[")) {
+                throw new BuildException("ios.vpn.tunnel.buildSettings."
+                        + settingKey + " sets the extension's product name"
+                        + " for one SDK only. This build has to know what the"
+                        + " product will be called so it can embed it in the"
+                        + " app, and it cannot evaluate an Xcode condition."
+                        + " Use ios.vpn.tunnel.buildSettings.PRODUCT_NAME"
+                        + " with a literal name.");
+            }
+        }
         String productName = effectiveExtensionProductName(
                 buildSettingsMap.get("PRODUCT_NAME"), name);
         if (productName == null) {
