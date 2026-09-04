@@ -57,7 +57,7 @@ SELF_CERTIFYING_RE = re.compile(
 DEV_GUIDE_ANCHOR_LINK_RE = re.compile(
     r"\]\(/developer-guide/#([A-Za-z0-9_.:-]+)(?:\s+[^)]*)?\)"
 )
-ASCIIDOC_HEADING_RE = re.compile(r"^={2,6}\s+(.+?)\s*$", re.MULTILINE)
+ASCIIDOC_HEADING_RE = re.compile(r"^(={1,6})\s+(.+?)\s*$", re.MULTILINE)
 ASCIIDOC_BLOCK_ID_RE = re.compile(
     r"^\s*(?:\[\[([^,\]]+)(?:,[^\]]*)?\]\]|\[#([^\]]+)\])\s*$",
     re.MULTILINE,
@@ -193,22 +193,60 @@ def asciidoc_default_anchor(heading):
     return f"_{normalized}" if normalized else ""
 
 
-def developer_guide_anchors(repo_root):
-    """Collect generated and explicit IDs from the single-page developer guide."""
+def developer_guide_sources(repo_root, git_ref=None):
+    """Yield (path, source) pairs from the worktree or a Git revision."""
     guide_root = os.path.join(repo_root, "docs", "developer-guide")
+    if git_ref is None:
+        for root, _dirs, files in os.walk(guide_root):
+            for name in files:
+                if not name.endswith((".asciidoc", ".adoc")):
+                    continue
+                full_path = os.path.join(root, name)
+                rel_path = os.path.relpath(full_path, repo_root)
+                with open(full_path, "r", encoding="utf-8") as fh:
+                    yield rel_path, fh.read()
+        return
+
+    listed = _git(
+        ["ls-tree", "-r", "--name-only", git_ref, "--", "docs/developer-guide"],
+        repo_root,
+    )
+    if listed.returncode != 0:
+        raise RuntimeError(
+            f"could not list developer guide files at {git_ref}: {listed.stderr.strip()}"
+        )
+    for rel_path in listed.stdout.splitlines():
+        if not rel_path.endswith((".asciidoc", ".adoc")):
+            continue
+        shown = _git(["show", f"{git_ref}:{rel_path}"], repo_root)
+        if shown.returncode != 0:
+            raise RuntimeError(
+                f"could not read {rel_path} at {git_ref}: {shown.stderr.strip()}"
+            )
+        yield rel_path, shown.stdout
+
+
+def developer_guide_anchors(repo_root, git_ref=None):
+    """Collect generated and explicit IDs from the single-page developer guide."""
     anchors = set()
-    for root, _dirs, files in os.walk(guide_root):
-        for name in files:
-            if not name.endswith((".asciidoc", ".adoc")):
+    guide_entry = "docs/developer-guide/developer-guide.asciidoc"
+    for rel_path, source in developer_guide_sources(repo_root, git_ref):
+        normalized_rel_path = rel_path.replace(os.sep, "/")
+        skipped_document_title = False
+        for match in ASCIIDOC_HEADING_RE.finditer(source):
+            level = len(match.group(1))
+            if (
+                normalized_rel_path == guide_entry
+                and level == 1
+                and not skipped_document_title
+            ):
+                skipped_document_title = True
                 continue
-            with open(os.path.join(root, name), "r", encoding="utf-8") as fh:
-                source = fh.read()
-            for match in ASCIIDOC_HEADING_RE.finditer(source):
-                anchor = asciidoc_default_anchor(match.group(1))
-                if anchor:
-                    anchors.add(anchor)
-            for match in ASCIIDOC_BLOCK_ID_RE.finditer(source):
-                anchors.add(match.group(1) or match.group(2))
+            anchor = asciidoc_default_anchor(match.group(2))
+            if anchor:
+                anchors.add(anchor)
+        for match in ASCIIDOC_BLOCK_ID_RE.finditer(source):
+            anchors.add(match.group(1) or match.group(2))
     return anchors
 
 
@@ -353,7 +391,9 @@ def build_accept_file(repo_root):
     return path
 
 
-def gate_file(path, base_sha, repo_root, lt_ctx, guide_anchors):
+def gate_file(
+    path, base_sha, repo_root, lt_ctx, head_guide_anchors, base_guide_anchors
+):
     head = head_content(path, repo_root)
     base = base_content(base_sha, path, repo_root)
     new = []
@@ -364,8 +404,8 @@ def gate_file(path, base_sha, repo_root, lt_ctx, guide_anchors):
         run_self_certifying_language(base, path),
     )
     new += net_new(
-        run_developer_guide_anchor_links(head, path, guide_anchors),
-        run_developer_guide_anchor_links(base, path, guide_anchors),
+        run_developer_guide_anchor_links(head, path, head_guide_anchors),
+        run_developer_guide_anchor_links(base, path, base_guide_anchors),
     )
     if lt_ctx:
         head_lt = lt_findings(head, path, lt_ctx)
@@ -398,13 +438,21 @@ def main():
         return 0
 
     accept_path = build_accept_file(repo_root)
-    guide_anchors = developer_guide_anchors(repo_root)
+    head_guide_anchors = developer_guide_anchors(repo_root)
+    base_guide_anchors = developer_guide_anchors(repo_root, base_sha)
     lt_ctx = None if args.no_languagetool else make_lt_context(accept_path)
     try:
         all_new = []
         for path in posts:
             all_new.extend(
-                gate_file(path, base_sha, repo_root, lt_ctx, guide_anchors)
+                gate_file(
+                    path,
+                    base_sha,
+                    repo_root,
+                    lt_ctx,
+                    head_guide_anchors,
+                    base_guide_anchors,
+                )
             )
     finally:
         if lt_ctx:
