@@ -36,6 +36,7 @@ import android.view.View;
 import com.codename1.io.Log;
 import com.codename1.ui.ClipboardContent;
 import com.codename1.ui.ClipboardDataProvider;
+import com.codename1.ui.Display;
 import com.codename1.ui.NativeDragAndDrop;
 import com.codename1.ui.NativeDragOperation;
 
@@ -80,6 +81,16 @@ final class AndroidNativeDragAndDrop {
     /// no action, so this is the only place the true answer exists.
     private static int localDropAction = NativeDragOperation.ACTION_NONE;
 
+    /// True between a drop being accepted and the target's callback having run.
+    ///
+    /// The drop is decided on the Android UI thread and delivered on the Codename One event
+    /// dispatch thread, and the payload is read inside that callback -- lazily, from the
+    /// staged files and content URIs the clip carries. ACTION_DRAG_ENDED arrives in between,
+    /// so releasing the drag's hold there made those files reclaimable before the target had
+    /// read them: over the budget, they were deleted out from under a drop that had already
+    /// been accepted, and on a move the source went on to delete its original as well.
+    private static boolean dropDispatchPending;
+
     private static NativeDragOperation exporting() {
         synchronized (LOCK) {
             return exporting;
@@ -101,6 +112,18 @@ final class AndroidNativeDragAndDrop {
     private static void setLastAction(int action) {
         synchronized (LOCK) {
             lastAction = action;
+        }
+    }
+
+    private static boolean dropDispatchPending() {
+        synchronized (LOCK) {
+            return dropDispatchPending;
+        }
+    }
+
+    private static void setDropDispatchPending(boolean pending) {
+        synchronized (LOCK) {
+            dropDispatchPending = pending;
         }
     }
 
@@ -280,7 +303,14 @@ final class AndroidNativeDragAndDrop {
                     // The drag is over, so its clip goes back to ageing out with the rest.
                     // Not deleted here: a receiver that kept a URI may still read it, and the
                     // window of recent clips is what covers that.
-                    AndroidImplementation.dragHolds(0);
+                    //
+                    // Unless a drop of this drag is still on its way to its target, in which
+                    // case the release is queued behind that callback and happens there. This
+                    // event arrives immediately after the drop, long before the event dispatch
+                    // thread has read anything.
+                    if (!dropDispatchPending()) {
+                        AndroidImplementation.dragHolds(0);
+                    }
                     setLastAction(UNDECIDED);
                     setLocalDropAction(NativeDragOperation.ACTION_NONE);
                     return true;
@@ -359,6 +389,25 @@ final class AndroidNativeDragAndDrop {
             // Our own drag, dropped on our own surface: remember what the target took, because
             // ACTION_DRAG_ENDED is about to be asked and has no way of knowing.
             setLocalDropAction(accepted);
+        }
+        if (accepted != NativeDragOperation.ACTION_NONE) {
+            // The target's callback is queued on the event dispatch thread, and it is there
+            // that the payload is finally read. The clip has to survive that long, so the hold
+            // ACTION_DRAG_ENDED would have released is released here instead -- queued after
+            // the callback, since callSerially is first in first out and NativeDragAndDrop.drop
+            // has just queued it.
+            //
+            // A target that keeps the content and reads it later still outruns this, as it
+            // outruns every bound here; what this covers is the ordinary target that reads
+            // what it was given, which used to race a reclamation triggered by its own drop.
+            setDropDispatchPending(true);
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    setDropDispatchPending(false);
+                    AndroidImplementation.dragHolds(0);
+                }
+            });
         }
         return accepted != NativeDragOperation.ACTION_NONE;
     }

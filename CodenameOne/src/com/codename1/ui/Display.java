@@ -5567,6 +5567,9 @@ public final class Display extends CN1Constants {
 
     /// Ends the previous transfer's memory of what its providers produced.
     ///
+    /// Also done by a port whose publication happens later than this call; see
+    /// `NativeDragAndDrop#beginTransfer(ClipboardContent)`.
+    ///
     /// A representation registered through
     /// `ClipboardContent#setDataProvider(java.lang.String, com.codename1.ui.ClipboardDataProvider)`
     /// is resolved once per transfer and remembered, so a consumer that asks twice does not

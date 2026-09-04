@@ -429,6 +429,27 @@ public final class NativeDragAndDrop {
     /// #### Returns
     ///
     /// the value, or null when there is no such representation
+    /// Ends a content's memory of what its providers produced, because a new transfer of it is
+    /// beginning.
+    ///
+    /// A representation registered through
+    /// `ClipboardContent#setDataProvider(java.lang.String, com.codename1.ui.ClipboardDataProvider)`
+    /// is resolved once per transfer and remembered, so a consumer that asks twice does not
+    /// make the provider write its file twice. `Display#copyToClipboard(ClipboardContent)`
+    /// calls this as the copy is asked for; a port whose publication really happens later --
+    /// Android assembles the clip on its own UI thread -- calls it again there, because two
+    /// copies asked for in quick succession would otherwise both reset first and the second
+    /// would then publish what the first one's assembly had just cached.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: the content about to be published, which may be null
+    public static void beginTransfer(ClipboardContent content) {
+        if (content != null) {
+            content.resetProvidedValues();
+        }
+    }
+
     public static Object produceTransferValue(ClipboardContent content, String mimeType) {
         return content == null ? null : content.produceData(mimeType);
     }

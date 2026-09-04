@@ -10249,6 +10249,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
                     android.content.ClipData clip;
                     if (obj instanceof ClipboardContent) {
+                        // Here, not only where the copy was asked for. The assembly happens on
+                        // this thread rather than the caller's, so two copies of one content
+                        // made in quick succession both reset before either assembled, and the
+                        // second then published what the first assembly had just cached: the
+                        // clipboard ended up holding the earlier copy's values, and for a
+                        // provider that writes a temporary file, a path that was already gone.
+                        com.codename1.ui.NativeDragAndDrop.beginTransfer((ClipboardContent) obj);
                         AssembledClip assembled = clipDataFor((ClipboardContent) obj);
                         clip = assembled.getData();
                         clipboardHolds(assembled.getClip());
