@@ -687,7 +687,7 @@ public class LocalCallTest {
         // a desktop JVM alive long after the call is over. The action being
         // answered exactly once hides this completely at the API level; the
         // only thing that shows it is the thread.
-        int before = liveTimerThreads();
+        java.util.Set<Thread> before = timerThreads();
         final List<CallAction> seen = new ArrayList<CallAction>();
         Calls.addActionListener(new CallActionAdapter() {
             public void endRequested(String callId, CallAction action) {
@@ -703,34 +703,60 @@ public class LocalCallTest {
         seen.get(0).fulfill();
 
         long limit = System.currentTimeMillis() + 2000;
-        while (liveTimerThreads() > before
+        while (!survivingNewTimers(before).isEmpty()
                 && System.currentTimeMillis() < limit) {
             sleep();
         }
-        // NOT MORE than before, rather than exactly the same. What this test is about is a
-        // safety timer that outlives the answer, so growth is the failure; a DROP is not. The
-        // count is JVM-wide -- liveTimerThreads() matches any thread named "Timer-" -- so timers
-        // started by earlier tests in this run can expire inside the window above, and the loop
-        // exits immediately when that happens because the count is no longer greater than the
-        // baseline. Equality then failed with "expected 4 but was 2": two unrelated timers had
-        // finished, which is exactly what should happen and has nothing to do with call
-        // deferral.
-        assertTrue(liveTimerThreads() <= before,
-                "answering must leave no safety timer running");
+        // IDENTITY, not a count. These threads are JVM-wide -- anything named "Timer-" -- so a
+        // count compares this call's safety timer against every other timer in the run, and
+        // arithmetic hides the thing under test: two unrelated timers expiring inside the window
+        // offsets one that leaked, and the assertion passes.
+        //
+        // That is not hypothetical. This started as an equality check, failed with "expected 4
+        // but was 2" when two unrelated timers finished -- which is correct behaviour and nothing
+        // to do with call deferral -- and was weakened to "not more than before" to quiet it. The
+        // weakening made it pass for the wrong reason instead of fixing what it measured.
+        //
+        // Tracking which threads existed BEFORE answers the actual question: did answering leave
+        // a timer of its own running. Unrelated timers may start or stop freely and are never
+        // counted, because they are compared by identity rather than by number.
+        java.util.Set<Thread> leaked = survivingNewTimers(before);
+        assertTrue(leaked.isEmpty(),
+                "answering left a safety timer running: " + names(leaked));
     }
 
-    /// Live java.util.Timer threads, which is where a leaked safety net shows.
-    private static int liveTimerThreads() {
-        int n = 0;
+    /// The live java.util.Timer threads, BY IDENTITY, which is where a leaked safety net shows.
+    private static java.util.Set<Thread> timerThreads() {
+        java.util.Set<Thread> out =
+                java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Thread, Boolean>());
         Thread[] all = new Thread[Thread.activeCount() * 2 + 16];
         int found = Thread.enumerate(all);
         for (int i = 0; i < found; i++) {
             Thread t = all[i];
             if (t != null && t.isAlive() && t.getName().startsWith("Timer-")) {
-                n++;
+                out.add(t);
             }
         }
-        return n;
+        return out;
+    }
+
+    /// Timer threads that are alive now and were not alive before -- the only ones this action
+    /// can be held responsible for.
+    private static java.util.Set<Thread> survivingNewTimers(java.util.Set<Thread> before) {
+        java.util.Set<Thread> now = timerThreads();
+        now.removeAll(before);
+        return now;
+    }
+
+    private static String names(java.util.Set<Thread> threads) {
+        StringBuilder sb = new StringBuilder();
+        for (Thread t : threads) {
+            if (sb.length() > 0) {
+                sb.append(", ");
+            }
+            sb.append(t.getName());
+        }
+        return sb.toString();
     }
 
     @Test

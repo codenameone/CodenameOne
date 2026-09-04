@@ -1266,6 +1266,15 @@ public final class Continuity {
             // prevent. Nothing goes out until the user does something new.
             pendingPublish = null;
             publishRequested = false;
+            // And the SCHEDULED capture, which is a fourth way the same stale screen gets out.
+            // routeStackChanged() sets `dirty` and queues a flush; that flush asks only whether a
+            // checkpoint is pending, so it ran after the restore, captured the state that had
+            // just ARRIVED under this device's identity, and published the very echo this block
+            // exists to suppress -- which the origin then accepts and restores on its next poll.
+            //
+            // Clearing it is right for the same reason the slot is cleared: whatever the user did
+            // before the restore describes a screen the restore has replaced.
+            dirty = false;
             // The ADVERTISED activity is stale in exactly the same way, and dropping only the
             // queued publish left half the job done. The platform activity stays current until
             // something replaces or withdraws it, and applyingRestore suppresses the checkpoint

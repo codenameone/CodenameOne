@@ -179,7 +179,16 @@ public class RestStateRelay implements StateRelay {
         // The handler itself does nothing on purpose: getAsString() builds its Response from the
         // request's own code and body rather than from these callbacks, so publish() and fetch()
         // still see 404, 204 and everything else exactly as before.
-        RequestBuilder quiet = b.onErrorCodeString(SILENT);
+        // NO REDIRECTS, because this request carries a bearer token. A redirect is followed
+        // with the same headers, so a 307 would hand the token and the state to whatever host
+        // the response names -- an `http://` one included, silently undoing the HTTPS the
+        // constructor insists on. A 302 or 303 is not safer, only different: it turns the POST
+        // into a GET, and the 2xx that follows makes publish() report a write that never
+        // happened.
+        //
+        // A relay that has moved should say so by being configured with its new URL, which is
+        // the application's decision to make and not a header's.
+        RequestBuilder quiet = b.followRedirects(false).onErrorCodeString(SILENT);
         String token = getToken();
         return token == null || token.length() == 0 ? quiet : quiet.bearer(token);
     }

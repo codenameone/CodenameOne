@@ -26,6 +26,8 @@ import com.codename1.continuity.sync.SyncedStore;
 import com.codename1.continuity.sync.SyncedStoreListener;
 import com.codename1.impl.continuity.LocalContinuityBridge;
 import com.codename1.io.Storage;
+import com.codename1.io.rest.RequestBuilder;
+import com.codename1.io.rest.Rest;
 import com.codename1.junit.EdtTest;
 import com.codename1.router.Navigation;
 import com.codename1.router.RouteDispatcher;
@@ -3229,6 +3231,98 @@ public class LocalContinuityTest extends UITestBase {
                 "the signed-out account's delivery marks are still on disk, so the next launch "
                         + "reloads which devices it synced with and how far: "
                         + Continuity.readSeenForTest());
+    }
+
+    /**
+     * The relay's requests refuse redirects, because they carry a bearer token.
+     *
+     * <p>A redirect is followed with the same headers, so a 307 hands the token and the state to
+     * whatever host the response names -- including an {@code http://} one, which silently undoes
+     * the HTTPS the constructor insists on. A 302 turns the POST into a GET and the 2xx that
+     * follows reports a write that never happened.</p>
+     *
+     * <p>Asked of the builder the relay actually produces, so it fails if the call is dropped
+     * from {@code auth()}, and paired with a control: a plain request still follows redirects,
+     * which is CodenameOne's default and not something this may change for everyone.</p>
+     */
+    @EdtTest
+    public void theRelayRefusesRedirectsOnItsAuthenticatedRequests() throws Exception {
+        RestStateRelay relay = new RestStateRelay("https://example.invalid/continuity");
+        Continuity.setRelay(relay);
+
+        java.lang.reflect.Method auth = RestStateRelay.class.getDeclaredMethod(
+                "auth", RequestBuilder.class);
+        auth.setAccessible(true);
+        RequestBuilder built = (RequestBuilder) auth.invoke(
+                relay, Rest.post("https://example.invalid/continuity"));
+
+        assertFalse(followsRedirects(built),
+                "the relay's requests follow redirects, so a 307 forwards the bearer token and "
+                        + "the state to whatever host the endpoint names");
+        assertTrue(followsRedirects(Rest.post("https://example.invalid/continuity")),
+                "an ordinary request stopped following redirects, which is a change to every "
+                        + "caller rather than to this one");
+    }
+
+    private static boolean followsRedirects(RequestBuilder b) throws Exception {
+        java.lang.reflect.Field f = RequestBuilder.class.getDeclaredField("followRedirects");
+        f.setAccessible(true);
+        return ((Boolean) f.get(b)).booleanValue();
+    }
+
+    /**
+     * A restore cancels the checkpoint a navigation had already scheduled.
+     *
+     * <p>routeStackChanged() sets the pending flag and queues a flush, and that flush asks only
+     * whether a checkpoint is pending. So it ran after the restore, captured the state that had
+     * just ARRIVED under this device's identity, and published the echo the restore path exists
+     * to suppress -- which the origin then accepts and restores on its next poll.</p>
+     */
+    @EdtTest
+    public void aRestoreCancelsTheCheckpointANavigationHadScheduled() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("screen", "before the arrival");
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(true);
+        Continuity.setRelay(new StateRelay() {
+            public void publish(AppState state) {
+                published.add(state);
+            }
+
+            public AppState fetch() {
+                return null;
+            }
+        });
+        pause(200L);
+        flushSerialCalls();
+        published.clear();
+
+        // The ORDER is the whole test, and getting it wrong is why the first version passed
+        // against the unfixed code. deliver() queues admission, admission queues the dispatch a
+        // turn later, and the navigation has to land BETWEEN them -- so its flush is queued
+        // behind the dispatch and runs after the restore has committed. Calling
+        // routeStackChanged() directly put the flush FIRST, where checkpoint() cleared the
+        // pending flag itself and the fix could not be observed at all.
+        Continuity.deliver(fromElsewhere("what the other device was doing", 97L));
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                Continuity.routeStackChanged();
+                assertTrue(Continuity.isCheckpointPending(),
+                        "the navigation scheduled nothing, so there is no capture to cancel");
+            }
+        });
+        flushSerialCalls();
+        assertNotNull(provider.restored, "the arrival was not applied, so this test is vacuous");
+
+        // Asserted on what reached the RELAY, not on the pending flag. checkpoint() clears that
+        // flag itself, so it reads false whether the capture was cancelled or performed -- a
+        // second version of this test asserted on it and passed against the unfixed code.
+        pause(300L);
+        flushSerialCalls();
+        assertTrue(published.isEmpty(),
+                "the checkpoint scheduled before the restore still ran, so the arrival went back "
+                        + "out under this device's id -- the echo the origin then accepts and "
+                        + "restores on its next poll: published=" + published.size());
     }
 
     /** Storage that refuses ONE name and passes everything else through. */

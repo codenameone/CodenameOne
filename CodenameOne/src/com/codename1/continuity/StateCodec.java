@@ -141,7 +141,11 @@ public final class StateCodec {
                     paths.add((String) path);
                 }
             }
-            state.setRoutes(paths);
+            // Unchecked, exactly as the payload below is: this document came from another
+            // device, and one route past this device's stored-string limit used to throw out of
+            // fromJson -- which the relay reads as a failed fetch, and the document never
+            // changes, so this device stopped publishing for good.
+            state.setRoutesUnchecked(paths);
         }
         // Whether the values are tagged is the DOCUMENT's answer, not a guess made per string.
         // See KEY_ENCODING: without it, "i:5" is just a string and stays one.
@@ -164,11 +168,11 @@ public final class StateCodec {
         }
         Object device = m.get(KEY_DEVICE);
         if (device instanceof String) {
-            state.setDeviceId((String) device);
+            state.setDeviceIdUnchecked((String) device);
         }
         Object title = m.get(KEY_TITLE);
         if (title instanceof String) {
-            state.setTitle((String) title);
+            state.setTitleUnchecked((String) title);
         }
         state.setSequence(asLong(m.get(KEY_SEQUENCE)));
         state.setTimestamp(asLong(m.get(KEY_TIMESTAMP)));

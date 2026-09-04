@@ -150,6 +150,29 @@ public final class AppState implements Externalizable {
         payload = deepCopy(p);
     }
 
+    /// The other three fields a REMOTE document supplies, set without the local size validation.
+    ///
+    /// Same reason as the payload beside them, and they were simply missed: a document from
+    /// another device goes through the validating setters, so one route longer than this device's
+    /// stored-string limit threw IllegalArgumentException out of StateCodec.fromJson -- which
+    /// fromJson does not document and the relay reads as a FAILED fetch. The document never
+    /// changes, so every retry fails identically and this device stops publishing for good.
+    ///
+    /// Carried rather than refused, because the limit is about writing: a state that cannot be
+    /// stored here can still be restored here, and persist() already reports its own failure to
+    /// the one caller that must not act on it.
+    void setRoutesUnchecked(List<String> r) {
+        routes = r == null ? new ArrayList<String>() : new ArrayList<String>(r);
+    }
+
+    void setDeviceIdUnchecked(String id) {
+        deviceId = id == null ? "" : id;
+    }
+
+    void setTitleUnchecked(String t) {
+        title = t;
+    }
+
     /// Copies a payload all the way down, not just its outer map.
     ///
     /// A shallow copy left the snapshot sharing the application's own lists and maps. That is a
