@@ -465,6 +465,31 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aModifierChangeDoesNotTurnAnUninterestedTargetIntoARefusal() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder target = addTarget(form);
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+
+        // The enter is queued while the drag offers a move only, and before the event dispatch
+        // thread runs it the user releases the modifier: the platform now offers a copy.
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), NativeDragOperation.ACTION_MOVE);
+        NativeDragAndDrop.dragOver(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        assertEquals(NativeDragOperation.ACTION_COPY,
+                NativeDragAndDrop.plannedDropAction(0, x, y, textContent("hi"),
+                        NativeDragOperation.ACTION_COPY),
+                "the target has no listener and refused nothing; a callback queued under the "
+                        + "offer that has since been withdrawn must not answer for the new one");
+
+        assertEquals(NativeDragOperation.ACTION_COPY,
+                NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY));
+        flushSerialCalls();
+        assertTrue(target.events.contains("drop"));
+    }
+
+    @FormTest
     void aTargetThatCannotPerformTheActionLetsAnAncestorHaveIt() {
         Form form = Display.getInstance().getCurrent();
         DropRecorder outer = addTarget(form);

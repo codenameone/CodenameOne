@@ -1311,7 +1311,17 @@ public final class NativeDragAndDrop {
                             // The generation as well as the component: the same component can be
                             // the target of the drag that just left and of the one that just
                             // arrived, and this decision belongs to whichever queued it.
+                            //
+                            // And the mask this event was built with. The platform's offer
+                            // changes under the framework -- releasing the modifier turns a
+                            // move and copy into a copy -- and neither the target nor the
+                            // generation moves when it does. A callback queued under the older
+                            // offer then started from a decision its own event cannot express,
+                            // accept() refused it as outside what that event permits, and this
+                            // wrote the refusal back: a target with no listener at all was
+                            // recorded as rejecting the drag, on nothing but a modifier key.
                             if (generation == targetGeneration
+                                    && allowedActions == advertisedActions
                                     && currentTarget == target) { // NOPMD CompareObjectsWithEquals
                                 currentAction = ev.getAcceptedAction();
                             }
