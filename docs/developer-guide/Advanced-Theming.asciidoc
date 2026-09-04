@@ -986,11 +986,19 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/advancedth
 include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtheming/PsdTutorialDemo.java[tag=psdStart,indent=0]
 ----
 
-Style it with <<CSS>>. Everything the design needs is a CSS property: a scaled
-background image is `cn1-background-type`, the exported artwork goes in as a
-multi-image so each density gets the right file, and a UIID inherits from another
-with `cn1-derive` rather than being redefined. Give each piece of the hierarchy a
-UIID, write the rules, and the result is the design running as an app:
+Style it with <<CSS>>. Ten UIIDs cover this design, and every value in it maps to an
+ordinary CSS property: the scaled header image is `cn1-background-type`, a UIID
+that only varies a color inherits the rest with `cn1-derive`, and the pressed
+and selected states are the `.pressed` and `.selected` classes rather than
+separate definitions. Sizes are in millimetres so they hold their physical size
+across densities.
+
+[source,css]
+----
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=psd-theme,indent=0]
+----
+
+That's the whole theme. With it in place the same code produces the design:
 
 .The result in the simulator
 image::img/psd2app-image3.png[The result in the simulator,scaledwidth=25%]
