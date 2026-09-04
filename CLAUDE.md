@@ -253,6 +253,50 @@ Platform-specific native code locations:
 - **Android**: Within Android port module (Java/Kotlin)
 - **JavaSE**: Within JavaSE port (Java)
 
+#### Prebuilt Android `.so` files must be 16 KB page aligned
+
+Google Play requires every **64-bit** shared library in an upload to be linked
+for 16 KB memory pages -- API 35+ uploads since 2025-11-01, Wear OS uploads
+containing native code from 2026-09-15. Each `PT_LOAD` segment needs `p_align`
+of `0x4000` or more (<https://developer.android.com/guide/practices/page-sizes>).
+
+Alignment is settled at **link** time. AGP aligns the ZIP entries and bundletool
+reports the outcome, but nothing downstream can move a segment inside a prebuilt
+`.so`, so a Codename One artifact that gets it wrong ships a broken app the
+developer cannot fix from their own sources. And it is silent: the app builds
+and runs on every 4 KB device, and only Play review or a real 16 KB device says
+otherwise.
+
+Build any Android native artifact with **NDK r28 or newer**. r28 is the first
+release that links this way by default, and the first whose prebuilt
+`libc++_shared.so` and `libomp.so` are aligned -- those are copied out of the
+NDK, so `-Wl,-z,max-page-size=16384` cannot fix them on r26/r27.
+
+Separately, the NDK's own floor has been API 21 since r26, so any AAR built
+here needs `minSdk 21` and an entry in `PlatformFeatureCatalog` with
+`.androidMinimumSdk(21)` to lift the application's default floor of 19 past the
+manifest merger. A lower `minSdk` in the library is a claim the `.so` files do
+not honour -- check `.note.android.ident`, which records the API level the
+slice was really compiled against.
+
+`scripts/check-16k-page-alignment.py` gates this over every tracked archive and
+loose `.so` in the tree, in its own workflow
+(`.github/workflows/check-16k-page-alignment.yml`) rather than inside `pr.yml`,
+whose `paths` filter would let a PR that only adds a native artifact skip it.
+Containers and libraries are found by magic bytes, not by extension, so a
+`.cn1lib` or any future container is covered.
+
+The rule reaches only 64-bit libraries under Android packaging. 32-bit slices
+are exempt because 16 KB pages are a 64-bit feature, and a desktop `.so` --
+which a cn1lib can ship through `nativelinux`/`nativese` -- is correct at
+0x1000. Integrity is not scoped that way: a `.so` that is not an ELF, or is
+truncated, fails wherever it sits.
+
+```bash
+scripts/check-16k-page-alignment.py            # every tracked artifact
+scripts/check-16k-page-alignment.py --verbose  # list everything scanned
+```
+
 #### ParparVM native names are checked, and getting one wrong is silent
 
 ParparVM encodes the **whole Java signature in the C function name**. For

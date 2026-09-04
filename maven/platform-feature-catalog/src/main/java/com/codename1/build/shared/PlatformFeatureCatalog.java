@@ -394,8 +394,16 @@ public final class PlatformFeatureCatalog {
                 .iosDependenciesUnsupportedOnArm64Simulator()
                 .description("ML Kit iOS Smart Reply backend"));
 
+        // The Android AAR declares minSdk 21, which is what its native code has
+        // always required -- the NDK's own floor is API 21, so the slices were
+        // compiled against 21 even while the AAR manifest still said 19.
+        // Without this floor the manifest merger rejects a default Codename One
+        // project, whose android.min_sdk_version is 19, with
+        // "uses-sdk:minSdkVersion 19 cannot be smaller than version 21 declared
+        // in library".
         e.add(new Entry("com/codename1/ai/whisper/")
                 .iosFrameworks("Accelerate")
+                .androidMinimumSdk(21)
                 .description("On-device Whisper transcription (libwhisper.a ships with the cn1lib)"));
 
         // Low-level cross-platform camera API: live preview + frame

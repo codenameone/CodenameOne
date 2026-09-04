@@ -1,0 +1,13 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::the-edt-event-dispatch-thread-text-001[]
+void invokeAndBlock(Runnable r) {
+    openThreadForR(r);
+    while(r is still running) {
+         performEventCallbacks();
+         performCallSeriallyCalls();
+         drawGraphicsAndAnimations();
+         sleepUntilNextEDTCycle();
+    }
+}
+// end::the-edt-event-dispatch-thread-text-001[]

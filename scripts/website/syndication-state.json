@@ -1875,6 +1875,27 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-03T00:01:21+00:00"
+      },
+      "devto": {
+        "id": 4567384,
+        "url": "https://dev.to/codenameone/app-intents-one-java-declaration-for-siri-spotlight-and-shortcuts-fdi",
+        "syndicated_at": "2026-09-03T17:05:39+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/a47fac3fce4b/edit",
+        "syndicated_at": "2026-09-03T19:01:10+00:00"
+      }
+    },
+    "native-desktop-windows": {
+      "hashnode": {
+        "url": "https://debugagent.com/one-app-more-than-one-native-window",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a9a0a1efcced619747363aa",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-04T00:01:37+00:00"
       }
     }
   }

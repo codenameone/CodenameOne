@@ -27,10 +27,11 @@
 /// package is the other thing: the app receives raw IP packets and decides
 /// what happens to them.
 ///
-/// #### Android only
+/// #### Where it runs
 ///
-/// [Tunnels#isSupported] answers true on **Android** and false everywhere
-/// else, including iOS. Ask it, and keep a path for the answer being no.
+/// [Tunnels#isSupported] answers true on **Android**, and on an **iOS**
+/// build that generated the extension. Ask it, and keep a path for the
+/// answer being no -- on iOS that is the default.
 ///
 /// - **Android**: `CN1VpnService`, which ships in the port and which the
 ///   builder declares in the manifest for an app that referenced this
@@ -38,13 +39,15 @@
 ///   `BIND_VPN_SERVICE` and the user's consent. The tunnel runs in that
 ///   process, so the instance passed to [Tunnels#start] is the instance
 ///   that runs and everything it closed over is still there.
-/// - **iOS**: not supported. A packet tunnel there is an
-///   `NEPacketTunnelProvider` in a Network Extension -- a separate process
-///   with its own bundle -- and a Java tunnel needs a virtual machine
-///   inside it. The translation that would produce one without the
-///   application shell, which uses UIKit APIs an extension may not call,
-///   has not been written. `ios.vpn.tunnel` fails the build rather than
-///   generating an extension too broken to compile.
+/// - **iOS**: an `NEPacketTunnelProvider` in a Network Extension, which
+///   the build generates for a project that sets `ios.vpn.tunnel=true` and
+///   names its tunnel in `ios.vpn.tunnel.class`. That extension is a
+///   separate process with a virtual machine of its own: it is translated
+///   from the tunnel rather than from the application, so it carries what
+///   the tunnel reaches and none of the app -- which is why the rule below
+///   is a link error there rather than advice. It also needs
+///   `com.apple.developer.networking.networkextension`, which Apple grants
+///   case by case, so no iOS build produces one without being asked.
 /// - **Simulator and desktop**: a loopback transport, so the packet loop can
 ///   be exercised without a device.
 ///

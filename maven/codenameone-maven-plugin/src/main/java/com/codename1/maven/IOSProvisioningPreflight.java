@@ -303,6 +303,26 @@ final class IOSProvisioningPreflight {
      *
      * @return one problem per generated extension that cannot be signed as configured
      */
+    /// The DOCUMENT PROVIDER only, and the packet tunnel is deliberately not
+    /// here.
+    ///
+    /// Both generate an extension target that needs a profile of its own, so
+    /// the shape is the same -- but everything this method knows how to say
+    /// is about App Groups, which the tunnel does not use. Covering it would
+    /// mean generalising the gate, adding a branch whose real question is
+    /// whether the profile grants
+    /// com.apple.developer.networking.networkextension, and writing a second
+    /// set of messages: a preflight built around one feature restructured
+    /// around two.
+    ///
+    /// The failure it would catch is caught anyway, one step later and by
+    /// name. IPhoneBuilder's registerGeneratedExtensionProfile refuses a
+    /// tunnel build with no CN1VpnTunnel profile, naming the App ID, the two
+    /// hints that supply one and the way to build without the tunnel, and it
+    /// checks the grant that this class would have had to learn about. What
+    /// is lost is the local warning before a cloud build is spent -- for a
+    /// feature behind a hint the developer set deliberately, having first
+    /// obtained a capability Apple grants by hand.
     static List<Problem> checkGeneratedExtensions(Properties settings, boolean release) {
         List<Problem> problems = new ArrayList<Problem>();
         if (settings == null) {

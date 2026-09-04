@@ -123,18 +123,33 @@ final class BuildHintsIos {
                 .type(HintType.BOOLEAN)
                 .def("false")
                 .platform("ios")
-                .doc("NOT SUPPORTED YET: setting this fails the build. A packet tunnel on iOS runs in a "
-                        + "Network Extension that has to carry a virtual machine, and the translation that "
-                        + "would give it one without the application shell -- which uses UIKit APIs an "
-                        + "extension may not call -- remains unwritten. `com.codename1.vpn.tunnel` runs on "
-                        + "Android; on iOS `Tunnels.isSupported()` answers false. When the iOS half lands, two "
-                        + "things have to be true for a tunnel to be built: the app references the package, "
-                        + "and this hint says the App ID holds "
-                        + "`com.apple.developer.networking.networkextension`, which Apple grants case by case "
-                        + "rather than self-serve. Generating the target without the grant fails codesigning "
-                        + "with an error naming an entitlement nobody asked for, so referencing the package "
-                        + "alone doesn't produce one. Left false, the build produces no extension and "
-                        + "`Tunnels.isSupported()` answers false."));
+                .doc("Generates the iOS packet tunnel: a Network Extension carrying a virtual "
+                        + "machine, running the `VpnTunnel` subclass named by `ios.vpn.tunnel.class`. "
+                        + "Two things have to be true, and this hint is the second: the app references "
+                        + "`com.codename1.vpn.tunnel`, and the App ID holds "
+                        + "`com.apple.developer.networking.networkextension`, which Apple grants case by "
+                        + "case rather than self-serve. Setting this hint is the project asserting the "
+                        + "grant -- generating the target without it fails codesigning with an error "
+                        + "naming an entitlement nobody asked for, which is why referencing the package "
+                        + "alone never produces one. BOTH App IDs need the grant: the extension is "
+                        + "the provider, and the app drives it through `NETunnelProviderManager`, which "
+                        + "is Network Extension API as well -- so the build writes the entitlement into "
+                        + "the app and into the extension, and refuses before the archive if either "
+                        + "provisioning profile doesn't grant it. A device archive also needs a "
+                        + "provisioning profile for the extension's own App ID, "
+                        + "`<packageName>.vpntunnel`, passed as "
+                        + "`ios.appext.CN1VpnTunnel.provisioningData` or `.provisioningURL`. Left false, "
+                        + "the build produces no extension and `Tunnels.isSupported()` answers false. "
+                        + "The extension carries the translated program and the virtual machine and "
+                        + "NO networking stack: `com.codename1.io.Socket` and everything else that "
+                        + "reaches `Util.getImplementation()` finds nothing there, and ParparVM's "
+                        + "`java.net` is URI and URL. An iOS tunnel can therefore inspect, rewrite, "
+                        + "drop and `forward` packets, but it can't relay them to a remote server -- "
+                        + "on Android it can, because the tunnel runs in the app's own process. "
+                        + "The extension is a translation of its own, rooted at the tunnel: it carries "
+                        + "what the tunnel reaches and nothing of the application, so a tunnel that "
+                        + "reaches for the app's own classes fails the extension's link rather than "
+                        + "misbehaving at runtime."));
 
         h.add(new Hint("ios.vpn.tunnel.class")
                 .group(HintGroup.IOS)
@@ -146,7 +161,13 @@ final class BuildHintsIos {
                         + "`VpnTunnel` is a class rather than an interface, so the shared class scanner "
                         + "skips it, and an app may have several subclasses while an extension "
                         + "runs exactly one. A wrong guess would build the wrong tunnel into the "
-                        + "extension and fail at link on a symbol nobody wrote."));
+                        + "extension and fail at link on a symbol nobody wrote. The build checks the "
+                        + "name against the compiled classes and refuses one it can't find, rather "
+                        + "than letting the generated entry point fail javac on a source file the "
+                        + "developer never wrote. It has to be a class this project compiles: the "
+                        + "translator reads loose class files, so a tunnel that lives only inside a "
+                        + "submitted library jar is never translated and can't be the extension's "
+                        + "entry point."));
 
         h.add(new Hint("ios.call.appGroup")
                 .group(HintGroup.IOS)

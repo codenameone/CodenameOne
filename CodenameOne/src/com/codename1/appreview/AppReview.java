@@ -54,7 +54,7 @@ import com.codename1.util.SuccessCallback;
 ///
 /// ```java
 /// AppReview.getInstance()
-///         .setStoreUrl("https://apps.apple.com/app/id0000000000")
+///         .setStoreUrl(storeUrl)   // the listing for THIS platform's store
 ///         .setSupportEmail("support@example.com")
 ///         .registerSession();
 /// ```
@@ -141,6 +141,10 @@ public class AppReview {
     /// #### Returns
     ///
     /// this instance for chaining.
+    /// The fallback opens this URL when no native review prompt is available,
+    /// so it has to be the listing for the store the app was installed from.
+    /// There is one slot, so an app shipping to more than one store picks the
+    /// URL at runtime rather than hard-coding a single vendor's link.
     public AppReview setStoreUrl(String storeUrl) {
         this.storeUrl = storeUrl;
         return this;

@@ -87,6 +87,10 @@ A material also carries a base color (`setColor`, packed `0xAARRGGBB`), an
 optional `Texture` (`setTexture`), and a `RenderState` controlling depth testing,
 alpha blending and face culling. Textures come from a Codename One `Image` or raw
 ARGB pixels:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThreeDGraphicsJava004Snippet.java[tag=3d-graphics-java-004,indent=0]
+----
 
 
 .An UNLIT cube with a checkerboard texture (NEAREST filtering)
@@ -115,6 +119,10 @@ Real scenes use authored geometry. `GltfLoader` loads a glTF 2.0 model, both the
 binary `.glb` container and the JSON `.gltf` form with embedded buffers.
 `loadModel` returns the mesh together with the base-color texture from the model's
 own material, so a textured model renders with no extra setup:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThreeDGraphicsJava005Snippet.java[tag=3d-graphics-java-005,indent=0]
+----
 
 
 The model below is the Khronos "BoomBox" glTF sample (a CC0 model carrying its own
@@ -157,6 +165,10 @@ https://www.codenameone.com/javadoc/com/codename1/gpu/Matrix4.html[Matrix4]
 * *JavaScript* - WebGL on a `<canvas>` peer; the generated GLSL ES runs unmodified.
 
 Querying capabilities at runtime:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThreeDGraphicsJava006Snippet.java[tag=3d-graphics-java-006,indent=0]
+----
 
 
 === Threading

@@ -223,7 +223,7 @@ App Shield moves trust decisions to the backend. App Hardening raises the cost o
 
 We want Codename One to lead cross-platform development on security. That requires more than adding isolated security switches. The safe path must be available from ordinary application code, included only when used, and tested on every target we claim to support. This week's encrypted database and tapjacking work move two more boundaries into that default path.
 
-Start with the [database guide](/developer-guide/#sql-encryption) if you have data at rest to migrate. Existing Ant applications should set `db.legacy` explicitly before moving to Maven. Applications with WebSQL-era browser data need an export plan before taking the new JavaScript engine.
+Start with the [storage encryption guide](/developer-guide/#_storage_encryption) if you have data at rest to migrate. Existing Ant applications should set `db.legacy` explicitly before moving to Maven. Applications with WebSQL-era browser data need an export plan before taking the new JavaScript engine.
 
 ---
 

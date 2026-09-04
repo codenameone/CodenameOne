@@ -223,6 +223,10 @@ whether it's `solid` (blocks movement), a `friction` multiplier, and an optional
 Materials are resolved through `MaterialRegistry`, a process-wide registry that ships six
 built-ins (`MaterialRegistry.GRASS`, `ROAD`, `STONE`, `SAND`, `WATER`, `DIRT`). `WATER`
 is registered as solid. Applications add their own without changing the level format:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameAssetsJava001Snippet.java[tag=game-assets-java-001,indent=0]
+----
 
 
 Unknown ids resolve to a neutral gray placeholder, so a level that references a

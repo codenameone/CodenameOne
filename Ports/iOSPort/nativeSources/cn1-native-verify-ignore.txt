@@ -6,4 +6,4 @@
 # The C SYMBOL, not the Java name: isIgnored compares against the mangled
 # form, so a dotted entry here matches nothing and reads as an ignore that
 # is in place when it is not.
-com_codename1_impl_ios_IOSExtensionTunnel_writeNative___byte_1ARRAY_int_int
+com_codename1_impl_ios_IOSExtensionTunnel_writeNative___int_byte_1ARRAY_int_int

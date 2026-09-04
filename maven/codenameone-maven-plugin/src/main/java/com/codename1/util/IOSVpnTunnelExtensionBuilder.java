@@ -26,49 +26,68 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * NOTHING CALLS THIS, and that is the current state rather than an oversight.
+ * Generates the iOS packet-tunnel app extension behind
+ * {@code com.codename1.vpn.tunnel}.
  *
- * <p>IPhoneBuilder refuses {@code ios.vpn.tunnel=true} and never enables
- * {@code CN1_VPN_TUNNEL}, so {@code vpnTunnelSupported()} compiles to false
- * in every build and no target is generated. The class is kept, and kept
- * under test, because the piece that is missing is a ByteCodeTranslator
- * translation rooted at the tunnel -- not any of this -- and throwing the
- * generator away would mean writing it again from nothing when that lands.
+ * <p>Called by {@code VpnTunnelNativeBuilder} for a project that sets
+ * {@code ios.vpn.tunnel=true} and names its tunnel class in
+ * {@code ios.vpn.tunnel.class}. Nothing else reaches it, and that gate is
+ * deliberate: the entitlement this extension carries is one Apple grants
+ * case by case, so the hint is also the project asserting it holds the
+ * grant.</p>
  *
- * <p>It has been read as evidence that the iOS tunnel works, twice. It is
- * not: a generator with no caller and a {@code #if} whose macro nothing
- * defines produce no code at all. The guide says the iOS half is unbuilt
- * because the iOS half is unbuilt.
+ * <p>This file used to open by saying NOTHING CALLS THIS, and for two rounds
+ * that was true -- the generator was written and left without a caller,
+ * because the piece believed to be missing was "a ByteCodeTranslator
+ * translation rooted at the tunnel". That translation already existed and
+ * had shipped: the watch slice is translated by a SECOND translator pass
+ * rooted at its own entry point, and {@code VpnTunnelNativeBuilder} does the
+ * same thing rooted at a generated tunnel stub. Rooting it there is what
+ * makes an app-extension target possible at all -- the extension carries
+ * what the tunnel reaches, so the port's UIKit natives, whose
+ * {@code UIApplicationMain} and {@code [UIApplication sharedApplication]}
+ * an {@code APPLICATION_EXTENSION_API_ONLY} target may not compile, are not
+ * in it.</p>
  *
- * <p>One consequence worth stating plainly: no build in this repository
- * compiles what this writes. The output was checked by generating it and
- * running clang against the real iOS SDK by hand, which is how a
- * forward-declaration break that would have failed the target's first build
- * was found sitting here. Treat a change to this file as unverified until
- * that is done again.
+ * <p><b>Nothing in CI compiles what this writes</b>, here or in the
+ * CodenameOne repository -- neither runs an Objective-C compiler. The output
+ * is checked instead by generating it and running clang against the real iOS
+ * SDK with {@code -fapplication-extension}, which is what
+ * {@code scripts/check-vpn-tunnel-extension-compiles.sh} does on a
+ * machine that has Xcode; it skips where there is none. Run it after
+ * changing this file: a forward-declaration break that would have failed the
+ * generated target's first build was found sitting here exactly that way.</p>
  *
  * <hr>
  *
- * <p>What it WOULD generate, when there is something to call it: the iOS
- * packet-tunnel app extension behind {@code com.codename1.vpn.tunnel}.</p>
+ * <p>The iOS packet-tunnel app extension behind
+ * {@code com.codename1.vpn.tunnel}.</p>
  *
  * <p>This one differs from every other extension this builder generates:
  * <b>it hosts a virtual machine</b>. The others are small Objective-C
  * handlers that answer the system and exit. A packet tunnel runs the
  * application's own {@code VpnTunnel} subclass, which is Java, so the
- * extension target is translated exactly as the app target is and the
- * generated provider below boots the VM before handing packets to it.</p>
+ * extension target is translated the way the app target is -- by the same
+ * translator, from its own root -- and the generated provider below boots
+ * the VM before handing packets to it.</p>
  *
  * <p>An earlier version of this framework recorded that this could not be
  * done -- that a Network Extension is "a separate process with no ParparVM
- * in it". That premise is half right, and the half that matters is the
- * reason nothing calls this yet: the extension WOULD be a target this build
- * produces, so what is in it would be this build's decision -- but the
- * translation that would put a VM in it without the application shell, whose
- * natives call UIKit an extension may not touch, has not been written. What
- * IS true either way is that it shares nothing with the app: no statics, no
- * {@code Display}, no open connections. Everything the tunnel needs travels
- * in {@code TunnelSetup.data} and arrives as the provider configuration.</p>
+ * in it". The premise is half right, and the half that matters is the half
+ * it got wrong: the extension is a target THIS BUILD produces, so what is in
+ * it is this build's decision. {@code VpnTunnelNativeBuilder} runs a second
+ * translator pass rooted at a stub that reaches the tunnel and nothing else,
+ * so the VM in the extension is carried WITHOUT the application shell whose
+ * natives call UIKit an extension may not touch.</p>
+ *
+ * <p>What IS true either way is that it shares nothing with the app: no
+ * statics, no {@code Display}, no open connections. Everything the tunnel
+ * needs travels in {@code TunnelSetup.data} and arrives as the provider
+ * configuration. That is not a style rule -- a tunnel that reaches for the
+ * application's own classes drags them into the rooted translation, and the
+ * ones backed by the port's UIKit natives cannot be compiled into an app
+ * extension at all, so it fails the extension's link rather than misbehaving
+ * at run time.</p>
  *
  * <p><b>The entitlement is not injected.</b>
  * {@code com.apple.developer.networking.networkextension} is granted by Apple
@@ -122,10 +141,11 @@ public final class IOSVpnTunnelExtensionBuilder {
      */
     public static Map<String, byte[]> buildFileMap(String packageName,
             String displayName, String shortVersion, String bundleVersion,
-            String tunnelClass) {
+            String tunnelClass, boolean convertSignalsToExceptions) {
         Map<String, byte[]> files = new LinkedHashMap<String, byte[]>();
         files.put("CN1VpnTunnelProvider.h", utf8(providerHeader()));
-        files.put("CN1VpnTunnelProvider.m", utf8(providerSource(tunnelClass)));
+        files.put("CN1VpnTunnelProvider.m", utf8(providerSource(tunnelClass,
+                convertSignalsToExceptions)));
         files.put("Info.plist", utf8(infoPlist(displayName, shortVersion,
                 bundleVersion)));
         files.put(EXTENSION_NAME + ".entitlements", utf8(entitlements()));
@@ -193,7 +213,8 @@ public final class IOSVpnTunnelExtensionBuilder {
      * into the pooled buffers the Java side already owns rather than being
      * copied into NSData objects first.</p>
      */
-    static String providerSource(String tunnelClass) {
+    static String providerSource(String tunnelClass,
+            boolean convertSignalsToExceptions) {
         String mangled = mangle(tunnelClass);
         StringBuilder sb = new StringBuilder();
         sb.append("#import \"CN1VpnTunnelProvider.h\"\n");
@@ -201,6 +222,9 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("#include \"com_codename1_impl_vpn_ExtensionTunnelHost.h\"\n");
         sb.append("#include \"com_codename1_impl_ios_IOSExtensionTunnel.h\"\n");
         sb.append("#include <stdatomic.h>\n");
+        if (convertSignalsToExceptions) {
+            sb.append("#include <signal.h>\n");
+        }
         sb.append("\n");
         sb.append("// The application's tunnel, named by the build. Reached\n");
         sb.append("// through the translated allocator rather than by\n");
@@ -208,11 +232,44 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("// here, so a name looked up at run time would not be\n");
         sb.append("// there -- which is the same reason Class.forName is\n");
         sb.append("// banned in the framework itself.\n");
-        sb.append("extern JAVA_OBJECT __NEW_").append(mangled).append("();\n");
-        sb.append("extern void ").append(mangled)
-                .append("_ctor__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);\n");
+        sb.append("// THE ABI ParparVM actually emits, which these two\n");
+        sb.append("// declarations got wrong twice over. __NEW_X takes the\n");
+        sb.append("// thread state -- it uses it for class initialisation and\n");
+        sb.append("// for the GC allocation -- and an empty parameter list is\n");
+        sb.append("// an old-style declaration that compiles and then leaves\n");
+        sb.append("// the argument register unset on arm64. And the\n");
+        sb.append("// no-argument constructor is X___INIT____, not X_ctor__,\n");
+        sb.append("// which is a symbol the translation never defines: the\n");
+        sb.append("// extension would not have linked.\n");
+        if (convertSignalsToExceptions) {
+            sb.append("// The two the signal handler allocates. Reachable\n");
+            sb.append("// because the generated stub names them; see\n");
+            sb.append("// VpnTunnelNativeBuilder.writeStubSource.\n");
+            sb.append("extern JAVA_OBJECT"
+                    + " __NEW_INSTANCE_java_lang_NullPointerException(\n");
+            sb.append("        CODENAME_ONE_THREAD_STATE);\n");
+            sb.append("extern JAVA_OBJECT"
+                    + " __NEW_INSTANCE_java_lang_RuntimeException(\n");
+            sb.append("        CODENAME_ONE_THREAD_STATE);\n");
+        }
+        sb.append("extern JAVA_OBJECT __NEW_").append(mangled)
+                .append("(CODENAME_ONE_THREAD_STATE);\n");
+        sb.append("extern JAVA_VOID ").append(mangled)
+                .append("___INIT____(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);\n");
         sb.append("\n");
         sb.append("static CN1VpnTunnelProvider *cn1tnProvider = nil;\n");
+        sb.append("\n");
+        sb.append("/// Which start put cn1tnProvider there.\n");
+        sb.append("///\n");
+        sb.append("/// Written and read under the same lock as the pointer,\n");
+        sb.append("/// because the two are one fact. The counter below cannot\n");
+        sb.append("/// stand in for it: a replacement start claims its\n");
+        sb.append("/// generation before it publishes, so between the two the\n");
+        sb.append("/// counter says somebody newer owns the slot while the\n");
+        sb.append("/// slot still holds the old provider -- and a stop that\n");
+        sb.append("/// consulted the counter left that provider in place to be\n");
+        sb.append("/// released by NE with the global still naming it.\n");
+        sb.append("static int cn1tnProviderGeneration = 0;\n");
         sb.append("\n");
         sb.append("// Which START the packet reads belong to.\n");
         sb.append("//\n");
@@ -236,6 +293,55 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("// which is the bug, not a smaller version of it.\n");
         sb.append("static atomic_int cn1tnReadGeneration;\n");
         sb.append("\n");
+        sb.append("// WHAT THE GENERATION DOES AND DOES NOT PROMISE, because\n");
+        sb.append("// the difference has been raised more than once.\n");
+        sb.append("//\n");
+        sb.append("// Every check against it is check-then-act: a stop can\n");
+        sb.append("// always land between the load and the call after it.\n");
+        sb.append("// What closes the gap is not the check but the fact that\n");
+        sb.append("// the generation TRAVELS -- into buffer(), received() and\n");
+        sb.append("// the writer -- so the Java side answers for the start\n");
+        sb.append("// the caller belongs to or answers nothing. A packet\n");
+        sb.append("// cannot therefore cross from one tunnel to the next in\n");
+        sb.append("// either direction, however the two threads interleave.\n");
+        sb.append("//\n");
+        sb.append("// The checks here are still worth having: they stop a\n");
+        sb.append("// batch early and keep a dead read from re-arming, which\n");
+        sb.append("// is work avoided rather than correctness.\n");
+        sb.append("//\n");
+        sb.append("// Two orderings carry the rest of it, and both are\n");
+        sb.append("// load-bearing. The provider pointer is published AFTER\n");
+        sb.append("// this counter is claimed, so a pointer a writer can see\n");
+        sb.append("// always belongs to a generation the writer can check;\n");
+        sb.append("// and the writer snapshots that pointer BEFORE it checks,\n");
+        sb.append("// so it can never use one that appeared later. On the\n");
+        sb.append("// Java side ExtensionTunnelHost.begin refuses a start\n");
+        sb.append("// older than the one already installed, under the lock\n");
+        sb.append("// that publishes it, so a completion that lost its race\n");
+        sb.append("// cannot replace a live tunnel with a cancelled one.\n");
+        sb.append("//\n");
+        sb.append("// What remains open is that such a completion still\n");
+        sb.append("// reports success to NE for a start that was already\n");
+        sb.append("// cancelled. Nothing follows from it: no host is\n");
+        sb.append("// installed, no read is armed for a live generation and\n");
+        sb.append("// no write is accepted. A lock is not the better trade\n");
+        sb.append("// for that last inch either -- delivery runs the\n");
+        sb.append("// application's onPacket, and holding a lock across it\n");
+        sb.append("// would make stopTunnelWithReason wait behind user code\n");
+        sb.append("// for a completion handler NE kills providers over.\n");
+        sb.append("//\n");
+        sb.append("// A lock is NOT the better trade here, and this is the\n");
+        sb.append("// reason rather than an opinion. Delivery runs the\n");
+        sb.append("// application's onPacket, which may take as long as it\n");
+        sb.append("// likes; holding a lock across it would make\n");
+        sb.append("// stopTunnelWithReason wait behind user code for its\n");
+        sb.append("// completion handler, and NE kills a provider that does\n");
+        sb.append("// not answer. Trading a window bounded by an XPC round\n");
+        sb.append("// trip -- a stop AND a full start, settings included,\n");
+        sb.append("// inside the gap between two instructions -- for a stop\n");
+        sb.append("// that can be blocked by an app callback is a worse\n");
+        sb.append("// extension, not a safer one.\n");
+        sb.append("\n");
         sb.append("// FORWARD DECLARATIONS for the helpers below.\n");
         sb.append("//\n");
         sb.append("// The implementation calls them and their definitions\n");
@@ -250,11 +356,90 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("        NSString *wire);\n");
         sb.append("static JAVA_INT cn1tnReason(NEProviderStopReason reason);\n");
         sb.append("\n");
-        sb.append("@implementation CN1VpnTunnelProvider\n");
+        if (convertSignalsToExceptions) {
+            sb.append("/// The SIGSEGV-to-NullPointerException handler, which\n");
+            sb.append("/// this target would otherwise be without.\n");
+            sb.append("///\n");
+            sb.append("/// ParparVM leans on it: a field read through null\n");
+            sb.append("/// faults rather than checking, unless\n");
+            sb.append("/// ios.fieldNullChecks is on, and a call through null\n");
+            sb.append("/// faults in every configuration. The app target gets\n");
+            sb.append("/// this from installSignalHandlers in\n");
+            sb.append("/// CodenameOne_GLAppDelegate.m -- a UIApplication\n");
+            sb.append("/// delegate, which an extension may not compile -- and\n");
+            sb.append("/// the watch runtime mirrors it in CN1WatchRuntime.m\n");
+            sb.append("/// for exactly this reason. Without it a null\n");
+            sb.append("/// dereference anywhere in the tunnel's code kills the\n");
+            sb.append("/// extension instead of arriving at the Throwable the\n");
+            sb.append("/// tunnel host already catches, and iOS tears the VPN\n");
+            sb.append("/// down with it.\n");
+            sb.append("///\n");
+            sb.append("/// Omitted when ios.convertSignalsToExceptions=false,\n");
+            sb.append("/// which is the same hint that comments the call out\n");
+            sb.append("/// of the app target: a developer who wants the fault\n");
+            sb.append("/// to stay a fault gets that here too.\n");
+            sb.append("static void cn1tnSignalHandler(int sig) {\n");
+            sb.append("    if (sig == SIGSEGV || sig == SIGBUS) {\n");
+            sb.append("        throwException(getThreadLocalData(),\n");
+            sb.append("                __NEW_INSTANCE_java_lang_NullPointerException(\n");
+            sb.append("                        getThreadLocalData()));\n");
+            sb.append("    } else {\n");
+            sb.append("        throwException(getThreadLocalData(),\n");
+            sb.append("                __NEW_INSTANCE_java_lang_RuntimeException(\n");
+            sb.append("                        getThreadLocalData()));\n");
+            sb.append("    }\n");
+            sb.append("}\n");
+            sb.append("\n");
+            sb.append("static void cn1tnInstallSignalHandlers(void) {\n");
+            sb.append("    signal(SIGABRT, cn1tnSignalHandler);\n");
+            sb.append("    signal(SIGILL, cn1tnSignalHandler);\n");
+            sb.append("    signal(SIGSEGV, cn1tnSignalHandler);\n");
+            sb.append("    signal(SIGFPE, cn1tnSignalHandler);\n");
+            sb.append("    signal(SIGBUS, cn1tnSignalHandler);\n");
+            sb.append("    signal(SIGPIPE, cn1tnSignalHandler);\n");
+            sb.append("}\n");
+            sb.append("\n");
+        }
+        sb.append("@implementation CN1VpnTunnelProvider {\n");
+        sb.append("    /// Which start this provider CLAIMED, published or\n");
+        sb.append("    /// not, and zero once a stop has taken it.\n");
+        sb.append("    ///\n");
+        sb.append("    /// A claim, rather than a publication, because a stop\n");
+        sb.append("    /// arriving between the two still has to invalidate\n");
+        sb.append("    /// the generation that start is holding -- otherwise\n");
+        sb.append("    /// the start resumes, finds its own number still\n");
+        sb.append("    /// current, and brings up a tunnel the user cancelled.\n");
+        sb.append("    ///\n");
+        sb.append("    /// The stop needs the generation THIS object owns,\n");
+        sb.append("    /// and the counter cannot tell it: a replacement that\n");
+        sb.append("    /// has already claimed leaves the counter reading the\n");
+        sb.append("    /// replacement's number, and a stop that read it back\n");
+        sb.append("    /// tore down the tunnel that had taken its place.\n");
+        sb.append("    /// Written and read under the same lock as the slot.\n");
+        sb.append("    ///\n");
+        sb.append("    /// ONE claim, not a stack of them, because NE does not\n");
+        sb.append("    /// overlap sessions on a provider: it calls\n");
+        sb.append("    /// stopTunnelWithReason and waits for that completion\n");
+        sb.append("    /// handler before it starts another. A stop DURING a\n");
+        sb.append("    /// start is a different thing and does happen -- that\n");
+        sb.append("    /// is one session ending before it finished coming up,\n");
+        sb.append("    /// which is why the claim above is taken at the claim\n");
+        sb.append("    /// and not at the publish. Everything else\n");
+        sb.append("    /// this file guards -- a settings completion resuming\n");
+        sb.append("    /// after a stop, a read outstanding across a restart --\n");
+        sb.append("    /// is OUR asynchrony inside one session, which the\n");
+        sb.append("    /// generation carries. Raised in review as needing\n");
+        sb.append("    /// per-session bookkeeping for a start that publishes\n");
+        sb.append("    /// while an earlier stop is still running; that is the\n");
+        sb.append("    /// system breaking its own sequence, and the answer to\n");
+        sb.append("    /// it is the line in the stop that gives this claim up,\n");
+        sb.append("    /// so a second stop finds nothing of anyone else's to\n");
+        sb.append("    /// tear down.\n");
+        sb.append("    int cn1tnMine;\n");
+        sb.append("}\n");
         sb.append("\n");
         sb.append("- (void)startTunnelWithOptions:(NSDictionary *)options\n");
         sb.append("        completionHandler:(void (^)(NSError *))completionHandler {\n");
-        sb.append("    cn1tnProvider = self;\n");
         sb.append("    // ONCE per process. The extension is started and\n");
         sb.append("    // stopped repeatedly within one process lifetime, and\n");
         sb.append("    // initialising the VM twice would reset every static\n");
@@ -262,6 +447,9 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("    static dispatch_once_t once;\n");
         sb.append("    dispatch_once(&once, ^{\n");
         sb.append("        initConstantPool();\n");
+        if (convertSignalsToExceptions) {
+            sb.append("        cn1tnInstallSignalHandlers();\n");
+        }
         sb.append("    });\n");
         sb.append("    NSString *wire = @\"\";\n");
         sb.append("    NETunnelProviderProtocol *proto =\n");
@@ -271,6 +459,62 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("                objectForKey:@\"cn1TunnelSetup\"];\n");
         sb.append("        if ([raw isKindOfClass:[NSString class]]) {\n");
         sb.append("            wire = (NSString *)raw;\n");
+        sb.append("        }\n");
+        sb.append("    }\n");
+        sb.append("    // THIS start, claimed before anything asynchronous\n");
+        sb.append("    // is issued. NE stops a provider whose start is still\n");
+        sb.append("    // in flight -- a user toggling the switch back is\n");
+        sb.append("    // enough -- and the settings completion below used to\n");
+        sb.append("    // run regardless: it built the tunnel, told Java to\n");
+        sb.append("    // begin, armed a read and reported the start a\n");
+        sb.append("    // success, all after the stop. The tunnel then ran\n");
+        sb.append("    // with cn1tnProvider nil, so every packet it forwarded\n");
+        sb.append("    // was dropped with nothing to say so.\n");
+        sb.append("    //\n");
+        sb.append("    // The read generation doubles as the start's identity,\n");
+        sb.append("    // which is what makes one counter enough: bumping it\n");
+        sb.append("    // here also invalidates a read still outstanding from\n");
+        sb.append("    // the previous tunnel.\n");
+        sb.append("    int cn1tnStart =\n");
+        sb.append("            atomic_fetch_add(&cn1tnReadGeneration, 1) + 1;\n");
+        sb.append("    // RECORDED AT THE CLAIM, not at the publish below.\n");
+        sb.append("    // NE can stop a start that is still in flight -- a\n");
+        sb.append("    // user toggling the switch back is enough -- and a\n");
+        sb.append("    // stop that found nothing claimed here left the\n");
+        sb.append("    // counter where it was. This start would then resume,\n");
+        sb.append("    // find its own generation still current, publish,\n");
+        sb.append("    // apply its settings and run the application's onStart\n");
+        sb.append("    // after the stop had finished: a tunnel brought up by\n");
+        sb.append("    // a start the user had already cancelled.\n");
+        sb.append("    @synchronized ([CN1VpnTunnelProvider class]) {\n");
+        sb.append("        cn1tnMine = cn1tnStart;\n");
+        sb.append("    }\n");
+        sb.append("    // PUBLISHED AFTER the generation is claimed, and that\n");
+        sb.append("    // order is the whole of what makes the writer's check\n");
+        sb.append("    // sound. Set first, a restart made the new provider\n");
+        sb.append("    // visible while the counter still read the old\n");
+        sb.append("    // generation -- so a write from the old tunnel found a\n");
+        sb.append("    // generation that still matched and a provider that\n");
+        sb.append("    // was already the new one, and went out on its link.\n");
+        sb.append("    // Under the lock the writer takes, which is what\n");
+        sb.append("    // lets it retain what it reads. This target compiles\n");
+        sb.append("    // without ARC -- the translated sources cannot be\n");
+        sb.append("    // built any other way -- so the global is a bare\n");
+        sb.append("    // pointer, and a bare pointer is no promise that the\n");
+        sb.append("    // object is still there.\n");
+        sb.append("    @synchronized ([CN1VpnTunnelProvider class]) {\n");
+        sb.append("        // STILL THIS START'S to give. Claiming and\n");
+        sb.append("        // publishing are two steps, and a start suspended\n");
+        sb.append("        // between them used to resume long after a stop\n");
+        sb.append("        // and a restart had been and gone -- and put its\n");
+        sb.append("        // own stopped provider in the slot, over the one\n");
+        sb.append("        // the running tunnel had published. The writer\n");
+        sb.append("        // then found a provider whose generation nothing\n");
+        sb.append("        // compared, and the live tunnel's packets went out\n");
+        sb.append("        // on a link that was already down.\n");
+        sb.append("        if (cn1tnStart == atomic_load(&cn1tnReadGeneration)) {\n");
+        sb.append("            cn1tnProvider = self;\n");
+        sb.append("            cn1tnProviderGeneration = cn1tnStart;\n");
         sb.append("        }\n");
         sb.append("    }\n");
         sb.append("    // The settings the system needs BEFORE any packet\n");
@@ -295,6 +539,7 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("        // so a system log reads the same as the API would,\n");
         sb.append("        // but nothing consumes it: this NSError goes to\n");
         sb.append("        // iOS, not to Java.\n");
+        sb.append("        [self cn1ForgetIfCurrent:cn1tnStart];\n");
         sb.append("        completionHandler([NSError\n");
         sb.append("                errorWithDomain:@\"com.codename1.vpn\"\n");
         sb.append("                code:2\n");
@@ -304,10 +549,38 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("                        forKey:NSLocalizedDescriptionKey]]);\n");
         sb.append("        return;\n");
         sb.append("    }\n");
+        sb.append("    // NOT serialised against an earlier start's request,\n");
+        sb.append("    // and it does not need to be. A request still pending\n");
+        sb.append("    // when its own session ends belongs to a session the\n");
+        sb.append("    // system has already torn down, and the next session\n");
+        sb.append("    // on this provider does not begin until the stop that\n");
+        sb.append("    // ended this one has returned -- so there is no second\n");
+        sb.append("    // start whose settings this could overwrite. What the\n");
+        sb.append("    // completion below guards is the other half: this\n");
+        sb.append("    // block resuming after that stop, which is ours to get\n");
+        sb.append("    // wrong and is what the generation check refuses.\n");
         sb.append("    [self setTunnelNetworkSettings:settings\n");
         sb.append("            completionHandler:^(NSError *error) {\n");
         sb.append("        if (error != nil) {\n");
+        sb.append("            [self cn1ForgetIfCurrent:cn1tnStart];\n");
         sb.append("            completionHandler(error);\n");
+        sb.append("            return;\n");
+        sb.append("        }\n");
+        sb.append("        if (cn1tnStart != atomic_load(&cn1tnReadGeneration)) {\n");
+        sb.append("            // Stopped while these settings were pending.\n");
+        sb.append("            // Nothing is started: no tunnel is built, Java\n");
+        sb.append("            // is not told to begin, and no read is armed.\n");
+        sb.append("            // The handler is still called exactly once,\n");
+        sb.append("            // because NE requires that -- with an error,\n");
+        sb.append("            // since this start did not happen.\n");
+        sb.append("            [self cn1ForgetIfCurrent:cn1tnStart];\n");
+        sb.append("            completionHandler([NSError\n");
+        sb.append("                    errorWithDomain:@\"com.codename1.vpn\"\n");
+        sb.append("                    code:1\n");
+        sb.append("                    userInfo:[NSDictionary\n");
+        sb.append("                            dictionaryWithObject:\n");
+        sb.append("                                    @\"The tunnel was stopped before it started\"\n");
+        sb.append("                            forKey:NSLocalizedDescriptionKey]]);\n");
         sb.append("            return;\n");
         sb.append("        }\n");
         sb.append("        CODENAME_ONE_THREAD_STATE = getThreadLocalData();\n");
@@ -315,20 +588,97 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("        // forward a packet, and a tunnel that forwards\n");
         sb.append("        // before the writer is installed drops it with\n");
         sb.append("        // nothing to say so.\n");
-        sb.append("        com_codename1_impl_ios_IOSExtensionTunnel_install__(\n");
-        sb.append("                threadStateData);\n");
-        sb.append("        JAVA_OBJECT tunnel = __NEW_").append(mangled).append("();\n");
-        sb.append("        ").append(mangled)
-                .append("_ctor__(threadStateData, tunnel);\n");
-        sb.append("        com_codename1_impl_vpn_ExtensionTunnelHost_begin___java_lang_Object_java_lang_String(\n");
-        sb.append("                threadStateData, tunnel,\n");
-        sb.append("                fromNSString(threadStateData, wire));\n");
-        sb.append("        // Armed for THIS start. A read belonging to an\n");
-        sb.append("        // earlier one may still be outstanding, and it\n");
-        sb.append("        // stops at the generation check rather than\n");
+        sb.append("        //\n");
+        sb.append("        // Installing before begin decides the winner is\n");
+        sb.append("        // safe because the install itself will not go\n");
+        sb.append("        // backwards: ExtensionTunnelHost.setWriter takes\n");
+        sb.append("        // the generation and ignores one older than the\n");
+        sb.append("        // writer already installed. A stale completion\n");
+        sb.append("        // resuming here therefore cannot leave the live\n");
+        sb.append("        // tunnel forwarding through a writer whose own\n");
+        sb.append("        // check rejects every packet -- raised in review\n");
+        sb.append("        // against this call, where the guard is not\n");
+        sb.append("        // visible, and it lives on the other side of the\n");
+        sb.append("        // boundary in the CodenameOne repository.\n");
+        sb.append("        com_codename1_impl_ios_IOSExtensionTunnel_install___int(\n");
+        sb.append("                threadStateData, cn1tnStart);\n");
+        sb.append("        JAVA_OBJECT tunnel = __NEW_").append(mangled)
+                .append("(threadStateData);\n");
+        sb.append("        if (tunnel != JAVA_NULL\n");
+        sb.append("                && threadStateData->exception == JAVA_NULL) {\n");
+        sb.append("            ").append(mangled)
+                .append("___INIT____(threadStateData, tunnel);\n");
+        sb.append("        }\n");
+        sb.append("        if (tunnel == JAVA_NULL\n");
+        sb.append("                || threadStateData->exception != JAVA_NULL) {\n");
+        sb.append("            // A CONSTRUCTOR that threw, or a class\n");
+        sb.append("            // initializer that did. There is no java try\n");
+        sb.append("            // region around a call made from here, and\n");
+        sb.append("            // throwException with no handler on the thread\n");
+        sb.append("            // RETURNS -- it records the exception and lets\n");
+        sb.append("            // the caller carry on. So this went on to begin\n");
+        sb.append("            // with a half-built tunnel and reported the\n");
+        sb.append("            // start a success.\n");
+        sb.append("            //\n");
+        sb.append("            // Cleared as well as reported: the next thing\n");
+        sb.append("            // this thread runs would otherwise find a\n");
+        sb.append("            // pending exception from a start that is over.\n");
+        sb.append("            threadStateData->exception = JAVA_NULL;\n");
+        sb.append("            [self cn1ForgetIfCurrent:cn1tnStart];\n");
+        sb.append("            completionHandler([NSError\n");
+        sb.append("                    errorWithDomain:@\"com.codename1.vpn\"\n");
+        sb.append("                    code:2\n");
+        sb.append("                    userInfo:[NSDictionary\n");
+        sb.append("                            dictionaryWithObject:\n");
+        sb.append("                                    @\"The tunnel class could not be constructed\"\n");
+        sb.append("                            forKey:NSLocalizedDescriptionKey]]);\n");
+        sb.append("            return;\n");
+        sb.append("        }\n");
+        sb.append("        // fromNSString is the TRANSLATOR's, not the\n");
+        sb.append("        // port's -- cn1_globals.m defines it under\n");
+        sb.append("        // #if defined(__APPLE__) && defined(__OBJC__),\n");
+        sb.append("        // and IOSNative.m only extern-declares it, as\n");
+        sb.append("        // CN1Vpn.m and a dozen other port sources do. It\n");
+        sb.append("        // therefore arrives with the translation and is\n");
+        sb.append("        // compiled into this target, which is why the\n");
+        sb.append("        // extension can leave every port native out and\n");
+        sb.append("        // still convert a string. (Raised as a link error\n");
+        sb.append("        // in review on the premise that it was the\n");
+        sb.append("        // port's; it is not.)\n");
+        sb.append("        JAVA_BOOLEAN cn1tnBegan =\n");
+        sb.append("                com_codename1_impl_vpn_ExtensionTunnelHost_begin___java_lang_Object_java_lang_String_int_R_boolean(\n");
+        sb.append("                        threadStateData, tunnel,\n");
+        sb.append("                        fromNSString(threadStateData, wire),\n");
+        sb.append("                        cn1tnStart);\n");
+        sb.append("        if (!cn1tnBegan) {\n");
+        sb.append("            // A newer start owns the extension. The check\n");
+        sb.append("            // at the top of this block is not enough on\n");
+        sb.append("            // its own -- a stop and a restart can land\n");
+        sb.append("            // between it and here -- and begin is where\n");
+        sb.append("            // the decision is actually made, under the\n");
+        sb.append("            // lock that publishes the host. Arming a read\n");
+        sb.append("            // anyway put a second reader on the flow for a\n");
+        sb.append("            // tunnel that does not exist, which can take a\n");
+        sb.append("            // batch the live tunnel was owed and drop it\n");
+        sb.append("            // at its own generation check.\n");
+        sb.append("            [self cn1ForgetIfCurrent:cn1tnStart];\n");
+        sb.append("            completionHandler([NSError\n");
+        sb.append("                    errorWithDomain:@\"com.codename1.vpn\"\n");
+        sb.append("                    code:2\n");
+        sb.append("                    userInfo:[NSDictionary\n");
+        sb.append("                            dictionaryWithObject:\n");
+        sb.append("                                    @\"The tunnel was stopped while it was starting\"\n");
+        sb.append("                            forKey:NSLocalizedDescriptionKey]]);\n");
+        sb.append("            return;\n");
+        sb.append("        }\n");
+        sb.append("        // Armed for THIS start, with the generation it\n");
+        sb.append("        // claimed above rather than a fresh one -- bumping\n");
+        sb.append("        // again here would invalidate the very start this\n");
+        sb.append("        // completion belongs to. A read belonging to an\n");
+        sb.append("        // earlier tunnel may still be outstanding, and it\n");
+        sb.append("        // stops at its own generation check rather than\n");
         sb.append("        // delivering into the tunnel just installed.\n");
-        sb.append("        [self cn1ReadPacketsForGeneration:\n");
-        sb.append("                atomic_fetch_add(&cn1tnReadGeneration, 1) + 1];\n");
+        sb.append("        [self cn1ReadPacketsForGeneration:cn1tnStart];\n");
         sb.append("        completionHandler(nil);\n");
         sb.append("    }];\n");
         sb.append("}\n");
@@ -340,6 +690,66 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("/// cn1tnReadGeneration: without it a read outstanding\n");
         sb.append("/// across a stop delivered its packets into the NEXT\n");
         sb.append("/// tunnel and re-armed alongside that tunnel's own reader.\n");
+        sb.append("/// Gives up this provider's claim on the global, if it\n");
+        sb.append("/// still has one.\n");
+        sb.append("///\n");
+        sb.append("/// A start that FAILS is torn down without\n");
+        sb.append("/// stopTunnelWithReason -- the tunnel never started, so\n");
+        sb.append("/// there is nothing for NE to stop -- and the global went\n");
+        sb.append("/// on naming the provider it had published. Without ARC\n");
+        sb.append("/// that is a bare pointer to an object the system is free\n");
+        sb.append("/// to dispose, and the next writer retained it before it\n");
+        sb.append("/// ever looked at a generation.\n");
+        sb.append("///\n");
+        sb.append("/// Conditional, because a newer start may already own the\n");
+        sb.append("/// global: this clears its own claim, never somebody\n");
+        sb.append("/// else's.\n");
+        sb.append("///\n");
+        sb.append("/// The GENERATION as well as the pointer. NE may hand a\n");
+        sb.append("/// restart to the same provider object, and then the\n");
+        sb.append("/// pointer alone says yes to a stale completion: the\n");
+        sb.append("/// newer start published the same self, and clearing it\n");
+        sb.append("/// would leave the running tunnel writing through nil and\n");
+        sb.append("/// dropping every packet.\n");
+        sb.append("///\n");
+        sb.append("/// The generation asked for is the SLOT's, not the\n");
+        sb.append("/// counter's. A replacement start claims its generation\n");
+        sb.append("/// before it publishes, and in that window the counter\n");
+        sb.append("/// answers for a provider that is not in the slot yet --\n");
+        sb.append("/// so a stop that asked it declined to clear, and left its\n");
+        sb.append("/// own provider named by the global for NE to release\n");
+        sb.append("/// underneath the next writer.\n");
+        sb.append("- (void)cn1ForgetIfCurrent:(int)generation {\n");
+        sb.append("    @synchronized ([CN1VpnTunnelProvider class]) {\n");
+        sb.append("        if (cn1tnProvider == self\n");
+        sb.append("                && cn1tnProviderGeneration == generation) {\n");
+        sb.append("            cn1tnProvider = nil;\n");
+        sb.append("        }\n");
+        sb.append("    }\n");
+        sb.append("}\n");
+        sb.append("\n");
+        sb.append("/// The read loop, one batch at a time.\n");
+        sb.append("///\n");
+        sb.append("/// A read outstanding across a restart is NOT waited for,\n");
+        sb.append("/// and that is deliberate. Raised in review as packet\n");
+        sb.append("/// loss: if NE hands a restart to this same object, the\n");
+        sb.append("/// old callback is still on the same flow, and the batch\n");
+        sb.append("/// it eventually gets -- read from the NEW link -- is\n");
+        sb.append("/// dropped at the check below instead of delivered.\n");
+        sb.append("///\n");
+        sb.append("/// True, and worth less than the alternative costs. The\n");
+        sb.append("/// loss is one batch, once, on a tunnel that has just come\n");
+        sb.append("/// back up -- a moment when everything queued on the old\n");
+        sb.append("/// link is gone anyway, and what survives is what the\n");
+        sb.append("/// peers retransmit. Guaranteeing a single reader means\n");
+        sb.append("/// tracking outstanding reads and handing the loop from a\n");
+        sb.append("/// retiring generation to the current one, which puts a\n");
+        sb.append("/// state machine on the hottest path in the extension:\n");
+        sb.append("/// get it wrong and the tunnel reads nothing at all, which\n");
+        sb.append("/// is every packet rather than one batch. The generation\n");
+        sb.append("/// checks already stop the crossing that would corrupt a\n");
+        sb.append("/// session -- packets read on one link reaching another --\n");
+        sb.append("/// and that is the property worth defending here.\n");
         sb.append("- (void)cn1ReadPacketsForGeneration:(int)generation {\n");
         sb.append("    [self.packetFlow readPacketsWithCompletionHandler:\n");
         sb.append("            ^(NSArray<NSData *> *packets, NSArray<NSNumber *> *protocols) {\n");
@@ -354,6 +764,21 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("        }\n");
         sb.append("        CODENAME_ONE_THREAD_STATE = getThreadLocalData();\n");
         sb.append("        for (NSUInteger i = 0; i < [packets count]; i++) {\n");
+        sb.append("            if (generation != atomic_load(&cn1tnReadGeneration)) {\n");
+        sb.append("                // PER PACKET, not once for the batch.\n");
+        sb.append("                // Delivering one packet runs the\n");
+        sb.append("                // application's onPacket, and a stop and\n");
+        sb.append("                // a restart can both complete while it\n");
+        sb.append("                // does -- the two are not documented to\n");
+        sb.append("                // be this queue. buffer() would then hand\n");
+        sb.append("                // back the NEW tunnel's pooled array and\n");
+        sb.append("                // the rest of a batch captured on the old\n");
+        sb.append("                // link would be pumped into it. A null\n");
+        sb.append("                // buffer catches a stop with nothing\n");
+        sb.append("                // started after it; this catches the\n");
+        sb.append("                // restart.\n");
+        sb.append("                break;\n");
+        sb.append("            }\n");
         sb.append("            NSData *p = [packets objectAtIndex:i];\n");
         sb.append("            // Straight into the POOLED buffer. Allocating\n");
         sb.append("            // a Java array per packet and handing it over\n");
@@ -361,10 +786,18 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("            // every packet at line rate, inside a process\n");
         sb.append("            // with a hard memory cap -- in an API whose\n");
         sb.append("            // buffers are pooled to avoid exactly that.\n");
+        sb.append("            // The generation goes WITH the request. The\n");
+        sb.append("            // check above is check-then-act, so a stop\n");
+        sb.append("            // and a restart can land between it and this\n");
+        sb.append("            // line; carrying the generation means the\n");
+        sb.append("            // Java side answers for the start this read\n");
+        sb.append("            // belongs to or answers null, rather than\n");
+        sb.append("            // handing back the new tunnel's buffer.\n");
         sb.append("            JAVA_OBJECT bytes =\n");
-        sb.append("                    com_codename1_impl_vpn_ExtensionTunnelHost_buffer___int_R_byte_1ARRAY(\n");
+        sb.append("                    com_codename1_impl_vpn_ExtensionTunnelHost_buffer___int_int_R_byte_1ARRAY(\n");
         sb.append("                            threadStateData,\n");
-        sb.append("                            (JAVA_INT)[p length]);\n");
+        sb.append("                            (JAVA_INT)[p length],\n");
+        sb.append("                            generation);\n");
         sb.append("            if (bytes == JAVA_NULL) {\n");
         sb.append("                // No tunnel running; the rest of this\n");
         sb.append("                // batch has nowhere to go either.\n");
@@ -372,8 +805,19 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("            }\n");
         sb.append("            memcpy(((JAVA_ARRAY)bytes)->data, [p bytes],\n");
         sb.append("                    [p length]);\n");
-        sb.append("            com_codename1_impl_vpn_ExtensionTunnelHost_received___int(\n");
-        sb.append("                    threadStateData, (JAVA_INT)[p length]);\n");
+        sb.append("            com_codename1_impl_vpn_ExtensionTunnelHost_received___int_int(\n");
+        sb.append("                    threadStateData, (JAVA_INT)[p length],\n");
+        sb.append("                    generation);\n");
+        sb.append("        }\n");
+        sb.append("        if (generation != atomic_load(&cn1tnReadGeneration)) {\n");
+        sb.append("            // Stopped WHILE this batch was being handed to\n");
+        sb.append("            // Java. Re-arming would leave a read for a dead\n");
+        sb.append("            // tunnel outstanding on the flow, and the next\n");
+        sb.append("            // start's first batch could go to it and be\n");
+        sb.append("            // dropped at its generation check -- packets\n");
+        sb.append("            // lost at the moment a tunnel comes up, which\n");
+        sb.append("            // is the hardest moment to explain.\n");
+        sb.append("            return;\n");
         sb.append("        }\n");
         sb.append("        [self cn1ReadPacketsForGeneration:generation];\n");
         sb.append("    }];\n");
@@ -382,16 +826,67 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("- (void)stopTunnelWithReason:(NEProviderStopReason)reason\n");
         sb.append("        completionHandler:(void (^)(void))completionHandler {\n");
         sb.append("    CODENAME_ONE_THREAD_STATE = getThreadLocalData();\n");
-        sb.append("    // INVALIDATED FIRST, so a read that completes while\n");
-        sb.append("    // this is tearing down finds a generation that has\n");
-        sb.append("    // moved and neither delivers nor re-arms. Bumped here\n");
-        sb.append("    // as well as on start because a process can sit\n");
-        sb.append("    // stopped for a long time, and an outstanding read has\n");
-        sb.append("    // no business surviving into whatever comes next.\n");
-        sb.append("    atomic_fetch_add(&cn1tnReadGeneration, 1);\n");
-        sb.append("    com_codename1_impl_vpn_ExtensionTunnelHost_end___int(\n");
-        sb.append("            threadStateData, cn1tnReason(reason));\n");
-        sb.append("    cn1tnProvider = nil;\n");
+        sb.append("    // THE GENERATION THIS PROVIDER OWNS, and only that\n");
+        sb.append("    // one. Reading the counter here -- however carefully\n");
+        sb.append("    // -- asks what the process is doing now, not what this\n");
+        sb.append("    // callback is for: a replacement that has already\n");
+        sb.append("    // claimed and published leaves the counter reading its\n");
+        sb.append("    // number, and a stop that took it invalidated the live\n");
+        sb.append("    // tunnel's reads and told Java to tear down the host\n");
+        sb.append("    // that had replaced its own.\n");
+        sb.append("    int cn1tnEnding;\n");
+        sb.append("    @synchronized ([CN1VpnTunnelProvider class]) {\n");
+        sb.append("        cn1tnEnding = cn1tnMine;\n");
+        sb.append("        // GIVEN UP as it is read. A session is stopped\n");
+        sb.append("        // once, so anything arriving here afterwards --\n");
+        sb.append("        // a repeated stop, or one delivered late -- has\n");
+        sb.append("        // nothing of its own to end, and zero is the\n");
+        sb.append("        // generation every check below refuses.\n");
+        sb.append("        cn1tnMine = 0;\n");
+        sb.append("    }\n");
+        sb.append("    // INVALIDATED only while the counter is still this\n");
+        sb.append("    // start's, so a read that completes while this is\n");
+        sb.append("    // tearing down finds a generation that has moved and\n");
+        sb.append("    // neither delivers nor re-arms. Bumped here as well as\n");
+        sb.append("    // on start because a process can sit stopped for a\n");
+        sb.append("    // long time, and an outstanding read has no business\n");
+        sb.append("    // surviving into whatever comes next -- but a stop\n");
+        sb.append("    // that has been overtaken invalidates nothing: the\n");
+        sb.append("    // start that overtook it already did, for itself.\n");
+        sb.append("    //\n");
+        sb.append("    // cn1tnEnded is what Java is told. On the ordinary\n");
+        sb.append("    // path it is the watermark this stop left, which\n");
+        sb.append("    // rejects a start still in flight; on the overtaken\n");
+        sb.append("    // path it stays this stop's own generation, which the\n");
+        sb.append("    // guard there reads as older than the running tunnel\n");
+        sb.append("    // and leaves alone.\n");
+        sb.append("    int cn1tnExpected = cn1tnEnding;\n");
+        sb.append("    int cn1tnEnded = cn1tnEnding;\n");
+        sb.append("    if (cn1tnEnding > 0\n");
+        sb.append("            && atomic_compare_exchange_strong(\n");
+        sb.append("                    &cn1tnReadGeneration, &cn1tnExpected,\n");
+        sb.append("                    cn1tnEnding + 1)) {\n");
+        sb.append("        cn1tnEnded = cn1tnEnding + 1;\n");
+        sb.append("    }\n");
+        sb.append("    // The counter as this stop left it, which is one\n");
+        sb.append("    // past every start still in flight -- so a settings\n");
+        sb.append("    // completion that already passed its own check and\n");
+        sb.append("    // reaches begin() after this is rejected there rather\n");
+        sb.append("    // than running the application's onStart for a tunnel\n");
+        sb.append("    // that is over.\n");
+        sb.append("    com_codename1_impl_vpn_ExtensionTunnelHost_end___int_int(\n");
+        sb.append("            threadStateData, cn1tnReason(reason),\n");
+        sb.append("            cn1tnEnded);\n");
+        sb.append("    // CLEARED BEFORE the handler, and only if the claim\n");
+        sb.append("    // is still this stop's. NE releases the provider once\n");
+        sb.append("    // this handler returns, so a writer that got here\n");
+        sb.append("    // first holds a retain and one that arrives after\n");
+        sb.append("    // finds nil; cleared after the handler instead, there\n");
+        sb.append("    // is a window in which the global names a deallocated\n");
+        sb.append("    // object. Unconditionally, a stop preempted by a\n");
+        sb.append("    // restart cleared the provider the restart had just\n");
+        sb.append("    // published.\n");
+        sb.append("    [self cn1ForgetIfCurrent:cn1tnEnding];\n");
         sb.append("    completionHandler();\n");
         sb.append("}\n");
         sb.append("\n");
@@ -413,11 +908,55 @@ public final class IOSVpnTunnelExtensionBuilder {
      */
     static String writerSource() {
         return "void com_codename1_impl_ios_IOSExtensionTunnel_writeNative"
-                + "___byte_1ARRAY_int_int(\n"
-                + "        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT packet,\n"
-                + "        JAVA_INT offset, JAVA_INT length) {\n"
-                + "    if (cn1tnProvider == nil || packet == JAVA_NULL\n"
+                + "___int_byte_1ARRAY_int_int(\n"
+                + "        CODENAME_ONE_THREAD_STATE, JAVA_INT generation,\n"
+                + "        JAVA_OBJECT packet, JAVA_INT offset,\n"
+                + "        JAVA_INT length) {\n"
+                + "    // SNAPSHOT FIRST, validate after. Read in this order\n"
+                + "    // the pointer can only be this generation's or an\n"
+                + "    // older one: anything installed by a later start is\n"
+                + "    // published after that start claimed its generation,\n"
+                + "    // so the check below sees the move and refuses. Read\n"
+                + "    // the other way round -- check, then dereference the\n"
+                + "    // global -- a restart landing in between handed this\n"
+                + "    // packet to the new provider, which is the crossing\n"
+                + "    // the generation exists to prevent.\n"
+                + "    //\n"
+                + "    // RETAINED, not just read. Without ARC the global is\n"
+                + "    // a bare pointer and the stop clears it just before\n"
+                + "    // NE releases the provider, so a write that overlapped\n"
+                + "    // a stop could reach packetFlow on a deallocated\n"
+                + "    // object. The retain is taken under the lock the stop\n"
+                + "    // clears under, which is what makes it a retain of\n"
+                + "    // something still alive rather than a race of its own.\n"
+                + "    CN1VpnTunnelProvider *flow;\n"
+                + "    @synchronized ([CN1VpnTunnelProvider class]) {\n"
+                + "        // THIS start's provider, named as such. The\n"
+                + "        // counter check below says the tunnel is still\n"
+                + "        // the current one; this says the provider in the\n"
+                + "        // slot is the one that tunnel published, which is\n"
+                + "        // a different question whenever the two steps of a\n"
+                + "        // start have been pulled apart.\n"
+                + "        flow = cn1tnProviderGeneration == generation\n"
+                + "                ? [cn1tnProvider retain] : nil;\n"
+                + "    }\n"
+                + "    if (flow == nil || packet == JAVA_NULL\n"
                 + "            || length <= 0) {\n"
+                + "        [flow release];\n"
+                + "        return;\n"
+                + "    }\n"
+                + "    if (generation != atomic_load(&cn1tnReadGeneration)) {\n"
+                + "        // A write from a tunnel that is over. Its\n"
+                + "        // onPacket can still be running -- a callback\n"
+                + "        // cannot be retracted, and the inbound checks\n"
+                + "        // only stop packets before they enter Java -- and\n"
+                + "        // ExtensionTunnelHost.end clears the host and the\n"
+                + "        // transport but not the writer. Without this the\n"
+                + "        // packet went out on whatever link was current,\n"
+                + "        // so one session's traffic could leave on\n"
+                + "        // another's tunnel. The generation travels with\n"
+                + "        // the writer, installed per start.\n"
+                + "        [flow release];\n"
                 + "        return;\n"
                 + "    }\n"
                 + "    NSData *data = [NSData dataWithBytes:\n"
@@ -430,9 +969,10 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "            ((unsigned char *)((JAVA_ARRAY)packet)->data)[offset];\n"
                 + "    NSNumber *family = [NSNumber numberWithInt:\n"
                 + "            ((first >> 4) == 6) ? AF_INET6 : AF_INET];\n"
-                + "    [cn1tnProvider.packetFlow\n"
+                + "    [flow.packetFlow\n"
                 + "            writePackets:[NSArray arrayWithObject:data]\n"
                 + "            withProtocols:[NSArray arrayWithObject:family]];\n"
+                + "    [flow release];\n"
                 + "}\n\n";
     }
 
@@ -530,6 +1070,20 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "    NSArray *items =\n"
                 + "            [list componentsSeparatedByString:@\",\"];\n"
                 + "    for (NSUInteger i = 0; i < [items count]; i++) {\n"
+                + "        if ([[items objectAtIndex:i] length] == 0) {\n"
+                + "            // An EMPTY entry, which is what an empty list\n"
+                + "            // is: componentsSeparatedByString returns one\n"
+                + "            // empty item for @\"\", and a setup with no\n"
+                + "            // routes of this family is ordinary -- a v6\n"
+                + "            // tunnel passes @\"\" here. Without this the\n"
+                + "            // v4 helper built a route whose destination\n"
+                + "            // was the empty string and iOS refused the\n"
+                + "            // whole settings object, so a valid setup\n"
+                + "            // would not start. The v6 helper never showed\n"
+                + "            // it: its own family test skips an empty\n"
+                + "            // entry for having no colon in it.\n"
+                + "            continue;\n"
+                + "        }\n"
                 + "        NSArray *parts = [[items objectAtIndex:i]\n"
                 + "                componentsSeparatedByString:@\"/\"];\n"
                 + "        NSString *net = [parts objectAtIndex:0];\n"
@@ -589,6 +1143,20 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "    NSArray *items =\n"
                 + "            [list componentsSeparatedByString:@\",\"];\n"
                 + "    for (NSUInteger i = 0; i < [items count]; i++) {\n"
+                + "        if ([[items objectAtIndex:i] length] == 0) {\n"
+                + "            // An EMPTY entry, which is what an empty list\n"
+                + "            // is: componentsSeparatedByString returns one\n"
+                + "            // empty item for @\"\", and a setup with no\n"
+                + "            // routes of this family is ordinary -- a v6\n"
+                + "            // tunnel passes @\"\" here. Without this the\n"
+                + "            // v4 helper built a route whose destination\n"
+                + "            // was the empty string and iOS refused the\n"
+                + "            // whole settings object, so a valid setup\n"
+                + "            // would not start. The v6 helper never showed\n"
+                + "            // it: its own family test skips an empty\n"
+                + "            // entry for having no colon in it.\n"
+                + "            continue;\n"
+                + "        }\n"
                 + "        NSArray *parts = [[items objectAtIndex:i]\n"
                 + "                componentsSeparatedByString:@\"/\"];\n"
                 + "        NSString *net = [parts objectAtIndex:0];\n"
@@ -639,6 +1207,27 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "                                    : @\"127.0.0.1\"]\n"
                 + "                    autorelease];\n"
                 + "    NSString *address = cn1tnField(f, 0);\n"
+                + "    if ([address length] == 0) {\n"
+                + "        // NO ADDRESS, so there is no link to establish.\n"
+                + "        // Tunnels.start refuses this setup on every\n"
+                + "        // platform and never saves it, so an ordinary\n"
+                + "        // start cannot arrive here -- but an on-demand\n"
+                + "        // relaunch reads whatever configuration was saved,\n"
+                + "        // and one written by an older version of the app,\n"
+                + "        // or carrying no cn1TunnelSetup at all, reaches\n"
+                + "        // this function with an empty wire.\n"
+                + "        //\n"
+                + "        // Returning the settings object anyway was the\n"
+                + "        // quiet failure: it named a placeholder remote\n"
+                + "        // address, carried no IPv4 or IPv6 settings, and\n"
+                + "        // iOS could accept it -- a tunnel reported\n"
+                + "        // connected, with no usable interface, and Java\n"
+                + "        // told to begin on an empty setup. Failing the\n"
+                + "        // start is the answer the rest of this file\n"
+                + "        // already gives for a configuration it cannot\n"
+                + "        // read.\n"
+                + "        return nil;\n"
+                + "    }\n"
                 + "    if ([address length] > 0) {\n"
                 + "        NSArray *parts =\n"
                 + "                [address componentsSeparatedByString:@\"/\"];\n"
@@ -710,6 +1299,18 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "        // fails and the error reaches the application --\n"
                 + "        // which is the outcome to prefer over a tunnel\n"
                 + "        // that says it carries everything and does not.\n"
+                + "        //\n"
+                + "        // Raised in review as something to refuse up\n"
+                + "        // front, on the premise that iOS cannot configure\n"
+                + "        // a family without an interface address. That is\n"
+                + "        // the assumption this comment declines to make,\n"
+                + "        // and refusing on it would reject a setup a given\n"
+                + "        // iOS may well accept. The failure it would\n"
+                + "        // prevent is already a failure WITH an error: the\n"
+                + "        // start does not complete and the application is\n"
+                + "        // told. Trading that for a refusal this side\n"
+                + "        // guessed at buys nothing and can cost a working\n"
+                + "        // tunnel.\n"
                 + "        if ([cn1tnField(f, 2) length] > 0) {\n"
                 + "            NSArray *other = v6\n"
                 + "                    ? cn1tnRoutes(cn1tnField(f, 2))\n"
@@ -793,7 +1394,17 @@ public final class IOSVpnTunnelExtensionBuilder {
      * @return the mangled prefix
      */
     static String mangle(String binaryName) {
-        return binaryName == null ? "" : binaryName.replace('.', '_');
+        // '$' and '/' as well as '.', which is what ParparVM does and what
+        // WatchNativeBuilder.mangle already documented. Replacing only '.'
+        // was right for every name anyone had tried and wrong for a NESTED
+        // tunnel -- com.example.Outer$Tunnel is a legal value for
+        // ios.vpn.tunnel.class, and the provider then declared __NEW_com_
+        // example_Outer$Tunnel, a symbol the translation never defines. The
+        // extension failed at link, which nothing in CI compiles far enough
+        // to see.
+        return binaryName == null ? ""
+                : binaryName.replace('.', '_').replace('/', '_')
+                        .replace('$', '_');
     }
 
     static String infoPlist(String displayName, String shortVersion,

@@ -1,0 +1,46 @@
+name: Check 16 KB page alignment
+
+# Google Play requires every 64-bit native library in an upload to be linked
+# for 16 KB memory pages: API 35+ uploads since 2025-11-01, and Wear OS uploads
+# containing native code from 2026-09-15.
+# See https://developer.android.com/guide/practices/page-sizes.
+#
+# Alignment is decided at link time, so nothing downstream can repair it -- not
+# AGP's ZIP alignment, not bundletool, not the developer. A Codename One
+# artifact that gets it wrong ships a broken app the developer cannot fix, and
+# the breakage is invisible until Play review or a real 16 KB device: the app
+# builds and runs on every 4 KB device in the office.
+#
+# Deliberately its own workflow rather than a step in pr.yml, whose paths filter
+# would let a PR that only adds a native artifact skip the check. The scan is a
+# ZIP listing plus an ELF header read, so running it on every PR costs nothing.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+jobs:
+  check-16k-page-alignment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Unit-test the gate's classification boundaries
+        # Every case in here is one a review caught: something unreadable
+        # passing as compliant, or a valid artifact rejected by a rule that
+        # does not apply to it. Run before the scan, so a broken gate is
+        # reported as a broken gate rather than as a clean tree.
+        shell: bash
+        run: python3 scripts/test_check_16k_page_alignment.py
+
+      - name: Scan tracked native artifacts for 16 KB page alignment
+        shell: bash
+        run: scripts/check-16k-page-alignment.py --verbose
