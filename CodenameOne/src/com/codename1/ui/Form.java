@@ -2770,6 +2770,13 @@ public class Form extends Container implements TopLevelContainer {
             }
         }
         reclaimTransferredListeners();
+        // And whatever a press on this form staged for the operating system. A press handler
+        // that shows another form -- which is what a great many of them do -- leaves the
+        // gesture behind on a form the user can no longer see, and nothing else clears it:
+        // the release goes to the new form, and on a platform whose own recognizer starts the
+        // session the drag begins later still. It would then have carried the hidden form's
+        // payload, and reported its outcome to a component that is no longer anywhere.
+        NativeDragAndDrop.topLevelDeinitialized(this);
         super.deinitializeImpl();
         animMananger.flush();
         componentsAwaitingRelease = null;

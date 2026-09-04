@@ -11420,6 +11420,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             com.codename1.io.Log.e(t);
             synchronized (STAGED_CLIP_FILES) {
                 clipboardWatched = false;
+                // Nothing will consume what was counted for the copy this call belongs to.
+                expectedClipChanges = 0;
             }
         }
     }
@@ -11428,7 +11430,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// not mistake its own callback for another application's copy.
     private static void clipboardPublishing() {
         synchronized (STAGED_CLIP_FILES) {
-            expectedClipChanges++;
+            if (clipboardWatched) {
+                expectedClipChanges++;
+            }
+            // Only while something is listening. Counting a copy no callback will ever arrive
+            // for -- a device that refused the listener -- left the count standing, and if a
+            // later copy did install the watcher, that phantom swallowed the first genuinely
+            // foreign clipboard change: the clip stayed pinned and its files stayed out of
+            // reach of the budget.
         }
     }
 

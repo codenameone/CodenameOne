@@ -758,6 +758,36 @@ public final class NativeDragAndDrop {
         }
     }
 
+    /// Abandons a staged gesture whose surface is going away.
+    ///
+    /// A press stages an operation on the surface it landed on, and that surface can be
+    /// replaced before the gesture ends -- a press handler that shows another form does
+    /// exactly that. What it staged has nowhere left to go: the component is off screen, the
+    /// release will be dispatched to whatever replaced it, and a platform that starts the
+    /// session from its own recognizer would begin a drag carrying a hidden form's payload.
+    ///
+    /// Only what belongs to this surface, so one form going away does not cancel a gesture
+    /// staged in a window that is still on screen.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the top level being deinitialized
+    static void topLevelDeinitialized(Container root) {
+        Component source;
+        synchronized (LOCK) {
+            source = pendingSource;
+        }
+        if (source == null || root == null) {
+            return;
+        }
+        Container owner = TopLevelSupport.rootOf(source);
+        if (owner == null || owner == root) { // NOPMD CompareObjectsWithEquals
+            // A source with no top level at all is stranded by construction: nothing will
+            // deliver its release either.
+            gestureCancelled();
+        }
+    }
+
     /// Abandons whatever a press staged, because the gesture it belonged to is over or has
     /// turned into something else.
     ///
@@ -1374,19 +1404,68 @@ public final class NativeDragAndDrop {
             return null;
         }
         while (cmp != null) {
-            if (cmp.isNativeDropTarget() && !cmp.isIgnorePointerEvents() && cmp.isEnabled()
-                    && (actions & cmp.getAcceptedDropActions()) != 0) {
-                try {
-                    if (cmp.canAcceptNativeDrop(content)) {
-                        return cmp;
-                    }
-                } catch (Throwable err) {
-                    Log.e(err);
-                }
+            if (acceptsDrop(cmp, content, actions)) {
+                return cmp;
             }
             cmp = cmp.getParent();
         }
+        // Nothing on the path hit testing answered with -- and that answer is not always the
+        // component deepest under the point. getComponentAt reports where a *pointer press*
+        // would go, and it promotes a focusable container over a child that is not focusable;
+        // being a native drop target has no say in it, since respondsToPointerEvents knows
+        // nothing about that. A target inside a focusable container -- a scrollable one, among
+        // plenty of others -- was therefore never examined at all: no enter, no drop, while the
+        // same component took the drag when its parent was plain. So the descent is made here
+        // instead, looking for what the pointer is actually over.
+        //
+        // After the walk rather than instead of it: where hit testing does answer with a
+        // target, or with a child of one, that answer is the same component a press would
+        // reach, and native drops and pointer events should not disagree about that.
+        try {
+            return descendToTarget(root, x, y, content, actions);
+        } catch (Throwable err) {
+            // Mid-layout, as above.
+            return null;
+        }
+    }
+
+    /// The topmost native drop target under a point, searched for directly.
+    ///
+    /// Last child first, because that is the one painted over the others and so the one the
+    /// user is pointing at. A component that ignores pointer events is passed over but not its
+    /// children: it is the component that opted out, not the subtree.
+    private static Component descendToTarget(Container root, int x, int y,
+            ClipboardContent content, int actions) {
+        for (int iter = root.getComponentCount() - 1; iter >= 0; iter--) {
+            Component child = root.getComponentAt(iter);
+            if (child == null || !child.isVisible() || !child.contains(x, y)) {
+                continue;
+            }
+            if (child instanceof Container) {
+                Component found = descendToTarget((Container) child, x, y, content, actions);
+                if (found != null) {
+                    return found;
+                }
+            }
+            if (acceptsDrop(child, content, actions)) {
+                return child;
+            }
+        }
         return null;
+    }
+
+    /// Whether this component would take this drag, by everything it says declaratively.
+    private static boolean acceptsDrop(Component cmp, ClipboardContent content, int actions) {
+        if (!cmp.isNativeDropTarget() || cmp.isIgnorePointerEvents() || !cmp.isEnabled()
+                || (actions & cmp.getAcceptedDropActions()) == 0) {
+            return false;
+        }
+        try {
+            return cmp.canAcceptNativeDrop(content);
+        } catch (Throwable err) {
+            Log.e(err);
+            return false;
+        }
     }
 
     /// The container a window id names: the current form for the main surface, the window

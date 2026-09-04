@@ -1233,6 +1233,35 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aTargetInsideAFocusableContainerStillGetsTheDrag() {
+        Form form = Display.getInstance().getCurrent();
+        Container holder = new Container(new BorderLayout());
+        // Focusable, which is what a scrollable container and a good many components are. Hit
+        // testing promotes one of those over a child that is not focusable.
+        holder.setFocusable(true);
+        DropRecorder target = new DropRecorder();
+        target.setNativeDropTarget(true);
+        target.setPreferredSize(new com.codename1.ui.geom.Dimension(40, 40));
+        holder.add(BorderLayout.CENTER, target);
+        form.setLayout(new BorderLayout());
+        form.add(BorderLayout.CENTER, holder);
+        form.revalidate();
+
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        assertEquals("[enter]", target.events.toString(),
+                "the target is under the pointer; that its parent takes the focus does not "
+                        + "make the drag land somewhere else");
+
+        NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+        assertTrue(target.events.contains("drop"));
+    }
+
+    @FormTest
     void aTargetHiddenByItsAncestorIsNotHandedTheDelayedDrop() {
         Form form = Display.getInstance().getCurrent();
         Container holder = new Container(new BorderLayout());
@@ -1898,6 +1927,47 @@ class NativeDragAndDropTest extends UITestBase {
             w.dispose();
             flushSerialCalls();
             implementation.setMultiWindowSupported(false);
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
+    void aFormThatGoesAwayTakesWhatItsPressStagedWithIt() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        // The port refuses to start, which is the case where a staged gesture outlives the
+        // press: the platform's own recognizer begins the session later.
+        implementation.setNativeDragStartRefused(true);
+        Form original = Display.getInstance().getCurrent();
+        try {
+            Container source = new Container();
+            source.setNativeDragOperation(new NativeDragOperation("on the form being left"));
+            original.setLayout(new BorderLayout());
+            original.add(BorderLayout.CENTER, source);
+            original.revalidate();
+
+            int x = source.getAbsoluteX() + 10;
+            int y = source.getAbsoluteY() + 10;
+            original.pointerPressed(x, y);
+            assertNotNull(implementation.getPreparedNativeDrag(), "the press staged one");
+
+            // What a press handler that navigates does: the form the gesture began on is
+            // replaced before the gesture ends.
+            new Form("somewhere else").show();
+            flushSerialCalls();
+
+            assertNull(NativeDragAndDrop.dragSessionStarted(),
+                    "the component is off screen and its release will go to the form that "
+                            + "replaced it, so a recognizer firing later must not start a drag "
+                            + "carrying the hidden form's payload");
+        } finally {
+            implementation.setNativeDragStartRefused(false);
+            NativeDragAndDrop.gestureCancelled();
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            original.show();
+            flushSerialCalls();
             implementation.setNativeDragAndDropSupported(false);
             implementation.resetNativeDragState();
         }
