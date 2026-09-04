@@ -809,8 +809,8 @@ public final class NativeDragAndDrop {
 
     /// Drops the operation prepared by a press that turned out to be a click. Called as the
     /// pointer is released.
-    static void pointerReleased(Object token) {
-        if (!ownsStaging(token)) {
+    static void pointerReleased(Object token, int x, int y) {
+        if (!ownsStaging(token, x, y)) {
             // A press that never owned the staging slot cannot end what does. The second
             // finger of a two finger gesture is exactly that: it is refused the slot by
             // stage() while the first finger's gesture is with the platform, and its release
@@ -829,19 +829,31 @@ public final class NativeDragAndDrop {
     /// may be about to become a session. A release that arrives with no press in progress at
     /// all -- the token is null, which is what a second release looks like once the first has
     /// run its course -- clears it anyway, and that is the backstop that keeps a staging from
-    /// outliving every gesture on the surface: a single token per top level cannot name the
-    /// first finger once the second one's release has finished.
+    /// outliving every gesture on the surface.
+    ///
+    /// The position decides where the token cannot. A top level mints one token per press and
+    /// keeps only the newest, so when the first of two fingers is the one that lifts, its
+    /// release arrives carrying the *second* finger's token -- and the staging of a finger that
+    /// is no longer down was kept, for the second finger's long press to turn into a session
+    /// carrying it. A release lands where its own finger is, and a gesture that had travelled
+    /// far enough to be somewhere else would have become a drag rather than sitting staged, so
+    /// a release at the staged press's position is that press's release whatever token it
+    /// carries.
     ///
     /// #### Parameters
     ///
     /// - `token`: the press the release belongs to, or null when there is no top level to ask
     ///   or no press in progress
-    private static boolean ownsStaging(Object token) {
+    private static boolean ownsStaging(Object token, int x, int y) {
+        int slop = dragThreshold();
         synchronized (LOCK) {
             if (pending == null || token == null) {
                 return true;
             }
-            return token == pressToken; // NOPMD CompareObjectsWithEquals
+            if (token == pressToken) { // NOPMD CompareObjectsWithEquals
+                return true;
+            }
+            return Math.abs(x - pressX) <= slop && Math.abs(y - pressY) <= slop;
         }
     }
 

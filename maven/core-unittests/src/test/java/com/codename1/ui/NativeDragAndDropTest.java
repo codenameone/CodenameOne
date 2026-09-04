@@ -2420,6 +2420,43 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void theFingerThatStagedLiftingClearsItEvenWhileAnotherIsDown() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container source = new Container();
+            source.setNativeDragOperation(new NativeDragOperation("the finger that lifted"));
+            Container other = new Container();
+            other.add(new Label("the finger still down"));
+            other.setNativeDragOperation(new NativeDragOperation("never staged"));
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, source);
+            form.add(BorderLayout.NORTH, other);
+            form.revalidate();
+
+            int x = source.getAbsoluteX() + 10;
+            int y = source.getAbsoluteY() + 10;
+            form.pointerPressed(x, y);
+            // The second finger comes down and is refused the slot, as it should be.
+            form.pointerPressed(other.getAbsoluteX() + 5, other.getAbsoluteY() + 5);
+            // And now the *first* one lifts, while the second is still held. Its release
+            // carries the second finger's token, because a top level keeps only the newest.
+            form.pointerReleased(x, y);
+
+            assertNull(NativeDragAndDrop.dragSessionStarted(),
+                    "the finger that staged this is no longer down, so a recognizer firing for "
+                            + "the one that is must not be handed what it staged");
+        } finally {
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            NativeDragAndDrop.gestureCancelled();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void anOperationThatPermitsNothingNeverBecomesADrag() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);
