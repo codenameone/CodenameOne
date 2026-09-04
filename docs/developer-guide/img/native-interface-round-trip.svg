@@ -39,9 +39,9 @@
   <polygon points="556,172 546,167 546,177" fill="#4a6fa5"/>
   <text x="384" y="165" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#4a6fa5">call, marshalled by the translator</text>
 
-  <line x1="556" y1="194" x2="214" y2="194" stroke="#7a5aa5" stroke-width="1.5"/>
-  <polygon points="214,194 224,189 224,199" fill="#7a5aa5"/>
-  <text x="384" y="210" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#7a5aa5">return value, marshalled straight back</text>
+  <line x1="556" y1="188" x2="214" y2="188" stroke="#7a5aa5" stroke-width="1.5"/>
+  <polygon points="214,188 224,183 224,193" fill="#7a5aa5"/>
+  <text x="384" y="228" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#7a5aa5">return value, marshalled straight back</text>
 
   <line x1="640" y1="206" x2="640" y2="236" stroke="#7a5aa5" stroke-width="1.5"/>
   <polygon points="640,236 635,226 645,226" fill="#7a5aa5"/>
@@ -49,11 +49,12 @@
   <polygon points="656,206 651,216 661,216" fill="#7a5aa5"/>
   <text x="700" y="226" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#7a5aa5">SDK</text>
 
-  <line x1="556" y1="262" x2="214" y2="262" stroke="#7a5aa5" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <polyline points="558,203 546,203 546,262 214,262" fill="none" stroke="#7a5aa5"
+            stroke-width="1.5" stroke-dasharray="5 4"/>
   <polygon points="214,262 224,257 224,267" fill="#7a5aa5"/>
-  <text x="384" y="255" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#7a5aa5">later result, into the static callback</text>
+  <text x="384" y="255" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#7a5aa5">later result, the impl calls the static callback</text>
 
   <text x="385" y="336" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#666666">
-    Only the implementation class talks to the SDK; a method returning a supported type returns it directly
+    Only the implementation class talks to the SDK, in both directions; a method returning a supported type returns it directly
   </text>
 </svg>
