@@ -3582,11 +3582,19 @@ public class LocalContinuityTest extends UITestBase {
             Continuity.deliver(arrival);
             flushSerialCalls();
 
-            assertNull(Continuity.getRestorableState(),
+                assertNull(Continuity.getRestorableState(),
                     "the restore committed after the route logged out, so the signed-out "
                             + "account's stack and checkpoint are back");
             assertTrue(Navigation.getStack().isEmpty(),
                     "the rebuilt stack survived the logout that happened while building it");
+            // The SCREEN as well as the history. clearStack() deliberately leaves the current
+            // form alone, so undoing only the stack left the signed-out account's work in front
+            // of the user with nothing but its breadcrumbs removed.
+            Form current = Display.getInstance().getCurrent();
+            assertNotNull(current, "no form is showing at all");
+            assertFalse("/account/statement".equals(current.getTitle()),
+                    "the signed-out account's restored screen is still displayed after the "
+                            + "logout that cancelled the restore");
         } finally {
             Navigation.setDispatcher(null);
             Navigation.clearStack();

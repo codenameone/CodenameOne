@@ -927,6 +927,11 @@ public final class Continuity {
         // cannot recognize its own work -- it arrives as a foreign device's state -- so it
         // restores it and republishes in turn, and the two bounce the same stack back and forth,
         // re-navigating the user on every poll.
+        // What is on screen BEFORE the rebuild, so an aborted restore can put it back. The stack
+        // and the display are two different things: clearStack() deliberately leaves the current
+        // form alone -- the caller decides where to go next -- so undoing the history of a
+        // cancelled restore left the signed-out account's SCREEN in front of the user.
+        com.codename1.ui.Form beforeRestore = Display.getInstance().getCurrent();
         boolean shown;
         applyingRestore = true;
         try {
@@ -961,6 +966,22 @@ public final class Continuity {
                 Log.e(t);
             } finally {
                 clearingStack = false;
+            }
+            // And the SCREEN, which the stack does not speak for. restoreStack() has already
+            // shown the rebuilt form by the time control gets here -- the cancellation came from
+            // inside that showing -- so without this the user is left looking at the signed-out
+            // account's work with only its history removed.
+            //
+            // show() rather than showBack(): this is not the user navigating back, it is a
+            // restore that never happened being undone. Showing a form directly does not go
+            // through Navigation, so it records nothing and checkpoints nothing.
+            try {
+                com.codename1.ui.Form now = Display.getInstance().getCurrent();
+                if (beforeRestore != null && beforeRestore != now) { //NOPMD CompareObjectsWithEquals
+                    beforeRestore.show();
+                }
+            } catch (Throwable t) {
+                Log.e(t);
             }
             outFailed[0] = true;
             return false;
