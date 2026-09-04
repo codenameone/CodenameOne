@@ -41,7 +41,7 @@ class VpnTunnelExtensionTest {
 
     private static String provider() {
         return IOSVpnTunnelExtensionBuilder.providerSource(
-                "com.example.MyTunnel");
+                "com.example.MyTunnel", true);
     }
 
     private static String text(Map<String, byte[]> files, String name)
@@ -64,6 +64,63 @@ class VpnTunnelExtensionTest {
             }
         }
         return sb.toString();
+    }
+
+    @Test
+    void aFaultBecomesAJavaExceptionHereToo() {
+        String src = provider();
+        // ParparVM leans on a SIGSEGV handler: a field read through null
+        // faults rather than checking unless ios.fieldNullChecks is on, and
+        // a call through null faults in every configuration. The app target
+        // takes that from installSignalHandlers in
+        // CodenameOne_GLAppDelegate.m -- a UIApplication delegate an
+        // extension may not compile -- and CN1WatchRuntime.m mirrors it for
+        // the same reason. Without it a null dereference in the tunnel's own
+        // code kills the extension instead of reaching the Throwable the
+        // host already catches, and iOS takes the VPN down with it.
+        assertTrue(src.contains("static void cn1tnSignalHandler(int sig) {"),
+                "the extension carries its own handler");
+        assertTrue(src.contains("__NEW_INSTANCE_java_lang_NullPointerException("),
+                "a bad access becomes a NullPointerException");
+        assertTrue(src.contains("signal(SIGSEGV, cn1tnSignalHandler);"));
+        // Installed with the VM, once, before any java runs.
+        int install = src.indexOf("cn1tnInstallSignalHandlers();");
+        int pool = src.indexOf("initConstantPool();");
+        assertTrue(pool > 0 && install > pool,
+                "installed inside the one-time bootstrap");
+        assertTrue(src.contains("#include <signal.h>"));
+
+        // And omitted for the hint that comments the app's call out, so a
+        // developer who wants the fault to stay a fault gets that here.
+        String off = IOSVpnTunnelExtensionBuilder.providerSource(
+                "com.example.MyTunnel", false);
+        assertFalse(off.contains("cn1tnSignalHandler"));
+        assertFalse(off.contains("#include <signal.h>"));
+        assertFalse(off.contains("__NEW_INSTANCE_java_lang_RuntimeException"),
+                "nothing left declaring what is not generated");
+    }
+
+    @Test
+    void aConstructorThatThrowsFailsTheStart() {
+        String src = provider();
+        // throwException with no handler on the thread RETURNS -- it records
+        // the exception and lets the caller carry on -- and a call made from
+        // here has no java try region around it. So a tunnel whose
+        // constructor or class initializer threw went on to begin() as a
+        // half-built object, and the start was reported a success.
+        int made = src.indexOf("JAVA_OBJECT tunnel = __NEW_");
+        int began = src.indexOf("_begin___java_lang_Object");
+        assertTrue(made > 0 && began > made);
+        String between = src.substring(made, began);
+        assertTrue(between.contains("threadStateData->exception != JAVA_NULL"),
+                "the constructor's failure has to be seen");
+        assertTrue(between.contains("tunnel == JAVA_NULL"),
+                "an allocation that failed as well");
+        // Cleared, or the next thing this thread runs finds an exception
+        // from a start that is over.
+        assertTrue(between.contains("threadStateData->exception = JAVA_NULL;"));
+        assertTrue(between.contains("The tunnel class could not be constructed"),
+                "and the start is failed, not reported up");
     }
 
     @Test
@@ -157,7 +214,10 @@ class VpnTunnelExtensionTest {
         }
         // Unreadable setup, a settings error, stopped while the settings
         // were pending, and a begin that refused.
-        assertEquals(5, forgets,
+        // Five failure paths -- unreadable setup, a settings error,
+        // stopped while the settings were pending, a constructor that threw
+        // and a begin that refused -- and the stop.
+        assertEquals(6, forgets,
                 "every failure path after the publish, and the stop");
     }
 
@@ -354,7 +414,7 @@ class VpnTunnelExtensionTest {
         // __NEW_com_example_Outer$Tunnel -- a symbol the translation never
         // defines, so the extension failed at link.
         String src = IOSVpnTunnelExtensionBuilder.providerSource(
-                "com.example.Outer$Tunnel");
+                "com.example.Outer$Tunnel", true);
         assertTrue(src.contains("__NEW_com_example_Outer_Tunnel("));
         assertTrue(src.contains("com_example_Outer_Tunnel___INIT____"));
         assertFalse(src.contains("Outer$Tunnel"),
@@ -642,7 +702,7 @@ class VpnTunnelExtensionTest {
     void theInfoPlistDeclaresAPacketTunnel() throws Exception {
         Map<String, byte[]> files = IOSVpnTunnelExtensionBuilder.buildFileMap(
                 "com.example.app", "My VPN", "1.0", "17",
-                "com.example.MyTunnel");
+                "com.example.MyTunnel", true);
         String plist = text(files, "Info.plist");
         assertTrue(plist.contains(
                 "com.apple.networkextension.packet-tunnel"),
@@ -658,7 +718,7 @@ class VpnTunnelExtensionTest {
     void theExtensionCarriesTheEntitlementThatMakesItATunnel() throws Exception {
         Map<String, byte[]> files = IOSVpnTunnelExtensionBuilder.buildFileMap(
                 "com.example.app", "My VPN", "1.0", "17",
-                "com.example.MyTunnel");
+                "com.example.MyTunnel", true);
         String ent = text(files, "CN1VpnTunnel.entitlements");
         assertTrue(ent.contains(
                 "com.apple.developer.networking.networkextension"),

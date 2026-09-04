@@ -141,10 +141,11 @@ public final class IOSVpnTunnelExtensionBuilder {
      */
     public static Map<String, byte[]> buildFileMap(String packageName,
             String displayName, String shortVersion, String bundleVersion,
-            String tunnelClass) {
+            String tunnelClass, boolean convertSignalsToExceptions) {
         Map<String, byte[]> files = new LinkedHashMap<String, byte[]>();
         files.put("CN1VpnTunnelProvider.h", utf8(providerHeader()));
-        files.put("CN1VpnTunnelProvider.m", utf8(providerSource(tunnelClass)));
+        files.put("CN1VpnTunnelProvider.m", utf8(providerSource(tunnelClass,
+                convertSignalsToExceptions)));
         files.put("Info.plist", utf8(infoPlist(displayName, shortVersion,
                 bundleVersion)));
         files.put(EXTENSION_NAME + ".entitlements", utf8(entitlements()));
@@ -212,7 +213,8 @@ public final class IOSVpnTunnelExtensionBuilder {
      * into the pooled buffers the Java side already owns rather than being
      * copied into NSData objects first.</p>
      */
-    static String providerSource(String tunnelClass) {
+    static String providerSource(String tunnelClass,
+            boolean convertSignalsToExceptions) {
         String mangled = mangle(tunnelClass);
         StringBuilder sb = new StringBuilder();
         sb.append("#import \"CN1VpnTunnelProvider.h\"\n");
@@ -220,6 +222,9 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("#include \"com_codename1_impl_vpn_ExtensionTunnelHost.h\"\n");
         sb.append("#include \"com_codename1_impl_ios_IOSExtensionTunnel.h\"\n");
         sb.append("#include <stdatomic.h>\n");
+        if (convertSignalsToExceptions) {
+            sb.append("#include <signal.h>\n");
+        }
         sb.append("\n");
         sb.append("// The application's tunnel, named by the build. Reached\n");
         sb.append("// through the translated allocator rather than by\n");
@@ -236,6 +241,17 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("// no-argument constructor is X___INIT____, not X_ctor__,\n");
         sb.append("// which is a symbol the translation never defines: the\n");
         sb.append("// extension would not have linked.\n");
+        if (convertSignalsToExceptions) {
+            sb.append("// The two the signal handler allocates. Reachable\n");
+            sb.append("// because the generated stub names them; see\n");
+            sb.append("// VpnTunnelNativeBuilder.writeStubSource.\n");
+            sb.append("extern JAVA_OBJECT"
+                    + " __NEW_INSTANCE_java_lang_NullPointerException(\n");
+            sb.append("        CODENAME_ONE_THREAD_STATE);\n");
+            sb.append("extern JAVA_OBJECT"
+                    + " __NEW_INSTANCE_java_lang_RuntimeException(\n");
+            sb.append("        CODENAME_ONE_THREAD_STATE);\n");
+        }
         sb.append("extern JAVA_OBJECT __NEW_").append(mangled)
                 .append("(CODENAME_ONE_THREAD_STATE);\n");
         sb.append("extern JAVA_VOID ").append(mangled)
@@ -340,6 +356,50 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("        NSString *wire);\n");
         sb.append("static JAVA_INT cn1tnReason(NEProviderStopReason reason);\n");
         sb.append("\n");
+        if (convertSignalsToExceptions) {
+            sb.append("/// The SIGSEGV-to-NullPointerException handler, which\n");
+            sb.append("/// this target would otherwise be without.\n");
+            sb.append("///\n");
+            sb.append("/// ParparVM leans on it: a field read through null\n");
+            sb.append("/// faults rather than checking, unless\n");
+            sb.append("/// ios.fieldNullChecks is on, and a call through null\n");
+            sb.append("/// faults in every configuration. The app target gets\n");
+            sb.append("/// this from installSignalHandlers in\n");
+            sb.append("/// CodenameOne_GLAppDelegate.m -- a UIApplication\n");
+            sb.append("/// delegate, which an extension may not compile -- and\n");
+            sb.append("/// the watch runtime mirrors it in CN1WatchRuntime.m\n");
+            sb.append("/// for exactly this reason. Without it a null\n");
+            sb.append("/// dereference anywhere in the tunnel's code kills the\n");
+            sb.append("/// extension instead of arriving at the Throwable the\n");
+            sb.append("/// tunnel host already catches, and iOS tears the VPN\n");
+            sb.append("/// down with it.\n");
+            sb.append("///\n");
+            sb.append("/// Omitted when ios.convertSignalsToExceptions=false,\n");
+            sb.append("/// which is the same hint that comments the call out\n");
+            sb.append("/// of the app target: a developer who wants the fault\n");
+            sb.append("/// to stay a fault gets that here too.\n");
+            sb.append("static void cn1tnSignalHandler(int sig) {\n");
+            sb.append("    if (sig == SIGSEGV || sig == SIGBUS) {\n");
+            sb.append("        throwException(getThreadLocalData(),\n");
+            sb.append("                __NEW_INSTANCE_java_lang_NullPointerException(\n");
+            sb.append("                        getThreadLocalData()));\n");
+            sb.append("    } else {\n");
+            sb.append("        throwException(getThreadLocalData(),\n");
+            sb.append("                __NEW_INSTANCE_java_lang_RuntimeException(\n");
+            sb.append("                        getThreadLocalData()));\n");
+            sb.append("    }\n");
+            sb.append("}\n");
+            sb.append("\n");
+            sb.append("static void cn1tnInstallSignalHandlers(void) {\n");
+            sb.append("    signal(SIGABRT, cn1tnSignalHandler);\n");
+            sb.append("    signal(SIGILL, cn1tnSignalHandler);\n");
+            sb.append("    signal(SIGSEGV, cn1tnSignalHandler);\n");
+            sb.append("    signal(SIGFPE, cn1tnSignalHandler);\n");
+            sb.append("    signal(SIGBUS, cn1tnSignalHandler);\n");
+            sb.append("    signal(SIGPIPE, cn1tnSignalHandler);\n");
+            sb.append("}\n");
+            sb.append("\n");
+        }
         sb.append("@implementation CN1VpnTunnelProvider\n");
         sb.append("\n");
         sb.append("- (void)startTunnelWithOptions:(NSDictionary *)options\n");
@@ -351,6 +411,9 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("    static dispatch_once_t once;\n");
         sb.append("    dispatch_once(&once, ^{\n");
         sb.append("        initConstantPool();\n");
+        if (convertSignalsToExceptions) {
+            sb.append("        cn1tnInstallSignalHandlers();\n");
+        }
         sb.append("    });\n");
         sb.append("    NSString *wire = @\"\";\n");
         sb.append("    NETunnelProviderProtocol *proto =\n");
@@ -472,8 +535,36 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("                threadStateData, cn1tnStart);\n");
         sb.append("        JAVA_OBJECT tunnel = __NEW_").append(mangled)
                 .append("(threadStateData);\n");
-        sb.append("        ").append(mangled)
+        sb.append("        if (tunnel != JAVA_NULL\n");
+        sb.append("                && threadStateData->exception == JAVA_NULL) {\n");
+        sb.append("            ").append(mangled)
                 .append("___INIT____(threadStateData, tunnel);\n");
+        sb.append("        }\n");
+        sb.append("        if (tunnel == JAVA_NULL\n");
+        sb.append("                || threadStateData->exception != JAVA_NULL) {\n");
+        sb.append("            // A CONSTRUCTOR that threw, or a class\n");
+        sb.append("            // initializer that did. There is no java try\n");
+        sb.append("            // region around a call made from here, and\n");
+        sb.append("            // throwException with no handler on the thread\n");
+        sb.append("            // RETURNS -- it records the exception and lets\n");
+        sb.append("            // the caller carry on. So this went on to begin\n");
+        sb.append("            // with a half-built tunnel and reported the\n");
+        sb.append("            // start a success.\n");
+        sb.append("            //\n");
+        sb.append("            // Cleared as well as reported: the next thing\n");
+        sb.append("            // this thread runs would otherwise find a\n");
+        sb.append("            // pending exception from a start that is over.\n");
+        sb.append("            threadStateData->exception = JAVA_NULL;\n");
+        sb.append("            [self cn1ForgetIfCurrent:cn1tnStart];\n");
+        sb.append("            completionHandler([NSError\n");
+        sb.append("                    errorWithDomain:@\"com.codename1.vpn\"\n");
+        sb.append("                    code:2\n");
+        sb.append("                    userInfo:[NSDictionary\n");
+        sb.append("                            dictionaryWithObject:\n");
+        sb.append("                                    @\"The tunnel class could not be constructed\"\n");
+        sb.append("                            forKey:NSLocalizedDescriptionKey]]);\n");
+        sb.append("            return;\n");
+        sb.append("        }\n");
         sb.append("        // fromNSString is the TRANSLATOR's, not the\n");
         sb.append("        // port's -- cn1_globals.m defines it under\n");
         sb.append("        // #if defined(__APPLE__) && defined(__OBJC__),\n");

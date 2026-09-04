@@ -11568,7 +11568,14 @@ public class IPhoneBuilder extends Executor {
                         request.getPackageName(), displayName,
                         embeddedExtensionShortVersion(request),
                         embeddedExtensionBundleVersion(request),
-                        vpnTunnelBuilder.getTunnelClass()),
+                        vpnTunnelBuilder.getTunnelClass(),
+                        // The SAME hint that comments installSignalHandlers
+                        // out of the app target. The extension has no
+                        // CodenameOne_GLAppDelegate to take them from, so it
+                        // carries its own -- and a developer who turned them
+                        // off did not ask for them back here.
+                        !"false".equals(request.getArg(
+                                "ios.convertSignalsToExceptions", "true"))),
                 new File(distDir, name));
         // Staged HERE, after the project exists and before the ruby that
         // references the files by path.

@@ -74,7 +74,7 @@ public class Emit {
     public static void main(String[] args) throws Exception {
         Map<String, byte[]> files = IOSVpnTunnelExtensionBuilder.buildFileMap(
                 "com.example.app", "Demo", "1.0", "1",
-                "com.example.app.MyTunnel");
+                "com.example.app.MyTunnel", true);
         File out = new File(args[0]);
         out.mkdirs();
         for (Map.Entry<String, byte[]> e : files.entrySet()) {
