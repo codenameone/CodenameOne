@@ -771,10 +771,24 @@ public final class Continuity {
         // only copy, and because dispatch had already written the sender's durable mark, a relay
         // retry was rejected after the next launch too -- a state that was never restored then
         // could not be restored at all, which is the one outcome this feature exists to prevent.
-        boolean shown = restore(state);
+        boolean[] failed = new boolean[1];
+        boolean shown = restore(state, failed);
+        if (failed[0]) {
+            // An attempt that FAILED keeps the slot. restore(state) deliberately does not
+            // acknowledge one -- a provider that threw is usually transient, so the state stays
+            // on the relay for a launch that can use it -- and clearing here undid exactly that:
+            // admit() has already put the sequence in the live map, so nothing offers the state
+            // again this run, and releasing the publication lets a checkpoint overwrite the
+            // relay's only copy. The retry it was being kept for then has nothing to retry.
+            return shown;
+        }
         // Released because the state was APPLIED, not because a form appeared. Gating this on
         // `shown` kept a payload-only arrival parked for ever: restore(state) hands the payload
         // to the provider and returns false, so every later call re-applied the same state.
+        //
+        // `failed` is the distinction `shown` cannot make. False means both "there was no form to
+        // show, and that is success" and "this did not work", which need opposite handling here --
+        // the same conflation that put two flags in capture() and in checkpoint().
         if (isSameState(parked, state)) {
             parked = null;
             // The slot is what holds a publication back; the decision has been made, so anything
@@ -820,6 +834,16 @@ public final class Continuity {
     ///
     /// true when a form was shown
     public static boolean restore(final AppState state) {
+        return restore(state, new boolean[1]);
+    }
+
+    /// As above, also reporting whether the attempt FAILED as opposed to having nothing to do.
+    ///
+    /// The public boolean answers "is a form showing", which is what a caller needs to decide
+    /// whether to start its own screen. It cannot also say whether the restore worked: a
+    /// payload-only state applies everything it has and still returns false. The parked slot has
+    /// to tell those apart, because releasing it is what allows the relay's copy to be replaced.
+    private static boolean restore(final AppState state, boolean[] outFailed) {
         if (state == null) {
             return false;
         }
@@ -862,6 +886,7 @@ public final class Continuity {
             // the worse failure of the two: a provider that only populates fields -- the
             // documented shape -- would leave the application on no screen at all.
             commit(state, applied, failed);
+            outFailed[0] = failed;
             return false;
         }
         // Applying a state is not the user navigating, and the difference is not cosmetic. The
@@ -895,6 +920,7 @@ public final class Continuity {
             failed = true;
         }
         commit(state, applied || shown, failed);
+        outFailed[0] = failed;
         return shown;
     }
 
@@ -1554,6 +1580,14 @@ public final class Continuity {
                 parked = null;
                 startPublisher();
             }
+            // Durably, and here rather than through commit(). Consuming a tombstone is the one
+            // arrival that CANNOT fail -- there is no payload to hand over and no route to
+            // rebuild -- so there is nothing to gate the mark on, and leaving it in memory only
+            // meant the next launch had never heard of it. An older state from the same origin
+            // that was already in flight then passed admission and offered work this tombstone
+            // exists to say no longer exists.
+            recordDurable(state.getDeviceId(), state.getSequence());
+            rememberSeen();
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
@@ -1612,6 +1646,18 @@ public final class Continuity {
             if (!accepted) {
                 // Consumed by the listener: it either handled the state itself or decided the user
                 // must not be moved. Asking the next listener would undo that decision.
+                //
+                // PARKED, not simply dropped. False has two documented meanings -- "I did the work
+                // myself" and "keep it, I will prompt and call restore() when the user accepts" --
+                // and the second one is a state waiting on a human, whose only other copy is the
+                // relay's. Returning without the slot left no hold, so a queued checkpoint could
+                // replace that copy while the prompt was still up, and a process death before the
+                // answer lost the work for good.
+                //
+                // Safe for the first meaning too: acknowledge() releases the slot, which is the
+                // call that meaning is documented to make. Whichever the application meant, the
+                // hold ends when it says so rather than being guessed at here.
+                parked = state;
                 return;
             }
         }

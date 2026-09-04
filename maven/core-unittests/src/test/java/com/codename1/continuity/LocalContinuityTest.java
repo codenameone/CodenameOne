@@ -2405,6 +2405,155 @@ public class LocalContinuityTest extends UITestBase {
                         + "credential the previous account's state would have gone out under");
     }
 
+    /**
+     * A restore that FAILED keeps the parked state, and keeps the publication held with it.
+     *
+     * <p>restore(AppState) deliberately does not acknowledge a failed attempt -- a provider that
+     * throws is usually transient, a dependency not up yet on a cold launch -- so the state stays
+     * on the relay for a launch that can use it. The no-argument restore() cleared the slot
+     * anyway, and both halves of that hurt: admit() has already put the sequence in the live map,
+     * so nothing offers the state again this run, and releasing the hold lets a checkpoint
+     * overwrite the relay's only copy. The retry it was being kept for has nothing left to
+     * retry.</p>
+     */
+    @EdtTest
+    public void aFailedRestoreKeepsTheParkedState() {
+        Continuity.setAutoRestore(false);
+        Continuity.setStateProvider(new StateProvider() {
+            public Map<String, Object> saveState() {
+                return new HashMap<String, Object>();
+            }
+
+            public void restoreState(Map<String, Object> payload) {
+                throw new IllegalStateException("the dependency this needs is not up yet");
+            }
+        });
+
+        AppState arrival = fromElsewhere("work worth keeping", 41L);
+        arrival.setRoutes(new ArrayList<String>());
+        Continuity.deliver(arrival);
+        flushSerialCalls();
+        assertNotNull(Continuity.getRestorableState(),
+                "the arrival never parked, so there is no slot for the restore to lose");
+
+        assertFalse(Continuity.restore(), "a provider that threw cannot have shown anything");
+
+        assertNotNull(Continuity.getRestorableState(),
+                "a restore that failed threw away the only copy it was keeping: nothing offers "
+                        + "the state again this run and the relay's copy is now replaceable");
+    }
+
+    /**
+     * And the control: a restore that WORKED still releases the slot.
+     *
+     * <p>Without this the fix above is satisfied by never clearing at all, which would keep a
+     * handled arrival on offer for ever and hold every later checkpoint behind it.</p>
+     */
+    @EdtTest
+    public void aSuccessfulRestoreStillReleasesTheParkedState() {
+        Continuity.setAutoRestore(false);
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        final List<AppState> out = java.util.Collections.synchronizedList(new ArrayList<AppState>());
+        Continuity.setRelay(new StateRelay() {
+            public void publish(AppState state) {
+                out.add(state);
+            }
+
+            public AppState fetch() {
+                return null;
+            }
+        });
+        pause(200L);
+        flushSerialCalls();
+        out.clear();
+
+        AppState arrival = fromElsewhere("work that applies", 42L);
+        arrival.setRoutes(new ArrayList<String>());
+        Continuity.deliver(arrival);
+        flushSerialCalls();
+
+        // Asserted on the HOLD, not on getRestorableState(). A successful restore persists the
+        // state, so that method legitimately keeps answering afterwards -- with the stored
+        // checkpoint rather than the parked arrival -- and a first version of this test read that
+        // as the slot never being released.
+        Continuity.checkpoint();
+        pause(200L);
+        flushSerialCalls();
+        assertTrue(out.isEmpty(), "the parked arrival did not hold the checkpoint back at all");
+
+        Continuity.restore();
+        pause(300L);
+        flushSerialCalls();
+
+        assertFalse(out.isEmpty(),
+                "a restore that applied the payload never released the hold, so this arrival "
+                        + "would keep every later checkpoint off the relay for good");
+    }
+
+    /**
+     * A listener that defers an arrival keeps it parked.
+     *
+     * <p>False has two documented meanings: "I did the work myself" and "keep it, I will prompt
+     * and call restore() when the user accepts". The second is a state waiting on a human whose
+     * only other copy is the relay's, and returning without the slot left no hold at all -- so a
+     * queued checkpoint could replace that copy while the prompt was still on screen, and a
+     * process death before the answer lost the work.</p>
+     */
+    @EdtTest
+    public void aListenerThatDefersAnArrivalKeepsItParked() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                // "Keep it, I am prompting" -- the documented deferral.
+                return false;
+            }
+        });
+
+        Continuity.deliver(fromElsewhere("waiting on the user", 43L));
+        flushSerialCalls();
+
+        AppState offered = Continuity.getRestorableState();
+        assertNotNull(offered,
+                "a deferred arrival was dropped, so nothing holds a checkpoint off the relay's "
+                        + "only copy while the user is being asked about it");
+        assertEquals(43L, offered.getSequence(), "a different state was left on offer");
+
+        // And the hold really ends when the application says so, rather than never.
+        Continuity.acknowledge(offered);
+        assertNull(Continuity.getRestorableState(),
+                "acknowledge() did not release the deferred state, which would hold every later "
+                        + "checkpoint behind an arrival the application has finished with");
+    }
+
+    /**
+     * A consumed tombstone is marked durably.
+     *
+     * <p>It is the one arrival that cannot fail -- no payload to hand over, no route to rebuild --
+     * so there is nothing to gate the mark on. Recording it in memory only meant the next launch
+     * had never heard of it, and an older state from the same origin that was already in flight
+     * passed admission and offered work the tombstone exists to say no longer exists.</p>
+     */
+    @EdtTest
+    public void aConsumedTombstoneIsMarkedDurably() {
+        Continuity.setStateProvider(new RecordingProvider());
+
+        AppState tombstone = new AppState()
+                .setDeviceId("some-other-device")
+                .setSequence(77L)
+                .setTimestamp(System.currentTimeMillis());
+        assertTrue(tombstone.isEmpty(), "this is not a tombstone, so the test is about nothing");
+        Continuity.deliver(tombstone);
+        flushSerialCalls();
+
+        Map<String, Long> persisted = Continuity.readSeenForTest();
+        Long mark = persisted.get("some-other-device");
+        assertNotNull(mark,
+                "the tombstone was consumed without a durable mark, so after a restart an older "
+                        + "state still in flight from that origin resurrects the work it cleared");
+        assertEquals(77L, mark.longValue(), "the durable mark is not the tombstone's sequence");
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;
@@ -2538,15 +2687,33 @@ public class LocalContinuityTest extends UITestBase {
      */
     @EdtTest
     public void anAcknowledgedOriginIsRefusedAfterItsDedupEntryIsEvicted() {
-        RecordingProvider provider = new RecordingProvider();
-        Continuity.setStateProvider(provider);
-
         AppState handled = fromElsewhere("dealt with", 5L);
         Continuity.acknowledge(handled);
 
-        // Enough other origins to push it out of the in-memory map, which is capped at 64.
+        // The crowd has to be arrivals that were ADMITTED and never COMPLETED, which is the
+        // difference between the two maps this test is about. A provider that throws is the
+        // cheapest way to say that: every one of these enters lastSeen on admission and none of
+        // them earns a durable mark.
+        //
+        // They used to be empty states, which is a tombstone -- and a consumed tombstone is a
+        // completed arrival, so once tombstones started being marked durably the crowd competed
+        // for the durable map too and evicted the acknowledgement this test exists to protect.
+        // The failure was real and the test was the thing that was wrong: its own premise is
+        // "every arrival versus only the completed ones", and an empty state is both.
+        Continuity.setStateProvider(new StateProvider() {
+            public Map<String, Object> saveState() {
+                return new HashMap<String, Object>();
+            }
+
+            public void restoreState(Map<String, Object> payload) {
+                throw new IllegalStateException("nothing here completes");
+            }
+        });
         for (int i = 0; i < 90; i++) {
+            Map<String, Object> payload = new HashMap<String, Object>();
+            payload.put("crowd", Integer.valueOf(i));
             Continuity.deliver(new AppState()
+                    .setPayload(payload)
                     .setDeviceId("crowd-" + i)
                     .setSequence(i + 1)
                     .setTimestamp(System.currentTimeMillis()));
