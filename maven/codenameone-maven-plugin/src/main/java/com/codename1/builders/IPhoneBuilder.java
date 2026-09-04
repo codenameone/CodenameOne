@@ -11576,37 +11576,25 @@ public class IPhoneBuilder extends Executor {
                 // construction.
                 continue;
             }
-            File overridden = new File(path);
-            if (!overridden.isAbsolute()) {
-                overridden = new File(distDir, path);
-            }
-            String declared = null;
-            if (overridden.isFile()) {
-                try {
-                    declared = readFileToString(overridden);
-                } catch (Exception unreadable) {
-                    declared = null;
-                }
-            }
-            if (declared == null) {
-                log("[vpnTunnel] NOTE: ios.vpn.tunnel.buildSettings."
-                        + settingKey + " points at " + path + ", which this"
-                        + " build cannot read, so it cannot check it. That"
-                        + " file has to declare"
-                        + " com.apple.developer.networking.networkextension"
-                        + " with packet-tunnel-provider: signed without it"
-                        + " the extension installs and iOS never starts it.");
-            } else if (declared.indexOf("packet-tunnel-provider") < 0) {
-                throw new RuntimeException("ios.vpn.tunnel.buildSettings."
-                        + settingKey + " replaces the extension's"
-                        + " entitlements with " + path + ", which does not"
-                        + " declare packet-tunnel-provider. That value is"
-                        + " what makes this bundle a packet tunnel -- signed"
-                        + " without it the extension is installed and never"
-                        + " started, with nothing on the device to say why."
-                        + " Add it to that file, or remove the override and"
-                        + " let the build supply the entitlements.");
-            }
+            // SAID, not checked, and that is the honest option here. The
+            // BuildDaemon twin refuses a file that does not declare the
+            // value, reading it with the plist parser it already has for
+            // ios.entitlementsInject: comments stripped, the key's array
+            // found, each entry decoded. This copy has no such parser, and a
+            // substring test is worse than nothing in both directions -- it
+            // says yes to the value sitting in an XML comment, and no to
+            // "packet&#45;tunnel-provider", refusing a build whose
+            // entitlements are correct. Writing a second plist reader to
+            // catch a mistake in a file the developer wrote, in a build they
+            // are sitting in front of, is not worth what it costs.
+            log("[vpnTunnel] NOTE: ios.vpn.tunnel.buildSettings."
+                    + settingKey + " replaces the extension's entitlements"
+                    + " with " + path + ". That file has to declare"
+                    + " com.apple.developer.networking.networkextension with"
+                    + " packet-tunnel-provider -- signed without it the"
+                    + " extension installs and iOS never starts it, with"
+                    + " nothing on the device to say why. The cloud build"
+                    + " reads the file and refuses.");
         }
 
         // A CONDITIONAL name or identifier is refused, not resolved.
