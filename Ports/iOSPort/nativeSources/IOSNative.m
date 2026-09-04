@@ -20632,17 +20632,25 @@ static id cn1ContinuitySanitize(id value) {
     return nil;
 }
 
-/// The synced store, or nil when this build did not earn one.
+/// The synced store, or nil when this process has no store object at all.
 ///
-/// Resolved once and cached, because the answer cannot change while the process runs: it is a
-/// property of how the app was signed.
+/// NOT gated on the synchronize probe, which answers a different question. A
+/// NSUbiquitousKeyValueStore is a LOCAL persistent store: reads and writes go to disk and iCloud
+/// propagation happens asynchronously afterwards, and -synchronize pushes the in-memory copy to
+/// that disk rather than to the network. Refusing to hand the store out because a synchronize
+/// answered NO therefore threw away work that would have persisted and propagated perfectly well
+/// -- get() ignored values already cached locally, and put() and remove() did nothing at all --
+/// for as long as the NO lasted.
 ///
-/// Three guards rather than one, and deliberately so. The entitlement is missing in the ordinary
-/// case that an app references com.codename1.continuity.sync and the App ID never had iCloud
-/// enabled, and what that produces has not been the same across releases of iOS -- a nil store, a
-/// store whose synchronize answers NO, and a raised exception have all been reported. Guessing
-/// which one this OS does would leave the app writing values into nothing on the others, and the
-/// symptom of that is a setting that silently fails to follow the user.
+/// Whether the store is USABLE and whether this build is ENTITLED are separate questions, and the
+/// probe belongs to the second one. See cn1ContinuitySyncEntitled.
+/// Whether a synchronize has ever succeeded, which is how a missing entitlement shows itself.
+///
+/// File scope rather than a function static so isSupported() can read it: what the application is
+/// told about support has to be this, and not "is there a store object", which is now yes for an
+/// unentitled build too.
+static BOOL cn1ContinuitySyncEntitled = NO;
+
 static NSUbiquitousKeyValueStore *cn1ContinuityStore(void) {
     static NSUbiquitousKeyValueStore *store = nil;
     static pthread_mutex_t cn1ContinuityStoreLock = PTHREAD_MUTEX_INITIALIZER;
@@ -20654,12 +20662,15 @@ static NSUbiquitousKeyValueStore *cn1ContinuityStore(void) {
     // available, and two threads passing together installed the external-change observer twice --
     // every remote change delivered to the listener twice.
     //
-    // But it must NOT latch failure. [s synchronize] is the probe for "is this store actually
-    // usable", and it answers NO for reasons that pass: an offline launch is the obvious one. A
-    // one-time initializer cached that NO for the life of the process, so an entitled app that
-    // happened to start without connectivity reported the synced store unsupported forever, with
-    // no observer, even once the network came back. Resolving again on the next call costs one
+    // But it must NOT latch failure. [s synchronize] is the probe for whether this build is
+    // ENTITLED -- Apple gives a missing entitlement as the example of what makes it answer NO --
+    // and a one-time initializer cached that NO for the life of the process. An app whose first
+    // probe failed for any other reason then reported the synced store unsupported forever, with
+    // no observer, however long the process ran. Probing again on a later call costs one
     // synchronize; getting it permanently wrong costs the feature.
+    //
+    // The probe is deliberately not asked to decide more than that. It is a DISK sync, so its
+    // answer says nothing about whether the local store can hold a value.
     pthread_mutex_lock(&cn1ContinuityStoreLock);
     @try {
         NSUbiquitousKeyValueStore *s = [NSUbiquitousKeyValueStore defaultStore];
@@ -20683,8 +20694,18 @@ static NSUbiquitousKeyValueStore *cn1ContinuityStore(void) {
                         CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
             }] retain];
         }
-        if (store == nil && s != nil && [s synchronize]) {
+        if (store == nil && s != nil) {
+            // Retained on the strength of the store EXISTING. A store that is never entitled
+            // still holds values locally, and holding them beats discarding them: the entitled
+            // case recovers everything written meanwhile, and the unentitled case is no worse off
+            // than the nil this used to return.
             store = [s retain];
+        }
+        if (!cn1ContinuitySyncEntitled && s != nil && [s synchronize]) {
+            // Latches SUCCESS only, like the store beside it. Once it has answered YES the
+            // question is settled -- an app cannot lose an entitlement while it runs -- and
+            // every later call skips the probe, so this is not a synchronize per store access.
+            cn1ContinuitySyncEntitled = YES;
         }
     } @catch (NSException *e) {
         // Deliberately NOT "store = nil". The handler now covers calls that already resolved --
@@ -20756,7 +20777,11 @@ void com_codename1_impl_ios_IOSNative_continuityClear__(CN1_THREAD_STATE_MULTI_A
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStoreSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
-    return cn1ContinuityStore() != nil ? JAVA_TRUE : JAVA_FALSE;
+    // Called for the side effect as much as the value: resolving is what runs the probe, and the
+    // flag it sets is the answer. Reporting "there is a store object" instead would tell an
+    // unentitled app the feature works, and its values would sit on that device for ever.
+    NSUbiquitousKeyValueStore *resolved = cn1ContinuityStore();
+    return (resolved != nil && cn1ContinuitySyncEntitled) ? JAVA_TRUE : JAVA_FALSE;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key, JAVA_OBJECT value) {
