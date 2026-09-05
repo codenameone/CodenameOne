@@ -4573,6 +4573,62 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A redirect performed by the restored form's show callback is what gets checkpointed.
+     *
+     * <p>routeStackChanged() returns early while a restore is being applied -- it has to, or the
+     * rebuild checkpoints and republishes the state it is applying and the two devices bounce it
+     * back and forth. But the restored form's show callback is application code and may navigate:
+     * a screen that redirects to a newer one, an expired detail page sending the user to a list.
+     * Both notifications for that navigation land inside the window and are dropped, so the
+     * checkpoint recorded the routes that ARRIVED instead of the ones the user is on -- and a
+     * process death before the next one restores the screen the application redirected away
+     * from.</p>
+     */
+    @EdtTest
+    public void aRedirectDuringTheRebuildIsWhatGetsCheckpointed() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+        final boolean[] redirected = new boolean[1];
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                Form f = new Form();
+                f.setTitle(url);
+                if ("/orders/17".equals(url)) {
+                    f.addShowListener(new com.codename1.ui.events.ActionListener() {
+                        public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                            if (!redirected[0]) {
+                                // "That order is gone -- here is the list instead."
+                                redirected[0] = true;
+                                Navigation.navigate("/orders");
+                            }
+                        }
+                    });
+                }
+                return f;
+            }
+        });
+        try {
+            Continuity.restore(new AppState()
+                    .setRoutes(java.util.Arrays.asList("/orders/17"))
+                    .setDeviceId("some-other-device")
+                    .setSequence(370L)
+                    .setTimestamp(System.currentTimeMillis()));
+            flushSerialCalls();
+            flushSerialCalls();
+            assertTrue(redirected[0], "the show callback never redirected, so this tests nothing");
+
+            AppState stored = Continuity.getRestorableState();
+            assertNotNull(stored, "nothing was stored at all");
+            assertTrue(stored.getRoutes().contains("/orders"),
+                    "the checkpoint kept the routes that ARRIVED (" + stored.getRoutes() + ") "
+                            + "rather than the ones the application redirected to, so a process "
+                            + "death restores the screen it sent the user away from");
+        } finally {
+            Navigation.setDispatcher(null);
+        }
+    }
+
+    /**
      * An unrecognised relay object is a failed read; a bare empty one is still an empty relay.
      *
      * <p>fromMap answers null for a document it recognises nothing in, and null means "the relay

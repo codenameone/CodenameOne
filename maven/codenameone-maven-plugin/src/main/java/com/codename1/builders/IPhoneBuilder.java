@@ -4148,6 +4148,25 @@ public class IPhoneBuilder extends Executor {
             // Not gated on the sync opt-out below: the store reports its own availability at
             // runtime from whether the entitlement actually granted one, and the continuation half
             // needs these symbols regardless.
+            // An explicit ios.continuity.sync=true is a DECLARATION, not only a veto. The hint
+            // documents itself as "set true to say so explicitly", and the signing preflight
+            // already reads it exactly that way -- it is how a project says it wants the store
+            // without that check having to read bytecode. The build ignored it unless the scan
+            // had already found the package, so a project that says so and whose usage the scan
+            // cannot see got neither the entitlement nor the define, while the preflight warned
+            // about a profile for a capability the build was never going to ask for.
+            //
+            // Both flags, because the scan sets both for the same reason its own comment gives:
+            // the store needs the native define as well as the entitlement, and an entitlement
+            // without the define is a SyncedStore that reports itself unsupported on a device.
+            //
+            // Only an explicit true does this. Unset still means "the bytecode decides", which is
+            // what keeps an app that merely hands work to a nearby device from being handed an
+            // iCloud entitlement its App ID may not carry.
+            if ("true".equals(request.getArg("ios.continuity.sync", null))) {
+                usesContinuity = true;
+                usesContinuitySync = true;
+            }
             if (usesContinuity) {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_CONTINUITY", "#define CN1_USE_CONTINUITY");
             }

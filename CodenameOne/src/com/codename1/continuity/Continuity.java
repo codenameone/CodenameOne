@@ -1259,6 +1259,30 @@ public final class Continuity {
             failed = true;
         }
         outFailed[0] = !commit(state, applied || shown, failed);
+        // What the application did DURING the rebuild, which nothing else records.
+        //
+        // routeStackChanged() returns early while applyingRestore is set -- it has to, or the
+        // rebuild checkpoints and republishes the state it is applying, and the two devices
+        // bounce it back and forth. But the restored form's show callback is application code and
+        // may navigate: a screen that redirects to a newer one, an expired detail page sending
+        // the user to a list. Both notifications for that navigation land inside the window and
+        // are dropped, so the checkpoint records the routes that ARRIVED rather than the ones the
+        // user is on -- and a process death before the next one restores the screen the
+        // application redirected away from.
+        //
+        // AFTER commit(), and that ordering is the whole of it. commit() CLEARS the pending flag
+        // as part of settling the arrival, so asking before it set a flag that commit then wiped
+        // and the scheduled flush found nothing owed. Asked here, the flush that follows writes
+        // the stack the user actually has.
+        //
+        // Also after the lifecycle branch above, which returns: a callback that ended the session
+        // leaves the stack different from what was restored too -- clear() empties it -- and
+        // checkpointing there writes for a session that has just ended.
+        //
+        // Compared rather than assumed, so the ordinary arrival still costs no extra write.
+        if (!currentRoutes().equals(routes)) {
+            routeStackChanged();
+        }
         return shown;
     }
 
