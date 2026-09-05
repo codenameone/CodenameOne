@@ -678,8 +678,10 @@ invoked at the same moment; only the visual rendering differs.
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] class's `execute` method allows you to invoke a URL which is bound to a particular application.
 
-This works rather well assuming the application is installed. For example: link:http://wiki.akosma.com/IPhone_URL_Schemes[this list]
-contains a set of valid URLs that can be used on iOS to run common applications and use built-in functionality.
+This works rather well assuming the application is installed. Apple's
+https://developer.apple.com/library/archive/featuredarticles/iPhoneURLScheme_Reference/Introduction/Introduction.html[URL scheme reference]
+lists the schemes iOS handles itself, for common applications and built-in
+functionality.
 
 Some URLs might not be supported if an app isn't installed, on Android there isn't much that can be done but iOS has a `canOpenURL` method for Objective-C.
 

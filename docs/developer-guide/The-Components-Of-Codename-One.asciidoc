@@ -1096,7 +1096,7 @@ TIP: Since the `MultiList` uses the `GenericListCellRenderer` internally you can
 
 ===== Going further with the ListModel
 
-Suppose that http://www.georgerrmartin.com/[GRRM] was prolific and wrote 1 million books. The default list model won't make much sense in that case but you would still be able to render everything in a list model.
+Suppose that https://georgerrmartin.com/[GRRM] was prolific and wrote 1 million books. The default list model won't make much sense in that case but you would still be able to render everything in a list model.
 
 You will fake it a bit but notice that 1M components won't be created even if you somehow scroll all the way down...
 
@@ -1707,7 +1707,7 @@ You can dynamically download images directly into the `ImageViewer` with a custo
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava189Snippet.java[tag=the-components-of-codename-one-java-189,indent=0]
 ----
 
-.Dynamically fetching an image URL from the internet footnote:[Image was fetched from http://awoiaf.westeros.org/index.php/Portal:Books]
+.Dynamically fetching an image URL from the internet footnote:[Image was fetched from https://awoiaf.westeros.org/index.php/Portal:Books]
 image::img/components-imageviewer-dynamic.png[Dynamically fetching an image URL from the internet,scaledwidth=20%]
 
 This fetches the images in the URL asynchronously and fires a data change event when the data arrives to automatically refresh the `ImageViewer` when that happens.
@@ -1844,7 +1844,7 @@ This places the component below the side menu bar. Notice that this component co
 
 Modern UI's often animate the title upon scrolling to balance the highly functional smaller title advantage with the gorgeous large image based title. This is pretty easy to do with the Toolbar API through the Title animation API.
 
-The code below shows off an attractive title based on a book by GRRM on top of text footnote:[The text below is from A Wiki of Ice & Fire: http://awoiaf.westeros.org/index.php/A_Game_of_Thrones] that's scrollable. As the text is scrolled the title fades out:
+The code below shows off an attractive title based on a book by GRRM on top of text footnote:[The text below is from A Wiki of Ice & Fire: https://awoiaf.westeros.org/index.php/A_Game_of_Thrones] that's scrollable. As the text is scrolled the title fades out:
 
 [source,java]
 ----

@@ -3,23 +3,3 @@
 # two lines, because that is two things to fix.
 # A ratchet: entries may be removed as links are fixed, never added.
 # Regenerate with check-guide-links.py --write-baseline.
-About-This-Guide.asciidoc	http://github.com/chen-fishbein/
-About-This-Guide.asciidoc	http://github.com/shannah/
-Advanced-Topics-Under-The-Hood.asciidoc	http://stackoverflow.com/questions/11421048/android-ios-custom-uri-protocol-handling
-Introduction.asciidoc	http://www.xmlvm.org/
-Miscellaneous-Features.asciidoc	http://wiki.akosma.com/IPhone_URL_Schemes
-The-Components-Of-Codename-One.asciidoc	http://awoiaf.westeros.org/index.php/A_Game_of_Thrones
-The-Components-Of-Codename-One.asciidoc	http://awoiaf.westeros.org/index.php/Portal:Books
-The-Components-Of-Codename-One.asciidoc	http://www.georgerrmartin.com/
-The-EDT---Event-Dispatch-Thread.asciidoc	http://foxtrot.sourceforge.net/
-basics.asciidoc	http://www.miglayout.com/QuickStart.pdf
-graphics.asciidoc	http://fontello.com/
-io.asciidoc	http://twillo.com/
-io.asciidoc	http://www.anapioficeandfire.com/api/characters?page=5&pageSize=3
-io.asciidoc	http://www.codenameone.com/javadoc/com/codename1/io/ConnectionRequest.html
-io.asciidoc	http://www.codenameone.com/javadoc/com/codename1/io/NetworkManager.html
-performance.asciidoc	http://optipng.sourceforge.net/
-signing.asciidoc	http://developer.android.com/guide/publishing/app-signing.html
-signing.asciidoc	http://developer.apple.com/
-signing.asciidoc	http://get.udid.io/
-signing.asciidoc	http://stackoverflow.com/questions/6320255/if-i-revoke-an-existing-distribution-certificate-will-it-mess-up-anything-with

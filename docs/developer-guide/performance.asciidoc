@@ -27,7 +27,7 @@ If you have a large image that's opaque you might want to consider converting it
 .Convert a MultiImage to use JPEGs instead of PNGs
 image::img/performance-image-to-jpen.png[Convert a MultiImage to use JPEGs instead of PNGs]
 
-You can use the excellent http://optipng.sourceforge.net/[OptiPng] tool to optimize image files right from the Codename One designer. To use this feature you need to install OptiPng then select #Images# -> #Launch OptiPng# from the menu. Once you do that the tool will automatically optimize all your PNG's.
+You can use the excellent https://optipng.sourceforge.net/[OptiPng] tool to optimize image files right from the Codename One designer. To use this feature you need to install OptiPng then select #Images# -> #Launch OptiPng# from the menu. Once you do that the tool will automatically optimize all your PNG's.
 
 When faced with size issues make sure to check the size of your res file, if your JAR file is large open it with a tool such as 7-zip and sort elements by size. Start reviewing which element justifies the size overhead.
 
