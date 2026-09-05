@@ -80,6 +80,40 @@ public class UIManagerPrefixedStyleCacheTest extends UITestBase {
                 "a prefixed style must rebuild through the newly installed selected base");
     }
 
+    /// The caches are bounded, so an application generating uiids or style types
+    /// at run time cannot retain a prototype, a key bucket and a prefix string
+    /// per combination for the lifetime of the theme. What matters as much as the
+    /// bound is that the answers stay right once it is reached: past the limit
+    /// the lookup rebuilds every time, exactly as it did before the cache.
+    @Test
+    public void styleLookupStaysCorrectPastTheCacheBound() {
+        UIManager manager = UIManager.getInstance();
+        Hashtable theme = new Hashtable();
+        theme.put("Base.fgColor", "111111");
+        for (int i = 0; i < 700; i++) {
+            // A generated id on a fixed type, and a generated TYPE on a fixed
+            // id: the first fills the prototype map, the second fills the prefix
+            // buckets. A prefixed style inherits nothing implicitly, so each one
+            // has to name its base or it legitimately resolves to the default.
+            theme.put("Gen" + i + ".press#derive", "Base");
+            theme.put("Base.t" + i + "#derive", "Base");
+        }
+        manager.setThemeProps(theme);
+
+        // Well past KEY_CACHE_LIMIT, with a distinct id AND a distinct type, so
+        // both the prototype map and the prefix buckets are pushed over.
+        for (int i = 0; i < 700; i++) {
+            assertEquals(0x111111,
+                    manager.getComponentCustomStyle("Gen" + i, "press").getFgColor(),
+                    "prefixed style " + i + " must resolve correctly past the bound");
+        }
+        for (int i = 0; i < 700; i++) {
+            assertEquals(0x111111,
+                    manager.getComponentCustomStyle("Base", "t" + i).getFgColor(),
+                    "generated type " + i + " must resolve correctly past the bound");
+        }
+    }
+
     @Test
     public void mutatingAnInstalledBaseIsVisibleToAPrefixedStyle() {
         UIManager manager = UIManager.getInstance();

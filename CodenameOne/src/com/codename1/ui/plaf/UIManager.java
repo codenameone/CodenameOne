@@ -104,9 +104,14 @@ public class UIManager {
     /// change and never need invalidating. Plain HashMaps, matching the access
     /// assumptions of the style caches above.
     ///
-    /// Bounded, because a UIID can be generated at run time: past the limit the
-    /// keys are simply rebuilt as before, so an unusual application loses the
-    /// optimisation instead of leaking.
+    /// Bounded, because a UIID *and* a style type can both be generated at run
+    /// time: past the limit the keys are simply rebuilt as before, so an unusual
+    /// application loses the optimisation instead of leaking. The bound applies
+    /// to each of the three maps below independently -- the ids in dottedIdCache,
+    /// the prefixes in prefixedKeyCache, and the ids within each of its buckets.
+    /// Bounding only the buckets would leave the prefixes themselves unbounded,
+    /// which is no better: a generated type is exactly as likely as a generated
+    /// id.
     private static final int KEY_CACHE_LIMIT = 512;
     private final HashMap<String, String> dottedIdCache = new HashMap<String, String>();
     private final HashMap<String, HashMap<String, String>> prefixedKeyCache =
@@ -127,7 +132,12 @@ public class UIManager {
         HashMap<String, String> byId = prefixedKeyCache.get(prefix);
         if (byId == null) {
             byId = new HashMap<String, String>();
-            prefixedKeyCache.put(prefix, byId);
+            if (prefixedKeyCache.size() < KEY_CACHE_LIMIT) {
+                prefixedKeyCache.put(prefix, byId);
+            }
+            // Otherwise this bucket is used for the call and dropped, which
+            // costs one small map and keeps a generated type from retaining a
+            // bucket, and a copy of its prefix string, for the theme's lifetime.
         }
         String key = byId.get(dotted);
         if (key == null) {
@@ -725,7 +735,15 @@ public class UIManager {
                         style = prefixedStyles.get(key);
                         if (style == null) {
                             style = createStyle(id, prefix, false);
-                            prefixedStyles.put(key, style);
+                            // Same bound, for the same reason: an application
+                            // generating uiids or types at run time would
+                            // otherwise retain one prototype per combination
+                            // until the theme changed. Past the limit this path
+                            // rebuilds every time, which is what it did before
+                            // the cache existed.
+                            if (prefixedStyles.size() < KEY_CACHE_LIMIT) {
+                                prefixedStyles.put(key, style);
+                            }
                         }
                     }
                 }
