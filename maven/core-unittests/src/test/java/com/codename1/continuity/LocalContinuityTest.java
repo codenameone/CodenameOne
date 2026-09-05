@@ -4876,6 +4876,50 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * An arrival this class is holding is dropped by a disable() that comes before any enable().
+     *
+     * <p>The sibling of the port-held case, and the door my own parking change opened.
+     * Callback.decide() parks an arrival that reaches the seam before the application has chosen
+     * -- a synced-store listener installs that seam without enabling continuity -- so a logged-out
+     * app saying "off" can have a copy here as well as at the port. Draining only the port's left
+     * this one in the slot, and enable() drains that slot on purpose, so the login restored a
+     * payload and routes that arrived before the application said it wanted none.</p>
+     */
+    @EdtTest
+    public void anArrivalThisClassIsHoldingIsDroppedByAFirstDisable() {
+        HoldingBridge holding = new HoldingBridge();
+        Continuity.setBridge(holding);
+        SyncedStoreListener listener = new SyncedStoreListener() {
+            public void storeChanged() {
+            }
+        };
+        try {
+            // A seam without continuity, which is what parks an arrival here.
+            SyncedStore.addChangeListener(listener);
+            Map<String, Object> info = StateCodec.toMap(fromElsewhere("before the app chose", 380L));
+            ContinuityCallback c = Continuity.callbackForTest();
+            c.continuationReceived(Continuity.getActivityType(), info);
+            flushSerialCalls();
+
+            // "Not while I am logged out."
+            Continuity.disable();
+
+            RecordingProvider provider = new RecordingProvider();
+            Continuity.setStateProvider(provider);
+            for (int i = 0; i < 20 && provider.restored == null; i++) {
+                pause(50L);
+                flushSerialCalls();
+            }
+            assertNull(provider.restored,
+                    "an arrival this class was holding survived the disable() and was restored by "
+                            + "the enable() that came with the login, though disable() documents "
+                            + "that arriving states are ignored");
+        } finally {
+            SyncedStore.removeChangeListener(listener);
+        }
+    }
+
+    /**
      * A cold-launch arrival the port is already holding is dropped by the first disable().
      *
      * <p>iOS parks a Handoff before init() runs and hands it over when a callback is next

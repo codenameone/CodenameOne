@@ -403,6 +403,16 @@ public final class Continuity {
             // is recorded -- so the callback claims and drops it, which is what disable() says
             // happens to arriving states. Same route as the one already taken by a state that
             // arrives after this returns, rather than a second mechanism doing the same job.
+            //
+            // THIS class's held arrival goes with it. Callback.decide() parks an arrival that
+            // reaches the seam before the application has chosen -- a synced-store listener
+            // installs that seam without enabling continuity -- so by the time a logged-out app
+            // says "off" there can be a copy here as well as at the port. Draining only the
+            // port's left this one in the slot, and enable() drains that slot on purpose, so the
+            // login restored a payload and routes that arrived before the application said it
+            // wanted none. The path below clears it as part of ending the session; this one
+            // returns before reaching that, which is the whole of the difference between them.
+            parked = null;
             installCallback(true);
             return;
         }
