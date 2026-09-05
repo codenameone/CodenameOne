@@ -421,6 +421,47 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void readsCannotEscapeTheEnclosingDerElement() {
+        // An AlgorithmIdentifier declaring length 0 (or too few bytes) followed
+        // by an OID that really belongs to the enclosing SEQUENCE used to be
+        // walked as though the OID were its own, reporting a malformed key as
+        // valid RSA -- and it then failed in the platform bridge with exactly
+        // the opaque error this parser exists to replace.
+        byte[] oid = {0x2A, (byte) 0x86, 0x48, (byte) 0x86, (byte) 0xF7,
+                0x0D, 0x01, 0x01, 0x01};
+
+        byte[] emptyAlgId = new byte[15];
+        emptyAlgId[0] = 0x30;
+        emptyAlgId[1] = 0x0D;
+        emptyAlgId[2] = 0x30;
+        emptyAlgId[3] = 0x00;
+        emptyAlgId[4] = 0x06;
+        emptyAlgId[5] = 0x09;
+        System.arraycopy(oid, 0, emptyAlgId, 6, oid.length);
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem("PUBLIC KEY", Base64.encodeNoNewline(emptyAlgId))));
+
+        byte[] shortAlgId = emptyAlgId.clone();
+        shortAlgId[3] = 0x02;
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem("PUBLIC KEY", Base64.encodeNoNewline(shortAlgId))));
+
+        byte[] pkcs8AlgId = new byte[18];
+        pkcs8AlgId[0] = 0x30;
+        pkcs8AlgId[1] = 0x10;
+        pkcs8AlgId[2] = 0x02;
+        pkcs8AlgId[3] = 0x01;
+        pkcs8AlgId[4] = 0x00;
+        pkcs8AlgId[5] = 0x30;
+        pkcs8AlgId[6] = 0x00;
+        pkcs8AlgId[7] = 0x06;
+        pkcs8AlgId[8] = 0x09;
+        System.arraycopy(oid, 0, pkcs8AlgId, 9, oid.length);
+        assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(pkcs8AlgId))));
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));

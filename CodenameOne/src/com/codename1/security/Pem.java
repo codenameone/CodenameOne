@@ -414,42 +414,50 @@ final class Pem {
 
     /// A read-only walk over a DER blob. Deliberately minimal: it only needs to
     /// step into SEQUENCE/context tags and read an OID, never to decode values.
+    ///
+    /// Every read is bounded by `end`, the end of the element the cursor is
+    /// currently inside, which [#enter] narrows as it descends. Bounding
+    /// against the whole blob instead would let a read escape its parent: an
+    /// AlgorithmIdentifier declared as `30 00` followed by an OID that really
+    /// belongs to the enclosing SEQUENCE would be walked as though the OID were
+    /// its own, and the malformed key would be reported as valid RSA. The walk
+    /// only ever descends, so `end` never has to be restored.
     private static final class Cursor {
         private final byte[] der;
         private int pos;
+        private int end;
 
         Cursor(byte[] der) {
             this.der = der;
+            this.end = der.length;
         }
 
         /// Tag of the element at the cursor, without consuming it.
         int peek() {
-            if (pos >= der.length) {
+            if (pos >= end) {
                 throw new CryptoException("malformed key: truncated DER");
             }
             return der[pos] & 0xFF;
         }
 
         /// Consumes a constructed element's header, leaving the cursor on its
-        /// first child.
+        /// first child and narrowing the walk to that element's contents.
         void enter(int expectedTag) {
             expect(expectedTag);
-            length();
+            int length = length();
+            requireRoom(length);
+            end = pos + length;
         }
 
         /// Consumes an element whole, contents included.
         void skip() {
+            peek();
             pos++;
             // length() advances pos past the length bytes, so its result has to
             // be read into a local first -- "pos += length()" would capture the
             // old pos and throw that advance away.
             int length = length();
-            // Compare against the space that is left, never "pos + length":
-            // a declared length near Integer.MAX_VALUE makes that sum overflow
-            // to a negative number, which slips past the check.
-            if (length > der.length - pos) {
-                throw new CryptoException("malformed key: truncated DER");
-            }
+            requireRoom(length);
             pos += length;
         }
 
@@ -458,9 +466,10 @@ final class Pem {
             return pos;
         }
 
-        /// True while the cursor has not reached the end of the blob.
+        /// True while the cursor has not reached the end of the element it is
+        /// inside.
         boolean hasMore() {
-            return pos < der.length;
+            return pos < end;
         }
 
         /// Consumes an element whole and returns its bytes, tag and length
@@ -477,13 +486,22 @@ final class Pem {
         byte[] read(int expectedTag) {
             expect(expectedTag);
             int length = length();
-            if (length > der.length - pos) {
-                throw new CryptoException("malformed key: truncated DER");
-            }
+            requireRoom(length);
             byte[] out = new byte[length];
             System.arraycopy(der, pos, out, 0, length);
             pos += length;
             return out;
+        }
+
+        /// Checks `length` bytes are available before the end of the enclosing
+        /// element. Phrased as a subtraction rather than "pos + length > end":
+        /// a declared length near Integer.MAX_VALUE makes that sum overflow to
+        /// a negative number, which slips past the check and reaches an
+        /// allocation.
+        private void requireRoom(int length) {
+            if (length > end - pos) {
+                throw new CryptoException("malformed key: truncated DER");
+            }
         }
 
         private void expect(int expectedTag) {
@@ -496,7 +514,7 @@ final class Pem {
         }
 
         private int length() {
-            if (pos >= der.length) {
+            if (pos >= end) {
                 throw new CryptoException("malformed key: truncated DER");
             }
             int first = der[pos++] & 0xFF;
@@ -504,7 +522,7 @@ final class Pem {
                 return first;
             }
             int count = first & 0x7F;
-            if (count == 0 || count > 4 || count > der.length - pos) {
+            if (count == 0 || count > 4 || count > end - pos) {
                 throw new CryptoException("malformed key: bad DER length");
             }
             int value = 0;
