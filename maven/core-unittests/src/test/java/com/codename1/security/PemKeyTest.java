@@ -758,6 +758,49 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void ecAlgorithmIdentifierMustNameItsCurve() {
+        // RFC 5480 makes ECParameters mandatory for id-ecPublicKey, and the
+        // platform enforces it. RSA is deliberately not held to the same rule:
+        // rsaEncryption should carry NULL parameters, but a key that omits them
+        // is accepted by the platform, so rejecting it here would refuse keys
+        // that work today.
+        byte[] ecBits = new byte[68];
+        ecBits[0] = 0x03;
+        ecBits[1] = 0x42;
+        ecBits[3] = 0x04;
+        byte[] algId = hex("3009 0607 2a8648ce3d0201");
+        byte[] content = new byte[algId.length + ecBits.length];
+        System.arraycopy(algId, 0, content, 0, algId.length);
+        System.arraycopy(ecBits, 0, content, algId.length, ecBits.length);
+        byte[] blob = new byte[content.length + 2];
+        blob[0] = 0x30;
+        blob[1] = (byte) content.length;
+        System.arraycopy(content, 0, blob, 2, content.length);
+
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem("PUBLIC KEY", Base64.encodeNoNewline(blob))));
+        assertTrue(e.getMessage().contains("curve"), e.getMessage());
+    }
+
+    @Test
+    void pkcs1PrivateKeyVersionMustMatchItsShape() {
+        // RFC 3447: version 0 is a two-prime key and version 1 a multi-prime
+        // one. Counting the field without reading it let any version through
+        // to be rewrapped as PKCS#8.
+        byte[] key = der(RSA_PKCS1);
+        int off = (key[1] & 0xFF) < 0x80 ? 2 : 2 + (key[1] & 0x7F);
+        for (int version : new int[] {1, 3, 99}) {
+            byte[] bad = key.clone();
+            bad[off + 2] = (byte) version;
+            assertThrows(CryptoException.class,
+                    () -> PrivateKey.fromPem(pem(RSA_PKCS1_LABEL, Base64.encodeNoNewline(bad))),
+                    "version " + version + " on a two-prime key must not be accepted");
+        }
+        // the genuine version-0 key still converts
+        assertArrayEquals(der(RSA_PKCS8), PrivateKey.fromPem(pem(RSA_PKCS1_LABEL, RSA_PKCS1)).getEncoded());
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));

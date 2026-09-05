@@ -139,7 +139,8 @@ final class Pem {
         // AlgorithmIdentifier ::= SEQUENCE { algorithm OID, parameters ANY
         // DEFINED BY algorithm OPTIONAL } -- at most one parameters element,
         // and nothing after it. Stopping at the OID accepted { OID, NULL, NULL }.
-        if (c.hasMore()) {
+        boolean hasParameters = c.hasMore();
+        if (hasParameters) {
             c.skip();
         }
         if (c.hasMore()) {
@@ -147,9 +148,17 @@ final class Pem {
                     + "parameters field");
         }
         if (equal(oid, OID_RSA)) {
+            // RFC 4055 says rsaEncryption carries NULL parameters, but a key
+            // that omits them is accepted by the platform, so refusing it here
+            // would reject keys that work. Only the EC requirement below is
+            // enforced, because that one the platform does enforce.
             return PublicKey.RSA;
         }
         if (equal(oid, OID_EC)) {
+            if (!hasParameters) {
+                throw new CryptoException("EC key names no curve: id-ecPublicKey requires "
+                        + "ECParameters in the AlgorithmIdentifier");
+            }
             return PublicKey.EC;
         }
         throw new CryptoException("unsupported key algorithm OID " + oidToString(oid)
@@ -187,7 +196,10 @@ final class Pem {
         if (c.peek() != 0x02) {
             return SHAPE_UNKNOWN;
         }
-        c.skip();
+        // Kept because PKCS#1 reads it as a version below. It is the modulus in
+        // an RSAPublicKey, so it can only be interpreted once the field count
+        // has said which container this is.
+        byte[] firstInteger = c.element();
         if (!c.hasMore()) {
             return SHAPE_UNKNOWN;
         }
@@ -234,6 +246,7 @@ final class Pem {
         if (integers != 9) {
             return SHAPE_UNKNOWN;
         }
+        boolean multiPrime = false;
         if (c.hasMore()) {
             // The only thing that may follow the nine fields is a single
             // otherPrimeInfos SEQUENCE, for a multi-prime key. Accepting
@@ -245,6 +258,14 @@ final class Pem {
             if (c.hasMore()) {
                 return SHAPE_UNKNOWN;
             }
+            multiPrime = true;
+        }
+        // RFC 3447: version 0 is a two-prime key and version 1 a multi-prime
+        // one, so the version and the presence of otherPrimeInfos have to
+        // agree. Counting the field and never reading it let any version
+        // through to be rewrapped as PKCS#8.
+        if (!isVersion(firstInteger, multiPrime ? 1 : 0)) {
+            return SHAPE_UNKNOWN;
         }
         return SHAPE_PKCS1_PRIVATE;
     }
