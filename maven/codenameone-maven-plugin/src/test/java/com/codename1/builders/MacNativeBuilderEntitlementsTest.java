@@ -41,6 +41,75 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// AVCaptureSession otherwise.
 class MacNativeBuilderEntitlementsTest {
 
+    /**
+     * Xcode accepts "${NAME}" as readily as "$(NAME)". Materializing only the parenthesised form
+     * left the brace form unresolved, so the iOS entitlement expanded it against the iOS bundle id
+     * while this one expanded it against the derived Catalyst id -- two slices, two stores.
+     */
+    @Test
+    void theBraceFormOfTheBundleIdIsMaterializedToo(@TempDir Path tmp) throws Exception {
+        BuildRequest req = new BuildRequest();
+        req.setMainClass("MyApp");
+        req.putArgument("macNative.enabled", "true");
+        req.putArgument("macNative.distribution", "developerID");
+        req.setPackageName("com.example.app");
+        req.putArgument("ios.entitlements.com.apple.developer.ubiquity-kvstore-identifier",
+                "$(TeamIdentifierPrefix)${CFBundleIdentifier}");
+
+        String body = writeEntitlements(req, tmp, "MyApp");
+
+        assertFalse(body.contains("${CFBundleIdentifier}"),
+                "the brace form was left unresolved, so the Catalyst slice expands it against the "
+                        + "DERIVED mac bundle id: " + body);
+        assertTrue(body.contains("$(TeamIdentifierPrefix)com.example.app"),
+                "the iOS bundle id did not reach the Mac slice: " + body);
+    }
+
+    /**
+     * A Catalyst archive is signed with the plist this writes, and it is assembled from the
+     * macNative.entitlements.* namespace alone. The iCloud key-value store entitlement the iOS
+     * side generates reached the iOS slice and silently missed the Mac one, so
+     * NSUbiquitousKeyValueStore had no container in the Mac slice of the very build that switched
+     * the shared continuity code on -- a runtime failure on a Mac with nothing said at build time.
+     */
+    @Test
+    void theSyncedStoreEntitlementReachesTheCatalystSlice(@TempDir Path tmp) throws IOException {
+        BuildRequest req = new BuildRequest();
+        req.setMainClass("MyApp");
+        req.putArgument("macNative.enabled", "true");
+        req.putArgument("macNative.distribution", "developerID");
+        req.setPackageName("com.example.app");
+        // What IPhoneBuilder puts there when the app references com.codename1.continuity.sync.
+        req.putArgument("ios.entitlements.com.apple.developer.ubiquity-kvstore-identifier",
+                "$(TeamIdentifierPrefix)$(CFBundleIdentifier)");
+
+        String body = writeEntitlements(req, tmp, "MyApp");
+
+        assertTrue(body.contains("<key>com.apple.developer.ubiquity-kvstore-identifier</key>"),
+                "the Mac slice was signed without the key-value store entitlement: " + body);
+        // MATERIALIZED. $(CFBundleIdentifier) is target-relative and the Catalyst target derives
+        // "<package>.maccatalyst", so leaving the expression in signed this slice for a DIFFERENT
+        // container than iOS -- the very failure this entitlement exists to prevent.
+        assertFalse(body.contains("$(CFBundleIdentifier)"),
+                "the Catalyst slice re-evaluates the iOS bundle id, so it signs for "
+                        + "<package>.maccatalyst instead: " + body);
+        assertTrue(body.contains("$(TeamIdentifierPrefix)com.example.app"),
+                "the iOS container did not reach the Mac slice: " + body);
+    }
+
+    /** An app that never references the sync package pays nothing on the Mac slice either. */
+    @Test
+    void noSyncedStoreMeansNoCatalystEntitlement(@TempDir Path tmp) throws IOException {
+        BuildRequest req = new BuildRequest();
+        req.setMainClass("MyApp");
+        req.putArgument("macNative.enabled", "true");
+        req.putArgument("macNative.distribution", "developerID");
+
+        String body = writeEntitlements(req, tmp, "MyApp");
+
+        assertFalse(body.contains("ubiquity-kvstore-identifier"), body);
+    }
+
     @Test
     void appStoreSandboxedAddsCameraAndMicEntitlementsWhenPlistDefaultsAreSet(@TempDir Path tmp)
             throws IOException {

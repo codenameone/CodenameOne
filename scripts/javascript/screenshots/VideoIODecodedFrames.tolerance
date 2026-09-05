@@ -1,0 +1,13 @@
+# The test encodes six frames and decodes them back, so it compares whatever
+# the platform codec returns -- lossy, and not bit-reproducible. Every other
+# comparing port ships this same sidecar at these values; JavaScript was the
+# one baseline without it, so readTolerance fell back to the harness defaults
+# (delta 4 / 0.30%) and ordinary decode noise failed the build.
+#
+# Measured on the failure that prompted this: worst single-channel delta
+# anywhere was 20/255, 2.611% of pixels exceeded delta 4, and 0.000% exceeded
+# delta 72. The regressions this test exists to catch -- frames blank,
+# reordered, wrong colour -- move whole blocks across most of the channel
+# range, so they stay caught.
+maxChannelDelta=72
+maxMismatchPercent=18.0

@@ -813,6 +813,21 @@ final class BuildHintsIos {
                         + "group, no plist keys -- leaving com.codename1.documents an inert no-op "
                         + "at runtime."));
 
+        h.add(new Hint("ios.continuity.sync")
+                .group(HintGroup.IOS)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("ios")
+                .doc("Whether this project wants the iCloud key-value store behind "
+                        + "com.codename1.continuity.sync. Left unset the build decides from the "
+                        + "bytecode, which is usually what you want. Set false when the App ID "
+                        + "has no iCloud capability and the app can live without a synced store: "
+                        + "the entitlement is dropped and SyncedStore reports itself unsupported "
+                        + "at runtime rather than the build failing to sign. Set true to say so "
+                        + "explicitly, which is what lets the signing preflight check the profile "
+                        + "before the build is sent. Handing work to a nearby device is "
+                        + "unaffected either way -- that half needs no entitlement."));
+
         h.add(new Hint("ios.superfastBuild")
                 .group(HintGroup.IOS)
                 .type(HintType.BOOLEAN)

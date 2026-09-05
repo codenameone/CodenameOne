@@ -120,6 +120,31 @@ If all you want is the app's own documents folder visible in Files, you need non
 
 The extension needs its own App ID and provisioning profile; `mvn cn1:certificatewizard` creates both, along with the App Group.
 
+## State restoration and continuity
+
+Saves what the user was doing and brings it back after the OS kills the process, and -- on Apple platforms -- offers the same work to the other devices that person is signed in to. Referencing `com.codename1.continuity` is what makes an iOS build compile the `NSUserActivity` handling and declare the app's activity type in `NSUserActivityTypes`. Android needs nothing injected: no permission, no manifest entry, no dependency.
+
+Install a `StateProvider` in `init()` and let `start()` read as "restore, or else begin":
+
+```java
+Continuity.setStateProvider(provider);   // enables the framework
+...
+public void start() {
+    if (!Continuity.restore()) {
+        Navigation.navigate("/home");
+    }
+}
+```
+
+The framework already knows the `@Route` navigation stack and restores it with no code; the provider supplies everything else as a `Map`. Saving is continuous -- every navigation schedules a checkpoint -- so there is no "save on exit" hook to write. Call `Continuity.checkpoint()` after a change no navigation followed.
+
+| Hint (`codename1.arg.` prefix) | Effect |
+| --- | --- |
+| `ios.continuity.sync=false` | Skip the iCloud key-value store entitlement a reference to `com.codename1.continuity.sync` earns, leaving `SyncedStore` unsupported at runtime. |
+| `ios.continuity.sync=true` | Declare the store explicitly, which is what lets the signing preflight check the provisioning profile before the build is sent. Left unset, the build decides from the bytecode. |
+
+Three things to get right. A payload admits only `String`, `Integer`, `Long`, `Double`, `Boolean` and `List`/`Map` of those, because it has to survive reaching another device -- anything else is refused where you produced it. `com.codename1.continuity.sync` is a separate package because it is the only half that costs an entitlement, which must be granted on the App ID or the build fails at codesigning. And Codename One runs no relay server: carrying state to a non-Apple device means implementing `StateRelay` (or subclassing `RestStateRelay`) against your own endpoint, because deciding which states belong to the same person is your account system's job.
+
 ## JavaScript / web
 
 | Hint | Effect |

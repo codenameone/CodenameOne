@@ -168,28 +168,82 @@ async function expectStatus(response, expected, what) {
     `${what}: expected ${expected}, got ${response.status} with body ${body}`);
 }
 
+/*
+ * True when a response is the edge saying it has no route for us yet, rather
+ * than our worker answering.
+ *
+ * The distinction is the one collectNotReady already draws and for the same
+ * reason: a 404 carrying Cloudflare's HTML error page is produced BEFORE the
+ * worker runs, so nothing was read, counted or deduplicated. A 5xx is not this
+ * -- bindings that are still initializing answer after the request reached the
+ * handler -- so it is deliberately not included here.
+ */
+async function isUnroutedEdgeResponse(response) {
+  if (response.status !== 404) {
+    return false;
+  }
+  const contentType = response.headers.get("content-type") || "";
+  return !contentType.includes("application/json");
+}
+
+/*
+ * Posts, retrying only while the edge has not routed us yet.
+ *
+ * waitFor gates the suite on one healthy round, and that is not enough on its
+ * own: propagation is per-request and neither monotonic nor global, so a later
+ * POST can still land on an edge node that has not caught up. That is what
+ * failed here -- the "unknown event name" assertion got Cloudflare's 404 page
+ * instead of the worker's 400, on a run whose readiness probe had already
+ * passed.
+ *
+ * Safe to repeat, and ONLY in this exact case. readSnapshot retries because a
+ * GET changes nothing; the objection to retrying a POST is that it could count
+ * twice. An unrouted 404 cannot: the request never reached the worker. Any
+ * response the worker itself produced -- including every rejection the suite
+ * asserts on -- is returned untouched on the first attempt.
+ */
 async function post(baseUrl, body, origin = "https://www.codenameone.com") {
-  return fetch(`${baseUrl}/api/exp004/collect`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Origin: origin,
-      "Sec-Fetch-Site": "same-origin",
-    },
-    body: JSON.stringify({ occurred_at: Date.now(), ...body }),
-  });
+  const payload = JSON.stringify({ occurred_at: Date.now(), ...body });
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    const response = await fetch(`${baseUrl}/api/exp004/collect`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: origin,
+        "Sec-Fetch-Site": "same-origin",
+      },
+      body: payload,
+    });
+    if (!await isUnroutedEdgeResponse(response) || Date.now() >= deadline) {
+      return response;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
 }
 
 async function enroll(baseUrl, sessionKey, arm) {
-  const response = await fetch(`${baseUrl}/api/exp004/session`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Origin: "https://www.codenameone.com",
-      "Sec-Fetch-Site": "same-origin",
-    },
-    body: JSON.stringify({ session_key: sessionKey, arm }),
-  });
+  // Same unrouted-edge retry as post(): enrolment is a POST on a second route,
+  // and a route propagates on its own schedule, so gating on /collect being
+  // live says nothing about /session.
+  const body = JSON.stringify({ session_key: sessionKey, arm });
+  const deadline = Date.now() + 30_000;
+  let response;
+  for (;;) {
+    response = await fetch(`${baseUrl}/api/exp004/session`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://www.codenameone.com",
+        "Sec-Fetch-Site": "same-origin",
+      },
+      body,
+    });
+    if (!await isUnroutedEdgeResponse(response) || Date.now() >= deadline) {
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
   await expectStatus(response, 201, `enroll ${sessionKey} into ${arm}`);
   const payload = await response.json();
   assert.match(payload.submission_token, /^[0-9a-f-]{36}$/);
