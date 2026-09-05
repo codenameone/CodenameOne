@@ -936,6 +936,40 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void pkcs8AttributesMustHoldRealAttributes() {
+        // Attributes ::= SET OF Attribute, and Attribute ::= SEQUENCE { type
+        // OID, values SET }. Skipping the wrapper let "A0 02 05 00" through --
+        // which the JDK tolerates and OpenSSL does not, so the key worked on
+        // JavaSE and Android and failed on the Linux port. Checking only that
+        // each child is a SEQUENCE is not enough either: OpenSSL also refuses
+        // "A0 04 30 02 05 00".
+        byte[] canonical = der(RSA_PKCS8);
+        String[] malformed = {"A0020500", "A00430020500"};
+        for (String attrs : malformed) {
+            assertThrows(CryptoException.class,
+                    () -> PrivateKey.fromPem(pem("PRIVATE KEY",
+                            Base64.encodeNoNewline(withTrailer(canonical, hex(attrs))))),
+                    attrs + " must not be accepted");
+        }
+
+        // a well-formed Attribute is still accepted -- verified against OpenSSL
+        byte[] wellFormed = hex("A011300F06092a864886f70d010907310205 00".replace(" ", ""));
+        assertNotNull(PrivateKey.fromPem(pem("PRIVATE KEY",
+                Base64.encodeNoNewline(withTrailer(canonical, wellFormed)))));
+    }
+
+    /// Appends `trailer` inside the key's outer SEQUENCE, widening its length.
+    private static byte[] withTrailer(byte[] key, byte[] trailer) {
+        byte[] blob = new byte[key.length + trailer.length];
+        System.arraycopy(key, 0, blob, 0, key.length);
+        System.arraycopy(trailer, 0, blob, key.length, trailer.length);
+        int length = (((blob[2] & 0xFF) << 8) | (blob[3] & 0xFF)) + trailer.length;
+        blob[2] = (byte) (length >> 8);
+        blob[3] = (byte) length;
+        return blob;
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));

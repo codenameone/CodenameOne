@@ -238,7 +238,7 @@ final class Pem {
             // in that order. Letting anything through carried the junk into the
             // key that was handed to the platform.
             if (c.hasMore() && c.peek() == 0xA0) {
-                c.skip();
+                requireAttributes(c.element());
             }
             // RFC 5958's module is IMPLICIT TAGS, so [1] PublicKey -- a BIT
             // STRING -- keeps the primitive form and arrives as 0x81, not the
@@ -532,6 +532,37 @@ final class Pem {
         }
         return tlv(0x30, concat(concat(tlv(0x02, new byte[] {0}), algorithm),
                 concat(privateKey, attributes)));
+    }
+
+    /// Checks a PKCS#8 `[0] attributes` wrapper.
+    ///
+    /// `Attributes ::= SET OF Attribute`, and `Attribute ::= SEQUENCE { type
+    /// OBJECT IDENTIFIER, values SET OF AttributeValue }`. Skipping the wrapper
+    /// whole let `A0 02 05 00` through -- which the JDK tolerates and OpenSSL
+    /// does not, so the key worked on JavaSE and Android and failed on the Linux
+    /// port. Checking only that each child is a SEQUENCE is not enough either:
+    /// OpenSSL also refuses `A0 04 30 02 05 00`, whose child is a SEQUENCE but
+    /// holds a NULL rather than the type and values it must.
+    private static void requireAttributes(byte[] element) {
+        Cursor c = new Cursor(element);
+        c.enter(0xA0);
+        while (c.hasMore()) {
+            if (c.peek() != 0x30) {
+                throw new CryptoException("malformed PKCS#8 key: attributes hold a 0x"
+                        + Integer.toHexString(c.peek()) + " where an Attribute SEQUENCE belongs");
+            }
+            Cursor attribute = new Cursor(c.element());
+            attribute.enter(0x30);
+            attribute.read(0x06);
+            if (!attribute.hasMore() || attribute.peek() != 0x31) {
+                throw new CryptoException("malformed PKCS#8 key: an Attribute has no values SET");
+            }
+            attribute.skip();
+            if (attribute.hasMore()) {
+                throw new CryptoException("malformed PKCS#8 key: an Attribute has more than "
+                        + "a type and a values SET");
+            }
+        }
     }
 
     /// True when `element` is the DER for `INTEGER value` as a version field.
