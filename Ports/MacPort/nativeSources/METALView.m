@@ -159,6 +159,22 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     /// completion callback on the queue's own thread. A plain int there is a
     /// data race, and the callback would not be guaranteed to observe the bump.
     _Atomic int cn1PresentGeneration;
+
+    /// Whether a blit into each surface has been submitted but not yet
+    /// completed.
+    ///
+    /// IOSurfaceIsInUse() answers "is the compositor reading this", which is
+    /// only half the question. Between committing a frame's blit and its
+    /// completion handler running, the surface is not yet attached to the layer,
+    /// so the compositor does not hold it and the query says false -- while the
+    /// GPU still has to write it and the pending handler is still going to hand
+    /// it over. Metal lets several command buffers be in flight at once, so
+    /// without this the search wraps the pool and picks that surface again; the
+    /// newer blit then overwrites it just as the older completion exposes it.
+    ///
+    /// ATOMIC because the two sides are different threads: set on the thread
+    /// that paints, cleared in the completion callback on the queue's thread.
+    _Atomic int cn1PresentInFlight[CN1_PRESENT_SURFACE_COUNT];
 }
 
 @synthesize commandQueue;
@@ -493,6 +509,11 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         }
     }
     cn1PresentIndex = 0;
+    for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
+        // The surfaces these referred to are gone; a leftover flag would
+        // retire the new slot that inherits the index.
+        atomic_store_explicit(&cn1PresentInFlight[i], 0, memory_order_release);
+    }
     atomic_fetch_add_explicit(&cn1PresentGeneration, 1, memory_order_release);
     NSDictionary *surfaceProps = @{
         (id)kIOSurfaceWidth:           @(pw),
@@ -719,6 +740,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
         int candidate = (cn1PresentIndex + i) % CN1_PRESENT_SURFACE_COUNT;
         if (cn1PresentSurfaces[candidate] != NULL
+                && !atomic_load_explicit(&cn1PresentInFlight[candidate], memory_order_acquire)
                 && !IOSurfaceIsInUse(cn1PresentSurfaces[candidate])) {
             presentIdx = candidate;
             break;
@@ -769,6 +791,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     //
     // The layer is retained by the block automatically; the surface is a CF type
     // and is not, so it is retained explicitly for the block's lifetime.
+    atomic_store_explicit(&cn1PresentInFlight[presentIdx], 1, memory_order_release);
     CALayer *presentLayer = self.layer;
     IOSurfaceRef presented = cn1PresentSurfaces[presentIdx];
     CFRetain(presented);
@@ -783,6 +806,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     // without ARC and __weak is not available.
     int frameGeneration = atomic_load_explicit(&cn1PresentGeneration, memory_order_acquire);
     METALView *presentView = self;
+    const int completedIdx = presentIdx;
     [self.commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
         if (atomic_load_explicit(&presentView->cn1PresentGeneration, memory_order_acquire) == frameGeneration) {
             [CATransaction begin];
@@ -792,6 +816,10 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
             presentLayer.contents = (id)presented;
             [CATransaction commit];
         }
+        // Always, whatever the generation check decided: the GPU is finished
+        // with this surface either way, and leaving the flag set would retire
+        // the slot permanently.
+        atomic_store_explicit(&presentView->cn1PresentInFlight[completedIdx], 0, memory_order_release);
         CFRelease(presented);
     }];
     [self.commandBuffer commit];
@@ -848,6 +876,11 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         }
     }
     cn1PresentIndex = 0;
+    for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
+        // The surfaces these referred to are gone; a leftover flag would
+        // retire the new slot that inherits the index.
+        atomic_store_explicit(&cn1PresentInFlight[i], 0, memory_order_release);
+    }
     framebufferWidth = 0;
     framebufferHeight = 0;
 }
