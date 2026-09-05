@@ -137,6 +137,28 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aPrefixTheElementReboundIsNotOurs() {
+        // The element takes the conventional prefix for a namespace of its own
+        // and carries the real Android one under an alias. Offering "android"
+        // unconditionally read android:name as a real fine-location
+        // declaration, so inject() added none -- and the button was left
+        // without the permission it exists to obtain. A binding ON the element
+        // is the innermost one in scope for its own attributes.
+        String rebound = "    <uses-permission xmlns:android=\"urn:fake\""
+                + " xmlns:a=\"http://schemas.android.com/apk/res/android\""
+                + " android:name=\"android.permission.ACCESS_FINE_LOCATION\""
+                + " a:name=\"android.permission.INTERNET\" />\n";
+        String out = LocationButtonManifestFragments.inject(rebound, false);
+        // COUNTED, not searched for. The element already contains that exact
+        // text -- in urn:fake -- so "is it present" is true whether or not a
+        // real declaration was added, and the first version of this test
+        // passed with the bug in place.
+        assertEquals(2, count(out, "android.permission.ACCESS_FINE_LOCATION"),
+                "a real fine-location declaration has to be added beside the "
+                + "one in urn:fake: " + out);
+    }
+
+    @Test
     void anInsertedFlagUsesThePrefixThatNamedThePermission() {
         // The element rebinds the conventional prefix to something else and
         // carries the real Android namespace under an alias. Inserting

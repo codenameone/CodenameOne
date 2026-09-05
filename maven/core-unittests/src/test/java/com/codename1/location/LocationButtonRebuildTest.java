@@ -394,6 +394,60 @@ class LocationButtonRebuildTest extends UITestBase {
                 "and the running request still reports the fix it obtained");
     }
 
+    @Test
+    void aQueuedFallbackTapSurvivesAPeerFailure() throws Exception {
+        RecordingBridge bridge = install();
+        ParkingManager granted = parkingManager();
+        bridge.granted = granted;
+        ParkingManager ordinary = parkingManager();
+        ordinary.answer = new Location();
+        ordinary.release();
+        implementation.setLocationManager(ordinary);
+
+        // A system button holds the slot, and a fallback button beside it.
+        LocationButton holder = new LocationButton();
+        bridge.building = false;
+        LocationButton fallbackButton = new LocationButton();
+        Button tapTarget = (Button) fallbackButton.getComponentAt(0);
+        final List<Location> heard = new ArrayList<Location>();
+        fallbackButton.addLocationSharedListener(new LocationSharedListener() {
+            public void locationShared(Location location) {
+                heard.add(location);
+            }
+        });
+
+        bridge.sessions.get(0).onResult.onSucess(Boolean.TRUE);
+        drain();
+        assertEquals(1, granted.lookups, "the holder's lookup is running");
+
+        // The user taps the fallback; its grant queues behind the holder.
+        tapTarget.pressed();
+        tapTarget.released();
+        drain();
+        assertEquals(0, heard.size(), "queued, so not answered yet");
+
+        // The component upgrades to a system button, and THAT session dies
+        // without anyone having touched it.
+        bridge.building = true;
+        fallbackButton.setTextType(LocationButton.TEXT_USE_PRECISE_LOCATION);
+        assertEquals(2, bridge.sessions.size());
+        bridge.sessions.get(1).onUnavailable.run();
+        drain();
+
+        granted.release();
+        drain();
+        drain();
+
+        // The queued tap had no session behind it -- it was going through the
+        // prompting manager, which this failure never touched. Dropping it
+        // from the queue answered the user with the null of a session their
+        // tap never used.
+        assertEquals(1, ordinary.lookups,
+                "the queued fallback tap still runs its own lookup");
+        assertTrue(heard.contains(ordinary.answer),
+                "and reports the location it obtained: " + heard);
+    }
+
     private static boolean wakePending() throws Exception {
         return field("staleWake").get(null) != null;
     }

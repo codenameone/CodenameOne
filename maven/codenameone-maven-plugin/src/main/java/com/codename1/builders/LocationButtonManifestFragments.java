@@ -250,7 +250,8 @@ final class LocationButtonManifestFragments {
         // some other permission, and the real ACCESS_BACKGROUND_LOCATION under
         // a second prefix is never looked at. Asking each spelling whether it
         // names THIS permission cannot be hidden from that way.
-        String[] prefixes = candidatePrefixes(text, ANDROID_NS, "android");
+        String[] prefixes = candidatePrefixes(element, text, ANDROID_NS,
+                "android");
         for (int iter = 0; iter < prefixes.length; iter++) {
             int[] value = findAttribute(element, prefixes[iter] + ":name");
             if (value != null
@@ -424,7 +425,8 @@ final class LocationButtonManifestFragments {
         // a removal read as a declaration only refuses a build, while a
         // declaration read as a removal lets an exclusive build through over a
         // permission that is genuinely being asked for.
-        String[] prefixes = candidatePrefixes(text, TOOLS_NS, "tools");
+        String[] prefixes = candidatePrefixes(element, text, TOOLS_NS,
+                "tools");
         for (int iter = 0; iter <= prefixes.length; iter++) {
             // The bare spelling last: findAttribute refuses a name preceded by
             // anything but whitespace or '<', so "node" cannot match inside
@@ -606,8 +608,8 @@ final class LocationButtonManifestFragments {
         // it. Writing the flag into an attribute that is in nobody's namespace
         // is inert; failing to write it into the real one gives away the
         // permission this hint exists to restrict.
-        String[] flagPrefixes = candidatePrefixes(xPermissions, ANDROID_NS,
-                "android");
+        String[] flagPrefixes = candidatePrefixes(element, xPermissions,
+                ANDROID_NS, "android");
         String merged = element;
         boolean found = false;
         boolean already = false;
@@ -708,8 +710,8 @@ final class LocationButtonManifestFragments {
         // method exists to prevent. Removing a cap that turns out to be in
         // nobody's namespace costs nothing; leaving the real one costs the
         // feature, so every match goes.
-        String[] prefixes = candidatePrefixes(xPermissions, ANDROID_NS,
-                "android");
+        String[] prefixes = candidatePrefixes(element, xPermissions,
+                ANDROID_NS, "android");
         String widened = element;
         boolean stripped = false;
         for (int iter = 0; iter < prefixes.length; iter++) {
@@ -756,13 +758,14 @@ final class LocationButtonManifestFragments {
      * rebound prefix then hides nothing, because the real attribute is still
      * examined.</p>
      *
+     * @param element  the element whose attributes are being read
      * @param document the file
      * @param uri      the namespace
      * @param usual    the conventional prefix
      * @return the prefixes to try, most likely first
      */
-    private static String[] candidatePrefixes(String document, String uri,
-            String usual) {
+    private static String[] candidatePrefixes(String element, String document,
+            String uri, String usual) {
         java.util.List<String> out = new java.util.ArrayList<String>();
         out.add(usual);
         int at = document.indexOf(uri);
@@ -772,6 +775,32 @@ final class LocationButtonManifestFragments {
                 out.add(prefix);
             }
             at = document.indexOf(uri, at + uri.length());
+        }
+        // Then drop the ones this ELEMENT has taken for something else.
+        //
+        // Collecting document-wide and always offering the conventional prefix
+        // finds more spellings than a literal test, and for a permission this
+        // scan wants to NOTICE that is the safe direction. It is the wrong
+        // direction for the callers that ask "is this permission already
+        // declared here", and I argued otherwise: an element that rebinds
+        // android to a namespace of its own and carries the real one under an
+        // alias was read as declaring whatever its android:name said, so
+        // inject() added no real ACCESS_FINE_LOCATION and the button could not
+        // be granted the permission it exists to obtain.
+        //
+        // A binding ON the element is the innermost one in scope for its own
+        // attributes, so a prefix it points somewhere else is not ours here --
+        // whatever the root said. That is not full scope resolution, which
+        // would mean tracking nesting, and it does not need to be: these are
+        // uses-permission elements directly under manifest, so the element and
+        // the root are the only two scopes there are.
+        for (int iter = out.size() - 1; iter >= 0; iter--) {
+            int[] bound = findAttribute(element, "xmlns:" + out.get(iter));
+            if (bound != null
+                    && !uri.equals(element.substring(bound[2], bound[3])
+                            .trim())) {
+                out.remove(iter);
+            }
         }
         return out.toArray(new String[out.size()]);
     }

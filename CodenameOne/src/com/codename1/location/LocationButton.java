@@ -618,7 +618,16 @@ public class LocationButton extends Container {
                 // as it drains -- but a queue that grows entries nobody removes
                 // and a backstop carrying the whole guarantee alone are both
                 // worth not having.
-                WAITING.remove(LocationButton.this);
+                // Unless what is queued is a FALLBACK tap. Its answer has
+                // no session behind it -- it goes through the ordinary
+                // prompting manager, which this failure has not touched -- so
+                // removing it here threw away a request that could still have
+                // been served, and the user's tap was answered by the null of
+                // a session it never used. Same question serveGrant asks of a
+                // running request: whose failure was this?
+                if (waitingGeneration != NO_SESSION) {
+                    WAITING.remove(LocationButton.this);
+                }
                 setBody(createUnavailablePlaceholder());
                 // And tell the listeners. A session that failed IS this button
                 // finishing without producing a location, which is exactly what
@@ -890,10 +899,21 @@ public class LocationButton extends Container {
         // Drains dead entries as it goes. A button whose session failed while
         // it waited has already been told so; skipping to whoever is behind it
         // matters because one dead entry must not strand the rest of the queue.
+        //
+        // Except a FALLBACK tap, which is not dead. Its answer never depended
+        // on a platform session -- grantedManager sends NO_SESSION down the
+        // prompting path -- so a peer that failed after the tap was queued,
+        // possibly a peer the upgrade installed and nobody ever touched, has
+        // taken nothing away from it. Dropping it here answered the user with
+        // the null of a session their tap never used, and that is the same
+        // principle already applied to a fallback tap that survives an upgrade
+        // rather than a new rule: what has no session cannot be superseded by
+        // one, and cannot be killed by one failing either.
         LocationButton found = null;
         while (found == null && !WAITING.isEmpty()) {
             LocationButton candidate = WAITING.remove(0);
-            if (candidate.unavailable) {
+            if (candidate.unavailable
+                    && candidate.waitingGeneration != NO_SESSION) {
                 continue;
             }
             if (!candidate.stillCurrent(candidate.waitingGeneration)) {
@@ -914,7 +934,8 @@ public class LocationButton extends Container {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                if (next.unavailable) {
+                if (next.unavailable
+                        && next.waitingGeneration != NO_SESSION) {
                     // Failed between being dequeued and running.
                     serveNextWaiting();
                     return;
