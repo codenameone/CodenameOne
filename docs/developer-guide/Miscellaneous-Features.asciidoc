@@ -753,115 +753,34 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 Once this is enabled you can set the cursor over a specific region using `cmp.setCursor()` which accepts one of the cursor constants defined in `Component`.
 
 
-=== Working with GIT
+=== Working with git
 
-Working with GIT for storing Codename One projects isn't a feature but since it's so ubiquitous you think it's important to have a common guideline.
+A generated Maven project ships a `.gitignore` for its build output -- `target`,
+`build`, and the RAD schema generated under `common/src/main/rad`. It says
+nothing about your editor, and that's deliberate, because most of what sits in
+those directories belongs to the project rather than to you. The archetype
+generates `.idea` and `.vscode` itself, including run configurations for the
+debug proxy, on-device debugging and the certificate wizard, and a CodeRAD
+project needs `common/.settings/org.eclipse.m2e.apt.prefs` before Eclipse will
+run the annotation processor. Commit those.
 
-When you first started committing to git you used something like this for NetBeans projects:
+The part worth ignoring is the narrow set that records what you personally had
+open, chiefly `.idea/workspace.xml`, `.idea/shelf/` and `*.iml`. That set is the
+same in every project you work on, which makes it a good fit for a global ignore
+file rather than a per-project one -- `git config --global core.excludesFile
+~/.gitignore_global`, with the patterns in the file it names.
 
-----
+The theme used to be the hard part here, because a `.res` is a binary that git
+can't diff, and two people editing one produce a conflict no merge tool can
+resolve. A Maven project doesn't have that problem. The theme's source is
+`common/src/main/css/theme.css`, and the `.res` is compiled out of it into
+`target/classes` on each build, so what's under version control is text and the
+binary is an artifact the `.gitignore` above already excludes.
 
-*.jar
-nbproject/private/
-build/
-dist/
-lib/CodenameOne_SRC.zip
-----
-
-Removing the jars, build, private folder etc. makes a lot of sense but there are a few nuances that are missing here...
-
-==== cn1lib's
-
-You will notice you excluded the jars which are stored under lib and you exclude the Codename One source zip. However, cn1libs aren't excluded... That was an omission since the original project you committed didn't have cn1libs. However, should you commit a binary file to git?
-
-It's a fair question. Git isn't good with binaries but committing cn1libs can still make sense. In another project that did have a cn1lib the approach was this:
-
-----
-
-*.jar
-nbproject/private/
-build/
-dist/
-lib/CodenameOne_SRC.zip
-lib/impl/
-native/internal_tmp/
-----
-
-The important lines are `lib/impl/` and `native/internal_tmp/`. Technically cn1libs are zips. When you run a refresh-libs operation they unzip into the right directories under `lib/impl` and `native/internal_tmp`. By excluding these directories you can remove duplicates that can result in conflicts.
-
-==== Resource files
-
-Committing the res file is a matter of personal choice. It's committed in the git ignore files above but you can remove it. The res file is at risk of corruption and in that case having a history you can refer to, matters a lot.
-
-However, the resource file is a bit of a problematic file. As a binary file if you have a team working with it the conflicts can be a major blocker. This was far worse with the old GUI builder, that was one of the big motivations of moving into the new GUI builder which works better for teams.
-
-Still, if you want to keep an eye of every change in the resource file you can switch on the #File# -> #XML Team Mode# which should be on by default. This mode creates a file hierarchy under the `res` directory to match the res file you opened. For example: if you have a file named `src/theme.res` it will create a matching `res/theme.xml` and also nest all the images and resources you use in the res directory.
-
-That's useful as you can edit the files directly and keep track of every file in git. For example, this has two big drawbacks:
-
-- It's flaky - while this mode works it never reached the stability of the regular res file mode
-- It conflicts - the simulator/device are oblivious to this mode. If you fetch an update you also need to update the res file and you might still have conflicts related to that file
-
-Both of these issues shouldn't be a deal-breaker. Even though this mode is a bit flaky it's better than the alternative as you can "see" the content of the resource file. You can revert and reapply your changes to the res file when merging from git, it's tedious but again not a deal-breaker.
-
-==== Eclipse version
-
-Building on the gitignore you've for NetBeans the eclipse version should look like this:
-
-----
-
-.DS_Store
-*.jar
-build/
-dist/
-lib/impl/
-native/internal_tmp/
-.metadata
-bin/
-tmp/
-*.tmp
-*.bak
-*.swp
-*.zip
-*~.nib
-local.properties
-.settings/
-.loadpath
-.recommenders
-.externalToolBuilders/
-*.launch
-*.pydevproject
-.cproject
-.factorypath
-.buildpath
-.project
-.classpath
-----
-
-==== IntelliJ/IDEA
-
-----
-
-.DS_Store
-*.jar
-build/
-dist/
-lib/impl/
-native/internal_tmp/
-*.zip
-.idea/**/workspace.xml
-.idea/**/tasks.xml
-.idea/dictionaries
-.idea/**/dataSources/
-.idea/**/dataSources.ids
-.idea/**/dataSources.xml
-.idea/**/dataSources.local.xml
-.idea/**/sqlDataSources.xml
-.idea/**/dynamic.xml
-.idea/**/uiDesigner.xml
-.idea/**/gradle.xml
-.idea/**/libraries
-*.iws
-/out/
-atlassian-ide-plugin.xml
-----
+That leaves the resource editor's *File* -> *XML Team Mode*, which writes a
+matching `res/theme.xml` tree beside a resource file so its contents diff and
+merge like source. It's on by default, but it only fires for the older Ant
+layout, because `saveXML` wants the resource's own directory to be named `src`
+with `codenameone_settings.properties` beside it, and no Maven source path looks
+like that. Expect to meet it in an inherited project rather than to adopt it in
+a new one.
