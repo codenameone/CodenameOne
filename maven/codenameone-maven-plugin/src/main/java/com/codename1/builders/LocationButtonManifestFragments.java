@@ -1497,20 +1497,20 @@ final class LocationButtonManifestFragments {
                 if (entry.isDirectory()) {
                     continue;
                 }
-                // The entry's own name, not a lowercased copy, for the
-                // classpath tests below. ZIP names are case-sensitive and the
-                // Android layout recognises classes.jar and libs/*.jar in
-                // exactly that spelling, so a resource called CLASSES.JAR is
-                // something nothing loads -- and reading a button reference out
-                // of one refused a build over code that never runs, which is
-                // the same mistake as scanning assets/sample.jar.
+                // The entry's own name, never a lowercased copy. ZIP names
+                // are case-sensitive and every path here is one the runtime
+                // looks up by exact name: the Android layout recognises
+                // classes.jar and libs/*.jar in that spelling, and a class
+                // loader asks a jar for com/example/Sample.class and gets
+                // nothing back for an entry called Sample.CLASS. Both are
+                // resources nothing loads, and reading a button reference out
+                // of one refused a build over code that never runs.
                 //
-                // Lowercase is still right for the .class suffix: that test
-                // asks what KIND of entry this is rather than whether the build
-                // consumes this exact path, and a plain jar's bytecode is on
-                // the classpath however it is spelled.
+                // An earlier version kept the suffix test lowercase, arguing
+                // that a plain jar's bytecode is on the classpath however it is
+                // spelled. It is not -- the lookup is exact -- and that is the
+                // whole reason the spelling decides anything here.
                 String name = entry.getName();
-                String lower = name.toLowerCase(java.util.Locale.ROOT);
                 // Only an aar's CLASSPATH jars. Gradle puts classes.jar and
                 // libs/*.jar of an aar on the application's classpath and
                 // nothing else, so a sample or tooling jar parked at
@@ -1557,8 +1557,8 @@ final class LocationButtonManifestFragments {
                 // last entry kind this loop reads: scan what the build
                 // consumes, not what the zip happens to contain. In a plain
                 // jar, by contrast, the .class entries ARE the classpath.
-                boolean classEntry = !isAar && lower.endsWith(".class")
-                        && !isFrameworkClass(entry.getName());
+                boolean classEntry = !isAar && name.endsWith(".class")
+                        && !isFrameworkClass(name);
                 if (!nested && !manifest && !classEntry) {
                     continue;
                 }
@@ -1691,9 +1691,11 @@ final class LocationButtonManifestFragments {
             while (entry != null && !found.settled()) {
                 String name = entry.getName();
                 budget.entry(name);
+                // Case-sensitively, like the outer walk and for the same
+                // reason: a class loader asks for Sample.class by that exact
+                // name and never finds Sample.CLASS.
                 if (!entry.isDirectory()
-                        && name.toLowerCase(java.util.Locale.ROOT)
-                                .endsWith(".class")
+                        && name.endsWith(".class")
                         && !isFrameworkClass(name)) {
                     inspect(budget.readEntry(in, name, entry.getSize()), found);
                 } else {

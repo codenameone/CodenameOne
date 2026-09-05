@@ -641,6 +641,34 @@ class LocationButtonRebuildTest extends UITestBase {
     }
 
     @Test
+    void aDeclinedRebuildKeepsTheControlItAlreadyHas() {
+        RecordingBridge bridge = install();
+        LocationButton button = new LocationButton();
+        assertTrue(button.getComponentAt(0) instanceof PeerComponent,
+                "the system control is up");
+
+        // A setter rebuilds while the platform cannot make one right now --
+        // the Android bridge needs the current Activity and answers null
+        // without it.
+        bridge.building = false;
+        button.setTextType(LocationButton.TEXT_USE_PRECISE_LOCATION);
+
+        // The peer stays. Downgrading to the fallback here loses the
+        // session-scoped path for good: initComponent's retry runs on ATTACH,
+        // and replacing a child does not re-attach an initialised component.
+        assertTrue(button.getComponentAt(0) instanceof PeerComponent,
+                "a control already on screen is not given up because a "
+                + "rebuild was declined");
+        assertFalse(button.isUnavailable(), "and this is not a failure");
+
+        // The rebuild is owed, and the next attach settles it.
+        bridge.building = true;
+        button.initComponent();
+        assertEquals(2, bridge.sessions.size(),
+                "the pending rebuild is retried on attach");
+    }
+
+    @Test
     void aSupportedControlThatThrowsIsUnavailableNotFallback() {
         RecordingBridge bridge = install();
         bridge.throwing = true;

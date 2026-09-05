@@ -264,6 +264,20 @@ public class LocationButton extends Container {
     /// they look at it, and every write is on the EDT as well.
     private int systemButtonGeneration;
 
+    /// Set when a rebuild wanted a system button and could not get one.
+    ///
+    /// A setter replaces the control, and the platform can decline right then
+    /// -- the Android bridge needs the current Activity and answers null
+    /// without one. Installing the ordinary fallback at that moment loses the
+    /// session-scoped path for good: initComponent's retry only runs on
+    /// ATTACH, and replacing a child does not re-attach an already initialised
+    /// component, so the fallback stayed after the Activity came back.
+    ///
+    /// So the existing peer is kept and the rebuild is remembered. The setter
+    /// has not taken effect yet, which is visible and recoverable; a button
+    /// that quietly asks for persistent location instead is neither.
+    private boolean rebuildPending;
+
     /// The stamp for an answer that belongs to no platform session.
     ///
     /// The fallback button has no session: it is an ordinary Codename One
@@ -458,6 +472,13 @@ public class LocationButton extends Container {
             setBody(createUnavailablePlaceholder());
             return;
         }
+        if (system == null && body instanceof PeerComponent) {
+            // Declined right now, with a working control already on screen.
+            // Keeping it beats downgrading to the fallback: see rebuildPending.
+            rebuildPending = true;
+            return;
+        }
+        rebuildPending = false;
         setBody(system);
     }
 
@@ -1015,11 +1036,16 @@ public class LocationButton extends Container {
     @Override
     protected void initComponent() {
         super.initComponent();
-        if (unavailable || body instanceof PeerComponent) {
+        if (unavailable) {
+            return;
+        }
+        // A peer already here and nothing owed: leave a working control alone.
+        if (body instanceof PeerComponent && !rebuildPending) {
             return;
         }
         PeerComponent system = createSystemButton();
         if (system != null) {
+            rebuildPending = false;
             setBody(system);
         }
     }

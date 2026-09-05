@@ -162,6 +162,46 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void anUppercasedClassSuffixIsNotBytecode() throws Exception {
+        // A class loader asks a jar for com/example/Sample.class by that exact
+        // name and gets nothing back for an entry called Sample.CLASS, so such
+        // an entry is a resource nothing loads. Reading a button reference out
+        // of one refused a build over code that never runs.
+        File root = tempDir("cn1-lb-classcase");
+        File jar = new File(root, "shouty.jar");
+        ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(jar));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/Sample.CLASS"));
+            zip.write(constantPoolEntry(
+                    "com/codename1/location/LocationButton"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "Sample.CLASS is not loadable bytecode: " + jar);
+
+        // The ordinary spelling in the same shape still is, so this test is
+        // about the suffix rather than about the fixture.
+        File live = tempDir("cn1-lb-classcase-live");
+        File liveJar = new File(live, "quiet.jar");
+        ZipOutputStream liveZip = new ZipOutputStream(
+                new FileOutputStream(liveJar));
+        try {
+            liveZip.putNextEntry(new ZipEntry("com/example/Sample.class"));
+            liveZip.write(constantPoolEntry(
+                    "com/codename1/location/LocationButton"));
+            liveZip.closeEntry();
+        } finally {
+            liveZip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(live)
+                        .usesButton(),
+                "the ordinary spelling is the classpath");
+    }
+
+    @Test
     void anUppercasedClassesJarIsNotTheClasspath() throws Exception {
         // ZIP names are case-sensitive and the Android layout recognises
         // classes.jar in exactly that spelling, so CLASSES.JAR is a resource

@@ -133,8 +133,20 @@ public class AndroidLocationButtonBridge implements LocationButtonBridge {
             }
         }
         if (failure[0] != null) {
+            // THROWN, not swallowed into a null. The component distinguishes
+            // the two: null means "no control here, not now" and keeps the
+            // ordinary fallback with a retry, while a throw means a control
+            // this device HAS could not be built -- a failed session, which
+            // the fallback is the wrong answer to, because an exclusive build
+            // has that request refused outright and a transactional one is
+            // trying not to need it.
+            //
+            // Returning null here made every genuine failure on Android look
+            // like the first case, so the distinction the component draws
+            // could never be reached from the port that needs it.
             Log.e(failure[0]);
-            return null;
+            throw new RuntimeException(
+                    "the location button could not be built", failure[0]);
         }
         PeerComponent peer = PeerComponent.create(created[0]);
         // The peer's preferred size is NOT derived from the native view --
