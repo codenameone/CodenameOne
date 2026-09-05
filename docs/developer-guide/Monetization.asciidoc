@@ -476,15 +476,16 @@ Both stores need the same two things from you: the products themselves, and a
 credential your server can validate receipts with. The consoles that do it are
 Google's and Apple's, and both have been redesigned more than once, so follow
 their own documentation for the clicking -- what matters here is what to end up
-with.
+with. Each step below links the vendor page that covers it.
 
 *Products.* Create one product per SKU your app sells, and use exactly the ids
 your code passes to `purchase()` and `subscribe()`. A subscription needs its own
 SKU per period, which is why the examples above keep both in a `PRODUCTS` array
 and pass the whole group to the status calls.
 
-*Google Play receipt validation.* Server-side validation goes through the Google
-Play Developer API. Enable that API for the project, create a service account,
+*Google Play receipt validation.* Server-side validation goes through the
+https://developers.google.com/android-publisher/getting_started[Google Play
+Developer API]. Enable that API for the project, create a service account,
 give it access to your Play account, and download its key. The key arrives as
 JSON and its `client_email` and `private_key` are what your server
 authenticates with:
@@ -494,8 +495,9 @@ authenticates with:
 include::../demos/common/src/main/snippets/developer-guide/monetization.json[tag=monetization-json-001,indent=0]
 ----
 
-*Apple receipt validation.* Apple uses a shared secret generated alongside the
-in-app products rather than a service account:
+*Apple receipt validation.* Apple uses a
+https://developer.apple.com/help/app-store-connect/configure-in-app-purchase-settings/generate-a-shared-secret-to-verify-receipts/[shared
+secret] generated alongside the in-app products rather than a service account:
 
 [source,java]
 ----
@@ -518,7 +520,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 *Test accounts.* Both stores let you nominate accounts that can buy without
-being charged. Apple's sandbox works against a development-signed build
+being charged --
+https://developer.apple.com/documentation/storekit/testing-in-app-purchases-with-sandbox[Apple's
+sandbox] and
+https://support.google.com/googleplay/android-developer/answer/6062777[Google's
+license testers]. Apple's sandbox works against a development-signed build
 installed straight onto a device, and Google's license testers can buy from a
 sideloaded build once the package name and products match; it's Play's
 track-based testing that needs an uploaded artifact. Their docs cover the current
