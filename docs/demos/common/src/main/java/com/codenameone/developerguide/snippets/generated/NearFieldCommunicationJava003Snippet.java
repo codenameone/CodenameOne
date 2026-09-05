@@ -85,9 +85,13 @@ class NearFieldCommunicationJava003Snippet {
     
     void snippet() throws Exception {
         // tag::near-field-communication-java-003[]
-        new NfcReadOptions()
+        NfcReadOptions options = new NfcReadOptions()
             .setTechFilter(TagType.NFC_F)
             .setFelicaSystemCodes("0003", "8008");
+        nfc.readTag(options);
         // end::near-field-communication-java-003[]
     }
+
+    Nfc nfc;
+
 }

@@ -85,14 +85,16 @@ class MotionSensorsJava001Snippet {
         // tag::motion-sensors-java-001[]
         MotionSensorManager m = MotionSensorManager.getInstance();
         MotionSensor accelerometer = m.getSensor(MotionSensorManager.TYPE_ACCELEROMETER);
+        MotionSensorListener listener = new MotionSensorListener() {
+            public void motionReceived(MotionEvent evt) {
+                // x, y and z are in meters per second squared
+                label.setText(evt.getX() + ", " + evt.getY() + ", " + evt.getZ());
+                label.getParent().revalidate();
+            }
+        };
         if (accelerometer != null) {
-            accelerometer.addListener(new MotionSensorListener() {
-                public void motionReceived(MotionEvent evt) {
-                    // x, y and z are in meters per second squared
-                    label.setText(evt.getX() + ", " + evt.getY() + ", " + evt.getZ());
-                    label.getParent().revalidate();
-                }
-            });
+            // keep the reference: removeListener needs this exact object
+            accelerometer.addListener(listener);
         }
         // end::motion-sensors-java-001[]
     }

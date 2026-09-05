@@ -91,9 +91,10 @@ class DeepLinksRoutingJava005Snippet {
                 if (!isDirty()) {
                     return true;
                 }
-                Dialog.show("Discard changes?", "You have unsaved edits.",
-                            "Stay", "Discard");
-                return false;
+                // Dialog.show returns true for the first button, so "Stay"
+                // blocks the pop and "Discard" allows it
+                return !Dialog.show("Discard changes?", "You have unsaved edits.",
+                                    "Stay", "Discard");
             }
         });
         // end::deep-links-routing-java-005[]
