@@ -264,74 +264,24 @@ You can then create a provisioning profile which comes in two flavors:
 
 You can then configure the 4 files in the IDE and start sending builds to the Codename One cloud.
 
-=== Provisioning profile & certificates visual guide
+==== Preparing the certificates and profiles
 
-One of the hardest parts in developing for iOS is the certificate & provisioning process. In this step-by-step guide you walk over the manual certificate generation process. Notice that the UI for the Apple website changes occasionally but the basic process remains the same...
+The layout of Apple's portal changes, so what follows are the constraints that
+hold whatever the current screens look like, rather than a tour of them.
 
-Start by logging in to the iOS-provisioning portal
+The application ID you register has to match your project's package identifier
+exactly. Nothing checks this while you're filling the forms in: the mismatch
+surfaces later, as a build that can't match a profile to the application.
 
-[[login-ios-provisioning]]
-.Login for the iOS provisioning portal
-image::img/login-ios-provisioning.png[Log into IOS provisioning portal,scaledwidth=30%]
+The development profile has to name every device you intend to install on. A
+device registered after the profile was generated isn't covered by it, so the
+profile has to be regenerated and downloaded again. The distribution profile
+names no devices at all.
 
-In the certificates section you can download your development and distribution certificates.
-
-[[download-dev-provisioning-profile]]
-.Download development provisioning profile
-image::img/download-dev-provisioning-profile.png[Download development provisioning profile,scaledwidth=30%]
-
-[[download-dist-provisioning-profile]]
-.Download distribution provisioning profile
-image::img/download-dist-provisioning-profile.png[Download distribution provisioning profile,scaledwidth=30%]
-
-In the devices section add device ids for the development devices you want to support. Notice no more than 100 devices are supported!
-
-[[ios-add-devices]]
-.Add devices
-image::img/ios-add-devices.png[Add devices,scaledwidth=30%]
-
-Create an application ID; it must match the package identifier of your application exactly!
-
-.Create application ID
-image::img/ios-create-app-id.png[Create application ID,scaledwidth=30%]
-
-Create a provisioning profile for development, make sure to select the right app and make sure to add the devices you want to use during debug.
-
-.Create provisioning profile step 1
-image::img/ios-create-prov-profile-1.png[Create provisioning profile step 1,scaledwidth=30%]
-
-.Create provisioning profile step 2
-image::img/ios-create-prov-profile-2.png[Create provisioning profile step 2,scaledwidth=30%]
-
-Refresh the screen to see the profile you created and press the download button to download your development provisioning profile.
-
-.Create provisioning profile step 3
-image::img/ios-create-prov-profile-3.png[Create provisioning profile step 3,scaledwidth=30%]
-
-Create a distribution provisioning profile; it will be used when uploading to the App Store. No need to specify devices here.
-
-.Create distribution provisioning profile
-image::img/ios-create-dist-prov-profile.png[Create distribution provisioning profile,scaledwidth=30%]
-
-Download the distribution provisioning profile.
-
-.Download distribution provisioning profile
-image::img/ios-download-dist-prov-profile.png[Download distribution provisioning profile,scaledwidth=30%]
-
-You can now import the cer files into the Keychain tool on a Mac by double clicking the file, on Windows the process is slightly more elaborate
-
-.Import cer files
-image::img/ios-import-cer-files.png[Import cer files,scaledwidth=30%]
-
-You can export the p12 files for the distribution and development profiles through the keychain tool
-
-.Export p12 files
-image::img/ios-export-p12.png[Export p12 files,scaledwidth=30%]
-
-In the IDE you enter the project settings, configure your provisioning profile, the password you typed when exporting and the p12 certificates. It's now possible to send the build to the server.
-
-.IOS Project Settings
-image::img/ios-project-settings.png[IOS Project Settings,scaledwidth=30%]
+Apple issues certificates as `.cer` files, and the build servers need `.p12`
+files. On a Mac, double-clicking a `.cer` imports it into Keychain Access, and
+you export the development and distribution certificates from there as `.p12`,
+choosing a password for each. Those are the passwords the next section asks for.
 
 ==== Configuring `codenameone_settings.properties` for manual signing
 
@@ -392,17 +342,10 @@ image::img/include-push-build-hint.png[Include push build hint,scaledwidth=30%]
 
 Signing Android applications is trivial when compared to the pain of iOS signing.
 
-The NetBeans and Eclipse plugins have a simple wizard to generate the certificate that you can launch by pressing this button:
-
-.Android keystore generation wizard
-image::img/android-certificate-wizard.png[Android keystore generation wizard,scaledwidth=50%]
-
-Then fill out your details and password in the form:
-
-.UI for Android certificate details
-image::img/android-certificate-wizard2.png[UI for Android certificate details,scaledwidth=30%]
-
-This will seamlessly generate a certificate for your project, you can reuse it for other projects as well.
+The <<certificate-wizard,Certificate Wizard>> generates a keystore for you. One
+keystore can sign every application you ship, though some developers prefer one
+per application, so that an application can be handed over to someone else later
+without also handing over the key to all the others.
 
 ==== Generating an Android certificate manually
 
