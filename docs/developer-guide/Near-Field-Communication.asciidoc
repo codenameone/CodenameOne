@@ -32,6 +32,10 @@ NDEF records carry one of the well-known types (`T`, `U`, `Sp`), a MIME media ty
 
 Beyond NDEF, the discovered `Tag` exposes accessors for the underlying technologies:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NearFieldCommunicationJava002Snippet.java[tag=near-field-communication-java-002,indent=0]
+----
 
 Each accessor returns `null` when the tag doesn't advertise the corresponding technology, so always null-check before calling.
 
@@ -49,6 +53,10 @@ Each accessor returns `null` when the tag doesn't advertise the corresponding te
 
 For FeliCa on iOS, set the system codes in `NfcReadOptions`:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NearFieldCommunicationJava003Snippet.java[tag=near-field-communication-java-003,indent=0]
+----
 
 The Codename One Maven plugin and build daemon automatically register `com.apple.developer.nfc.readersession.felica.systemcodes` from these values.
 
@@ -56,6 +64,10 @@ The Codename One Maven plugin and build daemon automatically register `com.apple
 
 Host Card Emulation (HCE) lets the device pretend to be a contactless smart card. A nearby reader (Android phone, payment terminal, access control gate) sends ISO 7816 APDUs and your app responds. Subclass `HostCardEmulationService` and register the instance:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NearFieldCommunicationJava004Snippet.java[tag=near-field-communication-java-004,indent=0]
+----
 
 Set the AIDs as a build hint so they appear in the platform routing tables:
 
