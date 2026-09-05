@@ -25,6 +25,7 @@ package com.codename1.location;
 import com.codename1.junit.UITestBase;
 import com.codename1.location.spi.LocationButtonBridge;
 import com.codename1.testing.TestUtils;
+import com.codename1.ui.Button;
 import com.codename1.ui.Display;
 import com.codename1.ui.PeerComponent;
 import com.codename1.util.SuccessCallback;
@@ -81,9 +82,15 @@ class LocationButtonRebuildTest extends UITestBase {
             return granted;
         }
 
+        /** When false the bridge answers null, so the caller falls back. */
+        private boolean building = true;
+
         public PeerComponent createButton(int textType, int backgroundColor,
                 int textColor, SuccessCallback<Boolean> onResult,
                 Runnable onUnavailable) {
+            if (!building) {
+                return null;
+            }
             Session session = new Session();
             session.onResult = onResult;
             session.onUnavailable = onUnavailable;
@@ -207,6 +214,51 @@ class LocationButtonRebuildTest extends UITestBase {
                 "but the tap still happened, so it is ANSWERED -- a grant that "
                 + "is silently dropped is the failure this queue exists to "
                 + "prevent");
+    }
+
+    @Test
+    void aFallbackTapSurvivesTheUpgradeToASystemButton() {
+        RecordingBridge bridge = install();
+        ParkingManager manager = new ParkingManager();
+        bridge.granted = manager;
+
+        // One real system button, which will hold the in-flight slot.
+        LocationButton holder = new LocationButton();
+        assertEquals(1, bridge.sessions.size());
+
+        // And one built while the bridge is answering null, so it carries the
+        // ordinary fallback button rather than a platform control.
+        bridge.building = false;
+        LocationButton fallbackButton = new LocationButton();
+        Button tapTarget = (Button) fallbackButton.getComponentAt(0);
+
+        // The holder is granted and its lookup parks, so anything else queues.
+        bridge.sessions.get(0).onResult.onSucess(Boolean.TRUE);
+        drain();
+        assertEquals(1, manager.lookups, "the holder's lookup is running");
+
+        // The user taps the fallback. Its answer belongs to NO platform
+        // session: it means "go and get a location the usual way".
+        tapTarget.pressed();
+        tapTarget.released();
+        drain();
+
+        // And now a system button becomes available and replaces it, which is
+        // what initComponent does on every attach where the fallback shows.
+        bridge.building = true;
+        fallbackButton.setTextType(LocationButton.TEXT_USE_PRECISE_LOCATION);
+        assertEquals(2, bridge.sessions.size(), "the upgrade built a control");
+
+        manager.release();
+        drain();
+        drain();
+
+        // Counted as LOOKUPS, not as listener calls: a stale queue entry is
+        // ANSWERED with null, so a test that counts answers sees one either
+        // way and proves nothing. Serving is what the tap earned.
+        assertEquals(2, manager.lookups,
+                "a tap on the fallback has no session to be superseded, so "
+                + "upgrading the component must not turn it into a null");
     }
 
     private RecordingBridge install() {

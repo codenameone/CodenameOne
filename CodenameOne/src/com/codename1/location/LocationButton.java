@@ -223,6 +223,28 @@ public class LocationButton extends Container {
     /// they look at it, and every write is on the EDT as well.
     private int systemButtonGeneration;
 
+    /// The stamp for an answer that belongs to no platform session.
+    ///
+    /// The fallback button has no session: it is an ordinary Codename One
+    /// button whose tap means "go and get a location the usual way". Stamping
+    /// it with the live generation made it STALE the moment a system button
+    /// arrived -- and initComponent installs one on every attach where the
+    /// fallback is showing, so a tap that was queued behind another request and
+    /// then upgraded on the way back to a form was answered null, and one still
+    /// in its callSerially was dropped without a word. Neither is a thing the
+    /// generation check is for: it exists to disown a REPLACED PEER, and the
+    /// fallback never had one.
+    ///
+    /// Never a real generation, which only ever counts up from zero.
+    private static final int NO_SESSION = -1;
+
+    /// True when this answer is not from a control that has since been
+    /// replaced. An answer with no session behind it is never superseded.
+    private boolean stillCurrent(int generation) {
+        return generation == NO_SESSION
+                || generation == systemButtonGeneration;
+    }
+
     /// Which system button the grant sitting in [#WAITING] came from.
     ///
     /// A queued grant is a tap the user already made and the platform already
@@ -549,7 +571,7 @@ public class LocationButton extends Container {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                if (generation != systemButtonGeneration) {
+                if (!stillCurrent(generation)) {
                     // The session that died belonged to a button a setter has
                     // already replaced. Retiring the component now would kill
                     // a healthy control on behalf of one nobody can see.
@@ -661,11 +683,12 @@ public class LocationButton extends Container {
                 // path reaches location through LocationManager, and every port
                 // that has one already prompts from there. Asking here as well
                 // would show the user two dialogs for one tap.
-                // The generation as it stands at the tap, not a captured one:
-                // this button is not a system button and has no session of its
-                // own, so what it reports belongs to whatever is on screen when
-                // the user presses it -- which is this.
-                permissionResult(systemButtonGeneration, true);
+                // NO_SESSION, not the generation as it stands: this button is
+                // not a system button and has nothing that can be superseded.
+                // Reading the live counter here made the answer stale as soon
+                // as initComponent upgraded the fallback to a real control,
+                // which is exactly when the user's tap most needs to survive.
+                permissionResult(NO_SESSION, true);
             }
         });
         return b;
@@ -706,7 +729,7 @@ public class LocationButton extends Container {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                if (generation != systemButtonGeneration) {
+                if (!stillCurrent(generation)) {
                     // A control that is no longer on screen answering for a
                     // tap on a control that is. Serving it would fire the
                     // listeners of a button the user has not touched, and on
@@ -805,7 +828,7 @@ public class LocationButton extends Container {
             if (candidate.unavailable) {
                 continue;
             }
-            if (candidate.waitingGeneration != candidate.systemButtonGeneration) {
+            if (!candidate.stillCurrent(candidate.waitingGeneration)) {
                 // The control that earned this grant was replaced while the
                 // grant waited. Answering it is the honest outcome: the tap
                 // happened and produced no location. Serving it instead would
@@ -828,7 +851,7 @@ public class LocationButton extends Container {
                     serveNextWaiting();
                     return;
                 }
-                if (next.waitingGeneration != next.systemButtonGeneration) {
+                if (!next.stillCurrent(next.waitingGeneration)) {
                     // Replaced between being dequeued and running, which the
                     // drain above cannot see because it already let this one
                     // through. Same answer as there.
