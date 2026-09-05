@@ -735,6 +735,15 @@ public class LocationButton extends Container {
                     // listeners of a button the user has not touched, and on
                     // the granted path would spend the one session the
                     // replacement was waiting for.
+                    //
+                    // SILENT here, where the queue answers a stale entry with
+                    // null instead, and the difference is deliberate: once an
+                    // answer has been queued this component has taken
+                    // responsibility for reporting it, and dropping it there
+                    // is the "never reports anything" failure the queue exists
+                    // to prevent. Before that it has promised nothing, and a
+                    // null for a button the app itself replaced is a
+                    // completion the caller never asked for.
                     return;
                 }
                 if (!granted) {

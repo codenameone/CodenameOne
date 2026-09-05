@@ -243,7 +243,8 @@ final class LocationButtonManifestFragments {
         if (!tag.startsWith("uses-permission")) {
             return false;
         }
-        int[] value = findAttribute(element, "android:name");
+        int[] value = findNamespacedAttribute(element, text,
+                ANDROID_NS, "android", "name");
         if (value == null) {
             return false;
         }
@@ -369,7 +370,8 @@ final class LocationButtonManifestFragments {
         // whitespace or '<' -- that guard is what stops android:maxSdkVersion
         // matching inside tools:android:maxSdkVersion, and it means the
         // prefixed spelling has to be asked for by its whole name.
-        int[] value = findAttribute(element, "tools:node");
+        int[] value = findNamespacedAttribute(element, text, TOOLS_NS,
+                "tools", "node");
         if (value == null) {
             value = findAttribute(element, "node");
         }
@@ -598,6 +600,122 @@ final class LocationButtonManifestFragments {
         widened = widened.replace("  ", " ");
         return xPermissions.substring(0, start) + widened
                 + xPermissions.substring(end + 1);
+    }
+
+    /**
+     * The Android attribute namespace. A manifest may bind it to ANY prefix.
+     */
+    private static final String ANDROID_NS =
+            "http://schemas.android.com/apk/res/android";
+
+    /** The manifest-merger namespace, bindable to any prefix in the same way. */
+    private static final String TOOLS_NS = "http://schemas.android.com/tools";
+
+    /**
+     * Finds a namespaced attribute however the document spells its prefix.
+     *
+     * <p>{@code xmlns:a="http://schemas.android.com/apk/res/android"} with
+     * {@code a:name="..."} is a perfectly valid manifest, and a submitted aar
+     * is somebody else's file. Looking only for the literal {@code android:}
+     * missed the permission such an archive requests, and missing it fails in
+     * the dangerous direction: the exclusivity check accepts the build, and
+     * Gradle then merges the background permission in beside
+     * {@code onlyForLocationButton} -- the contradiction the check exists to
+     * reject.</p>
+     *
+     * <p>The conventional prefix is ALWAYS tried as well as any the document
+     * binds, so this can only ever find more than the literal test did. A
+     * manifest that binds the URI to an alias and then writes {@code android:}
+     * anyway has an undeclared prefix and is not valid XML, but reading it the
+     * way it was plainly meant costs nothing and refuses more builds rather
+     * than fewer.</p>
+     *
+     * <p>Note the default namespace is deliberately not consulted. An
+     * unprefixed attribute is in NO namespace no matter what {@code xmlns=}
+     * says, so a bare {@code name=} is not an Android attribute and must not
+     * be read as one.</p>
+     *
+     * @param element  the element text
+     * @param document the whole file, which is where the bindings are
+     * @param uri      the namespace wanted
+     * @param usual    the conventional prefix, always tried
+     * @param local    the attribute's local name
+     * @return the bounds findAttribute would return, or null
+     */
+    private static int[] findNamespacedAttribute(String element,
+            String document, String uri, String usual, String local) {
+        int[] value = findAttribute(element, usual + ":" + local);
+        if (value != null) {
+            return value;
+        }
+        int at = document.indexOf(uri);
+        while (at >= 0) {
+            String prefix = prefixBoundAt(document, at);
+            if (prefix != null && !prefix.equals(usual)) {
+                value = findAttribute(element, prefix + ":" + local);
+                if (value != null) {
+                    return value;
+                }
+            }
+            at = document.indexOf(uri, at + uri.length());
+        }
+        return null;
+    }
+
+    /**
+     * Reads backwards from a namespace URI to the prefix it is bound to.
+     *
+     * <p>Backwards because the prefix is what has to be discovered: there is no
+     * name to search for. What must be there, reading right to left from the
+     * URI, is a quote, an equals sign, and an attribute called
+     * {@code xmlns:something} -- and anything else means this occurrence of the
+     * URI is not a binding at all, which is what keeps the same text inside a
+     * comment or another attribute's value from being read as one.</p>
+     *
+     * @param document the file
+     * @param at       where the URI starts
+     * @return the prefix, or null when this is not an xmlns binding
+     */
+    private static String prefixBoundAt(String document, int at) {
+        int cursor = at - 1;
+        if (cursor < 0) {
+            return null;
+        }
+        char quote = document.charAt(cursor);
+        if (quote != '"' && quote != '\'') {
+            return null;
+        }
+        cursor--;
+        while (cursor >= 0 && isXmlSpace(document.charAt(cursor))) {
+            cursor--;
+        }
+        if (cursor < 0 || document.charAt(cursor) != '=') {
+            return null;
+        }
+        cursor--;
+        while (cursor >= 0 && isXmlSpace(document.charAt(cursor))) {
+            cursor--;
+        }
+        int end = cursor + 1;
+        while (cursor >= 0 && isAttributeNameChar(document.charAt(cursor))) {
+            cursor--;
+        }
+        String name = document.substring(cursor + 1, end);
+        if (!name.startsWith("xmlns:") || name.length() == "xmlns:".length()) {
+            return null;
+        }
+        return name.substring("xmlns:".length());
+    }
+
+    /** Whitespace as XML counts it. */
+    private static boolean isXmlSpace(char c) {
+        return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+    }
+
+    /** A character that can appear inside an attribute name. */
+    private static boolean isAttributeNameChar(char c) {
+        return !isXmlSpace(c) && c != '<' && c != '>' && c != '/' && c != '='
+                && c != '"' && c != '\'';
     }
 
     /**

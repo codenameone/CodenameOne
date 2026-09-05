@@ -1455,6 +1455,71 @@ class LocationButtonManifestFragmentsTest {
                 "a plain jar's classes are its classpath");
     }
     /** A UTF-16 manifest asks for the permission just as plainly. */
+    /** An aar carrying nothing but the given root manifest. */
+    private static void writeAar(File at, String manifest) throws Exception {
+        at.getParentFile().mkdirs();
+        ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(at));
+        try {
+            zip.putNextEntry(new ZipEntry("AndroidManifest.xml"));
+            zip.write(manifest.getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+    }
+
+    @Test
+    void anAliasedAndroidNamespaceIsStillTheAndroidNamespace() throws Exception {
+        // A submitted aar is somebody else's file, and binding the Android
+        // namespace to a prefix of its own is perfectly valid XML. Looking
+        // only for the literal "android:" missed the permission it requests --
+        // and missing it fails in the dangerous direction: exclusive mode is
+        // accepted, and Gradle then merges the background permission in beside
+        // onlyForLocationButton.
+        File root = tempDir("cn1-lb-ns");
+        String manifest = "<manifest xmlns:a=\"http://schemas.android.com/"
+                + "apk/res/android\"><uses-permission a:name=\"android."
+                + "permission.ACCESS_BACKGROUND_LOCATION\"/></manifest>";
+        writeAar(new File(root, "aliased.aar"), manifest);
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresBackgroundLocation(),
+                "an aar that binds the Android namespace to its own prefix is "
+                + "still requesting background location");
+    }
+
+    @Test
+    void anUnprefixedNameIsNotAnAndroidAttribute() throws Exception {
+        // The default namespace does NOT reach attributes: an unprefixed
+        // attribute is in no namespace whatever xmlns= says. Reading a bare
+        // name= as android:name would refuse builds over an attribute that
+        // means nothing to the merger.
+        File root = tempDir("cn1-lb-ns-default");
+        String manifest = "<manifest xmlns=\"http://schemas.android.com/"
+                + "apk/res/android\"><uses-permission name=\"android."
+                + "permission.ACCESS_BACKGROUND_LOCATION\"/></manifest>";
+        writeAar(new File(root, "default-ns.aar"), manifest);
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresBackgroundLocation(),
+                "an unprefixed attribute is in no namespace");
+    }
+
+    @Test
+    void theUriInsideACommentIsNotABinding() throws Exception {
+        // The prefix is discovered by reading BACKWARDS from the URI, so an
+        // occurrence that is not an xmlns attribute must not create one.
+        File root = tempDir("cn1-lb-ns-comment");
+        String manifest = "<manifest xmlns:android=\"http://schemas.android"
+                + ".com/apk/res/android\">"
+                + "<!-- see http://schemas.android.com/apk/res/android -->"
+                + "<uses-permission q:name=\"android.permission."
+                + "ACCESS_BACKGROUND_LOCATION\"/></manifest>";
+        writeAar(new File(root, "commented.aar"), manifest);
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresBackgroundLocation(),
+                "a URI in a comment binds nothing, so q: is just a prefix "
+                + "nobody declared");
+    }
+
     @Test
     void aUtf16ManifestIsDecoded() throws Exception {
         File root = Files.createTempDirectory("cn1-lb-utf16").toFile();
