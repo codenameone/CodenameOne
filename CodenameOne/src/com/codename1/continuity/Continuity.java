@@ -2815,7 +2815,7 @@ public final class Continuity {
         Display.getInstance().startThread(new Runnable() {
             @Override
             public void run() {
-                long deadline = System.currentTimeMillis() + WINDOW_WAIT_MILLIS;
+                final long deadline = System.currentTimeMillis() + WINDOW_WAIT_MILLIS;
                 try {
                     while (System.currentTimeMillis() < deadline) {
                         try {
@@ -2824,7 +2824,13 @@ public final class Continuity {
                             Thread.currentThread().interrupt();
                             break;
                         }
-                        if (haveWindow()) {
+                        // The REMAINING budget, so the question cannot outlast the window it is
+                        // being asked inside. An untimed wait here blocks until the event thread
+                        // reaches the runnable, and a cold launch is exactly when it may not for a
+                        // long time -- a slow device building its first forms. The loop then could
+                        // not recheck its own deadline, so a "bounded 15 seconds" wait ran for as
+                        // long as the event thread was busy.
+                        if (haveWindow(deadline - System.currentTimeMillis())) {
                             break;
                         }
                     }
@@ -2836,7 +2842,7 @@ public final class Continuity {
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
-                            windowWaitFinished();
+                            windowWaitFinished(deadline);
                         }
                     });
                 }
@@ -2857,15 +2863,23 @@ public final class Continuity {
     /// Marshalled rather than guarded. This framework is single threaded on the event thread and
     /// the UI belongs to it; the fix for touching it from elsewhere is to stop doing that, not to
     /// put a lock around state that has no business being shared.
-    private static boolean haveWindow() {
+    private static boolean haveWindow(long budgetMillis) {
+        if (budgetMillis <= 0) {
+            return false;
+        }
         final boolean[] present = new boolean[1];
         try {
+            // The TIMED overload. On timeout it simply returns, leaving `present` false -- "not
+            // yet", which is the same answer a launch with no form gives and which the loop
+            // already handles by going round again or ending on the deadline. The runnable may
+            // run later and write to the array after we have stopped reading it; nothing else
+            // ever looks at it, so that write goes nowhere.
             Display.getInstance().callSeriallyAndWait(new Runnable() {
                 @Override
                 public void run() {
                     present[0] = Display.getInstance().getCurrent() != null;
                 }
-            });
+            }, (int) Math.min(budgetMillis, (long) Integer.MAX_VALUE));
         } catch (Throwable t) {
             // Answering "not yet" keeps the wait going, and the deadline still ends it. The
             // caller's finally reports back either way.
@@ -2875,8 +2889,22 @@ public final class Continuity {
     }
 
     /// The cold-launch wait is over. On the EDT.
-    private static void windowWaitFinished() {
+    ///
+    /// `deadline` is when the window closed, and it is checked HERE as well as in the loop because
+    /// this half runs on the event thread too: the waiter hands back through callSerially, so an
+    /// event thread that was busy past the deadline runs this whenever it recovers. Bounding only
+    /// the wait would have left that -- the arrival dispatched minutes later, replacing whatever
+    /// the user had started doing in the meantime, which is the interruption the bounded window
+    /// exists to rule out.
+    ///
+    /// Past the deadline the state stays PARKED rather than being dropped. Nothing has dealt with
+    /// it, so getRestorableState() goes on offering it and the application can restore it when it
+    /// chooses -- the same answer this method already gives when no form ever appeared.
+    private static void windowWaitFinished(long deadline) {
         waitingForWindow = false;
+        if (deadline > 0 && System.currentTimeMillis() >= deadline) {
+            return;
+        }
         if (Display.getInstance().getCurrent() == null) {
             // Still no form after the whole wait. The state stays parked, so an application that
             // gets going later can still ask for it through getRestorableState().
@@ -3151,7 +3179,17 @@ public final class Continuity {
     /// and this one always has one -- but the drain is the half that matters: it is where a state
     /// that was fresh when it arrived and expired while waiting reaches dispatch().
     static void drainParkedForTest() {
-        windowWaitFinished();
+        // No deadline: the harness is entering the drain directly, not finishing a timed wait.
+        windowWaitFinished(0L);
+    }
+
+    /// Test seam: the same drain, entered after the cold-launch window has already closed.
+    ///
+    /// The event thread being busy past the deadline is the case that cannot be staged here --
+    /// this harness always has a form and a responsive thread -- but the decision it leads to is
+    /// exactly this call, so that is what is pinned.
+    static void drainParkedPastTheWindowForTest() {
+        windowWaitFinished(System.currentTimeMillis() - 1L);
     }
 
     /// Test seam: the marks as they would be reloaded on the next launch.

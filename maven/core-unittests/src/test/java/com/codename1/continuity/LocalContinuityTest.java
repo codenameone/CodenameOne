@@ -7479,6 +7479,51 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * An arrival whose cold-launch window has closed is not dispatched into a running app.
+     *
+     * <p>The wait is documented as bounded, and it was bounded in only one of the two places it
+     * has to be. The waiter asked the event thread whether a window had appeared through an
+     * UNTIMED callSeriallyAndWait, so a thread busy building its first forms blocked the question
+     * itself and the loop could not recheck its own deadline; and the hand-back is a callSerially,
+     * so even a loop that ended on time runs this half whenever the event thread next gets to it.
+     * Either way the continuation could be applied minutes in -- replacing whatever the user had
+     * started doing, which is the interruption the bound exists to rule out.</p>
+     *
+     * <p>It stays PARKED rather than being dropped: nothing dealt with it, so the application can
+     * still take it through getRestorableState() at a moment of its own choosing.</p>
+     */
+    @EdtTest
+    public void anArrivalPastTheColdLaunchWindowIsNotDispatched() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(true);
+        final int[] dispatched = new int[1];
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                dispatched[0]++;
+                return true;
+            }
+        });
+
+        Continuity.parkForTest(fromElsewhere("waited out the window", 140L));
+        Continuity.drainParkedPastTheWindowForTest();
+
+        assertEquals(0, dispatched[0],
+                "an arrival was applied after its bounded window had closed, so it replaces "
+                        + "whatever the user started doing while the event thread was busy");
+        AppState still = Continuity.getRestorableState();
+        assertNotNull(still, "the arrival was dropped rather than left on offer");
+        assertEquals(140L, still.getSequence(),
+                "the arrival that outlived the window is no longer the one on offer");
+
+        // And the ordinary drain still dispatches, or this guard would have turned the cold-launch
+        // hand-over off altogether.
+        Continuity.drainParkedForTest();
+        assertEquals(1, dispatched[0],
+                "the in-window drain stopped dispatching, so nothing is ever handed over");
+    }
+
+    /**
      * clear() empties the shelf, not only the slot.
      *
      * <p>clear() is a logout: nothing from before it survives. A shelved arrival is state from
