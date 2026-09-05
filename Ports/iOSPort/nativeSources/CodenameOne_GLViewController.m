@@ -1599,7 +1599,23 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
                                         kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst,
                                         provider,
                                         NULL,
-                                        NO,
+                                        // shouldInterpolate: YES, matching what
+                                        // this used to produce. The path this
+                                        // replaced ended in
+                                        // CGBitmapContextCreateImage, and an
+                                        // image from a bitmap context carries
+                                        // shouldInterpolate YES; building it
+                                        // directly defaults to whatever is
+                                        // passed here, and NO turns every scaled
+                                        // draw of an ARGB-built image into
+                                        // nearest-neighbour sampling.
+                                        //
+                                        // Invisible at 1:1, which is why it
+                                        // survived: it only shows when the image
+                                        // is drawn at a size other than its own,
+                                        // and then it shows as the whole picture
+                                        // -- a smooth gradient turns blocky.
+                                        YES,
                                         kCGRenderingIntentDefault);
 
     CN1Image *image = nil;
