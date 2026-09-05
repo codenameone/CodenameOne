@@ -3062,6 +3062,28 @@ public class AndroidGradleBuilder extends Executor {
             gpsPermission |= appLocation.usesButton()
                     && !request.getArg("android.blockLocationPermission",
                             "false").equals("true");
+            // The persistent bit as well, which this scan gets RIGHT where
+            // the bytecode one cannot. Attribution there strips a class name at
+            // the first dollar, so an application's own legal top-level
+            // com/codename1/location/LocationManager$999 calling
+            // setLocationListener is read as a framework inner class and its
+            // call dropped -- and exclusive mode is then accepted over a
+            // request that really is being made, which downgrades it to
+            // approximate location.
+            //
+            // I withheld this bit in the commit that added the scan, on the
+            // grounds that widening a build-REFUSING flag to a name search
+            // would refuse builds over a method name that happened to sit in a
+            // constant pool. That was wrong about this scan: callsMethodOn
+            // walks Methodref entries and requires the OWNER class to be
+            // LocationManager as well as the name to match, so it is attributed
+            // -- at least as precise as the bytecode scan, and right about the
+            // dollar-named case the bytecode scan gets wrong.
+            //
+            // The background flag is NOT folded in here: on this tree it can
+            // only come from a manifest inside a staged archive, and archives
+            // the developer submitted are what libsDir covers below.
+            usesPersistentLocation |= appLocation.usesPersistentLocation();
             if (appLocation.usesButton() && !usesLocationButton) {
                 debug("Location button found in the application by the "
                         + "byte-level scan, which reads annotation class "

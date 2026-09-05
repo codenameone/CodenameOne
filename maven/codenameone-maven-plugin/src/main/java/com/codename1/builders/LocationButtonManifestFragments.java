@@ -340,6 +340,13 @@ final class LocationButtonManifestFragments {
             // behind -- a manifest fragment that no longer parses, produced by
             // the very path that is supposed to be tidying it up.
             if (out.charAt(end - 1) != '/') {
+                // The closing tag of THIS element, derived from its opening
+                // tag. declaresPermissionAt accepts any tag beginning
+                // "uses-permission", which includes uses-permission-sdk-23,
+                // and a hard-coded </uses-permission> does not consume
+                // </uses-permission-sdk-23> -- so the opening tag was spliced
+                // out and its closing tag left behind, which is the orphan
+                // that stops the manifest parsing at all.
                 // Past whitespace AND comments, not whitespace alone. A
                 // removal may carry its reason with it --
                 // <uses-permission ... tools:node="remove"><!-- why -->
@@ -350,7 +357,7 @@ final class LocationButtonManifestFragments {
                 // supposed to be tidying it up, which is the very failure the
                 // non-self-closing case was added to fix.
                 int lead = skipIgnorable(tail, 0);
-                String close = "</uses-permission>";
+                String close = "</" + elementName(out, start) + ">";
                 if (tail.regionMatches(lead, close, 0, close.length())) {
                     tail = tail.substring(lead + close.length());
                 }
@@ -364,6 +371,27 @@ final class LocationButtonManifestFragments {
             at = out.indexOf(name);
         }
         return out;
+    }
+
+    /**
+     * The element's tag name, read off its opening tag.
+     *
+     * @param text  the block
+     * @param start the index of the {@code <}
+     * @return the name between it and the first space, slash or {@code >}
+     */
+    private static String elementName(String text, int start) {
+        int at = start + 1;
+        int end = at;
+        while (end < text.length()) {
+            char c = text.charAt(end);
+            if (c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '/'
+                    || c == '>') {
+                break;
+            }
+            end++;
+        }
+        return text.substring(at, end);
     }
 
     /**

@@ -137,6 +137,48 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aDollarNamedTopLevelClasssPersistentCallIsTheApplications()
+            throws Exception {
+        // The bytecode scan attributes by stripping a class name at the first
+        // dollar, so an application's own legal top-level
+        // com/codename1/location/LocationManager$999 is read as a framework
+        // inner class and its setLocationListener call is dropped -- and
+        // exclusive mode is then accepted over a request that really is being
+        // made. This scan reads the metadata instead, so it gets it right, and
+        // the builder now consumes that answer.
+        File root = tempDir("cn1-lb-dollar-persistent");
+        writePoolClass(new File(root,
+                        "com/codename1/location/LocationManager$999.class"),
+                cpUtf8("com/codename1/location/LocationManager"),
+                cpOne(7, 1),
+                cpUtf8("setLocationListener"),
+                cpUtf8("(Lcom/codename1/location/LocationListener;)V"),
+                cpTwo(12, 3, 4),
+                cpTwo(10, 2, 5));
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesPersistentLocation(),
+                "a top-level class that merely has a dollar in its name is the "
+                + "application's, and its tracking call is the application's");
+    }
+
+    @Test
+    void anSdk23RemovalIsClosedWithItsOwnTag() {
+        // declaresPermissionAt accepts any tag beginning "uses-permission",
+        // which includes uses-permission-sdk-23. A hard-coded
+        // </uses-permission> does not consume </uses-permission-sdk-23>, so
+        // the opening tag was spliced out and its closing tag left behind --
+        // and an orphan closing tag stops the manifest parsing at all.
+        String sdk23 = "    <uses-permission-sdk-23 android:name=\"android."
+                + "permission.ACCESS_FINE_LOCATION\" tools:node=\"remove\">"
+                + "</uses-permission-sdk-23>\n";
+        String out = LocationButtonManifestFragments.inject(sdk23, false);
+        assertFalse(out.contains("</uses-permission-sdk-23>"),
+                "no closing tag may be left without its opening one: " + out);
+        assertFalse(out.contains("tools:node"),
+                "the removal itself is gone: " + out);
+    }
+
+    @Test
     void aRelocatedClassIsNotMistakenForTheFrameworks() throws Exception {
         // The loose-file path used to be normalised by searching the whole
         // filesystem path for com/codename1/ and truncating there, so an
@@ -1431,8 +1473,16 @@ class LocationButtonManifestFragmentsTest {
     }
 
     /**
-     * An anonymous inner class still is. A Java identifier cannot begin with a
-     * digit, so $1 is only ever the compiler's.
+     * An anonymous inner class still is -- established by its InnerClasses
+     * METADATA, not by the shape of its name.
+     *
+     * <p>An earlier version of this comment argued that "$7 is only ever the
+     * compiler's, because a Java identifier cannot begin with a digit". That
+     * is wrong: a digit is a legal identifier PART, so
+     * {@code LocationManager$999} is a name a library may legally give a
+     * top-level class, and reading it as the framework's is how a real call
+     * gets attributed away. The fixture below writes the InnerClasses
+     * attribute for that reason.</p>
      */
     @Test
     void anAnonymousFrameworkInnerClassIsStillFiltered() throws Exception {
@@ -1445,6 +1495,7 @@ class LocationButtonManifestFragmentsTest {
                 .scanForLocationUsage(root).usesButton(),
                 "the framework's own anonymous class must not charge the app");
     }
+
     /**
      * A removal written with a separate closing tag has to go entirely.
      * Deleting only the opening element left {@code </uses-permission>}
