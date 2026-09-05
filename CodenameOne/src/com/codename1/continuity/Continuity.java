@@ -2154,7 +2154,7 @@ public final class Continuity {
         if (!Display.isInitialized()) {
             // No event thread yet, so there is nothing to marshal to and nothing running that
             // could be racing this. Held for the EDT that is about to start.
-            parked = state;
+            placeOnOffer(state);
             return;
         }
         // The generation the arrival BELONGS to, read here rather than on the event thread,
@@ -2420,7 +2420,7 @@ public final class Continuity {
                 // call that meaning is documented to make. Whichever the application meant, the
                 // hold ends when it says so rather than being guessed at here.
                 if (!isAlreadyActedOn(state)) {
-                    parked = state;
+                    placeOnOffer(state);
                 }
                 return;
             }
@@ -2470,6 +2470,12 @@ public final class Continuity {
     }
 
     /// Puts a state on offer, without silently losing the one it replaces.
+    ///
+    /// EVERY path that offers a state comes through here, and that is the point rather than a
+    /// tidiness: the bookkeeping was added at two of the five and a listener that declines two
+    /// arrivals in a row still lost the first. The others are a cold-launch hold, the wait for a
+    /// first window, and the pre-enable hold -- each of them a place where a second arrival can
+    /// find one already waiting.
     ///
     /// The slot holds one arrival, which is right: `getRestorableState()` answers with a state,
     /// and an application that has not dealt with the last one does not want a queue growing
@@ -2538,7 +2544,7 @@ public final class Continuity {
     /// state: it sleeps, asks the event thread whether a window has appeared, and hands the
     /// decision back to it.
     private static void park(AppState state) {
-        parked = state;
+        placeOnOffer(state);
         if (waitingForWindow) {
             return;
         }
@@ -2872,7 +2878,7 @@ public final class Continuity {
 
     /// Test seam: parks a state, as a cold-launch arrival with no form yet does.
     static void parkForTest(AppState state) {
-        parked = state;
+        placeOnOffer(state);
     }
 
     /// Test seam: the cold-launch drain, entered exactly where the waiter enters it.
@@ -3435,7 +3441,7 @@ public final class Continuity {
                 // recovery the port used to provide, in the place that actually holds the state.
                 // False is still returned for a port that is holding one too: the two copies
                 // dedup on (origin, sequence) at admission.
-                parked = state;
+                placeOnOffer(state);
                 return false;
             }
             deliver(state);

@@ -4536,6 +4536,54 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A listener that holds two arrivals in a row does not lose the first.
+     *
+     * <p>Returning false keeps an arrival on offer -- the documented prompt-then-restore pattern.
+     * Do it for device A and then for device B before A is resolved and B replaced A in the slot,
+     * with A's mark still recorded, so A could never be offered again in that run. The
+     * bookkeeping that makes a replacement recoverable was added at two of the five places a
+     * state is put on offer, and this is one of the three it missed.</p>
+     */
+    @EdtTest
+    public void aListenerHoldingTwoArrivalsDoesNotLoseTheFirst() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(true);
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                // "I will prompt and call restore() when the user accepts."
+                return false;
+            }
+        });
+
+        AppState fromPhone = new AppState()
+                .setPayload(payloadWith("from the phone"))
+                .setDeviceId("phone").setSequence(1L)
+                .setTimestamp(System.currentTimeMillis());
+        AppState fromTablet = new AppState()
+                .setPayload(payloadWith("from the tablet"))
+                .setDeviceId("tablet").setSequence(1L)
+                .setTimestamp(System.currentTimeMillis());
+
+        Continuity.deliver(fromPhone);
+        flushSerialCalls();
+        Continuity.deliver(fromTablet);
+        flushSerialCalls();
+
+        assertNull(Continuity.readSeenForTest().get("phone"),
+                "a durable mark was left for a held state that was never completed");
+
+        // The phone's work comes round again -- another Handoff, or the next relay read. It has
+        // to be offerable, because nothing ever dealt with it.
+        Continuity.deliver(fromPhone);
+        flushSerialCalls();
+        AppState back = Continuity.getRestorableState();
+        assertNotNull(back, "the phone's held state came back to nothing");
+        assertEquals("phone", back.getDeviceId(),
+                "the state the listener was holding for the phone was refused as already seen "
+                        + "after the tablet's replaced it, so it is lost for the rest of the run");
+    }
+
+    /**
      * An offer replaced by one from ANOTHER device can be delivered again.
      *
      * <p>The slot holds one arrival, which is right, and replacing it is right when the two come
