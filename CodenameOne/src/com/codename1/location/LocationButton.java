@@ -223,6 +223,22 @@ public class LocationButton extends Container {
     /// they look at it, and every write is on the EDT as well.
     private int systemButtonGeneration;
 
+    /// Which system button the grant sitting in [#WAITING] came from.
+    ///
+    /// A queued grant is a tap the user already made and the platform already
+    /// answered, so it waits its turn rather than being dropped. But a setter
+    /// can replace the control while it waits, and then the grant belongs to a
+    /// peer that is gone: serving it would start a lookup against a session
+    /// nobody granted and report the result as the untapped replacement's.
+    ///
+    /// So the stamp is kept with the entry and rechecked on the way out. A
+    /// grant that lost its button is ANSWERED rather than discarded -- see
+    /// [#serveNextWaiting()] -- because a tap that is never reported at all is
+    /// the failure this queue exists to prevent.
+    ///
+    /// A button is in the list at most once, so one field is enough.
+    private int waitingGeneration;
+
     /// Creates a button labelled "Precise location".
     public LocationButton() {
         this(TEXT_PRECISE_LOCATION);
@@ -710,6 +726,7 @@ public class LocationButton extends Container {
                     // is what an earlier revision did, and it turned "two
                     // buttons corrupt each other's request" into "the second
                     // button never reports anything".
+                    waitingGeneration = generation;
                     if (!WAITING.contains(LocationButton.this)) {
                         WAITING.add(LocationButton.this);
                     }
@@ -785,9 +802,19 @@ public class LocationButton extends Container {
         LocationButton found = null;
         while (found == null && !WAITING.isEmpty()) {
             LocationButton candidate = WAITING.remove(0);
-            if (!candidate.unavailable) {
-                found = candidate;
+            if (candidate.unavailable) {
+                continue;
             }
+            if (candidate.waitingGeneration != candidate.systemButtonGeneration) {
+                // The control that earned this grant was replaced while the
+                // grant waited. Answering it is the honest outcome: the tap
+                // happened and produced no location. Serving it instead would
+                // run a lookup against a session nobody granted and hand the
+                // result to listeners as the untapped replacement's.
+                candidate.fire(null);
+                continue;
+            }
+            found = candidate;
         }
         if (found == null) {
             return;
@@ -798,6 +825,14 @@ public class LocationButton extends Container {
             public void run() {
                 if (next.unavailable) {
                     // Failed between being dequeued and running.
+                    serveNextWaiting();
+                    return;
+                }
+                if (next.waitingGeneration != next.systemButtonGeneration) {
+                    // Replaced between being dequeued and running, which the
+                    // drain above cannot see because it already let this one
+                    // through. Same answer as there.
+                    next.fire(null);
                     serveNextWaiting();
                     return;
                 }

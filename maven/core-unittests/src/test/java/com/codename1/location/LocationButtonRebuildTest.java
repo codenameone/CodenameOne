@@ -74,15 +74,11 @@ class LocationButtonRebuildTest extends UITestBase {
         public void setButtonEnabled(PeerComponent button, boolean enabled) {
         }
 
-        /**
-         * Null, which is what a platform that granted nothing usable answers.
-         * These tests are about which control a callback belongs to, not about
-         * what a served grant then produces, and a null manager keeps the
-         * served path from reaching for a location this module has no way to
-         * supply.
-         */
+        /** Whatever the test installed, or null: a platform with nothing. */
+        private LocationManager granted;
+
         public LocationManager getGrantedLocationManager() {
-            return null;
+            return granted;
         }
 
         public PeerComponent createButton(int textType, int backgroundColor,
@@ -101,6 +97,116 @@ class LocationButtonRebuildTest extends UITestBase {
             // counter came out two higher than there were controls.
             return new FakePeer();
         }
+    }
+
+    /**
+     * A manager whose lookup PARKS until the test releases it, the way a real
+     * one does while the platform is finding a fix.
+     *
+     * <p>Through {@code invokeAndBlock}, not a plain wait: the request runs on
+     * the EDT, and stopping the EDT dead would keep the second button's own
+     * callback from ever being delivered -- which is the state this test needs
+     * to reach.</p>
+     */
+    private static final class ParkingManager extends LocationManager {
+        private final Object lock = new Object();
+        private boolean released;
+        private int lookups;
+
+        @Override
+        public Location getCurrentLocationSync(long timeout) {
+            lookups++;
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                public void run() {
+                    synchronized (lock) {
+                        while (!released) {
+                            try {
+                                lock.wait(50);
+                            } catch (InterruptedException ignored) {
+                                return;
+                            }
+                        }
+                    }
+                }
+            });
+            return null;
+        }
+
+        private void release() {
+            synchronized (lock) {
+                released = true;
+                lock.notifyAll();
+            }
+        }
+
+        @Override
+        public Location getCurrentLocation() {
+            return null;
+        }
+
+        @Override
+        public Location getLastKnownLocation() {
+            return null;
+        }
+
+        @Override
+        protected void bindListener() {
+        }
+
+        @Override
+        protected void clearListener() {
+        }
+
+        @Override
+        protected void bindBackgroundListener() {
+        }
+
+        @Override
+        protected void clearBackgroundListener() {
+        }
+    }
+
+    @Test
+    void aQueuedGrantWhoseButtonWasRebuiltIsAnsweredRatherThanServed() {
+        RecordingBridge bridge = install();
+        ParkingManager manager = new ParkingManager();
+        bridge.granted = manager;
+
+        LocationButton first = new LocationButton();
+        LocationButton second = new LocationButton();
+        final int[] secondAnswers = new int[1];
+        second.addLocationSharedListener(new LocationSharedListener() {
+            public void locationShared(Location location) {
+                secondAnswers[0]++;
+            }
+        });
+        assertEquals(2, bridge.sessions.size());
+
+        // The first button is granted and its lookup parks, holding the slot.
+        bridge.sessions.get(0).onResult.onSucess(Boolean.TRUE);
+        drain();
+        assertEquals(1, manager.lookups, "the first lookup should be running");
+
+        // The second is granted while that one is in flight, so it QUEUES.
+        bridge.sessions.get(1).onResult.onSucess(Boolean.TRUE);
+        drain();
+        assertEquals(0, secondAnswers[0], "queued, so not answered yet");
+
+        // And now a setter replaces the second button while its grant waits.
+        second.setTextType(LocationButton.TEXT_USE_PRECISE_LOCATION);
+
+        // Releasing the first drains the queue.
+        manager.release();
+        drain();
+        drain();
+
+        assertEquals(1, manager.lookups,
+                "the queued grant belonged to a control that is gone, so it "
+                + "must not start a lookup against a session nobody granted");
+        assertEquals(1, secondAnswers[0],
+                "but the tap still happened, so it is ANSWERED -- a grant that "
+                + "is silently dropped is the failure this queue exists to "
+                + "prevent");
     }
 
     private RecordingBridge install() {

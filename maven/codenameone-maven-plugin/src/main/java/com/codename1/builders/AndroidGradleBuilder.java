@@ -1098,6 +1098,42 @@ public class AndroidGradleBuilder extends Executor {
     /// ship, which is not this change's business.
     private boolean appBackgroundLocation;
 
+    /// True when this reference is the APPLICATION asking for background
+    /// location, as opposed to the framework staged beside it.
+    ///
+    /// EXACT names and exact methods, unlike the prefix and substring tests
+    /// that set `backgroundLocationPermission` beside every call to this. Those
+    /// have always been loose and it cost nothing: the worst a
+    /// `LocationManagerHelper` calling `addGeoFencingLater` bought was a
+    /// background permission it did not need. This flag REFUSES the build
+    /// alongside `android.locationButton.exclusive`, so a name that merely
+    /// starts with or contains the right thing would turn a historical
+    /// over-grant into a build the developer cannot make.
+    static boolean appOwnsBackgroundLocation(String cls, String method,
+            String scanningType) {
+        return "com/codename1/location/LocationManager".equals(cls)
+                && ("addGeoFencing".equals(method)
+                        || "setBackgroundLocationListener".equals(method))
+                && !LocationButtonManifestFragments
+                        .isFrameworkOwner(scanningType);
+    }
+
+    /// True when the APPLICATION itself references the geofencing API.
+    ///
+    /// Exact for the reason above. The legacy test beside this one asks whether
+    /// the name CONTAINS `com/codename1/location/Geofence`, which an
+    /// application's own `GeofenceHelper` satisfies. Nested classes are the
+    /// framework's own and count.
+    static boolean appOwnsGeofencing(String cls, String scanningType) {
+        return ("com/codename1/location/Geofence".equals(cls)
+                        || "com/codename1/location/GeofenceManager".equals(cls)
+                        || cls.startsWith("com/codename1/location/Geofence$")
+                        || cls.startsWith(
+                                "com/codename1/location/GeofenceManager$"))
+                && !LocationButtonManifestFragments
+                        .isFrameworkOwner(scanningType);
+    }
+
     /// The identifier of the highest platform this machine has installed --
     /// "37.0", not "37".
     ///
@@ -2367,9 +2403,8 @@ public class AndroidGradleBuilder extends Executor {
                             playFlag = "false";
                             if (targetSDKVersionInt >= 29) {
                                 backgroundLocationPermission = true;
-                                appBackgroundLocation |=
-                                        !LocationButtonManifestFragments
-                                                .isFrameworkOwner(scanningLocationType);
+                                appBackgroundLocation |= appOwnsGeofencing(cls,
+                                        scanningLocationType);
                             }
                         }
                     }
@@ -2865,9 +2900,8 @@ public class AndroidGradleBuilder extends Executor {
                         if (!"true".equals(playServicesValue)) {
                             if (targetSDKVersionInt >= 29) {
                                 backgroundLocationPermission = true;
-                                appBackgroundLocation |=
-                                        !LocationButtonManifestFragments
-                                                .isFrameworkOwner(scanningLocationType);
+                                appBackgroundLocation |= appOwnsBackgroundLocation(cls,
+                                        method, scanningLocationType);
                             }
                         }
                     }
@@ -3540,6 +3574,29 @@ public class AndroidGradleBuilder extends Executor {
             if (conflict != null) {
                 error("Error: " + conflict, new RuntimeException());
                 return false;
+            }
+            if (locationButtonExclusive) {
+                // The legacy flag as well, which the conflict check above
+                // deliberately does not read: it is set by unattributed tests
+                // that the framework's own GeofenceManager trips in every build
+                // ever made, so reading it would refuse the hint for the
+                // button-only app it exists for.
+                //
+                // But the MANIFEST reads it, and that is the half this missed.
+                // An accepted exclusive build still emitted
+                // ACCESS_BACKGROUND_LOCATION beside onlyForLocationButton --
+                // asking for persistent background location while declaring
+                // that the fine-location grant is the button's alone, which is
+                // the exact contradiction this block exists to prevent. It also
+                // switched on the runtime background path for a permission the
+                // app can never be granted.
+                //
+                // Scoped to exclusivity ACCEPTED, so no build that does not set
+                // the hint changes: the worry recorded on appBackgroundLocation
+                // -- that tightening the legacy flag would change which
+                // permissions existing apps ship -- does not apply here,
+                // because the hint is this branch's own.
+                backgroundLocationPermission = false;
             }
             log("Location button fragments version "
                     + LocationButtonManifestFragments.FRAGMENT_VERSION
