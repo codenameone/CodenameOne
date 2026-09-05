@@ -944,6 +944,22 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// Secondary windows can sit on a monitor with a different transform --
     /// see canvasScale() -- but this question is asked of the Display as a
     /// whole, so it answers for the main one.
+    ///
+    /// retinaScale is captured once at start-up and is NOT re-read when the main
+    /// window is dragged to a monitor with a different scale. That is deliberate
+    /// here rather than an oversight, and reading the current GraphicsConfiguration
+    /// instead would make this WRONG: the main canvas renders at exactly this
+    /// value. canvasScale() returns retinaScale for windowId 0, and that is what
+    /// sizes the surface, allocates the backing buffer, and sets the blit, paint
+    /// and pointer scales. Reporting a scale the renderer is not using would hand
+    /// callers a number their artwork then fails to match, which is the very
+    /// mismatch the question is asked to avoid.
+    ///
+    /// The main window not following its display IS a real limitation, but it is
+    /// one of the rendering path: the fix is for canvasScale() to track the
+    /// canvas's configuration for window 0 as it already does for the others, at
+    /// which point this method follows for free because it reports whatever the
+    /// port draws with. Changing only this accessor would just split the two.
     @Override
     public float getDevicePixelRatio() {
         return retinaScale > 0 ? (float) retinaScale : super.getDevicePixelRatio();
