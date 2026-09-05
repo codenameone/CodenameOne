@@ -1389,6 +1389,27 @@ public final class Continuity {
             return;
         }
         polling = false;
+        if (!fetchFailed && fetched != null
+                && (fetched.getDeviceId() == null || fetched.getDeviceId().length() == 0)) {
+            // A document the relay HELD but this build cannot use: an origin is the key every
+            // mark and every dedup decision is made against, so admit() can only log it and drop
+            // it. Counting the read as successful anyway is what does the damage -- it clears
+            // fetchUnread and releases a checkpoint queued during the GET, and that publish
+            // overwrites the relay's only copy of remote work nothing here could read.
+            //
+            // Treated as a FAILED read instead, which is what it is: the document stays where it
+            // is, the publisher stays held, and a sender that names itself can replace it.
+            //
+            // Here rather than in the codec, because the codec also reads states this device
+            // built -- a round trip through toMap must not start requiring an origin AppState
+            // itself does not require -- and here it covers every StateRelay rather than only the
+            // one shipped with the framework.
+            Log.p("Continuity: the relay returned a state with no device id. Every state has to "
+                    + "carry the id of the device it came from, or nothing can tell it apart from "
+                    + "the states already seen. Treated as a failed read.");
+            fetchFailed = true;
+            fetched = null;
+        }
         // Recorded, because `polling` stops being true the moment this returns and the hold below
         // would then last only until the next checkpoint -- which is not what "anything owed
         // waits for a read that succeeds" says. The comment was making a promise the code kept

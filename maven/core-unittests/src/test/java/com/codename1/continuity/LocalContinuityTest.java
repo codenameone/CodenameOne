@@ -4573,6 +4573,49 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A relay document with no origin is a failed read, so the publisher stays held.
+     *
+     * <p>An origin is the key every mark and every dedup decision is made against, so admit() can
+     * only log such a state and drop it. Counting the read as successful anyway is what does the
+     * damage: it clears the unread flag and releases a checkpoint queued during the GET, and that
+     * publish overwrites the relay's only copy of remote work nothing here could read.</p>
+     */
+    @EdtTest
+    public void aRelayDocumentWithNoOriginIsAFailedRead() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+
+        final java.util.concurrent.atomic.AtomicInteger reads =
+                new java.util.concurrent.atomic.AtomicInteger();
+        Continuity.setRelay(new StateRelay() {
+            public void publish(AppState state) {
+                published.add(state);
+            }
+
+            public AppState fetch() {
+                reads.incrementAndGet();
+                // Recognisable -- it has a sequence -- and unusable, because it names no device.
+                return new AppState().setSequence(360L).setTimestamp(System.currentTimeMillis());
+            }
+        });
+        pause(300L);
+        flushSerialCalls();
+        assertTrue(reads.get() > 0, "the relay was never read, so this test is about nothing");
+
+        // A checkpoint queued while that read was outstanding must NOT go out: the document on the
+        // relay is remote work this build could not read, and publishing over it destroys it.
+        int before = published.size();
+        Continuity.checkpoint();
+        pause(300L);
+        flushSerialCalls();
+        assertEquals(before, published.size(),
+                "a checkpoint was published over a relay document this build could not read, so "
+                        + "the other device's only copy is gone");
+    }
+
+    /**
      * A continuation held by BOTH the port and the framework is delivered once.
      *
      * <p>A port may retain the same continuation its pre-enable callback declined, so both it and
