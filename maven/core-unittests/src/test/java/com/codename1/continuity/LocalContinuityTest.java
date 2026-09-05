@@ -3693,6 +3693,89 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A callback delivered from a foreign thread is still claimed and still delivered.
+     *
+     * <p>A REGRESSION GUARD, not a probe of the change it came with. The decision moved onto the
+     * event thread because it reads `enabled` and the application's choice, which that thread
+     * owns -- reading them from elsewhere was argued safe in one direction, since a decline is
+     * recoverable when the port retains and re-offers, and that argument died the moment the
+     * "off" answer became a CLAIM: a claim drops the activity, so a stale read there loses an
+     * arrival outright rather than delaying it.</p>
+     *
+     * <p>That is a memory-visibility fix and nothing in a test can demonstrate it: the harness
+     * has no failing publication to expose, and this test passes against the code without it.
+     * What it does pin is the behaviour the marshalling must not break -- a port calling from its
+     * own thread is told the activity was taken, and the arrival actually arrives.</p>
+     */
+    @EdtTest
+    public void aCallbackFromAForeignThreadIsStillClaimedAndDelivered() {
+        Continuity.enable();
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(true);
+        final ContinuityCallback callback = Continuity.callbackForTest();
+        final Map<String, Object> info =
+                StateCodec.toMap(fromElsewhere("from a background thread", 270L));
+        final java.util.concurrent.atomic.AtomicBoolean claimed =
+                new java.util.concurrent.atomic.AtomicBoolean();
+        final java.util.concurrent.atomic.AtomicBoolean onEdt =
+                new java.util.concurrent.atomic.AtomicBoolean(true);
+        final java.util.concurrent.CountDownLatch done =
+                new java.util.concurrent.CountDownLatch(1);
+
+        Display.getInstance().startThread(new Runnable() {
+            public void run() {
+                onEdt.set(Display.getInstance().isEdt());
+                claimed.set(callback.continuationReceived(Continuity.getActivityType(), info));
+                done.countDown();
+            }
+        }, "continuity foreign caller").start();
+
+        for (int i = 0; i < 40 && done.getCount() > 0; i++) {
+            pause(50L);
+            flushSerialCalls();
+        }
+        assertEquals(0L, done.getCount(), "the foreign caller never returned");
+        assertFalse(onEdt.get(), "the fixture ran on the event thread, so it tests nothing");
+        assertTrue(claimed.get(),
+                "the framework declined an arrival it had taken responsibility for, so the port "
+                        + "is entitled to hand it to something else");
+
+        for (int i = 0; i < 20 && provider.restored == null; i++) {
+            pause(50L);
+            flushSerialCalls();
+        }
+        assertNotNull(provider.restored,
+                "the arrival was claimed and then never delivered, which is the one outcome a "
+                        + "claim must not produce");
+    }
+
+    /**
+     * An inbound device id too long to store is a failed read, not a parked arrival.
+     *
+     * <p>Refused where an oversized title is dropped, and the two are not alike: a title is a
+     * label a receiving device may show, while the origin id is the key every mark and every dedup
+     * decision is made against -- admit() refuses a state without one anyway. Carrying it is what
+     * does damage: commit() writes it through Util.writeUTF, which throws every time, so the
+     * arrival is parked, re-applied on every retry and holds every relay publication behind it.</p>
+     */
+    @EdtTest
+    public void anInboundDeviceIdTooLongToStoreIsAFailedRead() throws Exception {
+        StringBuilder huge = new StringBuilder();
+        for (int i = 0; i < 70000; i++) {
+            huge.append('d');
+        }
+        Map<String, Object> wire = new HashMap<String, Object>();
+        wire.put("device", huge.toString());
+        wire.put("seq", "280");
+        wire.put("routes", java.util.Arrays.asList("/orders"));
+
+        assertNull(StateCodec.fromMap(wire),
+                "an origin id no checkpoint can hold was carried into the state, so commit() "
+                        + "throws on it every time and the arrival is never let go of");
+    }
+
+    /**
      * A bridge is given the framework's callback once, however many listeners register.
      *
      * <p>ContinuityBridge documents that setCallback is called once, and every

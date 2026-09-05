@@ -3105,6 +3105,38 @@ public final class Continuity {
             if (activityType == null || !activityType.equals(getActivityType())) {
                 return false;
             }
+            // MARSHALLED when this is not the event thread, and everything below then runs on it.
+            //
+            // ContinuityCallback lets a port call this from any thread, and the decision below
+            // reads `enabled` and `applicationHasChosen`, which the event thread owns. Reading
+            // them from elsewhere used to be argued safe in one direction -- a decline is
+            // recoverable, because the port retains the activity and offers it again -- and that
+            // argument stopped holding when the "off" answer became a CLAIM: a claim drops the
+            // activity, so a stale read there loses an arrival outright rather than delaying it.
+            //
+            // Claimed on the way out, because that is the truth: this framework has taken the
+            // activity and will deal with it. Nothing else answers to this application's own
+            // activity type, which the check above has already established.
+            //
+            // Every port shipped here already marshals -- the iOS one hands over through
+            // callSerially, the simulator's hooks are dispatched on the event thread -- so this
+            // is the guarantee for a bridge written elsewhere, not a change to how ours behave.
+            if (Display.isInitialized() && !Display.getInstance().isEdt()) {
+                final Map<String, Object> info = userInfo;
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        decide(info);
+                    }
+                });
+                return true;
+            }
+            return decide(userInfo);
+        }
+
+        /// The decision itself, on the event thread -- or before there is one, where nothing else
+        /// is running to race it and deliver() parks the arrival for the EDT that is starting.
+        private boolean decide(Map<String, Object> userInfo) {
             if (!enabled) {
                 // The answer is the application's own choice, and the two states that share
                 // `enabled == false` want opposite ones.
@@ -3129,10 +3161,10 @@ public final class Continuity {
                 // its own type so no other handler could take it, while the port's retention was
                 // written for a decline that never came.
                 //
-                // Both flags are read here from the platform's thread, which the rest of this
-                // method deliberately avoids. It is safe in the one direction that matters: a
-                // decline is RECOVERABLE -- the activity is retained and re-offered -- so losing
-                // the race can only delay the delivery, never lose it.
+                // Both flags are read on the EVENT THREAD, which owns them -- see the
+                // marshalling in continuationReceived. They used to be read from whatever thread
+                // the port called on, argued safe because a decline is recoverable; that argument
+                // died the moment the "off" answer became a claim.
                 return applicationHasChosen;
             }
             AppState state = StateCodec.fromMap(userInfo);

@@ -333,6 +333,23 @@ public final class StateCodec {
                     + "understands it can still use it.");
         }
         requireType(m, KEY_DEVICE, String.class, "a string");
+        Object device = m.get(KEY_DEVICE);
+        if (device instanceof String && exceedsWritableLength((String) device)) {
+            // REFUSED, where an oversized title is dropped. The two are not alike: a title is a
+            // label a receiving device may show, and losing it costs a nicety, while the origin
+            // id is the key every mark and every dedup decision is made against -- a state
+            // without one is refused by admit() anyway, so dropping it would only move the
+            // refusal somewhere less clear.
+            //
+            // Carrying it is the answer that does damage: commit() writes the id through
+            // Util.writeUTF, which throws on it every time, so the arrival is parked, re-applied
+            // on every retry and holds every relay publication behind it -- after the provider
+            // and the route rebuild have already run.
+            throw new IOException("The continuity relay returned a document whose device id is "
+                    + "longer than " + MAX_STRING_BYTES + " bytes of modified UTF-8, which is "
+                    + "more than a stored checkpoint can hold. Treated as a failed read, so the "
+                    + "document stays where a sender that fixes it can replace it.");
+        }
         requireType(m, KEY_TITLE, String.class, "a string");
         requireNumberLike(m, KEY_SEQUENCE);
         requireNumberLike(m, KEY_TIMESTAMP);
