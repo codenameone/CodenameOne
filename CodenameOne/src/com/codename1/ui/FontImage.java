@@ -7752,7 +7752,21 @@ public final class FontImage extends Image {
 
     private static final int MATERIAL_PIXEL_CACHE_LIMIT = 64;
 
-    private static Font materialAtPixels(int px) {
+    /// Synchronised, on the same monitor its own dependency already uses.
+    ///
+    /// Core Codename One does not lock as a rule -- it runs on one event
+    /// dispatch thread and its state does not need it. Fonts are the exception
+    /// the class already made: getMaterialDesignFont() below is
+    /// `static synchronized` and has been for as long as it has existed, because
+    /// nothing stops an application deriving a font from a worker thread. This
+    /// method therefore ALREADY took the class monitor on its first statement,
+    /// and only the part that reads and fills the map was left outside it, where
+    /// two threads could publish a map over each other or resize one another's.
+    ///
+    /// Extending the same lock over the whole lookup costs nothing measurable:
+    /// the call was serialised on this monitor either way, and what it guards is
+    /// a map lookup whose miss is a font derive that dwarfs it.
+    private static synchronized Font materialAtPixels(int px) {
         Font base = getMaterialDesignFont();
         java.util.HashMap<Integer, Font> cache = (java.util.HashMap<Integer, Font>)
                 Display.getInstance().extractHardRef(materialByPixels);
