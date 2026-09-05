@@ -597,6 +597,24 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void algorithmIdentifierCarriesAtMostOneParametersField() {
+        // AlgorithmIdentifier ::= SEQUENCE { OID, parameters ANY OPTIONAL }.
+        // Reading the OID and stopping accepted { rsaEncryption, NULL, NULL }.
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY",
+                Base64.encodeNoNewline(
+                        hex("3014 300f 0609 2a864886f70d010101 0500 0500 030100")))));
+    }
+
+    @Test
+    void aBitStringOfOnlyItsUnusedBitsOctetIsRejected() {
+        // "03 01 00" is a one-byte BIT STRING whose single octet is the
+        // unused-bits count, so it carries no key material -- the length check
+        // has to demand more than that one byte of metadata.
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY",
+                Base64.encodeNoNewline(hex("3012 300d 0609 2a864886f70d010101 0500 030100")))));
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));

@@ -33,6 +33,16 @@ import com.codename1.util.StringUtil;
 /// SEC1 container rather than the one the bridge wants. This class absorbs
 /// both differences so callers do not have to run `openssl` first.
 ///
+/// Validation stops at structure. This class checks what it walks, classifies
+/// on, or rebuilds -- container shape, mandatory fields, element bounds -- so a
+/// blob it cannot honestly convert is refused here, naming the problem rather
+/// than leaving the platform to answer "invalid key format". It deliberately
+/// does not check that the key material is usable. "The platform bridge rejects
+/// this encoding" is not a workable line to draw, because the platform also
+/// rejects a structurally perfect SubjectPublicKeyInfo whose modulus is one
+/// byte; deciding whether a well-formed key is a valid RSA or EC key belongs to
+/// the provider and cannot be reproduced portably here.
+///
 /// Nothing here is exposed publicly; the entry points are the `fromPem`
 /// factories on [PublicKey] and [PrivateKey].
 final class Pem {
@@ -126,6 +136,16 @@ final class Pem {
         }
         c.enter(0x30);
         byte[] oid = c.read(0x06);
+        // AlgorithmIdentifier ::= SEQUENCE { algorithm OID, parameters ANY
+        // DEFINED BY algorithm OPTIONAL } -- at most one parameters element,
+        // and nothing after it. Stopping at the OID accepted { OID, NULL, NULL }.
+        if (c.hasMore()) {
+            c.skip();
+        }
+        if (c.hasMore()) {
+            throw new CryptoException("malformed key: AlgorithmIdentifier carries more than one "
+                    + "parameters field");
+        }
         if (equal(oid, OID_RSA)) {
             return PublicKey.RSA;
         }
@@ -160,7 +180,9 @@ final class Pem {
             if (!c.hasMore() || c.peek() != 0x03) {
                 return SHAPE_UNKNOWN;
             }
-            return c.consume(0x03) > 0 && !c.hasMore() ? SHAPE_SPKI : SHAPE_UNKNOWN;
+            // A BIT STRING's first content octet counts unused bits, so a
+            // length of one is metadata and no key material at all.
+            return c.consume(0x03) > 1 && !c.hasMore() ? SHAPE_SPKI : SHAPE_UNKNOWN;
         }
         if (c.peek() != 0x02) {
             return SHAPE_UNKNOWN;
