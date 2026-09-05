@@ -1088,11 +1088,17 @@ public final class Continuity {
         // `failed` is the distinction `shown` cannot make. False means both "there was no form to
         // show, and that is success" and "this did not work", which need opposite handling here --
         // the same conflation that put two flags in capture() and in checkpoint().
-        settleShelved(state);
+        boolean shelfSettled = settleShelved(state);
         if (supersedesParked(state)) {
             parked = null;
             // The slot is what holds a publication back; the decision has been made, so anything
             // waiting on it can go out now.
+            startPublisher();
+        } else if (shelfSettled) {
+            // The SHELF held it too, and settling a shelved arrival without touching the slot is
+            // an ordinary path: a listener keeps its own reference to what it deferred and
+            // acknowledges that, rather than promoting it first. startPublisher() rechecks
+            // whatever else is still on offer, so this cannot release a hold that is still owed.
             startPublisher();
         }
         return shown;
@@ -2456,7 +2462,7 @@ public final class Continuity {
             // it, and the publication hold would go on withholding this device's checkpoints
             // behind it. Same shape as acknowledge() and expiry -- another way an arrival ends,
             // and every one of them has to release the slot.
-            settleShelved(state);
+            boolean shelfSettled = settleShelved(state);
             AppState waiting = parked;
             if (waiting != null && state.getDeviceId().equals(waiting.getDeviceId())
                     && waiting.getSequence() <= state.getSequence()) {
@@ -2471,6 +2477,14 @@ public final class Continuity {
                     //
                     // Left owed instead: whoever finishes the coalesced read releases it, which
                     // is the same path every other hold uses.
+                    publishRequested = true;
+                } else {
+                    startPublisher();
+                }
+            } else if (shelfSettled) {
+                // The tombstone settled a SHELVED state of its own and left the slot alone. Same
+                // release, and the same deference to a coalesced read that is still owed.
+                if (pollAgain) {
                     publishRequested = true;
                 } else {
                     startPublisher();
@@ -2868,15 +2882,26 @@ public final class Continuity {
     /// acknowledgement, or a tombstone from that origin finishes its shelved state too. Missing
     /// this would leave work on offer that the origin has already moved past, and hold this
     /// device's checkpoints behind it.
-    private static void settleShelved(AppState state) {
+    /// #### Returns
+    ///
+    /// true when this settled a shelved arrival, so the caller knows a publication hold may have
+    /// just been released. The shelf holds checkpoints back exactly as the slot does, and the
+    /// application can settle a SHELVED state directly -- a listener that kept its own reference
+    /// to the arrival it deferred and acknowledges that, rather than promoting it through
+    /// getRestorableState() first. The release beside every one of these calls is keyed to the
+    /// SLOT emptying, so nothing let the publisher go on that path and the queued checkpoint sat
+    /// until some unrelated later one happened to start it.
+    private static boolean settleShelved(AppState state) {
         String origin = state.getDeviceId();
         if (origin == null || origin.length() == 0) {
-            return;
+            return false;
         }
         AppState kept = shelved.get(origin);
         if (kept != null && kept.getSequence() <= state.getSequence()) {
             shelved.remove(origin);
+            return true;
         }
+        return false;
     }
 
     /// Whether this state has already been marked handled.
@@ -3124,7 +3149,7 @@ public final class Continuity {
                 recordDurable(from, seq);
             }
         }
-        settleShelved(state);
+        boolean shelfSettled = settleShelved(state);
         if (supersedesParked(state)) {
             // The application has dealt with this arrival -- acknowledge() is the documented way
             // to decline one -- so the slot must not go on offering it through
@@ -3132,6 +3157,11 @@ public final class Continuity {
             // hold exists because a parked state's only copy is on the relay; an acknowledged
             // state has a durable mark, so overwriting the relay's copy is now safe.
             parked = null;
+            startPublisher();
+        } else if (shelfSettled) {
+            // Settled off the SHELF without the slot changing, which is what a listener that kept
+            // its own reference to a deferred arrival does. The shelf holds publication too, so
+            // the hold has to be released here as well.
             startPublisher();
         }
         // Recorded before the write, because it is not about the write. What this process has

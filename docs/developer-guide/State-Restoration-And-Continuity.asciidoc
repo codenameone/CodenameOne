@@ -194,14 +194,14 @@ relay reads its token when the request runs:
 include::../demos/common/src/main/java/com/codenameone/developerguide/continuity/ContinuitySnippets.java[tag=logout,indent=0]
 ----
 
-WARNING: `clear()` alone is not a logout. It forgets the account's data -- the
+WARNING: `clear()` alone isn't a logout. It forgets the account's data -- the
 stored checkpoint, the advertised activity, anything queued for the relay -- and
-it deliberately leaves continuity switched ON, because forgetting state and
-turning the feature off are two different things and an app is entitled to do the
-first without the second. That means a continuation arriving while your login
-screen is up reaches a framework that is still listening, and the signed-out
-account's routes and payload are restored over it. `disable()` is what closes
-that gap, and `enable()` at login is what reopens it.
+it leaves continuity switched on by design, because forgetting state and turning
+the feature off are two different things and an app is entitled to do the first
+without the second. That means a continuation arriving while your login screen is
+up reaches a framework that's still listening, and the signed-out account's routes
+and payload are restored over it. `disable()` is what closes that gap, and
+`enable()` at login is what reopens it.
 
 === The synced store
 

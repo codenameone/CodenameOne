@@ -12074,6 +12074,51 @@ public class IPhoneBuilder extends Executor {
                 + "out so the build writes the whole array itself.");
     }
 
+    /// Refuses an App Intent whose id IS the continuity activity type.
+    ///
+    /// An intent's id is published as its NSUserActivity activityType verbatim -- see
+    /// userActivityTypesKey, which appends it unchanged -- and the continuity type goes into the
+    /// same array. Declare both and the array carries the string twice, which is untidy; the part
+    /// that matters is that the native delegate has nothing left to tell them apart, so whichever
+    /// handler looks first claims an activity meant for the other. Handoff resuming into an
+    /// intent's screen, or an intent invocation restoring a route stack, with nothing logged.
+    ///
+    /// Refused rather than renamed. The id is the application's, published to the system and
+    /// possibly already donated on a device, so a build that quietly changed it would break the
+    /// donations already out there; and the continuity type is what the delegate compiles in.
+    /// Naming the collision is the only repair that leaves both meanings intact.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intents`: the parsed intents manifest
+    ///
+    /// - `continuityType`: the resolved activity type, or null when the app does not use it
+    ///
+    /// #### Throws
+    ///
+    /// - `BuildException`: when an intent publishes the continuity type as its own
+    static void requireNoIntentClaimsTheContinuityType(List<Map<String, Object>> intents,
+            String continuityType) throws BuildException {
+        if (intents == null || continuityType == null || continuityType.length() == 0) {
+            return;
+        }
+        for (Map<String, Object> intent : intents) {
+            Object id = intent.get("id");
+            if (!(id instanceof String) || !IOSAppIntentsBuilder.publishesUserActivity(intent)) {
+                // Only the ones that reach NSUserActivityTypes. An intent that donates nothing
+                // shares no namespace with continuity and is none of this check's business.
+                continue;
+            }
+            if (continuityType.equals(id)) {
+                throw new BuildException("An App Intent declares the id '" + id + "', which is "
+                        + "the activity type this build publishes for continuity. Both are "
+                        + "advertised through NSUserActivityTypes and the native side has "
+                        + "nothing left to tell them apart, so one handler would claim the "
+                        + "other's activity. Give the intent an id of its own.");
+            }
+        }
+    }
+
     /// Refuses a fragment that declares NSUserActivityTypes twice at the root.
     ///
     /// The trap UIApplicationSceneManifest is already refused for, and it resolves the same way: a
@@ -14765,6 +14810,7 @@ public class IPhoneBuilder extends Executor {
             // unterminated comment, so everything after it was truncated and a live root key
             // beyond it went missing -- and this branch then appended a SECOND one.
             requireSingleUserActivityTypes(inject);
+            requireNoIntentClaimsTheContinuityType(intentsManifest, continuityActivityType);
             if (firstLiveRootIndex(inject, "NSUserActivityTypes") < 0) {
                 inject += userActivityTypesKey(intentsManifest, continuityActivityType);
             } else {

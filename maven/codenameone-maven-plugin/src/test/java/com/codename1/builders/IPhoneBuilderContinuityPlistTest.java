@@ -304,6 +304,37 @@ class IPhoneBuilderContinuityPlistTest {
     }
 
     /**
+     * An App Intent may not claim the continuity activity type as its own id.
+     *
+     * <p>An intent's id is published as its NSUserActivity activityType verbatim, and the
+     * continuity type goes into the same array. Declare both and the native delegate has nothing
+     * left to tell them apart, so whichever handler looks first claims an activity meant for the
+     * other -- Handoff resuming into an intent's screen, or an intent invocation restoring a route
+     * stack, with nothing logged either way.</p>
+     */
+    @Test
+    void anIntentMayNotClaimTheContinuityType() {
+        List<Map<String, Object>> colliding = intents(CONTINUITY_TYPE);
+
+        try {
+            IPhoneBuilder.requireNoIntentClaimsTheContinuityType(colliding, CONTINUITY_TYPE);
+            fail("an intent publishing the continuity activity type must not be accepted");
+        } catch (BuildException expected) {
+            assertTrue(expected.getMessage().contains(CONTINUITY_TYPE), expected.getMessage());
+        }
+    }
+
+    /**
+     * And an ordinary intent beside continuity is untouched, or the guard would refuse every app
+     * that uses both features -- which is the ordinary case the key exists to serve.
+     */
+    @Test
+    void anOrdinaryIntentBesideContinuityIsFine() throws BuildException {
+        IPhoneBuilder.requireNoIntentClaimsTheContinuityType(
+                intents("logWorkout", "com.example.app.sendMessage"), CONTINUITY_TYPE);
+    }
+
+    /**
      * A NSUserActivityTypes whose value is not an array is refused once a continuity type depends
      * on it.
      *

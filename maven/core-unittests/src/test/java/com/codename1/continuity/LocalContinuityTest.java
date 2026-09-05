@@ -7587,6 +7587,59 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * Acknowledging a SHELVED arrival directly releases the publication hold it was keeping.
+     *
+     * <p>A listener that defers two arrivals keeps its own references to both. Settling the
+     * parked one empties the slot; settling the shelved one is then done by handing that
+     * reference to acknowledge(), without promoting it through getRestorableState() first, which
+     * is the documented handle-it-yourself shape. The release beside every settle was keyed to
+     * the SLOT emptying, so on that path nothing let the publisher go and the queued checkpoint
+     * sat until some unrelated later one happened to start it.</p>
+     */
+    @EdtTest
+    public void acknowledgingAShelvedArrivalReleasesItsPublicationHold() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+        final GatedRelay r = new GatedRelay();
+        Continuity.setRelay(r);
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitEntered();
+            }
+        });
+        r.release();
+        pause(300L);
+        final int before = r.sent.size();
+
+        AppState phone = foreign("phone", 1L);
+        AppState tablet = foreign("tablet", 1L);
+        Continuity.parkForTest(phone);
+        Continuity.parkForTest(tablet);
+
+        // The slot's is settled first, which is the ordinary half.
+        Continuity.acknowledge(tablet);
+        Continuity.checkpoint();
+        pause(250L);
+        assertEquals(before, r.sent.size(),
+                "the shelved arrival is not holding the checkpoint, so there is no hold for the "
+                        + "settle below to release and the rest of this proves nothing");
+
+        // And now the SHELVED one, straight from the listener's own reference. Nothing calls
+        // getRestorableState(), so the slot never changes.
+        Continuity.acknowledge(phone);
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitAnySince(before);
+            }
+        });
+        assertTrue(r.sent.size() > before,
+                "the checkpoint stayed held after the last arrival was settled, because the "
+                        + "release is keyed to the slot emptying and this one came off the shelf");
+    }
+
+    /**
      * clear() empties the shelf, not only the slot.
      *
      * <p>clear() is a logout: nothing from before it survives. A shelved arrival is state from
