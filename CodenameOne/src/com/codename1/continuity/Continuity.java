@@ -409,14 +409,43 @@ public final class Continuity {
         AppState[] pending = takeAllPendingOffers();
         int count = pending.length;
         // takeAllPendingOffers() has already put them oldest first.
+        int drainingIn = lifecycle;
         for (int a = 0; a < count; a++) {
-            if (!enabled) {
-                // A listener that ran during this drain is allowed to turn continuity off, and
-                // what follows the disable() must not then be admitted into it.
+            if (!stillTheSameSession(drainingIn)) {
+                // A listener that ran during this drain is allowed to end the session, and what
+                // follows must not then be admitted into the one that replaced it.
+                //
+                // This asked only whether continuity was still ENABLED, which sees a disable() and
+                // not a clear() -- and clear() is the logout, the case that matters most, which
+                // deliberately leaves an enabled framework enabled. So the generation is the thing
+                // to compare, and enabled is the other half of the same question.
                 return;
             }
             admit(pending[a]);
         }
+    }
+
+    /// Whether the session a drain started in is still the one running.
+    ///
+    /// Both halves, because either can end it: disable() clears `enabled` and clear() bumps the
+    /// generation while deliberately leaving it set. A drain hands each state to application code,
+    /// and that code is entitled to do either.
+    ///
+    /// The generation arrives as a PARAMETER rather than being compared against a local copy of
+    /// the field. That is the shape the inbound callback already uses -- decide(state, arrivedIn)
+    /// -- and it is also the one the analyzers accept: comparing a field to a local snapshot of
+    /// itself reads as a self-comparison to SpotBugs, which cannot see that dispatch() reaches
+    /// application code that may change it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `generation`: the value of `lifecycle` when the drain began
+    ///
+    /// #### Returns
+    ///
+    /// true while the drain may go on
+    private static boolean stillTheSameSession(int generation) {
+        return enabled && lifecycle == generation;
     }
 
     /// Empties BOTH holders and returns what they held, oldest first. On the EDT.
@@ -1074,8 +1103,31 @@ public final class Continuity {
     /// A state with no timestamp is never too old: it came from a build that did not set one, and
     /// discarding it would be reading "unknown" as "expired".
     private static boolean isTooOld(AppState state) {
-        return maxAge > 0 && state.getTimestamp() > 0
-                && System.currentTimeMillis() - state.getTimestamp() > maxAge;
+        if (maxAge <= 0) {
+            // No expiry configured, so nothing expires.
+            return false;
+        }
+        long ts = state.getTimestamp();
+        if (ts == 0) {
+            // The documented "this state carries no time". Nothing to measure against, so an
+            // application that built its own state by hand is not caught out by an age it never
+            // set a clock for.
+            return false;
+        }
+        if (ts < 0) {
+            // Malformed, and refused HERE rather than only at the wire. The codec rejects a
+            // negative ts in a relay DOCUMENT, but a custom StateRelay.fetch() returns an AppState
+            // directly and never goes through it -- and so does an application calling restore()
+            // with one it built. Every one of those paths ends up in this predicate, which is why
+            // the answer belongs here.
+            //
+            // Too old rather than exempt. Reading it as "carries no time" made a state that cannot
+            // prove its freshness immortal under exactly the maxAge the application configured to
+            // stop that -- an expired checkout restorable for the life of the install. A value
+            // that means nothing should not outrank an expiry that means something.
+            return true;
+        }
+        return System.currentTimeMillis() - ts > maxAge;
     }
 
     /// Restores whatever `getRestorableState()` offers.
@@ -3136,7 +3188,21 @@ public final class Continuity {
         // how it came to be parked. Snapshotted and cleared before any of it is dispatched,
         // because a listener that defers lands straight back in placeOnOffer().
         AppState[] pending = takeAllPendingOffers();
+        // The session as it stands before any listener runs. dispatch() hands each state to
+        // application code, and that code is allowed to end the session -- a listener that finds
+        // the account signed out calls clear(), which is the documented shape. Everything after it
+        // in this array arrived BEFORE that happened, so continuing would offer the previous
+        // session's work to the one that replaced it, and dispatch() cannot notice on its own: it
+        // has no entry check for `enabled` and samples the generation afresh, so the next state
+        // looks like it belongs to the session it is actually crossing into.
+        //
+        // The sibling drain has had this since it was written -- "a listener that ran during this
+        // drain is allowed to turn continuity off" -- and this loop was added later without it.
+        int drainingIn = lifecycle;
         for (int i = 0; i < pending.length; i++) {
+            if (!stillTheSameSession(drainingIn)) {
+                return;
+            }
             dispatch(pending[i]);
         }
         // Whether they dispatched or were refused, neither holder is keeping anything back now.

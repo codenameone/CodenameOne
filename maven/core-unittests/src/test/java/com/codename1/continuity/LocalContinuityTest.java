@@ -7878,6 +7878,93 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A listener that ends the session during the cold-launch drain stops the rest of it.
+     *
+     * <p>dispatch() hands each state to application code, and that code may end the session -- a
+     * listener finding the account signed out calls clear(), which is the documented shape.
+     * Everything still in the drain arrived BEFORE that, so continuing offers the previous
+     * session's work to the one that replaced it. dispatch() cannot notice on its own: it has no
+     * entry check for enabled and samples the generation afresh, so the next state looks like it
+     * belongs to the session it is actually crossing into.</p>
+     *
+     * <p>The pre-enable drain has had this guard since it was written; this loop was added later
+     * without it.</p>
+     */
+    @EdtTest
+    public void aListenerThatEndsTheSessionStopsTheColdLaunchDrain() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+        final List<String> seen = new ArrayList<String>();
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                seen.add(state.getDeviceId());
+                // The account is signed out. This is the documented logout from a listener.
+                Continuity.clear();
+                return true;
+            }
+        });
+
+        long base = System.currentTimeMillis() - 4000L;
+        Continuity.parkForTest(new AppState()
+                .setPayload(payloadWith("from the phone"))
+                .setDeviceId("phone").setSequence(1L).setTimestamp(base));
+        Continuity.parkForTest(new AppState()
+                .setPayload(payloadWith("from the tablet"))
+                .setDeviceId("tablet").setSequence(1L).setTimestamp(base + 1000L));
+
+        Continuity.drainParkedForTest();
+        flushSerialCalls();
+
+        assertEquals(1, seen.size(),
+                "the drain carried on after the listener ended the session, so work from before "
+                        + "the logout was offered to the session that replaced it: " + seen);
+    }
+
+    /**
+     * A negative timestamp does not outrank the expiry the application configured.
+     *
+     * <p>The codec refuses one in a relay DOCUMENT, but a custom StateRelay.fetch() returns an
+     * AppState directly and never goes through it, and so does an application calling restore()
+     * with a state it built. All of those reach isTooOld(), where a "positive timestamp" guard
+     * read a negative one as the documented "carries no time" and exempted it from every maxAge --
+     * an expired checkout restorable for the life of the install, under exactly the setting that
+     * exists to stop it.</p>
+     */
+    @EdtTest
+    public void aNegativeTimestampIsNotExemptFromMaxAge() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+        Continuity.setMaxAge(60000L);
+        try {
+            Continuity.parkForTest(new AppState()
+                    .setPayload(payloadWith("a relay that returns nonsense"))
+                    .setDeviceId("phone").setSequence(1L).setTimestamp(-1L));
+
+            AppState left = Continuity.getRestorableState();
+            assertFalse(left != null && "phone".equals(left.getDeviceId()),
+                    "a state whose timestamp cannot prove its freshness was offered anyway, so it "
+                            + "is exempt from the maxAge that was configured to expire it");
+
+            // And the extreme, which is the value the explicit refusal is actually needed for.
+            // For an ordinary negative the subtraction already answers "too old" -- now minus a
+            // negative is enormous -- but Long.MIN_VALUE OVERFLOWS it back to a negative, so the
+            // comparison reads as fresh and the state becomes immortal by arithmetic rather than
+            // by the guard that used to exempt it.
+            Continuity.parkForTest(new AppState()
+                    .setPayload(payloadWith("the extreme of the same nonsense"))
+                    .setDeviceId("tablet").setSequence(1L).setTimestamp(Long.MIN_VALUE));
+
+            AppState extreme = Continuity.getRestorableState();
+            assertFalse(extreme != null && "tablet".equals(extreme.getDeviceId()),
+                    "Long.MIN_VALUE overflowed the age subtraction back to a negative, so the "
+                            + "state read as fresh and no maxAge can ever expire it");
+        } finally {
+            Continuity.setMaxAge(0L);
+        }
+    }
+
+    /**
      * clear() empties the shelf, not only the slot.
      *
      * <p>clear() is a logout: nothing from before it survives. A shelved arrival is state from
