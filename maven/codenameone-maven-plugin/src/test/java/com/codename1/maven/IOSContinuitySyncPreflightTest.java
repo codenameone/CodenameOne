@@ -217,6 +217,30 @@ public class IOSContinuitySyncPreflightTest {
     }
 
     /**
+     * The brace spelling is a variable too, and so is a value that mixes the two.
+     *
+     * <p>Xcode accepts ${CFBundleIdentifier} equally, replaceBuildSetting() substitutes both, and
+     * this project's own Mac entitlement test writes them in a single value. Recognising only
+     * "$(" does not fail to warn -- it warns WRONGLY, reporting a signing failure that will not
+     * happen for an override Xcode expands correctly.</p>
+     */
+    @Test
+    public void braceStyleAndMixedVariablesAreNotCompared() throws Exception {
+        Properties braces = settings(profile("WithCloudBraces", true));
+        braces.setProperty("codename1.arg.ios.entitlements.com.apple.developer"
+                + ".ubiquity-kvstore-identifier", "${TeamIdentifierPrefix}${CFBundleIdentifier}");
+        assertTrue("a ${...} override was compared as a literal", check(braces).isEmpty());
+
+        // A distinct name: the fixture writes a file named after the profile, so two in one test
+        // collide in the temporary folder.
+        Properties mixed = settings(profile("WithCloudMixed", true));
+        mixed.setProperty("codename1.arg.ios.entitlements.com.apple.developer"
+                + ".ubiquity-kvstore-identifier", "$(TeamIdentifierPrefix)${CFBundleIdentifier}");
+        assertTrue("a value mixing both spellings was compared as a literal",
+                check(mixed).isEmpty());
+    }
+
+    /**
      * But a profile that grants NO key-value store at all is answerable, and naming a container
      * does not rescue it: the builder puts the entitlement in either way and codesigning rejects
      * it. This returned early on the override and suppressed the one warning it can give for

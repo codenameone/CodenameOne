@@ -127,10 +127,20 @@ final class IOSProvisioningPreflight {
      *
      * <p>An Xcode variable expands at build time and a wildcard covers a set, so neither is a
      * value this can hold against another one. Only a plain literal is.</p>
+     *
+     * <p>Any {@code $} at all, not the {@code $(} spelling alone. Xcode accepts
+     * {@code ${CFBundleIdentifier}} equally, this project's own Mac entitlement test writes the
+     * two forms in a single value -- {@code $(TeamIdentifierPrefix)${CFBundleIdentifier}} -- and
+     * replaceBuildSetting() substitutes both, with a comment recording that handling one and not
+     * the other was already a bug once. Missing a spelling here does not fail to warn, it warns
+     * WRONGLY: the profile holds the expanded identifier, so an override Xcode would expand
+     * correctly gets reported as a signing failure that will not happen. A container identifier is
+     * reverse-DNS and has no business containing a dollar sign, so treating every one of them as
+     * "not comparable" costs nothing and cannot invent a third spelling to miss.</p>
      */
     private static boolean isLiteralContainer(String container) {
         return container != null && !container.isEmpty()
-                && container.indexOf("$(") < 0 && container.indexOf('*') < 0;
+                && container.indexOf('$') < 0 && container.indexOf('*') < 0;
     }
 
     /** A problem found before the build was sent: {@code message} is written for the user. */
