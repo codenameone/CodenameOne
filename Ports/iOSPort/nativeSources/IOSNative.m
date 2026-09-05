@@ -15755,7 +15755,39 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetBottom___R_int(CN1_
 }
 
 JAVA_FLOAT com_codename1_impl_ios_IOSNative_getDisplayScale___R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-#if TARGET_OS_WATCH
+#if TARGET_OS_OSX
+    // Not scaleValue on this slice either, and for a sharper reason than the
+    // watch: here it is a placeholder that LOOKS like a real answer.
+    // CN1MacRefreshScaleValue only publishes the true scale once the main window
+    // exists, and the window is built concurrently with Java start-up, so
+    // anything asking during initialisation would be told 1 -- indistinguishable
+    // from a genuine non-Retina display, and half the resolution the app should
+    // have been building its resources at.
+    //
+    // The window's own backingScaleFactor is both authoritative and what the
+    // renderer actually uses (CN1MacHostViewScale and CN1AppKitBackingScale both
+    // read it), so this reports the same number the pixels are produced at.
+    // Before the window exists the main screen is the closest real answer, and
+    // failing even that this returns 0 -- "not captured" -- which the Java caller
+    // already handles by deferring to the portable implementation. Returning 0 is
+    // better than returning 1: a caller can see the first and cannot see the
+    // second.
+    NSWindow *macWindow = [CN1MacHost sharedHost].window;
+    if (macWindow != nil) {
+        CGFloat windowScale = macWindow.backingScaleFactor;
+        if (windowScale > 0) {
+            return (JAVA_FLOAT)windowScale;
+        }
+    }
+    NSScreen *macScreen = [NSScreen mainScreen];
+    if (macScreen != nil) {
+        CGFloat screenScale = macScreen.backingScaleFactor;
+        if (screenScale > 0) {
+            return (JAVA_FLOAT)screenScale;
+        }
+    }
+    return (JAVA_FLOAT)0;
+#elif TARGET_OS_WATCH
     // Not scaleValue on this slice. It is only ever assigned from
     // [UIScreen mainScreen].scale, which the watch compiles out, so it stays at
     // its initializer of 1 forever -- while CN1WatchRenderingView allocates its
@@ -15773,12 +15805,12 @@ JAVA_FLOAT com_codename1_impl_ios_IOSNative_getDisplayScale___R_float(CN1_THREAD
     // answers by deferring to the portable implementation.
     return (JAVA_FLOAT)0;
 #else
-    // scaleValue, and nothing else: this file is shared with the Mac port, where
-    // there is no UIScreen at all (it is NSScreen, whose scale is
-    // backingScaleFactor). scaleValue is already the captured screen scale on
-    // every Apple target, so there is nothing to fall back TO -- 0 means "not
-    // captured yet", which the Java caller answers by deferring to the portable
-    // implementation.
+    // iOS and its UIKit relatives: scaleValue and nothing else. It is assigned
+    // from [UIScreen mainScreen].scale while the view controller is built, which
+    // happens before any application code runs, so there is no window in which it
+    // is still a placeholder here -- unlike the macOS and watchOS slices above,
+    // which is why they answer differently. 0 means "not captured yet", which the
+    // Java caller answers by deferring to the portable implementation.
     return (JAVA_FLOAT)scaleValue;
 #endif
 }
