@@ -291,7 +291,25 @@ public final class StateCodec {
         parser.setUseBooleanInstance(true);
         Map<String, Object> parsed = parser.parseJSON(new java.io.StringReader(json));
         requireKnownTypes(parsed);
-        return fromMap(parsed);
+        AppState state = fromMap(parsed);
+        if (state == null && parsed != null && !parsed.isEmpty()) {
+            // A document with CONTENT that this build recognises none of. fromMap answers null
+            // for it, and null means "the relay holds nothing" to the code that reads a fetch --
+            // so the publisher is released and a local checkpoint overwrites a document this
+            // device never managed to read. `{"error":"temporarily unavailable"}` returned with a
+            // 2xx is the shape that does it.
+            //
+            // NON-EMPTY is the whole condition. A bare `{}` is a plausible way for an endpoint to
+            // say it holds nothing, alongside the 404 and the empty body this class documents,
+            // and refusing that would leave such an endpoint unable to publish anything, ever.
+            // An object carrying fields none of which are ours is a different thing: something is
+            // there and this build cannot read it.
+            throw new IOException("The continuity relay returned an object with no fields this "
+                    + "build recognises. Treated as a failed read rather than as an empty relay, "
+                    + "because something is stored there and publishing over it would destroy "
+                    + "work this device could not read.");
+        }
+        return state;
     }
 
     /// Refuses a document whose known fields carry the wrong kind of value.

@@ -4573,6 +4573,34 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * An unrecognised relay object is a failed read; a bare empty one is still an empty relay.
+     *
+     * <p>fromMap answers null for a document it recognises nothing in, and null means "the relay
+     * holds nothing" to the code that reads a fetch -- so the publisher is released and a local
+     * checkpoint overwrites a document this device never read. A 2xx carrying
+     * {@code {"error":"temporarily unavailable"}} is the shape that does it.</p>
+     *
+     * <p>The empty half matters as much: a bare {@code &#123;&#125;} is a plausible way for an
+     * endpoint to say it holds nothing, and refusing it would leave such an endpoint unable to
+     * publish anything ever.</p>
+     */
+    @EdtTest
+    public void anUnrecognisedRelayObjectIsAFailedReadAndAnEmptyOneIsNot() throws Exception {
+        try {
+            StateCodec.fromJson("{\"error\":\"temporarily unavailable\"}");
+            fail("an object carrying fields none of which are ours was read as an empty relay, "
+                    + "so a checkpoint is published over work this device could not read");
+        } catch (java.io.IOException expected) {
+            assertTrue(expected.getMessage().length() > 0, "the refusal explained nothing");
+        }
+
+        // And the empty object still means "nothing here", which an endpoint is entitled to say.
+        assertNull(StateCodec.fromJson("{}"),
+                "a bare empty object was refused, so an endpoint that answers that way for "
+                        + "\"none\" can never publish anything");
+    }
+
+    /**
      * A relay document with no origin is a failed read, so the publisher stays held.
      *
      * <p>An origin is the key every mark and every dedup decision is made against, so admit() can

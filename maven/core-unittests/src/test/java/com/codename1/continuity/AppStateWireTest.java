@@ -52,7 +52,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * narrow -- and the point of these tests is that the narrowness is enforced where the application
  * can act on it rather than discovered as a value that stopped arriving.</p>
  */
-public class AppStateWireTest {
+// Extends UITestBase, as every other test in this package does, and not for the EDT: core code
+// logs, and Log.print() reaches Display.getInstance() the first time it runs -- so in a class
+// with no Display the FIRST test that makes the framework log dies with a NullPointerException
+// out of Util.cleanup(). Which test that is depends on the order they happen to run in, so the
+// class passed until an unrelated edit moved a different one to the front.
+public class AppStateWireTest extends com.codename1.junit.UITestBase {
 
     @Test
     public void jsonRoundTripPreservesEveryField() throws Exception {
@@ -411,12 +416,38 @@ public class AppStateWireTest {
      * state. Returning a default one meant the continuation callback CLAIMED it and delivered it:
      * the application's listeners ran, and an app that prompts before moving the user put a
      * "continue what you were doing?" dialog in front of them over nothing at all.
+     *
+     * <p>That harm is about FABRICATING a state and it is still asserted below, on the path where
+     * it happens: fromMap answers null, so the continuation callback declines rather than
+     * claiming. What has changed is the RELAY's reading of a document that carries fields none of
+     * which are ours -- null there means "the relay holds nothing", which releases the publisher
+     * and overwrites a document this device never read. An empty object stays null, because that
+     * is a plausible way for an endpoint to say it holds nothing.</p>
      */
     @Test
     public void aDocumentWithNoStateFieldsIsNotAState() throws Exception {
         assertNull(StateCodec.fromJson("{}"));
         assertNull(StateCodec.fromMap(new HashMap<String, Object>()));
-        assertNull(StateCodec.fromJson("{\"somethingElse\":1,\"unrelated\":\"x\"}"));
+
+        // No state is FABRICATED for an unrecognised document -- the guarantee this test was
+        // written for, on the path it applies to.
+        Map<String, Object> unrelated = new HashMap<String, Object>();
+        unrelated.put("somethingElse", Integer.valueOf(1));
+        unrelated.put("unrelated", "x");
+        assertNull(StateCodec.fromMap(unrelated),
+                "an unrecognised activity produced a state, so the callback claims it and the "
+                        + "application is prompted over nothing at all");
+
+        // And on the relay wire the same document is a failed READ, not an empty relay: null
+        // there means "the relay holds nothing", which releases the publisher and overwrites a
+        // document this device never read.
+        Exception unreadable = assertThrows(Exception.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() throws Throwable {
+                        StateCodec.fromJson("{\"somethingElse\":1,\"unrelated\":\"x\"}");
+                    }
+                });
+        assertTrue(unreadable.getMessage().length() > 0, "the refusal explained nothing");
     }
 
     /** One recognized field is enough -- a state with only routes is a real state. */
