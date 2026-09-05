@@ -212,21 +212,7 @@ final class Pem {
             }
             // A BIT STRING's first content octet counts unused bits, so a
             // length of one is metadata and no key material at all.
-            byte[] bits = c.read(0x03);
-            if (bits.length < 2 || c.hasMore()) {
-                return SHAPE_UNKNOWN;
-            }
-            // That octet is a count of 0..7, and the bits it declares unused
-            // must be zero. Checking only the length accepted "03 02 08 00"
-            // and "03 02 07 FF", which both decoders refuse.
-            int unused = bits[0] & 0xFF;
-            if (unused > 7) {
-                return SHAPE_UNKNOWN;
-            }
-            if (unused != 0 && (bits[bits.length - 1] & ((1 << unused) - 1)) != 0) {
-                return SHAPE_UNKNOWN;
-            }
-            return SHAPE_SPKI;
+            return isBitString(c.read(0x03)) && !c.hasMore() ? SHAPE_SPKI : SHAPE_UNKNOWN;
         }
         if (c.peek() != 0x02) {
             return SHAPE_UNKNOWN;
@@ -326,8 +312,7 @@ final class Pem {
             if (c.peek() != 0x30) {
                 return SHAPE_UNKNOWN;
             }
-            c.skip();
-            if (c.hasMore()) {
+            if (!isOtherPrimeInfos(c.element()) || c.hasMore()) {
                 return SHAPE_UNKNOWN;
             }
             multiPrime = true;
@@ -369,8 +354,8 @@ final class Pem {
                 throw new CryptoException("malformed PEM: -----BEGIN line is not terminated");
             }
             String label = pem.substring(labelStart, labelEnd).trim();
-            for (int i = 0; i < wanted.length; i++) {
-                if (wanted[i].equals(label)) {
+            for (String candidate : wanted) {
+                if (candidate.equals(label)) {
                     return body(pem.substring(begin), label);
                 }
             }
@@ -549,6 +534,55 @@ final class Pem {
                 concat(privateKey, attributes)));
     }
 
+    /// True when `contents` is a well-formed BIT STRING value.
+    ///
+    /// The first octet counts unused bits, so it is metadata: a value of one
+    /// octet carries no key at all. That count runs 0..7, and the bits it
+    /// declares unused have to be zero. Kept in one place because the rules
+    /// apply wherever a BIT STRING appears -- the SPKI public key and the SEC1
+    /// [1] wrapper both -- and having them in only one of those was how the
+    /// wrapper came to accept "03 01 00".
+    private static boolean isBitString(byte[] contents) {
+        if (contents.length < 2) {
+            return false;
+        }
+        int unused = contents[0] & 0xFF;
+        if (unused > 7) {
+            return false;
+        }
+        return unused == 0 || (contents[contents.length - 1] & ((1 << unused) - 1)) == 0;
+    }
+
+    /// True when `element` is a well-formed `OtherPrimeInfos`.
+    ///
+    /// `SEQUENCE SIZE (1..MAX) OF OtherPrimeInfo`, and each `OtherPrimeInfo` is
+    /// `SEQUENCE { prime INTEGER, exponent INTEGER, coefficient INTEGER }`.
+    /// Accepting any SEQUENCE let an empty "30 00" stand for the multi-prime
+    /// data a version-1 key promises.
+    private static boolean isOtherPrimeInfos(byte[] element) {
+        Cursor c = new Cursor(element);
+        c.enter(0x30);
+        if (!c.hasMore()) {
+            return false;
+        }
+        while (c.hasMore()) {
+            if (c.peek() != 0x30) {
+                return false;
+            }
+            Cursor info = new Cursor(c.element());
+            info.enter(0x30);
+            for (int field = 0; field < 3; field++) {
+                if (!info.hasMore() || info.peek() != 0x02 || info.consume(0x02) == 0) {
+                    return false;
+                }
+            }
+            if (info.hasMore()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /// Checks an OBJECT IDENTIFIER's contents.
     ///
     /// [Cursor#read] verifies the tag and the bounds, nothing more, so an empty
@@ -565,11 +599,11 @@ final class Pem {
         // Each sub-identifier is base-128, most significant group first, and a
         // leading 0x80 group would be a redundant zero.
         boolean startOfValue = true;
-        for (int i = 0; i < oid.length; i++) {
-            if (startOfValue && oid[i] == (byte) 0x80) {
+        for (byte group : oid) {
+            if (startOfValue && group == (byte) 0x80) {
                 throw new CryptoException("malformed key: the algorithm OID is not minimally encoded");
             }
-            startOfValue = (oid[i] & 0x80) == 0;
+            startOfValue = (group & 0x80) == 0;
         }
     }
 
@@ -592,11 +626,16 @@ final class Pem {
             }
             Cursor attribute = new Cursor(c.element());
             attribute.enter(0x30);
-            attribute.read(0x06);
+            requireOid(attribute.read(0x06));
             if (!attribute.hasMore() || attribute.peek() != 0x31) {
                 throw new CryptoException("malformed PKCS#8 key: an Attribute has no values SET");
             }
-            attribute.skip();
+            // AttributeValue ::= SET SIZE (1..MAX), so an empty set is not one
+            Cursor values = new Cursor(attribute.element());
+            values.enter(0x31);
+            if (!values.hasMore()) {
+                throw new CryptoException("malformed PKCS#8 key: an Attribute has an empty values SET");
+            }
             if (attribute.hasMore()) {
                 throw new CryptoException("malformed PKCS#8 key: an Attribute has more than "
                         + "a type and a values SET");
@@ -658,9 +697,9 @@ final class Pem {
             // it has to be checked here or it is never checked at all.
             Cursor wrapper = new Cursor(publicKey);
             wrapper.enter(0xA1);
-            if (wrapper.consume(0x03) == 0 || wrapper.hasMore()) {
+            if (!isBitString(wrapper.read(0x03)) || wrapper.hasMore()) {
                 throw new CryptoException("malformed SEC1 EC private key: the public key field "
-                        + "is not a single BIT STRING");
+                        + "is not a single well-formed BIT STRING");
             }
         }
         if (c.hasMore()) {

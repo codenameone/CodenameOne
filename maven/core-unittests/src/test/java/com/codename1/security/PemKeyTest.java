@@ -997,6 +997,60 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void otherPrimeInfosMustActuallyHoldPrimeInfo() {
+        // A version-1 PKCS#1 key promises multi-prime data; an empty "30 00"
+        // sequence is not it, and OpenSSL refuses the rewrapped result.
+        byte[] key = der(RSA_PKCS1);
+        int off = (key[1] & 0xFF) < 0x80 ? 2 : 2 + (key[1] & 0x7F);
+        byte[] body = new byte[key.length - off];
+        System.arraycopy(key, off, body, 0, body.length);
+        body[2] = 0x01;                                   // two-prime -> multi-prime
+        byte[] empty = hex("3000");
+        byte[] content = new byte[body.length + empty.length];
+        System.arraycopy(body, 0, content, 0, body.length);
+        System.arraycopy(empty, 0, content, body.length, empty.length);
+        byte[] blob = new byte[content.length + 4];
+        blob[0] = 0x30;
+        blob[1] = (byte) 0x82;
+        blob[2] = (byte) (content.length >> 8);
+        blob[3] = (byte) content.length;
+        System.arraycopy(content, 0, blob, 4, content.length);
+
+        assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem(RSA_PKCS1_LABEL, Base64.encodeNoNewline(blob))));
+    }
+
+    @Test
+    void attributeOidsAndValueSetsAreChecked() {
+        // "A0 06 30 04 06 00 31 00" has an empty OID and an empty values SET;
+        // AttributeValue is SET SIZE (1..MAX), and OpenSSL refuses the key.
+        assertThrows(CryptoException.class, () -> PrivateKey.fromPem(pem("PRIVATE KEY",
+                Base64.encodeNoNewline(withTrailer(der(RSA_PKCS8), hex("A0063004060031 00".replace(" ", "")))))));
+    }
+
+    @Test
+    void theSec1PublicKeyBitStringObeysTheSameRules() {
+        // The BIT STRING rules live in one helper now, so the SEC1 [1] wrapper
+        // gets exactly what the SPKI public key gets: payload beyond the
+        // unused-bits octet, a count of 0..7, and zeroed padding.
+        for (String bits : new String[] {"030100", "03020800", "030207ff"}) {
+            byte[] content = hex("020101"
+                    + "0420" + "0000000000000000000000000000000000000000000000000000000000000000"
+                    + "A00A" + "06082a8648ce3d030107"
+                    + "A1" + String.format("%02x", hex(bits).length) + bits);
+            byte[] blob = new byte[content.length + 2];
+            blob[0] = 0x30;
+            blob[1] = (byte) content.length;
+            System.arraycopy(content, 0, blob, 2, content.length);
+            assertThrows(CryptoException.class,
+                    () -> PrivateKey.fromPem(pem(EC_SEC1_LABEL, Base64.encodeNoNewline(blob))),
+                    bits + " must not be accepted");
+        }
+        // the real key, whose [1] holds a proper BIT STRING, still converts
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(pem(EC_SEC1_LABEL, EC_SEC1)).getEncoded());
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));
