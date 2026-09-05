@@ -360,8 +360,18 @@ public final class Navigation {
             // run the reverse transition into a screen they have not seen yet.
             top.show();
         } catch (RuntimeException e) {
-            stack.clear();
-            stack.addAll(previous);
+            // The STACK, and only while it is still exactly what this method installed. The
+            // display test below was added first and left this one unconditional, which made the
+            // two disagree: a show callback that navigates somewhere of its own and then throws
+            // -- or that navigates and a later listener throws -- has already changed both, so
+            // erasing the stack while leaving its screen up describes a place the user is not.
+            //
+            // Same rule as the ordinary navigations use, for the same reason: whatever ran later
+            // and changed the stack meant to, and it wins.
+            if (rebuilt.equals(stack)) {
+                stack.clear();
+                stack.addAll(previous);
+            }
             // And the screen with it -- but ONLY when the screen still showing is the one this
             // method put up. show() rather than showBack(): the user is not going back, an
             // attempt that failed is being undone.

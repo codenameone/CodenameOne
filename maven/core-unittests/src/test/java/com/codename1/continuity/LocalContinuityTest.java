@@ -4343,6 +4343,56 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A screen the restored form's callback navigated to keeps its stack entry when a later
+     * listener throws.
+     *
+     * <p>The display half of this rollback was gated first and the stack half left
+     * unconditional, which made the two disagree: a show callback that navigates somewhere of
+     * its own and then throws has already changed both, so erasing the stack while leaving its
+     * screen up describes a place the user is not -- back() then works on a history that does
+     * not include what is in front of them.</p>
+     */
+    @EdtTest
+    public void aScreenTheCallbackNavigatedToKeepsItsStackEntry() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                Form f = new Form();
+                f.setTitle(url);
+                if ("/orders/17".equals(url)) {
+                    f.addShowListener(new com.codename1.ui.events.ActionListener() {
+                        public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                            if (Navigation.getCurrent() == null
+                                    || !"/replacement".equals(Navigation.getCurrent().getPath())) {
+                                Navigation.navigate("/replacement");
+                                throw new IllegalStateException("and then this failed");
+                            }
+                        }
+                    });
+                }
+                return f;
+            }
+        });
+        try {
+            Continuity.restore(new AppState()
+                    .setRoutes(java.util.Arrays.asList("/orders/17"))
+                    .setDeviceId("some-other-device")
+                    .setSequence(400L)
+                    .setTimestamp(System.currentTimeMillis()));
+            flushSerialCalls();
+
+            assertNotNull(Navigation.getCurrent(), "the stack was emptied altogether");
+            assertEquals("/replacement", Navigation.getCurrent().getPath(),
+                    "the rollback erased the screen the callback navigated to, so back() works "
+                            + "on a history that does not include what the user is looking at; "
+                            + "top is " + Navigation.getCurrent().getPath());
+        } finally {
+            Navigation.setDispatcher(null);
+        }
+    }
+
+    /**
      * A login form opened by the restored form's own show callback survives.
      *
      * <p>restoreStack() rolls its screen back when show() throws, and it used to do that whenever
