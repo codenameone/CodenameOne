@@ -7640,6 +7640,113 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * The cold-launch drain hands over EVERY arrival it was holding, not just the slot's.
+     *
+     * <p>Two devices can both reach the callback before the first form exists -- which is the
+     * situation the wait exists for -- and the second displaces the first onto the shelf.
+     * Dispatching only the slot left that first arrival with nothing coming for it: never handed
+     * to a listener even with automatic restoration on, reachable only if the application called
+     * getRestorableState() by hand, and holding every relay publication behind it meanwhile.</p>
+     *
+     * <p>The third path in this class to need it, after the pre-enable drain and the settles.
+     * A second holder means every path that empties either one has to deal with both.</p>
+     */
+    @EdtTest
+    public void theColdLaunchDrainHandsOverEveryArrivalItHeld() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+        final List<String> seen = new ArrayList<String>();
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                seen.add(state.getDeviceId());
+                return true;
+            }
+        });
+
+        long base = System.currentTimeMillis() - 4000L;
+        Map<String, Object> first = new HashMap<String, Object>();
+        first.put("note", "from the phone");
+        Continuity.parkForTest(new AppState()
+                .setPayload(first).setDeviceId("phone").setSequence(1L).setTimestamp(base));
+        Map<String, Object> second = new HashMap<String, Object>();
+        second.put("note", "from the tablet");
+        Continuity.parkForTest(new AppState()
+                .setPayload(second).setDeviceId("tablet").setSequence(1L)
+                .setTimestamp(base + 1000L));
+
+        Continuity.drainParkedForTest();
+        flushSerialCalls();
+
+        assertTrue(seen.contains("tablet"), "the slot's arrival was never handed over: " + seen);
+        assertTrue(seen.contains("phone"),
+                "the arrival displaced onto the shelf before the first form existed was never "
+                        + "handed over, so nothing was ever going to dispatch it and it went on "
+                        + "holding every relay checkpoint behind it: " + seen);
+    }
+
+    /**
+     * A session ended BEFORE the restore installed anything leaves the pre-restore history alone.
+     *
+     * <p>A route factory can end the session on its very first call, before restoreStack() has put
+     * anything in place. The live stack is then the history the user already had, and disable() is
+     * not a logout -- there is nothing here that licenses destroying it.</p>
+     *
+     * <p>The subsequence test alone could not see this: a pre-restore stack can coincide with a
+     * prefix of what was requested, which is ordinary rather than contrived -- live /home against
+     * a requested /home,/detail -- and it read as restoration-owned. Asking whether the stack
+     * changed at all is what separates "installed a subset" from "installed nothing".</p>
+     */
+    @EdtTest
+    public void aSessionEndedBeforeAnythingWasInstalledKeepsThePreRestoreHistory() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+
+        final Form home = new Form("home");
+        home.show();
+        flushSerialCalls();
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                Form f = new Form();
+                f.setTitle(url);
+                return f;
+            }
+        });
+        try {
+            // The history the user already has, put there the ordinary way.
+            Navigation.navigate("/home");
+            flushSerialCalls();
+            assertEquals(1, Navigation.getStack().size(), "the fixture never built a stack");
+
+            // Now a restore whose FIRST factory call ends the session before installing anything.
+            Navigation.setDispatcher(new RouteDispatcher() {
+                public Form dispatch(String url) {
+                    Continuity.disable();
+                    return null;
+                }
+            });
+            Map<String, Object> payload = new HashMap<String, Object>();
+            payload.put("draft", "from the other device");
+            Continuity.restore(new AppState()
+                    .setPayload(payload)
+                    .setRoutes(java.util.Arrays.asList("/home", "/detail"))
+                    .setDeviceId("some-other-device")
+                    .setSequence(180L)
+                    .setTimestamp(System.currentTimeMillis()));
+            flushSerialCalls();
+
+            assertEquals(1, Navigation.getStack().size(),
+                    "the pre-restore history was cleared by an abort, even though this restore "
+                            + "installed nothing -- disable() is not a logout: "
+                            + Navigation.getStack());
+        } finally {
+            Navigation.setDispatcher(null);
+            Navigation.clearStack();
+        }
+    }
+
+    /**
      * clear() empties the shelf, not only the slot.
      *
      * <p>clear() is a logout: nothing from before it survives. A shelved arrival is state from

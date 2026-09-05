@@ -157,6 +157,13 @@ public final class Continuity {
     /// means this is a count of the user's devices, and eight is past any real account.
     private static final int MAX_SHELVED = 8;
 
+    /// When a continuation payload is worth mentioning. Advisory only -- see
+    /// warnIfLargeForHandoff, which reports and never refuses.
+    private static final int HANDOFF_ADVISORY_CHARS = 3072;
+
+    /// Whether the size above has already been reported this session.
+    private static boolean handoffSizeReported;
+
     /// How long to wait for the application to produce its first form before giving up on a
     /// continuation that cold-launched it. A launch that never produces one is a broken
     /// application, and restoring minutes later into whatever the user is doing by then is worse
@@ -383,6 +390,33 @@ public final class Continuity {
         if (!enabled) {
             return;
         }
+        AppState[] pending = takeAllPendingOffers();
+        int count = pending.length;
+        // takeAllPendingOffers() has already put them oldest first.
+        for (int a = 0; a < count; a++) {
+            if (!enabled) {
+                // A listener that ran during this drain is allowed to turn continuity off, and
+                // what follows the disable() must not then be admitted into it.
+                return;
+            }
+            admit(pending[a]);
+        }
+    }
+
+    /// Empties BOTH holders and returns what they held, oldest first. On the EDT.
+    ///
+    /// Snapshotted and cleared before the caller does anything with the result, because both
+    /// dispatch() and admit() land back in placeOnOffer() for whatever a listener defers -- so
+    /// draining a live collection would either re-take what was just put back or lose it.
+    ///
+    /// Oldest first by the ORIGIN's clock, which is the only ordering two devices share: a
+    /// sequence is a per-device counter and comparing one against another's says nothing. That
+    /// leaves the newest as the one on offer once they have all been through.
+    ///
+    /// Selection sort rather than Collections.sort, because this is the core API surface -- what
+    /// exists is what vm/JavaAPI and Ports/CLDC11 both define -- and the count is the number of
+    /// the user's devices.
+    private static AppState[] takeAllPendingOffers() {
         AppState[] pending = new AppState[shelved.size() + (parked == null ? 0 : 1)];
         int count = 0;
         if (parked != null) {
@@ -394,13 +428,6 @@ public final class Continuity {
         }
         parked = null;
         shelved.clear();
-        // OLDEST first, so the newest is the one left on offer once they have all been through.
-        // By the ORIGIN's clock, which is the only ordering two devices share -- sequences are
-        // per-device counters and comparing one against another's says nothing.
-        //
-        // Selection sort rather than Collections.sort: this runs on the core API surface, where
-        // what exists is what vm/JavaAPI and Ports/CLDC11 both define, and the count here is the
-        // number of the user's devices.
         for (int a = 0; a < count - 1; a++) {
             int oldest = a;
             for (int b = a + 1; b < count; b++) {
@@ -412,14 +439,7 @@ public final class Continuity {
             pending[a] = pending[oldest];
             pending[oldest] = swap;
         }
-        for (int a = 0; a < count; a++) {
-            if (!enabled) {
-                // A listener that ran during this drain is allowed to turn continuity off, and
-                // what follows the disable() must not then be admitted into it.
-                return;
-            }
-            admit(pending[a]);
-        }
+        return pending;
     }
 
     /// Hands the port a callback.
@@ -1356,7 +1376,19 @@ public final class Continuity {
             //
             // Same rule as the two rollbacks in Navigation: undo what this restore installed, and
             // leave what application code chose afterwards.
-            if (isStillTheRestoredStack(currentRoutes(), routes)) {
+            // Unchanged since before the rebuild means this restore installed NOTHING yet -- a
+            // route factory that ended the session on its first call, before restoreStack() put
+            // anything in place. The live stack is then the pre-restore history, and clearing it
+            // destroys navigation the user had before any of this started. disable() is not a
+            // logout, so there is nothing here that licenses throwing that away.
+            //
+            // The subsequence test alone could not see it: a pre-restore stack can coincide with
+            // a prefix of what was requested -- live /home against a requested /home,/detail is
+            // the ordinary case, not a contrived one -- and it read as restoration-owned. Asking
+            // whether anything changed first is what separates "the restore installed a subset"
+            // from "the restore installed nothing and this was already here".
+            List<String> live = currentRoutes();
+            if (!live.equals(routesBefore) && isStillTheRestoredStack(live, routes)) {
                 try {
                     clearingStack = true;
                     Navigation.clearStack();
@@ -2051,6 +2083,19 @@ public final class Continuity {
                 b.clearContinuation();
                 return;
             }
+            // Said once when the payload is large, and NOT refused. The platform carries a
+            // continuation's userInfo as a small dictionary -- Apple documents it for small
+            // payloads and offers continuation streams for anything more -- but publishes no hard
+            // byte limit that fails cleanly, so an oversized one simply does not arrive on the
+            // other device. The local checkpoint and the relay are unaffected, which is what
+            // makes it hard to see: everything works except the half that crosses the room.
+            //
+            // A REFUSAL would need a number this framework cannot source. Guessing one and
+            // rejecting on it would drop states that transfer perfectly well today, which is a
+            // worse failure than the one being reported. So the size is measured with the
+            // framework's own portable stand-in and reported once per session, turning a silent
+            // failure into one with something to search for.
+            warnIfLargeForHandoff(state);
             b.publishContinuation(getActivityType(), state.getTitle(), StateCodec.toMap(state));
         } catch (Throwable t) {
             Log.e(t);
@@ -3046,13 +3091,58 @@ public final class Continuity {
         }
         // Taken and cleared rather than compared against the state the waiter was started for. A
         // newer arrival while it waited is the one worth showing.
-        AppState waiting = parked;
-        parked = null;
-        if (waiting != null) {
-            dispatch(waiting);
+        //
+        // The SHELF as well as the slot, and for the third time in this class: two devices can
+        // both reach the callback before the first form exists, and the second displaces the
+        // first onto the shelf. Dispatching only the slot left that first arrival with nothing
+        // coming for it -- never handed to a listener even with automatic restoration on, and
+        // reachable only if the application called getRestorableState() by hand -- while it went
+        // on holding every relay publication behind it.
+        //
+        // The generalisation, since patching one path at a time has now missed three: a SECOND
+        // holder means every path that empties EITHER of them has to deal with both. The
+        // pre-enable drain, the settles, and this.
+        //
+        // dispatch(), not admit(): everything here has already been through admission, which is
+        // how it came to be parked. Snapshotted and cleared before any of it is dispatched,
+        // because a listener that defers lands straight back in placeOnOffer().
+        AppState[] pending = takeAllPendingOffers();
+        for (int i = 0; i < pending.length; i++) {
+            dispatch(pending[i]);
         }
-        // Whether it dispatched or was refused, the slot is no longer holding anything back.
+        // Whether they dispatched or were refused, neither holder is keeping anything back now.
         startPublisher();
+    }
+
+    /// Reports a continuation payload big enough that the platform may not carry it.
+    ///
+    /// Advisory, not a limit: the threshold below is this framework's own conservative reading of
+    /// "small", not a constant Apple publishes, which is exactly why nothing is refused on it.
+    ///
+    /// Once per session. A checkpoint runs on every route change, so a per-publish message would
+    /// bury the log of an application that is simply carrying a lot of state -- and it is the
+    /// same state each time, so saying it again adds nothing.
+    private static void warnIfLargeForHandoff(AppState state) {
+        if (handoffSizeReported) {
+            return;
+        }
+        int size;
+        try {
+            size = StateCodec.encodedSize(state);
+        } catch (Throwable t) {
+            // Measuring must never be the thing that stops a publish.
+            Log.e(t);
+            return;
+        }
+        if (size <= HANDOFF_ADVISORY_CHARS) {
+            return;
+        }
+        handoffSizeReported = true;
+        Log.p("Continuity: this checkpoint encodes to " + size + " characters, which is larger "
+                + "than a continuation's userInfo is meant to carry. Saving and restoring on this "
+                + "device is unaffected, and so is any relay -- but the hand-off to a nearby "
+                + "device may not arrive. Put an identifier in the payload and fetch the rest on "
+                + "the other side.");
     }
 
     /// A fresh origin id, minted once per install and persisted.
@@ -3735,6 +3825,7 @@ public final class Continuity {
         deviceId = null;
         parked = null;
         shelved.clear();
+        handoffSizeReported = false;
         dirty = false;
         waitingForWindow = false;
         applyingRestore = false;

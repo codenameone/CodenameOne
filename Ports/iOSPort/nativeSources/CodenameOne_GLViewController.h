@@ -242,9 +242,22 @@ BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
 //#define CN1_APP_INTENTS_DECLARED
 
 // Core Spotlight and App Intents are unavailable on watchOS / tvOS; undo the defines there.
-// Continuity goes with them: NSUserActivity handoff has no watchOS or tvOS counterpart, and
-// NSUbiquitousKeyValueStore is unavailable on both. The Java half is unaffected -- a watch app
-// still saves and restores its own state, which is the half that needs no native support.
+// Continuity goes with them, as a SCOPE decision rather than an availability one, and the
+// difference matters because the comment here used to claim the wrong thing. Both APIs exist on
+// these platforms: Foundation declares NSUserActivity as watchos(2.0)/tvos(9.0) and
+// NSUbiquitousKeyValueStore as watchos(9.0)/tvos(9.0). What this feature ships and tests is the
+// phone-to-phone and phone-to-Mac case, so the natives are left out of the watch and TV slices
+// rather than shipped untested.
+//
+// Nothing misreports itself as a result. isContinuationSupported() and isSyncedStoreSupported()
+// both answer false on those slices, which is true of the build even though it is not true of
+// the platform, and an application branches on those rather than on which device it is. The Java
+// half is unaffected either way -- a watch app still saves and restores its own state, which is
+// the half that needs no native support.
+//
+// Turning either on later means giving the synced store its own define rather than widening this
+// one, since the two capabilities are advertised independently and only one of them has anything
+// to do with Handoff.
 #if TARGET_OS_WATCH || TARGET_OS_TV
 #undef CN1_USE_INTENTS
 #undef CN1_APP_INTENTS_DECLARED
