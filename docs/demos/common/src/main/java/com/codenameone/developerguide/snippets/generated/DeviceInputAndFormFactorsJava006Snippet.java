@@ -81,11 +81,24 @@ class DeviceInputAndFormFactorsJava006Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     
-    void snippet() throws Exception {
-        // tag::device-input-and-form-factors-java-006[]
-        CN.addPostureListener(e -> relayoutForPosture(CN.getDevicePosture()));
-        // end::device-input-and-form-factors-java-006[]
+    // tag::device-input-and-form-factors-java-006[]
+    class FoldAwareForm extends Form {
+        private ActionListener postureListener;
+
+        protected void initComponent() {
+            super.initComponent();
+            postureListener = e -> relayoutForPosture(CN.getDevicePosture());
+            CN.addPostureListener(postureListener);
+        }
+
+        protected void deinitialize() {
+            // CN registers on the singleton Display, so a screen that never
+            // unregisters stays reachable and keeps receiving posture changes
+            CN.removePostureListener(postureListener);
+            super.deinitialize();
+        }
     }
+    // end::device-input-and-form-factors-java-006[]
 
     void relayoutForPosture(com.codename1.ui.DevicePosture p) { }
 

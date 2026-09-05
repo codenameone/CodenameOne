@@ -82,23 +82,24 @@ class MotionSensorsJava001Snippet {
     Resources theme;
     
     // tag::motion-sensors-java-001[]
-    private MotionSensor accelerometer;
-    private MotionSensorListener listener;
+    class SensorForm extends Form {
+        private MotionSensor accelerometer;
+        private MotionSensorListener listener;
 
-    void startSampling() {
-        MotionSensorManager m = MotionSensorManager.getInstance();
-        accelerometer = m.getSensor(MotionSensorManager.TYPE_ACCELEROMETER);
-        if (accelerometer != null) {
-            // both are fields: removeListener needs this exact object, and the
-            // form's removeNotify runs long after this method returns
-            listener = new MotionSensorListener() {
-                public void motionReceived(MotionEvent evt) {
-                    // x, y and z are in meters per second squared
-                    label.setText(evt.getX() + ", " + evt.getY() + ", " + evt.getZ());
-                    label.getParent().revalidate();
-                }
-            };
-            accelerometer.addListener(listener);
+        protected void initComponent() {
+            super.initComponent();
+            MotionSensorManager m = MotionSensorManager.getInstance();
+            accelerometer = m.getSensor(MotionSensorManager.TYPE_ACCELEROMETER);
+            if (accelerometer != null) {
+                listener = new MotionSensorListener() {
+                    public void motionReceived(MotionEvent evt) {
+                        // x, y and z are in meters per second squared
+                        label.setText(evt.getX() + ", " + evt.getY() + ", " + evt.getZ());
+                        label.getParent().revalidate();
+                    }
+                };
+                accelerometer.addListener(listener);
+            }
         }
     }
     // end::motion-sensors-java-001[]
