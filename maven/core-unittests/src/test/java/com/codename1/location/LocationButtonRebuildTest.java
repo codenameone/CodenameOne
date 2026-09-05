@@ -297,6 +297,54 @@ class LocationButtonRebuildTest extends UITestBase {
      * five seconds of sleeping in a unit test to observe a boolean. The field
      * is the mechanism this test is about, so a rename should fail it.</p>
      */
+    @Test
+    void twoGrantsForOneButtonBothGetAnAnswer() throws Exception {
+        RecordingBridge bridge = install();
+        ParkingManager manager = parkingManager();
+        bridge.granted = manager;
+
+        LocationButton holder = new LocationButton();
+        LocationButton second = new LocationButton();
+        final int[] answers = new int[1];
+        second.addLocationSharedListener(new LocationSharedListener() {
+            public void locationShared(Location location) {
+                answers[0]++;
+            }
+        });
+        assertEquals(2, bridge.sessions.size());
+
+        // The holder parks, so anything else queues.
+        bridge.sessions.get(0).onResult.onSucess(Boolean.TRUE);
+        drain();
+
+        // The user taps the second button and its grant waits.
+        bridge.sessions.get(1).onResult.onSucess(Boolean.TRUE);
+        drain();
+        assertEquals(0, answers[0], "queued, so not answered yet");
+
+        // A setter replaces that control, and the user taps the replacement
+        // before the queue has moved.
+        second.setTextType(LocationButton.TEXT_USE_PRECISE_LOCATION);
+        assertEquals(3, bridge.sessions.size(), "the replacement control");
+        bridge.sessions.get(2).onResult.onSucess(Boolean.TRUE);
+        drain();
+
+        manager.release();
+        drain();
+        manager.release();
+        drain();
+        drain();
+
+        // TWO taps, two answers. The first is the null its retired control has
+        // earned, the second is the served lookup. Overwriting the stamp under
+        // a contains() test gave the first tap nothing at all.
+        assertEquals(2, answers[0],
+                "each grant is answered: the superseded one with null, the "
+                + "current one by being served");
+        assertEquals(2, manager.lookups,
+                "and only the current one runs a lookup");
+    }
+
     private static boolean wakePending() throws Exception {
         return field("staleWake").get(null) != null;
     }

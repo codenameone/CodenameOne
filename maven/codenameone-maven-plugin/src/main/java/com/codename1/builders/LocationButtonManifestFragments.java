@@ -417,15 +417,28 @@ final class LocationButtonManifestFragments {
         // whitespace or '<' -- that guard is what stops android:maxSdkVersion
         // matching inside tools:android:maxSdkVersion, and it means the
         // prefixed spelling has to be asked for by its whole name.
-        int[] value = findNamespacedAttribute(element, text, TOOLS_NS,
-                "tools", "node");
-        if (value == null) {
-            value = findAttribute(element, "node");
+        // Asked of EVERY candidate spelling, like the permission name is. The
+        // short-circuiting form settled on whichever "node" it found first, so
+        // a decoy under a rebound prefix -- tools:node="keep" beside a real
+        // a:node="remove" -- answered for the element. That direction matters:
+        // a removal read as a declaration only refuses a build, while a
+        // declaration read as a removal lets an exclusive build through over a
+        // permission that is genuinely being asked for.
+        String[] prefixes = candidatePrefixes(text, TOOLS_NS, "tools");
+        for (int iter = 0; iter <= prefixes.length; iter++) {
+            // The bare spelling last: findAttribute refuses a name preceded by
+            // anything but whitespace or '<', so "node" cannot match inside
+            // "tools:node" and has to be asked for separately.
+            int[] value = iter < prefixes.length
+                    ? findAttribute(element, prefixes[iter] + ":node")
+                    : findAttribute(element, "node");
+            if (value != null
+                    && "remove".equals(element.substring(value[2], value[3])
+                            .trim())) {
+                return true;
+            }
         }
-        if (value == null) {
-            return false;
-        }
-        return "remove".equals(element.substring(value[2], value[3]).trim());
+        return false;
     }
 
     /**
@@ -586,30 +599,56 @@ final class LocationButtonManifestFragments {
         // namespace to an alias in its own android.xpermissions block, and the
         // literal lookup then reported no existing flags and added a SECOND
         // attribute beside the one already there.
-        int[] existing = findNamespacedAttribute(element, xPermissions,
-                ANDROID_NS, "android", "usesPermissionFlags");
-        String replacement;
-        if (existing == null) {
-            // Before the element's own close, whatever shape it has: the
-            // declaration may end in "/>", in "  />" or in ">".
-            int insert = element.length() - 1;
-            while (insert > 0 && (element.charAt(insert - 1) == '/'
-                    || element.charAt(insert - 1) == ' '
-                    || element.charAt(insert - 1) == '\t')) {
-                insert--;
+        // Merged into EVERY candidate spelling that exists, for the reason
+        // declareUncapped strips every cap: with bindings collected
+        // document-wide, a decoy under a rebound prefix could otherwise take
+        // the flag while the attribute the merger actually reads goes without
+        // it. Writing the flag into an attribute that is in nobody's namespace
+        // is inert; failing to write it into the real one gives away the
+        // permission this hint exists to restrict.
+        String[] flagPrefixes = candidatePrefixes(xPermissions, ANDROID_NS,
+                "android");
+        String merged = element;
+        boolean found = false;
+        boolean already = false;
+        for (int iter = 0; iter < flagPrefixes.length; iter++) {
+            int[] slot = findAttribute(merged,
+                    flagPrefixes[iter] + ":usesPermissionFlags");
+            if (slot == null) {
+                continue;
             }
-            replacement = element.substring(0, insert)
-                    + " android:usesPermissionFlags=\"" + flag + "\""
-                    + element.substring(insert);
-        } else {
-            String value = element.substring(existing[2], existing[3]);
+            found = true;
+            String value = merged.substring(slot[2], slot[3]);
             if (hasFlag(value, flag)) {
+                already = true;
+                continue;
+            }
+            merged = merged.substring(0, slot[2])
+                    + (value.trim().length() == 0 ? flag : value + "|" + flag)
+                    + merged.substring(slot[3]);
+        }
+        if (found) {
+            if (already && merged.equals(element)) {
                 return xPermissions;
             }
-            replacement = element.substring(0, existing[2])
-                    + (value.trim().length() == 0 ? flag : value + "|" + flag)
-                    + element.substring(existing[3]);
+            return xPermissions.substring(0, start) + merged
+                    + xPermissions.substring(end + 1);
         }
+        // Nothing to merge into, so the element gains the attribute. Written
+        // with the conventional prefix: this is our own text now, and the
+        // block it goes into is the one we emit.
+        //
+        // Before the element's own close, whatever shape it has: the
+        // declaration may end in "/>", in "  />" or in ">".
+        int insert = element.length() - 1;
+        while (insert > 0 && (element.charAt(insert - 1) == '/'
+                || element.charAt(insert - 1) == ' '
+                || element.charAt(insert - 1) == '\t')) {
+            insert--;
+        }
+        String replacement = element.substring(0, insert)
+                + " android:usesPermissionFlags=\"" + flag + "\""
+                + element.substring(insert);
         return xPermissions.substring(0, start) + replacement
                 + xPermissions.substring(end + 1);
     }
@@ -649,12 +688,31 @@ final class LocationButtonManifestFragments {
         // duplicate is added either, so the button silently lost fine location
         // above API 30 -- which is the whole failure this method exists to
         // prevent, reintroduced one attribute to the left.
-        int[] cap = findNamespacedAttribute(element, xPermissions, ANDROID_NS,
-                "android", "maxSdkVersion");
-        if (cap == null) {
+        // EVERY candidate spelling, not the first. Prefix bindings are
+        // collected document-wide, so an element that rebinds the conventional
+        // prefix could carry a decoy android:maxSdkVersion beside the real
+        // a:maxSdkVersion -- and stripping the decoy while leaving the real cap
+        // in place is the silent loss of fine location above API 30 that this
+        // method exists to prevent. Removing a cap that turns out to be in
+        // nobody's namespace costs nothing; leaving the real one costs the
+        // feature, so every match goes.
+        String[] prefixes = candidatePrefixes(xPermissions, ANDROID_NS,
+                "android");
+        String widened = element;
+        boolean stripped = false;
+        for (int iter = 0; iter < prefixes.length; iter++) {
+            int[] cap = findAttribute(widened,
+                    prefixes[iter] + ":maxSdkVersion");
+            while (cap != null) {
+                widened = widened.substring(0, cap[0])
+                        + widened.substring(cap[1]);
+                stripped = true;
+                cap = findAttribute(widened, prefixes[iter] + ":maxSdkVersion");
+            }
+        }
+        if (!stripped) {
             return xPermissions;
         }
-        String widened = element.substring(0, cap[0]) + element.substring(cap[1]);
         // The attribute left a double space behind it.
         widened = widened.replace("  ", " ");
         return xPermissions.substring(0, start) + widened
@@ -669,49 +727,6 @@ final class LocationButtonManifestFragments {
 
     /** The manifest-merger namespace, bindable to any prefix in the same way. */
     private static final String TOOLS_NS = "http://schemas.android.com/tools";
-
-    /**
-     * Finds a namespaced attribute however the document spells its prefix.
-     *
-     * <p>{@code xmlns:a="http://schemas.android.com/apk/res/android"} with
-     * {@code a:name="..."} is a perfectly valid manifest, and a submitted aar
-     * is somebody else's file. Looking only for the literal {@code android:}
-     * missed the permission such an archive requests, and missing it fails in
-     * the dangerous direction: the exclusivity check accepts the build, and
-     * Gradle then merges the background permission in beside
-     * {@code onlyForLocationButton} -- the contradiction the check exists to
-     * reject.</p>
-     *
-     * <p>The conventional prefix is ALWAYS tried as well as any the document
-     * binds, so this can only ever find more than the literal test did. A
-     * manifest that binds the URI to an alias and then writes {@code android:}
-     * anyway has an undeclared prefix and is not valid XML, but reading it the
-     * way it was plainly meant costs nothing and refuses more builds rather
-     * than fewer.</p>
-     *
-     * <p>Note the default namespace is deliberately not consulted. An
-     * unprefixed attribute is in NO namespace no matter what {@code xmlns=}
-     * says, so a bare {@code name=} is not an Android attribute and must not
-     * be read as one.</p>
-     *
-     * @param element  the element text
-     * @param document the whole file, which is where the bindings are
-     * @param uri      the namespace wanted
-     * @param usual    the conventional prefix, always tried
-     * @param local    the attribute's local name
-     * @return the bounds findAttribute would return, or null
-     */
-    private static int[] findNamespacedAttribute(String element,
-            String document, String uri, String usual, String local) {
-        String[] prefixes = candidatePrefixes(document, uri, usual);
-        for (int iter = 0; iter < prefixes.length; iter++) {
-            int[] value = findAttribute(element, prefixes[iter] + ":" + local);
-            if (value != null) {
-                return value;
-            }
-        }
-        return null;
-    }
 
     /**
      * Every prefix that might spell an attribute in {@code uri}.

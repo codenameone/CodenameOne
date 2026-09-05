@@ -258,7 +258,11 @@ public class LocationButton extends Container {
     /// [#serveNextWaiting()] -- because a tap that is never reported at all is
     /// the failure this queue exists to prevent.
     ///
-    /// A button is in the list at most once, so one field is enough.
+    /// One field, because a button occupies one slot in the queue. When a
+    /// SECOND grant arrives for the same button under a newer stamp -- a tap
+    /// on the replacement while a tap on the old peer is still waiting -- the
+    /// superseded one is answered on the spot rather than given a slot of its
+    /// own, so no grant is lost to the overwrite.
     private int waitingGeneration;
 
     /// Creates a button labelled "Precise location".
@@ -758,8 +762,26 @@ public class LocationButton extends Container {
                     // is what an earlier revision did, and it turned "two
                     // buttons corrupt each other's request" into "the second
                     // button never reports anything".
+                    boolean queued = WAITING.contains(LocationButton.this);
+                    if (queued && waitingGeneration != generation) {
+                        // Two grants, one slot. A tap on the old peer is
+                        // already waiting, a setter has since replaced the
+                        // control, and this is a tap on its replacement.
+                        // Overwriting the stamp and stopping at contains()
+                        // left the FIRST tap with nothing at all -- neither
+                        // its stale null nor a lookup of its own -- so two
+                        // taps produced one answer, which is the same silence
+                        // the queue exists to prevent, arrived at from the
+                        // other direction.
+                        //
+                        // Answered here rather than queued twice: the drain
+                        // would give it the same null a moment later, and one
+                        // entry per button is what makes contains() a
+                        // meaningful test.
+                        fire(null);
+                    }
                     waitingGeneration = generation;
-                    if (!WAITING.contains(LocationButton.this)) {
+                    if (!queued) {
                         WAITING.add(LocationButton.this);
                     }
                     scheduleStaleWake();

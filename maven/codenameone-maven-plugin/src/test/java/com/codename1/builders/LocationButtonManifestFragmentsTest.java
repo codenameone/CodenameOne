@@ -116,6 +116,42 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void everySpellingOfTheCapIsStripped() {
+        // A decoy cap under the conventional prefix, and the real one under
+        // another prefix bound to the Android namespace. Stripping the first
+        // match removed the decoy and left the real cap in place, which is the
+        // silent loss of fine location above API 30 that widening exists to
+        // prevent.
+        String decoyed = "    <uses-permission xmlns:a=\"http://schemas."
+                + "android.com/apk/res/android\" a:name=\"android.permission."
+                + "ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"99\""
+                + " a:maxSdkVersion=\"30\" />\n";
+        String out = LocationButtonManifestFragments.inject(decoyed, false);
+        assertFalse(out.contains("maxSdkVersion"),
+                "no spelling of the cap may survive: " + out);
+        assertEquals(1, count(out, "android.permission.ACCESS_FINE_LOCATION"),
+                out);
+    }
+
+    @Test
+    void everySpellingOfTheFlagIsMergedInto() {
+        // Same shape for the flag being added: writing it into a decoy while
+        // the attribute the merger reads goes without it gives away the
+        // permission the hint exists to restrict.
+        String decoyed = "    <uses-permission xmlns:a=\"http://schemas."
+                + "android.com/apk/res/android\" a:name=\"android.permission."
+                + "ACCESS_FINE_LOCATION\" android:usesPermissionFlags=\""
+                + "neverForLocation\" a:usesPermissionFlags=\""
+                + "neverForLocation\" />\n";
+        String out = LocationButtonManifestFragments.addPermissionFlag(
+                decoyed, LocationButtonManifestFragments.FINE_LOCATION,
+                LocationButtonManifestFragments.ONLY_FOR_LOCATION_BUTTON);
+        assertEquals(2, count(out, "neverForLocation|onlyForLocationButton"),
+                "both spellings carry the flag, so whichever one is really "
+                + "the Android namespace has it: " + out);
+    }
+
+    @Test
     void aDecoyUnderAReboundPrefixHidesNothing() throws Exception {
         // Bindings are collected document-wide rather than resolved in the
         // element's scope, so a manifest can rebind the conventional prefix on
