@@ -1145,6 +1145,24 @@ public final class Continuity {
             }
         }
         List<String> routes = usableRoutes(state.getRoutes());
+        if (routes.size() != state.getRoutes().size()) {
+            // The FILTERED set is what gets committed, and it is applied HERE so that every exit
+            // below carries it. usableRoutes() dropped a route this device cannot store, and only
+            // the copy handed to restoreStack() had it removed -- so commit() persisted the
+            // original, externalize() threw on the oversized string every time, and the arrival
+            // stayed parked: re-applied on every retry, with every relay publication held behind
+            // it, for ever.
+            //
+            // It sat further down and the payload-only return below reached commit() before it,
+            // so a state whose routes were ALL unusable -- a valid payload with nothing storable
+            // beside it -- still committed the originals and failed in exactly that way. That is
+            // the second time this reconciliation was applied to one path and not the other,
+            // which is why it is now the statement immediately after the filter it belongs to.
+            //
+            // Unchecked because these routes have already passed the very check that produced
+            // this list.
+            state.setRoutesUnchecked(routes);
+        }
         if (routes.isEmpty()) {
             // Payload-only restoration, which is what an app that does not use @Route gets. The
             // provider has been given everything there is, and false is deliberate: it is what
@@ -1239,15 +1257,6 @@ public final class Continuity {
             }
             outFailed[0] = true;
             return false;
-        }
-        if (routes.size() != state.getRoutes().size()) {
-            // The FILTERED set is what gets committed. usableRoutes() dropped a route this device
-            // cannot store, and only the copy handed to restoreStack() had it removed -- so
-            // commit() went on to persist the original, externalize() threw on the oversized
-            // string every time, and the arrival stayed parked: re-applied on every retry, with
-            // every relay publication held behind it, for ever. Unchecked because these routes
-            // have already passed the very check that produced this list.
-            state.setRoutesUnchecked(routes);
         }
         if (routesThrew) {
             // A THROW, which is a different thing from routes that would not rebuild, and the two

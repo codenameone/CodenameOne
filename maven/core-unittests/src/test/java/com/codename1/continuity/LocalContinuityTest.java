@@ -4536,6 +4536,47 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A state whose routes are ALL unusable still commits, on the payload-only path.
+     *
+     * <p>The sibling of the test below, and the exit the reconciliation did not cover.
+     * usableRoutes() drops every route this device cannot store, so a state carrying a good
+     * payload and nothing storable beside it takes the payload-only return -- which reached
+     * commit() before the filtered set was applied. persist() then threw on the original
+     * oversized route every time, so the arrival stayed parked, was re-applied on every retry,
+     * and held every relay publication behind it.</p>
+     */
+    @EdtTest
+    public void aStateWhoseRoutesAreAllUnusableStillCommits() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+        StringBuilder huge = new StringBuilder("/");
+        for (int i = 0; i < 70000; i++) {
+            huge.append('x');
+        }
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("draft", "worth keeping");
+        AppState arriving = new AppState()
+                .setPayload(payload)
+                .setDeviceId("some-other-device")
+                .setSequence(410L)
+                .setTimestamp(System.currentTimeMillis());
+        // Unchecked, because a remote document is accepted unchecked on purpose -- which is how
+        // an unstorable route reaches this device at all.
+        arriving.setRoutesUnchecked(java.util.Arrays.asList(huge.toString()));
+
+        Continuity.restore(arriving);
+        flushSerialCalls();
+
+        assertEquals("worth keeping", provider.restored.get("draft"),
+                "the payload never reached the provider, so this test is about nothing");
+        assertNotNull(Continuity.readSeenForTest().get("some-other-device"),
+                "the arrival was never acknowledged: commit() persisted the oversized route the "
+                        + "filter had already dropped, so it stays parked, is re-applied on every "
+                        + "retry, and holds every relay publication behind it");
+    }
+
+    /**
      * A route this device cannot store is dropped from what gets COMMITTED too, not only from
      * what gets rebuilt.
      *
