@@ -83,7 +83,15 @@ class InCarExperiencesJava002Snippet {
     
     void snippet() throws Exception {
         // tag::in-car-experiences-java-002[]
-        int max = context.getListRowLimit(); // 0 when unknown
+        int max = context.getListRowLimit(); // 0 when the head unit doesn't say
+        int count = (max > 0) ? Math.min(items.size(), max) : items.size();
+        CarListTemplate t = new CarListTemplate().setTitle("Library");
+        for (int i = 0; i < count; i++) {
+            t.addRow(new CarRow(items.get(i)));
+        }
         // end::in-car-experiences-java-002[]
     }
+
+    java.util.List<String> items = new java.util.ArrayList<String>();
+
 }

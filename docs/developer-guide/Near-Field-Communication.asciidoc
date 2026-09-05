@@ -39,6 +39,14 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 Each accessor returns `null` when the tag doesn't advertise the corresponding technology, so always null-check before calling.
 
+NOTE: On iOS the AIDs handed to `setIsoSelectAids` must also be listed in
+`Info.plist` under
+`com.apple.developer.nfc.readersession.iso7816.select-identifiers`. Core NFC only
+discovers an application the app declared up front, and the builders can't read a
+runtime argument, so inject that key with `ios.plistInject` too. The
+`nfc.hce.iso7816.select-identifiers` entitlement the builders do set is the
+host-card-emulation key, which is a different thing.
+
 [options="header"]
 |===
 | Accessor | Android | iOS | Notes
@@ -58,17 +66,17 @@ For FeliCa on iOS, set the system codes in `NfcReadOptions`:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NearFieldCommunicationJava003Snippet.java[tag=near-field-communication-java-003,indent=0]
 ----
 
-The builders can't derive the entitlement from that call -- the codes are a
-runtime argument they never see. Declare the same codes as a build hint, which
-the generic entitlement renderer emits into the app:
+The builders can't derive that from the call -- the codes are a runtime argument
+they never see. iOS wants them in `Info.plist`, so inject the key at build time:
 
 ----
-codename1.arg.ios.entitlements.com.apple.developer.nfc.readersession.felica.systemcodes=0003\n8008
+codename1.arg.ios.plistInject=<key>com.apple.developer.nfc.readersession.felica.systemcodes</key><array><string>0003</string><string>8008</string></array>
 ----
 
 Seeing `com.codename1.nfc` on the classpath gets you CoreNFC, a default
-`NFCReaderUsageDescription` and `com.apple.developer.nfc.readersession.formats`
-automatically. The FeliCa system codes are the one part you supply.
+`NFCReaderUsageDescription` and the
+`com.apple.developer.nfc.readersession.formats` entitlement automatically. These
+system codes are the one part you supply.
 
 === Quick start: Host card emulation
 
