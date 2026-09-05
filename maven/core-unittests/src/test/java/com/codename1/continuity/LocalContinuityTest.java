@@ -7747,6 +7747,50 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * Enabling a session reads the relay, so a login finds the new account's work.
+     *
+     * <p>setRelay() installs the transport and does not read it, and clear() and disable() end the
+     * session and drop any fetch in flight. So the enable() that comes with a login had the relay
+     * still installed and nothing asking it anything: the account that just signed in did not see
+     * its own state from another device until the application happened to call pollRelay() or the
+     * app was resumed -- and Android's resume poll is a different event that a login completed in
+     * the foreground never fires, with no automatic one on iOS at all.</p>
+     *
+     * <p>Unlike the disable() that clear() needs, there is nothing to leave to the application
+     * here: a session beginning is the moment to read the relay, and this is the code that knows
+     * one began.</p>
+     */
+    @EdtTest
+    public void enablingASessionReadsTheRelay() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        final GatedRelay r = new GatedRelay();
+        Continuity.setRelay(r);
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitEntered();
+            }
+        });
+        r.release();
+        pause(300L);
+
+        // The documented logout, which ends the session and drops anything in flight.
+        Continuity.clear();
+        Continuity.disable();
+        flushSerialCalls();
+        final int before = r.fetches();
+
+        // And the login.
+        Continuity.enable();
+        pause(400L);
+
+        assertTrue(r.fetches() > before,
+                "enabling a new session never read the relay, so the account that just signed in "
+                        + "does not see its own work from another device until something else "
+                        + "happens to poll");
+    }
+
+    /**
      * clear() empties the shelf, not only the slot.
      *
      * <p>clear() is a logout: nothing from before it survives. A shelved arrival is state from

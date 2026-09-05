@@ -362,6 +362,22 @@ public final class Continuity {
                 }
             });
         }
+        // And the RELAY, which is the third place a session's work can be waiting.
+        //
+        // setRelay() installs the transport and does not read it, and clear() and disable() end
+        // the session and drop any fetch in flight -- so the enable() that comes with a login had
+        // the relay object still installed and nothing asking it anything. The account that just
+        // signed in then did not see its own state from another device until the application
+        // happened to call pollRelay() or the app was resumed: Android's resume poll is a
+        // different event that a login completed in the foreground never fires, and there is no
+        // automatic one on iOS at all.
+        //
+        // Unlike the disable() that clear() needs, there is nothing here to leave to the
+        // application. A new session beginning is exactly the moment to read the relay, and this
+        // is the code that knows one began. pollRelay() guards itself on a relay being installed
+        // and defers behind a publish in flight, and a second poll from an application that also
+        // asks is coalesced -- so the cost of being wrong about wanting it is nothing.
+        pollRelay();
     }
 
     /// Admits everything this class was holding before enable(), oldest first. On the EDT.
