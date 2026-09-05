@@ -4066,7 +4066,10 @@ public class LocalContinuityTest extends UITestBase {
                             + "the state and there is nothing left to retry from -- while the "
                             + "user sits on a screen they did not ask for");
         } finally {
+            // The stack too: nothing resets Navigation between tests, and a test that leaves
+            // entries behind breaks the NEXT test's fixture rather than its own assertions.
             Navigation.setDispatcher(null);
+            Navigation.clearStack();
         }
     }
 
@@ -4388,7 +4391,10 @@ public class LocalContinuityTest extends UITestBase {
                             + "on a history that does not include what the user is looking at; "
                             + "top is " + Navigation.getCurrent().getPath());
         } finally {
+            // The stack too: nothing resets Navigation between tests, and a test that leaves
+            // entries behind breaks the NEXT test's fixture rather than its own assertions.
             Navigation.setDispatcher(null);
+            Navigation.clearStack();
         }
     }
 
@@ -4441,7 +4447,10 @@ public class LocalContinuityTest extends UITestBase {
                             + "previous account's screen; showing "
                             + Display.getInstance().getCurrent().getTitle());
         } finally {
+            // The stack too: nothing resets Navigation between tests, and a test that leaves
+            // entries behind breaks the NEXT test's fixture rather than its own assertions.
             Navigation.setDispatcher(null);
+            Navigation.clearStack();
         }
     }
 
@@ -4488,7 +4497,10 @@ public class LocalContinuityTest extends UITestBase {
                             + "signed-out account's UI; showing "
                             + Display.getInstance().getCurrent().getTitle());
         } finally {
+            // The stack too: nothing resets Navigation between tests, and a test that leaves
+            // entries behind breaks the NEXT test's fixture rather than its own assertions.
             Navigation.setDispatcher(null);
+            Navigation.clearStack();
         }
     }
 
@@ -4531,7 +4543,10 @@ public class LocalContinuityTest extends UITestBase {
                             + "was invoked for that account, and emptying the stack afterwards "
                             + "undoes none of what they did");
         } finally {
+            // The stack too: nothing resets Navigation between tests, and a test that leaves
+            // entries behind breaks the NEXT test's fixture rather than its own assertions.
             Navigation.setDispatcher(null);
+            Navigation.clearStack();
         }
     }
 
@@ -4579,6 +4594,97 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * An out-of-order arrival from the same device does not move the user backward.
+     *
+     * <p>Replacing a same-origin offer is supersession, and supersession has a direction. The
+     * comment said the newer sequence is the one worth showing and nothing checked: arrivals do
+     * not necessarily land in the order they were sent, so a delayed sequence 10 landing after 11
+     * replaced it. admit() has this check, but the pre-enable path does not go through admit() --
+     * the states a synced-store listener's seam collects before enable() arrive here unordered,
+     * and both copies have already been claimed from the port.</p>
+     */
+    @EdtTest
+    public void anOutOfOrderArrivalDoesNotMoveTheUserBackward() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+
+        Continuity.parkForTest(new AppState()
+                .setPayload(payloadWith("the newer work"))
+                .setDeviceId("phone").setSequence(11L)
+                .setTimestamp(System.currentTimeMillis()));
+        // The delayed one lands second.
+        Continuity.parkForTest(new AppState()
+                .setPayload(payloadWith("the older work"))
+                .setDeviceId("phone").setSequence(10L)
+                .setTimestamp(System.currentTimeMillis()));
+
+        AppState onOffer = Continuity.getRestorableState();
+        assertNotNull(onOffer, "nothing is on offer");
+        assertEquals(11L, onOffer.getSequence(),
+                "a delayed older state from the same device replaced the newer one, so the user "
+                        + "is moved backward and the newer continuation is gone");
+
+        // And a genuinely newer one still supersedes, or this guard would freeze the slot.
+        Continuity.parkForTest(new AppState()
+                .setPayload(payloadWith("newer still"))
+                .setDeviceId("phone").setSequence(12L)
+                .setTimestamp(System.currentTimeMillis()));
+        assertEquals(12L, Continuity.getRestorableState().getSequence(),
+                "a newer state no longer supersedes, so the slot is stuck on the first arrival");
+    }
+
+    /**
+     * A screen chosen after the session ended keeps its stack entry.
+     *
+     * <p>A callback that ends the session and then goes somewhere -- clear() and then
+     * navigate("/login"), the ordinary shape of a logout discovered mid-restore -- has already
+     * replaced the stack. Emptying it then removed the login entry too, and the display guard
+     * kept the login FORM, so getCurrent() showed it while Navigation.getCurrent() was null and
+     * back() had nothing to go back to.</p>
+     */
+    @EdtTest
+    public void aScreenChosenAfterTheSessionEndedKeepsItsStackEntry() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                Form f = new Form();
+                f.setTitle(url);
+                if ("/orders/17".equals(url)) {
+                    f.addShowListener(new com.codename1.ui.events.ActionListener() {
+                        public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                            if (Continuity.isEnabled()) {
+                                Continuity.clear();
+                                Navigation.navigate("/login");
+                            }
+                        }
+                    });
+                }
+                return f;
+            }
+        });
+        try {
+            Continuity.restore(new AppState()
+                    .setRoutes(java.util.Arrays.asList("/orders/17"))
+                    .setDeviceId("some-other-device").setSequence(460L)
+                    .setTimestamp(System.currentTimeMillis()));
+            flushSerialCalls();
+
+            assertNotNull(Navigation.getCurrent(),
+                    "the stack was emptied along with the restoration's own entries, so the login "
+                            + "screen is showing with no history behind it and back() has nothing");
+            assertEquals("/login", Navigation.getCurrent().getPath(),
+                    "the stack does not name the screen the logout chose; top is "
+                            + Navigation.getCurrent().getPath());
+        } finally {
+            // The stack too: nothing resets Navigation between tests, and a test that leaves
+            // entries behind breaks the NEXT test's fixture rather than its own assertions.
+            Navigation.setDispatcher(null);
+            Navigation.clearStack();
+        }
+    }
+
+    /**
      * A route-only arrival whose factory redirects is settled, not parked for ever.
      *
      * <p>restoreStack() returns false when it leaves a factory's redirect alone, and false used
@@ -4615,7 +4721,10 @@ public class LocalContinuityTest extends UITestBase {
                     "the arrival was never settled, so it stays parked, holds relay publication, "
                             + "and is offered again after every launch to redirect again");
         } finally {
+            // The stack too: nothing resets Navigation between tests, and a test that leaves
+            // entries behind breaks the NEXT test's fixture rather than its own assertions.
             Navigation.setDispatcher(null);
+            Navigation.clearStack();
         }
     }
 
@@ -4654,7 +4763,10 @@ public class LocalContinuityTest extends UITestBase {
                     "a factory ran after an earlier one had already redirected, so it built a "
                             + "screen and touched whatever is behind it for nothing: " + built);
         } finally {
+            // The stack too: nothing resets Navigation between tests, and a test that leaves
+            // entries behind breaks the NEXT test's fixture rather than its own assertions.
             Navigation.setDispatcher(null);
+            Navigation.clearStack();
         }
     }
 
@@ -4699,7 +4811,10 @@ public class LocalContinuityTest extends UITestBase {
                     "the rebuild replaced the screen the factory redirected to; top is "
                             + Navigation.getCurrent().getPath());
         } finally {
+            // The stack too: nothing resets Navigation between tests, and a test that leaves
+            // entries behind breaks the NEXT test's fixture rather than its own assertions.
             Navigation.setDispatcher(null);
+            Navigation.clearStack();
         }
     }
 
@@ -4935,7 +5050,10 @@ public class LocalContinuityTest extends UITestBase {
                             + "usableRoutes() had already dropped: it stays parked, is re-applied "
                             + "on every retry, and holds every relay publication behind it");
         } finally {
+            // The stack too: nothing resets Navigation between tests, and a test that leaves
+            // entries behind breaks the NEXT test's fixture rather than its own assertions.
             Navigation.setDispatcher(null);
+            Navigation.clearStack();
         }
     }
 
@@ -5035,7 +5153,10 @@ public class LocalContinuityTest extends UITestBase {
                             + "rather than the ones the application redirected to, so a process "
                             + "death restores the screen it sent the user away from");
         } finally {
+            // The stack too: nothing resets Navigation between tests, and a test that leaves
+            // entries behind breaks the NEXT test's fixture rather than its own assertions.
             Navigation.setDispatcher(null);
+            Navigation.clearStack();
         }
     }
 
@@ -5462,7 +5583,10 @@ public class LocalContinuityTest extends UITestBase {
                             + "the signed-out account's UI; showing "
                             + Display.getInstance().getCurrent().getTitle());
         } finally {
+            // The stack too: nothing resets Navigation between tests, and a test that leaves
+            // entries behind breaks the NEXT test's fixture rather than its own assertions.
             Navigation.setDispatcher(null);
+            Navigation.clearStack();
         }
     }
 
@@ -5554,7 +5678,10 @@ public class LocalContinuityTest extends UITestBase {
                             + "payload applied, so the relay's only other copy is released while "
                             + "the user is not on the restored screen");
         } finally {
+            // The stack too: nothing resets Navigation between tests, and a test that leaves
+            // entries behind breaks the NEXT test's fixture rather than its own assertions.
             Navigation.setDispatcher(null);
+            Navigation.clearStack();
         }
     }
 
@@ -5601,7 +5728,10 @@ public class LocalContinuityTest extends UITestBase {
                             + "make: capture() threw, dirty stayed set, and nothing was written "
                             + "or published again");
         } finally {
+            // The stack too: nothing resets Navigation between tests, and a test that leaves
+            // entries behind breaks the NEXT test's fixture rather than its own assertions.
             Navigation.setDispatcher(null);
+            Navigation.clearStack();
         }
     }
 
@@ -5864,7 +5994,10 @@ public class LocalContinuityTest extends UITestBase {
                             + "form constructors and show callbacks all ran, and undoing the "
                             + "stack afterwards cannot unrun them");
         } finally {
+            // The stack too: nothing resets Navigation between tests, and a test that leaves
+            // entries behind breaks the NEXT test's fixture rather than its own assertions.
             Navigation.setDispatcher(null);
+            Navigation.clearStack();
         }
     }
 

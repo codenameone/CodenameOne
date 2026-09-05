@@ -1263,13 +1263,26 @@ public final class Continuity {
             // account's screens were back in the history even with nothing written to storage.
             // Suppressed while doing it, or the emptying schedules a checkpoint of its own and
             // recreates exactly what the logout removed.
-            try {
-                clearingStack = true;
-                Navigation.clearStack();
-            } catch (Throwable t) {
-                Log.e(t);
-            } finally {
-                clearingStack = false;
+            //
+            // ONLY while the stack is still the restoration's own. A callback that ends the
+            // session and then goes somewhere -- clear() and then navigate("/login"), which is
+            // the ordinary shape of a logout discovered mid-restore -- has already replaced it,
+            // and emptying it then removed the login entry too: the display guard below kept the
+            // login FORM, so getCurrent() showed it while Navigation.getCurrent() was null and
+            // back() had nothing. disable() during a restore did worse, since it is not a logout
+            // and the pre-restore history was destroyed for it.
+            //
+            // Same rule as the two rollbacks in Navigation: undo what this restore installed, and
+            // leave what application code chose afterwards.
+            if (currentRoutes().equals(routes)) {
+                try {
+                    clearingStack = true;
+                    Navigation.clearStack();
+                } catch (Throwable t) {
+                    Log.e(t);
+                } finally {
+                    clearingStack = false;
+                }
             }
             // And the SCREEN, which the stack does not speak for. restoreStack() has already
             // shown the rebuilt form by the time control gets here -- the cancellation came from
@@ -2541,14 +2554,26 @@ public final class Continuity {
     /// this state, so a newer mark for that origin is left alone.
     private static void placeOnOffer(AppState state) {
         AppState replaced = parked;
-        parked = state;
         if (replaced == null || replaced == state) { //NOPMD CompareObjectsWithEquals
+            parked = state;
             return;
         }
         String origin = replaced.getDeviceId();
-        if (origin == null || origin.length() == 0 || origin.equals(state.getDeviceId())) {
+        if (origin != null && origin.length() > 0 && origin.equals(state.getDeviceId())) {
+            // SAME device, so this is supersession -- and supersession has a direction. The
+            // comment below has always said the newer sequence is the one worth showing, and
+            // nothing checked: arrivals do not necessarily land in the order they were sent, and
+            // a delayed sequence 10 landing after 11 moved the user BACKWARD. admit() has this
+            // check, but the pre-enable path does not go through admit(), so the states a
+            // synced-store listener's seam collects before enable() arrive here unordered and
+            // both copies have already been claimed from the port.
+            if (state.getSequence() < replaced.getSequence()) {
+                return;
+            }
+            parked = state;
             return;
         }
+        parked = state;
         Long mark = lastSeen.get(origin);
         if (mark != null && mark.longValue() == replaced.getSequence()) {
             lastSeen.remove(origin);
