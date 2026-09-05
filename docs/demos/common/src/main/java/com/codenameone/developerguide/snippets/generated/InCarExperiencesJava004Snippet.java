@@ -81,18 +81,28 @@ class InCarExperiencesJava004Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     
-    void snippet() throws Exception {
-        // tag::in-car-experiences-java-004[]
-        // Car.addConnectionListener is static, so keep the reference: an
-        // observer scoped to a screen has to be handed back to
-        // Car.removeConnectionListener when that screen goes away
-        CarConnectionListener connectionListener = new CarConnectionListener() {
-            public void carConnected(CarContext ctx) { startLocationStream(); }
-            public void carDisconnected()           { stopLocationStream(); }
-        };
-        Car.addConnectionListener(connectionListener);
-        // end::in-car-experiences-java-004[]
+    // tag::in-car-experiences-java-004[]
+    class CarAwareForm extends Form {
+        // Car keeps the listener in a static list, so a screen-scoped observer
+        // has to hand back this exact instance or every recreated screen stays
+        // reachable and keeps receiving connection callbacks
+        private CarConnectionListener connectionListener;
+
+        protected void initComponent() {
+            super.initComponent();
+            connectionListener = new CarConnectionListener() {
+                public void carConnected(CarContext ctx) { startLocationStream(); }
+                public void carDisconnected()           { stopLocationStream(); }
+            };
+            Car.addConnectionListener(connectionListener);
+        }
+
+        protected void deinitialize() {
+            Car.removeConnectionListener(connectionListener);
+            super.deinitialize();
+        }
     }
+    // end::in-car-experiences-java-004[]
 
     void startLocationStream() { }
     void stopLocationStream() { }
