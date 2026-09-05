@@ -55,6 +55,20 @@ public class ContinuityStateTest extends BaseTest {
         return false;
     }
 
+    /// Progress marker, printed before each phase.
+    ///
+    /// This test wedged the tvOS suite: the console stops immediately after the support-probe
+    /// line and every test after it alphabetically never runs, so the run reports them as
+    /// "missing actual" and the suite never emits SUITE:FINISHED. It has done that since the
+    /// test was added, and it does NOT happen on iOS, where the same test runs to completion.
+    ///
+    /// The markers are how the next tvOS run says which statement it stops on, and they earn
+    /// their place afterwards: this is a device conformance test whose whole job is to report
+    /// what a platform does.
+    private static void phase(String name) {
+        System.out.println("CN1SS:INFO:test=ContinuityStateTest phase=" + name);
+    }
+
     @Override
     public boolean runTest() {
         try {
@@ -69,10 +83,12 @@ public class ContinuityStateTest extends BaseTest {
             // NSUserActivityTypes by the build on the other. If the two ever disagree, iOS
             // silently refuses to deliver anything -- so the shape is asserted where it is
             // computed.
+            phase("activityType");
             String activityType = Continuity.getActivityType();
             assertBool(activityType != null && activityType.endsWith(".continuity"),
                     "activity type ends with .continuity");
 
+            phase("provider");
             final Map<String, Object> restored = new HashMap<String, Object>();
             Continuity.setStateProvider(new StateProvider() {
                 public Map<String, Object> saveState() {
@@ -88,9 +104,12 @@ public class ContinuityStateTest extends BaseTest {
             });
             assertBool(Continuity.isEnabled(), "installing a provider enables the framework");
 
+            phase("title");
             Continuity.setTitle("cn1ss continuity");
+            phase("checkpoint");
             Continuity.checkpoint();
 
+            phase("restorable");
             AppState stored = Continuity.getRestorableState();
             assertBool(stored != null, "a checkpoint leaves a restorable state");
             assertEqual("cn1ss draft", stored.getPayload().get("draft"), "stored payload");
@@ -101,6 +120,7 @@ public class ContinuityStateTest extends BaseTest {
             // Restoring an app with no routes hands the payload back and shows nothing, which is
             // what lets "restore, or else begin" work. Answering true here would make such an app
             // skip its own first screen.
+            phase("restore");
             assertBool(!Continuity.restore(), "a routeless restore shows no form");
             assertEqual("cn1ss draft", restored.get("draft"), "the payload reached the provider");
 
@@ -108,6 +128,7 @@ public class ContinuityStateTest extends BaseTest {
             // device and the map one is handed to the operating system, and a millisecond
             // timestamp is past the range a JSON number represents exactly -- which is why they
             // are encoded as strings and why that is asserted rather than assumed.
+            phase("wire");
             AppState wire = new AppState()
                     .setRoutes(routes())
                     .setPayload(payload())
@@ -124,6 +145,7 @@ public class ContinuityStateTest extends BaseTest {
             assertEqual("cn1ss", viaMap.getPayload().get("name"), "payload survives the map form");
 
             // The payload rule is enforced where the application can act on it, on every port.
+            phase("payloadRule");
             boolean refused = false;
             try {
                 Map<String, Object> bad = new HashMap<String, Object>();
@@ -141,6 +163,7 @@ public class ContinuityStateTest extends BaseTest {
             // behind by a run that was interrupted between the write and the removal made the
             // absent-value assertion fail on every later run, permanently -- and on iOS the value
             // can also arrive from another device, which no amount of local cleanup prevents.
+            phase("syncedStore");
             String key = "cn1ss.sortOrder." + System.currentTimeMillis();
             try {
                 SyncedStore.remove(key);
