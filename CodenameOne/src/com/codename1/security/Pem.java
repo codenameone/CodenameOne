@@ -254,10 +254,22 @@ final class Pem {
             if (c.hasMore()) {
                 return SHAPE_UNKNOWN;
             }
-            // RFC 5958 only allows publicKey in a version-1 key, and the
-            // version-0 path returns the bytes untouched -- so a version-0
-            // container carrying one was handed to the platform with a field
-            // its own version forbids.
+            // RFC 5958 section 2 is deliberately asymmetric here: "If publicKey
+            // is present, then version MUST be v2 (1). Otherwise version SHOULD
+            // be v1 (0)." So this check is one-way on purpose.
+            //
+            // A version-0 container carrying a publicKey breaks the MUST, and
+            // the version-0 path returns the bytes untouched, so it would reach
+            // the platform with a field its own version forbids. That is
+            // refused.
+            //
+            // Version 1 without a publicKey only breaks the SHOULD, and
+            // refusing it would cost a key that works: measured, such a key is
+            // accepted raw by JDK 17 and later, and normalizePkcs8 below
+            // turns it into the canonical version-0 encoding -- byte for byte
+            // the same key -- which JDK 11 accepts as well. Rejecting it would
+            // be a regression on every supported runtime in exchange for
+            // enforcing a SHOULD, so it is normalized instead.
             if (hasPublicKey && !isVersion(firstInteger, 1)) {
                 return SHAPE_UNKNOWN;
             }
