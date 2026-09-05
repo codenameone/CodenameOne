@@ -4290,6 +4290,59 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A login form opened by the restored form's own show callback survives.
+     *
+     * <p>restoreStack() rolls its screen back when show() throws, and it used to do that whenever
+     * the display had changed -- which is true of two different things. show() installs the form
+     * and only THEN runs its listeners, so a listener that finds the session expired, calls
+     * clear(), opens a login form and then throws has already replaced the screen with its own
+     * choice. Re-showing the pre-restore form put the signed-out account's screen back in front
+     * of the user, which is the one thing that callback ran to prevent -- and Continuity.restore()
+     * cannot correct it, because by the time it runs the rollback has happened.</p>
+     */
+    @EdtTest
+    public void aLoginFormOpenedByAFailingShowCallbackSurvivesTheRollback() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+
+        Form dashboard = new Form("dashboard");
+        dashboard.show();
+        flushSerialCalls();
+
+        final Form login = new Form("login");
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                Form f = new Form();
+                f.setTitle(url);
+                f.addShowListener(new com.codename1.ui.events.ActionListener() {
+                    public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                        Continuity.clear();
+                        login.show();
+                        throw new IllegalStateException("the session had expired");
+                    }
+                });
+                return f;
+            }
+        });
+        try {
+            Continuity.restore(new AppState()
+                    .setRoutes(java.util.Arrays.asList("/orders/17"))
+                    .setDeviceId("some-other-device")
+                    .setSequence(320L)
+                    .setTimestamp(System.currentTimeMillis()));
+            flushSerialCalls();
+
+            assertTrue(login == Display.getInstance().getCurrent(),
+                    "the rollback put the pre-restore screen back over the login form the show "
+                            + "callback had just chosen, returning the signed-out user to the "
+                            + "previous account's screen; showing "
+                            + Display.getInstance().getCurrent().getTitle());
+        } finally {
+            Navigation.setDispatcher(null);
+        }
+    }
+
+    /**
      * A login form a route FACTORY opened survives the undo.
      *
      * <p>The other half of the show-callback case, and the one the undo used to get wrong. The
@@ -4419,6 +4472,98 @@ public class LocalContinuityTest extends UITestBase {
                             + "on every retry, and holds every relay publication behind it");
         } finally {
             Navigation.setDispatcher(null);
+        }
+    }
+
+    /**
+     * A cold-launch arrival the port is holding is dropped by a clear() that precedes enable().
+     *
+     * <p>The sibling of the disable() case, and the door it left open. A Handoff that
+     * cold-launches a logged-out app reaches the port before anything has installed a callback
+     * and is held there, so clearing the framework's own parked slot cleared nothing that
+     * existed -- and the enable() that came with the later login drained the port and restored
+     * the pre-logout payload and routes into the next account.</p>
+     *
+     * <p>Not done by recording a choice: clear() is a logout, not "I do not want continuity",
+     * and an arrival that comes AFTER it is not from before it and must still be held for the
+     * enable() that is coming.</p>
+     */
+    @EdtTest
+    public void aHeldArrivalIsDroppedByAClearThatPrecedesEnable() {
+        HoldingBridge holding = new HoldingBridge();
+        holding.pending = StateCodec.toMap(fromElsewhere("from before the logout", 300L));
+        Continuity.setBridge(holding);
+
+        // Never enabled -- logged out at launch -- and the app wipes state.
+        Continuity.clear();
+        assertNull(holding.pending,
+                "the port is still holding the pre-logout arrival, so the enable() that comes "
+                        + "with the login will drain it into the next account");
+
+        Continuity.setStateProvider(new RecordingProvider());
+        flushSerialCalls();
+        assertNull(Continuity.getRestorableState(),
+                "the arrival from before the clear() was restored after it");
+
+        // And an arrival AFTER the clear is still held for the enable that is coming, which is
+        // what makes this a drain rather than a policy change.
+        Continuity.reset();
+        Storage.getInstance().clearStorage();
+        HoldingBridge later = new HoldingBridge();
+        Continuity.setBridge(later);
+        Continuity.clear();
+        later.pending = StateCodec.toMap(fromElsewhere("after the clear", 301L));
+        ContinuityCallback c = Continuity.callbackForTest();
+        assertFalse(c.continuationReceived(Continuity.getActivityType(), later.pending),
+                "an arrival that came after the clear was claimed and dropped, so the enable() "
+                        + "about to happen has nothing to deliver");
+    }
+
+    /**
+     * A background callback is not told an arrival was claimed when the decision will decline it.
+     *
+     * <p>The marshalling that fixed cross-thread visibility answered "claimed" unconditionally,
+     * and the queued decision then declined -- because the application has not said whether it
+     * wants continuity. The bridge acts on the synchronous answer: it lets go of an activity the
+     * framework never kept, so the enable() that follows a sync-only listener has nothing to
+     * deliver and the cold-launch continuation is gone. That is the loss the retention contract
+     * exists to prevent.</p>
+     */
+    @EdtTest
+    public void aBackgroundCallbackIsNotToldAnArrivalWasClaimedWhenItWillBeDeclined() {
+        // A sync-only application: the store listener installs the callback and continuity is
+        // deliberately NOT enabled.
+        SyncedStoreListener listener = new SyncedStoreListener() {
+            public void storeChanged() {
+            }
+        };
+        SyncedStore.addChangeListener(listener);
+        try {
+            final ContinuityCallback callback = Continuity.callbackForTest();
+            final Map<String, Object> info =
+                    StateCodec.toMap(fromElsewhere("cold-launch handoff", 310L));
+            final java.util.concurrent.atomic.AtomicBoolean claimed =
+                    new java.util.concurrent.atomic.AtomicBoolean(true);
+            final java.util.concurrent.CountDownLatch done =
+                    new java.util.concurrent.CountDownLatch(1);
+
+            Display.getInstance().startThread(new Runnable() {
+                public void run() {
+                    claimed.set(callback.continuationReceived(Continuity.getActivityType(), info));
+                    done.countDown();
+                }
+            }, "continuity background caller").start();
+
+            for (int i = 0; i < 40 && done.getCount() > 0; i++) {
+                pause(50L);
+                flushSerialCalls();
+            }
+            assertEquals(0L, done.getCount(), "the background caller never returned");
+            assertFalse(claimed.get(),
+                    "the framework told the port it had taken an arrival it then declined, so a "
+                            + "conforming bridge discards a continuation nothing is holding");
+        } finally {
+            SyncedStore.removeChangeListener(listener);
         }
     }
 

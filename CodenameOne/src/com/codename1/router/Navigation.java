@@ -362,11 +362,24 @@ public final class Navigation {
         } catch (RuntimeException e) {
             stack.clear();
             stack.addAll(previous);
-            // And the screen with it. show() rather than showBack(): the user is not going back,
-            // an attempt that failed is being undone.
+            // And the screen with it -- but ONLY when the screen still showing is the one this
+            // method put up. show() rather than showBack(): the user is not going back, an
+            // attempt that failed is being undone.
+            //
+            // The test used to be "the display changed", which is true of two different things.
+            // show() installs the form and only THEN runs onShowCompleted and the show listeners,
+            // so a listener that finds the session expired, calls Continuity.clear(), opens a
+            // login form and then throws has already replaced the screen with its own choice --
+            // and re-showing the pre-restore form put the signed-out account's screen back in
+            // front of the user, which is the one thing that callback ran to prevent.
+            //
+            // Asking whether `top` is still current separates them: if it is, nothing has been
+            // chosen since and the restore's own screen comes down; if it is not, application
+            // code put something else there and it stays. Continuity.restore() cannot make this
+            // distinction on its own -- by the time it runs, this rollback has already happened.
             try {
                 Form now = Display.getInstance().getCurrent();
-                if (displayed != null && displayed != now) { //NOPMD CompareObjectsWithEquals
+                if (displayed != null && now == top) { //NOPMD CompareObjectsWithEquals
                     displayed.show();
                 }
             } catch (RuntimeException ignored) {

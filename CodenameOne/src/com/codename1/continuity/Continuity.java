@@ -231,6 +231,11 @@ public final class Continuity {
     /// the session ended is the one point where the two are still distinguishable.
     private static com.codename1.ui.Form formAtSessionEnd;
 
+    /// Armed only while clear() drains whatever the port has been holding, and read by the
+    /// callback the port offers it to. Confined to that call: the offer is synchronous, on the
+    /// event thread, and the flag is lowered in a finally.
+    private static boolean discardHeldArrival;
+
     /// Whether the application has said anything about continuity yet -- either enable() or
     /// disable(). It is NOT the negation of `enabled`: the two states that share
     /// `enabled == false` -- nothing said yet, and switched off on purpose -- want opposite
@@ -1406,6 +1411,24 @@ public final class Continuity {
         lifecycle++;
         parked = null;
         dirty = false;
+        // The PORT's held arrival too, not only this class's parked slot. A Handoff that
+        // cold-launches a logged-out app reaches IOSContinuityCallbacks before anything has
+        // installed a callback, and it is held there -- so clearing `parked` cleared nothing that
+        // existed, and the enable() that came with the later login drained the port and restored
+        // the pre-logout payload and routes into the next account. clear() says nothing from
+        // before it survives.
+        //
+        // A one-shot rather than applicationHasChosen: clear() is a logout, not "I do not want
+        // continuity", and it deliberately leaves an enabled framework enabled. Recording a
+        // choice here would make every arrival AFTER the clear be dropped instead of held for
+        // the enable() that is about to come -- and an arrival after the clear is not from
+        // before it.
+        discardHeldArrival = true;
+        try {
+            installCallback();
+        } finally {
+            discardHeldArrival = false;
+        }
         // The label goes with the work it describes. It is CONTENT, not configuration -- "Draft
         // to Dana", "Invoice 2031", read at every checkpoint -- so leaving it behind meant the
         // first checkpoint after a logout, a login screen or the next account's opening route,
@@ -3160,6 +3183,22 @@ public final class Continuity {
             // callSerially, the simulator's hooks are dispatched on the event thread -- so this
             // is the guarantee for a bridge written elsewhere, not a change to how ours behave.
             if (Display.isInitialized() && !Display.getInstance().isEdt()) {
+                if (!applicationHasChosen) {
+                    // DECLINED, and nothing queued. The application has not said whether it wants
+                    // continuity, so the queued decision would decline too -- and claiming ahead
+                    // of a decline is a lie the port acts on: it lets go of an activity this
+                    // framework did not keep, so the enable() that follows a sync-only listener
+                    // has nothing to deliver and the cold-launch continuation is gone. Exactly
+                    // the loss the retention contract exists to prevent, reintroduced by the
+                    // marshalling that fixed the visibility problem.
+                    //
+                    // Safe to read from here, and it is the ONE flag that is: it goes false to
+                    // true once and never back, so a stale read answers false -- a decline, which
+                    // the port recovers from by offering the activity again the next time a
+                    // callback is installed. `enabled` has no such property, which is why the
+                    // decision below is marshalled rather than taken here.
+                    return false;
+                }
                 final Map<String, Object> info = userInfo;
                 Display.getInstance().callSerially(new Runnable() {
                     @Override
@@ -3175,6 +3214,11 @@ public final class Continuity {
         /// The decision itself, on the event thread -- or before there is one, where nothing else
         /// is running to race it and deliver() parks the arrival for the EDT that is starting.
         private boolean decide(Map<String, Object> userInfo) {
+            if (discardHeldArrival) {
+                // clear() is draining what the port held from before it. Claimed, which is what
+                // makes the port let go of it.
+                return true;
+            }
             if (!enabled) {
                 // The answer is the application's own choice, and the two states that share
                 // `enabled == false` want opposite ones.
