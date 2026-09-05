@@ -5375,18 +5375,23 @@ public final class Display extends CN1Constants {
     /// #### Returns
     ///
     /// pixels per logical pixel, or 0 when the platform does not report one
+    public float getDevicePixelRatio() {
+        return impl.getDevicePixelRatio();
+    }
+
     /// Whether this platform can round a picture's corners as it draws it,
     /// rather than the caller having to build a rounded copy of the bitmap.
+    ///
+    /// The platform answering yes does not mean every picture can be rounded --
+    /// procedural images and rotated ones cannot. Ask
+    /// [Graphics#isRoundedImageSupported(Image)] about the specific picture
+    /// before skipping a rounded-copy fallback.
     ///
     /// #### Returns
     ///
     /// true if [Graphics#drawImageRounded(Image, int, int, int, int, float)] rounds
     public boolean isRoundedImageSupported() {
         return impl.isRoundedImageDrawSupported();
-    }
-
-    public float getDevicePixelRatio() {
-        return impl.getDevicePixelRatio();
     }
 
     /// Returns the device density as a string.

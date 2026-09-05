@@ -960,6 +960,32 @@ public final class Graphics {
         return impl.isRoundedImageDrawSupported();
     }
 
+    /// Whether [#drawImageRounded(Image, int, int, int, int, float)] will round
+    /// THIS image, which is the question a caller actually needs answered.
+    ///
+    /// The platform may round and still not be able to round a given picture.
+    /// Drawing an Image is a virtual call, and ComponentImage, DynamicImage,
+    /// FontImage, RGBImage and SVGScaledView paint procedurally rather than
+    /// handing over a bitmap; a rotated image keeps its angle beside a shared
+    /// peer. None of those can be handed to a rounded draw without losing the
+    /// drawing or the rotation, so they come out square.
+    ///
+    /// A caller that consults the no-argument method alone therefore skips its
+    /// own rounded-copy fallback on a platform that advertises support and gets
+    /// square artwork for exactly those images. Ask this one per picture.
+    ///
+    /// #### Parameters
+    ///
+    /// - `img`: the image about to be drawn
+    ///
+    /// #### Returns
+    ///
+    /// true if this image will be rounded; false to use the copy fallback
+    public boolean isRoundedImageSupported(Image img) {
+        return img != null && impl.isRoundedImageDrawSupported()
+                && img.roundedDrawPeer() != null;
+    }
+
     /// Draws an image with rounded corners, without building a rounded copy of
     /// it, on platforms that support it; elsewhere the image is drawn square.
     ///
@@ -984,8 +1010,10 @@ public final class Graphics {
             // Not drawable from a peer alone -- a procedural subclass or a
             // rotated image. Rounding it here would drop the subclass's own
             // drawing or the rotation, so it goes through the normal path and
-            // comes out square, which is what this method already promises on a
-            // platform that cannot round.
+            // comes out square. Ask isRoundedImageSupported(Image) rather than
+            // the no-argument form to find this out BEFORE skipping a
+            // rounded-copy fallback; the platform answering yes does not mean
+            // every picture can be rounded.
             drawImage(img, x, y, w, h);
             return;
         }
