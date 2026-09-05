@@ -1479,7 +1479,7 @@ On Android you need to define an intent filter which you can do using the `andro
 include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.xml[tag=advanced-topics-under-the-hood-xml-007,indent=0]
 ----
 
-You can read more about it in link:http://stackoverflow.com/questions/11421048/android-ios-custom-uri-protocol-handling[this stack overflow question].
+You can read more about it in link:https://stackoverflow.com/questions/11421048/android-ios-custom-uri-protocol-handling[this stack overflow question].
 
 To bind the `myapp://` URL to your application. As a result typing `myapp://x` into the Android browser will launch the application.
 

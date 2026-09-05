@@ -34,7 +34,7 @@ The UDID is the Universal Device Identifier. It identifies mobile devices unique
 You need the iOS device UDID value during development to add the device into the list of allowed devices.
 
 IMPORTANT: Don't use an app to get the UDID! +
-Most return the wrong value. Use the Finder device summary (macOS), Apple Configurator, or a trusted service such as http://get.udid.io/ which seems to work rather well
+Most return the wrong value. Use the Finder device summary on macOS, or Apple Configurator.
 
 ==== Should you reuse the same certificate for all apps
 
@@ -186,7 +186,7 @@ The same decision need to be made twice: Once for the development certificate, a
 TIP: Each Apple Developer account can have three active iOS Development certificates and three active iOS Distribution certificates at a time. Reuse existing certificates whenever possible to avoid hitting this limit.
 
 TIP: You can revoke a certificate when you have an application in the store shipping with said certificate! +
-This won't affect the shipping app see http://stackoverflow.com/questions/6320255/if-i-revoke-an-existing-distribution-certificate-will-it-mess-up-anything-with[this].
+This won't affect the shipping app see https://stackoverflow.com/questions/6320255/if-i-revoke-an-existing-distribution-certificate-will-it-mess-up-anything-with[this].
 
 .Why Two Certificates?
 ****
@@ -252,7 +252,7 @@ You need two versions of each file (4 total files) one pair is for development a
 
 IMPORTANT: You need to use a Mac to create a certificate file for iOS
 
-The first step you need to do is signing up as a developer to http://developer.apple.com/[Apple's iOS development program], even for testing on a device this is required! +
+The first step you need to do is signing up as a developer to https://developer.apple.com/[Apple's iOS development program], even for testing on a device this is required! +
 This step requires that you pay Apple on an annual basis.
 
 The Apple website will guide you through the process of applying for a certificate at the end of this process you should have a distribution and development certificate pair. After that point you can log in to the https://developer.apple.com/ios/manage/overview/index.action[iOS provisioning portal] where there are plenty of videos and tutorials to guide you through the process. Within the iOS provisioning portal you need to create an application ID and register your development devices.
@@ -371,4 +371,4 @@ Password: [password] (we expect both passwords to be identical)
 
 Executing the command produces a `Keystore.ks` file in that directory. Keep it safe: if you lose it, you can no longer publish upgrades signed with the same identity. Enter its path, alias, and passwords in `common/codenameone_settings.properties`, or use the *Android* page in the standalone Certificate Wizard (`mvn cn1:certificatewizard`) to generate and install a keystore.
 
-For more details see http://developer.android.com/guide/publishing/app-signing.html
+For more details see https://developer.android.com/studio/publish/app-signing

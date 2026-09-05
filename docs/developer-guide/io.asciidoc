@@ -522,11 +522,11 @@ run reports both for every platform it covers.
 
 === Network manager & connection request
 
-One of the more common problems in Network programming is spawning a new thread to handle the network operations. In Codename One this is done seamlessly and becomes unessential thanks to the http://www.codenameone.com/javadoc/com/codename1/io/NetworkManager.html[NetworkManager].
+One of the more common problems in Network programming is spawning a new thread to handle the network operations. In Codename One this is done seamlessly and becomes unessential thanks to the https://www.codenameone.com/javadoc/com/codename1/io/NetworkManager.html[NetworkManager].
 
 `NetworkManager` effectively alleviates the need for managing network threads by managing the complexity of network threading. The connection request class can be used to ease web service requests when coupled with the JSON/XML parsing capabilities.
 
-To open a connection one needs to use a http://www.codenameone.com/javadoc/com/codename1/io/ConnectionRequest.html[ConnectionRequest]
+To open a connection one needs to use a https://www.codenameone.com/javadoc/com/codename1/io/ConnectionRequest.html[ConnectionRequest]
 object, which has some similarities to the networking mechanism in JavaScript but is obviously somewhat more elaborate.
 
 You can send a get request to a URL using something like:
@@ -799,7 +799,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 The response is a `Map` containing a nested hierarchy of `Collection` (`java.util.List`), Strings and numbers to represent the content of the submitted JSON. To extract the data from a specific path iterate the `Map` keys and recurs into it.
 
-The sample below uses results from https://anapioficeandfire.com/[an API of ice and fire] that queries structured data about the "Song Of Ice & Fire" book series. Here is a sample result returned from the API for the query http://www.anapioficeandfire.com/api/characters?page=5&pageSize=3 :
+The sample below uses results from https://anapioficeandfire.com/[an API of ice and fire] that queries structured data about the "Song Of Ice & Fire" book series. Here is a sample result returned from the API for the query https://www.anapioficeandfire.com/api/characters?page=5&pageSize=3 :
 
 [source,JavaScript]
 ----
@@ -1170,7 +1170,7 @@ The code in the kitchen sink webservice sample was updated to use this API. The 
 
 The best way to explain the usage of this API is through a concrete "real world" example. Twilio provides many great telephony-oriented webservices to developers. One of those is an SMS sending webservice which can be useful for things such as "device activation."
 
-To get started you would need to sign up to http://twillo.com/[Twilio] and have the following 3 variable values:
+To get started you would need to sign up to https://www.twilio.com/[Twilio] and have the following 3 variable values:
 
 [source,java]
 ----

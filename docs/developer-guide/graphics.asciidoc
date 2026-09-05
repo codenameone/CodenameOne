@@ -793,7 +793,7 @@ The 9-image borders use multi images by default to keep their appearance more re
 
 https://www.codenameone.com/javadoc/com/codename1/ui/FontImage.html[FontImage] allows using an icon font as if it was an image. You can specify the character, color and size and then treat the `FontImage` as if its a regular image. The huge benefits are that the font image can adapt to platform conventions in color and scale to adapt to DPI.
 
-You can generate icon fonts using free tools on the internet such as http://fontello.com/[this]. Icon fonts are a simple and powerful technique to create a small, modern applications.
+You can generate icon fonts using free tools on the internet such as https://fontello.com/[this]. Icon fonts are a simple and powerful technique to create a small, modern applications.
 
 Icon fonts can be created in 2 basic ways the first is explicitly by defining all the elements within the font:
 
