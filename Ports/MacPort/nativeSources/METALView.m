@@ -772,6 +772,39 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     repaintUI();
 }
 
+/// Gives up on presenting this frame, recording that one is owed and arranging
+/// for it to be asked for again.
+///
+/// EVERY path that abandons a present goes through here. Having two of them do
+/// it separately is what let the nil-texture case drift: it committed and
+/// returned like the exhausted-pool case but never set the flag, so that frame
+/// was simply lost -- drawFrame ignores the result and marks it painted.
+- (BOOL)cn1DeferFrameAndCommit {
+    atomic_store_explicit(&cn1PresentDeferred, 1, memory_order_release);
+    // Who pays it back depends on why we gave up. A blit still in flight will
+    // free a slot and ask from its completion; with nothing in flight, no
+    // completion is coming -- the window server releases surfaces silently -- so
+    // time it instead. Immediately would only spin, one display interval later
+    // usually will not.
+    BOOL anyInFlight = NO;
+    for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
+        if (atomic_load_explicit(&cn1PresentInFlight[i], memory_order_acquire)) {
+            anyInFlight = YES;
+            break;
+        }
+    }
+    if (!anyInFlight) {
+        METALView *deferredView = self;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(NSEC_PER_SEC / 60)),
+                       dispatch_get_main_queue(), ^{
+            [deferredView cn1PayDeferredPresent];
+        });
+    }
+    [self.commandBuffer commit];
+    self.commandBuffer = nil;
+    return NO;
+}
+
 - (BOOL)presentFramebuffer {
     static int firstPresent = 1;
     if (firstPresent) { firstPresent = 0; cn1StartupPhase("firstPresent"); }
@@ -802,6 +835,11 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
         int candidate = (cn1PresentIndex + i) % CN1_PRESENT_SURFACE_COUNT;
         if (cn1PresentSurfaces[candidate] != NULL
+                // A surface can exist with no texture: the build loop only skips
+                // a slot whose IOSurfaceCreate failed, so a
+                // newTextureWithDescriptor that returns nil under GPU pressure
+                // leaves one behind. Selecting it meant giving up on the frame.
+                && cn1PresentTextures[candidate] != nil
                 && candidate != atomic_load_explicit(&cn1PresentCurrent, memory_order_acquire)
                 && !atomic_load_explicit(&cn1PresentInFlight[candidate], memory_order_acquire)
                 && !IOSurfaceIsInUse(cn1PresentSurfaces[candidate])) {
@@ -821,42 +859,17 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         // DISPLAYING, so at rest exactly one of the three is in use and the
         // renderer always has somewhere to go. Reaching here at all means a
         // handoff is in flight, which resolves on its own.
-        atomic_store_explicit(&cn1PresentDeferred, 1, memory_order_release);
-        // Who will pay this back depends on WHY every surface was busy.
-        //
-        // If a blit is still in flight, its completion frees that slot and asks
-        // for the frame from there. But the surfaces can all be held by the
-        // window server with no GPU work outstanding at all, and the compositor
-        // releases them without a callback of any kind -- so in that case no
-        // completion is coming and the frame would sit owed until something
-        // unrelated happened to repaint.
-        //
-        // Asking again immediately would spin: the state that caused the drop is
-        // still true. One display interval later it usually is not.
-        BOOL anyInFlight = NO;
-        for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
-            if (atomic_load_explicit(&cn1PresentInFlight[i], memory_order_acquire)) {
-                anyInFlight = YES;
-                break;
-            }
-        }
-        if (!anyInFlight) {
-            METALView *deferredView = self;
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(NSEC_PER_SEC / 60)),
-                           dispatch_get_main_queue(), ^{
-                [deferredView cn1PayDeferredPresent];
-            });
-        }
-        [self.commandBuffer commit];
-        self.commandBuffer = nil;
-        return NO;
+        // Every surface was busy. Nothing else here may abandon a frame by
+        // hand -- see cn1DeferFrameAndCommit.
+        return [self cn1DeferFrameAndCommit];
     }
     cn1PresentIndex = (presentIdx + 1) % CN1_PRESENT_SURFACE_COUNT;
     id<MTLTexture> presentTexture = cn1PresentTextures[presentIdx];
     if (presentTexture == nil) {
-        [self.commandBuffer commit];
-        self.commandBuffer = nil;
-        return NO;
+        // Selection excludes these now, so this is belt and braces -- but it
+        // gives up the same way everything else does rather than losing the
+        // frame, which is what it used to do.
+        return [self cn1DeferFrameAndCommit];
     }
     id<MTLBlitCommandEncoder> blit = [self.commandBuffer blitCommandEncoder];
     [blit copyFromTexture:self.screenTexture
