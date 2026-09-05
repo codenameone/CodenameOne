@@ -2475,6 +2475,16 @@ public class UIManager {
         // when a style is actually parsed, not while styles are being read.
         prefixedStyles.clear();
 
+        // The style-definition index too. It answers "does the theme define
+        // this id", is memoised for a whole theme, and is keyed on
+        // themeGeneration -- which only setThemePropsImpl bumps. Parsing writes
+        // straight into themeProps without bumping it, so a $Dark override
+        // added through the public parseComponentStyle API was invisible to
+        // every id resolved for the first time afterwards, and the light style
+        // was built instead. Dropping the map rebuilds both it and the $Dark
+        // key index on the next question.
+        styleDefinitionCache = null;
+
         return getComponentStyleImpl(originalId, selected, prefix);
 
     }
