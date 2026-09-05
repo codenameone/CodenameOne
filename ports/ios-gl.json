@@ -1,36 +1,36 @@
 {
-  "commit": "6ba5b7d7c429fb5b90a25e7e86f0823717453079",
-  "generated_at": "2026-09-04T15:45:14Z",
+  "commit": "30ffac801ba0caf2af1410755560be8f2de85c36",
+  "generated_at": "2026-09-05T06:12:04Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 342425000
+        "duration_ns": 384012000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 21674000
+        "duration_ns": 30080000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 118248000
+        "duration_ns": 141725000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 76204000
+        "duration_ns": 128621000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 366262000
+        "duration_ns": 420764000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 127437000
+        "duration_ns": 166122000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 163016000
+        "duration_ns": 201298000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "ios-gl",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/33842400674",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/33944339830",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "fail": 0,
+    "fail": 1,
     "not-run": 0,
-    "pass": 179,
+    "pass": 178,
     "skip": 4
   },
   "tests": {
@@ -84,7 +84,10 @@
     },
     "AppReviewDialogScreenshotTest": {
       "feature": "dialogs-and-labels",
-      "status": "pass"
+      "reasons": [
+        "screenshot-different:AppReviewDialog"
+      ],
+      "status": "fail"
     },
     "AudioMixerApiTest": {
       "feature": "audio-media-playback",
