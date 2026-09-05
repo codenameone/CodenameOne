@@ -75,6 +75,21 @@ public class UIManager {
     /// it is paid by every Codename One application, on every screen.
     private final HashMap<String, Style> prefixedStyles = new HashMap<String, Style>();
 
+    /// True once a Style has been installed through setComponentStyle or
+    /// setComponentSelectedStyle, which switches the prefixed cache off.
+    ///
+    /// Those objects stay owned by the caller, who is free to mutate one after
+    /// installing it -- and a mutation reaches UIManager through nothing at all,
+    /// so a prefixed prototype derived from one cannot be told it has gone
+    /// stale. Everything else the cache is built from does announce itself:
+    /// themeProps changes run through parseStyle, and a theme swap clears the
+    /// map outright. So the cache is kept only while every input is one we hear
+    /// about, and dropped for the lifetime of the theme once one is not.
+    ///
+    /// This costs almost nothing in practice: no framework or port code calls
+    /// those setters at all, they are purely an application-facing API.
+    private boolean programmaticStyleInstalled;
+
     /// Style-lookup keys derived from a UIID, memoised.
     ///
     /// getComponentStyleImpl rebuilt them on EVERY request -- `id + "."` on
@@ -438,7 +453,10 @@ public class UIManager {
         // here, and then the result is cached under prefix + id. Without this
         // the cache keeps answering with the prototype built from the PREVIOUS
         // base and the style installed here is silently ignored.
+        // The clear drops what is already cached; the flag stops anything
+        // being cached again, because this object can still be mutated.
         prefixedStyles.clear();
+        programmaticStyleInstalled = true;
     }
 
     /// Allows a developer to programmatically install a style into the UI manager
@@ -473,7 +491,10 @@ public class UIManager {
         // here, and then the result is cached under prefix + id. Without this
         // the cache keeps answering with the prototype built from the PREVIOUS
         // base and the style installed here is silently ignored.
+        // The clear drops what is already cached; the flag stops anything
+        // being cached again, because this object can still be mutated.
         prefixedStyles.clear();
+        programmaticStyleInstalled = true;
     }
 
     /// Allows a developer to programmatically install a style into the UI manager
@@ -497,7 +518,10 @@ public class UIManager {
         // here, and then the result is cached under prefix + id. Without this
         // the cache keeps answering with the prototype built from the PREVIOUS
         // base and the style installed here is silently ignored.
+        // The clear drops what is already cached; the flag stops anything
+        // being cached again, because this object can still be mutated.
         prefixedStyles.clear();
+        programmaticStyleInstalled = true;
     }
 
     /// Returns the style of the component with the given id or a **new instance** of the default
@@ -691,11 +715,18 @@ public class UIManager {
                     // Cached on prefix + id, exactly as the unprefixed styles
                     // are. The returned Style is a copy either way, so a
                     // caller still gets its own mutable instance.
-                    String key = prefixedKey(prefix, id);
-                    style = prefixedStyles.get(key);
-                    if (style == null) {
+                    if (programmaticStyleInstalled) {
+                        // Rebuild every time, exactly as this did before the
+                        // cache existed: a base installed programmatically can
+                        // be mutated by whoever installed it without telling us.
                         style = createStyle(id, prefix, false);
-                        prefixedStyles.put(key, style);
+                    } else {
+                        String key = prefixedKey(prefix, id);
+                        style = prefixedStyles.get(key);
+                        if (style == null) {
+                            style = createStyle(id, prefix, false);
+                            prefixedStyles.put(key, style);
+                        }
                     }
                 }
             }
@@ -1626,6 +1657,8 @@ public class UIManager {
             styles.clear();
             selectedStyles.clear();
             prefixedStyles.clear();
+            // styles.clear() above discarded the installed objects too.
+            programmaticStyleInstalled = false;
             themeGeneration++;
             imageCache.clear();
             current.refreshTheme(false);
@@ -1737,6 +1770,8 @@ public class UIManager {
         styles.clear();
         selectedStyles.clear();
         prefixedStyles.clear();
+        // styles.clear() above discarded the installed objects too.
+        programmaticStyleInstalled = false;
         themeGeneration++;
         imageCache.clear();
         current.refreshTheme(false);
@@ -1913,6 +1948,8 @@ public class UIManager {
         themeConstants.clear();
         selectedStyles.clear();
         prefixedStyles.clear();
+        // styles.clear() above discarded the installed objects too.
+        programmaticStyleInstalled = false;
         themeGeneration++;
         imageCache.clear();
         if (themelisteners != null) {

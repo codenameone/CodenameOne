@@ -81,6 +81,26 @@ public class UIManagerPrefixedStyleCacheTest extends UITestBase {
     }
 
     @Test
+    public void mutatingAnInstalledBaseIsVisibleToAPrefixedStyle() {
+        UIManager manager = UIManager.getInstance();
+        manager.setThemeProps(derivedFromBase());
+
+        Style installed = new Style();
+        installed.setFgColor(0x222222);
+        manager.setComponentStyle("Base", installed);
+
+        assertEquals(0x222222, manager.getComponentCustomStyle("Child", "press").getFgColor(),
+                "precondition: the prefixed style follows the installed base");
+
+        // The caller still owns this object and can change it without going
+        // through UIManager at all, so nothing can invalidate a cached copy.
+        installed.setFgColor(0x555555);
+
+        assertEquals(0x555555, manager.getComponentCustomStyle("Child", "press").getFgColor(),
+                "a prefixed style must follow later mutations of an installed base");
+    }
+
+    @Test
     public void installedTypedStyleIsVisibleToAPrefixedStyleResolvedEarlier() {
         UIManager manager = UIManager.getInstance();
         manager.setThemeProps(derivedFromBase());
