@@ -2362,6 +2362,32 @@ public class IOSImplementation extends CodenameOneImplementation {
         });
     }
 
+    /// Repaints one desktop window, named by id, from native code.
+    ///
+    /// The Mac renderer can defer a presentation when every surface is busy and
+    /// ask for the frame again once one frees. repaintUI() is the wrong way to
+    /// ask for a SECONDARY window: it repaints Display.getCurrent(), which is the
+    /// main form, so the window that actually owed a frame is never dirtied and
+    /// the retry clears itself without producing one.
+    ///
+    /// Called only from native (CN1MacWindowDeliverRepaint), which is also what
+    /// keeps it: the translator keeps a method whose mangled name appears in the
+    /// native sources.
+    public static void windowRepaintCallback(final int windowId) {
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                com.codename1.ui.Window[] all = com.codename1.ui.Desktop.getInstance().getWindows();
+                for (int iter = 0; iter < all.length; iter++) {
+                    if (all[iter].getWindowId() == windowId) {
+                        all[iter].asContainer().repaint();
+                        return;
+                    }
+                }
+            }
+        });
+    }
+
     private static void reattachPeers(com.codename1.ui.Container c) {
         int count = c.getComponentCount();
         for (int iter = 0; iter < count; iter++) {

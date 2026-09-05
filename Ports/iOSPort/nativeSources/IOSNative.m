@@ -2767,6 +2767,10 @@ void CN1MacWindowDeliverContentReady(int windowId) {
     com_codename1_impl_ios_IOSImplementation_windowContentReadyCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
 }
 
+void CN1MacWindowDeliverRepaint(int windowId) {
+    com_codename1_impl_ios_IOSImplementation_windowRepaintCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
+}
+
 void CN1MacWindowDeliverActivationFailed(int windowId, int requestSeq) {
     com_codename1_impl_ios_IOSImplementation_windowActivationFailedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, requestSeq);
 }

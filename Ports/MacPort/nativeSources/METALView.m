@@ -728,14 +728,30 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 /// a GPU completion that freed a surface, and the timer below for when no GPU
 /// work is outstanding -- cannot both ask for the same frame.
 - (void)cn1PayDeferredPresent {
+    // Readiness FIRST, and only then clear the flag. Clearing it and then
+    // discovering there is nobody to ask would drop the frame on the floor with
+    // the flag saying it had been paid, which is the failure this whole retry
+    // exists to prevent. Left set, it is still owed and the next completion or
+    // timer pays it.
+    extern BOOL cn1MacRuntimeIsJavaReady(void);
+    if (!cn1MacRuntimeIsJavaReady()) {
+        return;
+    }
     if (!atomic_exchange_explicit(&cn1PresentDeferred, 0, memory_order_acq_rel)) {
         return;
     }
-    extern BOOL cn1MacRuntimeIsJavaReady(void);
-    extern void repaintUI(void);
-    if (cn1MacRuntimeIsJavaReady()) {
-        repaintUI();
+    if (self.cn1WindowId >= 0) {
+        // A secondary window has to be asked for by name. repaintUI() repaints
+        // Display.getCurrent(), which is the main form -- for one of these it
+        // dirties the wrong surface entirely, so the frame stays owed while the
+        // flag above says it was paid. cn1WindowId is -1 for the host's view and
+        // >= 0 for a created window, the same test the pointer and key paths use.
+        extern void CN1MacWindowDeliverRepaint(int windowId);
+        CN1MacWindowDeliverRepaint(self.cn1WindowId);
+        return;
     }
+    extern void repaintUI(void);
+    repaintUI();
 }
 
 - (BOOL)presentFramebuffer {
