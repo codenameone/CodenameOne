@@ -439,10 +439,11 @@ public final class Continuity {
             return;
         }
         AppState[] pending = takeAllPendingOffers();
-        int count = pending.length;
-        // takeAllPendingOffers() has already put them oldest first.
+        // takeAllPendingOffers() has already put them oldest first. Foreach rather than an index:
+        // PMD's ForLoopCanBeForeach is on the project's forbidden list, and a plain walk of an
+        // array is exactly what it is about.
         int drainingIn = lifecycle;
-        for (int a = 0; a < count; a++) {
+        for (AppState state : pending) {
             if (!stillTheSameSession(drainingIn)) {
                 // A listener that ran during this drain is allowed to end the session, and what
                 // follows must not then be admitted into the one that replaced it.
@@ -453,7 +454,7 @@ public final class Continuity {
                 // to compare, and enabled is the other half of the same question.
                 return;
             }
-            admit(pending[a]);
+            admit(state);
         }
     }
 
@@ -2012,8 +2013,7 @@ public final class Continuity {
     /// restore's own order with only gaps in it is the restore's own.
     private static boolean isStillTheRestoredStack(List<String> live, List<String> requested) {
         int at = 0;
-        for (int i = 0; i < live.size(); i++) {
-            String path = live.get(i);
+        for (String path : live) {
             while (at < requested.size() && !requested.get(at).equals(path)) {
                 at++;
             }
@@ -3238,11 +3238,11 @@ public final class Continuity {
         // The sibling drain has had this since it was written -- "a listener that ran during this
         // drain is allowed to turn continuity off" -- and this loop was added later without it.
         int drainingIn = lifecycle;
-        for (int i = 0; i < pending.length; i++) {
+        for (AppState state : pending) {
             if (!stillTheSameSession(drainingIn)) {
                 return;
             }
-            dispatch(pending[i]);
+            dispatch(state);
         }
         // Whether they dispatched or were refused, neither holder is keeping anything back now.
         startPublisher();

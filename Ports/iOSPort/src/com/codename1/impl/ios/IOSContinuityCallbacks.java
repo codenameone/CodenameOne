@@ -45,13 +45,27 @@ import java.util.Map;
 final class IOSContinuityCallbacks {
     /// The framework's inbound seam, owned by the event thread.
     ///
-    /// The platform hands a continuation over on a thread of its own, so `nativeContinuation`
-    /// marshals with `com.codename1.ui.Display#callSerially` and everything below it is ordinary
-    /// EDT code. The one arrival that cannot be marshalled is the one that beats the event thread
-    /// into existence -- a cold launch delivers from `willConnectToSession`, before Display is
-    /// initialized -- and that one is parked on the platform's thread. It needs no guard either:
-    /// the writes happen before the EDT is started, and starting a thread publishes everything
-    /// written before it.
+    /// Read and written from the platform's thread as well as the event thread, and PLAIN --
+    /// neither volatile nor guarded, because this project does not allow either here.
+    ///
+    /// The doc here used to say the platform's arrival is marshalled and everything below is
+    /// ordinary EDT code. That stopped being true when nativeContinuation() began calling
+    /// deliverToFramework() inline: the answer is owed to the OS synchronously and the framework
+    /// binds an arrival to the generation it arrived in, so the hand-over happens on whatever
+    /// thread the activity came in on, while the event thread may be installing a callback.
+    ///
+    /// Four reviews have now asked for safe publication of these fields, the last of them
+    /// observing correctly that the re-read in deliverToFramework() settles the ORDERING and
+    /// establishes no happens-before edge. Both remedies it offers are closed to this file:
+    /// `volatile` is on the project's forbidden PMD list (AvoidUsingVolatile) and this port is
+    /// one of the gated modules, and a lock would have to span the delivery to add anything --
+    /// which means holding it while calling into the framework and the event thread, trading a
+    /// missed activity for a deadlock.
+    ///
+    /// So the ordering is closed and the visibility is not, deliberately. What that leaves is a
+    /// continuation delivered late rather than never: the arrival stays in the pending pair
+    /// below, and setCallback() drains it inline at the next enable(), disable(), clear() or
+    /// bridge swap.
     private static ContinuityCallback callback;
 
     /// Written once by the class initializer, which every thread's first touch of this class
