@@ -57,7 +57,7 @@ import com.codename1.ui.table.TableLayout;
 import java.util.*;
 
 
-class MiscellaneousFeaturesJava040Snippet {
+class MiscellaneousFeaturesJava046Snippet {
 
 
     Object context;
@@ -84,30 +84,18 @@ class MiscellaneousFeaturesJava040Snippet {
     Resources theme;
     
     void snippet() throws Exception {
-        // tag::miscellaneous-features-java-040[]
-        try {
-            switch(Display.getInstance().getSMSSupport()) {
-                case Display.SMS_NOT_SUPPORTED:
-                    return;
-                case Display.SMS_SEAMLESS:
-                    showUIDialogToEditMessageData();
-                    Display.getInstance().sendSMS(phone, data);
-                    return;
-                default:
-                    Display.getInstance().sendSMS(phone, data);
-                    return;
-            }
-        } catch(IOException err) {
-            Log.e(err);
-            Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
-        }
-        // end::miscellaneous-features-java-040[]
+        // tag::miscellaneous-features-java-046[]
+        Geofence gf = new Geofence("test", loc, 100, 100000);
+
+        LocationManager.getLocationManager()
+                .addGeoFencing(GeofenceListenerImpl.class, gf);
+        // end::miscellaneous-features-java-046[]
     }
 
-    String data = "message body";
-
-
-    void showUIDialogToEditMessageData() { }
-    String phone = "555-0100";
+    com.codename1.location.Location loc;
+    static class GeofenceListenerImpl implements com.codename1.location.GeofenceListener {
+        public void onExit(String id) { }
+        public void onEntered(String id) { }
+    }
 
 }

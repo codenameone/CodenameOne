@@ -57,7 +57,7 @@ import com.codename1.ui.table.TableLayout;
 import java.util.*;
 
 
-class MiscellaneousFeaturesJava040Snippet {
+class MiscellaneousFeaturesJava047Snippet {
 
 
     Object context;
@@ -83,31 +83,25 @@ class MiscellaneousFeaturesJava040Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     
-    void snippet() throws Exception {
-        // tag::miscellaneous-features-java-040[]
-        try {
-            switch(Display.getInstance().getSMSSupport()) {
-                case Display.SMS_NOT_SUPPORTED:
-                    return;
-                case Display.SMS_SEAMLESS:
-                    showUIDialogToEditMessageData();
-                    Display.getInstance().sendSMS(phone, data);
-                    return;
-                default:
-                    Display.getInstance().sendSMS(phone, data);
-                    return;
-            }
-        } catch(IOException err) {
-            Log.e(err);
-            Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
+    // tag::miscellaneous-features-java-047[]
+    public class GeofenceListenerImpl implements GeofenceListener {
+        @Override
+        public void onExit(String id) {
         }
-        // end::miscellaneous-features-java-040[]
+
+        @Override
+        public void onEntered(String id) {
+            if(Display.getInstance().isMinimized()) {
+                Display.getInstance().callSerially(() -> {
+                    Dialog.show("Welcome", "Thanks for arriving", "OK", null);
+                });
+            } else {
+                LocalNotification ln = new LocalNotification();
+                ln.setAlertTitle("Welcome");
+                ln.setAlertBody("Thanks for arriving!");
+                Display.getInstance().scheduleLocalNotification(ln, 10, LocalNotification.REPEAT_NONE);
+            }
+        }
     }
-
-    String data = "message body";
-
-
-    void showUIDialogToEditMessageData() { }
-    String phone = "555-0100";
-
+    // end::miscellaneous-features-java-047[]
 }

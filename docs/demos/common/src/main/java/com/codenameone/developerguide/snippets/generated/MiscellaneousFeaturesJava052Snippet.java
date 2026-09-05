@@ -57,7 +57,7 @@ import com.codename1.ui.table.TableLayout;
 import java.util.*;
 
 
-class MiscellaneousFeaturesJava040Snippet {
+class MiscellaneousFeaturesJava052Snippet {
 
 
     Object context;
@@ -84,30 +84,12 @@ class MiscellaneousFeaturesJava040Snippet {
     Resources theme;
     
     void snippet() throws Exception {
-        // tag::miscellaneous-features-java-040[]
-        try {
-            switch(Display.getInstance().getSMSSupport()) {
-                case Display.SMS_NOT_SUPPORTED:
-                    return;
-                case Display.SMS_SEAMLESS:
-                    showUIDialogToEditMessageData();
-                    Display.getInstance().sendSMS(phone, data);
-                    return;
-                default:
-                    Display.getInstance().sendSMS(phone, data);
-                    return;
-            }
-        } catch(IOException err) {
-            Log.e(err);
-            Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
-        }
-        // end::miscellaneous-features-java-040[]
+        // tag::miscellaneous-features-java-052[]
+        e.run(() -> doThisOnTheThread());
+        // end::miscellaneous-features-java-052[]
     }
 
-    String data = "message body";
-
-
-    void showUIDialogToEditMessageData() { }
-    String phone = "555-0100";
+    EasyThread e;
+    Object doThisOnTheThread() { return null; }
 
 }

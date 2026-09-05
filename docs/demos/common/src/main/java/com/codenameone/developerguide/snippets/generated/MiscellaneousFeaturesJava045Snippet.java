@@ -57,7 +57,7 @@ import com.codename1.ui.table.TableLayout;
 import java.util.*;
 
 
-class MiscellaneousFeaturesJava040Snippet {
+class MiscellaneousFeaturesJava045Snippet {
 
 
     Object context;
@@ -84,30 +84,26 @@ class MiscellaneousFeaturesJava040Snippet {
     Resources theme;
     
     void snippet() throws Exception {
-        // tag::miscellaneous-features-java-040[]
-        try {
-            switch(Display.getInstance().getSMSSupport()) {
-                case Display.SMS_NOT_SUPPORTED:
-                    return;
-                case Display.SMS_SEAMLESS:
-                    showUIDialogToEditMessageData();
-                    Display.getInstance().sendSMS(phone, data);
-                    return;
-                default:
-                    Display.getInstance().sendSMS(phone, data);
-                    return;
-            }
-        } catch(IOException err) {
-            Log.e(err);
-            Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
-        }
-        // end::miscellaneous-features-java-040[]
+        // tag::miscellaneous-features-java-045[]
+        Form hi = new Form("L10N", new TableLayout(16, 2));
+        L10NManager l10n = L10NManager.getInstance();
+        hi.add("format(double)").add(l10n.format(11.11)).
+            add("format(int)").add(l10n.format(33)).
+            add("formatCurrency").add(l10n.formatCurrency(53.267)).
+            add("formatDateLongStyle").add(l10n.formatDateLongStyle(new Date())).
+            add("formatDateShortStyle").add(l10n.formatDateShortStyle(new Date())).
+            add("formatDateTime").add(l10n.formatDateTime(new Date())).
+            add("formatDateTimeMedium").add(l10n.formatDateTimeMedium(new Date())).
+            add("formatDateTimeShort").add(l10n.formatDateTimeShort(new Date())).
+            add("getCurrencySymbol").add(l10n.getCurrencySymbol()).
+            add("getLanguage").add(l10n.getLanguage()).
+            add("getLocale").add(l10n.getLocale()).
+            add("isRTLLocale").add("" + l10n.isRTLLocale()).
+            add("parseCurrency").add(l10n.formatCurrency(l10n.parseCurrency("33.77$"))).
+            add("parseDouble").add(l10n.format(l10n.parseDouble("34.35"))).
+            add("parseInt").add(l10n.format(l10n.parseInt("56"))).
+            add("parseLong").add("" + l10n.parseLong("4444444"));
+        hi.show();
+        // end::miscellaneous-features-java-045[]
     }
-
-    String data = "message body";
-
-
-    void showUIDialogToEditMessageData() { }
-    String phone = "555-0100";
-
 }

@@ -4,8 +4,6 @@
 Advanced-Topics-Under-The-Hood.asciidoc	You can override these methods in the draggable components:
 Advertising.asciidoc	identifier. The recommended order is to initialize, gather consent, then load:
 Advertising.asciidoc	method that registers its provider with `AdManager`:
-Animations.asciidoc	That one command will enable swiping back from `currentForm`. https://www.codenameone.com/javadoc/com/codename1/util/LazyValue.html[LazyValue] allows you to pass a value lazily:
-Animations.asciidoc	builder:
 Annotation-Component-Binding.asciidoc	ASM and inserts the equivalent of:
 Annotation-Component-Binding.asciidoc	After binding, drive validation through the returned handle:
 Annotation-JSON-XML-Mapping.asciidoc	Hand-write a `Mapper<T>` and register it at startup:
@@ -23,21 +21,7 @@ Introduction.asciidoc	Now that you have a general sense of the lifecycle lets lo
 Introduction.asciidoc	The hello world Java source file looks like this (removed some comments and whitespace):
 Maven-Creating-CN1Libs.adoc	Now try it out. Try adding the following code to your application project's main class (or anywhere in the application project, for that matter):
 Maven-Creating-CN1Libs.adoc	The simulator dispatches every action on the Codename One EDT through `Display.callSerially`, so your method can call `Display.getInstance()`, `Form.show()`, `Dialog.show()`, `ToastBar.showInfoMessage()` and any other CN1 API. Reflection uses the same classloader that loaded `Display`, so cn1lib internals (including package-private classes) resolve normally:
-Miscellaneous-Features.asciidoc	A typical use of this API would be something like this:
-Miscellaneous-Features.asciidoc	Easy thread can be created like this:
-Miscellaneous-Features.asciidoc	For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize the permission prompt message using the localization key `android.permission.ACCESS_BACKGROUND_LOCATION`:
-Miscellaneous-Features.asciidoc	For example: you can copy the `Image` to `Storage` using:
-Miscellaneous-Features.asciidoc	However, it gets better, say you want to return a value:
-Miscellaneous-Features.asciidoc	If you need to apply the scale manually for custom fonts or layout calculations, read the values directly:
-Miscellaneous-Features.asciidoc	It allows formatting numbers/dates & time based on platform locale. It also provides a great deal of the information you need such as the language/locale information you need to pick the proper resource bundle:
-Miscellaneous-Features.asciidoc	The `Capture` API also includes a callback based API that uses the `ActionListener` interface to implement capture. For example: you can adapt the previous sample to use this API as such:
-Miscellaneous-Features.asciidoc	The following code demonstrates usage of the GeoFence API:
-Miscellaneous-Features.asciidoc	The list of available languages in the resource bundle could be retrieved like this. Notice that this a list that was set by you and doesn't need to confirm to the ISO language code standards:
-Miscellaneous-Features.asciidoc	These asynchronous calls make things a bit painful to wade through, so the API wraps them in a simplified synchronous version:
 Miscellaneous-Features.asciidoc	To solve this sort of used case you have two APIs in `Display`:
-Miscellaneous-Features.asciidoc	You can add more than one attachment by putting them directly into the attachment map for example:
-Miscellaneous-Features.asciidoc	You can install the bundle using code like this:
-Miscellaneous-Features.asciidoc	You can send a task to the thread using:
 Monetization.asciidoc	And you also provide a button to allow the user to manually synchronize the receipts:
 Monetization.asciidoc	In the hello world app you'll use this information in a few different places. On your main form you'll include a label to show the current expiry date, and you allow the user to press a button to synchronize receipts manually if they think the value is out of date:
 Monetization.asciidoc	On the server-side, your REST controller is a standard JAX-RS REST interface. The Netbeans web service wizard generated it and then it was modified to suit the purposes here. The methods of the `ReceiptsFacadeREST` class for the REST API are shown here:

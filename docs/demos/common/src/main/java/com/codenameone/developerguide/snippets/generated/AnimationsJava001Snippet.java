@@ -51,13 +51,10 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
-import com.codename1.util.EasyThread;
-import com.codename1.notifications.LocalNotification;
-import com.codename1.ui.table.TableLayout;
 import java.util.*;
 
 
-class MiscellaneousFeaturesJava040Snippet {
+class AnimationsJava001Snippet {
 
 
     Object context;
@@ -84,30 +81,15 @@ class MiscellaneousFeaturesJava040Snippet {
     Resources theme;
     
     void snippet() throws Exception {
-        // tag::miscellaneous-features-java-040[]
-        try {
-            switch(Display.getInstance().getSMSSupport()) {
-                case Display.SMS_NOT_SUPPORTED:
-                    return;
-                case Display.SMS_SEAMLESS:
-                    showUIDialogToEditMessageData();
-                    Display.getInstance().sendSMS(phone, data);
-                    return;
-                default:
-                    Display.getInstance().sendSMS(phone, data);
-                    return;
-            }
-        } catch(IOException err) {
-            Log.e(err);
-            Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
-        }
-        // end::miscellaneous-features-java-040[]
+        // tag::animations-java-001[]
+        MorphTransition morph = MorphTransition.create(300)
+                .snapshotMode(true)
+                .morph("card");
+        nextForm.setTransitionInAnimator(morph);
+        nextForm.show();
+        // end::animations-java-001[]
     }
 
-    String data = "message body";
-
-
-    void showUIDialogToEditMessageData() { }
-    String phone = "555-0100";
+    Form nextForm = new Form();
 
 }

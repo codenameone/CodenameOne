@@ -57,7 +57,7 @@ import com.codename1.ui.table.TableLayout;
 import java.util.*;
 
 
-class MiscellaneousFeaturesJava040Snippet {
+class MiscellaneousFeaturesJava049Snippet {
 
 
     Object context;
@@ -84,30 +84,31 @@ class MiscellaneousFeaturesJava040Snippet {
     Resources theme;
     
     void snippet() throws Exception {
-        // tag::miscellaneous-features-java-040[]
-        try {
-            switch(Display.getInstance().getSMSSupport()) {
-                case Display.SMS_NOT_SUPPORTED:
-                    return;
-                case Display.SMS_SEAMLESS:
-                    showUIDialogToEditMessageData();
-                    Display.getInstance().sendSMS(phone, data);
-                    return;
-                default:
-                    Display.getInstance().sendSMS(phone, data);
-                    return;
-            }
-        } catch(IOException err) {
-            Log.e(err);
-            Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
-        }
-        // end::miscellaneous-features-java-040[]
+        // tag::miscellaneous-features-java-049[]
+        hi.getToolbar().addCommandToRightBar("", icon, (ev) -> {
+            Capture.capturePhoto((e) -> {
+                if(e != null && e.getSource() != null) {
+                    try {
+                        DefaultListModel<Image> m = (DefaultListModel<Image>)iv.getImageList();
+                        Image img = Image.createImage((String)e.getSource());
+                        if(m == null) {
+                            m = new DefaultListModel<>(img);
+                            iv.setImageList(m);
+                            iv.setImage(img);
+                        } else {
+                            m.addItem(img);
+                        }
+                        m.setSelectedIndex(m.getSize() - 1);
+                    } catch(IOException err) {
+                        Log.e(err);
+                    }
+                }
+            });
+        });
+        // end::miscellaneous-features-java-049[]
     }
 
-    String data = "message body";
-
-
-    void showUIDialogToEditMessageData() { }
-    String phone = "555-0100";
+    Image icon;
+    com.codename1.components.ImageViewer iv;
 
 }

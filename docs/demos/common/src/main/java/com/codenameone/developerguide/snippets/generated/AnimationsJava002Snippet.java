@@ -51,13 +51,10 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
-import com.codename1.util.EasyThread;
-import com.codename1.notifications.LocalNotification;
-import com.codename1.ui.table.TableLayout;
 import java.util.*;
 
 
-class MiscellaneousFeaturesJava040Snippet {
+class AnimationsJava002Snippet {
 
 
     Object context;
@@ -83,31 +80,19 @@ class MiscellaneousFeaturesJava040Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     
-    void snippet() throws Exception {
-        // tag::miscellaneous-features-java-040[]
-        try {
-            switch(Display.getInstance().getSMSSupport()) {
-                case Display.SMS_NOT_SUPPORTED:
-                    return;
-                case Display.SMS_SEAMLESS:
-                    showUIDialogToEditMessageData();
-                    Display.getInstance().sendSMS(phone, data);
-                    return;
-                default:
-                    Display.getInstance().sendSMS(phone, data);
-                    return;
-            }
-        } catch(IOException err) {
-            Log.e(err);
-            Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
-        }
-        // end::miscellaneous-features-java-040[]
+    // tag::animations-java-002[]
+    /**
+     * Useful when passing a value that might not exist to a function, e.g. When we
+     * pass a form that we might need to construct dynamically later on.
+     */
+    public interface LazyValue<T> {
+        /**
+         * Returns the actual value.
+         *
+         * @param args optional arguments for the creation of the lazy value
+         * @return the value
+         */
+        T get(Object... args);
     }
-
-    String data = "message body";
-
-
-    void showUIDialogToEditMessageData() { }
-    String phone = "555-0100";
-
+    // end::animations-java-002[]
 }
