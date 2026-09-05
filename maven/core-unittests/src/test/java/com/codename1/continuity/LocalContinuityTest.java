@@ -4536,6 +4536,55 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A local checkpoint whose restore FAILED survives the next checkpoint.
+     *
+     * <p>dispatch() already keeps an arrival whose restore failed; the application-driven path
+     * did not. So a cold start whose provider threw -- a dependency not up yet, which is the
+     * transient this failure branch exists for -- left the on-device checkpoint as the only copy,
+     * and the next navigation checkpointed the fallback screen over it. The draft the user was
+     * promised is gone at exactly the moment "restore, or else begin" is meant to protect it.</p>
+     */
+    @EdtTest
+    public void aLocalCheckpointWhoseRestoreFailedSurvivesTheNextCheckpoint() {
+        // A provider that saves a draft, then refuses to restore it once, then answers empty --
+        // an application whose own data has not loaded yet.
+        final boolean[] refuse = new boolean[] {false};
+        final Map<String, Object> toSave = new HashMap<String, Object>();
+        toSave.put("draft", "half a letter");
+        Continuity.setStateProvider(new StateProvider() {
+            public Map<String, Object> saveState() {
+                return new HashMap<String, Object>(toSave);
+            }
+
+            public void restoreState(Map<String, Object> payload) {
+                if (refuse[0]) {
+                    throw new IllegalStateException("the store is not open yet");
+                }
+            }
+        });
+        Continuity.checkpoint();
+        flushSerialCalls();
+        assertNotNull(Continuity.getRestorableState(), "the fixture stored nothing");
+
+        // The restore fails, and the application carries on with an empty provider.
+        refuse[0] = true;
+        toSave.clear();
+        assertFalse(Continuity.restore(), "the refusing restore reported a shown form");
+        flushSerialCalls();
+
+        // Ordinary work continues and checkpoints, as it must.
+        Continuity.checkpoint();
+        flushSerialCalls();
+
+        AppState still = Continuity.getRestorableState();
+        assertNotNull(still, "nothing is offered at all after the failed restore");
+        assertEquals("half a letter", still.getPayload().get("draft"),
+                "the checkpoint that followed the failed restore overwrote the only copy of the "
+                        + "payload, so the retry this failure path exists for has nothing left "
+                        + "to retry");
+    }
+
+    /**
      * A listener that holds two arrivals in a row does not lose the first.
      *
      * <p>Returning false keeps an arrival on offer -- the documented prompt-then-restore pattern.

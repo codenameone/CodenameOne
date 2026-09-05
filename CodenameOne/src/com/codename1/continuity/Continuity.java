@@ -991,6 +991,23 @@ public final class Continuity {
             // admit() has already put the sequence in the live map, so nothing offers the state
             // again this run, and releasing the publication lets a checkpoint overwrite the
             // relay's only copy. The retry it was being kept for then has nothing to retry.
+            //
+            // ON OFFER, which is what keeps a state that came from STORAGE rather than from the
+            // slot. dispatch() already does this for an arrival whose restore failed; the
+            // application-driven path did not, so a cold start whose provider threw -- a
+            // dependency not up yet, which is the transient this whole failure branch exists for
+            // -- left the on-device checkpoint as the only copy, and the next navigation
+            // checkpointed the fallback screen over it. The draft the user was promised is then
+            // gone, at exactly the moment "restore, or else begin" was meant to protect it.
+            //
+            // A no-op when the state came from the slot: placeOnOffer() returns immediately when
+            // it is asked to replace something with itself.
+            //
+            // It does hold relay publication until the application resolves the state, by
+            // retrying or by acknowledging it. That is the same hold a failed arrival already
+            // takes and for the same reason -- what is on the relay is worth more than what this
+            // device would write over it while it cannot even load its own payload.
+            placeOnOffer(state);
             return shown;
         }
         // Released because the state was APPLIED, not because a form appeared. Gating this on
