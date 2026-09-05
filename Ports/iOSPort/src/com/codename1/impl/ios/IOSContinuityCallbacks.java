@@ -217,7 +217,26 @@ final class IOSContinuityCallbacks {
             return new HashMap<String, Object>();
         }
         try {
-            Map<String, Object> parsed = JSONParser.parseJSON(json);
+            // CONFIGURED like StateCodec.fromJson, which is the reference: this is the same
+            // document arriving through the other door, and a parser set up differently changes
+            // what the application receives.
+            //
+            // useBoolean, because the default answers a raw JSON true or false with the strings
+            // "true" and "false". Harmless for the tagged form this framework writes -- "b:true"
+            // is a string either way -- and wrong for an untagged compatibility document from a
+            // hand-written sender: the payload reaches the listeners and the provider with
+            // Strings where booleans were sent, passes validation because a String is a
+            // representable type, and is acknowledged.
+            //
+            // includeNulls, because dropping a null here is worse than refusing it. fromMap()
+            // refuses a null nested in a list -- a property list cannot carry one, and the iOS
+            // sanitiser shifts every index after it -- but only if it can see it. Dropped by the
+            // parser, the list simply arrives one element shorter, which is the corruption that
+            // check exists to prevent.
+            JSONParser parser = new JSONParser();
+            parser.setUseBooleanInstance(true);
+            parser.setIncludeNullsInstance(true);
+            Map<String, Object> parsed = parser.parseJSON(new java.io.StringReader(json));
             return parsed == null ? new HashMap<String, Object>() : parsed;
         } catch (Throwable t) {
             Log.e(t);

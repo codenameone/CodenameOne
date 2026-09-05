@@ -180,6 +180,10 @@ class IOSContinuityBridge implements ContinuityBridge {
             if (json == null || json.length() == 0) {
                 return new String[0];
             }
+            // The default parser is right HERE, unlike the continuation hop in
+            // IOSContinuityCallbacks: this document is {"keys":[...]} written by our own native
+            // side, its elements are strings, and the loop below discards anything that is not
+            // one. There is no boolean to mistype and no null whose absence changes a meaning.
             parsed = JSONParser.parseJSON(json);
         } catch (Throwable t) {
             Log.e(t);
