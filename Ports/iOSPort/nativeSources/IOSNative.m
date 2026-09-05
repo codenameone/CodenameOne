@@ -15764,27 +15764,23 @@ JAVA_FLOAT com_codename1_impl_ios_IOSNative_getDisplayScale___R_float(CN1_THREAD
     // from a genuine non-Retina display, and half the resolution the app should
     // have been building its resources at.
     //
-    // The window's own backingScaleFactor is both authoritative and what the
-    // renderer actually uses (CN1MacHostViewScale and CN1AppKitBackingScale both
-    // read it), so this reports the same number the pixels are produced at.
-    // Before the window exists the main screen is the closest real answer, and
-    // failing even that this returns 0 -- "not captured" -- which the Java caller
-    // already handles by deferring to the portable implementation. Returning 0 is
-    // better than returning 1: a caller can see the first and cannot see the
-    // second.
-    NSWindow *macWindow = [CN1MacHost sharedHost].window;
-    if (macWindow != nil) {
-        CGFloat windowScale = macWindow.backingScaleFactor;
-        if (windowScale > 0) {
-            return (JAVA_FLOAT)windowScale;
-        }
-    }
-    NSScreen *macScreen = [NSScreen mainScreen];
-    if (macScreen != nil) {
-        CGFloat screenScale = macScreen.backingScaleFactor;
-        if (screenScale > 0) {
-            return (JAVA_FLOAT)screenScale;
-        }
+    // The already-published value answers instead, through an accessor that only
+    // reads atomics. Deliberately NOT [CN1MacHost sharedHost].window: that
+    // property BUILDS the window on first access, from whichever thread asks, so
+    // reaching it from the event dispatch thread during start-up costs 56-86ms
+    // of blocked EDT and races the queued build -- the exact regression
+    // builtWindow exists to prevent, described in CN1MacHost.h. Reading an
+    // AppKit property off the main thread would not be sound either.
+    //
+    // The published value is the main window's own screen scale where there is
+    // one, and the primary screen's otherwise, which is what the renderer draws
+    // at. Until something has published either, this returns 0 -- "not captured"
+    // -- and the Java caller defers to the portable implementation. Zero is the
+    // better failure: a caller can see it, and cannot see a wrong 1.
+    extern int cn1MacPublishedScaleTimes100(void);
+    int publishedScale = cn1MacPublishedScaleTimes100();
+    if (publishedScale > 0) {
+        return (JAVA_FLOAT)(publishedScale / 100.0);
     }
     return (JAVA_FLOAT)0;
 #elif TARGET_OS_WATCH

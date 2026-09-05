@@ -488,6 +488,32 @@ void CN1MacPublishMainWindowScreen(void) {
     __atomic_store_n(&cn1MainWindowScreenAndScale, packed, __ATOMIC_RELEASE);
 }
 
+/// Device pixels per point, times 100, for the display Codename One is drawing
+/// on -- or 0 when nothing has published one yet.
+///
+/// Lock free and callable from any thread: it only reads the values
+/// CN1MacPublishMainWindowScreen and the primary-screen publisher already store
+/// with release semantics. That is the whole point of it. Asking
+/// [CN1MacHost sharedHost].window for a backingScaleFactor instead BUILDS the
+/// window on first access, from whichever thread asked -- 56-86ms of blocked
+/// event dispatch thread at launch, which is exactly what builtWindow was
+/// introduced to stop (see its comment in CN1MacHost.h). Reading AppKit
+/// properties off the main thread is not sound either.
+///
+/// Prefers the main window's own screen and falls back to the primary one,
+/// which is the same order the monitor queries below use.
+int cn1MacPublishedScaleTimes100(void) {
+    int64_t packed = __atomic_load_n(&cn1MainWindowScreenAndScale, __ATOMIC_ACQUIRE);
+    if (packed >= 0) {
+        int windowScale = (int)(packed & 0xffffffff);
+        if (windowScale > 0) {
+            return windowScale;
+        }
+    }
+    int primary = __atomic_load_n(&cn1PrimaryScaleTimes100, __ATOMIC_ACQUIRE);
+    return primary > 0 ? primary : 0;
+}
+
 static int cn1IndexOfScreen(NSScreen *screen) {
     NSArray<NSScreen *> *screens = [NSScreen screens];
     NSUInteger idx = screen == nil ? NSNotFound : [screens indexOfObject:screen];
