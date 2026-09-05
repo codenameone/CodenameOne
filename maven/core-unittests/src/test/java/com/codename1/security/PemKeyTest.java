@@ -859,6 +859,27 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void sec1ParametersWrapperHoldsExactlyOneValue() {
+        // ECParameters is a CHOICE, so [0] carries one value. Reading the first
+        // and ignoring the rest dropped the extra bytes and handed back a
+        // well-formed key built from a spliced container.
+        byte[] content = hex("020101"
+                + "0420" + "0000000000000000000000000000000000000000000000000000000000000000"
+                + "A00C" + "06082a8648ce3d030107" + "0500");
+        byte[] blob = new byte[content.length + 2];
+        blob[0] = 0x30;
+        blob[1] = (byte) content.length;
+        System.arraycopy(content, 0, blob, 2, content.length);
+
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem(EC_SEC1_LABEL, Base64.encodeNoNewline(blob))));
+        assertTrue(e.getMessage().contains("parameters"), e.getMessage());
+
+        // the real key is unaffected
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(pem(EC_SEC1_LABEL, EC_SEC1)).getEncoded());
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));

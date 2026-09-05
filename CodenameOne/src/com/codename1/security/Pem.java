@@ -475,6 +475,17 @@ final class Pem {
             // [0] attributes is legal in version 0 as well, so it is kept
             attributes = c.element();
         }
+        if (c.hasMore() && (c.peek() == 0x81 || c.peek() == 0xA1)) {
+            // the [1] publicKey that version 0 has no room for
+            c.skip();
+        }
+        if (c.hasMore()) {
+            // shapeOf() has already refused anything else, but this method
+            // rebuilds a key from what it reads, so it does not lean on that:
+            // silently dropping a leftover would launder a spliced container.
+            throw new CryptoException("malformed PKCS#8 key: unexpected field 0x"
+                    + Integer.toHexString(c.peek()));
+        }
         return tlv(0x30, concat(concat(tlv(0x02, new byte[] {0}), algorithm),
                 concat(privateKey, attributes)));
     }
@@ -518,6 +529,14 @@ final class Pem {
             Cursor parameters = new Cursor(c.element());
             parameters.enter(0xA0);
             ecParameters = parameters.element();
+            if (parameters.hasMore()) {
+                // ECParameters is a CHOICE, so the wrapper holds exactly one
+                // value. Reading the first and ignoring the rest dropped the
+                // extra bytes and returned a well-formed key built from a
+                // spliced container.
+                throw new CryptoException("malformed SEC1 EC private key: "
+                        + "more than one value in the parameters field");
+            }
         }
         if (c.hasMore() && c.peek() == 0xA1) {
             publicKey = c.element();
