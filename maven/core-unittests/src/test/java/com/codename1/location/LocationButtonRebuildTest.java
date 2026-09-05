@@ -137,6 +137,10 @@ class LocationButtonRebuildTest extends UITestBase {
                                 return;
                             }
                         }
+                        // Consumed, so release() is one permit rather than an
+                        // open gate: a test that needs the NEXT request to
+                        // park as well would otherwise find it running free.
+                        released = false;
                     }
                 }
             });
@@ -272,6 +276,62 @@ class LocationButtonRebuildTest extends UITestBase {
                 + "manager, however the component was rebuilt while it waited");
         assertEquals(1, bridge.grantedAsks,
                 "and the granted path is asked once, for the holder alone");
+    }
+
+    /**
+     * Whether a stale wake is pending.
+     *
+     * <p>Read by reflection, and deliberately: the alternative is to WAIT for
+     * the wake, and its delay is the in-flight deadline plus STALE_MARGIN --
+     * five seconds of sleeping in a unit test to observe a boolean. The field
+     * is the mechanism this test is about, so a rename should fail it.</p>
+     */
+    private static boolean wakePending() throws Exception {
+        java.lang.reflect.Field f =
+                LocationButton.class.getDeclaredField("staleWake");
+        f.setAccessible(true);
+        return f.get(null) != null;
+    }
+
+    @Test
+    void servingOneQueuedButtonLeavesAWakeForTheRest() throws Exception {
+        RecordingBridge bridge = install();
+        ParkingManager manager = new ParkingManager();
+        bridge.granted = manager;
+
+        LocationButton first = new LocationButton();
+        LocationButton second = new LocationButton();
+        LocationButton third = new LocationButton();
+        assertEquals(3, bridge.sessions.size());
+
+        // The first is granted and parks, holding the slot.
+        bridge.sessions.get(0).onResult.onSucess(Boolean.TRUE);
+        drain();
+        assertEquals(1, manager.lookups);
+
+        // The other two are granted while it runs, so both queue.
+        bridge.sessions.get(1).onResult.onSucess(Boolean.TRUE);
+        bridge.sessions.get(2).onResult.onSucess(Boolean.TRUE);
+        drain();
+        assertTrue(wakePending(), "a queued button schedules a wake");
+
+        // The first finishes, so the queue is drained: serveNextWaiting
+        // cancels the wake on its way in, takes the second, and starts it --
+        // and the second parks too, because ParkingManager is not released
+        // again. The third is still waiting.
+        manager.release();
+        drain();
+        drain();
+        assertEquals(2, manager.lookups, "the second request is running");
+
+        // That request can outlive its deadline without bound --
+        // getCurrentLocationSync ignores its timeout entirely once somebody
+        // holds LocationManager's listener slot. Without a wake, the third
+        // button waits on it returning, or on another tap, neither of which
+        // has to happen.
+        assertTrue(wakePending(),
+                "starting a request while the queue is not empty must leave a "
+                + "wake for whoever is behind it");
     }
 
     private RecordingBridge install() {

@@ -3022,6 +3022,46 @@ public class AndroidGradleBuilder extends Executor {
         // missing from the manifest as well -- so the application would fall
         // back to the ordinary permission prompt on exactly the Android
         // version where that is a Play policy violation.
+        // And the application's own tree, for the BUTTON alone.
+        //
+        // The loose scan is ASM, and ASM is handed a visitor that returns null
+        // from visitAnnotation -- so annotations are never walked. An
+        // annotation's Class value is not a CONSTANT_Class either: it is a
+        // field DESCRIPTOR in a Utf8, which is why normalising class literals
+        // did not reach it. An application whose only reference to the button
+        // is @Widget(LocationButton.class) therefore looked like an
+        // application that never mentions it, and the bridge was deleted out
+        // from under a control the app really does build.
+        //
+        // The byte-level scan already reads exactly that Utf8, which is how
+        // the SAME annotation inside a cn1lib is found today. Running it over
+        // the application tree removes that inconsistency rather than adding a
+        // new rule: the same code was detected or not depending only on which
+        // jar it shipped in.
+        //
+        // The button flag ONLY. usesPersistentLocation and the background flag
+        // decide whether to REFUSE a build, and the attributed ASM scan is
+        // what makes them precise; widening those to a name search would
+        // refuse builds over a method name that appears in a constant pool.
+        // This one fails the other way -- it keeps an implementation package
+        // that would otherwise be deleted -- so a false positive costs an
+        // unused class and a false negative costs the feature.
+        try {
+            LocationButtonManifestFragments.LocationUsage appLocation =
+                    LocationButtonManifestFragments.scanForLocationUsage(
+                            dummyClassesDir);
+            if (appLocation.usesButton() && !usesLocationButton) {
+                debug("Location button found in the application by the "
+                        + "byte-level scan, which reads annotation class "
+                        + "values the bytecode scan cannot see");
+                usesLocationButton = true;
+            }
+        } catch (Exception scanFailed) {
+            // The bytecode scan above has already run and is the primary
+            // signal; this one only ever adds to it.
+            debug("Application location scan failed: " + scanFailed);
+        }
+
         try {
             LocationButtonManifestFragments.LocationUsage libraryLocation =
                     LocationButtonManifestFragments.scanForLocationUsage(libsDir);

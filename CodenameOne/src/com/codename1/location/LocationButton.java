@@ -786,6 +786,23 @@ public class LocationButton extends Container {
         // to answer late. Generous on purpose: taking the slot from a request
         // that was about to succeed is worse than waiting a little longer.
         inFlightDeadline = timeout + STALE_MARGIN;
+        // A wake for whoever is BEHIND this request, because the queue may not
+        // be empty and this request is not guaranteed to end.
+        //
+        // getCurrentLocationSync honours its timeout only while nobody holds
+        // LocationManager's single listener slot; when somebody does it falls
+        // through to getCurrentLocation(), which takes as long as the platform
+        // takes. A stale request that is still parked holds exactly that slot,
+        // so the request being started here can outlive its own deadline
+        // without bound -- and serveNextWaiting cancelled the only wake on its
+        // way in. Everything still queued behind it then waits on this request
+        // returning, or on another tap, neither of which has to happen.
+        //
+        // scheduleStaleWake is a no-op while one is pending, so the ordinary
+        // path where this drains synchronously costs nothing.
+        if (!WAITING.isEmpty()) {
+            scheduleStaleWake();
+        }
         Location result = null;
         try {
             LocationManager manager = grantedManager(generation);

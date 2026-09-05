@@ -114,6 +114,26 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aRemovalCarryingItsReasonIsDeletedWholly() {
+        // A removal may explain itself. Skipping only whitespace between the
+        // tags left the closing one behind while the opening one was spliced
+        // out, and an orphan </uses-permission> is a fragment that no longer
+        // parses -- produced by the path that exists to tidy it up.
+        String withReason = "    <uses-permission android:name=\"android."
+                + "permission.ACCESS_FINE_LOCATION\" tools:node=\"remove\">"
+                + "<!-- the button owns this grant --></uses-permission>\n";
+        String out = LocationButtonManifestFragments.inject(withReason, false);
+        assertFalse(out.contains("</uses-permission>"),
+                "no closing tag may be left without its opening one: " + out);
+        assertFalse(out.contains("tools:node"),
+                "the removal itself is gone: " + out);
+        assertFalse(out.contains("the button owns this grant"),
+                "and so is the comment inside it: " + out);
+        assertEquals(1, count(out, "android.permission.ACCESS_FINE_LOCATION"),
+                "the permission is declared once, by us: " + out);
+    }
+
+    @Test
     void anAliasedFlagIsAddedToRatherThanDuplicated() {
         // Same shape as the test above, with the namespace bound to an alias.
         // The literal lookup found no existing flags on it and wrote a SECOND

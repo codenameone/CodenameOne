@@ -300,18 +300,19 @@ final class LocationButtonManifestFragments {
             // behind -- a manifest fragment that no longer parses, produced by
             // the very path that is supposed to be tidying it up.
             if (out.charAt(end - 1) != '/') {
-                String trimmed = tail;
-                int lead = 0;
-                while (lead < trimmed.length()
-                        && (trimmed.charAt(lead) == ' '
-                            || trimmed.charAt(lead) == '\t'
-                            || trimmed.charAt(lead) == '\r'
-                            || trimmed.charAt(lead) == '\n')) {
-                    lead++;
-                }
+                // Past whitespace AND comments, not whitespace alone. A
+                // removal may carry its reason with it --
+                // <uses-permission ... tools:node="remove"><!-- why -->
+                // </uses-permission> -- and skipping only spaces left the
+                // closing tag unconsumed while the opening one was spliced
+                // out. The result is an orphan </uses-permission>: a fragment
+                // that no longer parses, produced by the path that is
+                // supposed to be tidying it up, which is the very failure the
+                // non-self-closing case was added to fix.
+                int lead = skipIgnorable(tail, 0);
                 String close = "</uses-permission>";
-                if (trimmed.regionMatches(lead, close, 0, close.length())) {
-                    tail = trimmed.substring(lead + close.length());
+                if (tail.regionMatches(lead, close, 0, close.length())) {
+                    tail = tail.substring(lead + close.length());
                 }
             }
             if (tail.startsWith("\r\n")) {
@@ -323,6 +324,41 @@ final class LocationButtonManifestFragments {
             at = out.indexOf(name);
         }
         return out;
+    }
+
+    /**
+     * Advances past whitespace and complete comments.
+     *
+     * <p>What may legally sit between an empty element's tags: nothing that
+     * carries meaning, but not necessarily nothing at all. Anything else is
+     * left where it is -- {@code uses-permission} has no content model, so
+     * text between its tags is not something this method should learn to
+     * step over.</p>
+     *
+     * @param text the block
+     * @param from where to start
+     * @return the first index that is neither whitespace nor a comment
+     */
+    private static int skipIgnorable(String text, int from) {
+        int at = from;
+        while (at < text.length()) {
+            char c = text.charAt(at);
+            if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+                at++;
+                continue;
+            }
+            if (text.startsWith("<!--", at)) {
+                int end = text.indexOf("-->", at + 4);
+                if (end < 0) {
+                    // Unterminated, so there is no "past" it to reach.
+                    return at;
+                }
+                at = end + 3;
+                continue;
+            }
+            return at;
+        }
+        return at;
     }
 
     /**
