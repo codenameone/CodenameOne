@@ -4579,6 +4579,86 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A route-only arrival whose factory redirects is settled, not parked for ever.
+     *
+     * <p>restoreStack() returns false when it leaves a factory's redirect alone, and false used
+     * to read as "nothing happened": a state with routes and no payload took the failure branch,
+     * was parked, held relay publication, and was offered again after every launch to redirect
+     * again. The application DID handle it -- by going somewhere else.</p>
+     */
+    @EdtTest
+    public void aRouteOnlyArrivalWhoseFactoryRedirectsIsSettled() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+        final boolean[] redirected = new boolean[1];
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                if ("/orders/17".equals(url) && !redirected[0]) {
+                    redirected[0] = true;
+                    Navigation.navigate("/orders");
+                }
+                Form f = new Form();
+                f.setTitle(url);
+                return f;
+            }
+        });
+        try {
+            AppState routeOnly = new AppState()
+                    .setRoutes(java.util.Arrays.asList("/orders/17"))
+                    .setDeviceId("some-other-device").setSequence(440L)
+                    .setTimestamp(System.currentTimeMillis());
+            Continuity.restore(routeOnly);
+            flushSerialCalls();
+            assertTrue(redirected[0], "the factory never redirected, so this tests nothing");
+
+            assertNotNull(Continuity.readSeenForTest().get("some-other-device"),
+                    "the arrival was never settled, so it stays parked, holds relay publication, "
+                            + "and is offered again after every launch to redirect again");
+        } finally {
+            Navigation.setDispatcher(null);
+        }
+    }
+
+    /**
+     * A factory that redirects stops the rebuild before the next factory runs.
+     *
+     * <p>The comparison sat after the whole loop, so every later factory still constructed its
+     * screen and touched whatever the application keeps behind it -- an unavailable parent
+     * redirecting to a safe list while its child factories go on reading the record that is
+     * unavailable -- and all of it was then discarded in favour of the redirect.</p>
+     */
+    @EdtTest
+    public void aFactoryRedirectStopsTheRebuildBeforeTheNextFactoryRuns() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+        final List<String> built = new ArrayList<String>();
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                built.add(url);
+                if ("/orders/17".equals(url) && built.size() == 1) {
+                    Navigation.navigate("/orders");
+                }
+                Form f = new Form();
+                f.setTitle(url);
+                return f;
+            }
+        });
+        try {
+            Continuity.restore(new AppState()
+                    .setRoutes(java.util.Arrays.asList("/orders/17", "/orders/17/pay"))
+                    .setDeviceId("some-other-device").setSequence(450L)
+                    .setTimestamp(System.currentTimeMillis()));
+            flushSerialCalls();
+
+            assertFalse(built.contains("/orders/17/pay"),
+                    "a factory ran after an earlier one had already redirected, so it built a "
+                            + "screen and touched whatever is behind it for nothing: " + built);
+        } finally {
+            Navigation.setDispatcher(null);
+        }
+    }
+
+    /**
      * A redirect started inside a route FACTORY wins over the stack being rebuilt.
      *
      * <p>A factory is application code and may redirect -- an expired detail page sending the user

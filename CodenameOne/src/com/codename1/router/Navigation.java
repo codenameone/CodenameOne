@@ -303,6 +303,15 @@ public final class Navigation {
         List<NavigationEntry> beforeDispatch = new ArrayList<NavigationEntry>(stack);
         List<NavigationEntry> rebuilt = new ArrayList<NavigationEntry>();
         for (String path : paths) {
+            if (!beforeDispatch.equals(stack)) {
+                // A FACTORY navigated, and the rebuild stops here rather than at the end. Every
+                // later factory would still construct its screen and read or write whatever the
+                // application keeps behind it -- an unavailable parent redirecting to a safe list
+                // while its child factories go on touching the record that is unavailable -- and
+                // all of it would then be discarded in favour of the redirect. Asked per
+                // iteration for the same reason the session check beside it is.
+                return false;
+            }
             if (sessionEnded()) {
                 // A factory ended the continuity session -- it found the account signed out,
                 // which is exactly the decision a route factory is entitled to make. Every later
@@ -332,15 +341,18 @@ public final class Navigation {
             }
         }
         if (!beforeDispatch.equals(stack)) {
-            // A FACTORY navigated. A route factory is application code and may redirect -- an
-            // expired detail page sending the user to a list, a screen that has moved -- and it
-            // does so before this method has installed anything, so the rebuild that follows
-            // would replace both its stack entry and its screen with the ones being restored.
+            // Asked again, because the loop tests before each factory and the LAST one has no
+            // next iteration to be stopped by -- the same pairing the session check uses.
             //
-            // Its choice wins, which is the same rule the rollback below and the ordinary
-            // navigations already use: whatever ran later and changed the stack meant to. This
-            // returns false, so Continuity treats the restore as one that showed nothing, and the
-            // reconciliation there checkpoints the stack the factory actually left behind.
+            // A route factory is application code and may redirect: an expired detail page
+            // sending the user to a list, a screen that has moved. It does so before this method
+            // has installed anything, so the rebuild would replace both its stack entry and its
+            // screen. Its choice wins, which is the rule the rollback below and the ordinary
+            // navigations already use.
+            //
+            // Continuity notices the stack moved and settles the arrival rather than treating it
+            // as one that failed -- see the note there. It also checkpoints what the factory left
+            // behind, so the redirect survives a process death.
             return false;
         }
         if (rebuilt.isEmpty() || sessionEnded()) {

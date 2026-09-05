@@ -1224,6 +1224,15 @@ public final class Continuity {
         // form alone -- the caller decides where to go next -- so undoing the history of a
         // cancelled restore left the signed-out account's SCREEN in front of the user.
         com.codename1.ui.Form beforeRestore = Display.getInstance().getCurrent();
+        // The live stack BEFORE the rebuild, so application code that navigates during it can be
+        // recognised afterwards. A route factory or a show callback may redirect -- an expired
+        // detail page sending the user to a list -- and restoreStack() then returns false because
+        // it deliberately did not install its own screens over that choice.
+        //
+        // Without this, false reads as "nothing happened": a route-only arrival takes the
+        // failure branch below, is parked, holds relay publication, and is offered again after
+        // every launch to redirect again. The application DID handle it, by going somewhere else.
+        List<String> routesBefore = currentRoutes();
         boolean shown;
         boolean routesThrew = false;
         applyingRestore = true;
@@ -1306,7 +1315,7 @@ public final class Continuity {
             // restored screen, and the next navigation overwriting both. Restoring twice is a
             // smaller harm than losing the work.
             failed = true;
-        } else if (!shown && !applied) {
+        } else if (!shown && !applied && currentRoutes().equals(routesBefore)) {
             // Routes were named, none could be rebuilt, and nothing else in the state applied
             // either -- an attempt that failed outright, so it stays on the relay for a launch
             // that can use it.
@@ -1320,7 +1329,12 @@ public final class Continuity {
             // payload already worked on this one.
             failed = true;
         }
-        outFailed[0] = !commit(state, applied || shown, failed);
+        // Handled ALSO when the application navigated during the rebuild. It chose where to go
+        // because of this arrival, which is as much an answer as showing the restored screen
+        // would have been -- and leaving it unsettled parks it, holds publication, and offers it
+        // again after every launch.
+        outFailed[0] = !commit(state,
+                applied || shown || !currentRoutes().equals(routesBefore), failed);
         // What the application did DURING the rebuild, which nothing else records.
         //
         // routeStackChanged() returns early while applyingRestore is set -- it has to, or the
