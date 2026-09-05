@@ -1133,6 +1133,49 @@ public abstract class CodenameOneImplementation {
     /// a native image
     public abstract Object createImage(byte[] bytes, int offset, int len);
 
+
+    /// Whether this port can round a picture's corners as it draws it.
+    ///
+    /// The alternative -- and what callers have to do when this is false -- is
+    /// to build a rounded COPY of the bitmap: read the pixels back, clear the
+    /// alpha outside the corner arcs, and upload the result as a second image.
+    /// That is a full pixel round trip and a second texture per picture, and the
+    /// corners are a property of how the picture is DRAWN, not of the picture.
+    ///
+    /// #### Returns
+    ///
+    /// true if `drawImageRounded` rounds; false if it will simply draw the image
+    /// square
+    public boolean isRoundedImageDrawSupported() {
+        return false;
+    }
+
+    /// Draws an image with its corners rounded to the given radius, if the port
+    /// supports it; otherwise draws it square.
+    ///
+    /// Check `isRoundedImageDrawSupported()` first -- a caller that needs the
+    /// corners must keep its own fallback for ports that cannot.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `img`: the image
+    ///
+    /// - `x`: destination x
+    ///
+    /// - `y`: destination y
+    ///
+    /// - `w`: destination width
+    ///
+    /// - `h`: destination height
+    ///
+    /// - `cornerRadius`: radius in destination pixels, clamped by the port to
+    /// half the smaller side
+    public void drawImageRounded(Object graphics, Object img, int x, int y, int w, int h, float cornerRadius) {
+        drawImage(graphics, img, x, y, w, h);
+    }
+
     /// Returns the width of a native image
     ///
     /// #### Parameters
@@ -5097,12 +5140,26 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
-    /// Returns one of the density variables appropriate for this device, notice that
-    /// density doesn't always correspond to resolution and an implementation might
-    /// decide to change the density based on DPI constraints.
+    /// Returns the platform's own logical-pixel scale factor: device pixels per
+    /// logical pixel, the number iOS calls `UIScreen.scale` and Android calls
+    /// `density`.
+    ///
+    /// This is NOT the same question as [#getDeviceDensity], even though the two are
+    /// easily confused. Density is a coarse DPI bucket used to pick artwork and to size
+    /// things in physical units. The scale factor is what the platform itself uses to
+    /// convert its own layout units into pixels, and on iOS it is only ever 1, 2 or 3 --
+    /// never the 3.5 that a 560-dpi bucket would imply. Anything laying out in
+    /// platform-logical units (density-independent pixels) has to ask this question, not the
+    /// density one, or it renders every dimension off by the ratio between them.
     ///
     /// #### Returns
     ///
+    /// pixels per logical pixel, or 0 when the platform does not report one -- callers
+    /// should then fall back to deriving it from the density bucket
+    public float getDevicePixelRatio() {
+        return 0;
+    }
+
     /// one of the DENSITY constants of Display
     public int getDeviceDensity() {
         int d = getActualDisplayHeight() * getDisplayWidth();

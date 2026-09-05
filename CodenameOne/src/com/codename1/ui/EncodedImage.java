@@ -342,6 +342,7 @@ public class EncodedImage extends Image {
         return create(Display.getInstance().getResourceAsStream(EncodedImage.class, i));
     }
 
+
     /// A subclass might choose to load asynchroniously and reset the cache when the image is ready.
     protected void resetCache() {
         cache = null;
@@ -461,6 +462,11 @@ public class EncodedImage extends Image {
         Image i;
         try {
             byte[] b = getImageData();
+            // No platform-side copy of the decoded pixels: THIS object is the
+            // recovery path. It holds the encoded bytes and re-decodes on the
+            // generation bump above, so a port that would otherwise keep a
+            // CPU-side bitmap alive next to its GPU texture -- the same picture
+            // in memory twice -- does not have to.
             i = Image.createImage(b, 0, b.length);
             if (opaqueChecked) {
                 i.setOpaque(opaque);
@@ -625,6 +631,15 @@ public class EncodedImage extends Image {
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
         Display.impl.drawingEncodedImage(this);
         getInternalImpl().drawImage(g, nativeGraphics, x, y, w, h);
+    }
+
+    /// The decoded image's peer, announced through the same hook the normal draw
+    /// uses so the image is not reclaimed out from under the draw.
+    @Override
+    Object roundedDrawPeer() {
+        Display.impl.drawingEncodedImage(this);
+        Image internal = getInternalImpl();
+        return internal == null ? null : internal.roundedDrawPeer();
     }
 
     /// {@inheritDoc}

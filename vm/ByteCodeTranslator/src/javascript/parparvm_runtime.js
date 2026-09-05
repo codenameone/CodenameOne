@@ -5427,6 +5427,12 @@ bindNative(["cn1_java_lang_Math_sin_double_R_double"], function(v) { return Math
 bindNative(["cn1_java_lang_Math_sqrt_double_R_double"], function(v) { return Math.sqrt(v); });
 bindNative(["cn1_java_lang_Math_tan_double_R_double"], function(v) { return Math.tan(v); });
 bindNative(["cn1_java_lang_Math_atan_double_R_double"], function(v) { return Math.atan(v); });
+bindNative(["cn1_java_lang_Math_acos_double_R_double"], function(v) { return Math.acos(v); });
+bindNative(["cn1_java_lang_Math_asin_double_R_double"], function(v) { return Math.asin(v); });
+bindNative(["cn1_java_lang_Math_atan2_double_double_R_double"], function(y, x) { return Math.atan2(y, x); });
+bindNative(["cn1_java_lang_Math_exp_double_R_double"], function(v) { return Math.exp(v); });
+bindNative(["cn1_java_lang_Math_log_double_R_double"], function(v) { return Math.log(v); });
+bindNative(["cn1_java_lang_Math_log10_double_R_double"], function(v) { return Math.log10(v); });
 bindNative(["cn1_java_lang_Integer_toString_int_R_java_lang_String"], function(v) { return createJavaString(String(v | 0)); });
 bindNative(["cn1_java_lang_Integer_toString_int_int_R_java_lang_String"], function(v, radix) { return createJavaString((v | 0).toString((radix | 0) || 10)); });
 bindNative(["cn1_java_lang_Long_toString_long_int_R_java_lang_String"], function(v, radix) { return createJavaString(_LtoStr(v, (radix | 0) || 10)); });
@@ -5676,6 +5682,17 @@ bindNative(["cn1_java_lang_Class_getName_R_java_lang_String"], function(__cn1Thi
 bindNative(["cn1_java_lang_Class_isArray_R_boolean"], function(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.name.indexOf("[]") > -1 ? 1 : 0; });
 bindNative(["cn1_java_lang_Class_isAssignableFrom_java_lang_Class_R_boolean"], function(__cn1ThisObject, cls) { return cls && cls.__classDef && cls.__classDef.assignableTo[__cn1ThisObject.__classDef.name] ? 1 : 0; });
 bindNative(["cn1_java_lang_Class_isInstance_java_lang_Object_R_boolean"], function(__cn1ThisObject, obj) { return jvm.instanceOf(obj, __cn1ThisObject.__classDef.name) ? 1 : 0; });
+bindNative(["cn1_java_lang_Class_getSuperclass_R_java_lang_Class"], function(__cn1ThisObject) {
+  const def = __cn1ThisObject.__classDef;
+  // Null for an interface, matching the C runtime: a class file records
+  // java/lang/Object as an interface's super_class, so the isInterface flag is
+  // the only thing separating the two and getSuperclass() must report null.
+  // Object, the primitives and void carry no baseClass at all.
+  if (!def || def.isInterface || !def.baseClass) {
+    return null;
+  }
+  return classObjectForName(def.baseClass);
+});
 bindNative(["cn1_java_lang_Class_isInterface_R_boolean"], function(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.isInterface ? 1 : 0; });
 bindNative(["cn1_java_lang_Class_newInstanceImpl_R_java_lang_Object"], function*(__cn1ThisObject) {
   const def = __cn1ThisObject.__classDef;

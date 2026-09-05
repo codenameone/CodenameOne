@@ -41,10 +41,15 @@
     int height;
     GLUIImage* img;
     int renderingHints;
+    // Destination-space corner radius. Zero means square corners, which is the
+    // ordinary case; anything positive rounds the quad in the fragment shader
+    // so nobody has to build a rounded copy of the bitmap.
+    float cornerRadius;
 }
 
 -(id)initWithArgs:(int)a xpos:(int)xpos ypos:(int)ypos i:(GLUIImage*)i w:(int)w h:(int)h;
 -(void)execute;
 -(void)setRenderingHints:(JAVA_INT)hints;
+-(void)setCornerRadius:(float)r;
 
 @end

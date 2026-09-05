@@ -28,6 +28,9 @@
 #import <objc/runtime.h>
 #import "CodenameOne_GLViewController.h"
 #include "cn1_globals.h"
+
+/// Defined below; used by the window delegate above it.
+void CN1MacPublishMainWindowScreen(void);
 #include "java_lang_String.h"
 
 // Shared with Mac Catalyst; defined in IOSNative.m.
@@ -178,6 +181,7 @@ static void cn1DeliverShownWithOwner(CN1MacWindowRecord *rec);
     // listener and relayed out every window, for something that happened to
     // one of them; monitorsChanged is for a display being attached, removed or
     // reconfigured.
+    CN1MacPublishMainWindowScreen();
     CN1MacWindowDeliverWindowMonitorChanged(self.windowId);
 }
 
@@ -187,6 +191,7 @@ static void cn1DeliverShownWithOwner(CN1MacWindowRecord *rec);
     // 2x display into 200 on a 1x one.
     cn1ApplyMinimumSize(self);
     [self windowDidResize:notification];
+    CN1MacPublishMainWindowScreen();
     CN1MacWindowDeliverWindowMonitorChanged(self.windowId);
 }
 
@@ -402,6 +407,85 @@ static NSScreen *cn1ScreenAt(int monitor) {
         return [screens objectAtIndex:0];
     }
     return [screens objectAtIndex:monitor];
+}
+
+/// The primary screen's backing scale, published BY the main thread so the
+/// event dispatch thread can read it without marshalling.
+///
+/// NSScreen is not thread safe -- see macMonitorCount -- so every other screen
+/// query in this file hops to the main thread, and that normally costs about six
+/// microseconds. At START-UP it does not: the very first one lands while the main
+/// queue is still bringing AppKit up, so the event dispatch thread sits in
+/// dispatch_sync for 16-19ms (measured, every launch) inside UIManager's
+/// constructor, waiting for a number it needs to size a font.
+///
+/// Publishing instead of asking removes the wait without reading AppKit off the
+/// main thread. Only the PRIMARY screen is served this way, which is the only one
+/// that can be asked about before a window exists -- macMonitorForMainWindow
+/// answers 0 until then. Anything else still marshals.
+static int cn1PrimaryScaleTimes100 = 0;
+
+/// Main thread only. Safe to call repeatedly; a screen reconfiguration re-runs it.
+void CN1MacPublishPrimaryScale(void) {
+    if (![NSThread isMainThread]) {
+        return;
+    }
+    NSArray<NSScreen *> *screens = [NSScreen screens];
+    if (screens.count == 0) {
+        return;
+    }
+    CGFloat s = [screens objectAtIndex:0].backingScaleFactor;
+    if (s > 0) {
+        __atomic_store_n(&cn1PrimaryScaleTimes100, (int)(s * 100), __ATOMIC_RELEASE);
+    }
+}
+
+/// The main window's screen and that screen's scale, published together as one
+/// value. Same trade as CN1MacPublishPrimaryScale above, for the query that
+/// still marshalled: macMonitorForMainWindow hopped to the main thread on EVERY
+/// call once a window existed, and Style.convertUnit calls it through
+/// MacImplementation.convertToPixels for every padding and margin on every
+/// component. Measured at 35ms of blocked event dispatch thread per launch.
+///
+/// Index and scale share one 64-bit slot rather than sitting in two ints so a
+/// reader can never pair an index with the other screen's scale. A negative
+/// value means nothing has been published yet.
+static int64_t cn1MainWindowScreenAndScale = -1;
+
+static int cn1IndexOfScreen(NSScreen *screen);
+
+/// Main thread only. Safe to call repeatedly; a window move or a screen
+/// reconfiguration re-runs it.
+void CN1MacPublishMainWindowScreen(void) {
+    if (![NSThread isMainThread]) {
+        return;
+    }
+    NSWindow *w = [CN1MacHost sharedHost].builtWindow;
+    if (w == nil) {
+        return;
+    }
+    // A window that is built but not yet on screen answers nil here, which is
+    // precisely the state at start-up -- the moment the published value is
+    // worth having. Falling back to the primary screen keeps the fast path
+    // engaged from the window's creation, and it is the same answer the
+    // marshalling version gives in that state: cn1IndexOfScreen(nil) is 0, and
+    // index 0 IS the primary screen. windowDidChangeScreen republishes the
+    // moment AppKit places it somewhere else.
+    NSScreen *screen = w.screen;
+    if (screen == nil) {
+        NSArray<NSScreen *> *screens = [NSScreen screens];
+        if (screens.count == 0) {
+            return;
+        }
+        screen = [screens objectAtIndex:0];
+    }
+    CGFloat scale = screen.backingScaleFactor;
+    if (scale <= 0) {
+        return;
+    }
+    int64_t packed = (((int64_t)cn1IndexOfScreen(screen)) << 32)
+            | (int64_t)((int)(scale * 100));
+    __atomic_store_n(&cn1MainWindowScreenAndScale, packed, __ATOMIC_RELEASE);
 }
 
 static int cn1IndexOfScreen(NSScreen *screen) {
@@ -1507,7 +1591,17 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macTextInputSetOwnerWindow___int(CODE
 }
 
 JAVA_VOID com_codename1_impl_mac_MacNative_macWindowWatchScreens__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
-    cn1OnMain(^{
+    // Asynchronously: this installs a notification observer and reads nothing
+    // back, but it is called from AppKitWindowManager's constructor, which the
+    // event dispatch thread reaches lazily through AccessibilityManager
+    // .invalidate while the first components are being built -- the exact
+    // moment the main queue is still bringing AppKit up. Marshalled
+    // synchronously it cost 37ms of blocked event dispatch thread per launch
+    // (measured). Nothing depends on the observer existing by the time the
+    // constructor returns; a screen change arriving before it is installed is
+    // already carried by the publish on window build. The guard inside stays
+    // correct because every block on the main queue runs serially.
+    dispatch_async(dispatch_get_main_queue(), ^{
         if (cn1MacWatchingScreens) {
             return;
         }
@@ -1612,6 +1706,24 @@ JAVA_INT com_codename1_impl_mac_MacNative_macMonitorDpi___int_R_int(CODENAME_ONE
 }
 
 JAVA_INT com_codename1_impl_mac_MacNative_macMonitorScaleTimes100___int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT monitor) {
+    // The published value, when the main thread has got there. Zero means it has
+    // not yet -- the answer is then still correct, just paid for with the hop.
+    if (monitor <= 0) {
+        int published = __atomic_load_n(&cn1PrimaryScaleTimes100, __ATOMIC_ACQUIRE);
+        if (published > 0) {
+            return published;
+        }
+    }
+    // The main window's screen, when that is the one being asked about. Without
+    // this the pair of calls in MacImplementation.convertToPixels still hopped
+    // once per conversion whenever the window sat on a secondary display.
+    int64_t packed = __atomic_load_n(&cn1MainWindowScreenAndScale, __ATOMIC_ACQUIRE);
+    if (packed >= 0 && (int)(packed >> 32) == monitor) {
+        int publishedScale = (int)(packed & 0xffffffff);
+        if (publishedScale > 0) {
+            return publishedScale;
+        }
+    }
     __block CGFloat scale = 1;
     cn1OnMain(^{
         NSScreen *screen = cn1ScreenAt(monitor);
@@ -1634,9 +1746,36 @@ JAVA_INT com_codename1_impl_mac_MacNative_macMonitorForWindow___int_R_int(CODENA
 }
 
 JAVA_INT com_codename1_impl_mac_MacNative_macMonitorForMainWindow___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    // No window yet means there is no screen to name, and the main display --
+    // index 0 -- is the honest answer. Asked through builtWindow rather than
+    // window so that finding out never CREATES one: this native is on the
+    // start-up path (MacImplementation.convertToPixels calls it, uncached, from
+    // UIManager's constructor) and building a window here cost 56-86ms of
+    // blocked event dispatch thread on every launch.
+    //
+    // The default costs nothing in accuracy either. The only caller pairs this
+    // with macMonitorScaleTimes100, which reads the screen list rather than the
+    // window, so the scale is already right for the display the window is about
+    // to open on -- and the value is recomputed on every query by design, so it
+    // corrects itself the moment a window exists.
+    //
+    // Published by CN1MacPublishMainWindowScreen when the window is built and
+    // whenever it changes screen, so the common case reads an atomic and the
+    // hop below is only for the window that exists but has not been published
+    // yet.
+    int64_t packed = __atomic_load_n(&cn1MainWindowScreenAndScale, __ATOMIC_ACQUIRE);
+    if (packed >= 0) {
+        return (int)(packed >> 32);
+    }
+    if ([CN1MacHost sharedHost].builtWindow == nil) {
+        return 0;
+    }
     __block int index = 0;
     cn1OnMain(^{
-        index = cn1IndexOfScreen([CN1MacHost sharedHost].window.screen);
+        NSWindow *w = [CN1MacHost sharedHost].builtWindow;
+        if (w != nil) {
+            index = cn1IndexOfScreen(w.screen);
+        }
     });
     return index;
 }

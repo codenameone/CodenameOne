@@ -1477,89 +1477,149 @@ BOOL isIOS7() {
 }
 
 
+/// Frees the premultiplied buffer handed to CGImageCreate once CoreGraphics is
+/// finished with it. Must be a C function pointer, so it lives at file scope.
+static void cn1ArgbImageFreeData(void * __unused info, const void *data, size_t __unused size) {
+    free((void *)data);
+}
+
 void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
 (int* buffer, int width, int height) {
-    size_t bufferLength = width * height * 4;
-    size_t bitsPerComponent = 8;
-    size_t bitsPerPixel = 32;
-    size_t bytesPerRow = 4 * width;
-    
-    
-    CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, buffer, bufferLength, NULL);
-    
+    size_t bufferLength = (size_t)width * (size_t)height * 4;
+    size_t bytesPerRow = 4 * (size_t)width;
+
     CGColorSpaceRef colorSpaceRef = CGColorSpaceCreateDeviceRGB();
-    
     if(colorSpaceRef == NULL) {
         CN1Log(@"Error allocating color space");
-        CGDataProviderRelease(provider);
         return nil;
     }
-    
-    CGBitmapInfo bitmapInfo = kCGBitmapByteOrder32Little | kCGImageAlphaFirst;
-    CGColorRenderingIntent renderingIntent = kCGRenderingIntentDefault;
-    
-    CGImageRef iref = CGImageCreate(width,
-                                    height,
-                                    bitsPerComponent,
-                                    bitsPerPixel,
-                                    bytesPerRow,
-                                    colorSpaceRef,
-                                    bitmapInfo,
-                                    provider,	// data provider
-                                    NULL,	// decode
-                                    NO,	// should interpolate
-                                    renderingIntent);
-    
-    uint32_t* pixels = (uint32_t*)malloc(bufferLength);
-    
+
+    // PREMULTIPLY IN ONE PASS. Codename One hands over straight (un-premultiplied)
+    // ARGB and CoreGraphics wants it premultiplied, and the way that conversion
+    // used to happen was: wrap the caller's array in a CGImage, malloc a second
+    // full-size buffer, memset it, wrap THAT in a bitmap context, draw the first
+    // image into the second through the whole CoreGraphics pixel pipeline, then
+    // make a third CGImage out of the result. All of it to multiply three bytes
+    // by a fourth. Image.createImage(int[], w, h) is on the start-up path -- it
+    // is how the runtime rounds the corners of every card image -- so this ran
+    // once per picture during the first frame.
+    uint32_t *pixels = (uint32_t *)malloc(bufferLength);
     if(pixels == NULL) {
         CN1Log(@"Error: Memory not allocated for bitmap");
-        CGDataProviderRelease(provider);
         CGColorSpaceRelease(colorSpaceRef);
-        CGImageRelease(iref);
         return nil;
     }
-    memset(pixels, 0, bufferLength);
-    
-    CGContextRef context = CGBitmapContextCreate(pixels,
-                                                 width,
-                                                 height,
-                                                 bitsPerComponent,
-                                                 bytesPerRow,
-                                                 colorSpaceRef,
-                                                 kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
-    
-    if(context == NULL) {
-        CN1Log(@"Error context not created");
-        free(pixels);
-        return NULL;
+    const uint32_t *src = (const uint32_t *)buffer;
+    size_t count = (size_t)width * (size_t)height;
+    for(size_t i = 0 ; i < count ; i++) {
+        uint32_t p = src[i];
+        uint32_t a = (p >> 24) & 0xff;
+        if(a == 0xff) {
+            pixels[i] = p;
+            continue;
+        }
+        if(a == 0) {
+            pixels[i] = 0;
+            continue;
+        }
+        uint32_t r = (p >> 16) & 0xff;
+        uint32_t g = (p >> 8) & 0xff;
+        uint32_t b = p & 0xff;
+        // Rounded, not truncated: CoreGraphics rounds, and a truncating
+        // premultiply drifts one level darker on every semi-transparent pixel.
+        r = (r * a + 127) / 255;
+        g = (g * a + 127) / 255;
+        b = (b * a + 127) / 255;
+        pixels[i] = (a << 24) | (r << 16) | (g << 8) | b;
     }
-    
+
+    // CN1_VERIFY_ARGB reproduces the old CoreGraphics conversion and reports any
+    // pixel that differs. Channel order and premultiply rounding are exactly the
+    // kind of thing that is invisible in a stack trace and shows up as an image
+    // that is slightly dark, or blue. Set it once after touching this.
+    static int verifyArgb = -1;
+    if(verifyArgb < 0) {
+        verifyArgb = getenv("CN1_VERIFY_ARGB") ? 1 : 0;
+    }
+    if(verifyArgb) {
+        uint32_t *reference = (uint32_t *)calloc(1, bufferLength);
+        if(reference != NULL) {
+            CGDataProviderRef srcProvider =
+                CGDataProviderCreateWithData(NULL, buffer, bufferLength, NULL);
+            CGImageRef srcImage = srcProvider ? CGImageCreate(width, height, 8, 32, bytesPerRow,
+                    colorSpaceRef, kCGBitmapByteOrder32Little | kCGImageAlphaFirst,
+                    srcProvider, NULL, NO, kCGRenderingIntentDefault) : NULL;
+            CGContextRef refCtx = CGBitmapContextCreate(reference, width, height, 8, bytesPerRow,
+                    colorSpaceRef, kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
+            if(srcImage != NULL && refCtx != NULL) {
+                CGContextDrawImage(refCtx, CGRectMake(0.0f, 0.0f, width, height), srcImage);
+                CGContextFlush(refCtx);
+                size_t bad = 0, worst = 0;
+                long firstIdx = -1;
+                for(size_t i = 0 ; i < count ; i++) {
+                    if(pixels[i] == reference[i]) continue;
+                    if(firstIdx < 0) firstIdx = (long)i;
+                    bad++;
+                    for(int ch = 0 ; ch < 4 ; ch++) {
+                        long d = (long)((pixels[i] >> (ch * 8)) & 0xff)
+                               - (long)((reference[i] >> (ch * 8)) & 0xff);
+                        if(d < 0) d = -d;
+                        if((size_t)d > worst) worst = (size_t)d;
+                    }
+                }
+                if(bad != 0) {
+                    CN1Log(@"CN1_VERIFY_ARGB: %zu/%zu differ, worst channel delta %zu "
+                            "(first at %ld: fast=%08x cg=%08x) for %ix%i",
+                           bad, count, worst, firstIdx,
+                           (unsigned)pixels[firstIdx], (unsigned)reference[firstIdx], width, height);
+                } else {
+                    CN1Log(@"CN1_VERIFY_ARGB: %ix%i matches", width, height);
+                }
+            }
+            if(refCtx != NULL) CGContextRelease(refCtx);
+            if(srcImage != NULL) CGImageRelease(srcImage);
+            if(srcProvider != NULL) CGDataProviderRelease(srcProvider);
+            free(reference);
+        }
+    }
+
+    CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, pixels, bufferLength,
+                                                              cn1ArgbImageFreeData);
+    if(provider == NULL) {
+        free(pixels);
+        CGColorSpaceRelease(colorSpaceRef);
+        return nil;
+    }
+
+    CGImageRef imageRef = CGImageCreate(width,
+                                        height,
+                                        8,
+                                        32,
+                                        bytesPerRow,
+                                        colorSpaceRef,
+                                        kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst,
+                                        provider,
+                                        NULL,
+                                        NO,
+                                        kCGRenderingIntentDefault);
+
     CN1Image *image = nil;
-    if(context) {
-        
-        CGContextDrawImage(context, CGRectMake(0.0f, 0.0f, width, height), iref);
-        
-        CGImageRef imageRef = CGBitmapContextCreateImage(context);
-        
+    if(imageRef != NULL) {
 #if TARGET_OS_OSX
         image = CN1AppleImageWithCGImage(imageRef);
 #else
         image = [CN1Image imageWithCGImage:imageRef];
 #endif
-        
         CGImageRelease(imageRef);
-        CGContextRelease(context);
     }
-    
+
     CGColorSpaceRelease(colorSpaceRef);
-    CGImageRelease(iref);
+    // The provider owns `pixels` now and frees it through the callback.
     CGDataProviderRelease(provider);
-    
-    if(pixels) {
-        free(pixels);
+
+    if(image == nil) {
+        return nil;
     }
-    
     return (BRIDGE_CAST void*) [[GLUIImage alloc] initWithImage:image];
 }
 
@@ -2936,6 +2996,9 @@ void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
     return (BRIDGE_CAST void*)gl;
 }
 
+void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayCGImpl
+(void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
+
 void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 (void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight) {
 #ifdef CN1_USE_METAL
@@ -2983,6 +3046,14 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
         }
     }
 #endif
+    Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayCGImpl(
+        peer, arr, x, y, width, height, imgWidth, imgHeight);
+}
+
+/// The CoreGraphics reader: rasterises the picture into the caller's array. Kept
+/// separate so the Metal fast path above can be checked against it.
+void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayCGImpl
+(void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight) {
     BOOL currentlyDrawing = NO;
     BOOL oldCurrentMutableTransformSet = currentMutableTransformSet;
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {
@@ -3019,6 +3090,53 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 }
 
 
+
+/// Whether this build can round a picture's corners as it draws it. Only the
+/// Metal renderer has the shader; the GL and CoreGraphics paths do not, and the
+/// caller keeps its own fallback for them.
+JAVA_BOOLEAN Java_com_codename1_impl_ios_IOSImplementation_isRoundedImageDrawSupportedImpl(void) {
+#if defined(CN1_USE_METAL) && !TARGET_OS_WATCH
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalImpl
+(void* peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius) {
+#ifdef CN1_USE_METAL
+    if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {
+        Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
+    }
+    DrawImage* f = [[DrawImage alloc] initWithArgs:alpha xpos:x ypos:y i:(BRIDGE_CAST GLUIImage*)peer w:width h:height];
+    [f setRenderingHints:renderingHints];
+    [f setCornerRadius:cornerRadius];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+#else
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl(peer, alpha, x, y, width, height, renderingHints);
+#endif
+}
+
+void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedMutableImpl
+(void* peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius) {
+#ifdef CN1_USE_METAL
+    GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+    if (target == nil) return;
+    DrawImage *f = [[DrawImage alloc] initWithArgs:alpha xpos:x ypos:y i:(BRIDGE_CAST GLUIImage*)peer w:width h:height];
+    [f setRenderingHints:renderingHints];
+    [f setCornerRadius:cornerRadius];
+    [f setTarget:target];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+#else
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl(peer, alpha, x, y, width, height, renderingHints);
+#endif
+}
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl
 (void* peer, int alpha, int x, int y, int width, int height, int renderingHints) {
@@ -4923,6 +5041,37 @@ BOOL prefersStatusBarHidden = NO;
         [renderingView prepareRetainedFramebufferForDrawRect:rect displayWidth:displayWidth displayHeight:displayHeight];
     }
 #endif
+    // How much of the screen does a frame actually repaint? The offscreen
+    // screenTexture exists so a frame can repaint only its dirty region and keep
+    // the rest; it costs a full-screen texture to do that. If frames repaint
+    // most of the screen anyway, that texture is buying very little.
+    // CN1_REPAINT_RATIO reports it; costs one cached getenv otherwise.
+    {
+        static int repaintRatioOn = -1;
+        if(repaintRatioOn < 0) {
+            repaintRatioOn = getenv("CN1_REPAINT_RATIO") ? 1 : 0;
+        }
+        if(repaintRatioOn) {
+            static long frames = 0;
+            static double areaSum = 0;
+            static long fullFrames = 0;
+            double full = (double)displayWidth * (double)displayHeight;
+            double area = (double)rect.size.width * (double)rect.size.height;
+            if(full > 0) {
+                double frac = area / full;
+                if(frac > 1.0) frac = 1.0;
+                frames++;
+                areaSum += frac;
+                if(frac > 0.95) fullFrames++;
+                if((frames % 5) == 0) {
+                    fprintf(stderr, "BENCH:REPAINT frames=%ld mean=%.1f%% full(>95%%)=%ld (%.0f%%)\n",
+                            frames, 100.0 * areaSum / (double)frames, fullFrames,
+                            100.0 * (double)fullFrames / (double)frames);
+                    fflush(stderr);
+                }
+            }
+        }
+    }
     [renderingView setFramebuffer];
     GLErrorLog;
     BOOL drewContentOps = NO;

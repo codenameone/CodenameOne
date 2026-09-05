@@ -198,6 +198,8 @@ static CodenameOne_GLViewController *singletonInstance = nil;
 }
 
 - (void)drawFrame:(CGRect)rect allowInactive:(BOOL)allowInactive {
+    static int firstDraw = 1;
+    if (firstDraw) { firstDraw = 0; cn1StartupPhase("firstDrawFrame"); }
     METALView *v = (METALView *)[CN1MacHost sharedHost].activeRenderingView;
     if (v == nil) {
         return;

@@ -781,6 +781,53 @@ void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int widt
     drawQuad(CN1MetalPipelineTexturedRGBA, vertices, texcoords, tint, texture);
 }
 
+/**
+ * Draws a texture with analytically rounded, antialiased corners.
+ *
+ * <p>The point of this is what does NOT happen: nobody builds a rounded copy of
+ * the bitmap. The runtime used to read a picture back with getRGB, clear the
+ * alpha outside the corner arcs, and upload the result as a second image --
+ * per picture, inside the layout that produces the first frame. The corners are
+ * a property of how the picture is DRAWN, and this is where that belongs.</p>
+ *
+ * <p>Radius is in destination pixels and is clamped to half the smaller side.</p>
+ */
+void CN1MetalDrawImageRounded(id<MTLTexture> texture, int alpha, int x, int y,
+                              int width, int height, float cornerRadius) {
+    if (texture == nil || width <= 0 || height <= 0) return;
+    if (cornerRadius <= 0.0f) {
+        CN1MetalDrawImage(texture, alpha, x, y, width, height);
+        return;
+    }
+    if (activeEncoder == nil || pipelineCache == nil) return;
+    id<MTLRenderPipelineState> state = [pipelineCache pipelineFor:CN1MetalPipelineTexturedRounded];
+    if (state == nil) {
+        CN1MetalDrawImage(texture, alpha, x, y, width, height);
+        return;
+    }
+    bindPipelineStateIfChanged(state);
+
+    float a = alpha / 255.0f;
+    simd_float4 tint = (simd_float4){ a, a, a, a };
+    float vertices[8] = {
+        (float)x,         (float)y,
+        (float)(x+width), (float)y,
+        (float)x,         (float)(y+height),
+        (float)(x+width), (float)(y+height)
+    };
+    // Same V=0-at-top mapping CN1MetalDrawImage uses; see the note there for why
+    // the source is stored bottom-up.
+    static const float texcoords[8] = { 0, 0,  1, 0,  0, 1,  1, 1 };
+    [activeEncoder setVertexBytes:vertices length:sizeof(float) * 8 atIndex:0];
+    uploadMatricesIfChanged(1);
+    [activeEncoder setVertexBytes:texcoords length:sizeof(float) * 8 atIndex:2];
+    [activeEncoder setFragmentBytes:&tint length:sizeof(tint) atIndex:0];
+    simd_float4 params = (simd_float4){ (float)width, (float)height, cornerRadius, 0.0f };
+    [activeEncoder setFragmentBytes:&params length:sizeof(params) atIndex:1];
+    [activeEncoder setFragmentTexture:texture atIndex:0];
+    [activeEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+}
+
 void CN1MetalDrawLens(id<MTLTexture> texture, int x, int y, int w, int h,
                       int fw, int fh, float magnify, float aberration,
                       int tintColor, float tintStrength, float cornerRadiusPx) {
@@ -1462,9 +1509,30 @@ id<MTLTexture> CN1MetalTextureFromUIImage(CN1Image *image) {
     // memory_row_0 and produced a 1-pixel decoration leak at the title-bar
     // top edge (rows 246-247) because cn1 9-patch slices put their drop-shadow
     // row at source row 0 — which GL has always rendered at dest BOTTOM.
+    // ONE COPY THROUGH A SCRATCH BUFFER, DELIBERATELY.
+    //
+    // The obvious optimisation here is to make the texture a view onto an
+    // MTLBuffer and point CoreGraphics at that buffer's contents, so the picture
+    // is rasterised once, into the memory the GPU samples, with no scratch and no
+    // replaceRegion copy. That was tried and REVERTED: a pixel-level check of the
+    // resulting texture against CoreGraphics -- read the texture's bytes and the
+    // same picture's CoreGraphics rasterisation and compare pixel by pixel --
+    // found regions of the texture reading back as ZERO
+    // -- unwritten -- on roughly one read in ten, 1554 and 45856 pixels of a
+    // 560x384 image on two runs. Adding CGContextFlush before the texture is
+    // created did not fix it; it only made the clean runs more common, which is
+    // worse than not helping.
+    //
+    // Whatever the cause -- CoreGraphics deferring into a linear destination, or
+    // this function racing another thread through getMTLTexture -- the failure is
+    // intermittent and silent, and it corrupts what is DRAWN, not just what is
+    // read back. replaceRegion copies the bytes out through CoreGraphics' own
+    // accounting and has never shown a hole. If you revisit this, the check above
+    // is how you find out, and one clean run proves nothing: three consecutive
+    // clean runs preceded the two that failed.
     CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
-    void *rawData = calloc(h * w * 4, sizeof(uint8_t));
-    CGContextRef ctx = CGBitmapContextCreate(rawData, w, h, 8, w * 4, cs,
+    void *rawData = calloc((size_t)h * (size_t)w * 4, sizeof(uint8_t));
+    CGContextRef ctx = CGBitmapContextCreate(rawData, w, h, 8, (size_t)w * 4, cs,
         kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
     CGColorSpaceRelease(cs);
     // NSImage has no CGImage property, for the same reason it has no scale: it
@@ -1850,11 +1918,35 @@ BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
     id<MTLCommandQueue> queue = CN1MetalCommandQueue();
     if (queue == nil) return NO;
 
+    // Work out the REGION first, and stage only that. This used to allocate a
+    // scratch texture the size of the whole image, blit the whole image into it
+    // and pull all of it back, so a 100x100 getRGB on a full-screen mutable
+    // allocated 12MB of texture, moved 12MB across the blit and malloc'd 12MB
+    // more, to deliver 40KB. When no scaling is in play the requested rect maps
+    // one-to-one onto texture pixels; a scaled read still has to sample the
+    // whole surface.
+    float scaleX = (imgWidth  > 0) ? ((float)texW / (float)imgWidth)  : 1.0f;
+    float scaleY = (imgHeight > 0) ? ((float)texH / (float)imgHeight) : 1.0f;
+    BOOL unscaled = (scaleX == 1.0f && scaleY == 1.0f);
+    int readX = 0, readY = 0, readW = texW, readH = texH;
+    if (unscaled) {
+        readX = x < 0 ? 0 : x;
+        readY = y < 0 ? 0 : y;
+        readW = w;
+        readH = h;
+        if (readX + readW > texW) readW = texW - readX;
+        if (readY + readH > texH) readH = texH - readY;
+        if (readW <= 0 || readH <= 0) {
+            unscaled = NO;
+            readX = 0; readY = 0; readW = texW; readH = texH;
+        }
+    }
+
     // Private storage textures can't be getBytes'd directly on iOS. Blit
-    // into a shared-storage scratch texture, wait, then read.
+    // the region into a shared-storage scratch texture, wait, then read.
     MTLTextureDescriptor *desc = [MTLTextureDescriptor
         texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
-        width:(NSUInteger)texW height:(NSUInteger)texH mipmapped:NO];
+        width:(NSUInteger)readW height:(NSUInteger)readH mipmapped:NO];
     desc.usage = MTLTextureUsageShaderRead;
     desc.storageMode = MTLStorageModeShared;
     id<MTLTexture> shared = [device newTextureWithDescriptor:desc];
@@ -1864,33 +1956,46 @@ BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
     id<MTLCommandBuffer> blitCb = [queue commandBuffer];
     id<MTLBlitCommandEncoder> blit = [blitCb blitCommandEncoder];
     [blit copyFromTexture:tex sourceSlice:0 sourceLevel:0
-              sourceOrigin:MTLOriginMake(0, 0, 0)
-                sourceSize:MTLSizeMake((NSUInteger)texW, (NSUInteger)texH, 1)
+              sourceOrigin:MTLOriginMake((NSUInteger)readX, (NSUInteger)readY, 0)
+                sourceSize:MTLSizeMake((NSUInteger)readW, (NSUInteger)readH, 1)
                  toTexture:shared destinationSlice:0 destinationLevel:0
          destinationOrigin:MTLOriginMake(0, 0, 0)];
     [blit endEncoding];
     [blitCb commit];
     cn1MetalWaitCommandBufferBounded(blitCb, 8.0);
 
-    // Read shared texture into a temp BGRA buffer, then convert + scale
-    // into outARGB. Texture dims equal imgWidth/imgHeight when the
-    // mutable was created via Image.createImage(w, h) but the API allows
-    // for arbitrary scaling; honour it.
-    NSUInteger rowBytes = (NSUInteger)(texW * 4);
-    uint8_t *bytes = (uint8_t *)malloc(rowBytes * (NSUInteger)texH);
-    if (bytes == NULL) return NO;
+    NSUInteger rowBytes = (NSUInteger)(readW * 4);
+    uint8_t *bytes = (uint8_t *)malloc(rowBytes * (NSUInteger)readH);
+    if (bytes == NULL) {
+#ifndef CN1_USE_ARC
+        [shared release];
+#endif
+        return NO;
+    }
+    // From the ZERO origin: the blit above copied the (readX, readY) region of
+    // the source INTO this scratch at (0, 0), and the scratch is only readW by
+    // readH, so a region starting at (readX, readY) runs off the end of it.
+    // Metal fails the read for any ordinary non-origin subregion. The loop
+    // below already treats the scratch as zero-based (srcX = (x + col) - readX).
     [shared getBytes:bytes bytesPerRow:rowBytes
-          fromRegion:MTLRegionMake2D(0, 0, (NSUInteger)texW, (NSUInteger)texH)
+          fromRegion:MTLRegionMake2D(0, 0,
+                                     (NSUInteger)readW, (NSUInteger)readH)
          mipmapLevel:0];
 
-    float scaleX = (imgWidth  > 0) ? ((float)texW / (float)imgWidth)  : 1.0f;
-    float scaleY = (imgHeight > 0) ? ((float)texH / (float)imgHeight) : 1.0f;
     for (int row = 0; row < h; row++) {
         for (int col = 0; col < w; col++) {
-            int srcX = (int)((x + col) * scaleX);
-            int srcY = (int)((y + row) * scaleY);
+            int srcX, srcY;
+            if (unscaled) {
+                srcX = (x + col) - readX;
+                srcY = (y + row) - readY;
+            } else {
+                // The scratch holds the whole surface in this branch, so the
+                // scaled coordinates index it directly.
+                srcX = (int)((x + col) * scaleX);
+                srcY = (int)((y + row) * scaleY);
+            }
             int dstIdx = row * w + col;
-            if (srcX < 0 || srcX >= texW || srcY < 0 || srcY >= texH) {
+            if (srcX < 0 || srcX >= readW || srcY < 0 || srcY >= readH) {
                 outARGB[dstIdx] = 0;
                 continue;
             }

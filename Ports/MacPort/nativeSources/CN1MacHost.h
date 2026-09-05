@@ -47,6 +47,18 @@
 /// The METALView inside it. This is what the render driver draws through.
 @property (nonatomic, readonly) NSView *renderingView;
 
+/// The main window if one has been built, and nil otherwise. Unlike `window`,
+/// this never creates one.
+///
+/// Answering a question ABOUT the window must not bring a window into
+/// existence. macMonitorForMainWindow asked `window` for its screen from the
+/// event dispatch thread during start-up -- through Display.convertToPixels, in
+/// UIManager's constructor, before anything is painted -- and that built an
+/// entire NSWindow and METALView inside a dispatch_sync onto a main queue still
+/// bringing AppKit up. Measured at 56-86ms of blocked EDT on every launch, and
+/// racy: whichever of the two threads reached it first paid for it.
+- (NSWindow *)builtWindow;
+
 /// Size in pixels rather than points: Codename One works in device pixels, and
 /// on a Retina display the two differ by the backing scale.
 @property (nonatomic, readonly) int displayWidth;

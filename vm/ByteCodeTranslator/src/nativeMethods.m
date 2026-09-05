@@ -2728,13 +2728,41 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
             data->counter++;
             return;
         }
+        // NO try-lock fast path here. It was tried and reverted; do not restore
+        // it without solving all three of these.
+        //
+        // The idea was that a lock which does not block need not announce a park,
+        // saving the handshake wait on every uncontended synchronized call --
+        // measured at 8.7ms of blocked event dispatch thread per launch. What it
+        // actually cost:
+        //
+        //  - pthread_mutex_trylock is not in the Windows compatibility layer, so
+        //    every Windows target failed to compile until it was added.
+        //  - Returning early skipped the GC HANDSHAKE, and monitorEnter is one of
+        //    the few safepoints a long-running loop is guaranteed to reach, so a
+        //    loop synchronizing in its body could spin forever while a
+        //    stop-the-world collector waited for it.
+        //  - Returning early also skipped the threadActive = TRUE below. A thread
+        //    that entered here already marked inactive then ran Java while the
+        //    collector believed it was parked, which is heap corruption: the
+        //    collector scans a stale stack and reclaims objects that are live.
+        //    Seen as a SIGSEGV on a wild pointer inside ArrayList.remove, called
+        //    from the event dispatch loop -- nowhere near a monitor.
+        //
+        // The saving is real but small, and it is not worth reintroducing without
+        // a way to prove the thread-state invariants hold.
         threadStateData->threadActive = JAVA_FALSE;
         err = pthread_mutex_lock(&data->__codenameOneMutex);
         data->counter++;
         data->ownerThread = own;
+        CN1_STALL_T0(__stallMon);
         while (threadStateData->threadBlockedByGC) {
             usleep(100);
         }
+        // Instrumented so the [GCSTALL] report stops under-reporting: this
+        // handshake loop was invisible to it, which is why a run that really
+        // did lose time here reported stallMs=0.
+        CN1_STALL_ADD(__stallMon, CN1_STALL_HANDSHAKE, threadStateData);
         threadStateData->threadActive = JAVA_TRUE;
 
 

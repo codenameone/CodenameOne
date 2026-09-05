@@ -945,6 +945,91 @@ public final class Graphics {
     /// - `w`: the width to occupy
     ///
     /// - `h`: the height to occupy
+    /// Whether this platform can round a picture's corners as it draws it.
+    ///
+    /// When it cannot, the only way to get rounded corners is to build a rounded
+    /// COPY of the bitmap -- read the pixels back, clear the alpha outside the
+    /// corner arcs and upload the result -- which is a full pixel round trip and
+    /// a second texture per picture. Code that wants rounded artwork should ask
+    /// here and keep that copy as its fallback.
+    ///
+    /// #### Returns
+    ///
+    /// true if [#drawImageRounded(Image, int, int, int, int, float)] rounds
+    public boolean isRoundedImageSupported() {
+        return impl.isRoundedImageDrawSupported();
+    }
+
+    /// Whether [#drawImageRounded(Image, int, int, int, int, float)] will round
+    /// THIS image, which is the question a caller actually needs answered.
+    ///
+    /// The platform may round and still not be able to round a given picture.
+    /// Drawing an Image is a virtual call, and ComponentImage, DynamicImage,
+    /// FontImage, RGBImage and SVGScaledView paint procedurally rather than
+    /// handing over a bitmap; a rotated image keeps its angle beside a shared
+    /// peer. None of those can be handed to a rounded draw without losing the
+    /// drawing or the rotation, so they come out square.
+    ///
+    /// A caller that consults the no-argument method alone therefore skips its
+    /// own rounded-copy fallback on a platform that advertises support and gets
+    /// square artwork for exactly those images. Ask this one per picture.
+    ///
+    /// #### Parameters
+    ///
+    /// - `img`: the image about to be drawn
+    ///
+    /// #### Returns
+    ///
+    /// true if this image will be rounded; false to use the copy fallback
+    public boolean isRoundedImageSupported(Image img) {
+        return img != null && impl.isRoundedImageDrawSupported()
+                && img.roundedDrawPeer() != null;
+    }
+
+    /// Draws an image with rounded corners, without building a rounded copy of
+    /// it, on platforms that support it; elsewhere the image is drawn square.
+    ///
+    /// The corners are anti-aliased where the platform draws them analytically,
+    /// which a shaped clip of the same outline is not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `img`: the image to draw
+    /// - `x`: destination x
+    /// - `y`: destination y
+    /// - `w`: destination width
+    /// - `h`: destination height
+    /// - `cornerRadius`: radius in pixels, clamped to half the smaller side
+    public void drawImageRounded(Image img, int x, int y, int w, int h, float cornerRadius) {
+        if (cornerRadius <= 0) {
+            drawImage(img, x, y, w, h);
+            return;
+        }
+        if (!isRoundedImageSupported(img)) {
+            // Either the platform cannot round at all, or this picture cannot be
+            // handed over as a peer -- a procedural subclass or a rotated image,
+            // where rounding here would drop the subclass's own drawing or the
+            // rotation. Both go through the normal path and come out square.
+            //
+            // The platform half of that test is not optional. Without it this
+            // called impl.drawImageRounded for any image with a peer, and the
+            // inherited implementation forwards to the six-argument drawImage,
+            // whose body in CodenameOneImplementation is EMPTY -- so on a port
+            // that does not override it (J2ME, Windows, Linux, BlackBerry) the
+            // image was not drawn square, it was not drawn at all. drawImage
+            // below is what knows to pre-scale when the port cannot draw a
+            // scaled image itself.
+            //
+            // Asking isRoundedImageSupported(Image) rather than repeating its
+            // two conditions keeps the public query and this behaviour in step:
+            // whatever it answers is exactly what happens here.
+            drawImage(img, x, y, w, h);
+            return;
+        }
+        impl.drawImageRounded(nativeGraphics, img.roundedDrawPeer(),
+                x + xTranslate, y + yTranslate, w, h, cornerRadius);
+    }
+
     public void drawImage(Image img, int x, int y, int w, int h) {
         if (impl.isScaledImageDrawingSupported()) {
             img.drawImage(this, nativeGraphics, x, y, w, h);

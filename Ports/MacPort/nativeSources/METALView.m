@@ -27,6 +27,18 @@
 #import "CN1AppKitCompat.h"
 #import "CN1MacTextInput.h"
 #import "CN1Metalcompat.h"
+#include <stdatomic.h>
+#import <IOSurface/IOSurface.h>
+
+/// Three, not two. The window server is not asked when it has finished reading a
+/// surface -- there is no such callback -- so the only safe surface to draw into
+/// is one it does not currently hold. IOSurfaceIsInUse() reports exactly that,
+/// and a third slot means the renderer still has somewhere to go on the frame
+/// where one surface is on screen and another is still being picked up. Two
+/// slots have to reuse the older one as soon as the compositor is more than a
+/// frame behind, which is the tearing this whole path exists to avoid.
+#define CN1_PRESENT_SURFACE_COUNT 3
+
 #include "cn1_globals.h"
 
 /// Orthographic projection with the origin at the top left.
@@ -120,6 +132,49 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     /// accumulate into the first whole pixel and the content creeps as it should.
     double cn1WheelRemainderX;
     double cn1WheelRemainderY;
+    /// The surfaces the window server composites, and the Metal textures that
+    /// write into them.
+    ///
+    /// A small ring, not the single surface this started with and not
+    /// CAMetalLayer's pool either (see makeBackingLayer). Handing the layer a
+    /// surface does not wait for the window server to finish reading it, so
+    /// writing the NEXT frame into the same surface can land while the previous
+    /// composite is still in progress and put half of each frame on screen.
+    ///
+    /// Which slot a frame goes to is decided by asking IOSurfaceIsInUse() rather
+    /// than by taking turns -- see presentFramebuffer. A turn order alone still
+    /// wraps onto a surface the compositor is holding as soon as it falls far
+    /// enough behind, because nothing in this path ever waits for it.
+    IOSurfaceRef cn1PresentSurfaces[CN1_PRESENT_SURFACE_COUNT];
+    id<MTLTexture> cn1PresentTextures[CN1_PRESENT_SURFACE_COUNT];
+    /// Where to START looking, not the slot in use: presentFramebuffer skips any
+    /// surface the window server still holds, so this only sets the search order.
+    int cn1PresentIndex;
+
+    /// Bumped whenever the surfaces are rebuilt, so a frame that was already in
+    /// flight can tell that it belongs to the previous size.
+    ///
+    /// ATOMIC because the two sides are different threads: the bump happens on
+    /// the thread that rebuilds the framebuffer, and the read happens in a Metal
+    /// completion callback on the queue's own thread. A plain int there is a
+    /// data race, and the callback would not be guaranteed to observe the bump.
+    _Atomic int cn1PresentGeneration;
+
+    /// Whether a blit into each surface has been submitted but not yet
+    /// completed.
+    ///
+    /// IOSurfaceIsInUse() answers "is the compositor reading this", which is
+    /// only half the question. Between committing a frame's blit and its
+    /// completion handler running, the surface is not yet attached to the layer,
+    /// so the compositor does not hold it and the query says false -- while the
+    /// GPU still has to write it and the pending handler is still going to hand
+    /// it over. Metal lets several command buffers be in flight at once, so
+    /// without this the search wraps the pool and picks that surface again; the
+    /// newer blit then overwrites it just as the older completion exposes it.
+    ///
+    /// ATOMIC because the two sides are different threads: set on the thread
+    /// that paints, cleared in the completion callback on the queue's thread.
+    _Atomic int cn1PresentInFlight[CN1_PRESENT_SURFACE_COUNT];
 }
 
 @synthesize commandQueue;
@@ -165,11 +220,40 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 
 // ---- view configuration -------------------------------------------------
 
-/// Layer-hosted rather than layer-backed. Returning the CAMetalLayer from here
-/// means AppKit adopts it as the view's own layer and never draws into it, so
-/// Metal is the only thing that touches those pixels.
+/// A plain CALayer fed an IOSurface, NOT a CAMetalLayer.
+///
+/// CAMetalLayer owns a pool of drawables and will not go below two of them, and
+/// each one is a full-window IOSurface -- 11.7MB at a 1024x717 Retina window. On
+/// top of that the renderer needs its own persistent screenTexture, because
+/// Codename One queues only what changed since the last frame and therefore has
+/// to keep the previous one. So the pool was pure overhead: three full-size
+/// buffers to present a single image, measured at 21.5MB of IOSurface against
+/// the 11.6MB a single-surface compositor uses for the same window.
+///
+/// Presenting through IOSurfaces instead lets the window server composite
+/// directly out of shared memory, and the renderer picks a surface the server is
+/// not holding (presentFramebuffer) so the one being composited is never the one
+/// being written -- a single surface let the next frame land on top of a
+/// composite still in progress.
+///
+/// The honest cost: CN1_PRESENT_SURFACE_COUNT surfaces plus the persistent
+/// screenTexture is one buffer MORE than CAMetalLayer's pool, so this no longer
+/// wins on memory the way the two-surface version did. It is bought
+/// deliberately. During a handoff the server can hold both the surface still on
+/// screen and the one just attached, so with only two the renderer has nowhere
+/// untouched to draw and has to overwrite a held surface -- which is the tearing
+/// this whole path exists to prevent. The third slot is what keeps a free
+/// surface available across that handoff.
+///
+/// Layer-hosted still: AppKit adopts this as the view's own layer and never
+/// draws into it.
 - (CALayer *)makeBackingLayer {
-    return [CAMetalLayer layer];
+    CALayer *l = [CALayer layer];
+    l.opaque = YES;
+    // Top-left, matching -isFlipped, or the image lands upside down.
+    l.contentsGravity = kCAGravityTopLeft;
+    l.geometryFlipped = YES;
+    return l;
 }
 
 - (BOOL)wantsUpdateLayer {
@@ -237,7 +321,6 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     // resize, which reads as a smear rather than a redraw.
     self.layerContentsPlacement = NSViewLayerContentsPlacementTopLeft;
 
-    CAMetalLayer *metalLayer = (CAMetalLayer *)self.layer;
     // The FIRST view to get here decides the device and the command queue for
     // the whole process; every later window reuses them.
     //
@@ -254,21 +337,8 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         device = MTLCreateSystemDefaultDevice();
         ownsDevice = YES;
     }
-    metalLayer.device = device;
-    metalLayer.opaque = YES;
-    metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
-    // Must be NO: presentFramebuffer blits screenTexture into the drawable, and
-    // Metal's blit validation rejects a framebufferOnly destination.
-    metalLayer.framebufferOnly = NO;
-    metalLayer.maximumDrawableCount = 3;
-
-    // sRGB so CoreGraphics-rasterised images and gradients, which carry
-    // DeviceRGB bytes, are not treated as linear and displayed too bright.
-    CGColorSpaceRef cs = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-    if (cs != NULL) {
-        metalLayer.colorspace = cs;
-        CGColorSpaceRelease(cs);
-    }
+    // Nothing to configure on the layer: it is a plain CALayer and the surface
+    // carries the pixel format and the colour space. See makeBackingLayer.
 
     id<MTLCommandQueue> queue = CN1MetalCommandQueue();
     if (queue == nil) {
@@ -324,6 +394,16 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     [self updateBackingSize];
 }
 
+/// The first point at which a real surface can be sized correctly: the view now
+/// has a window, so CN1AppKitBackingScale answers with the display's true scale
+/// rather than 1. Sizing is deliberately declined before this (see
+/// updateFrameBufferSize:h:), so this is what actually allocates the surface --
+/// once, at the right size.
+- (void)viewDidMoveToWindow {
+    [super viewDidMoveToWindow];
+    [self updateBackingSize];
+}
+
 // ---- framebuffer --------------------------------------------------------
 
 /// Records a resize for the render thread to apply.
@@ -333,6 +413,21 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 /// encoder are replaced in applyPendingFrameBufferSize, which runs at a frame
 /// boundary on the thread that paints.
 - (void)updateFrameBufferSize:(int)w h:(int)h {
+    // No window yet means there is no real surface to make. The view's backing
+    // scale is only known once it belongs to a window, so a framebuffer sized
+    // before then is provisional -- allocated at 1x and thrown away the instant
+    // the view joins a Retina window, which is a second full-size IOSurface for
+    // nothing. Measured: 21.5MB across 12 IOSurface regions instead of 10.8MB
+    // across 4.
+    //
+    // Declining here loses nothing. AppKit re-drives the size the moment the
+    // view has a window, through viewDidMoveToWindow and
+    // viewDidChangeBackingProperties, and the framework works from mock
+    // dimensions until then -- it does not need a surface before the first Form
+    // is shown, only a size to lay out against.
+    if (self.window == nil) {
+        return;
+    }
     int pw = w, ph = h;
     if (pw <= 0 || ph <= 0) {
         CGFloat s = CN1AppKitBackingScale(self);
@@ -391,7 +486,6 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         self.renderPassDescriptor = nil;
     }
 
-    BOOL sizeWasKnown = framebufferWidth > 0 && framebufferHeight > 0;
     framebufferWidth = pw;
     framebufferHeight = ph;
     projectionMatrix = CN1MacOrtho(0.0f, (float)pw, (float)ph, 0.0f, -1.0f, 1.0f);
@@ -400,9 +494,60 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     // has to agree with, and on the thread that renders. Splitting them was what
     // let a live shrink land between setFramebuffer and presentFramebuffer and
     // blit an old-sized texture into a new, smaller drawable.
-    CAMetalLayer *layer = (CAMetalLayer *)self.layer;
-    layer.contentsScale = CN1AppKitBackingScale(self);
-    layer.drawableSize = CGSizeMake(pw, ph);
+    self.layer.contentsScale = CN1AppKitBackingScale(self);
+
+    // The surface the window server reads. Replaced rather than resized: an
+    // IOSurface is fixed at its creation size.
+    for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
+        if (cn1PresentTextures[i] != nil) {
+            [cn1PresentTextures[i] release];
+            cn1PresentTextures[i] = nil;
+        }
+        if (cn1PresentSurfaces[i] != NULL) {
+            CFRelease(cn1PresentSurfaces[i]);
+            cn1PresentSurfaces[i] = NULL;
+        }
+    }
+    cn1PresentIndex = 0;
+    for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
+        // The surfaces these referred to are gone; a leftover flag would
+        // retire the new slot that inherits the index.
+        atomic_store_explicit(&cn1PresentInFlight[i], 0, memory_order_release);
+    }
+    atomic_fetch_add_explicit(&cn1PresentGeneration, 1, memory_order_release);
+    NSDictionary *surfaceProps = @{
+        (id)kIOSurfaceWidth:           @(pw),
+        (id)kIOSurfaceHeight:          @(ph),
+        (id)kIOSurfaceBytesPerElement: @4,
+        (id)kIOSurfacePixelFormat:     @((unsigned int)'BGRA'),
+    };
+    for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
+        cn1PresentSurfaces[i] = IOSurfaceCreate((CFDictionaryRef)surfaceProps);
+        if (cn1PresentSurfaces[i] == NULL) {
+            continue;
+        }
+        // sRGB, for the same reason the CAMetalLayer carried it: CoreGraphics
+        // rasterises into DeviceRGB, and a surface tagged linear displays it
+        // too bright.
+        IOSurfaceSetValue(cn1PresentSurfaces[i], CFSTR("IOSurfaceColorSpace"), kCGColorSpaceSRGB);
+        MTLTextureDescriptor *pdesc = [MTLTextureDescriptor
+            texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+            width:pw height:ph mipmapped:NO];
+        pdesc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+        pdesc.storageMode = MTLStorageModeShared;
+        cn1PresentTextures[i] = [CN1MetalDevice() newTextureWithDescriptor:pdesc
+                                                                iosurface:cn1PresentSurfaces[i]
+                                                                    plane:0];
+    }
+    if (cn1PresentSurfaces[0] != NULL) {
+        // The first one, so there is something to show before a frame is drawn.
+        // Every later frame re-points the layer at whichever surface it just
+        // filled, which is also what marks the layer dirty.
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        self.layer.contents = (id)cn1PresentSurfaces[0];
+        [CATransaction commit];
+    }
 
     // The persistent target. Codename One only queues the operations that
     // changed since the previous frame, so it has to survive between them; a
@@ -412,7 +557,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         width:pw height:ph mipmapped:NO];
     desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
     desc.storageMode = MTLStorageModePrivate;
-    id<MTLTexture> newScreen = [layer.device newTextureWithDescriptor:desc];
+    id<MTLTexture> newScreen = [CN1MetalDevice() newTextureWithDescriptor:desc];
     self.screenTexture = newScreen;
 #ifndef CN1_USE_ARC
     [newScreen release];
@@ -439,7 +584,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         width:pw height:ph mipmapped:NO];
     stencilDesc.usage = MTLTextureUsageRenderTarget;
     stencilDesc.storageMode = MTLStorageModePrivate;
-    id<MTLTexture> newStencil = [layer.device newTextureWithDescriptor:stencilDesc];
+    id<MTLTexture> newStencil = [CN1MetalDevice() newTextureWithDescriptor:stencilDesc];
     self.stencilTexture = newStencil;
 #ifndef CN1_USE_ARC
     [newStencil release];
@@ -452,10 +597,20 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     // their delegate calls CN1MacWindowDeliverResize; window 0 has no such
     // delegate and this is its equivalent.
     //
-    // Skipped for the first sizing, where there is no previous size to have
-    // changed from and the framework has not been told a size at all yet -- and
-    // skipped until Java exists, since this runs from AppKit before the app's
-    // main thread has constructed anything.
+    // The FIRST sizing is delivered too, and that is not an oversight corrected
+    // later -- it is required. The framework no longer learns the window size by
+    // asking for it: a size query does not build a window any more (see
+    // -displayWidth in CN1MacHost.m, where doing so blocked the event dispatch
+    // thread for 56-86ms of every launch), so by the time this runs the
+    // framework has already been told the DEFAULT size and laid out against it.
+    // The first real size is therefore a genuine change, and skipping it left
+    // the application permanently laid out for a window it does not have.
+    //
+    // Still skipped until Java exists, since this runs from AppKit before the
+    // app's main thread has constructed anything. That costs nothing here: this
+    // method only runs at a frame boundary on the thread that paints, and a
+    // frame is driven by the framework, so a sizing that arrives early is
+    // applied at the first frame instead -- by which point Java is ready.
     // The MAIN view only. screenSizeChanged() sets the framework's one display
     // size, so a secondary window running through here would resize the main
     // Form to the auxiliary window's dimensions. Those windows have their own
@@ -491,7 +646,10 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         displayWidth = pw;
         displayHeight = ph;
     }
-    if (sizeWasKnown && self.cn1WindowId < 0 && cn1MacRuntimeIsJavaReady()) {
+    // The FIRST sizing is delivered: displayWidth reports a default until the
+    // window exists, so the framework has laid out against that and the real
+    // size IS a change it has to hear about.
+    if (self.cn1WindowId < 0 && cn1MacRuntimeIsJavaReady()) {
         screenSizeChanged(pw, ph);
     }
 }
@@ -553,6 +711,8 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 }
 
 - (BOOL)presentFramebuffer {
+    static int firstPresent = 1;
+    if (firstPresent) { firstPresent = 0; cn1StartupPhase("firstPresent"); }
     if (self.renderCommandEncoder == nil) {
         self.commandBuffer = nil;
         return NO;
@@ -562,12 +722,49 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     self.renderCommandEncoder = nil;
     self.renderPassDescriptor = nil;
 
-    // Acquired here rather than in setFramebuffer to keep its dwell time short:
-    // holding a drawable across the whole encoding phase stalls nextDrawable for
-    // the frames behind it.
-    CAMetalLayer *layer = (CAMetalLayer *)self.layer;
-    id<CAMetalDrawable> dr = [layer nextDrawable];
-    if (dr == nil) {
+    // Draw into a surface the window server is NOT holding, rather than trusting
+    // a turn order. Alternation alone only moves the problem: nothing here waits
+    // for the compositor, so if it falls more than one frame behind, the turn
+    // comes back round to a surface it is still reading and half of each frame
+    // lands on screen -- the exact artefact this path exists to prevent.
+    //
+    // IOSurfaceIsInUse() is that missing acknowledgement. Verified rather than
+    // assumed: binding an MTLTexture to a surface does NOT mark it in use, a
+    // surface the window server is displaying DOES report in use, and it stops
+    // reporting so once the layer has moved on -- so this genuinely distinguishes
+    // "still being read" from "safe to overwrite".
+    //
+    // The search starts at the slot after the one used last, so a surface is not
+    // immediately reused while its own completion handler is still pending.
+    int presentIdx = -1;
+    for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
+        int candidate = (cn1PresentIndex + i) % CN1_PRESENT_SURFACE_COUNT;
+        if (cn1PresentSurfaces[candidate] != NULL
+                && !atomic_load_explicit(&cn1PresentInFlight[candidate], memory_order_acquire)
+                && !IOSurfaceIsInUse(cn1PresentSurfaces[candidate])) {
+            presentIdx = candidate;
+            break;
+        }
+    }
+    if (presentIdx < 0) {
+        // Every surface is still held. Overwriting one anyway would undo the
+        // check just made, so drop the frame instead: the command buffer is
+        // still committed, and screenTexture is persistent -- Codename One
+        // queues only what changed, so the drawing is not lost and the next
+        // present carries it. Blocking to wait is not an option either; that
+        // wait was 16ms of start-up.
+        //
+        // This cannot starve: the window server holds the surface it is
+        // DISPLAYING, so at rest exactly one of the three is in use and the
+        // renderer always has somewhere to go. Reaching here at all means a
+        // handoff is in flight, which resolves on its own.
+        [self.commandBuffer commit];
+        self.commandBuffer = nil;
+        return NO;
+    }
+    cn1PresentIndex = (presentIdx + 1) % CN1_PRESENT_SURFACE_COUNT;
+    id<MTLTexture> presentTexture = cn1PresentTextures[presentIdx];
+    if (presentTexture == nil) {
         [self.commandBuffer commit];
         self.commandBuffer = nil;
         return NO;
@@ -577,11 +774,64 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
               sourceSlice:0 sourceLevel:0
              sourceOrigin:MTLOriginMake(0, 0, 0)
                sourceSize:MTLSizeMake(framebufferWidth, framebufferHeight, 1)
-                toTexture:dr.texture
+                toTexture:presentTexture
          destinationSlice:0 destinationLevel:0
         destinationOrigin:MTLOriginMake(0, 0, 0)];
     [blit endEncoding];
-    [self.commandBuffer presentDrawable:dr];
+    // Handed to the compositor from the completion handler rather than by
+    // blocking here.
+    //
+    // The surface has to be complete before the window server may read it, which
+    // presentDrawable: used to guarantee. Waiting for it on this thread does
+    // guarantee it -- and cost 16ms of start-up, measured, because this thread is
+    // the one the framework paints on and it cannot do anything else meanwhile.
+    // The completion handler gives the same ordering for free: it runs once the
+    // GPU has finished the blit, which is exactly the condition that has to hold
+    // before the layer may point at the surface.
+    //
+    // The layer is retained by the block automatically; the surface is a CF type
+    // and is not, so it is retained explicitly for the block's lifetime.
+    atomic_store_explicit(&cn1PresentInFlight[presentIdx], 1, memory_order_release);
+    CALayer *presentLayer = self.layer;
+    IOSurfaceRef presented = cn1PresentSurfaces[presentIdx];
+    CFRetain(presented);
+    // The generation this frame was drawn for. A resize between the commit and
+    // the completion rebuilds the surfaces at the new size, and handing the
+    // layer this retained OLD one would show the previous frame stretched or
+    // cropped until something newer completed -- visible flicker while dragging
+    // a window edge. A superseded frame is simply dropped: the resize path has
+    // already installed the new surface for the layer to show.
+    // Captured by value; the block retains self until it runs, which is exactly
+    // as long as the check needs it. No __weak here -- this port compiles
+    // without ARC and __weak is not available.
+    int frameGeneration = atomic_load_explicit(&cn1PresentGeneration, memory_order_acquire);
+    METALView *presentView = self;
+    const int completedIdx = presentIdx;
+    [self.commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
+        // One load for both decisions below, so they cannot disagree.
+        int currentGeneration = atomic_load_explicit(&presentView->cn1PresentGeneration,
+                                                     memory_order_acquire);
+        if (currentGeneration == frameGeneration) {
+            [CATransaction begin];
+            [CATransaction setDisableActions:YES];
+            // Re-assigned every frame: the assignment is what marks the layer
+            // dirty for the next composite.
+            presentLayer.contents = (id)presented;
+            [CATransaction commit];
+        }
+        // Only while this is still the generation that set it. A resize
+        // rebuilds the surfaces and zeroes every flag, so by the time an older
+        // frame lands, the slot with this index is a DIFFERENT surface that a
+        // newer frame may already have claimed -- clearing it then would
+        // advertise a surface whose own blit is still in flight, which is the
+        // reuse this flag exists to stop. Nothing leaks by skipping it: the
+        // rebuild already cleared what this frame set.
+        if (currentGeneration == frameGeneration) {
+            atomic_store_explicit(&presentView->cn1PresentInFlight[completedIdx], 0,
+                                  memory_order_release);
+        }
+        CFRelease(presented);
+    }];
     [self.commandBuffer commit];
     self.commandBuffer = nil;
     return YES;
@@ -625,6 +875,22 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 - (void)deleteFramebuffer {
     self.screenTexture = nil;
     self.stencilTexture = nil;
+    for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
+        if (cn1PresentTextures[i] != nil) {
+            [cn1PresentTextures[i] release];
+            cn1PresentTextures[i] = nil;
+        }
+        if (cn1PresentSurfaces[i] != NULL) {
+            CFRelease(cn1PresentSurfaces[i]);
+            cn1PresentSurfaces[i] = NULL;
+        }
+    }
+    cn1PresentIndex = 0;
+    for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
+        // The surfaces these referred to are gone; a leftover flag would
+        // retire the new slot that inherits the index.
+        atomic_store_explicit(&cn1PresentInFlight[i], 0, memory_order_release);
+    }
     framebufferWidth = 0;
     framebufferHeight = 0;
 }
@@ -678,7 +944,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         width:w height:h mipmapped:NO];
     desc.usage = MTLTextureUsageShaderRead;
     desc.storageMode = MTLStorageModeShared;
-    id<MTLTexture> staging = [((CAMetalLayer *)self.layer).device newTextureWithDescriptor:desc];
+    id<MTLTexture> staging = [CN1MetalDevice() newTextureWithDescriptor:desc];
     if (staging == nil) {
         return NO;
     }
