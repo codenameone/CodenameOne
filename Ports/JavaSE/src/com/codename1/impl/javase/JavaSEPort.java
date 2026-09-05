@@ -927,6 +927,28 @@ public class JavaSEPort extends CodenameOneImplementation {
         designMode = aDesignMode;
     }
 
+    /// The backing scale of the display the pixels actually land on.
+    ///
+    /// This port is a deployment target, not only the simulator -- a desktop
+    /// build runs on it -- and there the host display's scale is exactly the
+    /// question this API asks, the same thing UIScreen.scale answers on iOS.
+    /// It is what the port already sizes its own buffers and fonts with, so a
+    /// caller sizing a bitmap from it matches what gets rasterised.
+    ///
+    /// Under a device skin the simulator is imitating a phone whose real scale
+    /// may differ, but the pixels still land on this display, so this stays the
+    /// useful answer for anything choosing a bitmap resolution. It also honours
+    /// the cn1.retinaScale property and CN1_RETINA_SCALE, which is how a
+    /// developer pins the value when testing.
+    ///
+    /// Secondary windows can sit on a monitor with a different transform --
+    /// see canvasScale() -- but this question is asked of the Display as a
+    /// whole, so it answers for the main one.
+    @Override
+    public float getDevicePixelRatio() {
+        return retinaScale > 0 ? (float) retinaScale : super.getDevicePixelRatio();
+    }
+
     public int getDeviceDensity() {
         if(defaultPixelMilliRatio != null) {
             /*
