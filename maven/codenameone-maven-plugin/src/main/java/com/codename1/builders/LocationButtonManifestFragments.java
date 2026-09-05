@@ -128,7 +128,8 @@ final class LocationButtonManifestFragments {
         int at = xPermissions.indexOf(BACKGROUND_LOCATION);
         while (at >= 0) {
             if (declaresPermissionAt(xPermissions, at, BACKGROUND_LOCATION)
-                    && isRemovalDirective(xPermissions, at)) {
+                    && isRemovalDirective(xPermissions, at)
+                    && !isSelectorScoped(xPermissions, at)) {
                 return true;
             }
             at = xPermissions.indexOf(BACKGROUND_LOCATION,
@@ -457,6 +458,48 @@ final class LocationButtonManifestFragments {
             return at;
         }
         return at;
+    }
+
+    /**
+     * Whether the element around {@code at} is scoped by {@code tools:selector}.
+     *
+     * <p>A selector restricts a node marker to the one dependency it names, so
+     * a scoped removal takes the permission out of THAT library and leaves any
+     * other library's alone. The flag it would otherwise clear is an aggregate
+     * over every submitted archive, and clearing it on a scoped removal
+     * accepted exclusive mode while another archive's declaration went on into
+     * the merged manifest.</p>
+     *
+     * <p>So only an unscoped removal clears it. That is conservative rather
+     * than exact: a developer who scoped a removal at the only library that
+     * declared the permission is refused a hint they would in fact qualify
+     * for, and the way out is to drop the selector. Being exact means
+     * attributing each declaration to the archive it came from, which this
+     * aggregate scan does not do -- and erring the other way lets a manifest
+     * through that contradicts itself, which is the thing the check exists to
+     * stop.</p>
+     *
+     * @param text the permission block
+     * @param at   where the permission name was found
+     * @return whether that element carries a selector
+     */
+    private static boolean isSelectorScoped(String text, int at) {
+        int open = text.lastIndexOf('<', at);
+        int close = text.indexOf('>', at);
+        if (open < 0 || close < 0) {
+            return false;
+        }
+        String element = text.substring(open, close);
+        String[] prefixes = candidatePrefixes(element, text, TOOLS_NS, "tools");
+        for (int iter = 0; iter <= prefixes.length; iter++) {
+            int[] value = iter < prefixes.length
+                    ? findAttribute(element, prefixes[iter] + ":selector")
+                    : findAttribute(element, "selector");
+            if (value != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -919,6 +962,13 @@ final class LocationButtonManifestFragments {
      */
     private static String rootElement(String document) {
         int at = document.indexOf("<manifest");
+        // Past any that are commented out. An aar may open with an example in
+        // a comment, and taking the first textual match let that example's
+        // namespaces decide how the real root's attributes were read -- which
+        // discards the real Android prefix and loses a live declaration.
+        while (at >= 0 && isInsideComment(document, at)) {
+            at = document.indexOf("<manifest", at + "<manifest".length());
+        }
         if (at < 0) {
             return "";
         }

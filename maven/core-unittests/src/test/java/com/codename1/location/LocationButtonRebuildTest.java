@@ -287,6 +287,12 @@ class LocationButtonRebuildTest extends UITestBase {
         // -- and served through the ORDINARY manager. Reading the body at
         // service time sent it down the granted path instead, asking the
         // platform for a session nobody opened.
+        waitUntil("the fallback tap reached the prompting manager",
+                new Settled() {
+                    public boolean isSo() {
+                        return ordinary.lookups == 1;
+                    }
+                });
         assertEquals(1, ordinary.lookups,
                 "a queued fallback tap is served through the prompting "
                 + "manager, however the component was rebuilt while it waited");
@@ -343,6 +349,11 @@ class LocationButtonRebuildTest extends UITestBase {
         // TWO taps, two answers. The first is the null its retired control has
         // earned, the second is the served lookup. Overwriting the stamp under
         // a contains() test gave the first tap nothing at all.
+        waitUntil("both grants answered", new Settled() {
+            public boolean isSo() {
+                return answers[0] == 2;
+            }
+        });
         assertEquals(2, answers[0],
                 "each grant is answered: the superseded one with null, the "
                 + "current one by being served");
@@ -387,6 +398,11 @@ class LocationButtonRebuildTest extends UITestBase {
         // and the location the tap actually obtained. Suppressing on the
         // component-wide flag threw the second away and left the user's tap
         // answered by a session it had nothing to do with.
+        waitUntil("failure and result both reported", new Settled() {
+            public boolean isSo() {
+                return heard.size() == 2;
+            }
+        });
         assertEquals(2, heard.size(), "both the failure and the result: "
                 + heard);
         assertNull(heard.get(0), "the failure reports first");
@@ -442,6 +458,11 @@ class LocationButtonRebuildTest extends UITestBase {
         // prompting manager, which this failure never touched. Dropping it
         // from the queue answered the user with the null of a session their
         // tap never used.
+        waitUntil("the fallback tap ran its lookup", new Settled() {
+            public boolean isSo() {
+                return ordinary.lookups == 1;
+            }
+        });
         assertEquals(1, ordinary.lookups,
                 "the queued fallback tap still runs its own lookup");
         assertTrue(heard.contains(ordinary.answer),
@@ -490,6 +511,12 @@ class LocationButtonRebuildTest extends UITestBase {
         drain();
         drain();
 
+        waitUntil("both taps run their own lookup",
+                new Settled() {
+                    public boolean isSo() {
+                        return ordinary.lookups == 2 && heard.size() == 2;
+                    }
+                });
         assertEquals(2, ordinary.lookups, "each tap runs its own lookup");
         assertEquals(2, heard.size(), "and each is answered: " + heard);
     }
@@ -532,6 +559,11 @@ class LocationButtonRebuildTest extends UITestBase {
         drain();
         drain();
 
+        waitUntil("both grants answered", new Settled() {
+            public boolean isSo() {
+                return heard.size() == 2;
+            }
+        });
         assertEquals(2, heard.size(),
                 "the failed session retires its own grant; the earlier one is "
                 + "still answered by the drain: " + heard);
@@ -568,7 +600,38 @@ class LocationButtonRebuildTest extends UITestBase {
         manager.release();
         drain();
         drain();
+        waitUntil("the queued grant is served", new Settled() {
+            public boolean isSo() {
+                return manager.lookups == 2;
+            }
+        });
         assertEquals(2, manager.lookups, "and is served once the first ends");
+    }
+
+    /** A condition the EDT and its invokeAndBlock workers will reach. */
+    private interface Settled {
+        boolean isSo();
+    }
+
+    /**
+     * Drains until {@code condition} holds, or fails saying it never did.
+     *
+     * <p>A fixed number of drains is not enough for anything that has been
+     * through {@code getCurrentLocationSync}: that parks in invokeAndBlock, so
+     * the request finishes on another thread and posts its completion back.
+     * The sentinel in {@link #drain()} proves the EDT ran what was queued WHEN
+     * IT WAS POSTED, which is a weaker thing, and asserting a count straight
+     * after it made these tests depend on how loaded the machine was. One of
+     * them failed exactly that way in a full-suite run while passing alone.</p>
+     */
+    private static void waitUntil(String what, Settled condition) {
+        for (int guard = 0; guard < 200; guard++) {
+            if (condition.isSo()) {
+                return;
+            }
+            drain();
+        }
+        assertTrue(condition.isSo(), "never settled: " + what);
     }
 
     private static boolean wakePending() throws Exception {

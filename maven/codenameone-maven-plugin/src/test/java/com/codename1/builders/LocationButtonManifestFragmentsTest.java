@@ -162,6 +162,44 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aSelectorScopedRemovalDoesNotClearTheAggregate() {
+        // tools:selector restricts the removal to the one dependency it names,
+        // so another submitted archive's declaration survives into the merged
+        // manifest. Clearing an aggregate flag on that basis accepted exclusive
+        // mode beside a permission that is still there.
+        String scoped = "    <uses-permission android:name=\"android."
+                + "permission.ACCESS_BACKGROUND_LOCATION\" tools:node=\""
+                + "remove\" tools:selector=\"com.example.first\" />\n";
+        assertFalse(LocationButtonManifestFragments
+                        .removesBackgroundLocation(scoped),
+                "a scoped removal is not a blanket one: " + scoped);
+        // The unscoped form still clears it.
+        String blanket = "    <uses-permission android:name=\"android."
+                + "permission.ACCESS_BACKGROUND_LOCATION\" tools:node=\""
+                + "remove\" />\n";
+        assertTrue(LocationButtonManifestFragments
+                .removesBackgroundLocation(blanket));
+    }
+
+    @Test
+    void aCommentedRootIsNotTheRoot() throws Exception {
+        // An aar may open with an example in a comment. Taking the first
+        // textual <manifest let that example's namespaces decide how the real
+        // root's attributes were read, which discards the real Android prefix
+        // and loses the live declaration underneath it.
+        File root = tempDir("cn1-lb-commentroot");
+        String manifest = "<!-- like this: <manifest xmlns:android=\"urn:fake"
+                + "\"> -->\n<manifest xmlns:android=\"http://schemas.android"
+                + ".com/apk/res/android\"><uses-permission android:name=\""
+                + "android.permission.ACCESS_BACKGROUND_LOCATION\"/>"
+                + "</manifest>";
+        writeAar(new File(root, "commentroot.aar"), manifest);
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresBackgroundLocation(),
+                "the real root's namespaces are the ones in scope");
+    }
+
+    @Test
     void aPrefixTheRootReboundIsNotOursEither() throws Exception {
         // The rebinding lives where a manifest actually declares its
         // namespaces -- on the root -- and the element binds nothing itself.
