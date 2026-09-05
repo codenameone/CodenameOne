@@ -175,6 +175,15 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     /// ATOMIC because the two sides are different threads: set on the thread
     /// that paints, cleared in the completion callback on the queue's thread.
     _Atomic int cn1PresentInFlight[CN1_PRESENT_SURFACE_COUNT];
+
+    /// Set when a frame had to be dropped because every surface was busy.
+    ///
+    /// Dropping alone is not enough. drawFrame ignores the result and marks the
+    /// frame painted either way, so if that drop was the last frame of a burst
+    /// and the application then goes idle, nothing else asks to paint and the
+    /// screen keeps showing the previous frame indefinitely. This says a frame
+    /// is owed, and the completion that frees a surface pays it.
+    _Atomic int cn1PresentDeferred;
 }
 
 @synthesize commandQueue;
@@ -514,6 +523,9 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         // retire the new slot that inherits the index.
         atomic_store_explicit(&cn1PresentInFlight[i], 0, memory_order_release);
     }
+    // The rebuild path asks for a repaint of its own, so an owed frame is
+    // already covered and the flag would otherwise ask for a second one.
+    atomic_store_explicit(&cn1PresentDeferred, 0, memory_order_release);
     atomic_fetch_add_explicit(&cn1PresentGeneration, 1, memory_order_release);
     NSDictionary *surfaceProps = @{
         (id)kIOSurfaceWidth:           @(pw),
@@ -758,6 +770,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         // DISPLAYING, so at rest exactly one of the three is in use and the
         // renderer always has somewhere to go. Reaching here at all means a
         // handoff is in flight, which resolves on its own.
+        atomic_store_explicit(&cn1PresentDeferred, 1, memory_order_release);
         [self.commandBuffer commit];
         self.commandBuffer = nil;
         return NO;
@@ -829,6 +842,23 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         if (currentGeneration == frameGeneration) {
             atomic_store_explicit(&presentView->cn1PresentInFlight[completedIdx], 0,
                                   memory_order_release);
+            // A surface just became free. If a frame was dropped because none
+            // was, ask the framework to paint again -- the content of that frame
+            // is still in screenTexture, but only a frame started on the thread
+            // that paints may touch it, so this WAKES that thread rather than
+            // re-presenting from here. Same reason updateBackingSize does it: a
+            // layer-hosted view has no drawRect:, so setNeedsDisplay: alone
+            // reaches nothing.
+            if (atomic_exchange_explicit(&presentView->cn1PresentDeferred, 0,
+                                         memory_order_acq_rel)) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    extern BOOL cn1MacRuntimeIsJavaReady(void);
+                    extern void repaintUI(void);
+                    if (cn1MacRuntimeIsJavaReady()) {
+                        repaintUI();
+                    }
+                });
+            }
         }
         CFRelease(presented);
     }];
@@ -891,6 +921,9 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         // retire the new slot that inherits the index.
         atomic_store_explicit(&cn1PresentInFlight[i], 0, memory_order_release);
     }
+    // The rebuild path asks for a repaint of its own, so an owed frame is
+    // already covered and the flag would otherwise ask for a second one.
+    atomic_store_explicit(&cn1PresentDeferred, 0, memory_order_release);
     framebufferWidth = 0;
     framebufferHeight = 0;
 }
