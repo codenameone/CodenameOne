@@ -30,6 +30,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.PeerComponent;
 import com.codename1.util.SuccessCallback;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -122,6 +123,8 @@ class LocationButtonRebuildTest extends UITestBase {
     private static final class ParkingManager extends LocationManager {
         private final Object lock = new Object();
         private boolean released;
+        /** Once open, every parked and future lookup runs straight through. */
+        private boolean open;
         private int lookups;
 
         @Override
@@ -130,7 +133,7 @@ class LocationButtonRebuildTest extends UITestBase {
             Display.getInstance().invokeAndBlock(new Runnable() {
                 public void run() {
                     synchronized (lock) {
-                        while (!released) {
+                        while (!released && !open) {
                             try {
                                 lock.wait(50);
                             } catch (InterruptedException ignored) {
@@ -150,6 +153,14 @@ class LocationButtonRebuildTest extends UITestBase {
         private void release() {
             synchronized (lock) {
                 released = true;
+                lock.notifyAll();
+            }
+        }
+
+        /** Teardown: let everything parked go, and stay open. */
+        private void openGate() {
+            synchronized (lock) {
+                open = true;
                 lock.notifyAll();
             }
         }
@@ -184,7 +195,7 @@ class LocationButtonRebuildTest extends UITestBase {
     @Test
     void aQueuedGrantWhoseButtonWasRebuiltIsAnsweredRatherThanServed() {
         RecordingBridge bridge = install();
-        ParkingManager manager = new ParkingManager();
+        ParkingManager manager = parkingManager();
         bridge.granted = manager;
 
         LocationButton first = new LocationButton();
@@ -227,12 +238,12 @@ class LocationButtonRebuildTest extends UITestBase {
     @Test
     void aFallbackTapKeepsThePromptingManagerAcrossAnUpgrade() {
         RecordingBridge bridge = install();
-        ParkingManager granted = new ParkingManager();
+        ParkingManager granted = parkingManager();
         bridge.granted = granted;
         // The ordinary manager, which is what a fallback tap is entitled to:
         // it never had a platform grant, so its answer comes through the
         // prompting path like any other Codename One location request.
-        ParkingManager ordinary = new ParkingManager();
+        ParkingManager ordinary = parkingManager();
         ordinary.release();
         implementation.setLocationManager(ordinary);
 
@@ -287,16 +298,13 @@ class LocationButtonRebuildTest extends UITestBase {
      * is the mechanism this test is about, so a rename should fail it.</p>
      */
     private static boolean wakePending() throws Exception {
-        java.lang.reflect.Field f =
-                LocationButton.class.getDeclaredField("staleWake");
-        f.setAccessible(true);
-        return f.get(null) != null;
+        return field("staleWake").get(null) != null;
     }
 
     @Test
     void servingOneQueuedButtonLeavesAWakeForTheRest() throws Exception {
         RecordingBridge bridge = install();
-        ParkingManager manager = new ParkingManager();
+        ParkingManager manager = parkingManager();
         bridge.granted = manager;
 
         LocationButton first = new LocationButton();
@@ -334,6 +342,24 @@ class LocationButtonRebuildTest extends UITestBase {
                 + "wake for whoever is behind it");
     }
 
+    /**
+     * Every parking manager a test builds, so teardown can open all of them.
+     *
+     * <p>A test that deliberately leaves a lookup parked -- and one of these
+     * does, because that is the state it is about -- would otherwise leave an
+     * invokeAndBlock worker blocked forever, holding inFlight, with entries
+     * still in WAITING and a timer pending. The next test in the same fork
+     * would then find its own request queued behind a button that no longer
+     * exists.</p>
+     */
+    private final List<ParkingManager> parkers = new ArrayList<ParkingManager>();
+
+    private ParkingManager parkingManager() {
+        ParkingManager manager = new ParkingManager();
+        parkers.add(manager);
+        return manager;
+    }
+
     private RecordingBridge install() {
         RecordingBridge bridge = new RecordingBridge();
         implementation.setLocationButtonBridge(bridge);
@@ -341,11 +367,62 @@ class LocationButtonRebuildTest extends UITestBase {
     }
 
     @AfterEach
-    void removeBridge() {
+    void removeBridge() throws Exception {
         // The implementation is a singleton shared with every other test class
         // in this module, so a bridge left installed would make an unrelated
         // component believe this device renders the button itself.
         implementation.setLocationButtonBridge(null);
+        implementation.setLocationManager(null);
+        // Let every parked lookup finish, then drain what that releases.
+        for (ParkingManager manager : parkers) {
+            manager.openGate();
+        }
+        parkers.clear();
+        drain();
+        drain();
+        // And then say so plainly. The statics are shared by every
+        // LocationButton in the process, so a queue or a flag left set here is
+        // a failure delivered to some other test class -- which is the worst
+        // kind, because it is reported against code that did nothing wrong.
+        clearStatics();
+    }
+
+    @BeforeEach
+    void theSharedStateMustBeCleanBeforeEachTest() throws Exception {
+        // In @BeforeEach rather than in a test of its own, because a test can
+        // only observe what ran BEFORE it and JUnit promises no order: as a
+        // test it would pass for free whenever it happened to run first. Here
+        // it runs after every one of its siblings in turn, so whichever of
+        // them leaked is the one it reports.
+        //
+        // These are statics shared by every LocationButton in the process, so
+        // a queue or a flag left set is a failure delivered to some other test
+        // class -- the worst kind, because it is reported against code that
+        // did nothing wrong.
+        assertFalse(field("inFlight").getBoolean(null),
+                "a previous test left a request in flight");
+        assertTrue(((java.util.List<?>) field("WAITING").get(null)).isEmpty(),
+                "a previous test left buttons queued");
+        assertFalse(wakePending(), "a previous test left a timer pending");
+    }
+
+    /** Puts the shared request state back to what a fresh process has. */
+    private static void clearStatics() throws Exception {
+        field("inFlight").setBoolean(null, false);
+        ((java.util.List<?>) field("WAITING").get(null)).clear();
+        java.lang.reflect.Field wake = field("staleWake");
+        java.util.Timer pending = (java.util.Timer) wake.get(null);
+        if (pending != null) {
+            pending.cancel();
+            wake.set(null, null);
+        }
+    }
+
+    private static java.lang.reflect.Field field(String name) throws Exception {
+        java.lang.reflect.Field f =
+                LocationButton.class.getDeclaredField(name);
+        f.setAccessible(true);
+        return f;
     }
 
     /**

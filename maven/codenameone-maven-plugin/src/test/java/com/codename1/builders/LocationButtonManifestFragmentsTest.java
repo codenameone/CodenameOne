@@ -24,8 +24,10 @@ package com.codename1.builders;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
+import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -111,6 +113,71 @@ class LocationButtonManifestFragmentsTest {
         assertEquals(1, count(out, "android.permission.ACCESS_FINE_LOCATION"),
                 out);
         assertFalse(out.contains("android:maxSdkVersion"), out);
+    }
+
+    @Test
+    void aDecoyUnderAReboundPrefixHidesNothing() throws Exception {
+        // Bindings are collected document-wide rather than resolved in the
+        // element's scope, so a manifest can rebind the conventional prefix on
+        // one element. If the check acted on the FIRST spelling that carries a
+        // name attribute, a decoy under that prefix would answer for the
+        // element and the real permission under a second prefix would never be
+        // examined -- and the exclusive build would be accepted over an aar
+        // that does contribute background location.
+        File root = tempDir("cn1-lb-decoy");
+        String manifest = "<manifest xmlns:android=\"http://schemas.android"
+                + ".com/apk/res/android\" xmlns:b=\"http://schemas.android"
+                + ".com/apk/res/android\">"
+                + "<uses-permission xmlns:android=\"http://example.com/not"
+                + "-android\" android:name=\"android.permission.INTERNET\""
+                + " b:name=\"android.permission.ACCESS_BACKGROUND_LOCATION\""
+                + "/></manifest>";
+        writeAar(new File(root, "decoy.aar"), manifest);
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresBackgroundLocation(),
+                "the real permission must be seen even when another spelling "
+                + "on the same element answers first");
+    }
+
+    @Test
+    void anAnnotationClassValueIsUseOfTheButton() throws Exception {
+        // @Widget(LocationButton.class) creates NO CONSTANT_Class: javac puts
+        // the field descriptor in a Utf8 and points the annotation's
+        // element_value at it. A scan that reads only the class table sees an
+        // application that never mentions the button, and the bridge is deleted
+        // under a control it really does build.
+        //
+        // Built with ASM's own annotation visitor rather than by hand, so the
+        // bytes are the shape a compiler emits and not the shape I assumed.
+        File root = tempDir("cn1-lb-annotation");
+        ClassWriter w = new ClassWriter(0);
+        w.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "com/example/Annotated",
+                null, "java/lang/Object", null);
+        AnnotationVisitor a = w.visitAnnotation("Lcom/example/Widget;", true);
+        a.visit("value",
+                Type.getObjectType("com/codename1/location/LocationButton"));
+        a.visitEnd();
+        w.visitEnd();
+        byte[] bytes = w.toByteArray();
+
+        // The premise, checked rather than trusted: no CONSTANT_Class for the
+        // button anywhere in this file. If ASM ever started emitting one the
+        // test would still pass while testing nothing.
+        assertFalse(new String(bytes, StandardCharsets.ISO_8859_1)
+                        .contains("com/codename1/location/LocationButton\u0000"),
+                "sanity: the annotated form is a descriptor, not a bare name");
+
+        File at = new File(root, "com/example/Annotated.class");
+        at.getParentFile().mkdirs();
+        OutputStream out = new FileOutputStream(at);
+        try {
+            out.write(bytes);
+        } finally {
+            out.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "a class referenced only from an annotation is still used");
     }
 
     @Test

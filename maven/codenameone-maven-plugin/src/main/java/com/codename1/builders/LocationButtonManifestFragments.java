@@ -243,12 +243,23 @@ final class LocationButtonManifestFragments {
         if (!tag.startsWith("uses-permission")) {
             return false;
         }
-        int[] value = findNamespacedAttribute(element, text,
-                ANDROID_NS, "android", "name");
-        if (value == null) {
-            return false;
+        // EVERY candidate spelling, not the first one that happens to carry a
+        // "name" attribute. Prefix bindings are collected document-wide, so a
+        // manifest that rebinds the conventional prefix on this element could
+        // otherwise put a decoy under it -- the decoy is found first, reports
+        // some other permission, and the real ACCESS_BACKGROUND_LOCATION under
+        // a second prefix is never looked at. Asking each spelling whether it
+        // names THIS permission cannot be hidden from that way.
+        String[] prefixes = candidatePrefixes(text, ANDROID_NS, "android");
+        for (int iter = 0; iter < prefixes.length; iter++) {
+            int[] value = findAttribute(element, prefixes[iter] + ":name");
+            if (value != null
+                    && name.equals(element.substring(value[2], value[3])
+                            .trim())) {
+                return true;
+            }
         }
-        return name.equals(element.substring(value[2], value[3]).trim());
+        return false;
     }
 
     /**
@@ -692,22 +703,50 @@ final class LocationButtonManifestFragments {
      */
     private static int[] findNamespacedAttribute(String element,
             String document, String uri, String usual, String local) {
-        int[] value = findAttribute(element, usual + ":" + local);
-        if (value != null) {
-            return value;
+        String[] prefixes = candidatePrefixes(document, uri, usual);
+        for (int iter = 0; iter < prefixes.length; iter++) {
+            int[] value = findAttribute(element, prefixes[iter] + ":" + local);
+            if (value != null) {
+                return value;
+            }
         }
+        return null;
+    }
+
+    /**
+     * Every prefix that might spell an attribute in {@code uri}.
+     *
+     * <p>The conventional one first, then each one the document binds. NOT
+     * scoped to the element: working out which binding is in scope where means
+     * tracking element nesting, which is writing an XML parser, and this class
+     * hand-parses on purpose.</p>
+     *
+     * <p>The cost of not scoping is that a prefix rebound on an inner element
+     * is still offered here. Every caller that a crafted manifest could
+     * exploit therefore has to try them ALL rather than act on the first --
+     * see declaresPermissionAt, which asks each spelling whether it names the
+     * permission instead of asking one spelling what it names. A decoy under a
+     * rebound prefix then hides nothing, because the real attribute is still
+     * examined.</p>
+     *
+     * @param document the file
+     * @param uri      the namespace
+     * @param usual    the conventional prefix
+     * @return the prefixes to try, most likely first
+     */
+    private static String[] candidatePrefixes(String document, String uri,
+            String usual) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        out.add(usual);
         int at = document.indexOf(uri);
         while (at >= 0) {
             String prefix = prefixBoundAt(document, at);
-            if (prefix != null && !prefix.equals(usual)) {
-                value = findAttribute(element, prefix + ":" + local);
-                if (value != null) {
-                    return value;
-                }
+            if (prefix != null && !out.contains(prefix)) {
+                out.add(prefix);
             }
             at = document.indexOf(uri, at + uri.length());
         }
-        return null;
+        return out.toArray(new String[out.size()]);
     }
 
     /**
@@ -1549,7 +1588,21 @@ final class LocationButtonManifestFragments {
             }
             return;
         }
-        if (referencesClass(pool, BUTTON_MARKER)) {
+        // Or as an annotation's class value, which is a different shape
+        // entirely. referencesClass wants a CONSTANT_Class, and
+        // @Widget(LocationButton.class) creates none: javac stores the value as
+        // the field DESCRIPTOR "Lcom/codename1/location/LocationButton;" in a
+        // Utf8, pointed at from the annotation's element_value. So the class
+        // that is plainly named in the source is absent from the one table this
+        // scan was reading, and the bridge was deleted under an app that really
+        // does build the control.
+        //
+        // The BUTTON only. The markers below decide whether to REFUSE a build,
+        // and a descriptor test would widen them on the strength of a type
+        // appearing in somebody's signature. This one only ever keeps an
+        // implementation package that would otherwise be removed.
+        if (referencesClass(pool, BUTTON_MARKER)
+                || referencesDescriptor(pool, BUTTON_MARKER)) {
             found.button = true;
         }
         // The geofencing wrapper counts as persistent use on its own. Its calls
@@ -1959,6 +2012,36 @@ final class LocationButtonManifestFragments {
                 continue;
             }
             return true;
+        }
+        return false;
+    }
+
+    /**
+     * Whether the pool holds this class's FIELD DESCRIPTOR as a Utf8.
+     *
+     * <p>The shape an annotation class value takes: {@code @Widget(Foo.class)}
+     * puts {@code "Lcom/example/Foo;"} in a Utf8 and points the annotation's
+     * element_value at it, creating no {@code CONSTANT_Class} at all. A field
+     * declared of that type is the same shape.</p>
+     *
+     * <p>Exact equality, not a substring: a method descriptor such as
+     * {@code (Lcom/example/Foo;)V} is one Utf8 of its own, and matching inside
+     * it would report a class as used by every signature that merely mentions
+     * it. The annotation case needs no such reach -- its Utf8 is the descriptor
+     * and nothing else.</p>
+     *
+     * @param pool         the parsed constant pool
+     * @param internalName the class, in internal form
+     * @return whether some Utf8 is exactly that class's descriptor
+     */
+    private static boolean referencesDescriptor(Pool pool,
+            String internalName) {
+        String descriptor = "L" + internalName + ";";
+        for (int index = 1; index < pool.tag.length; index++) {
+            if (pool.tag[index] == TAG_UTF8
+                    && descriptor.equals(utf8At(pool, index))) {
+                return true;
+            }
         }
         return false;
     }
