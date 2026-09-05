@@ -5889,13 +5889,31 @@ public final class Display extends CN1Constants {
     /// - `obj`: @param obj object to copy, while this can be any arbitrary object it is recommended that only Strings or Codename One
     /// image objects be used to copy
     public void copyToClipboard(Object obj) {
+        if (obj instanceof ClipboardContent) {
+            forgetProvidedValues((ClipboardContent) obj);
+        }
         impl.copyToClipboard(obj);
     }
 
     /// Copies a set of alternative clipboard representations. The first entry should normally be
     /// `text/plain`; richer consumers can negotiate HTML, RTF, Markdown, AsciiDoc, or custom MIME data.
     public void copyToClipboard(ClipboardContent content) {
+        forgetProvidedValues(content);
         impl.copyToClipboard(content);
+    }
+
+    /// Ends the previous transfer's memory of what its providers produced.
+    ///
+    /// A representation registered through
+    /// `ClipboardContent#setDataProvider(java.lang.String, com.codename1.ui.ClipboardDataProvider)`
+    /// is resolved once per transfer and remembered, so a consumer that asks twice does not
+    /// make the provider write its file twice. A copy is a transfer, and the same content
+    /// copied again is a new one: without this the second copy published the first one's
+    /// value, which for a provider that generates the current data is stale and for one that
+    /// writes a temporary file is a path that may no longer exist. A drag already does this
+    /// when the session is armed.
+    private static void forgetProvidedValues(ClipboardContent content) {
+        NativeDragAndDrop.beginTransfer(content);
     }
 
     /// Returns the current content of the clipboard

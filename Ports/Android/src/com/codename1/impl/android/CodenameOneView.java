@@ -837,6 +837,11 @@ public class CodenameOneView {
                 cn1GrabbedPointer = false;
                 break;
             case MotionEvent.ACTION_CANCEL:
+                // A cancelled touch delivers no release, so nothing else tells the framework
+                // this gesture is over. An operation a press had staged for a native drag
+                // would otherwise outlive it, and the port would still be holding the drag it
+                // was asked to prepare.
+                com.codename1.ui.NativeDragAndDrop.gestureCancelled();
                 cn1GrabbedPointer = false;
                 break;
             case MotionEvent.ACTION_MOVE:

@@ -53,6 +53,7 @@
 #endif
 #import "CN1AudioUnit.h"
 #import "CN1AppleUI.h"
+#import "CN1DragAndDrop.h"
 
 #if TARGET_OS_OSX
 /*
@@ -1068,21 +1069,154 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardContent___java_lang_Str
 extern NSData* arrayToData(JAVA_OBJECT arr);
 extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 
-#if TARGET_OS_OSX
-/// The pasteboard type the bytes actually are, by magic number, or nil when
+/*
+ * Native drag and drop. The UIKit half lives in CN1DragAndDrop.m; everything here is the
+ * ParparVM boundary, kept in this file with the other bridges so all the thread-state handling
+ * stays in one place.
+ */
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isNativeDragAndDropSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return CN1DragAndDropSupported() ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isNativeDragOutsideAppSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return CN1DragOutsideAppSupported() ? JAVA_TRUE : JAVA_FALSE;
+}
+
+void com_codename1_impl_ios_IOSNative_prepareNativeDrag___java_lang_String_int_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeTypes, JAVA_INT allowedActions, JAVA_OBJECT dragImagePng, JAVA_INT touchX, JAVA_INT touchY) {
+    POOL_BEGIN();
+    NSString* mimes = mimeTypes == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG mimeTypes);
+    NSData* preview = dragImagePng == JAVA_NULL ? nil : arrayToData(dragImagePng);
+    // On the main thread: the interactions and the state they read live there, and this is
+    // called from the event dispatch thread as the press is dispatched.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CN1PrepareNativeDrag(mimes, (int)allowedActions, preview, (int)touchX, (int)touchY);
+    });
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_beginNativeDragPayload___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT sessionId) {
+    CN1BeginNativeDragPayload((int)sessionId);
+}
+
+void com_codename1_impl_ios_IOSNative_declareNativeDragPayload___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType) {
+    POOL_BEGIN();
+    // Synchronously, unlike prepare: these run inside the session-started callback on the main
+    // thread and the item providers are built from them the moment it returns.
+    CN1DeclareNativeDragPayload(mimeType == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG mimeType));
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_addNativeDragFiles___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
+    POOL_BEGIN();
+    // One file per call; see CN1AddNativeDragFiles for why there is no list here.
+    CN1AddNativeDragFiles(path == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG path));
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_addNativeDragUrl___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT url) {
+    POOL_BEGIN();
+    // One link per call, as the files are; see CN1AddNativeDragUrl.
+    CN1AddNativeDragUrl(url == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG url));
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_cancelNativeDrag__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CN1CancelNativeDrag();
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_enableNativeDragSource__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    CN1EnableNativeDragSource();
+}
+
+void com_codename1_impl_ios_IOSNative_enableNativeDropTarget__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    CN1EnableNativeDropTarget();
+}
+
+int CN1NativeDragDeliverOver(int x, int y, NSString* mimeTypes, int allowedActions, BOOL entering) {
+    return (int)com_codename1_impl_ios_IOSImplementation_nativeDragOverCallback___int_int_java_lang_String_int_boolean_R_int(
+            CN1_THREAD_GET_STATE_PASS_ARG x, y,
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeTypes),
+            allowedActions, entering ? JAVA_TRUE : JAVA_FALSE);
+}
+
+void CN1NativeDragDeliverExit(void) {
+    com_codename1_impl_ios_IOSImplementation_nativeDragExitCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void CN1NativeDragDeliverDropBegin(void) {
+    com_codename1_impl_ios_IOSImplementation_nativeDropBeginCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void CN1NativeDragDeliverDropAdd(NSString* mimeType, NSString* text, NSData* binary) {
+    com_codename1_impl_ios_IOSImplementation_nativeDropAddCallback___java_lang_String_java_lang_String_byte_1ARRAY(
+            CN1_THREAD_GET_STATE_PASS_ARG
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeType),
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG text),
+            binary == nil ? JAVA_NULL : nsDataToByteArr(binary));
+}
+
+void CN1NativeDragDeliverDropAddFile(NSString* mimeType, NSString* path, NSString* charset) {
+    com_codename1_impl_ios_IOSImplementation_nativeDropAddFileCallback___java_lang_String_java_lang_String_java_lang_String(
+            CN1_THREAD_GET_STATE_PASS_ARG
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeType),
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path),
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG charset));
+}
+
+NSData* CN1NativeDragDeliverResolve(NSString* mimeType, int sessionId) {
+    JAVA_OBJECT bytes = com_codename1_impl_ios_IOSImplementation_nativeDragResolveCallback___java_lang_String_int_R_byte_1ARRAY(
+            CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeType), sessionId);
+    return bytes == JAVA_NULL ? nil : arrayToData(bytes);
+}
+
+void CN1NativeDragDeliverPayloadReleased(int sessionId) {
+    com_codename1_impl_ios_IOSImplementation_nativeDragPayloadReleasedCallback___int(
+            CN1_THREAD_GET_STATE_PASS_ARG sessionId);
+}
+
+int CN1NativeDragDeliverDropCommit(int x, int y, int action, int allowedActions, BOOL local,
+                                   int hoverGeneration, int dropId) {
+    return (int)com_codename1_impl_ios_IOSImplementation_nativeDropCommitCallback___int_int_int_int_boolean_int_int_R_int(
+            CN1_THREAD_GET_STATE_PASS_ARG x, y, action, allowedActions,
+            local ? JAVA_TRUE : JAVA_FALSE, hoverGeneration, dropId);
+}
+
+void com_codename1_impl_ios_IOSNative_dropDeliveryFinished___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT dropId) {
+    CN1DropDeliveryFinished((int)dropId);
+}
+
+int CN1NativeDragDeliverHoverGeneration(void) {
+    return (int)com_codename1_impl_ios_IOSImplementation_nativeDragHoverGenerationCallback___R_int(
+            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+int CN1NativeDragDeliverSessionStarted(void) {
+    return (int)com_codename1_impl_ios_IOSImplementation_nativeDragSessionStartedCallback___R_int(
+            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void CN1NativeDragDeliverCompleted(int action) {
+    com_codename1_impl_ios_IOSImplementation_nativeDragCompletedCallback___int(
+            CN1_THREAD_GET_STATE_PASS_ARG action);
+}
+
+/// The uniform type identifier the bytes actually are, by magic number, or nil when
 /// they are none of the three the Java side can hand us.
 ///
 /// IOSImplementation.clipboardImageBytes() takes ClipboardContent's MIME_PNG
 /// representation if it has one, else MIME_JPEG, else MIME_GIF -- so the bytes
 /// arriving here are frequently not PNG, and declaring them PNG makes every
 /// other application decode JPEG or GIF data as PNG.
-static NSString* cn1MacPasteboardImageType(NSData* data) {
+static NSString* cn1PasteboardImageUti(NSData* data) {
     if (data.length < 4) {
         return nil;
     }
     const unsigned char* b = (const unsigned char*)data.bytes;
     if (b[0] == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G') {
-        return NSPasteboardTypePNG;
+        return @"public.png";
     }
     if (b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) {
         return @"public.jpeg";
@@ -1092,7 +1226,56 @@ static NSString* cn1MacPasteboardImageType(NSData* data) {
     }
     return nil;
 }
+
+/// The URL a MIME_FILE entry names, whichever way it was spelled.
+///
+/// ClipboardContent's file representation explicitly permits a raw local path, and
+/// URLWithString: turns one into a scheme-less relative URL whose isFileURL is NO. A
+/// receiver then gets no usable file reference, and neither UIPasteboard.URLs nor the
+/// Finder can see what was just published. An absolute path is obvious; a relative one --
+/// exports/report.pdf -- looks enough like a URL to be parsed as one, so anything that does
+/// not come back with a scheme is a path too.
+static NSURL* cn1PasteboardUrlFor(NSString* entry) {
+    if (entry.length == 0) {
+        return nil;
+    }
+    if ([entry hasPrefix:@"/"] || [entry hasPrefix:@"~"]) {
+        return [NSURL fileURLWithPath:[entry stringByExpandingTildeInPath]];
+    }
+    NSURL* url = [NSURL URLWithString:entry];
+    if (url == nil || url.scheme == nil) {
+        return [NSURL fileURLWithPath:entry];
+    }
+    return url;
+}
+
+#if TARGET_OS_OSX
+/// The same, as the pasteboard type name AppKit declares for it.
+static NSString* cn1MacPasteboardImageType(NSData* data) {
+    NSString* uti = cn1PasteboardImageUti(data);
+    return uti != nil && [uti isEqualToString:@"public.png"] ? NSPasteboardTypePNG : uti;
+}
 #endif
+
+/// The representations setClipboardContent has still to publish, keyed by uniform type
+/// identifier: whatever the fixed arguments of that call have no room for.
+static NSMutableDictionary* cn1PendingClipboardExtras = nil;
+
+void com_codename1_impl_ios_IOSNative_addClipboardRepresentation___java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType, JAVA_OBJECT value) {
+    POOL_BEGIN();
+    NSString* mime = mimeType == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG mimeType);
+    NSData* data = value == JAVA_NULL ? nil : arrayToData(value);
+    if (mime.length > 0 && data != nil) {
+        NSString* uti = CN1UtiForMime(mime);
+        if (uti != nil) {
+            if (cn1PendingClipboardExtras == nil) {
+                cn1PendingClipboardExtras = [[NSMutableDictionary alloc] init];
+            }
+            [cn1PendingClipboardExtras setObject:data forKey:uti];
+        }
+    }
+    POOL_END();
+}
 
 void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT plain, JAVA_OBJECT html, JAVA_OBJECT rtf, JAVA_OBJECT markdown, JAVA_OBJECT asciidoc, JAVA_OBJECT image, JAVA_OBJECT fileUris) {
 #if TARGET_OS_OSX
@@ -1130,6 +1313,13 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
             }
         }
     }
+    for (NSString* uti in cn1PendingClipboardExtras) {
+        // Whatever the fixed arguments had no room for -- an application's own format, a
+        // type the framework has no constant for. Published beside them rather than
+        // instead: a content offering only such a type used to reach the pasteboard as
+        // nothing at all.
+        [pb setData:[cn1PendingClipboardExtras objectForKey:uti] forType:uti];
+    }
     if (fileUris != JAVA_NULL) {
         NSString* joined = toNSString(CN1_THREAD_STATE_PASS_ARG fileUris);
         NSMutableArray* urls = [NSMutableArray array];
@@ -1145,20 +1335,10 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
             // means changing the bridge for both platforms rather than making
             // macOS disagree with iOS about what the separator means.
             //
-            // ClipboardContent.MIME_FILE's contract explicitly permits a raw
-            // local path, and URLWithString: turns one into a scheme-less
-            // relative URL whose isFileURL is NO. The Finder then gets no
-            // usable file reference, and getClipboardFileUris() -- which asks
-            // for file URLs only -- cannot read back what this just wrote.
-            NSURL* url;
-            if ([u hasPrefix:@"/"] || [u hasPrefix:@"~"]) {
-                url = [NSURL fileURLWithPath:[u stringByExpandingTildeInPath]];
-            } else {
-                url = [NSURL URLWithString:u];
-                if (url != nil && url.scheme == nil) {
-                    url = [NSURL fileURLWithPath:u];
-                }
-            }
+            // A raw local path is read as one rather than as a relative URL; see
+            // cn1PasteboardUrlFor, which is also what getClipboardFileUris() has to be
+            // able to read back, since it asks for file URLs only.
+            NSURL* url = cn1PasteboardUrlFor(u);
             if (url != nil) [urls addObject:url];
         }
         // Written as objects rather than as a type, which is what makes the
@@ -1166,6 +1346,7 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
         // paste -- a URL string on the pasteboard is only text.
         if (urls.count > 0) [pb writeObjects:urls];
     }
+    [cn1PendingClipboardExtras removeAllObjects];
     POOL_END();
 #else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
@@ -1182,22 +1363,103 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
     }
     if (image != JAVA_NULL) {
         NSData* imgData = arrayToData(image);
-        if (imgData != nil && imgData.length > 0) [item setObject:imgData forKey:@"public.png"];
+        if (imgData != nil && imgData.length > 0) {
+            // Under the type the bytes actually are. The Java side sends whichever of PNG,
+            // JPEG or GIF the content offered, and calling a JPEG public.png had every
+            // receiver -- this port's own reader included -- decode it as something it is
+            // not. Unrecognized bytes keep the old label, which is no worse than before.
+            NSString* imageUti = cn1PasteboardImageUti(imgData);
+            [item setObject:imgData forKey:imageUti == nil ? @"public.png" : imageUti];
+        }
+    }
+    for (NSString* uti in cn1PendingClipboardExtras) {
+        // As above: the types the fixed arguments cannot name travel on the same item as
+        // the rest, because they are alternative readings of one payload.
+        [item setObject:[cn1PendingClipboardExtras objectForKey:uti] forKey:uti];
     }
     NSMutableArray* items = [NSMutableArray array];
-    if ([item count] > 0) [items addObject:item];
     if (fileUris != JAVA_NULL) {
         NSString* joined = toNSString(CN1_THREAD_STATE_PASS_ARG fileUris);
         for (NSString* u in [joined componentsSeparatedByString:@"\n"]) {
-            if (u.length == 0) continue;
-            NSData* urlData = [u dataUsingEncoding:NSUTF8StringEncoding];
-            if (urlData != nil) [items addObject:[NSDictionary dictionaryWithObject:urlData forKey:@"public.url"]];
+            // As an NSURL, not as the bytes of a string: a raw path is not a URL
+            // representation at all, and UIPasteboard.URLs and every other URL reader look
+            // for the object. See cn1PasteboardUrlFor.
+            NSURL* url = cn1PasteboardUrlFor(u);
+            if (url == nil) {
+                continue;
+            }
+            NSMutableDictionary* urlItem =
+                    [NSMutableDictionary dictionaryWithObject:url forKey:@"public.url"];
+            if ([item count] > 0) {
+                // The text, markup and image ride on the first URL rather than becoming an
+                // item of their own. An item is a copied *object*, so a document beside its
+                // text fallback as two items is two things on the pasteboard, and a receiver
+                // importing everything took the document *and* a stray piece of text instead
+                // of choosing the best form of one thing. The drag path has always done it
+                // this way; see registerDeclared in CN1DragAndDrop.m.
+                [urlItem addEntriesFromDictionary:item];
+                [item removeAllObjects];
+            }
+            [items addObject:urlItem];
         }
     }
+    // Whatever the alternatives were not able to ride on, which is the whole payload when
+    // the content named no files at all.
+    if ([item count] > 0) [items addObject:item];
     [UIPasteboard generalPasteboard].items = items;
+    [cn1PendingClipboardExtras removeAllObjects];
     POOL_END();
 #endif
 #endif
+}
+
+/// The identifiers the system pasteboard is offering, in its own order.
+static NSArray* cn1ClipboardTypes(void) {
+#if TARGET_OS_OSX
+    return [[NSPasteboard generalPasteboard] types];
+#else
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+    return [UIPasteboard generalPasteboard].pasteboardTypes;
+#else
+    return nil;
+#endif
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getClipboardTypeCount___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    POOL_BEGIN();
+    JAVA_INT count = (JAVA_INT)cn1ClipboardTypes().count;
+    POOL_END();
+    return count;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardTypeAt___int_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT index) {
+    POOL_BEGIN();
+    NSArray* types = cn1ClipboardTypes();
+    NSString* mime = index >= 0 && index < (JAVA_INT)types.count
+            ? CN1MimeForUti([types objectAtIndex:index]) : nil;
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_STATE_PASS_ARG mime);
+    POOL_END();
+    return result;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardRepresentation___java_lang_String_R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType) {
+    POOL_BEGIN();
+    NSString* mime = mimeType == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG mimeType);
+    NSString* uti = mime == nil ? nil : CN1UtiForMime(mime);
+    NSData* data = nil;
+    if (uti != nil) {
+#if TARGET_OS_OSX
+        data = [[NSPasteboard generalPasteboard] dataForType:uti];
+#else
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+        data = [[UIPasteboard generalPasteboard] dataForPasteboardType:uti];
+#endif
+#endif
+    }
+    JAVA_OBJECT result = data == nil ? JAVA_NULL : nsDataToByteArr(data);
+    POOL_END();
+    return result;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardImage___R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
@@ -1254,8 +1516,14 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardFileUris___R_java_lang_
 #if TARGET_OS_OSX
     POOL_BEGIN();
     NSPasteboard* pb = [NSPasteboard generalPasteboard];
-    NSArray<NSURL *>* urls = [pb readObjectsForClasses:@[[NSURL class]]
-                                               options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}];
+    // Every URL, not only the ones naming files. A link is a URL the pasteboard is perfectly
+    // able to carry -- this port publishes them itself now -- and asking for file URLs only
+    // meant an https address written here could not be read back at all, so a paste after a
+    // restart, or of a link another application copied, reported nothing.
+    //
+    // Which of them are files is the Java side's question, and it asks it: the ones naming
+    // something on this device become MIME_FILE, and all of them the URI list.
+    NSArray<NSURL *>* urls = [pb readObjectsForClasses:@[[NSURL class]] options:@{}];
     NSString* joined = nil;
     if (urls.count > 0) {
         NSMutableArray* parts = [NSMutableArray array];

@@ -2247,12 +2247,15 @@ public class WindowsImplementation extends CodenameOneImplementation {
             if (files != null) {
                 WindowsNative.clipboardSetFiles(files);
             }
-            byte[] image = content.getBytes(com.codename1.ui.ClipboardContent.MIME_PNG);
+            // Through clipboardValue, like every other port read: a provider is permitted to
+            // fail, and one that did threw the whole copy away rather than the one encoding
+            // it could not produce.
+            byte[] image = clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_PNG);
             if (image == null) {
-                image = content.getBytes(com.codename1.ui.ClipboardContent.MIME_JPEG);
+                image = clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_JPEG);
             }
             if (image == null) {
-                image = content.getBytes(com.codename1.ui.ClipboardContent.MIME_GIF);
+                image = clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_GIF);
             }
             if (image != null) {
                 WindowsNative.clipboardSetImage(image);
@@ -2266,7 +2269,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
      * paths (a single String path is wrapped), or null when no file list present.
      */
     private static String[] clipboardFilePaths(com.codename1.ui.ClipboardContent content) {
-        Object value = content.getData(com.codename1.ui.ClipboardContent.MIME_FILE);
+        Object value = clipboardValue(content, com.codename1.ui.ClipboardContent.MIME_FILE);
         if (value instanceof String[]) {
             return (String[]) value;
         }

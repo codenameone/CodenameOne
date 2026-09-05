@@ -344,10 +344,125 @@ public final class IOSNative {
 
     native void setClipboardString(String s);
     native String getClipboardString();
+    /// Adds one further representation to the clip the next setClipboardContent publishes.
+    ///
+    /// The fixed arguments below name the types the framework has constants for; a content
+    /// may offer any type at all, and one of those reached the pasteboard nowhere else.
+    native void addClipboardRepresentation(String mimeType, byte[] value);
     native void setClipboardContent(String plain, String html, String rtf, String markdown, String asciidoc, byte[] image, String fileUris);
     native String getClipboardContent(String mimeType);
+
+    /// How many representations the system pasteboard is offering, so they can be read by
+    /// index rather than joined into one string -- see addNativeDragFiles for what a
+    /// separator costs.
+    native int getClipboardTypeCount();
+
+    /// The MIME type of one of them, or null for an identifier this framework has no
+    /// reading of.
+    native String getClipboardTypeAt(int index);
+
+    /// Its bytes, or null when the pasteboard no longer has it.
+    native byte[] getClipboardRepresentation(String mimeType);
     native byte[] getClipboardImage();
     native String getClipboardFileUris();
+
+    /// Native drag and drop. UIKit owns the drag gesture, so the framework stages what a press
+    /// has made draggable and the native side asks for the payload once UIDragInteraction
+    /// decides a drag has begun. See `Ports/iOSPort/nativeSources/CN1DragAndDrop.m`.
+    native boolean isNativeDragAndDropSupported();
+
+    /// True where a drag started in this application can be dropped in another one, which is
+    /// iPadOS and Mac Catalyst rather than a phone in full screen.
+    native boolean isNativeDragOutsideAppSupported();
+
+    /// Stages the representations a drag could offer -- named, not built -- along with what a
+    /// receiver may do with them and the image to show under the finger.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mimeTypes`: newline separated MIME types
+    ///
+    /// - `allowedActions`: the `com.codename1.ui.NativeDragOperation` action bit set
+    ///
+    /// - `dragImagePng`: the preview as PNG bytes, or null for the platform default
+    ///
+    /// - `touchX`: the press position within the drag image
+    ///
+    /// - `touchY`: the press position within the drag image
+    native void prepareNativeDrag(String mimeTypes, int allowedActions, byte[] dragImagePng,
+            int touchX, int touchY);
+
+    /// Clears the payload, ready for the representations of the session UIKit has just started,
+    /// and records the id the framework gave that session. Called from inside the
+    /// session-started callback, so that a promised representation is built only once a drag
+    /// really happens.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sessionId`: travels with every load handler this session registers, so a
+    ///   representation read after another drag has begun resolves against its own operation
+    native void beginNativeDragPayload(int sessionId);
+
+    /// Names a representation the drag can offer, without producing it.
+    ///
+    /// Every MIME type the operation advertises goes through here rather than a fixed list, so
+    /// nothing the application published is silently left behind -- a drag offering only
+    /// `text/markdown` used to advertise it and then carry nothing, which UIKit cancels. The
+    /// value is produced only if a receiver reads that type, which is what
+    /// `com.codename1.ui.ClipboardContent#setDataProvider(java.lang.String, com.codename1.ui.ClipboardDataProvider)`
+    /// promises.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mimeType`: the representation's MIME type
+    native void declareNativeDragPayload(String mimeType);
+
+    /// Adds the file list, the one representation that cannot be deferred: UIKit needs the
+    /// number of items when the session begins, and for a file drag that is the number of
+    /// files.
+    ///
+    /// #### Parameters
+    ///
+    /// - `paths`: newline separated file paths or `file:` URIs
+    native void addNativeDragFiles(String path);
+
+    /// Reports that a drop's target callback has run, so the files it copied out are no longer
+    /// owed to anybody and may be reclaimed with the rest.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dropId`: the drop, as the commit named it
+    native void dropDeliveryFinished(int dropId);
+
+    /// Adds one link a text/uri-list named, which becomes a drag item of its own.
+    ///
+    /// Resolved when the session begins for the reason the file list is: the item count is
+    /// fixed then, and a list of links is that many items. A public.url representation is
+    /// one URL, so the whole list registered as a single one reached every native receiver
+    /// as a malformed address.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: one entry of the list, a URL or a local path
+    native void addNativeDragUrl(String url);
+
+    /// Drops whatever `#prepareNativeDrag(java.lang.String, int, byte[], int, int)` staged,
+    /// because the press turned out to be a tap.
+    native void cancelNativeDrag();
+
+    /// Attaches the drag interaction, because the application has a component that can be
+    /// dragged out.
+    ///
+    /// UIKit recognizes the drag gesture with a recognizer installed on the surface, and having
+    /// one there changes how every touch is delivered -- with it attached unconditionally a
+    /// plain tap stopped reaching the framework. So it is attached on demand, and an
+    /// application that never drags anything keeps exactly the touch handling it had.
+    /// Idempotent.
+    native void enableNativeDragSource();
+
+    /// Attaches the drop interaction, because the application has a component that accepts
+    /// drops. Withheld until then on the same principle as the drag interaction. Idempotent.
+    native void enableNativeDropTarget();
     
     native void setPinchToZoomEnabled(long peer, boolean e);
     native void setNativeBrowserScrollingEnabled(long peer, boolean e);
