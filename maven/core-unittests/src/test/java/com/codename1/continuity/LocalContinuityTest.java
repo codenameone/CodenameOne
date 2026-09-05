@@ -7791,6 +7791,47 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * The simulator bridge hands out a real copy of what it advertised, nested containers too.
+     *
+     * <p>AppState already decided this for its own snapshot -- a shallow copy left it sharing the
+     * application's lists and maps, and a snapshot has to be a snapshot -- and this bridge
+     * contradicted it at the three places it passes a payload across. What it advertises is what
+     * the simulator shows and what tests assert on, so a caller reaching into a nested list was
+     * editing the record of what had been published, and the next simulateArrival() delivered the
+     * edit instead of the checkpoint.</p>
+     *
+     * <p>A double that shares state it says it copied is worse than one that is plainly wrong,
+     * because what it breaks is the test's ability to notice.</p>
+     */
+    @EdtTest
+    public void theSimulatorBridgeCopiesNestedPayloadContainers() {
+        RecordingProvider provider = new RecordingProvider();
+        List<String> lines = new ArrayList<String>();
+        lines.add("the original draft");
+        provider.saved.put("lines", lines);
+        Continuity.setStateProvider(provider);
+        Continuity.routeStackChanged();
+        Continuity.checkpoint();
+        flushSerialCalls();
+
+        Map<String, Object> published = bridge.getPublishedInfo();
+        assertNotNull(published, "nothing was advertised, so this test has nothing to copy");
+
+        // Reach into a NESTED container of what was handed back.
+        Object payload = published.get("payload");
+        assertTrue(payload instanceof Map, "the advertised payload is not a map: " + payload);
+        Object got = ((Map<?, ?>) payload).get("lines");
+        assertTrue(got instanceof List, "the nested list did not survive the round trip: " + got);
+        ((List<Object>) got).add("an edit the caller made to its own copy");
+
+        Map<String, Object> again = bridge.getPublishedInfo();
+        Object second = ((Map<?, ?>) again.get("payload")).get("lines");
+        assertEquals(1, ((List<?>) second).size(),
+                "the caller's edit reached the advertised payload, so the bridge shares the "
+                        + "container it says it copied: " + second);
+    }
+
+    /**
      * clear() empties the shelf, not only the slot.
      *
      * <p>clear() is a logout: nothing from before it survives. A shelved arrival is state from

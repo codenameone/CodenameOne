@@ -96,8 +96,7 @@ public class LocalContinuityBridge implements ContinuityBridge {
     @Override
     public void publishContinuation(String activityType, String title,
             Map<String, Object> userInfo) {
-        Map<String, Object> copy = userInfo == null
-                ? null : new HashMap<String, Object>(userInfo);
+        Map<String, Object> copy = userInfo == null ? null : deepCopy(userInfo);
         publishedType = activityType;
         publishedTitle = title;
         publishedInfo = copy;
@@ -134,7 +133,7 @@ public class LocalContinuityBridge implements ContinuityBridge {
     ///
     /// a copy of the payload
     public Map<String, Object> getPublishedInfo() {
-        return publishedInfo == null ? null : new HashMap<String, Object>(publishedInfo);
+        return publishedInfo == null ? null : deepCopy(publishedInfo);
     }
 
     /// Delivers the currently advertised activity back to the app as though it had arrived from
@@ -151,7 +150,7 @@ public class LocalContinuityBridge implements ContinuityBridge {
         if (publishedType == null || publishedInfo == null) {
             return false;
         }
-        Map<String, Object> copy = new HashMap<String, Object>(publishedInfo);
+        Map<String, Object> copy = deepCopy(publishedInfo);
         copy.put("device", "simulated-device");
         return simulateArrival(publishedType, copy);
     }
@@ -522,4 +521,51 @@ public class LocalContinuityBridge implements ContinuityBridge {
         }
         return write(INDEX, sb.toString());
     }
+
+    /// A real copy of a payload, nested lists and maps included.
+    ///
+    /// AppState already made this decision for its own snapshot -- "a shallow copy left the
+    /// snapshot sharing the application's own lists and maps ... a snapshot has to be a snapshot"
+    /// -- and this class contradicted it at the three places it hands a payload across. What is
+    /// advertised here is what the simulator shows and what tests assert on, so a caller that
+    /// reaches into a nested list was editing the record of what had been published: the next
+    /// simulateArrival() then delivered the edit rather than the checkpoint.
+    ///
+    /// A test double that shares state it says it copied is worse than one that is simply wrong,
+    /// because what it breaks is the test's ability to notice.
+    ///
+    /// Its own copy rather than AppState's, which is private and belongs to a different package.
+    /// Fifteen lines here is a smaller price than widening that class's surface for an impl.
+    private static Map<String, Object> deepCopy(Map<String, Object> p) {
+        Map<String, Object> out = new HashMap<String, Object>();
+        for (Map.Entry<String, Object> e : p.entrySet()) {
+            out.put(e.getKey(), copyValue(e.getValue()));
+        }
+        return out;
+    }
+
+    private static Object copyValue(Object value) {
+        if (value instanceof List) {
+            List<?> in = (List<?>) value;
+            List<Object> out = new ArrayList<Object>(in.size());
+            for (Object element : in) {
+                out.add(copyValue(element));
+            }
+            return out;
+        }
+        if (value instanceof Map) {
+            Map<?, ?> in = (Map<?, ?>) value;
+            Map<String, Object> out = new HashMap<String, Object>();
+            for (Map.Entry<?, ?> e : in.entrySet()) {
+                if (e.getKey() instanceof String) {
+                    out.put((String) e.getKey(), copyValue(e.getValue()));
+                }
+            }
+            return out;
+        }
+        // Everything else a payload may carry is immutable -- String, the boxed primitives -- so
+        // sharing it is sharing a value, not a container.
+        return value;
+    }
+
 }

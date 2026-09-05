@@ -160,17 +160,60 @@ public class IOSContinuitySyncPreflightTest {
     }
 
     /**
-     * An app sharing a store with a sibling names that sibling's container. WHICH container a
-     * profile grants is not a question this can answer from the key alone, so a profile that
-     * grants the capability is left alone.
+     * A profile granting one container while the project names another is a build that fails at
+     * codesigning, and this says so before it is sent.
+     *
+     * <p>This test used to assert the opposite, on the reasoning that WHICH container a profile
+     * grants could not be answered from the key alone. That was true only because the parser threw
+     * the value away -- a limitation the code then described as if it were inherent. Keeping the
+     * string makes the comparison ordinary, and an app sharing a sibling's store is exactly when a
+     * project names a container by hand and can name the wrong one.</p>
      */
     @Test
-    public void anExplicitContainerOnAGrantingProfileIsLeftAlone() throws Exception {
+    public void anExplicitContainerTheProfileDoesNotGrantIsWarnedAbout() throws Exception {
         Properties p = settings(profile("WithCloud", true));
         p.setProperty("codename1.arg.ios.entitlements.com.apple.developer"
                 + ".ubiquity-kvstore-identifier", "ABCD1234.com.example.shared");
 
+        List<IOSProvisioningPreflight.Problem> problems = check(p);
+
+        assertEquals("a container the profile does not grant was not reported",
+                1, problems.size());
+        assertTrue(problems.get(0).message,
+                problems.get(0).message.contains("ABCD1234.com.example.shared"));
+        assertTrue(problems.get(0).message,
+                problems.get(0).message.contains("ABCD1234.com.example.app"));
+    }
+
+    /**
+     * The container the profile actually grants passes quietly, or the check above would fire on
+     * every correctly configured project that names its container explicitly.
+     */
+    @Test
+    public void theContainerTheProfileGrantsIsLeftAlone() throws Exception {
+        Properties p = settings(profile("WithCloud", true));
+        p.setProperty("codename1.arg.ios.entitlements.com.apple.developer"
+                + ".ubiquity-kvstore-identifier", "ABCD1234.com.example.app");
+
         assertTrue(check(p).isEmpty());
+    }
+
+    /**
+     * And anything that is not a literal is left alone on both sides.
+     *
+     * <p>The value the build requests when the project names no container is
+     * "$(TeamIdentifierPrefix)$(CFBundleIdentifier)", two Xcode variables this has no business
+     * expanding, and a profile may grant a wildcard. Comparing either would warn about
+     * configurations that sign perfectly well, and a preflight that cries wolf is one people stop
+     * reading.</p>
+     */
+    @Test
+    public void aVariableOrWildcardContainerIsNotCompared() throws Exception {
+        Properties p = settings(profile("WithCloud", true));
+        p.setProperty("codename1.arg.ios.entitlements.com.apple.developer"
+                + ".ubiquity-kvstore-identifier", "$(TeamIdentifierPrefix)$(CFBundleIdentifier)");
+
+        assertTrue("the Xcode-variable default was compared as a literal", check(p).isEmpty());
     }
 
     /**

@@ -109,6 +109,28 @@ final class IOSProvisioningPreflight {
          * none, because a profile that could not be parsed at all produces no Profile.</p>
          */
         boolean ubiquityKeyValueStore;
+
+        /**
+         * The container that entitlement names, exactly as the profile spells it, or null.
+         *
+         * <p>Kept rather than reduced to the boolean above, because the boolean is what made the
+         * check unable to answer which container was granted -- a limitation the code then
+         * described as inherent when it was only self-inflicted. Codesigning rejects an app
+         * entitlement the profile's value does not cover, so a profile granting one container
+         * and a project naming another is a build that fails at signing.</p>
+         */
+        String ubiquityKeyValueStoreValue;
+    }
+
+    /**
+     * Whether a container name is something two sides can be compared on.
+     *
+     * <p>An Xcode variable expands at build time and a wildcard covers a set, so neither is a
+     * value this can hold against another one. Only a plain literal is.</p>
+     */
+    private static boolean isLiteralContainer(String container) {
+        return container != null && !container.isEmpty()
+                && container.indexOf("$(") < 0 && container.indexOf('*') < 0;
     }
 
     /** A problem found before the build was sent: {@code message} is written for the user. */
@@ -280,9 +302,31 @@ final class IOSProvisioningPreflight {
             return problems;
         }
         if (appProfile.ubiquityKeyValueStore) {
-            // Granted. WHICH container it grants is not something this can answer from the key
-            // alone, so a project naming its own -- the shape of an app sharing a store with a
-            // sibling -- is where the check stops rather than warning on what it cannot check.
+            // Granted -- and now WHICH container, when both sides say so literally.
+            //
+            // Only then. The value the build requests when the project names none is
+            // "$(TeamIdentifierPrefix)$(CFBundleIdentifier)", two Xcode variables this has no
+            // business expanding, and a profile may grant a wildcard. Comparing either of those
+            // would produce warnings on configurations that sign perfectly well, which is worse
+            // than staying quiet: a preflight that cries wolf is one people stop reading.
+            //
+            // Two literals that differ is the case that is certain, and it is the ordinary way to
+            // get this wrong -- an app sharing a sibling's store, which is exactly when a project
+            // names a container by hand.
+            if (isLiteralContainer(override) && isLiteralContainer(
+                    appProfile.ubiquityKeyValueStoreValue)
+                    && !override.equals(appProfile.ubiquityKeyValueStoreValue)) {
+                problems.add(new Problem("This project asks for the iCloud key-value store "
+                        + "container \"" + override + "\", and the provisioning profile \""
+                        + appProfile.name + "\" grants \""
+                        + appProfile.ubiquityKeyValueStoreValue + "\".\n"
+                        + "Codesigning rejects an app entitlement the profile does not cover, so "
+                        + "this build fails when it is signed rather than when it is sent.\n"
+                        + "Either point ios.entitlements.com.apple.developer"
+                        + ".ubiquity-kvstore-identifier at the container the profile grants, or "
+                        + "regenerate the profile from an App ID whose iCloud capability includes "
+                        + "the one you want.", false));
+            }
             return problems;
         }
         // Not granted AT ALL, and an explicit container does not rescue that: the builder puts the
@@ -1095,6 +1139,10 @@ final class IOSProvisioningPreflight {
         // makes the build declare.
         Element ubiquity = valueForKey(doc, "com.apple.developer.ubiquity-kvstore-identifier");
         profile.ubiquityKeyValueStore = ubiquity != null;
+        if (ubiquity != null && "string".equals(ubiquity.getTagName())) {
+            String granted = ubiquity.getTextContent().trim();
+            profile.ubiquityKeyValueStoreValue = granted.isEmpty() ? null : granted;
+        }
         profile.type = deriveType(doc);
         return profile;
     }

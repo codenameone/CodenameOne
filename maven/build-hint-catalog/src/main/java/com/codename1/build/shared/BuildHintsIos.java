@@ -795,7 +795,14 @@ final class BuildHintsIos {
         h.add(new Hint("ios.continuity.sync")
                 .group(HintGroup.IOS)
                 .type(HintType.BOOLEAN)
-                .def("true")
+                // NO default, because this hint has three states and def() can only describe two.
+                // Unset is its own answer -- the bytecode scan decides -- while an explicit true
+                // now DECLARES the store, forcing the entitlement and the provisioning preflight
+                // whatever the scan found. Declaring "true" here said the two were the same thing
+                // to everything that reads the catalog, so a project that had merely never set it
+                // was presented as having opted in, and the tooling would offer an iCloud
+                // entitlement the build would not have asked for. The doc below says which state
+                // does what.
                 .platform("ios")
                 .doc("Whether this project wants the iCloud key-value store behind "
                         + "com.codename1.continuity.sync. Left unset the build decides from the "
