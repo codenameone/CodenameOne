@@ -722,6 +722,22 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
                        framebufferWidth, framebufferHeight);
 }
 
+/// Asks the framework for another frame, if one is owed.
+///
+/// Clears the owed flag first and only acts if it was set, so the two callers --
+/// a GPU completion that freed a surface, and the timer below for when no GPU
+/// work is outstanding -- cannot both ask for the same frame.
+- (void)cn1PayDeferredPresent {
+    if (!atomic_exchange_explicit(&cn1PresentDeferred, 0, memory_order_acq_rel)) {
+        return;
+    }
+    extern BOOL cn1MacRuntimeIsJavaReady(void);
+    extern void repaintUI(void);
+    if (cn1MacRuntimeIsJavaReady()) {
+        repaintUI();
+    }
+}
+
 - (BOOL)presentFramebuffer {
     static int firstPresent = 1;
     if (firstPresent) { firstPresent = 0; cn1StartupPhase("firstPresent"); }
@@ -771,6 +787,31 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         // renderer always has somewhere to go. Reaching here at all means a
         // handoff is in flight, which resolves on its own.
         atomic_store_explicit(&cn1PresentDeferred, 1, memory_order_release);
+        // Who will pay this back depends on WHY every surface was busy.
+        //
+        // If a blit is still in flight, its completion frees that slot and asks
+        // for the frame from there. But the surfaces can all be held by the
+        // window server with no GPU work outstanding at all, and the compositor
+        // releases them without a callback of any kind -- so in that case no
+        // completion is coming and the frame would sit owed until something
+        // unrelated happened to repaint.
+        //
+        // Asking again immediately would spin: the state that caused the drop is
+        // still true. One display interval later it usually is not.
+        BOOL anyInFlight = NO;
+        for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
+            if (atomic_load_explicit(&cn1PresentInFlight[i], memory_order_acquire)) {
+                anyInFlight = YES;
+                break;
+            }
+        }
+        if (!anyInFlight) {
+            METALView *deferredView = self;
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(NSEC_PER_SEC / 60)),
+                           dispatch_get_main_queue(), ^{
+                [deferredView cn1PayDeferredPresent];
+            });
+        }
         [self.commandBuffer commit];
         self.commandBuffer = nil;
         return NO;
@@ -849,16 +890,9 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
             // re-presenting from here. Same reason updateBackingSize does it: a
             // layer-hosted view has no drawRect:, so setNeedsDisplay: alone
             // reaches nothing.
-            if (atomic_exchange_explicit(&presentView->cn1PresentDeferred, 0,
-                                         memory_order_acq_rel)) {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    extern BOOL cn1MacRuntimeIsJavaReady(void);
-                    extern void repaintUI(void);
-                    if (cn1MacRuntimeIsJavaReady()) {
-                        repaintUI();
-                    }
-                });
-            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [presentView cn1PayDeferredPresent];
+            });
         }
         CFRelease(presented);
     }];
