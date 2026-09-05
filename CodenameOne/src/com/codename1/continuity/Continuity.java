@@ -347,26 +347,78 @@ public final class Continuity {
         // enabled continuity is parked here rather than left with the port -- see Callback.decide
         // -- so enabling has to look. On the next turn, because dispatch() runs application
         // listeners and enable() is not the place to do that.
-        if (parked != null) {
+        if (parked != null || !shelved.isEmpty()) {
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
-                    AppState waiting = parked;
-                    if (waiting != null && enabled) {
-                        parked = null;
-                        // Through admit(), not dispatch(). A port is allowed to retain the same
-                        // continuation it declined, so both it and this class can be holding one
-                        // copy each -- and installing the seam re-offers the port's while this
-                        // drains ours. admission is where (origin, sequence) deduplication lives,
-                        // so it is what makes the second copy a no-op; dispatching straight past
-                        // it ran the listeners and the provider twice on one arrival.
-                        //
-                        // The comment that justified parking said the two copies dedup at
-                        // admission. They only do if they both go through it.
-                        admit(waiting);
-                    }
+                    drainPendingOffers();
                 }
             });
+        }
+    }
+
+    /// Admits everything this class was holding before enable(), oldest first. On the EDT.
+    ///
+    /// The SHELF as well as the slot. Two devices can each reach the callback before the
+    /// application enables continuity -- a synced-store listener installs that seam without
+    /// enabling anything -- and the second displaces the first into the shelf. Admitting only the
+    /// slot left that first arrival in a state nothing resolves: never dispatched, so its
+    /// listeners and provider never saw it, and reachable only if the application happened to call
+    /// getRestorableState() by hand.
+    ///
+    /// Worse since the shelf started holding relay publication, which is a hold this same change
+    /// introduced: an arrival nothing is going to dispatch was withholding every checkpoint from
+    /// this device for the rest of the process.
+    ///
+    /// Through admit(), not dispatch(). A port is allowed to retain the same continuation it
+    /// declined, so both it and this class can be holding one copy each -- and installing the seam
+    /// re-offers the port's while this drains ours. admission is where (origin, sequence)
+    /// deduplication lives, so it is what makes the second copy a no-op; dispatching straight past
+    /// it ran the listeners and the provider twice on one arrival.
+    ///
+    /// Snapshotted and cleared BEFORE any of it is admitted, because admit() lands back in
+    /// placeOnOffer() for anything a listener defers -- so draining a live collection would either
+    /// re-admit what was just put back or lose it.
+    private static void drainPendingOffers() {
+        if (!enabled) {
+            return;
+        }
+        AppState[] pending = new AppState[shelved.size() + (parked == null ? 0 : 1)];
+        int count = 0;
+        if (parked != null) {
+            pending[count++] = parked;
+        }
+        Iterator<AppState> i = shelved.values().iterator();
+        while (i.hasNext()) {
+            pending[count++] = i.next();
+        }
+        parked = null;
+        shelved.clear();
+        // OLDEST first, so the newest is the one left on offer once they have all been through.
+        // By the ORIGIN's clock, which is the only ordering two devices share -- sequences are
+        // per-device counters and comparing one against another's says nothing.
+        //
+        // Selection sort rather than Collections.sort: this runs on the core API surface, where
+        // what exists is what vm/JavaAPI and Ports/CLDC11 both define, and the count here is the
+        // number of the user's devices.
+        for (int a = 0; a < count - 1; a++) {
+            int oldest = a;
+            for (int b = a + 1; b < count; b++) {
+                if (pending[b].getTimestamp() < pending[oldest].getTimestamp()) {
+                    oldest = b;
+                }
+            }
+            AppState swap = pending[a];
+            pending[a] = pending[oldest];
+            pending[oldest] = swap;
+        }
+        for (int a = 0; a < count; a++) {
+            if (!enabled) {
+                // A listener that ran during this drain is allowed to turn continuity off, and
+                // what follows the disable() must not then be admitted into it.
+                return;
+            }
+            admit(pending[a]);
         }
     }
 
@@ -1623,6 +1675,19 @@ public final class Continuity {
         // choice here would make every arrival AFTER the clear be dropped instead of held for
         // the enable() that is about to come -- and an arrival after the clear is not from
         // before it.
+        //
+        // The window is THIS CALL, and that is a contract rather than an accident: setCallback()
+        // requires a port to offer a held continuation before it returns. It has to be the call,
+        // because a held continuation reaches the seam by exactly the same route a brand new one
+        // does and carries nothing that tells them apart -- so the framework cannot bind the
+        // discard to the cleared session instead. A window that outlasted this call would start
+        // eating the arrivals meant for the account now signing in, which is the other half of
+        // what clear() promises and the reason it is not simply "continuity off".
+        //
+        // A port that answered later would have its pre-logout activity taken for a new one. That
+        // is a port failing its side of the contract, not a case for this code to guess at: the
+        // guess that would cover it -- drop everything for a while after a logout -- is exactly
+        // the behaviour the paragraph above rules out.
         discardHeldArrival = true;
         try {
             installCallback(true);

@@ -8065,6 +8065,120 @@ public class LocalContinuityTest extends UITestBase {
         }
     }
 
+    /**
+     * clear() empties the port of a held continuation, and does NOT stop the next one.
+     *
+     * <p>Both halves in one test because they are one promise. A logout has to take the previous
+     * account's held activity with it -- a Handoff that cold-launched a logged-out app sits in the
+     * port before anything has installed a callback, so clearing only this class's slot cleared
+     * nothing that existed -- and it has to leave the framework able to receive the arrival that
+     * belongs to the account now signing in. clear() is a logout, not "continuity off".</p>
+     *
+     * <p>The discard window is the setCallback call, which is why ContinuityBridge requires a held
+     * continuation to be offered before that method returns. A held one reaches the seam by the
+     * same route a new one does and carries nothing that separates them, so there is no way to
+     * bind the discard to the cleared session instead -- and any window that outlasted the call
+     * would start eating the arrivals the second half of this test asserts must survive.</p>
+     */
+    @EdtTest
+    public void clearEmptiesTheHeldContinuationWithoutDeafeningWhatFollows() {
+        HoldingBridge bridge = new HoldingBridge();
+        Continuity.setBridge(bridge);
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+
+        Map<String, Object> before = new HashMap<String, Object>();
+        before.put("note", "the signed-out account's work");
+        bridge.pending = StateCodec.toMap(new AppState()
+                .setPayload(before)
+                .setDeviceId("phone").setSequence(1L)
+                .setTimestamp(System.currentTimeMillis()));
+
+        Continuity.clear();
+        flushSerialCalls();
+
+        assertNull(bridge.pending,
+                "the port is still holding the signed-out account's continuation, so the enable() "
+                        + "that comes with the next login drains it into that account");
+        AppState left = Continuity.getRestorableState();
+        assertNull(left,
+                "the previous account's work survived the logout and is on offer to the next one");
+
+        // The other half: an arrival AFTER the clear belongs to whoever is signing in now, and a
+        // discard window that outlasted the drain would swallow it.
+        Continuity.enable();
+        flushSerialCalls();
+        Map<String, Object> after = new HashMap<String, Object>();
+        after.put("note", "the new account's work");
+        // Through the BRIDGE, not deliver(): the discard flag is read in the inbound callback, and
+        // deliver() is a seam that enters at admit(). Asserting this half over deliver() exercised
+        // nothing -- a probe that left the window open for ever still passed.
+        bridge.simulateArrival(Continuity.getActivityType(), StateCodec.toMap(new AppState()
+                .setPayload(after)
+                .setDeviceId("tablet").setSequence(1L)
+                .setTimestamp(System.currentTimeMillis())));
+        flushSerialCalls();
+
+        AppState arrived = Continuity.getRestorableState();
+        assertNotNull(arrived, "an arrival after the logout was dropped along with it");
+        assertEquals("the new account's work", arrived.getPayload().get("note"),
+                "the arrival that reached the new session is not the one it was sent");
+    }
+
+    /**
+     * enable() drains EVERY arrival held before it, not just the last one.
+     *
+     * <p>Two devices can each reach the seam before the application enables continuity -- a
+     * synced-store listener installs one without enabling anything, and a key/value store is not
+     * consent to restore a route stack -- so the second displaces the first onto the shelf. A
+     * drain that took only the slot left that first arrival in a state nothing resolved: never
+     * dispatched, so its listeners and provider never ran, and reachable only if the application
+     * happened to call getRestorableState() by hand.</p>
+     *
+     * <p>And worse than merely unreachable once the shelf started holding relay publication back,
+     * which the same change introduced: an arrival nothing was ever going to dispatch withheld
+     * every checkpoint this device made for the rest of the process.</p>
+     */
+    @EdtTest
+    public void enableDrainsEveryArrivalHeldBeforeItNotJustTheLast() {
+        // Staged BEFORE anything enables continuity, which is the whole point: these reach the
+        // seam while the application has said nothing, so the framework holds them itself.
+        ContinuityCallback c = Continuity.callbackForTest();
+        long base = System.currentTimeMillis() - 5000L;
+        Map<String, Object> first = new HashMap<String, Object>();
+        first.put("note", "from the phone");
+        c.continuationReceived(Continuity.getActivityType(), StateCodec.toMap(new AppState()
+                .setPayload(first).setDeviceId("phone").setSequence(1L).setTimestamp(base)));
+        flushSerialCalls();
+        Map<String, Object> second = new HashMap<String, Object>();
+        second.put("note", "from the tablet");
+        c.continuationReceived(Continuity.getActivityType(), StateCodec.toMap(new AppState()
+                .setPayload(second).setDeviceId("tablet").setSequence(1L)
+                .setTimestamp(base + 1000L)));
+        flushSerialCalls();
+
+        final List<String> seen = new ArrayList<String>();
+        Continuity.setAutoRestore(false);
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                seen.add(state.getDeviceId());
+                return true;
+            }
+        });
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.enable();
+        flushSerialCalls();
+        flushSerialCalls();
+        flushSerialCalls();
+
+        assertTrue(seen.contains("tablet"),
+                "the arrival in the slot was never dispatched by the enable: " + seen);
+        assertTrue(seen.contains("phone"),
+                "the arrival displaced onto the shelf before enable() was never dispatched, so "
+                        + "its listeners and provider never saw it and it went on holding every "
+                        + "relay checkpoint behind it: " + seen);
+    }
+
     static class RecordingProvider implements StateProvider {
         final Map<String, Object> saved = new HashMap<String, Object>();
         Map<String, Object> restored;

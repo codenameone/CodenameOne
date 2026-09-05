@@ -113,6 +113,27 @@ public interface ContinuityBridge {
     /// is what recovers a Handoff that cold-launched the app before anything was listening -- is
     /// relying on exactly that, so a framework that installed strictly once would strand it.
     ///
+    /// A held continuation offered in response to this call MUST be offered BEFORE this method
+    /// returns. Not a style note -- the framework's logout depends on it, and it is the one
+    /// ordering requirement this interface makes.
+    ///
+    /// `Continuity.clear()` empties the port as part of ending a session, and it does that by
+    /// installing a callback that discards whatever comes back. The window in which it discards
+    /// is this call, because the framework has no other way to draw the line: a held continuation
+    /// reaches `ContinuityCallback.continuationReceived` by exactly the same route a brand new one
+    /// does, carrying nothing that distinguishes them. A port that answered later would have its
+    /// pre-logout activity taken as a new arrival and restored into the account that just signed
+    /// in.
+    ///
+    /// Widening the window instead would break the other half of the same promise. `clear()` is a
+    /// logout, not "continuity off", and it deliberately leaves an enabled framework enabled, so a
+    /// continuation that genuinely arrives after it -- for the account now signing in -- has to be
+    /// delivered. Any window that outlasts the call starts eating those.
+    ///
+    /// Every port here already satisfies this: the iOS bridge hands its pending activity over
+    /// inline, and a bridge holding nothing satisfies it trivially. Writing it down is what stops
+    /// the next one from being the exception.
+    ///
     /// #### Parameters
     ///
     /// - `callback`: the seam, never null
