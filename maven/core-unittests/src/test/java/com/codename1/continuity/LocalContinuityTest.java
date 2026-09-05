@@ -3693,6 +3693,52 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * Minting the device id does not go anywhere near a web view.
+     *
+     * <p>enable() mints an origin id on first use, and it used to do that through
+     * Util.getUUID(). Instantiating Util.UUID runs a static initialiser that seeds itself from
+     * getUniqueDeviceID(), which reaches CN.getProperty("User-Agent") -- and the Apple ports
+     * answer that by standing up a web view. tvOS has no WebKit at all, so the call never
+     * returned: enable() hung on the event thread and the device suite stopped dead on the first
+     * test that installs a state provider, taking every test after it with it. The iOS console
+     * shows a thousand WebKit lines starting at that instant; the tvOS one has none.</p>
+     *
+     */
+    @EdtTest
+    public void mintingTheDeviceIdAsksForNoDeviceProperties() {
+        Continuity.reset();
+        Storage.getInstance().clearStorage();
+        Continuity.setBridge(new LocalContinuityBridge());
+        Continuity.enable();
+
+        String id = Continuity.getDeviceId();
+        assertNotNull(id, "enabling minted no device id");
+        // The SHAPE, which is what a test can actually check here: the JavaSE port answers
+        // getProperty("User-Agent") out of a table and never builds a browser, so the hang
+        // itself cannot be reproduced in this harness. What can be pinned is that the id is
+        // this framework's own and not a Util.UUID -- reverting to Util.getUUID() produces a
+        // dashed UUID and fails this line, which is the whole point of asserting it.
+        assertTrue(id.startsWith("cn1-"),
+                "the origin id was not minted here but handed over by Util.getUUID(), whose "
+                        + "static initialiser reads getProperty(\"User-Agent\") -- a call the "
+                        + "Apple ports answer with a web view, and one tvOS never returns from");
+
+        // Minted ONCE and then persisted: a second enable in the same install keeps it, which is
+        // what makes this device recognise its own echo from the relay.
+        String again = Continuity.getDeviceId();
+        assertEquals(id, again, "the device id changed within one install");
+
+        // And two fresh installs do not collide, which is what the discarded UUID was for.
+        Continuity.reset();
+        Storage.getInstance().clearStorage();
+        Continuity.setBridge(new LocalContinuityBridge());
+        Continuity.enable();
+        assertFalse(id.equals(Continuity.getDeviceId()),
+                "two installs minted the same origin id, so each would drop the other's states "
+                        + "as its own echo");
+    }
+
+    /**
      * A callback delivered from a foreign thread is still claimed and still delivered.
      *
      * <p>A REGRESSION GUARD, not a probe of the change it came with. The decision moved onto the

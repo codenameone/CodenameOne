@@ -2455,6 +2455,44 @@ public final class Continuity {
         startPublisher();
     }
 
+    /// A fresh origin id, minted once per install and persisted.
+    ///
+    /// NOT Util.getUUID(), and the reason is worth the paragraph. Instantiating Util.UUID runs its
+    /// static initialiser, which seeds itself from getUniqueDeviceID() -- and that reaches
+    /// CN.getProperty("User-Agent"), which the Apple ports answer by standing up a web view. On
+    /// tvOS there is no WebKit at all, so the call never returns: enable() hung on the event
+    /// thread, and the device suite stopped dead on the first test that installs a state
+    /// provider, taking every test after it with it. The iOS log makes the mechanism plain --
+    /// a thousand WebKit lines starting at exactly that instant -- and the tvOS log has not one.
+    ///
+    /// An id that identifies one installation to the devices it syncs with does not need a
+    /// browser's user agent to seed it, and must not need a working web view to be minted. Time
+    /// plus two draws from a Random seeded independently of it is ample: this runs ONCE per
+    /// install, and the result is written to storage.
+    private static String mintDeviceId() {
+        long time = System.currentTimeMillis();
+        java.util.Random random = new java.util.Random(time ^ (long) new Object().hashCode());
+        return "cn1-" + hex64(time) + "-" + hex64(random.nextLong()) + hex64(random.nextLong());
+    }
+
+    /// A long as sixteen hex digits, through Integer.toHexString on each half.
+    ///
+    /// Long.toHexString is in neither vm/JavaAPI nor Ports/CLDC11, and the Maven build compiles
+    /// core against the full JDK and would have accepted it.
+    private static String hex64(long value) {
+        return hex32((int) (value >>> 32)) + hex32((int) value);
+    }
+
+    private static String hex32(int value) {
+        String hex = Integer.toHexString(value);
+        StringBuilder out = new StringBuilder();
+        for (int pad = hex.length(); pad < 8; pad++) {
+            out.append('0');
+        }
+        out.append(hex);
+        return out.toString();
+    }
+
     private static String loadDeviceId() {
         try {
             String id = null;
@@ -2465,7 +2503,7 @@ public final class Continuity {
                 }
             }
             if (id == null || id.length() == 0) {
-                id = Util.getUUID();
+                id = mintDeviceId();
                 if (!Storage.getInstance().writeObject(PREF_DEVICE_ID, id)) {
                     // Minted but not stored, so the next launch mints another one and every state
                     // this device has sent starts looking like a stranger's. Nothing here can
