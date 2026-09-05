@@ -199,7 +199,19 @@ final class Pem {
             if (!c.hasMore() || c.peek() != 0x04) {
                 return SHAPE_UNKNOWN;
             }
-            return c.consume(0x04) > 0 ? SHAPE_PKCS8 : SHAPE_UNKNOWN;
+            if (c.consume(0x04) == 0) {
+                return SHAPE_UNKNOWN;
+            }
+            // Only [0] attributes and [1] publicKey may follow the privateKey,
+            // in that order. Letting anything through carried the junk into the
+            // key that was handed to the platform.
+            if (c.hasMore() && c.peek() == 0xA0) {
+                c.skip();
+            }
+            if (c.hasMore() && c.peek() == 0xA1) {
+                c.skip();
+            }
+            return c.hasMore() ? SHAPE_UNKNOWN : SHAPE_PKCS8;
         }
         if (c.peek() == 0x04) {
             // ECPrivateKey ::= SEQUENCE { INTEGER, OCTET STRING, [0], [1] }

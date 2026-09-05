@@ -725,6 +725,39 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void pkcs8RejectsAnythingAfterItsOptionalFields() {
+        // RFC 5958 allows only [0] attributes and [1] publicKey after the
+        // privateKey. Found by fuzzing real keys against the platform rather
+        // than by review: appending a bare NULL, INTEGER or OCTET STRING was
+        // accepted here and refused by the JDK.
+        for (String base : new String[] {RSA_PKCS8, EC_PKCS8}) {
+            byte[] key = der(base);
+            for (String junk : new String[] {"0500", "020100", "0400"}) {
+                byte[] extra = hex(junk);
+                byte[] blob = new byte[key.length + extra.length];
+                System.arraycopy(key, 0, blob, 0, key.length);
+                System.arraycopy(extra, 0, blob, key.length, extra.length);
+                // widen the outer length to cover the appended element
+                if ((blob[1] & 0xFF) == 0x82) {
+                    int len = (((blob[2] & 0xFF) << 8) | (blob[3] & 0xFF)) + extra.length;
+                    blob[2] = (byte) (len >> 8);
+                    blob[3] = (byte) len;
+                } else if ((blob[1] & 0xFF) == 0x81) {
+                    blob[2] = (byte) ((blob[2] & 0xFF) + extra.length);
+                } else {
+                    blob[1] = (byte) ((blob[1] & 0xFF) + extra.length);
+                }
+                assertThrows(CryptoException.class,
+                        () -> PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(blob))),
+                        "trailing " + junk + " must not be accepted");
+            }
+        }
+        // the untouched keys still load
+        assertArrayEquals(der(RSA_PKCS8), PrivateKey.fromPem(pem(RSA_PKCS8_LABEL, RSA_PKCS8)).getEncoded());
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(pem(EC_PKCS8_LABEL, EC_PKCS8)).getEncoded());
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));
