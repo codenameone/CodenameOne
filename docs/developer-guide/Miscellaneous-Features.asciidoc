@@ -757,11 +757,18 @@ Once this is enabled you can set the cursor over a specific region using `cmp.se
 
 A generated Maven project ships a `.gitignore` for its build output -- `target`,
 `build`, and the RAD schema generated under `common/src/main/rad`. It says
-nothing about your editor, so IDE metadata such as `.idea/`, `*.iml`, `.project`
-and `.settings/` is left over for git to pick up. Those files describe your
-machine rather than the project, so the durable place for them is a global
-ignore file, set with `git config --global core.excludesFile`, which covers
-every project you open instead of one.
+nothing about your editor, and that's deliberate, because most of what sits in
+those directories belongs to the project rather than to you. The archetype
+generates `.idea` and `.vscode` itself, including run configurations for the
+debug proxy, on-device debugging and the certificate wizard, and a CodeRAD
+project needs `common/.settings/org.eclipse.m2e.apt.prefs` before Eclipse will
+run the annotation processor. Commit those.
+
+The part worth ignoring is the narrow set that records what you personally had
+open, chiefly `.idea/workspace.xml`, `.idea/shelf/` and `*.iml`. That set is the
+same in every project you work on, which makes it a good fit for a global ignore
+file rather than a per-project one -- `git config --global core.excludesFile
+~/.gitignore_global`, with the patterns in the file it names.
 
 The theme used to be the hard part here, because a `.res` is a binary that git
 can't diff, and two people editing one produce a conflict no merge tool can
