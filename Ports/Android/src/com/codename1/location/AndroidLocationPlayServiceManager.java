@@ -140,34 +140,9 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         return null;
     }
 
-    /// Counts every change of intent, so each half can tell whether it has
-    /// been overtaken.
-    ///
-    /// Incremented by BOTH bind and clear, and checked by both. Guarding only
-    /// the removal was half a fix: a bind whose thread was still waiting for
-    /// the API client could post its requestLocationUpdates after the request
-    /// that wanted it had gone, leaving a continuous high-accuracy
-    /// subscription registered with nothing consuming it until some later
-    /// clear happened to remove it -- and the clear that would have removed it
-    /// was itself suppressed as overtaken.
-    ///
-    /// Symmetric, so the last call made is the one that takes effect: whoever
-    /// finds the count still equal to the one it took is the current intent,
-    /// and everybody else does nothing.
-    ///
-    /// Atomic because the two sides genuinely are on different threads: bind
-    /// and clear are called from the Codename One EDT, and the checks run on
-    /// the Android main looper. This is the native boundary, which is where
-    /// that marshalling belongs.
-    private final java.util.concurrent.atomic.AtomicInteger intent =
-            new java.util.concurrent.atomic.AtomicInteger();
-
     @Override
     protected void bindListener() {
         final Class bgListenerClass = getBackgroundLocationListener();
-        // Counted before the thread is spawned, so anything already on its way
-        // sees that it has been overtaken. See intent.
-        final int mine = intent.incrementAndGet();
         Thread t = new Thread(new Runnable() {
 
             @Override
@@ -181,12 +156,6 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                 mHandler.post(new Runnable() {
 
                     public void run() {
-                        if (intent.get() != mine) {
-                            // Overtaken while this thread waited for the API
-                            // client. Registering now would leave a
-                            // subscription nobody asked for any more.
-                            return;
-                        }
                         LocationRequest r = locationRequest;
 
                         com.codename1.location.LocationRequest request = getRequest();
@@ -291,27 +260,35 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
     }
 
     @Override
+    // KNOWN HAZARD, deliberately not patched here.
+    //
+    // This method and bindListener each spawn a thread that waits for the API
+    // client to CONNECT before posting to the main looper, so the order they
+    // are called in is not the order they run in. If the client is down when a
+    // clear starts and up when the bind after it starts, the bind posts first
+    // and this removal lands on the subscription that bind had just made --
+    // and what is removed is the MANAGER, not a per-request listener, so it
+    // cancels whatever is current and its owner waits out its timeout getting
+    // nothing.
+    //
+    // Two patches were tried on the location-button branch and both were
+    // withdrawn, because each traded a narrow failure for a broader one. A
+    // counter that suppressed an overtaken clear also suppressed the clear in
+    // setLocationListener, which calls clear and bind back to back on EVERY
+    // listener replacement: when that replacement switches delivery between
+    // the callback and the PendingIntent -- which is what crossing
+    // foreground/background does -- the old channel is then never removed and
+    // goes on asking for high-accuracy fixes. Guarding the bind side as well
+    // does not help, because the two calls are still racing.
+    //
+    // The real fix is to SERIALIZE bind and clear so they run in the order
+    // they were called, which means one worker for this manager rather than a
+    // thread per call. That is a change to location code every Android app
+    // uses, it cannot be exercised by anything in this repository -- the
+    // emulator instrumentation suite is a separate job -- and it wants device
+    // testing. It does not belong to a feature branch about a button.
     protected void clearListener() {
         final Class bgListenerClass = getBackgroundLocationListener();
-        // Which binding this cleanup is retiring.
-        //
-        // Both halves wait for the API client to CONNECT before posting, so
-        // the order they are called in is not the order they run in: a clear
-        // that starts while the client is down sleeps in the loop below, and a
-        // bind issued afterwards -- once the client is up -- posts first. The
-        // removal then lands on the subscription the bind had just made.
-        //
-        // That matters because what is removed is this MANAGER, not a
-        // per-request listener: removeLocationUpdates takes
-        // AndroidLocationPlayServiceManager.this, so a stale removal cancels
-        // whatever subscription is current, and the request that owns it waits
-        // out its whole timeout receiving nothing.
-        //
-        // Reachable before the location button existed -- a successful request
-        // ends in setLocationListener(null) and the next one can start
-        // straight away -- but the button's queue starts the next request the
-        // moment the previous one finishes, which is precisely the window.
-        final int mine = intent.incrementAndGet();
         Thread t = new Thread(new Runnable() {
 
             @Override
@@ -324,11 +301,6 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                 mHandler.post(new Runnable() {
 
                     public void run() {
-                        if (intent.get() != mine) {
-                            // Overtaken. Whatever is in place belongs to a
-                            // later call, which will retire it itself.
-                            return;
-                        }
                         if (inMemoryBackgroundLocationListener != null) {
                             Context context = AndroidNativeUtil.getContext();
                             Intent intent = new Intent(context, BackgroundLocationHandler.class);
