@@ -140,9 +140,21 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         return null;
     }
 
+    /// Counts bindings, so a cleanup can tell whether it has been overtaken.
+    ///
+    /// Atomic because the two sides genuinely are on different threads: bind
+    /// and clear are called from the Codename One EDT, and the check runs on
+    /// the Android main looper. This is the native boundary, which is where
+    /// that marshalling belongs.
+    private final java.util.concurrent.atomic.AtomicInteger bindGeneration =
+            new java.util.concurrent.atomic.AtomicInteger();
+
     @Override
     protected void bindListener() {
         final Class bgListenerClass = getBackgroundLocationListener();
+        // Counted before the thread is spawned, so a cleanup already on its
+        // way sees that it has been overtaken. See clearListener.
+        bindGeneration.incrementAndGet();
         Thread t = new Thread(new Runnable() {
 
             @Override
@@ -262,6 +274,25 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
     @Override
     protected void clearListener() {
         final Class bgListenerClass = getBackgroundLocationListener();
+        // Which binding this cleanup is retiring.
+        //
+        // Both halves wait for the API client to CONNECT before posting, so
+        // the order they are called in is not the order they run in: a clear
+        // that starts while the client is down sleeps in the loop below, and a
+        // bind issued afterwards -- once the client is up -- posts first. The
+        // removal then lands on the subscription the bind had just made.
+        //
+        // That matters because what is removed is this MANAGER, not a
+        // per-request listener: removeLocationUpdates takes
+        // AndroidLocationPlayServiceManager.this, so a stale removal cancels
+        // whatever subscription is current, and the request that owns it waits
+        // out its whole timeout receiving nothing.
+        //
+        // Reachable before the location button existed -- a successful request
+        // ends in setLocationListener(null) and the next one can start
+        // straight away -- but the button's queue starts the next request the
+        // moment the previous one finishes, which is precisely the window.
+        final int retiring = bindGeneration.get();
         Thread t = new Thread(new Runnable() {
 
             @Override
@@ -274,6 +305,13 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                 mHandler.post(new Runnable() {
 
                     public void run() {
+                        if (bindGeneration.get() != retiring) {
+                            // Overtaken by a bind. The subscription in place is
+                            // not the one this call set out to remove, and the
+                            // clear that retires THAT one will do its own
+                            // removal, so nothing is left running.
+                            return;
+                        }
                         if (inMemoryBackgroundLocationListener != null) {
                             Context context = AndroidNativeUtil.getContext();
                             Intent intent = new Intent(context, BackgroundLocationHandler.class);
