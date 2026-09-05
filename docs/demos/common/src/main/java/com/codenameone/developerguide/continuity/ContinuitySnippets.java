@@ -163,7 +163,19 @@ public class ContinuitySnippets {
 
     // tag::logout[]
     public void onLogout() {
+        // Both, and in this order. clear() forgets the account's data; disable() closes the
+        // door behind it. clear() on its own leaves continuity ON, so a continuation that
+        // arrives while your login screen is up is a valid arrival to a framework that is
+        // still listening -- and the signed-out account's routes and payload get restored
+        // over it.
         Continuity.clear();
+        Continuity.disable();
+    }
+
+    public void onLogin() {
+        // And open it again. Continuity stays off until you say otherwise, which is what
+        // makes the gap above safe.
+        Continuity.enable();
     }
     // end::logout[]
 

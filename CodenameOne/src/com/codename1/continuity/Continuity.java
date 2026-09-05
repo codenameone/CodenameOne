@@ -1350,7 +1350,7 @@ public final class Continuity {
             //
             // Same rule as the two rollbacks in Navigation: undo what this restore installed, and
             // leave what application code chose afterwards.
-            if (currentRoutes().equals(routes)) {
+            if (isStillTheRestoredStack(currentRoutes(), routes)) {
                 try {
                     clearingStack = true;
                     Navigation.clearStack();
@@ -1648,7 +1648,21 @@ public final class Continuity {
     /// Forgets everything: the stored checkpoint, any parked arrival, the activity advertised to
     /// the user's other devices, and anything queued for the relay.
     ///
-    /// Belongs on your logout path. The advertised activity outlives the app's own screen, so an
+    /// Belongs on your logout path, PAIRED WITH disable(), and enable() on the way back in.
+    ///
+    /// This call alone is not a logout. It forgets the account's data and deliberately leaves
+    /// continuity switched ON, because forgetting state and turning the feature off are two
+    /// different things: an application is entitled to do the first without the second -- a
+    /// "start over" that is not a sign-out -- and making this imply the other would stop
+    /// continuity dead for every app that used it that way and never called enable() again.
+    ///
+    /// The consequence, if it is not paired: a continuation that arrives while the login screen is
+    /// up reaches a framework that is still listening and still enabled. It is a valid arrival by
+    /// every test this class makes -- it came AFTER the clear, so it is not from the session that
+    /// ended -- so the signed-out account's routes and payload are restored over the login screen
+    /// and written to storage. disable() is what closes that gap; enable() at login reopens it.
+    ///
+    /// The advertised activity outlives the app's own screen, so an
     /// account's work would otherwise stay offered to the devices around it after the user signed
     /// out -- and a queued relay publish would have gone out later under whatever credentials the
     /// relay returned by then, which after a logout is the NEXT account's.
@@ -1822,6 +1836,36 @@ public final class Continuity {
     // ------------------------------------------------------------------
     // Internals
     // ------------------------------------------------------------------
+
+    /// Whether the live stack is still the one this restore installed, and nothing else.
+    ///
+    /// Not equality with the REQUESTED routes, which is what this asked before and got wrong the
+    /// moment a route was skipped. restoreStack() drops a path the build no longer registers --
+    /// deliberately, that is the tolerance that lets an old checkpoint still restore what it can
+    /// -- so what it installs is a SUBSEQUENCE of what it was given, and the two are equal only
+    /// when nothing was skipped. Comparing for equality then answered "the application has
+    /// navigated" for a stack the application had not touched, and the abort left the restored
+    /// entries in Navigation: getCurrent() and back() disagreeing with what is on screen, and
+    /// those entries exposed again if continuity is re-enabled.
+    ///
+    /// A subsequence, not a subset, because order is the part that separates the two cases.
+    /// Anything the application navigated to is a path this restore did not ask for -- a login
+    /// screen, a safe list -- so it breaks the subsequence, and a stack that is still in the
+    /// restore's own order with only gaps in it is the restore's own.
+    private static boolean isStillTheRestoredStack(List<String> live, List<String> requested) {
+        int at = 0;
+        for (int i = 0; i < live.size(); i++) {
+            String path = live.get(i);
+            while (at < requested.size() && !requested.get(at).equals(path)) {
+                at++;
+            }
+            if (at == requested.size()) {
+                return false;
+            }
+            at++;
+        }
+        return true;
+    }
 
     private static List<String> currentRoutes() {
         List<String> paths = new ArrayList<String>();

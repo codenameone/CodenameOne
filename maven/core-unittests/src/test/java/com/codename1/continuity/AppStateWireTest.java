@@ -29,6 +29,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -215,6 +216,50 @@ public class AppStateWireTest extends com.codename1.junit.UITestBase {
      * a null LIST ELEMENT, which shifts every index after it -- so the payload arriving on the
      * other device is a different shape from the one that was sent.
      */
+    /**
+     * A NEGATIVE timestamp is refused rather than read as "this state carries no time".
+     *
+     * <p>Zero is the documented absent value and isTooOld() reads anything not positive that way,
+     * so a negative ts arriving from a custom relay or a compatibility sender produced a state
+     * that could never expire -- whatever maxAge the application had configured. An expired
+     * checkout or a released booking hold would go on being restorable for the life of the
+     * install, which is the one thing maxAge exists to stop.</p>
+     *
+     * <p>Refused at the wire boundary rather than clamped, for the reason the sequence check
+     * gives: a value this codec silently repaired would differ from what the sender believes it
+     * sent, and the two sides then disagree about a state neither can see.</p>
+     */
+    @Test
+    public void aNegativeTimestampIsRefused() {
+        String doc = "{\"routes\":[\"/a\"],\"device\":\"phone\",\"seq\":\"3\","
+                + "\"ts\":\"-1\"}";
+
+        assertThrows(IOException.class, new org.junit.jupiter.api.function.Executable() {
+            public void execute() throws Throwable {
+                StateCodec.fromJson(doc);
+            }
+        }, "a negative timestamp was accepted, so the state can never expire");
+    }
+
+    /**
+     * And the extreme of the same value, which is also where the arithmetic would go wrong.
+     *
+     * <p>Long.MIN_VALUE overflows the subtraction isTooOld() would make, and the only reason it
+     * does not today is the positive-guard that this same malformed value hides behind. Refusing
+     * it at the boundary is what keeps both true at once.</p>
+     */
+    @Test
+    public void theMostNegativeTimestampIsRefused() {
+        String doc = "{\"routes\":[\"/a\"],\"device\":\"phone\",\"seq\":\"3\","
+                + "\"ts\":\"" + Long.MIN_VALUE + "\"}";
+
+        assertThrows(IOException.class, new org.junit.jupiter.api.function.Executable() {
+            public void execute() throws Throwable {
+                StateCodec.fromJson(doc);
+            }
+        }, "Long.MIN_VALUE was accepted as a timestamp");
+    }
+
     @Test
     public void aNullPayloadValueIsRefusedWithItsKey() {
         final Map<String, Object> payload = new HashMap<String, Object>();

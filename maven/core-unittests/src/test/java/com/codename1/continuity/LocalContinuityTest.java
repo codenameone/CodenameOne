@@ -5559,6 +5559,69 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A restore whose session ends mid-way empties the stack it installed, even when a route was
+     * SKIPPED.
+     *
+     * <p>restoreStack() drops a path this build no longer registers -- deliberately, it is the
+     * tolerance that lets an old checkpoint restore what it still can -- so what it installs is a
+     * subsequence of what it was asked for, equal to it only when nothing was skipped. The abort
+     * compared the live stack against the REQUESTED routes, so one skipped path made it answer
+     * "the application has navigated" for a stack the application had not touched, and the
+     * restored entries were left in Navigation: getCurrent() and back() disagreeing with what is
+     * on screen, and those entries exposed again if continuity is re-enabled.</p>
+     */
+    @EdtTest
+    public void aSessionEndedMidRestoreEmptiesTheStackEvenWhenARouteWasSkipped() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+
+        final Form dashboard = new Form("dashboard");
+        dashboard.show();
+        flushSerialCalls();
+
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                if ("/gone".equals(url)) {
+                    // A route this build no longer registers. Skipped, not fatal.
+                    return null;
+                }
+                Form f = new Form();
+                f.setTitle(url);
+                if ("/orders/17".equals(url)) {
+                    f.addShowListener(new com.codename1.ui.events.ActionListener() {
+                        public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                            // Ends the session and goes NOWHERE, which is the case that separates
+                            // "the application navigated" from "the restore's own stack".
+                            Continuity.disable();
+                        }
+                    });
+                }
+                return f;
+            }
+        });
+        try {
+            Map<String, Object> payload = new HashMap<String, Object>();
+            payload.put("draft", "the previous account's");
+            Continuity.restore(new AppState()
+                    .setPayload(payload)
+                    .setRoutes(java.util.Arrays.asList("/orders", "/gone", "/orders/17"))
+                    .setDeviceId("some-other-device")
+                    .setSequence(171L)
+                    .setTimestamp(System.currentTimeMillis()));
+            flushSerialCalls();
+
+            assertTrue(Navigation.getStack().isEmpty(),
+                    "the restore's own entries were left in Navigation after the session ended, "
+                        + "because one skipped route made the live stack unequal to the routes "
+                        + "that were asked for: " + Navigation.getStack());
+        } finally {
+            Navigation.setDispatcher(null);
+            Navigation.clearStack();
+        }
+    }
+
+    /**
      * A login form the logout callback put up is not replaced by the screen the restore started
      * from.
      *
@@ -8177,6 +8240,57 @@ public class LocalContinuityTest extends UITestBase {
                 "the arrival displaced onto the shelf before enable() was never dispatched, so "
                         + "its listeners and provider never saw it and it went on holding every "
                         + "relay checkpoint behind it: " + seen);
+    }
+
+    /**
+     * The documented logout flow closes the gap in front of the login screen.
+     *
+     * <p>clear() alone is not a logout and deliberately does not try to be: it forgets the
+     * account's data and leaves continuity switched ON, because forgetting state and turning the
+     * feature off are two different things and an app is entitled to do the first without the
+     * second. The consequence is that a continuation arriving while the login screen is up reaches
+     * a framework that is still enabled, and is valid by every test this class makes -- it came
+     * AFTER the clear, so it is not from the session that ended -- so the signed-out account's
+     * routes and payload get restored over the login screen and written to storage.</p>
+     *
+     * <p>disable() is what closes it. This pins that the pairing the guide and the clear()
+     * javadoc now prescribe is the thing that actually works, rather than advice nothing checks:
+     * take the disable() away and the arrival is restored.</p>
+     */
+    @EdtTest
+    public void theDocumentedLogoutFlowClosesTheGapBeforeTheLoginScreen() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(true);
+        Continuity.enable();
+        flushSerialCalls();
+
+        // The logout path, as the guide and the javadoc prescribe it.
+        Continuity.clear();
+        Continuity.disable();
+        flushSerialCalls();
+        provider.restored = null;
+
+        // A continuation lands while the login screen is up. It is not from the ended session --
+        // it arrived after the clear -- so nothing else in this class refuses it.
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("note", "the signed-out account's work");
+        ContinuityCallback c = Continuity.callbackForTest();
+        assertTrue(c.continuationReceived(Continuity.getActivityType(),
+                        StateCodec.toMap(new AppState()
+                                .setPayload(payload).setDeviceId("phone").setSequence(7L)
+                                .setTimestamp(System.currentTimeMillis()))),
+                "the arrival was not claimed, so the port goes on holding work for an account "
+                        + "that has signed out");
+        flushSerialCalls();
+        flushSerialCalls();
+
+        assertNull(provider.restored,
+                "an arrival that landed in front of the login screen was restored, so the "
+                        + "signed-out account's work is on the next user's screen");
+        AppState left = Continuity.getRestorableState();
+        assertFalse(left != null && "phone".equals(left.getDeviceId()),
+                "the arrival is still on offer, so the enable() at login will apply it");
     }
 
     static class RecordingProvider implements StateProvider {

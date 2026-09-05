@@ -371,6 +371,24 @@ public final class StateCodec {
         requireType(m, KEY_TITLE, String.class, "a string");
         requireNumberLike(m, KEY_SEQUENCE);
         requireNumberLike(m, KEY_TIMESTAMP);
+        // And a timestamp that is not in the PAST-or-absent shape the rest of the framework reads
+        // it as. Zero is the documented "this state carries no time", and isTooOld() reads
+        // anything not positive that way -- so a negative one is a state that can never expire,
+        // whatever maxAge the application configured. An expired checkout or a released booking
+        // hold would go on being restorable for the life of the install, which is the one thing
+        // maxAge exists to stop.
+        //
+        // Refused HERE rather than clamped, for the reason the sequence check gives: a value this
+        // codec silently repaired would differ from what the sender believes it sent, and the two
+        // sides then disagree about a state neither can see. It is also where the arithmetic
+        // stays safe -- Long.MIN_VALUE would overflow a subtraction, and the only reason it does
+        // not today is the positive-guard that this same malformed value hides behind.
+        if (asLong(m.get(KEY_TIMESTAMP)) < 0) {
+            throw new IOException("The continuity relay returned a document whose \""
+                    + KEY_TIMESTAMP + "\" is negative. Zero means a state carries no time and "
+                    + "anything below it means nothing at all, so it is refused rather than read "
+                    + "as a state that can never expire.");
+        }
     }
 
     /// Every ELEMENT of the route array, not just the array.
