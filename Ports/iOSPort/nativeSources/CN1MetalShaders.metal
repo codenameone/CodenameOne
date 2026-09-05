@@ -153,7 +153,14 @@ fragment float4 cn1_fs_textured_rounded(
     float ay = max(dye, 0.0);
     float outside = sqrt(ax * ax + ay * ay);
     float inside = min(max(dxe, dye), 0.0);
-    float coverage = clamp(-(outside + inside - r), 0.0, 1.0);
+    // The 0.5 is the pixel centre. The distance is measured from the centre of
+    // the fragment's cell, so the outermost cell INSIDE a straight edge has its
+    // centre half a pixel in and a bare clamp(-sd) scores it 0.5 -- a uniformly
+    // translucent one-pixel frame around all four sides, not just the corner
+    // arcs. Offsetting by half a pixel puts full coverage on a cell that lies
+    // entirely inside and 0.5 on one the boundary bisects, which is what the
+    // corner antialiasing wanted in the first place.
+    float coverage = clamp(0.5 - (outside + inside - r), 0.0, 1.0);
     if (coverage <= 0.0) {
         return float4(0.0);
     }
