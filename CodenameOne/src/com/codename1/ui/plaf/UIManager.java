@@ -433,6 +433,12 @@ public class UIManager {
         }
 
         styles.put(id, style);
+        // A prefixed style can derive from this id: createStyle resolves
+        // "derive" through getComponentStyle, which reads the very map written
+        // here, and then the result is cached under prefix + id. Without this
+        // the cache keeps answering with the prototype built from the PREVIOUS
+        // base and the style installed here is silently ignored.
+        prefixedStyles.clear();
     }
 
     /// Allows a developer to programmatically install a style into the UI manager
@@ -462,6 +468,12 @@ public class UIManager {
         }
 
         styles.put(id, style);
+        // A prefixed style can derive from this id: createStyle resolves
+        // "derive" through getComponentStyle, which reads the very map written
+        // here, and then the result is cached under prefix + id. Without this
+        // the cache keeps answering with the prototype built from the PREVIOUS
+        // base and the style installed here is silently ignored.
+        prefixedStyles.clear();
     }
 
     /// Allows a developer to programmatically install a style into the UI manager
@@ -480,6 +492,12 @@ public class UIManager {
         }
 
         selectedStyles.put(id, style);
+        // A prefixed style can derive from this id: createStyle resolves
+        // "derive" through getComponentStyle, which reads the very map written
+        // here, and then the result is cached under prefix + id. Without this
+        // the cache keeps answering with the prototype built from the PREVIOUS
+        // base and the style installed here is silently ignored.
+        prefixedStyles.clear();
     }
 
     /// Returns the style of the component with the given id or a **new instance** of the default
