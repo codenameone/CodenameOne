@@ -63,7 +63,8 @@ public final class PublicKey extends Key {
     /// Accepts a `PUBLIC KEY` (SPKI) block, the older PKCS#1 `RSA PUBLIC KEY`
     /// block, and -- for keys carried in JSON or a build hint rather than a
     /// file -- bare base64 with no `-----BEGIN-----` armor at all. Line
-    /// endings, blank lines and text surrounding the block are ignored.
+    /// endings, blank lines and text surrounding the block are ignored, and in
+    /// a file holding several blocks the first public key is the one used.
     ///
     /// Throws [CryptoException] if the text is not a public key, if it is
     /// passphrase-encrypted, or if the key is neither RSA nor EC.

@@ -58,8 +58,10 @@ public final class PrivateKey extends Key {
     /// Accepts a `PRIVATE KEY` (PKCS#8) block and also the older
     /// `RSA PRIVATE KEY` (PKCS#1) and `EC PRIVATE KEY` (SEC1) blocks, which are
     /// rewrapped as PKCS#8 here -- so a key straight out of `ssh-keygen -m PEM`
-    /// or `openssl ecparam -genkey` works without a conversion step. Bare
-    /// base64 with no `-----BEGIN-----` armor is accepted too.
+    /// or `openssl ecparam -genkey` works without a conversion step, including
+    /// the `EC PARAMETERS` block that command writes ahead of the key: the
+    /// first block that actually is a private key is the one used. Bare base64
+    /// with no `-----BEGIN-----` armor is accepted too.
     ///
     /// A passphrase-encrypted key (`ENCRYPTED PRIVATE KEY`) is rejected with a
     /// [CryptoException] naming the command that decrypts it; so is a key that

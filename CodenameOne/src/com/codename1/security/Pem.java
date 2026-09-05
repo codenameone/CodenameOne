@@ -43,6 +43,9 @@ final class Pem {
     private static final int SHAPE_SEC1 = 4;
     private static final int SHAPE_UNKNOWN = 5;
 
+    private static final String[] PUBLIC_LABELS = {"PUBLIC KEY", "RSA PUBLIC KEY"};
+    private static final String[] PRIVATE_LABELS = {"PRIVATE KEY", "RSA PRIVATE KEY", "EC PRIVATE KEY"};
+
     private static final String BEGIN = "-----BEGIN ";
     private static final String END = "-----END ";
     private static final String DASHES = "-----";
@@ -67,15 +70,7 @@ final class Pem {
     /// Accepts a `PUBLIC KEY` block, a PKCS#1 `RSA PUBLIC KEY` block (rewrapped
     /// here), or bare base64 with no armor at all.
     static byte[] toSpki(String pem) {
-        String label = label(pem);
-        byte[] der = body(pem, label);
-        if (label != null && !"PUBLIC KEY".equals(label) && !"RSA PUBLIC KEY".equals(label)) {
-            if ("CERTIFICATE".equals(label)) {
-                throw new CryptoException("this is a certificate, not a public key; "
-                        + "extract the key with: openssl x509 -in cert.pem -pubkey -noout");
-            }
-            throw new CryptoException("not a public key PEM block: -----BEGIN " + label + "-----");
-        }
+        byte[] der = select(pem, PUBLIC_LABELS, false);
         // The container is settled by the DER's own shape rather than by the
         // label, so unarmored input accepts exactly what armored input does.
         int shape = shapeOf(der);
@@ -101,16 +96,7 @@ final class Pem {
     /// SEC1 `EC PRIVATE KEY` blocks (rewrapped here), or bare base64 with no
     /// armor at all.
     static byte[] toPkcs8(String pem) {
-        String label = label(pem);
-        byte[] der = body(pem, label);
-        if (label != null && !"PRIVATE KEY".equals(label)
-                && !"RSA PRIVATE KEY".equals(label) && !"EC PRIVATE KEY".equals(label)) {
-            if ("ENCRYPTED PRIVATE KEY".equals(label)) {
-                throw new CryptoException("this private key is passphrase-encrypted; decrypt it first with: "
-                        + "openssl pkcs8 -topk8 -nocrypt -in key.pem -out key_pkcs8.pem");
-            }
-            throw new CryptoException("not a private key PEM block: -----BEGIN " + label + "-----");
-        }
+        byte[] der = select(pem, PRIVATE_LABELS, true);
         int shape = shapeOf(der);
         if (shape == SHAPE_PKCS8) {
             return der;
@@ -203,22 +189,55 @@ final class Pem {
         return integers >= 9 ? SHAPE_PKCS1_PRIVATE : SHAPE_UNKNOWN;
     }
 
-    /// Returns the label of the first armored block, or `null` when the input
-    /// carries no armor and is therefore treated as bare base64.
-    private static String label(String pem) {
+    /// Decodes the first armored block whose label is one of `wanted`.
+    ///
+    /// The first block is not necessarily the key: `openssl ecparam -genkey`
+    /// writes an `EC PARAMETERS` block ahead of the `EC PRIVATE KEY` one, and
+    /// taking whatever came first rejected that file even though it holds
+    /// exactly the key that was asked for. Input carrying no armor at all is
+    /// decoded whole.
+    private static byte[] select(String pem, String[] wanted, boolean privateKey) {
         if (pem == null) {
             throw new CryptoException("pem must not be null");
         }
-        int begin = pem.indexOf(BEGIN);
-        if (begin < 0) {
-            return null;
+        if (pem.indexOf(BEGIN) < 0) {
+            return body(pem, null);
         }
-        int labelStart = begin + BEGIN.length();
-        int labelEnd = pem.indexOf(DASHES, labelStart);
-        if (labelEnd < 0) {
-            throw new CryptoException("malformed PEM: -----BEGIN line is not terminated");
+        StringBuilder seen = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int begin = pem.indexOf(BEGIN, at);
+            if (begin < 0) {
+                break;
+            }
+            int labelStart = begin + BEGIN.length();
+            int labelEnd = pem.indexOf(DASHES, labelStart);
+            if (labelEnd < 0) {
+                throw new CryptoException("malformed PEM: -----BEGIN line is not terminated");
+            }
+            String label = pem.substring(labelStart, labelEnd).trim();
+            for (int i = 0; i < wanted.length; i++) {
+                if (wanted[i].equals(label)) {
+                    return body(pem.substring(begin), label);
+                }
+            }
+            if (seen.length() > 0) {
+                seen.append(", ");
+            }
+            seen.append(label);
+            at = labelEnd + DASHES.length();
         }
-        return pem.substring(labelStart, labelEnd).trim();
+        String labels = seen.toString();
+        if (privateKey && labels.indexOf("ENCRYPTED PRIVATE KEY") >= 0) {
+            throw new CryptoException("this private key is passphrase-encrypted; decrypt it first with: "
+                    + "openssl pkcs8 -topk8 -nocrypt -in key.pem -out key_pkcs8.pem");
+        }
+        if (!privateKey && labels.indexOf("CERTIFICATE") >= 0) {
+            throw new CryptoException("this is a certificate, not a public key; "
+                    + "extract the key with: openssl x509 -in cert.pem -pubkey -noout");
+        }
+        throw new CryptoException("no " + (privateKey ? "private" : "public")
+                + " key block in this PEM; it holds: " + labels);
     }
 
     /// Base64-decodes the payload between the armor lines (or the whole input

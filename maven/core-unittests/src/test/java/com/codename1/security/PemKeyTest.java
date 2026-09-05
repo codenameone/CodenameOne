@@ -531,6 +531,34 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void aLeadingParametersBlockIsSkipped() {
+        // "openssl ecparam -name prime256v1 -genkey" (without -noout) writes an
+        // EC PARAMETERS block ahead of the key, and taking whatever block came
+        // first rejected that file -- the exact command the javadoc says works.
+        String twoBlocks = pem("EC PARAMETERS", "BggqhkjOPQMBBw==")
+                + pem(EC_SEC1_LABEL, EC_SEC1);
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(twoBlocks).getEncoded());
+    }
+
+    @Test
+    void eachFactoryPicksItsOwnBlockFromAMixedFile() {
+        String both = pem(EC_SPKI_LABEL, EC_SPKI) + pem(EC_PKCS8_LABEL, EC_PKCS8);
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(both).getEncoded());
+        assertArrayEquals(der(EC_SPKI), PublicKey.fromPem(both).getEncoded());
+
+        String reversed = pem(EC_PKCS8_LABEL, EC_PKCS8) + pem(EC_SPKI_LABEL, EC_SPKI);
+        assertArrayEquals(der(EC_SPKI), PublicKey.fromPem(reversed).getEncoded());
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(reversed).getEncoded());
+    }
+
+    @Test
+    void aFileWithNoUsableBlockNamesWhatItHolds() {
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem("EC PARAMETERS", "BggqhkjOPQMBBw==")));
+        assertTrue(e.getMessage().contains("EC PARAMETERS"), e.getMessage());
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));
