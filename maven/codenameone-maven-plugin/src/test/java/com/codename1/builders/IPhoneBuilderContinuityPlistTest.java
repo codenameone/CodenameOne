@@ -170,6 +170,93 @@ class IPhoneBuilderContinuityPlistTest {
     }
 
     /**
+     * A declaration spelled with character references is the SAME declaration.
+     *
+     * <p>Foundation resolves {@code <string>com&#46;example.app.continuity</string>} to
+     * {@code com.example.app.continuity}, so a project that spells its injected type that way has
+     * declared exactly what this build publishes. topLevelPlistString sliced the raw XML between
+     * the tags and handed back the undecoded text, so the equality check called it a CONFLICTING
+     * declaration and failed a build that was correct.</p>
+     *
+     * <p>The key half of the same method already resolved through the shared helper -- that is
+     * what makes the fragment findable at all -- so the two halves were answering one question
+     * two different ways.</p>
+     */
+    @Test
+    void aDeclarationSpelledWithCharacterReferencesAgrees() throws BuildException {
+        String inject = "<key>CN1ContinuityActivityType</key>"
+                + "<string>com&#46;example.app.continuity</string>";
+
+        String out = IPhoneBuilder.withContinuityActivityType(inject, CONTINUITY_TYPE);
+
+        assertEquals(inject, out,
+                "an agreeing declaration spelled with a character reference was treated as a "
+                        + "conflict, so a correct build was refused");
+    }
+
+    /**
+     * The same resolution must not blunt the conflict check itself.
+     *
+     * <p>Decoding is only correct if a genuinely different type still fails: a declaration naming
+     * another app's type has the delegate rejecting this application's own continuations while
+     * iOS goes on offering them.</p>
+     */
+    @Test
+    void aDifferentTypeSpelledWithCharacterReferencesStillConflicts() {
+        String inject = "<key>CN1ContinuityActivityType</key>"
+                + "<string>com&#46;other.app.continuity</string>";
+
+        try {
+            IPhoneBuilder.withContinuityActivityType(inject, CONTINUITY_TYPE);
+            fail("a declaration naming a different type must still be refused");
+        } catch (BuildException expected) {
+            assertTrue(expected.getMessage().contains("com.other.app.continuity"),
+                    "the message should name the DECODED type the project declared: "
+                            + expected.getMessage());
+        }
+    }
+
+    /**
+     * Two live root NSUserActivityTypes declarations are refused rather than guessed between.
+     *
+     * <p>A property list takes the LAST of a duplicated key while every lookup here answers with
+     * the first, so merging into the first leaves the second in force on the device: a build that
+     * succeeds with the activity types sitting in an array iOS never reads, and Handoff silently
+     * not advertised. UIApplicationSceneManifest is already refused for exactly this.</p>
+     */
+    @Test
+    void twoLiveActivityTypesDeclarationsAreRefused() {
+        String inject = "<key>NSUserActivityTypes</key><array>"
+                + "<string>com.example.app.legacy</string></array>"
+                + "<key>NSUserActivityTypes</key><array>"
+                + "<string>com.example.app.replacement</string></array>";
+
+        try {
+            IPhoneBuilder.requireSingleUserActivityTypes(inject);
+            fail("a duplicated NSUserActivityTypes must not be silently merged into one of them");
+        } catch (BuildException expected) {
+            assertTrue(expected.getMessage().contains("twice"), expected.getMessage());
+        }
+    }
+
+    /**
+     * A declaration the project COMMENTED OUT is not a second declaration.
+     *
+     * <p>The live-element handling exists for exactly this shape -- a project that kept its old
+     * declaration above the real one -- so a duplicate check that counted the comment would refuse
+     * the projects that handling was added for.</p>
+     */
+    @Test
+    void aCommentedOutActivityTypesDeclarationIsNotADuplicate() throws BuildException {
+        String inject = "<!-- <key>NSUserActivityTypes</key><array>"
+                + "<string>com.example.app.legacy</string></array> -->"
+                + "<key>NSUserActivityTypes</key><array>"
+                + "<string>com.example.app.replacement</string></array>";
+
+        IPhoneBuilder.requireSingleUserActivityTypes(inject);
+    }
+
+    /**
      * A NSUserActivityTypes whose value is not an array is refused once a continuity type depends
      * on it.
      *

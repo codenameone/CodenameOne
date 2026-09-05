@@ -11741,6 +11741,12 @@ public class IPhoneBuilder extends Executor {
                     + "'. The application would refuse its own continuations. Remove the "
                     + "injected key.");
         }
+        // Only an AGREEING declaration reaches here. A value that differs was refused by the
+        // check above and a non-string one by the check above that, so this cannot leave the
+        // fragment advertising one type through NSUserActivityTypes while the delegate reads
+        // another -- both keys are written from the same resolved string a few lines apart in the
+        // caller, and a declaration that disagrees with it fails the build rather than being
+        // stood aside for.
         if (declaresTopLevelPlistKey(inject, "CN1ContinuityActivityType")) {
             return inject;
         }
@@ -12053,6 +12059,39 @@ public class IPhoneBuilder extends Executor {
                 + "', which iOS only reads from an <array> under that key. Declare it as an "
                 + "array -- the build adds the type to an array it can find -- or leave the key "
                 + "out so the build writes the whole array itself.");
+    }
+
+    /// Refuses a fragment that declares NSUserActivityTypes twice at the root.
+    ///
+    /// The trap UIApplicationSceneManifest is already refused for, and it resolves the same way: a
+    /// property list takes the LAST of a duplicated key, while every lookup here answers with the
+    /// first. Merging into the first would leave the second in force on the device -- a build that
+    /// succeeds with the activity types sitting in an array iOS never reads, so Handoff and
+    /// Spotlight are silently not advertised and nothing says so until they do not work.
+    ///
+    /// There is no safe pick between them. Fragments composed by more than one injector are how
+    /// this arises, and merging into either one is a guess about which the parser will keep, so it
+    /// is reported rather than guessed at.
+    ///
+    /// Comment-aware, because plistMemberRange walks live elements only: a declaration the project
+    /// kept COMMENTED OUT above its real one is not a second declaration, and refusing that would
+    /// break the very projects the live-element handling was added for.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inject`: the plist fragment the application supplied
+    ///
+    /// #### Throws
+    ///
+    /// - `BuildException`: when the key is declared more than once at the root
+    static void requireSingleUserActivityTypes(String inject) throws BuildException {
+        if (!plistMemberDuplicated(inject, 0, inject.length(), "NSUserActivityTypes")) {
+            return;
+        }
+        throw new BuildException("ios.plistInject declares NSUserActivityTypes twice. A property "
+                + "list takes the last of a duplicated key, so this build cannot tell which array "
+                + "the device will read -- and the activity types would go into the other one. "
+                + "Compose them into one array.");
     }
 
     /// The same merge, adding the continuity activity type alongside the intent ids.
@@ -13042,7 +13081,20 @@ public class IPhoneBuilder extends Executor {
         if (!value.startsWith("<string>") || !value.endsWith("</string>")) {
             return null;
         }
-        return value.substring("<string>".length(), value.length() - "</string>".length()).trim();
+        // The element's CONTENT through the shared resolver, not a slice of its serialization.
+        // A plist author may spell a value with character references -- "com&#46;example.app" --
+        // or wrap it in CDATA, or put a comment inside the element, and Foundation reads all
+        // three as the same string. Handing back the raw text made every caller compare the
+        // serialization instead: withContinuityActivityType saw "com&#46;example.app.continuity"
+        // where the build publishes "com.example.app.continuity", called that a conflicting
+        // declaration, and failed a build that was correct.
+        //
+        // The key side of this method already resolves the same way -- plistMemberRange compares
+        // key names through this helper -- so the two halves were answering one question two
+        // different ways.
+        String content = WatchNativeBuilder.plistStringContentExact(
+                value.substring("<string>".length(), value.length() - "</string>".length()));
+        return content == null ? null : content.trim();
     }
 
     /// Whether the fragment declares the key as a member of ITS OWN level.
@@ -14669,6 +14721,7 @@ public class IPhoneBuilder extends Executor {
             // own: a valid CDATA value containing the text "<!--" and no "-->" looked like an
             // unterminated comment, so everything after it was truncated and a live root key
             // beyond it went missing -- and this branch then appended a SECOND one.
+            requireSingleUserActivityTypes(inject);
             if (firstLiveRootIndex(inject, "NSUserActivityTypes") < 0) {
                 inject += userActivityTypesKey(intentsManifest, continuityActivityType);
             } else {
