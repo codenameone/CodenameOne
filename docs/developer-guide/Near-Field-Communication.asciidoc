@@ -58,7 +58,17 @@ For FeliCa on iOS, set the system codes in `NfcReadOptions`:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NearFieldCommunicationJava003Snippet.java[tag=near-field-communication-java-003,indent=0]
 ----
 
-The Codename One Maven plugin and build daemon automatically register `com.apple.developer.nfc.readersession.felica.systemcodes` from these values.
+The builders can't derive the entitlement from that call -- the codes are a
+runtime argument they never see. Declare the same codes as a build hint, which
+the generic entitlement renderer emits into the app:
+
+----
+codename1.arg.ios.entitlements.com.apple.developer.nfc.readersession.felica.systemcodes=0003\n8008
+----
+
+Seeing `com.codename1.nfc` on the classpath gets you CoreNFC, a default
+`NFCReaderUsageDescription` and `com.apple.developer.nfc.readersession.formats`
+automatically. The FeliCa system codes are the one part you supply.
 
 === Quick start: Host card emulation
 

@@ -84,8 +84,10 @@ class DeviceInputAndFormFactorsJava005Snippet {
     void snippet() throws Exception {
         // tag::device-input-and-form-factors-java-005[]
         DevicePosture p = CN.getDevicePosture();
-        if (p.isFoldable() && p.isTableTop()) {
-            // half-opened, hinge horizontal: put media on top, controls on the bottom half
+        // isTableTop() is true for book posture too, so check the hinge is
+        // horizontal before laying out top-and-bottom
+        if (p.isFoldable() && p.isTableTop()
+                && p.getFoldOrientation() == DevicePosture.FOLD_ORIENTATION_HORIZONTAL) {
             layoutForTableTop(p.getFoldBounds(null));
         }
         // end::device-input-and-form-factors-java-005[]

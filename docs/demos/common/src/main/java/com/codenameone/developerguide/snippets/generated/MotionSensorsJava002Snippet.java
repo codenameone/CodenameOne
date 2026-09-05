@@ -83,7 +83,10 @@ class MotionSensorsJava002Snippet {
     
     void snippet() throws Exception {
         // tag::motion-sensors-java-002[]
-        accelerometer.removeListener(listener);
+        // getSensor returns null on a device without the hardware
+        if (accelerometer != null) {
+            accelerometer.removeListener(listener);
+        }
         // end::motion-sensors-java-002[]
     }
 

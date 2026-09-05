@@ -81,13 +81,23 @@ class MotionSensorsJava003Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     
-    void snippet() throws Exception {
-        // tag::motion-sensors-java-003[]
-        MotionSensorManager.getInstance().addGestureListener(GestureEvent.TYPE_SHAKE, new GestureListener() {
+    // tag::motion-sensors-java-003[]
+    private GestureListener shakeListener;
+
+    void listenForShake() {
+        shakeListener = new GestureListener() {
             public void gestureDetected(GestureEvent evt) {
                 Dialog.show("Shaken", "You shook the device", "OK", null);
             }
-        });
-        // end::motion-sensors-java-003[]
+        };
+        MotionSensorManager.getInstance()
+                .addGestureListener(GestureEvent.TYPE_SHAKE, shakeListener);
     }
+
+    void stopListeningForShake() {
+        // the accelerometer stays powered while any gesture listener is registered
+        MotionSensorManager.getInstance()
+                .removeGestureListener(GestureEvent.TYPE_SHAKE, shakeListener);
+    }
+    // end::motion-sensors-java-003[]
 }

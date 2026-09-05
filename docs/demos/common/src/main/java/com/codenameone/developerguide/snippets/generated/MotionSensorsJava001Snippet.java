@@ -81,21 +81,25 @@ class MotionSensorsJava001Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     
-    void snippet() throws Exception {
-        // tag::motion-sensors-java-001[]
+    // tag::motion-sensors-java-001[]
+    private MotionSensor accelerometer;
+    private MotionSensorListener listener;
+
+    void startSampling() {
         MotionSensorManager m = MotionSensorManager.getInstance();
-        MotionSensor accelerometer = m.getSensor(MotionSensorManager.TYPE_ACCELEROMETER);
-        MotionSensorListener listener = new MotionSensorListener() {
-            public void motionReceived(MotionEvent evt) {
-                // x, y and z are in meters per second squared
-                label.setText(evt.getX() + ", " + evt.getY() + ", " + evt.getZ());
-                label.getParent().revalidate();
-            }
-        };
+        accelerometer = m.getSensor(MotionSensorManager.TYPE_ACCELEROMETER);
         if (accelerometer != null) {
-            // keep the reference: removeListener needs this exact object
+            // both are fields: removeListener needs this exact object, and the
+            // form's removeNotify runs long after this method returns
+            listener = new MotionSensorListener() {
+                public void motionReceived(MotionEvent evt) {
+                    // x, y and z are in meters per second squared
+                    label.setText(evt.getX() + ", " + evt.getY() + ", " + evt.getZ());
+                    label.getParent().revalidate();
+                }
+            };
             accelerometer.addListener(listener);
         }
-        // end::motion-sensors-java-001[]
     }
+    // end::motion-sensors-java-001[]
 }
