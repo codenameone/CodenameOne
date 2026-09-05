@@ -162,6 +162,54 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aPrefixTheRootReboundIsNotOursEither() throws Exception {
+        // The rebinding lives where a manifest actually declares its
+        // namespaces -- on the root -- and the element binds nothing itself.
+        // Checking only the element left the conventional prefix unexamined,
+        // so this decoy android:name was read as a real background-location
+        // request and an exclusive build was refused over a permission the
+        // merger never sees.
+        File root = tempDir("cn1-lb-rootbind");
+        String manifest = "<manifest xmlns:android=\"urn:fake\""
+                + " xmlns:a=\"http://schemas.android.com/apk/res/android\">"
+                + "<uses-permission android:name=\"android.permission."
+                + "ACCESS_BACKGROUND_LOCATION\" a:name=\"android.permission."
+                + "INTERNET\"/></manifest>";
+        writeAar(new File(root, "rootbind.aar"), manifest);
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresBackgroundLocation(),
+                "a prefix the root bound elsewhere is not the Android "
+                + "namespace, however conventional its spelling");
+    }
+
+    @Test
+    void anApplicationRemovalOfBackgroundLocationIsRecognised() {
+        // tools:node="remove" in the project's own block outranks a library
+        // that contributed the permission, and the merger honours it. The
+        // builder consults this before folding an archive's declaration into
+        // the exclusivity check, so a developer who removed the transitive
+        // request is not refused the hint they now qualify for.
+        String removal = "    <uses-permission android:name=\"android."
+                + "permission.ACCESS_BACKGROUND_LOCATION\" tools:node=\""
+                + "remove\" />\n";
+        assertTrue(LocationButtonManifestFragments
+                        .removesBackgroundLocation(removal),
+                "an active removal of background location is a removal");
+        // And a plain declaration is not a removal, nor is a commented-out one
+        // either kind.
+        assertFalse(LocationButtonManifestFragments.removesBackgroundLocation(
+                "    <uses-permission android:name=\"android.permission."
+                + "ACCESS_BACKGROUND_LOCATION\" />\n"));
+        assertFalse(LocationButtonManifestFragments.removesBackgroundLocation(
+                "    <!-- <uses-permission android:name=\"android.permission."
+                + "ACCESS_BACKGROUND_LOCATION\" tools:node=\"remove\" /> -->"
+                + "\n"),
+                "a commented-out removal removes nothing");
+        assertFalse(LocationButtonManifestFragments
+                .removesBackgroundLocation(null));
+    }
+
+    @Test
     void anSdk23RemovalIsClosedWithItsOwnTag() {
         // declaresPermissionAt accepts any tag beginning "uses-permission",
         // which includes uses-permission-sdk-23. A hard-coded

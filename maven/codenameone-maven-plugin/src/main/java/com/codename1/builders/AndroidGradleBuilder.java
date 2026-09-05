@@ -3090,10 +3090,17 @@ public class AndroidGradleBuilder extends Executor {
                         + "values the bytecode scan cannot see");
                 usesLocationButton = true;
             }
-        } catch (Exception scanFailed) {
-            // The bytecode scan above has already run and is the primary
-            // signal; this one only ever adds to it.
-            debug("Application location scan failed: " + scanFailed);
+        } catch (IOException budgetOrIo) {
+            // Upwards, exactly like the library scan below, and for the same
+            // reason: a tree we only partly read cannot answer whether the
+            // button is used. Swallowing it here made unknown mean ABSENT --
+            // and absent deletes the bridge and drops the permission, so an
+            // application that reaches the button only through an annotation
+            // would ship the API-37 control with nothing behind it. The
+            // bytecode scan cannot cover for that: it does not visit
+            // annotations at all, which is why this scan exists.
+            throw new BuildException("Failed to scan the application classes"
+                    + " for location API usage.", budgetOrIo);
         }
 
         try {
@@ -3119,7 +3126,16 @@ public class AndroidGradleBuilder extends Executor {
             // so no bytecode scan sees it, and its permission still merges into
             // the application's manifest. Exclusive mode is as wrong for that
             // app as it is for one that geofences.
-            appBackgroundLocation |= libraryLocation.declaresBackgroundLocation();
+            // Unless the application REMOVES it. tools:node="remove" in the
+            // project's own block outranks the library that contributed the
+            // permission and the merger honours it, so the merged manifest
+            // asks for nothing -- and refusing the build anyway punishes the
+            // developer who did exactly the right thing to qualify for the
+            // hint. Same mistake as reading their removal as a declaration,
+            // approached from the other side.
+            appBackgroundLocation |= libraryLocation.declaresBackgroundLocation()
+                    && !LocationButtonManifestFragments
+                            .removesBackgroundLocation(xPermissions);
             // The library hit declares the ORDINARY location permissions too,
             // not only the button's. inject() below adds fine and coarse, but
             // the uses-feature declarations that mark the location hardware

@@ -108,6 +108,36 @@ final class LocationButtonManifestFragments {
     static final String ONLY_FOR_LOCATION_BUTTON = "onlyForLocationButton";
 
     /**
+     * Whether the project's own block actively REMOVES background location.
+     *
+     * <p>{@code tools:node="remove"} in the application's manifest outranks a
+     * library that contributed the permission, and the merger honours it: the
+     * merged manifest does not request background location at all. Folding an
+     * archive's own declaration into the exclusivity check regardless refused
+     * the build of a developer who had done exactly the right thing to qualify
+     * for the hint -- which is the same mistake, from the other side, as
+     * reading their removal as a declaration.</p>
+     *
+     * @param xPermissions the permission block, or null
+     * @return whether some live element removes the background permission
+     */
+    static boolean removesBackgroundLocation(String xPermissions) {
+        if (xPermissions == null) {
+            return false;
+        }
+        int at = xPermissions.indexOf(BACKGROUND_LOCATION);
+        while (at >= 0) {
+            if (declaresPermissionAt(xPermissions, at, BACKGROUND_LOCATION)
+                    && isRemovalDirective(xPermissions, at)) {
+                return true;
+            }
+            at = xPermissions.indexOf(BACKGROUND_LOCATION,
+                    at + BACKGROUND_LOCATION.length());
+        }
+        return false;
+    }
+
+    /**
      * Whether the manifest permissions accumulated so far already ask for
      * background location.
      *
@@ -850,15 +880,50 @@ final class LocationButtonManifestFragments {
         // would mean tracking nesting, and it does not need to be: these are
         // uses-permission elements directly under manifest, so the element and
         // the root are the only two scopes there are.
+        String root = rootElement(document);
         for (int iter = out.size() - 1; iter >= 0; iter--) {
-            int[] bound = findAttribute(element, "xmlns:" + out.get(iter));
+            String prefix = out.get(iter);
+            // The INNERMOST binding wins: the element's own, and failing that
+            // the root's. Checking only the element left the conventional
+            // prefix unexamined whenever the rebinding was at the root -- which
+            // is where a manifest declares its namespaces -- so a decoy
+            // android:name on an element that binds nothing itself was still
+            // read as an Android attribute.
+            String owner = element;
+            int[] bound = findAttribute(element, "xmlns:" + prefix);
+            if (bound == null && root.length() > 0) {
+                owner = root;
+                bound = findAttribute(root, "xmlns:" + prefix);
+            }
             if (bound != null
-                    && !uri.equals(element.substring(bound[2], bound[3])
+                    && !uri.equals(owner.substring(bound[2], bound[3])
                             .trim())) {
                 out.remove(iter);
             }
         }
         return out.toArray(new String[out.size()]);
+    }
+
+    /**
+     * The document's root {@code <manifest>} element, or an empty string.
+     *
+     * <p>Where a manifest declares its namespaces, and the outer scope for
+     * every {@code uses-permission} beneath it. Empty for an
+     * {@code android.xpermissions} fragment, which has no root element -- and
+     * that emptiness matters: searching the whole fragment for a binding would
+     * let one element's {@code xmlns} decide the reading of another's, which
+     * is not what scope means.</p>
+     *
+     * @param document the file or fragment
+     * @return the root element's text, or {@code ""} when there is none
+     */
+    private static String rootElement(String document) {
+        int at = document.indexOf("<manifest");
+        if (at < 0) {
+            return "";
+        }
+        int close = document.indexOf('>', at);
+        return close < 0 ? "" : document.substring(at, close + 1);
     }
 
     /**
