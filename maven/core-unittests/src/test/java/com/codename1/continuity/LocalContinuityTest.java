@@ -4536,6 +4536,94 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A state that expires while the user is deciding is refused when the listener hands it back.
+     *
+     * <p>dispatch() and getRestorableState() both check maxAge, and neither is the last word. The
+     * documented flow is that a listener returns false, prompts, and calls restore(state) when the
+     * user accepts -- and the deciding is exactly the time that passes. An expired checkout or
+     * booking hold is what maxAge exists to refuse, and it was applied, persisted and acknowledged
+     * because this door did not ask.</p>
+     */
+    @EdtTest
+    public void aStateThatExpiredWhileTheUserDecidedIsRefused() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+        try {
+            AppState offered = new AppState()
+                    .setPayload(payloadWith("a checkout hold"))
+                    .setDeviceId("some-other-device").setSequence(420L)
+                    .setTimestamp(System.currentTimeMillis());
+
+            // Fresh when it arrives.
+            Continuity.setMaxAge(60000L);
+            Continuity.deliver(offered);
+            flushSerialCalls();
+            assertNotNull(Continuity.getRestorableState(), "the arrival was not offered at all");
+
+            // The user takes their time, and the hold expires while the prompt is up.
+            Continuity.setMaxAge(1L);
+            pause(30L);
+
+            assertFalse(Continuity.restore(offered), "an expired state reported a shown form");
+            flushSerialCalls();
+            assertNull(provider.restored,
+                    "an expired checkout hold was handed to the provider, applied and "
+                            + "acknowledged, though maxAge exists to refuse exactly that");
+            assertNull(Continuity.getRestorableState(),
+                    "the expired state is still on offer, so the application will be handed it "
+                            + "again");
+        } finally {
+            Continuity.setMaxAge(0L);
+        }
+    }
+
+    /**
+     * A redirect started inside a route FACTORY wins over the stack being rebuilt.
+     *
+     * <p>A factory is application code and may redirect -- an expired detail page sending the user
+     * to a list. It does so before restoreStack() has installed anything, so the rebuild replaced
+     * both its stack entry and its screen with the ones being restored. The show-callback twin of
+     * this was fixed earlier; this one happens a step sooner.</p>
+     */
+    @EdtTest
+    public void aRedirectStartedInsideAFactoryWins() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+        final boolean[] redirected = new boolean[1];
+        Navigation.setDispatcher(new RouteDispatcher() {
+            public Form dispatch(String url) {
+                if ("/orders/17".equals(url) && !redirected[0]) {
+                    redirected[0] = true;
+                    // "That order is gone." Redirect from inside the factory itself -- and still
+                    // answer with a form, because a factory that returns null is already covered
+                    // by the empty-rebuild check and would make this test pass either way. That
+                    // is what a first version of it did.
+                    Navigation.navigate("/orders");
+                }
+                Form f = new Form();
+                f.setTitle(url);
+                return f;
+            }
+        });
+        try {
+            Continuity.restore(new AppState()
+                    .setRoutes(java.util.Arrays.asList("/orders/17"))
+                    .setDeviceId("some-other-device").setSequence(430L)
+                    .setTimestamp(System.currentTimeMillis()));
+            flushSerialCalls();
+            assertTrue(redirected[0], "the factory never redirected, so this tests nothing");
+
+            assertNotNull(Navigation.getCurrent(), "the stack was left empty");
+            assertEquals("/orders", Navigation.getCurrent().getPath(),
+                    "the rebuild replaced the screen the factory redirected to; top is "
+                            + Navigation.getCurrent().getPath());
+        } finally {
+            Navigation.setDispatcher(null);
+        }
+    }
+
+    /**
      * A local checkpoint whose restore FAILED survives the next checkpoint.
      *
      * <p>dispatch() already keeps an arrival whose restore failed; the application-driven path

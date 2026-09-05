@@ -298,6 +298,9 @@ public final class Navigation {
         if (d == null || paths == null || paths.isEmpty()) {
             return false;
         }
+        // The stack as it stands BEFORE any factory runs, so a factory that navigates can be
+        // told apart from one that does not. See the check after the loop.
+        List<NavigationEntry> beforeDispatch = new ArrayList<NavigationEntry>(stack);
         List<NavigationEntry> rebuilt = new ArrayList<NavigationEntry>();
         for (String path : paths) {
             if (sessionEnded()) {
@@ -327,6 +330,18 @@ public final class Navigation {
             if (f != null) {
                 rebuilt.add(new NavigationEntry(path, f));
             }
+        }
+        if (!beforeDispatch.equals(stack)) {
+            // A FACTORY navigated. A route factory is application code and may redirect -- an
+            // expired detail page sending the user to a list, a screen that has moved -- and it
+            // does so before this method has installed anything, so the rebuild that follows
+            // would replace both its stack entry and its screen with the ones being restored.
+            //
+            // Its choice wins, which is the same rule the rollback below and the ordinary
+            // navigations already use: whatever ran later and changed the stack meant to. This
+            // returns false, so Continuity treats the restore as one that showed nothing, and the
+            // reconciliation there checkpoints the stack the factory actually left behind.
+            return false;
         }
         if (rebuilt.isEmpty() || sessionEnded()) {
             // Asked again, because the loop tests before each factory and the LAST one has no

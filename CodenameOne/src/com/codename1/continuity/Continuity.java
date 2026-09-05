@@ -1097,6 +1097,23 @@ public final class Continuity {
         if (state == null) {
             return false;
         }
+        if (isTooOld(state)) {
+            // Rechecked HERE, where the application hands one back. dispatch() and
+            // getRestorableState() both ask, and neither is the last word: the documented flow is
+            // that a listener returns false, puts a prompt in front of the user, and calls
+            // restore(state) when they accept -- and the deciding is exactly the time that
+            // passes. A state fresh when it was offered can be stale by the time it is taken, and
+            // an expired checkout or booking hold is precisely what maxAge exists to refuse.
+            //
+            // Discarded the way getRestorableState() discards one, rather than left on offer to
+            // be handed back again: the slot is released and the publisher let go, because the
+            // hold existed for a state that is now never going to be applied.
+            if (parked == state) { //NOPMD CompareObjectsWithEquals
+                parked = null;
+            }
+            startPublisher();
+            return false;
+        }
         if (isFromAnEndedSession(state)) {
             // Delivered in a session that has since ended. The only way to be holding one of
             // these is the documented prompt-then-restore pattern -- a listener returns false,
