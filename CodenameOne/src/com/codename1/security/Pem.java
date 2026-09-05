@@ -129,6 +129,33 @@ final class Pem {
     /// Both containers reach the AlgorithmIdentifier the same way once an
     /// optional leading version INTEGER is skipped, so one walk covers both.
     static String algorithm(byte[] der) {
+        byte[] oid = algorithmIdentifier(der);
+        if (equal(oid, OID_RSA)) {
+            return PublicKey.RSA;
+        }
+        if (equal(oid, OID_EC)) {
+            return PublicKey.EC;
+        }
+        throw new CryptoException("unsupported key algorithm OID " + oidToString(oid)
+                + "; only RSA and EC keys are supported");
+    }
+
+    /// Runs the same AlgorithmIdentifier checks as [#algorithm] without
+    /// insisting the OID be one this class recognizes.
+    ///
+    /// The `fromPem` overloads that take an algorithm name never call
+    /// [#algorithm], so without this they skipped every structural check it
+    /// performs: an SPKI whose AlgorithmIdentifier was an empty `30 00` came
+    /// back as a usable key.
+    static void requireAlgorithmIdentifier(byte[] der) {
+        algorithmIdentifier(der);
+    }
+
+    /// Walks to the AlgorithmIdentifier, checks it, and returns its OID.
+    ///
+    /// SPKI and PKCS#8 reach it the same way once an optional leading version
+    /// INTEGER is skipped, so one walk covers both.
+    private static byte[] algorithmIdentifier(byte[] der) {
         Cursor c = new Cursor(der);
         c.enter(0x30);
         if (c.peek() == 0x02) {
@@ -147,22 +174,15 @@ final class Pem {
             throw new CryptoException("malformed key: AlgorithmIdentifier carries more than one "
                     + "parameters field");
         }
-        if (equal(oid, OID_RSA)) {
-            // RFC 4055 says rsaEncryption carries NULL parameters, but a key
-            // that omits them is accepted by the platform, so refusing it here
-            // would reject keys that work. Only the EC requirement below is
-            // enforced, because that one the platform does enforce.
-            return PublicKey.RSA;
+        // RFC 4055 says rsaEncryption carries NULL parameters, but a key that
+        // omits them is accepted by the platform, so refusing it here would
+        // reject keys that work. Only the EC requirement is enforced, because
+        // that one the platform does enforce.
+        if (equal(oid, OID_EC) && !hasParameters) {
+            throw new CryptoException("EC key names no curve: id-ecPublicKey requires "
+                    + "ECParameters in the AlgorithmIdentifier");
         }
-        if (equal(oid, OID_EC)) {
-            if (!hasParameters) {
-                throw new CryptoException("EC key names no curve: id-ecPublicKey requires "
-                        + "ECParameters in the AlgorithmIdentifier");
-            }
-            return PublicKey.EC;
-        }
-        throw new CryptoException("unsupported key algorithm OID " + oidToString(oid)
-                + "; only RSA and EC keys are supported");
+        return oid;
     }
 
     /// Classifies a key blob by walking the outer SEQUENCE's children, which

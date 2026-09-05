@@ -920,6 +920,22 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void theExplicitAlgorithmOverloadsValidateToo() {
+        // These never call Pem.algorithm(), which was the only place the
+        // AlgorithmIdentifier was checked, so an SPKI whose identifier is an
+        // empty "30 00" came back as a usable key.
+        String spki = pem("PUBLIC KEY", Base64.encodeNoNewline(hex("3008 3000 03020001")));
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(PublicKey.RSA, spki));
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(spki));
+
+        // the real keys still load through both overloads
+        assertArrayEquals(der(RSA_SPKI),
+                PublicKey.fromPem(PublicKey.RSA, pem(RSA_SPKI_LABEL, RSA_SPKI)).getEncoded());
+        assertArrayEquals(der(RSA_PKCS8),
+                PrivateKey.fromPem(PublicKey.RSA, pem(RSA_PKCS8_LABEL, RSA_PKCS8)).getEncoded());
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));

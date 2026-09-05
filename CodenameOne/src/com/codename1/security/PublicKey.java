@@ -87,7 +87,9 @@ public final class PublicKey extends Key {
     /// from the key. Use this only for a key whose algorithm OID this class
     /// does not recognize but the platform does.
     public static PublicKey fromPem(String algorithm, String pem) {
-        return fromX509(algorithm, Pem.toSpki(pem));
+        byte[] der = Pem.toSpki(pem);
+        Pem.requireAlgorithmIdentifier(der);
+        return fromX509(algorithm, der);
     }
 
     /// [#fromPem(String,String)] over the raw bytes of a `.pem` file.

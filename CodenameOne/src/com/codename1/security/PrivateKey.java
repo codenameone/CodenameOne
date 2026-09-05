@@ -88,7 +88,9 @@ public final class PrivateKey extends Key {
     /// from the key. Use this only for a key whose algorithm OID this class
     /// does not recognize but the platform does.
     public static PrivateKey fromPem(String algorithm, String pem) {
-        return fromPkcs8(algorithm, Pem.toPkcs8(pem));
+        byte[] der = Pem.toPkcs8(pem);
+        Pem.requireAlgorithmIdentifier(der);
+        return fromPkcs8(algorithm, der);
     }
 
     /// [#fromPem(String,String)] over the raw bytes of a `.pem` file.
