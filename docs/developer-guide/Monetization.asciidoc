@@ -388,6 +388,20 @@ container: alongside its JAX-RS endpoints it uses a `@Stateless` bean and a
 container-managed `@Schedule` job to revalidate subscriptions, and neither Tomcat
 nor Jetty supplies those on its own.
 
+Some of what it builds against isn't published to a public repository, so the
+project ships a task that installs those artifacts into your local Maven
+repository. Run it once after cloning, before the first build:
+
+----
+$ git clone https://github.com/shannah/cn1-iap-demo-server
+$ cd cn1-iap-demo-server
+$ ant install-deps
+----
+
+NOTE: That task needs `ant`, `mvn` and `git` on your PATH. Check the project's
+own README first in case it has moved on since -- it's the server's build, not
+Codename One's.
+
 Create a database and a `RECEIPTS` table in it. The shape of that table is the
 whole storage contract between the two halves:
 
