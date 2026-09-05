@@ -2462,10 +2462,42 @@ public final class Continuity {
                 //
                 // The answer was thrown away here. restore(state) has always known the
                 // difference; this call site simply did not ask.
-                parked = state;
+                placeOnOffer(state);
             }
         } else {
-            parked = state;
+            placeOnOffer(state);
+        }
+    }
+
+    /// Puts a state on offer, without silently losing the one it replaces.
+    ///
+    /// The slot holds one arrival, which is right: `getRestorableState()` answers with a state,
+    /// and an application that has not dealt with the last one does not want a queue growing
+    /// behind it. Replacement is right too when the two come from the SAME device -- that is
+    /// supersession, and the newer sequence is the one worth showing.
+    ///
+    /// Two different devices are not that. With automatic restoration off, both can be dispatched
+    /// before the application calls restore(), and the second simply overwrote the first -- which
+    /// would be survivable if the first could come back, and it could not: its (origin, sequence)
+    /// is in the in-memory map from admission, so a redelivery in the same run is refused as
+    /// already seen. Recorded as handled and then dropped.
+    ///
+    /// So the mark goes with it. Only the in-memory one: durableSeen is written when a state
+    /// COMPLETES, and this one never did, so nothing durable claims it. Only when it still names
+    /// this state, so a newer mark for that origin is left alone.
+    private static void placeOnOffer(AppState state) {
+        AppState replaced = parked;
+        parked = state;
+        if (replaced == null || replaced == state) { //NOPMD CompareObjectsWithEquals
+            return;
+        }
+        String origin = replaced.getDeviceId();
+        if (origin == null || origin.length() == 0 || origin.equals(state.getDeviceId())) {
+            return;
+        }
+        Long mark = lastSeen.get(origin);
+        if (mark != null && mark.longValue() == replaced.getSequence()) {
+            lastSeen.remove(origin);
         }
     }
 

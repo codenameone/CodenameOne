@@ -4536,6 +4536,61 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * An offer replaced by one from ANOTHER device can be delivered again.
+     *
+     * <p>The slot holds one arrival, which is right, and replacing it is right when the two come
+     * from the same device -- that is supersession. Two different devices are not that: with
+     * automatic restoration off both can be dispatched before the application calls restore(),
+     * and the second overwrote the first. That would be survivable if the first could come back,
+     * and it could not: its (origin, sequence) went into the in-memory map at admission, so a
+     * redelivery in the same run was refused as already seen. Recorded as handled and then
+     * dropped.</p>
+     */
+    @EdtTest
+    public void anOfferReplacedByAnotherDeviceCanBeDeliveredAgain() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+
+        AppState first = new AppState()
+                .setPayload(payloadWith("from the phone"))
+                .setDeviceId("phone").setSequence(1L)
+                .setTimestamp(System.currentTimeMillis());
+        AppState second = new AppState()
+                .setPayload(payloadWith("from the tablet"))
+                .setDeviceId("tablet").setSequence(1L)
+                .setTimestamp(System.currentTimeMillis());
+
+        Continuity.deliver(first);
+        flushSerialCalls();
+        Continuity.deliver(second);
+        flushSerialCalls();
+
+        AppState onOffer = Continuity.getRestorableState();
+        assertNotNull(onOffer, "nothing is on offer at all");
+        assertEquals("tablet", onOffer.getDeviceId(),
+                "the newer arrival is not the one on offer");
+
+        // The phone's state was dropped from the slot. It must not ALSO be remembered as handled,
+        // or the relay and the port can never offer it again for the rest of the run.
+        assertNull(Continuity.readSeenForTest().get("phone"),
+                "a durable mark was left for a state that was never completed");
+        Continuity.deliver(first);
+        flushSerialCalls();
+        AppState back = Continuity.getRestorableState();
+        assertNotNull(back, "the phone's state came back to nothing");
+        assertEquals("phone", back.getDeviceId(),
+                "the phone's state was refused as already seen, though it was dropped without "
+                        + "ever being handled -- so it is lost for the rest of the process");
+    }
+
+    private static Map<String, Object> payloadWith(String note) {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("note", note);
+        return payload;
+    }
+
+    /**
      * A state whose routes are ALL unusable still commits, on the payload-only path.
      *
      * <p>The sibling of the test below, and the exit the reconciliation did not cover.
