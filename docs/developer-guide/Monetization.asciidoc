@@ -350,8 +350,10 @@ In this section you'll describe the general workflow of subscription management 
 
 A complete demo exists as two projects: a
 https://gist.github.com/shannah/b61b9b6b35ea0eac923a54163f5d4deb[client app] and a
-https://github.com/shannah/cn1-iap-demo-server[server app]. The server is an
-ordinary JAX-RS application and runs on any servlet container.
+https://github.com/shannah/cn1-iap-demo-server[server app]. The server needs a
+Java EE application server rather than a servlet container: alongside its JAX-RS
+endpoints it uses a `@Stateless` bean and a container-managed `@Schedule` job to
+revalidate subscriptions, and neither Tomcat nor Jetty supplies those on its own.
 
 Two things about reaching that server from a device. The client can't talk to
 `http://localhost` -- on a device that name means the phone -- so point it at the
