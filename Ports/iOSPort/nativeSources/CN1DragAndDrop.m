@@ -23,17 +23,192 @@
 
 #import "CN1DragAndDrop.h"
 
-#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+// The type identifier machinery, on every slice: the MIME mapping below is compiled for all
+// of them because the clipboard uses it, while the drag interaction further down is not.
+// CoreServices is where macOS keeps what MobileCoreServices holds elsewhere; both are only
+// reached when UTType is unavailable.
+#if TARGET_OS_OSX
+#import <CoreServices/CoreServices.h>
+#else
 #import <MobileCoreServices/MobileCoreServices.h>
+#endif
 #if __has_include(<UniformTypeIdentifiers/UniformTypeIdentifiers.h>)
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
-#endif
 #endif
 
 #define CN1_DND_ACTION_NONE 0
 #define CN1_DND_ACTION_COPY 1
 #define CN1_DND_ACTION_MOVE 2
 #define CN1_DND_ACTION_LINK 4
+
+// ------------------------------------------------------------------------------------
+// MIME types and uniform type identifiers. Every slice needs these, drag and drop or not:
+// the clipboard natives in IOSNative.m name what they publish with them, and they are
+// compiled for macOS, watchOS and tvOS as well -- where the drag interaction below is not.
+// Kept above the guard for that reason; nothing here touches UIKit.
+// ------------------------------------------------------------------------------------
+
+/// The MIME types the framework names, mapped onto the uniform type identifiers UIKit and
+/// every other application on the system speak.
+/// The uniform type identifier MobileCoreServices knows a MIME type by, or nil.
+///
+/// Deprecated from iOS 15, which is why it is reached only when UTType is unavailable; the
+/// warning is silenced rather than the call avoided, because on those releases it is the only
+/// way to name a type the system will recognize.
+static NSString* cn1LegacyUtiForMime(NSString* mime) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    CFStringRef identifier = UTTypeCreatePreferredIdentifierForTag(kUTTagClassMIMEType,
+                                                                   (CFStringRef) mime, NULL);
+#pragma clang diagnostic pop
+    if (identifier == NULL) {
+        return nil;
+    }
+    NSString* result = [(NSString*) identifier autorelease];
+    // A MIME type it does not know produces a dynamic identifier, which carries no more meaning
+    // to a receiver than the MIME type itself and reads far worse.
+    return [result hasPrefix:@"dyn."] ? nil : result;
+}
+
+static NSString* cn1UtiForMime(NSString* mime);
+static NSString* cn1MimeForUti(NSString* uti);
+
+NSString* CN1MimeForUti(NSString* uti) {
+    return cn1MimeForUti(uti);
+}
+
+NSString* CN1UtiForMime(NSString* mime) {
+    return cn1UtiForMime(mime);
+}
+
+static NSString* cn1UtiForMime(NSString* mime) {
+    if ([mime isEqualToString:@"text/plain"]) {
+        return @"public.utf8-plain-text";
+    }
+    if ([mime isEqualToString:@"text/html"]) {
+        return @"public.html";
+    }
+    if ([mime isEqualToString:@"text/rtf"]) {
+        return @"public.rtf";
+    }
+    if ([mime isEqualToString:@"text/markdown"]) {
+        return @"net.daringfireball.markdown";
+    }
+    if ([mime isEqualToString:@"image/png"]) {
+        return @"public.png";
+    }
+    if ([mime isEqualToString:@"image/jpeg"]) {
+        return @"public.jpeg";
+    }
+    if ([mime isEqualToString:@"image/gif"]) {
+        return @"com.compuserve.gif";
+    }
+    if ([mime isEqualToString:@"application/x-file-list"]) {
+        return @"public.file-url";
+    }
+    if ([mime isEqualToString:@"text/uri-list"]) {
+        return @"public.url";
+    }
+    // Anything else -- text/asciidoc, application/pdf, an application's own type -- still has
+    // to travel. Ask the system to name it, and fall back to the MIME type itself, which is an
+    // opaque identifier that a receiver which does not know it simply never asks for.
+    // Returning nil here would drop a representation the application deliberately published,
+    // and a drag whose *only* representation was one of those would begin with no items at all
+    // and be cancelled on the spot.
+#if __has_include(<UniformTypeIdentifiers/UniformTypeIdentifiers.h>)
+    if (@available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, *)) {
+        UTType* type = [UTType typeWithMIMEType:mime];
+        if (type != nil && type.identifier.length > 0) {
+            return type.identifier;
+        }
+        return mime;
+    }
+#endif
+    // Below iOS 14 UTType does not exist, and an application may deploy that far back through
+    // the ios.deployment_target build hint. Without this every type not named above -- including
+    // application/pdf -- was published under its MIME string, which no other application asking
+    // for the standard identifier would ever match.
+    NSString* legacy = cn1LegacyUtiForMime(mime);
+    return legacy != nil ? legacy : mime;
+}
+
+/// The MIME type MobileCoreServices knows a uniform type identifier by, or nil. The reverse of
+/// cn1LegacyUtiForMime, and deprecated from iOS 15 for the same reason.
+static NSString* cn1LegacyMimeForUti(NSString* uti) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    CFStringRef mime = UTTypeCopyPreferredTagWithClass((CFStringRef) uti, kUTTagClassMIMEType);
+#pragma clang diagnostic pop
+    if (mime == NULL) {
+        return nil;
+    }
+    NSString* result = [(NSString*) mime autorelease];
+    return result.length > 0 ? [result lowercaseString] : nil;
+}
+
+static NSString* cn1MimeForUti(NSString* uti) {
+    // Every spelling of plain text, the UTF-16 ones included. They are what a document dragged
+    // out of some editors offers -- occasionally the only thing it offers -- and leaving them
+    // unnamed meant the session advertised no text/plain at all, so a text target refused the
+    // hover and the materialization loop skipped the representation. cn1TextFromData already
+    // decodes both through cn1CharsetNameForUti; naming them here is what it takes for either
+    // to reach it. The identifier does not survive into the MIME type, which is why the charset
+    // travels beside it.
+    if ([uti isEqualToString:@"public.utf8-plain-text"] || [uti isEqualToString:@"public.plain-text"]
+            || [uti isEqualToString:@"public.utf16-plain-text"]
+            || [uti isEqualToString:@"public.utf16-external-plain-text"]
+            || [uti isEqualToString:@"public.text"]) {
+        return @"text/plain";
+    }
+    if ([uti isEqualToString:@"public.html"]) {
+        return @"text/html";
+    }
+    if ([uti isEqualToString:@"public.rtf"]) {
+        return @"text/rtf";
+    }
+    if ([uti isEqualToString:@"net.daringfireball.markdown"]) {
+        return @"text/markdown";
+    }
+    if ([uti isEqualToString:@"public.png"]) {
+        return @"image/png";
+    }
+    if ([uti isEqualToString:@"public.jpeg"]) {
+        return @"image/jpeg";
+    }
+    if ([uti isEqualToString:@"com.compuserve.gif"]) {
+        return @"image/gif";
+    }
+    if ([uti isEqualToString:@"public.file-url"]) {
+        return @"application/x-file-list";
+    }
+    if ([uti isEqualToString:@"public.url"]) {
+        return @"text/uri-list";
+    }
+    if ([uti containsString:@"/"]) {
+        // One of ours: cn1UtiForMime falls back to the MIME type as the identifier.
+        return uti;
+    }
+#if __has_include(<UniformTypeIdentifiers/UniformTypeIdentifiers.h>)
+    if (@available(iOS 14.0, macOS 11.0, watchOS 7.0, tvOS 14.0, *)) {
+        UTType* type = [UTType typeWithIdentifier:uti];
+        if (type != nil && type.preferredMIMEType.length > 0) {
+            return type.preferredMIMEType;
+        }
+        return nil;
+    }
+#endif
+    // Below iOS 14, the same way round as cn1UtiForMime goes. Answering nil here regardless of
+    // the identifier left a standard type such as com.adobe.pdf unnamed on those releases, so a
+    // drag of one was neither discovered while it hovered nor materialized when it dropped --
+    // the outgoing direction had its legacy conversion and the incoming one did not.
+    NSString* legacy = cn1LegacyMimeForUti(uti);
+    if (legacy != nil) {
+        return legacy;
+    }
+    // A dynamic or private identifier with no MIME equivalent. Naming it anyway would fill the
+    // content with identifiers no drop target could match on.
+    return nil;
+}
 
 #if TARGET_OS_OSX || TARGET_OS_WATCH || TARGET_OS_TV
 
@@ -79,6 +254,13 @@ void CN1AddNativeDragUrl(NSString* url) {
 }
 
 void CN1CancelNativeDrag(void) {
+}
+
+void CN1DropDeliveryFinished(int dropId) {
+    // Nothing was ever copied out on a slice that cannot receive a drop, so nothing is owed.
+    // Defined all the same: IOSNative.m's native is compiled everywhere and would otherwise
+    // leave the link short of a symbol, which is how the clipboard's type mapping broke the
+    // macOS and watchOS slices before it was moved above this guard.
 }
 
 #else
@@ -242,167 +424,6 @@ static int cn1LocalDropResult = -1;
 static CN1View* cn1DragSurface = nil;
 static id cn1DragDelegate = nil;
 
-/// The MIME types the framework names, mapped onto the uniform type identifiers UIKit and
-/// every other application on the system speak.
-/// The uniform type identifier MobileCoreServices knows a MIME type by, or nil.
-///
-/// Deprecated from iOS 15, which is why it is reached only when UTType is unavailable; the
-/// warning is silenced rather than the call avoided, because on those releases it is the only
-/// way to name a type the system will recognize.
-static NSString* cn1LegacyUtiForMime(NSString* mime) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    CFStringRef identifier = UTTypeCreatePreferredIdentifierForTag(kUTTagClassMIMEType,
-                                                                   (CFStringRef) mime, NULL);
-#pragma clang diagnostic pop
-    if (identifier == NULL) {
-        return nil;
-    }
-    NSString* result = [(NSString*) identifier autorelease];
-    // A MIME type it does not know produces a dynamic identifier, which carries no more meaning
-    // to a receiver than the MIME type itself and reads far worse.
-    return [result hasPrefix:@"dyn."] ? nil : result;
-}
-
-static NSString* cn1UtiForMime(NSString* mime);
-static NSString* cn1MimeForUti(NSString* uti);
-
-NSString* CN1MimeForUti(NSString* uti) {
-    return cn1MimeForUti(uti);
-}
-
-NSString* CN1UtiForMime(NSString* mime) {
-    return cn1UtiForMime(mime);
-}
-
-static NSString* cn1UtiForMime(NSString* mime) {
-    if ([mime isEqualToString:@"text/plain"]) {
-        return @"public.utf8-plain-text";
-    }
-    if ([mime isEqualToString:@"text/html"]) {
-        return @"public.html";
-    }
-    if ([mime isEqualToString:@"text/rtf"]) {
-        return @"public.rtf";
-    }
-    if ([mime isEqualToString:@"text/markdown"]) {
-        return @"net.daringfireball.markdown";
-    }
-    if ([mime isEqualToString:@"image/png"]) {
-        return @"public.png";
-    }
-    if ([mime isEqualToString:@"image/jpeg"]) {
-        return @"public.jpeg";
-    }
-    if ([mime isEqualToString:@"image/gif"]) {
-        return @"com.compuserve.gif";
-    }
-    if ([mime isEqualToString:@"application/x-file-list"]) {
-        return @"public.file-url";
-    }
-    if ([mime isEqualToString:@"text/uri-list"]) {
-        return @"public.url";
-    }
-    // Anything else -- text/asciidoc, application/pdf, an application's own type -- still has
-    // to travel. Ask the system to name it, and fall back to the MIME type itself, which is an
-    // opaque identifier that a receiver which does not know it simply never asks for.
-    // Returning nil here would drop a representation the application deliberately published,
-    // and a drag whose *only* representation was one of those would begin with no items at all
-    // and be cancelled on the spot.
-#if __has_include(<UniformTypeIdentifiers/UniformTypeIdentifiers.h>)
-    if (@available(iOS 14.0, *)) {
-        UTType* type = [UTType typeWithMIMEType:mime];
-        if (type != nil && type.identifier.length > 0) {
-            return type.identifier;
-        }
-        return mime;
-    }
-#endif
-    // Below iOS 14 UTType does not exist, and an application may deploy that far back through
-    // the ios.deployment_target build hint. Without this every type not named above -- including
-    // application/pdf -- was published under its MIME string, which no other application asking
-    // for the standard identifier would ever match.
-    NSString* legacy = cn1LegacyUtiForMime(mime);
-    return legacy != nil ? legacy : mime;
-}
-
-/// The MIME type MobileCoreServices knows a uniform type identifier by, or nil. The reverse of
-/// cn1LegacyUtiForMime, and deprecated from iOS 15 for the same reason.
-static NSString* cn1LegacyMimeForUti(NSString* uti) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    CFStringRef mime = UTTypeCopyPreferredTagWithClass((CFStringRef) uti, kUTTagClassMIMEType);
-#pragma clang diagnostic pop
-    if (mime == NULL) {
-        return nil;
-    }
-    NSString* result = [(NSString*) mime autorelease];
-    return result.length > 0 ? [result lowercaseString] : nil;
-}
-
-static NSString* cn1MimeForUti(NSString* uti) {
-    // Every spelling of plain text, the UTF-16 ones included. They are what a document dragged
-    // out of some editors offers -- occasionally the only thing it offers -- and leaving them
-    // unnamed meant the session advertised no text/plain at all, so a text target refused the
-    // hover and the materialization loop skipped the representation. cn1TextFromData already
-    // decodes both through cn1CharsetNameForUti; naming them here is what it takes for either
-    // to reach it. The identifier does not survive into the MIME type, which is why the charset
-    // travels beside it.
-    if ([uti isEqualToString:@"public.utf8-plain-text"] || [uti isEqualToString:@"public.plain-text"]
-            || [uti isEqualToString:@"public.utf16-plain-text"]
-            || [uti isEqualToString:@"public.utf16-external-plain-text"]
-            || [uti isEqualToString:@"public.text"]) {
-        return @"text/plain";
-    }
-    if ([uti isEqualToString:@"public.html"]) {
-        return @"text/html";
-    }
-    if ([uti isEqualToString:@"public.rtf"]) {
-        return @"text/rtf";
-    }
-    if ([uti isEqualToString:@"net.daringfireball.markdown"]) {
-        return @"text/markdown";
-    }
-    if ([uti isEqualToString:@"public.png"]) {
-        return @"image/png";
-    }
-    if ([uti isEqualToString:@"public.jpeg"]) {
-        return @"image/jpeg";
-    }
-    if ([uti isEqualToString:@"com.compuserve.gif"]) {
-        return @"image/gif";
-    }
-    if ([uti isEqualToString:@"public.file-url"]) {
-        return @"application/x-file-list";
-    }
-    if ([uti isEqualToString:@"public.url"]) {
-        return @"text/uri-list";
-    }
-    if ([uti containsString:@"/"]) {
-        // One of ours: cn1UtiForMime falls back to the MIME type as the identifier.
-        return uti;
-    }
-#if __has_include(<UniformTypeIdentifiers/UniformTypeIdentifiers.h>)
-    if (@available(iOS 14.0, *)) {
-        UTType* type = [UTType typeWithIdentifier:uti];
-        if (type != nil && type.preferredMIMEType.length > 0) {
-            return type.preferredMIMEType;
-        }
-        return nil;
-    }
-#endif
-    // Below iOS 14, the same way round as cn1UtiForMime goes. Answering nil here regardless of
-    // the identifier left a standard type such as com.adobe.pdf unnamed on those releases, so a
-    // drag of one was neither discovered while it hovered nor materialized when it dropped --
-    // the outgoing direction had its legacy conversion and the incoming one did not.
-    NSString* legacy = cn1LegacyMimeForUti(uti);
-    if (legacy != nil) {
-        return legacy;
-    }
-    // A dynamic or private identifier with no MIME equivalent. Naming it anyway would fill the
-    // content with identifiers no drop target could match on.
-    return nil;
-}
 
 /// What the source of this drop session allows.
 ///
