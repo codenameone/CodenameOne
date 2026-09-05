@@ -83,10 +83,14 @@ class InCarExperiencesJava004Snippet {
     
     void snippet() throws Exception {
         // tag::in-car-experiences-java-004[]
-        Car.addConnectionListener(new CarConnectionListener() {
+        // Car.addConnectionListener is static, so keep the reference: an
+        // observer scoped to a screen has to be handed back to
+        // Car.removeConnectionListener when that screen goes away
+        CarConnectionListener connectionListener = new CarConnectionListener() {
             public void carConnected(CarContext ctx) { startLocationStream(); }
             public void carDisconnected()           { stopLocationStream(); }
-        });
+        };
+        Car.addConnectionListener(connectionListener);
         // end::in-car-experiences-java-004[]
     }
 

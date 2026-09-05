@@ -91,10 +91,11 @@ class DeepLinksRoutingJava005Snippet {
                 if (!isDirty()) {
                     return true;
                 }
-                // Dialog.show returns true for the first button, so "Stay"
-                // blocks the pop and "Discard" allows it
-                return !Dialog.show("Discard changes?", "You have unsaved edits.",
-                                    "Stay", "Discard");
+                // Discard is the ok command, so it returns true and the pop
+                // proceeds. The back key fires the cancel command, which means
+                // dismissing this dialog keeps the user on the form.
+                return Dialog.show("Discard changes?", "You have unsaved edits.",
+                                   "Discard", "Stay");
             }
         });
         // end::deep-links-routing-java-005[]
