@@ -162,6 +162,23 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aRemoveAllMarkerIsARemovalToo() {
+        // removeAll is a removal to the merger. Reading it as an ordinary
+        // declaration was worse than missing it: declareUncapped took the
+        // marker for the active declaration it wanted, added no real
+        // permission, and the merger then applied the removal -- so the button
+        // shipped with the one permission it exists to obtain stripped out.
+        String removeAll = "    <uses-permission android:name=\"android."
+                + "permission.ACCESS_FINE_LOCATION\" tools:node=\"removeAll\""
+                + " />\n";
+        String out = LocationButtonManifestFragments.inject(removeAll, false);
+        assertFalse(out.contains("removeAll"),
+                "the marker has to go, not be mistaken for a request: " + out);
+        assertEquals(1, count(out, "android.permission.ACCESS_FINE_LOCATION"),
+                "and a real declaration takes its place: " + out);
+    }
+
+    @Test
     void aSelectorScopedRemovalDoesNotClearTheAggregate() {
         // tools:selector restricts the removal to the one dependency it names,
         // so another submitted archive's declaration survives into the merged

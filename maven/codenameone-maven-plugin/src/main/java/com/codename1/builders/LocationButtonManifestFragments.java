@@ -563,9 +563,17 @@ final class LocationButtonManifestFragments {
             int[] value = iter < prefixes.length
                     ? findAttribute(element, prefixes[iter] + ":node")
                     : findAttribute(element, "node");
-            if (value != null
-                    && "remove".equals(element.substring(value[2], value[3])
-                            .trim())) {
+            if (value == null) {
+                continue;
+            }
+            String marker = element.substring(value[2], value[3]).trim();
+            // "removeAll" as well as "remove". Both are removals to the
+            // merger, and reading removeAll as an ordinary declaration was
+            // worse than missing it: declareUncapped took the marker for the
+            // active declaration it was looking for, added no real permission,
+            // and the merger then applied the removal -- so the button was
+            // built with the one permission it exists to obtain stripped out.
+            if ("remove".equals(marker) || "removeAll".equals(marker)) {
                 return true;
             }
         }
