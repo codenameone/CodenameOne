@@ -626,8 +626,11 @@ class PemKeyTest extends UITestBase {
         System.arraycopy(canonical, off, inner, 0, inner.length);
         inner[2] = 0x01;                                  // version 0 -> 1
 
-        byte[] publicKey = new byte[66];                  // a [1] publicKey field
-        publicKey[0] = (byte) 0xA1;
+        // RFC 5958's module is IMPLICIT TAGS, so [1] PublicKey keeps the BIT
+        // STRING's primitive form and is tagged 0x81, not the constructed 0xA1
+        // this fixture used to carry.
+        byte[] publicKey = new byte[66];
+        publicKey[0] = (byte) 0x81;
         publicKey[1] = 64;
         byte[] content = new byte[inner.length + publicKey.length];
         System.arraycopy(inner, 0, content, 0, inner.length);
@@ -798,6 +801,61 @@ class PemKeyTest extends UITestBase {
         }
         // the genuine version-0 key still converts
         assertArrayEquals(der(RSA_PKCS8), PrivateKey.fromPem(pem(RSA_PKCS1_LABEL, RSA_PKCS1)).getEncoded());
+    }
+
+    @Test
+    void bothSpellingsOfTheRfc5958PublicKeyTagAreAccepted() {
+        // 0x81 is what the RFC specifies; 0xA1 is what some encoders emit and
+        // the platform tolerates. Rejecting 0x81 refused keys the JDK accepts.
+        byte[] canonical = der(RSA_PKCS8);
+        int off = (canonical[1] & 0xFF) < 0x80 ? 2 : 2 + (canonical[1] & 0x7F);
+        for (int tag : new int[] {0x81, 0xA1}) {
+            byte[] inner = new byte[canonical.length - off];
+            System.arraycopy(canonical, off, inner, 0, inner.length);
+            inner[2] = 0x01;
+            byte[] field = new byte[10];
+            field[0] = (byte) tag;
+            field[1] = 8;
+            byte[] content = new byte[inner.length + field.length];
+            System.arraycopy(inner, 0, content, 0, inner.length);
+            System.arraycopy(field, 0, content, inner.length, field.length);
+            byte[] blob = new byte[content.length + 4];
+            blob[0] = 0x30;
+            blob[1] = (byte) 0x82;
+            blob[2] = (byte) (content.length >> 8);
+            blob[3] = (byte) content.length;
+            System.arraycopy(content, 0, blob, 4, content.length);
+            assertArrayEquals(canonical,
+                    PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(blob))).getEncoded(),
+                    "tag 0x" + Integer.toHexString(tag) + " must normalize");
+        }
+    }
+
+    @Test
+    void sec1VersionMustBeOne() {
+        // RFC 5915 defines only version 1; any other value was copied into the
+        // rewrapped key for the provider to reject later.
+        byte[] key = der(EC_SEC1);
+        int off = (key[1] & 0xFF) < 0x80 ? 2 : 2 + (key[1] & 0x7F);
+        for (int version : new int[] {0, 2, 77}) {
+            byte[] bad = key.clone();
+            bad[off + 2] = (byte) version;
+            CryptoException e = assertThrows(CryptoException.class,
+                    () -> PrivateKey.fromPem(pem(EC_SEC1_LABEL, Base64.encodeNoNewline(bad))),
+                    "SEC1 version " + version + " must not be accepted");
+            assertTrue(e.getMessage().contains("version 1"), e.getMessage());
+        }
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(pem(EC_SEC1_LABEL, EC_SEC1)).getEncoded());
+    }
+
+    @Test
+    void emptyDerIntegersAreRejected() {
+        // A DER INTEGER carries at least one content octet, so "02 00" is not a
+        // number -- but counting tags without reading them let it through.
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(
+                pem("RSA PUBLIC KEY", Base64.encodeNoNewline(hex("3006 020101 0200")))));
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(
+                pem("RSA PUBLIC KEY", Base64.encodeNoNewline(hex("3006 0200 020103")))));
     }
 
     @Test

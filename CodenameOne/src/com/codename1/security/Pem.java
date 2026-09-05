@@ -220,7 +220,13 @@ final class Pem {
             if (c.hasMore() && c.peek() == 0xA0) {
                 c.skip();
             }
-            if (c.hasMore() && c.peek() == 0xA1) {
+            // RFC 5958's module is IMPLICIT TAGS, so [1] PublicKey -- a BIT
+            // STRING -- keeps the primitive form and arrives as 0x81, not the
+            // constructed 0xA1. Checking only for 0xA1 rejected the encoding
+            // the RFC actually specifies while the platform accepted it. Both
+            // spellings are taken; the field is dropped by the version-0
+            // rewrite either way.
+            if (c.hasMore() && (c.peek() == 0x81 || c.peek() == 0xA1)) {
                 c.skip();
             }
             return c.hasMore() ? SHAPE_UNKNOWN : SHAPE_PKCS8;
@@ -235,9 +241,16 @@ final class Pem {
         // PKCS#1. RSAPublicKey is exactly { modulus, publicExponent };
         // RSAPrivateKey's nine INTEGER fields are all mandatory, and a
         // multi-prime key adds an otherPrimeInfos SEQUENCE after them.
+        // A DER INTEGER always carries at least one content octet, so an empty
+        // one is malformed however many of them there are.
+        if (firstInteger.length <= 2) {
+            return SHAPE_UNKNOWN;
+        }
         int integers = 1;
         while (c.hasMore() && c.peek() == 0x02) {
-            c.skip();
+            if (c.consume(0x02) == 0) {
+                return SHAPE_UNKNOWN;
+            }
             integers++;
         }
         if (integers == 2 && !c.hasMore()) {
@@ -485,6 +498,11 @@ final class Pem {
         Cursor c = new Cursor(sec1);
         c.enter(0x30);
         byte[] version = c.element();
+        if (!isVersion(version, 1)) {
+            // RFC 5915 defines only version 1; copying any other value into the
+            // rewrapped key left the provider to reject it on first use.
+            throw new CryptoException("SEC1 EC private key must be version 1");
+        }
         byte[] privateKey = c.element();
         byte[] ecParameters = null;
         byte[] publicKey = new byte[0];
