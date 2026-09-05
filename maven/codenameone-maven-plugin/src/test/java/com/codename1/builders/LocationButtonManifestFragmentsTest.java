@@ -116,6 +116,48 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aUriThatMerelyStartsWithOursBindsNothing() throws Exception {
+        // The backward read validated everything BEFORE the URI and nothing
+        // after it, so indexOf matching a longer value was accepted:
+        // ".../apk/res/android-fake" bound its prefix to the Android
+        // namespace. An element could then put a real permission under a
+        // prefix the merger reads as somebody else's, and a build that asks
+        // for nothing of the sort is refused.
+        File root = tempDir("cn1-lb-uri");
+        String manifest = "<manifest xmlns:android=\"http://schemas.android"
+                + ".com/apk/res/android\" xmlns:a=\"http://schemas.android"
+                + ".com/apk/res/android-fake\">"
+                + "<uses-permission android:name=\"android.permission."
+                + "INTERNET\" a:name=\"android.permission."
+                + "ACCESS_BACKGROUND_LOCATION\"/></manifest>";
+        writeAar(new File(root, "lookalike.aar"), manifest);
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresBackgroundLocation(),
+                "a namespace that merely starts with ours is not ours");
+    }
+
+    @Test
+    void anInsertedFlagUsesThePrefixThatNamedThePermission() {
+        // The element rebinds the conventional prefix to something else and
+        // carries the real Android namespace under an alias. Inserting
+        // android:usesPermissionFlags there puts the flag in the rebound
+        // namespace, where the merger never looks -- so the permission keeps
+        // ordinary precise access while the build reports itself exclusive.
+        String rebound = "    <uses-permission xmlns:android=\"urn:fake\""
+                + " xmlns:a=\"http://schemas.android.com/apk/res/android\""
+                + " a:name=\"android.permission.ACCESS_FINE_LOCATION\" />\n";
+        String out = LocationButtonManifestFragments.addPermissionFlag(
+                rebound, LocationButtonManifestFragments.FINE_LOCATION,
+                LocationButtonManifestFragments.ONLY_FOR_LOCATION_BUTTON);
+        assertTrue(out.contains("a:usesPermissionFlags=\""
+                        + "onlyForLocationButton\""),
+                "the flag goes under the prefix that named the permission: "
+                + out);
+        assertFalse(out.contains("android:usesPermissionFlags"),
+                "and not under the rebound one: " + out);
+    }
+
+    @Test
     void everySpellingOfTheCapIsStripped() {
         // A decoy cap under the conventional prefix, and the real one under
         // another prefix bound to the Android namespace. Stripping the first

@@ -38,6 +38,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -127,6 +129,9 @@ class LocationButtonRebuildTest extends UITestBase {
         private boolean open;
         private int lookups;
 
+        /** What a completed lookup hands back. */
+        private Location answer;
+
         @Override
         public Location getCurrentLocationSync(long timeout) {
             lookups++;
@@ -147,7 +152,7 @@ class LocationButtonRebuildTest extends UITestBase {
                     }
                 }
             });
-            return null;
+            return answer;
         }
 
         private void release() {
@@ -343,6 +348,50 @@ class LocationButtonRebuildTest extends UITestBase {
                 + "current one by being served");
         assertEquals(2, manager.lookups,
                 "and only the current one runs a lookup");
+    }
+
+    @Test
+    void aNewPeerFailingDoesNotSwallowTheRunningRequestsResult()
+            throws Exception {
+        RecordingBridge bridge = install();
+        ParkingManager manager = parkingManager();
+        manager.answer = new Location();
+        bridge.granted = manager;
+
+        LocationButton button = new LocationButton();
+        final List<Location> heard = new ArrayList<Location>();
+        button.addLocationSharedListener(new LocationSharedListener() {
+            public void locationShared(Location location) {
+                heard.add(location);
+            }
+        });
+
+        // The user taps, and the lookup parks with a real fix waiting for it.
+        bridge.sessions.get(0).onResult.onSucess(Boolean.TRUE);
+        drain();
+        assertEquals(1, manager.lookups, "the tap's lookup is running");
+
+        // A setter replaces the control while that request is still running,
+        // and the REPLACEMENT's session dies without anyone touching it.
+        button.setTextType(LocationButton.TEXT_USE_PRECISE_LOCATION);
+        assertEquals(2, bridge.sessions.size());
+        bridge.sessions.get(1).onUnavailable.run();
+        drain();
+        assertTrue(button.isUnavailable(), "the current control did fail");
+
+        manager.release();
+        drain();
+        drain();
+
+        // Two things happened, so the listener hears two: the failure's null,
+        // and the location the tap actually obtained. Suppressing on the
+        // component-wide flag threw the second away and left the user's tap
+        // answered by a session it had nothing to do with.
+        assertEquals(2, heard.size(), "both the failure and the result: "
+                + heard);
+        assertNull(heard.get(0), "the failure reports first");
+        assertNotNull(heard.get(1),
+                "and the running request still reports the fix it obtained");
     }
 
     private static boolean wakePending() throws Exception {

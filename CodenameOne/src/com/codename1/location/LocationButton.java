@@ -201,6 +201,22 @@ public class LocationButton extends Container {
     /// asking for another one and makes [#isUnavailable()] answer true.
     private boolean unavailable;
 
+    /// Which system button's session failed, when one has.
+    ///
+    /// [#unavailable] is component-wide, and a request in flight belongs to one
+    /// particular peer. A setter can replace the control while a granted lookup
+    /// is still running, and the REPLACEMENT's session can then fail without
+    /// anyone having touched it -- at which point suppressing the completion of
+    /// the request that is still running answers the user's tap with the
+    /// failure's null and throws away the location it actually obtained.
+    ///
+    /// So the suppression asks whose failure it was. A session that failed
+    /// under the request's own stamp still silences it, which is the case that
+    /// rule was written for: getCurrentLocationSync parks through
+    /// invokeAndBlock, the EDT keeps pumping, and firing twice for one tap is
+    /// the listener contract broken where callers notice least.
+    private int failedGeneration = NO_SESSION;
+
     /// Which system button the callbacks now arriving belong to.
     ///
     /// A setter that changes the label or the colours has to REPLACE the
@@ -585,6 +601,7 @@ public class LocationButton extends Container {
                     return;
                 }
                 unavailable = true;
+                failedGeneration = generation;
                 // Out of the queue as well. A button whose grant arrived while
                 // another was being served is WAITING, and a session that fails
                 // before its turn used to leave it there: serveNextWaiting
@@ -849,7 +866,10 @@ public class LocationButton extends Container {
         // they already handled, arriving a second time with a different value.
         // Fired regardless of ownership: this tap asked a question and got an
         // answer, and a request that lost the slot still deserves to report.
-        if (!unavailable) {
+        // Suppressed only when the session that failed is THIS request's. A
+        // newer peer failing is not this tap's answer, and the tap did obtain
+        // a location.
+        if (!unavailable || failedGeneration != generation) {
             fire(result);
         }
         // Driving the queue is the OWNER's job. A superseded request doing it

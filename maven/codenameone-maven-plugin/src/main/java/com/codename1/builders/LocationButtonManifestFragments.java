@@ -634,10 +634,22 @@ final class LocationButtonManifestFragments {
             return xPermissions.substring(0, start) + merged
                     + xPermissions.substring(end + 1);
         }
-        // Nothing to merge into, so the element gains the attribute. Written
-        // with the conventional prefix: this is our own text now, and the
-        // block it goes into is the one we emit.
-        //
+        // Nothing to merge into, so the element gains the attribute -- under
+        // the prefix that NAMED this permission, not the conventional one.
+        // An element may rebind "android" to something else and carry the real
+        // Android namespace under an alias; inserting android:... there puts
+        // the flag in the rebound namespace, where the merger never looks, and
+        // the permission it was meant to restrict keeps ordinary precise
+        // access while the build reports itself exclusive.
+        String prefix = flagPrefixes.length > 0 ? flagPrefixes[0] : "android";
+        for (int iter = 0; iter < flagPrefixes.length; iter++) {
+            int[] named = findAttribute(element, flagPrefixes[iter] + ":name");
+            if (named != null && name.equals(element
+                    .substring(named[2], named[3]).trim())) {
+                prefix = flagPrefixes[iter];
+                break;
+            }
+        }
         // Before the element's own close, whatever shape it has: the
         // declaration may end in "/>", in "  />" or in ">".
         int insert = element.length() - 1;
@@ -647,7 +659,7 @@ final class LocationButtonManifestFragments {
             insert--;
         }
         String replacement = element.substring(0, insert)
-                + " android:usesPermissionFlags=\"" + flag + "\""
+                + " " + prefix + ":usesPermissionFlags=\"" + flag + "\""
                 + element.substring(insert);
         return xPermissions.substring(0, start) + replacement
                 + xPermissions.substring(end + 1);
@@ -755,7 +767,7 @@ final class LocationButtonManifestFragments {
         out.add(usual);
         int at = document.indexOf(uri);
         while (at >= 0) {
-            String prefix = prefixBoundAt(document, at);
+            String prefix = prefixBoundAt(document, at, at + uri.length());
             if (prefix != null && !out.contains(prefix)) {
                 out.add(prefix);
             }
@@ -776,15 +788,27 @@ final class LocationButtonManifestFragments {
      *
      * @param document the file
      * @param at       where the URI starts
+     * @param past     the index just past it
      * @return the prefix, or null when this is not an xmlns binding
      */
-    private static String prefixBoundAt(String document, int at) {
+    private static String prefixBoundAt(String document, int at,
+            int past) {
         int cursor = at - 1;
         if (cursor < 0) {
             return null;
         }
         char quote = document.charAt(cursor);
         if (quote != '"' && quote != '\'') {
+            return null;
+        }
+        // And the SAME quote immediately after the URI, which is what makes
+        // this the whole value rather than the start of a longer one.
+        // Without it xmlns:a="http://schemas.android.com/apk/res/android-fake"
+        // bound "a" to the Android namespace: an element could then put a real
+        // permission under a prefix the merger reads as somebody else's, and a
+        // build that asks for nothing of the sort is refused.
+        if (past >= document.length()
+                || document.charAt(past) != quote) {
             return null;
         }
         cursor--;
