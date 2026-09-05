@@ -193,7 +193,7 @@ straight lines rather than curves might look like this:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava052Snippet.java[tag=graphics-java-052,indent=0]
 ----
 
-You introduced a couple house-keeping member vars (`lastX` and `lastY`) to store the last point that was added
+The sample introduces a couple of house-keeping member vars (`lastX` and `lastY`) to store the last point that was added
 that you know whether this is the first tap or a later tap. The first tap triggers a `moveTo()` call, whereas
 later taps trigger `lineTo()` calls, which draw lines from the last point to the current point.
 
@@ -484,7 +484,7 @@ ensures that the clock will be redrawn when the time changes.
 === Starting and stopping the animation
 
 Animations can be started and stopped through the `Form.registerAnimated(component)` and
-`Form.deregisterAnimated(component)` methods. You chose to encapsulate these calls in `start()` and `stop()`
+`Form.deregisterAnimated(component)` methods. The sample encapsulates these calls in `start()` and `stop()`
 methods in the component as follows:
 
 [source,java]
@@ -976,7 +976,7 @@ image has to come out rounded.
 
 ===== URLImage in lists
 
-The biggest problem with image download service is with lists. You decided to attack this issue at the core by
+The biggest problem with image download service is with lists. Codename One attacks this issue at the core by
 integrating https://www.codenameone.com/javadoc/com/codename1/ui/URLImage.html[URLImage] support directly into https://www.codenameone.com/javadoc/com/codename1/ui/list/GenericListCellRenderer.html[GenericListCellRenderer] which means it will work with https://www.codenameone.com/javadoc/com/codename1/ui/list/MultiList.html[MultiList],
 https://www.codenameone.com/javadoc/java/util/List.html[List] & https://www.codenameone.com/javadoc/com/codename1/ui/list/ContainerList.html[ContainerList]. To use this support define the name of the component (name not UIID) to end with
 `_URLImage` and give it an icon to use as the placeholder. This is easy to do in the multilist by changing the
