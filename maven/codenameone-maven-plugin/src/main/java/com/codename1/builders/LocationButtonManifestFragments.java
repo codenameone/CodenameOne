@@ -1559,11 +1559,36 @@ final class LocationButtonManifestFragments {
      * @param text the class file, decoded ISO-8859-1
      * @return the outer class's internal name, or null
      */
-    private static String outerClassName(String text) {
+    /// What a class file's own metadata says about its nesting.
+    ///
+    /// Two facts, read in one pass because they come from the same attribute
+    /// table and the caller needs both: the immediately enclosing class, and
+    /// every name the InnerClasses table lists as a nested class.
+    ///
+    /// The second is what makes a transitive walk possible without opening any
+    /// other file. A class that is not a member of a package MUST appear in the
+    /// InnerClasses table of any class whose constant pool names it (JVMS
+    /// 4.7.6), so an enclosing anonymous class is listed there -- verified
+    /// against the real LocationButton$7$1, whose table carries an entry for
+    /// LocationButton$7. A top-level class IS a member of a package and is
+    /// therefore absent, however many dollars its name contains.
+    private static final class Nesting {
+
+        /// The immediately enclosing class, or null when this class is not
+        /// nested at all.
+        private String outer;
+
+        /// Every name the InnerClasses table lists as an inner_class.
+        private final java.util.Set<String> listed =
+                new java.util.HashSet<String>();
+    }
+
+    private static Nesting readNesting(String text) {
         Pool pool = parsePool(text);
         if (pool == null) {
             return null;
         }
+        Nesting found = new Nesting();
         int at = pool.end;
         // access_flags, this_class, super_class
         if (at + 6 > text.length()) {
@@ -1597,7 +1622,15 @@ final class LocationButtonManifestFragments {
                     if (off + 8 > text.length()) {
                         return null;
                     }
-                    if (u2(text, off) == thisClass) {
+                    int inner = u2(text, off);
+                    if (inner > 0 && inner < pool.tag.length
+                            && pool.tag[inner] == TAG_CLASS) {
+                        String listed = utf8At(pool, pool.first[inner]);
+                        if (listed != null) {
+                            found.listed.add(listed);
+                        }
+                    }
+                    if (inner == thisClass) {
                         int outer = u2(text, off + 2);
                         // Zero for an ANONYMOUS class, which has no outer entry
                         // here at all -- what encloses it is in EnclosingMethod,
@@ -1605,7 +1638,7 @@ final class LocationButtonManifestFragments {
                         // LocationButton$1 through $6 are all anonymous.
                         if (outer > 0 && outer < pool.tag.length
                                 && pool.tag[outer] == TAG_CLASS) {
-                            return utf8At(pool, pool.first[outer]);
+                            found.outer = utf8At(pool, pool.first[outer]);
                         }
                     }
                 }
@@ -1614,11 +1647,18 @@ final class LocationButtonManifestFragments {
             }
             at = body + length;
         }
-        if (enclosing > 0 && enclosing < pool.tag.length
+        if (found.outer == null && enclosing > 0
+                && enclosing < pool.tag.length
                 && pool.tag[enclosing] == TAG_CLASS) {
-            return utf8At(pool, pool.first[enclosing]);
+            found.outer = utf8At(pool, pool.first[enclosing]);
         }
-        return null;
+        return found;
+    }
+
+    /// The immediately enclosing class, or null when there is none.
+    static String outerClassName(String text) {
+        Nesting nesting = readNesting(text);
+        return nesting == null ? null : nesting.outer;
     }
 
     /**
@@ -1632,18 +1672,46 @@ final class LocationButtonManifestFragments {
      * @return whether it is the framework's own inner class
      */
     static boolean isNestedInsideFramework(String text) {
-        String outer = outerClassName(text);
-        // isFrameworkOwner on the outer, not isFrameworkClass, because nesting
-        // goes deeper than one level: an anonymous class inside an anonymous
-        // class -- LocationButton$7$1, which is the Runnable inside the
-        // TimerTask inside scheduleStaleWake -- reports LocationButton$7 as its
-        // outer, and that is not on the list. Only the top-level type is.
+        Nesting nesting = readNesting(text);
+        if (nesting == null || nesting.outer == null) {
+            // Not nested, so whoever it is, it is not the framework's by
+            // nesting. A top-level class whose NAME contains a dollar lands
+            // here and is inspected, which is the point.
+            return false;
+        }
+        // Walk outward, not one step. Nesting goes deeper than one level: the
+        // Runnable inside the TimerTask inside scheduleStaleWake is
+        // LocationButton$7$1, and it reports LocationButton$7 as its outer --
+        // which is not on the list, because only the top-level type is.
         //
-        // Sound here in a way the bare name test is not, because METADATA has
-        // already established that this class really is nested; all the name is
-        // being asked for is which top-level type it belongs to. A class that
-        // is not nested never reaches this line.
-        return outer != null && isFrameworkOwner(outer);
+        // Each step up is licensed by METADATA rather than by the shape of the
+        // name. The step is taken only when the InnerClasses table of the class
+        // being inspected lists the outer as a nested class, which it is
+        // required to do for any class in its pool that is not a member of a
+        // package (JVMS 4.7.6). A library's top-level
+        // com/codename1/location/LocationButton$Adapter is a package member, so
+        // it is absent from that table, the walk stops on it, and its children
+        // are inspected as the application code they are. Stripping the name to
+        // the first dollar would have charged them to the framework and dropped
+        // a real reference on the floor.
+        String outer = nesting.outer;
+        // Bounded because the input is a file, not a promise: a hand-made class
+        // could list itself and spin here forever. Nothing javac emits comes
+        // close to this depth.
+        for (int step = 0; step < 32; step++) {
+            if (isFrameworkClass(outer)) {
+                return true;
+            }
+            if (!nesting.listed.contains(outer)) {
+                return false;
+            }
+            int cut = outer.lastIndexOf('$');
+            if (cut <= 0) {
+                return false;
+            }
+            outer = outer.substring(0, cut);
+        }
+        return false;
     }
 
     /** Skips a u2 count followed by that many fixed-size entries. */

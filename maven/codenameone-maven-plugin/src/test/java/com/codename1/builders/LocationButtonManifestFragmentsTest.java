@@ -547,6 +547,14 @@ class LocationButtonManifestFragmentsTest {
                 "java/lang/Object", new String[] {"java/lang/Runnable"});
         w.visitInnerClass("com/codename1/location/LocationButton$7$1",
                 "com/codename1/location/LocationButton$7", null, 0);
+        // The enclosing anonymous class is listed too, with neither an outer
+        // nor a name because that is what anonymous means here. Not decoration:
+        // javac is required to list every class in the pool that is not a
+        // member of a package, and the real LocationButton$7$1 carries exactly
+        // this entry -- it is the only thing that distinguishes the framework's
+        // own $7 from a library's top-level class of the same name.
+        w.visitInnerClass("com/codename1/location/LocationButton$7", null, null,
+                Opcodes.ACC_STATIC);
         w.visitEnd();
         String text = new String(w.toByteArray(), StandardCharsets.ISO_8859_1);
         assertTrue(LocationButtonManifestFragments
@@ -561,9 +569,53 @@ class LocationButtonManifestFragmentsTest {
                 null, "java/lang/Object", null);
         app.visitInnerClass("com/example/MyForm$1$1", "com/example/MyForm$1",
                 null, 0);
+        app.visitInnerClass("com/example/MyForm$1", null, null,
+                Opcodes.ACC_STATIC);
         app.visitEnd();
         assertFalse(LocationButtonManifestFragments.isNestedInsideFramework(
                 new String(app.toByteArray(), StandardCharsets.ISO_8859_1)));
+    }
+
+    @Test
+    void aLibrarysDollarNamedTopLevelClassKeepsItsChildren() throws Exception {
+        // A dollar is an ordinary identifier character, so a library may
+        // legally declare a TOP-LEVEL class called LocationButton$Adapter, in
+        // the framework's own package, with a nested class of its own that is
+        // the only place it touches the button.
+        //
+        // Walking outward by stripping the name to the first dollar reaches
+        // LocationButton, charges the child to the framework and drops the
+        // reference -- the toolchain gate never fires and the bridge the app
+        // needs is deleted. So the walk steps up only where the InnerClasses
+        // table says the outer is itself nested, and a top-level class is a
+        // member of a package and is never listed there.
+        ClassWriter w = new ClassWriter(0);
+        w.visit(Opcodes.V1_8, Opcodes.ACC_SUPER,
+                "com/codename1/location/LocationButton$Adapter$1", null,
+                "java/lang/Object", null);
+        w.visitInnerClass("com/codename1/location/LocationButton$Adapter$1",
+                "com/codename1/location/LocationButton$Adapter", null, 0);
+        w.visitEnd();
+        assertFalse(LocationButtonManifestFragments.isNestedInsideFramework(
+                new String(w.toByteArray(), StandardCharsets.ISO_8859_1)),
+                "a library's own top-level LocationButton$Adapter is not the "
+                + "framework, so neither are its children");
+
+        // The distinguishing bit is the table, not the shape of the name: the
+        // SAME name, listed as nested, is the framework's.
+        ClassWriter nested = new ClassWriter(0);
+        nested.visit(Opcodes.V1_8, Opcodes.ACC_SUPER,
+                "com/codename1/location/LocationButton$Adapter$1", null,
+                "java/lang/Object", null);
+        nested.visitInnerClass("com/codename1/location/LocationButton$Adapter$1",
+                "com/codename1/location/LocationButton$Adapter", null, 0);
+        nested.visitInnerClass("com/codename1/location/LocationButton$Adapter",
+                "com/codename1/location/LocationButton", "Adapter", 0);
+        nested.visitEnd();
+        assertTrue(LocationButtonManifestFragments.isNestedInsideFramework(
+                new String(nested.toByteArray(), StandardCharsets.ISO_8859_1)),
+                "the framework's own member class and its children are the "
+                + "framework's");
     }
 
     @Test

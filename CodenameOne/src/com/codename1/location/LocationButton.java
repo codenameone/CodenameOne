@@ -201,6 +201,28 @@ public class LocationButton extends Container {
     /// asking for another one and makes [#isUnavailable()] answer true.
     private boolean unavailable;
 
+    /// Which system button the callbacks now arriving belong to.
+    ///
+    /// A setter that changes the label or the colours has to REPLACE the
+    /// platform control, because it takes those at construction. The old
+    /// native view is removed from this container, but nothing unregisters the
+    /// listeners it holds -- they are the ones handed to `createButton`, and
+    /// they point here, not at the peer. So a session that dies after its
+    /// button has been replaced still called [#systemButtonFailed(int)] and
+    /// retired the healthy control that took its place, and a permission
+    /// result from the retired view was served as though the new one had
+    /// produced it.
+    ///
+    /// Each system button is stamped as it is built, and its callbacks compare
+    /// the stamp against this field before acting. Installing anything that is
+    /// not a peer -- the fallback button, the placeholder -- advances it too,
+    /// because at that point no system button is current and nothing an old one
+    /// reports is either.
+    ///
+    /// No lock, and none needed: both callbacks marshal onto the EDT before
+    /// they look at it, and every write is on the EDT as well.
+    private int systemButtonGeneration;
+
     /// Creates a button labelled "Precise location".
     public LocationButton() {
         this(TEXT_PRECISE_LOCATION);
@@ -375,6 +397,13 @@ public class LocationButton extends Container {
             body = null;
         }
         body = replacement == null ? createFallbackButton() : replacement;
+        if (!(body instanceof PeerComponent)) {
+            // Not a system button, so no outstanding callback from one is
+            // current any more. Covers the placeholder a failed session leaves,
+            // the unavailable rebuild, and the fallback button on a device that
+            // has no platform control at all.
+            systemButtonGeneration++;
+        }
         addComponent(BorderLayout.CENTER, body);
         applyEnabledState();
         if (isInitialized()) {
@@ -452,18 +481,22 @@ public class LocationButton extends Container {
             if (bridge == null || !bridge.isSupported()) {
                 return null;
             }
+            // Stamped before the control exists, because the callbacks are
+            // handed to createButton and there is no later moment at which
+            // this peer could be told which generation it belongs to.
+            final int generation = ++systemButtonGeneration;
             return bridge.createButton(textType, backgroundColor, textColor,
                     new SuccessCallback<Boolean>() {
                         @Override
                         public void onSucess(Boolean granted) {
-                            permissionResult(granted != null
+                            permissionResult(generation, granted != null
                                     && granted.booleanValue());
                         }
                     },
                     new Runnable() {
                         @Override
                         public void run() {
-                            systemButtonFailed();
+                            systemButtonFailed(generation);
                         }
                     });
         } catch (Throwable unavailable) {
@@ -496,10 +529,16 @@ public class LocationButton extends Container {
     ///
     /// Sticky for the life of the component: retrying a session that has
     /// already failed once produces the same dead control.
-    private void systemButtonFailed() {
+    private void systemButtonFailed(final int generation) {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
+                if (generation != systemButtonGeneration) {
+                    // The session that died belonged to a button a setter has
+                    // already replaced. Retiring the component now would kill
+                    // a healthy control on behalf of one nobody can see.
+                    return;
+                }
                 if (unavailable) {
                     return;
                 }
@@ -511,7 +550,16 @@ public class LocationButton extends Container {
                 // than a peer and took the ORDINARY path -- prompting, which is
                 // the one thing the system button exists to avoid -- and the
                 // listeners heard a second answer after the null below.
-                WAITING.remove(this);
+                //
+                // LocationButton.this, not this: inside this Runnable the bare
+                // form is the RUNNABLE, which a List<LocationButton> never
+                // contains, so the line removed nothing and the comment above
+                // it described something that was not happening. Not a live
+                // bug only because serveNextWaiting skips unavailable entries
+                // as it drains -- but a queue that grows entries nobody removes
+                // and a backstop carrying the whole guarantee alone are both
+                // worth not having.
+                WAITING.remove(LocationButton.this);
                 setBody(createUnavailablePlaceholder());
                 // And tell the listeners. A session that failed IS this button
                 // finishing without producing a location, which is exactly what
@@ -533,7 +581,7 @@ public class LocationButton extends Container {
     /// True when the platform's button was drawn and then failed, so this
     /// component cannot obtain a location at all.
     ///
-    /// A failed session leaves nothing usable: see [#systemButtonFailed()] on
+    /// A failed session leaves nothing usable: see [#systemButtonFailed(int)] on
     /// why substituting an ordinary permission request would be wrong rather
     /// than merely worse. The component shows a disabled placeholder so the
     /// layout does not jump; an app that would rather show its own message can
@@ -597,7 +645,11 @@ public class LocationButton extends Container {
                 // path reaches location through LocationManager, and every port
                 // that has one already prompts from there. Asking here as well
                 // would show the user two dialogs for one tap.
-                permissionResult(true);
+                // The generation as it stands at the tap, not a captured one:
+                // this button is not a system button and has no session of its
+                // own, so what it reports belongs to whatever is on screen when
+                // the user presses it -- which is this.
+                permissionResult(systemButtonGeneration, true);
             }
         });
         return b;
@@ -633,10 +685,19 @@ public class LocationButton extends Container {
     /// On the EDT throughout. `getCurrentLocationSync` blocks through
     /// `invokeAndBlock`, which needs the EDT to keep running underneath it, and
     /// the listeners are UI code.
-    private void permissionResult(final boolean granted) {
+    private void permissionResult(final int generation,
+            final boolean granted) {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
+                if (generation != systemButtonGeneration) {
+                    // A control that is no longer on screen answering for a
+                    // tap on a control that is. Serving it would fire the
+                    // listeners of a button the user has not touched, and on
+                    // the granted path would spend the one session the
+                    // replacement was waiting for.
+                    return;
+                }
                 if (!granted) {
                     fire(null);
                     return;
