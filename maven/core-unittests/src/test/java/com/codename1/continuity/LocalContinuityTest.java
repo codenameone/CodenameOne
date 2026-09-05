@@ -3693,6 +3693,79 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A bridge is given the framework's callback once, however many listeners register.
+     *
+     * <p>ContinuityBridge documents that setCallback is called once, and every
+     * SyncedStore.addChangeListener() reached the install path -- so a second listener gave the
+     * same bridge a second callback, and a port that registers a native observer there keeps both
+     * and delivers every store change twice.</p>
+     *
+     * <p>A bridge the port has SWAPPED must still be given one, which is what refreshBridge()
+     * exists for, so the guard is the bridge INSTANCE rather than a flag.</p>
+     */
+    @EdtTest
+    public void aBridgeIsGivenTheCallbackOnceHoweverManyListenersRegister() {
+        CountingBridge counting = new CountingBridge();
+        Continuity.setBridge(counting);
+        SyncedStoreListener first = new SyncedStoreListener() {
+            public void storeChanged() {
+            }
+        };
+        SyncedStoreListener second = new SyncedStoreListener() {
+            public void storeChanged() {
+            }
+        };
+        try {
+            SyncedStore.addChangeListener(first);
+            SyncedStore.addChangeListener(second);
+            Continuity.enable();
+            Continuity.refreshBridge();
+
+            assertEquals(1, counting.callbacks,
+                    "the bridge was given " + counting.callbacks + " callbacks, so a port that "
+                            + "registers a native observer in setCallback keeps every one of them "
+                            + "and delivers each store change that many times");
+
+            // And a bridge the port SWAPS in still gets one, or refreshBridge() would be inert.
+            CountingBridge replacement = new CountingBridge();
+            Continuity.setBridge(replacement);
+            Continuity.refreshBridge();
+            assertEquals(1, replacement.callbacks,
+                    "a swapped-in bridge was left with no callback, so every inbound "
+                            + "continuation and store notification goes nowhere");
+        } finally {
+            SyncedStore.removeChangeListener(first);
+            SyncedStore.removeChangeListener(second);
+        }
+    }
+
+    /**
+     * A raw JSON boolean in an untagged document stays a boolean.
+     *
+     * <p>The parser defaults to answering true and false with the strings "true" and "false".
+     * That is harmless for the tagged form this codec writes -- "b:true" is a string either way --
+     * and wrong for an untagged compatibility document from a hand-written endpoint: the payload
+     * reached the listeners and the provider with Strings where the sender wrote booleans, passed
+     * validation because a String is a representable type, and was acknowledged.</p>
+     */
+    @EdtTest
+    public void anUntaggedJsonBooleanStaysABoolean() throws Exception {
+        AppState back = StateCodec.fromJson(
+                "{\"device\":\"other\",\"seq\":\"10\",\"payload\":{\"on\":true,\"off\":false}}");
+        assertNotNull(back, "the document was refused");
+        assertEquals(Boolean.TRUE, back.getPayload().get("on"),
+                "a raw JSON true reached the application as " + back.getPayload().get("on"));
+        assertEquals(Boolean.FALSE, back.getPayload().get("off"),
+                "a raw JSON false reached the application as " + back.getPayload().get("off"));
+
+        // The tagged form this codec writes is unaffected.
+        AppState tagged = StateCodec.fromJson("{\"device\":\"other\",\"seq\":\"10\","
+                + "\"enc\":\"1\",\"payload\":{\"on\":\"b:true\"}}");
+        assertEquals(Boolean.TRUE, tagged.getPayload().get("on"),
+                "the tagged form stopped decoding");
+    }
+
+    /**
      * Keys the host filesystem would merge stay distinct, whatever rule it merges them by.
      *
      * <p>The character list this replaces grew by one entry per review round and was wrong every
@@ -5673,6 +5746,19 @@ public class LocalContinuityTest extends UITestBase {
                 }
             }
             return folded.toString();
+        }
+    }
+
+    /** A bridge that counts how many callbacks it was given. */
+    static class CountingBridge extends LocalContinuityBridge {
+        int callbacks;
+
+        @Override
+        public void setCallback(ContinuityCallback c) {
+            super.setCallback(c);
+            if (c != null) {
+                callbacks++;
+            }
         }
     }
 

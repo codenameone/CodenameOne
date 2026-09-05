@@ -286,7 +286,7 @@ public class LocalContinuityBridge implements ContinuityBridge {
         // Escaping can multiply a key's length by five, and a filesystem will not take a name of
         // any length. Truncated and then made unique again by a hash of the WHOLE key, so two
         // long keys sharing a prefix still address different files.
-        return sb.substring(0, MAX_NAME_CHARS) + "$$" + hash(key);
+        return sb.toString().substring(0, MAX_NAME_CHARS) + "$$" + hash(key);
     }
 
     /// The most characters a storage name may use before it is truncated and hashed. Well inside
@@ -294,16 +294,29 @@ public class LocalContinuityBridge implements ContinuityBridge {
     private static final int MAX_NAME_CHARS = 120;
 
     /// FNV-1a, 64 bit, as 16 hex digits. Only ever used to keep two truncated names apart.
+    ///
+    /// Formatted through Integer.toHexString on each half rather than Long.toHexString, and
+    /// String.substring rather than StringBuilder.substring, because core is compiled a second
+    /// time against Ports/CLDC11 and translated against vm/JavaAPI -- neither of which defines
+    /// those two. The Maven build compiles against the full JDK and accepts them, so the mistake
+    /// only appears in the Ant leg.
     private static String hash(String key) {
         long h = 0xcbf29ce484222325L;
         for (int i = 0; i < key.length(); i++) {
             h ^= key.charAt(i);
             h *= 0x100000001b3L;
         }
-        StringBuilder out = new StringBuilder(Long.toHexString(h).toUpperCase());
-        while (out.length() < 16) {
-            out.insert(0, '0');
+        return hex32((int) (h >>> 32)) + hex32((int) h);
+    }
+
+    /// One 32-bit half as exactly eight uppercase hex digits.
+    private static String hex32(int value) {
+        String hex = Integer.toHexString(value).toUpperCase();
+        StringBuilder out = new StringBuilder();
+        for (int pad = hex.length(); pad < 8; pad++) {
+            out.append('0');
         }
+        out.append(hex);
         return out.toString();
     }
 

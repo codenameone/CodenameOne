@@ -241,8 +241,15 @@ public final class Continuity {
     /// explicit disable() as though it had never spoken.
     private static boolean applicationHasChosen;
 
-    /// Whether the port already holds this framework's callback.
-    private static boolean callbackInstalled;
+    /// The bridge this framework's callback was last given to, or null.
+    ///
+    /// The INSTANCE rather than a boolean, because both questions have to be answered by one
+    /// field: a second install on the same bridge is the bug -- ContinuityBridge documents that
+    /// setCallback is called once, and a port that registers a native observer there ends up
+    /// with several, delivering every store change as many times as there are listeners -- while
+    /// a bridge the port has SWAPPED must be given one, which is the whole job of
+    /// refreshBridge().
+    private static ContinuityBridge callbackInstalledOn;
 
     /// The relay session a framework worker is running for, bound for the length of its call
     /// into the relay and unbound afterwards. Null on the event thread and on any thread the
@@ -311,16 +318,16 @@ public final class Continuity {
     /// Only from those two, so a build that merely LINKS this class -- because something else in
     /// the framework mentions it -- never installs a callback or touches storage.
     private static void installCallback() {
-        if (callbackInstalled) {
-            return;
-        }
         ContinuityBridge b = bridgeInternal();
         if (b == null) {
             return;
         }
+        if (b == callbackInstalledOn) { //NOPMD CompareObjectsWithEquals
+            return;
+        }
         try {
             b.setCallback(new Callback());
-            callbackInstalled = true;
+            callbackInstalledOn = b;
         } catch (Throwable t) {
             Log.e(t);
         }
@@ -2996,15 +3003,12 @@ public final class Continuity {
     /// which is what lets the listener work with continuity still off.
     public static void installSyncedStoreCallback() {
         storeCallbackInstalled = true;
-        ContinuityBridge b = bridgeInternal();
-        if (b == null) {
-            return;
-        }
-        try {
-            b.setCallback(new Callback());
-        } catch (Throwable t) {
-            Log.e(t);
-        }
+        // Through the one installer, which is what stops this being called once per LISTENER.
+        // Every SyncedStore.addChangeListener() reached here, so a second listener gave the same
+        // bridge a second callback -- and ContinuityBridge documents that setCallback is called
+        // once, so a port that registers a native observer there keeps both and delivers every
+        // store change twice.
+        installCallback();
     }
 
     /// Internal. Re-installs the framework's inbound seam on whatever bridge the port now
@@ -3021,15 +3025,11 @@ public final class Continuity {
         if (!enabled && !storeCallbackInstalled) {
             return;
         }
-        ContinuityBridge b = bridgeInternal();
-        if (b == null) {
-            return;
-        }
-        try {
-            b.setCallback(new Callback());
-        } catch (Throwable t) {
-            Log.e(t);
-        }
+        // Also through the one installer. It re-installs exactly when the bridge is a DIFFERENT
+        // object, which is what this method is for and is a sharper test than the unconditional
+        // call it replaces: a port that calls this without having swapped anything no longer
+        // stacks a second callback on the bridge it already gave one to.
+        installCallback();
     }
 
     static ContinuityBridge bridgeInternal() {
@@ -3063,7 +3063,7 @@ public final class Continuity {
         bridgeOverridden = false;
         enabled = false;
         applicationHasChosen = false;
-        callbackInstalled = false;
+        callbackInstalledOn = null;
         formAtSessionEnd = null;
         autoRestore = true;
         flushScheduled = false;

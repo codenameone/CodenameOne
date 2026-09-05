@@ -282,6 +282,13 @@ public final class StateCodec {
         // distinguishable from one that was never sent.
         JSONParser parser = new JSONParser();
         parser.setIncludeNullsInstance(true);
+        // Booleans as BOOLEANS. The parser defaults to answering a raw JSON true or false with
+        // the strings "true" and "false", which is fine for the tagged form this codec writes --
+        // "b:true" is a string either way -- and wrong for an untagged compatibility document
+        // from a hand-written endpoint: the payload reached the listeners and the provider with
+        // Strings where the sender wrote booleans, passed validation because a String is a
+        // representable type, and was acknowledged.
+        parser.setUseBooleanInstance(true);
         Map<String, Object> parsed = parser.parseJSON(new java.io.StringReader(json));
         requireKnownTypes(parsed);
         return fromMap(parsed);
