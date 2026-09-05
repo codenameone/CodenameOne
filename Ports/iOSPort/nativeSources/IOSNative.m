@@ -13226,21 +13226,40 @@ void com_codename1_impl_ios_IOSNative_registerBundledFont___java_lang_String(CN1
     if (f != nil && [f length] > 0) {
         // Registering the same URL twice is an error Core Text reports and we
         // discard, but the parse still costs -- so remember what has been done.
+        //
+        // Synchronised, which core Codename One deliberately is not. The
+        // framework runs on one event dispatch thread and its state needs no
+        // locks, but this is the native boundary and nothing holds callers to
+        // that thread: Font.createTrueTypeFont is public, carries no such
+        // restriction, and loading fonts on a background thread while the UI
+        // comes up is an ordinary thing for an application to do. Two threads
+        // mutating an NSMutableSet is not a stale read the way a Java map would
+        // be, it is undefined behaviour that crashes.
+        //
+        // dispatch_once for the creation so the set cannot be built twice, and
+        // the lock spans the registration rather than just the membership test:
+        // releasing it after the add would let a second caller for the same file
+        // decide it was already registered and ask Core Text for the name while
+        // the first was still parsing it. Serialising here costs nothing worth
+        // measuring -- a font file is registered once in the life of a process.
         static NSMutableSet *done = nil;
-        if (done == nil) {
+        static dispatch_once_t doneOnce;
+        dispatch_once(&doneOnce, ^{
             done = [[NSMutableSet alloc] init];
-        }
-        if (![done containsObject:f]) {
-            [done addObject:f];
-            NSString *path = [[[NSBundle mainBundle] resourcePath]
-                                stringByAppendingPathComponent:f];
-            if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
-                CFErrorRef error = NULL;
-                CTFontManagerRegisterFontsForURL(
-                    (BRIDGE_CAST CFURLRef)[NSURL fileURLWithPath:path],
-                    kCTFontManagerScopeProcess, &error);
-                if (error != NULL) {
-                    CFRelease(error);
+        });
+        @synchronized (done) {
+            if (![done containsObject:f]) {
+                [done addObject:f];
+                NSString *path = [[[NSBundle mainBundle] resourcePath]
+                                    stringByAppendingPathComponent:f];
+                if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
+                    CFErrorRef error = NULL;
+                    CTFontManagerRegisterFontsForURL(
+                        (BRIDGE_CAST CFURLRef)[NSURL fileURLWithPath:path],
+                        kCTFontManagerScopeProcess, &error);
+                    if (error != NULL) {
+                        CFRelease(error);
+                    }
                 }
             }
         }
