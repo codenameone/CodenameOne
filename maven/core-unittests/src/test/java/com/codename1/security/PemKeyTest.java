@@ -615,6 +615,64 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void rfc5958VersionOneKeysAreNormalized() {
+        // JDK 11 refuses a version-1 OneAsymmetricKey ("version mismatch") while
+        // 17 and later accept it, so passing one through works on some supported
+        // runtimes and not others. Normalizing reproduces the canonical
+        // version-0 key exactly.
+        byte[] canonical = der(RSA_PKCS8);
+        int off = (canonical[1] & 0xFF) < 0x80 ? 2 : 2 + (canonical[1] & 0x7F);
+        byte[] inner = new byte[canonical.length - off];
+        System.arraycopy(canonical, off, inner, 0, inner.length);
+        inner[2] = 0x01;                                  // version 0 -> 1
+
+        byte[] publicKey = new byte[66];                  // a [1] publicKey field
+        publicKey[0] = (byte) 0xA1;
+        publicKey[1] = 64;
+        byte[] content = new byte[inner.length + publicKey.length];
+        System.arraycopy(inner, 0, content, 0, inner.length);
+        System.arraycopy(publicKey, 0, content, inner.length, publicKey.length);
+
+        byte[] v1 = new byte[content.length + 4];
+        v1[0] = 0x30;
+        v1[1] = (byte) 0x82;
+        v1[2] = (byte) (content.length >> 8);
+        v1[3] = (byte) content.length;
+        System.arraycopy(content, 0, v1, 4, content.length);
+
+        PrivateKey key = PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(v1)));
+        assertArrayEquals(canonical, key.getEncoded());
+
+        // a key that is already version 0 is passed through untouched
+        assertArrayEquals(canonical, PrivateKey.fromPem(pem(RSA_PKCS8_LABEL, RSA_PKCS8)).getEncoded());
+    }
+
+    @Test
+    void nonMinimalDerLengthsAreRejected() {
+        // DER demands the shortest length encoding; BER does not. JDK 11 and 17
+        // refuse a redundant length while 21 and later accept it, so a key
+        // encoded this way loads on some supported runtimes and not others.
+        byte[] spki = der(RSA_SPKI);
+        byte[] content = new byte[spki.length - 4];
+        System.arraycopy(spki, 4, content, 0, content.length);
+
+        byte[] leadingZero = new byte[content.length + 5];
+        leadingZero[0] = 0x30;
+        leadingZero[1] = (byte) 0x83;
+        leadingZero[2] = 0x00;
+        leadingZero[3] = (byte) (content.length >> 8);
+        leadingZero[4] = (byte) content.length;
+        System.arraycopy(content, 0, leadingZero, 5, content.length);
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem("PUBLIC KEY", Base64.encodeNoNewline(leadingZero))));
+        assertTrue(e.getMessage().contains("non-minimal"), e.getMessage());
+
+        // long form used where the short form would do
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY",
+                Base64.encodeNoNewline(hex("3014 30810d 0609 2a864886f70d010101 0500 03020001")))));
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));

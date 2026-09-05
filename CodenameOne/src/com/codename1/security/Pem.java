@@ -109,7 +109,7 @@ final class Pem {
         byte[] der = select(pem, PRIVATE_LABELS, true);
         int shape = shapeOf(der);
         if (shape == SHAPE_PKCS8) {
-            return der;
+            return normalizePkcs8(der);
         }
         if (shape == SHAPE_PKCS1_PRIVATE) {
             return wrapPkcs8(rsaAlgorithmIdentifier(), der);
@@ -382,6 +382,34 @@ final class Pem {
         return tlv(0x30, concat(concat(version, algorithmIdentifier), tlv(0x04, privateKey)));
     }
 
+    /// Rewrites an RFC 5958 version-1 `OneAsymmetricKey` as the version-0
+    /// `PrivateKeyInfo` of RFC 5208, dropping the `[1] publicKey` that only the
+    /// later version allows.
+    ///
+    /// JDK 11 refuses a version-1 key outright ("version mismatch: supported 00,
+    /// parsed 01") while 17 and later accept it, so passing one straight through
+    /// works on some supported runtimes and not others. The private key itself
+    /// is untouched and the public half is derivable from it, so the version-0
+    /// form every provider understands loses nothing. A key that is already
+    /// version 0 is returned byte for byte.
+    private static byte[] normalizePkcs8(byte[] der) {
+        Cursor c = new Cursor(der);
+        c.enter(0x30);
+        byte[] version = c.element();
+        if (version.length == 3 && version[0] == 0x02 && version[1] == 0x01 && version[2] == 0) {
+            return der;
+        }
+        byte[] algorithm = c.element();
+        byte[] privateKey = c.element();
+        byte[] attributes = new byte[0];
+        if (c.hasMore() && c.peek() == 0xA0) {
+            // [0] attributes is legal in version 0 as well, so it is kept
+            attributes = c.element();
+        }
+        return tlv(0x30, concat(concat(tlv(0x02, new byte[] {0}), algorithm),
+                concat(privateKey, attributes)));
+    }
+
     /// Converts a SEC1 `ECPrivateKey` --
     /// `SEQUENCE { INTEGER 1, OCTET STRING privateKey, [0] parameters, [1] publicKey }`
     /// -- into a PKCS#8 PrivateKeyInfo.
@@ -617,12 +645,23 @@ final class Pem {
             if (count == 0 || count > 4 || count > end - pos) {
                 throw new CryptoException("malformed key: bad DER length");
             }
+            // DER requires the shortest possible length encoding. BER does not,
+            // and the difference is not academic: JDK 11 and 17 refuse a
+            // redundant length outright while 21 and later accept it, so a key
+            // encoded this way works on some supported runtimes and not others.
+            if (der[pos] == 0) {
+                throw new CryptoException("malformed key: non-minimal DER length, leading zero octet");
+            }
             int value = 0;
             for (int i = 0; i < count; i++) {
                 value = (value << 8) | (der[pos++] & 0xFF);
             }
             if (value < 0) {
                 throw new CryptoException("malformed key: bad DER length");
+            }
+            if (value < 0x80) {
+                throw new CryptoException("malformed key: non-minimal DER length, long form used for "
+                        + value);
             }
             return value;
         }
