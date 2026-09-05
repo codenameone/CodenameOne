@@ -170,6 +170,30 @@ class PemKeyTest extends UITestBase {
             + "2Agk+VJipUjmP2DGPGmfheb09pKrc3f8N8HZJEaVEnVpEr5ps/cf1Jrg5rRhwWfH"
             + "6j/tPHJczFOda/pPLAvKUTJFb0ykC1SarM1a7JAlBkIjQV/6gy1LnZo=";
 
+    /// Body of a throwaway EC PRIVATE KEY test key written with explicit curve parameters.
+    private static final String EC_SEC1_EXPLICIT_LABEL = "EC PRIVATE KEY";
+    private static final String EC_SEC1_EXPLICIT = ""
+            + "MIIBaAIBAQQgzgQyqm3SoKJl/+kk1lZcl5DdXBwSi5mcV2dUxnlnnl6ggfowgfcC"
+            + "AQEwLAYHKoZIzj0BAQIhAP////8AAAABAAAAAAAAAAAAAAAA////////////////"
+            + "MFsEIP////8AAAABAAAAAAAAAAAAAAAA///////////////8BCBaxjXYqjqT57Pr"
+            + "vVV2mIa8ZR0GsMxTsPY7zjw+J9JgSwMVAMSdNgiG5wSTamZ44ROdJreBn36QBEEE"
+            + "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpZP40Li/hp/m47n60p8D54W"
+            + "K84zV2sxXs7LtkBoN79R9QIhAP////8AAAAA//////////+85vqtpxeehPO5ysL8"
+            + "YyVRAgEBoUQDQgAELryQVp8o9+EzTdiZFP3DYQLp8K4b54Nhj++QzO8OKuAFi3Y7"
+            + "WIGMvCvnnWjHO2n1HlYN2qjIcumoTe+Vc0lLow==";
+
+    /// Body of a throwaway PRIVATE KEY test key written with explicit curve parameters.
+    private static final String EC_PKCS8_EXPLICIT_LABEL = "PRIVATE KEY";
+    private static final String EC_PKCS8_EXPLICIT = ""
+            + "MIIBeQIBADCCAQMGByqGSM49AgEwgfcCAQEwLAYHKoZIzj0BAQIhAP////8AAAAB"
+            + "AAAAAAAAAAAAAAAA////////////////MFsEIP////8AAAABAAAAAAAAAAAAAAAA"
+            + "///////////////8BCBaxjXYqjqT57PrvVV2mIa8ZR0GsMxTsPY7zjw+J9JgSwMV"
+            + "AMSdNgiG5wSTamZ44ROdJreBn36QBEEEaxfR8uEsQkf4vOblY6RA8ncDfYEt6zOg"
+            + "9KE5RdiYwpZP40Li/hp/m47n60p8D54WK84zV2sxXs7LtkBoN79R9QIhAP////8A"
+            + "AAAA//////////+85vqtpxeehPO5ysL8YyVRAgEBBG0wawIBAQQgzgQyqm3SoKJl"
+            + "/+kk1lZcl5DdXBwSi5mcV2dUxnlnnl6hRANCAAQuvJBWnyj34TNN2JkU/cNhAunw"
+            + "rhvng2GP75DM7w4q4AWLdjtYgYy8K+edaMc7afUeVg3aqMhy6ahN75VzSUuj";
+
     private static String pem(String label, String base64) {
         StringBuilder sb = new StringBuilder("-----BEGIN ").append(label).append("-----\n");
         for (int i = 0; i < base64.length(); i += 64) {
@@ -459,6 +483,22 @@ class PemKeyTest extends UITestBase {
         System.arraycopy(oid, 0, pkcs8AlgId, 9, oid.length);
         assertThrows(CryptoException.class,
                 () -> PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(pkcs8AlgId))));
+    }
+
+    @Test
+    void sec1WithExplicitCurveParametersIsPreserved() {
+        // ECParameters is a CHOICE: usually a named-curve OID, but a whole
+        // SEQUENCE when the key was written with "openssl ecparam
+        // -param_enc explicit". Reading an OID out of it rejected a valid SEC1
+        // key, so the field is carried over whole -- and the result is what
+        // "openssl pkcs8 -topk8" produces for the same file, byte for byte.
+        PrivateKey priv = PrivateKey.fromPem(pem(EC_SEC1_EXPLICIT_LABEL, EC_SEC1_EXPLICIT));
+        assertEquals(PublicKey.EC, priv.getAlgorithm());
+        assertArrayEquals(der(EC_PKCS8_EXPLICIT), priv.getEncoded());
+
+        // and unarmored input reaches the same key
+        assertArrayEquals(der(EC_PKCS8_EXPLICIT),
+                PrivateKey.fromPem(EC_SEC1_EXPLICIT).getEncoded());
     }
 
     @Test

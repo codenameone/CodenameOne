@@ -301,9 +301,14 @@ final class Pem {
         return tlv(0x30, concat(tlv(0x06, OID_RSA), tlv(0x05, new byte[0])));
     }
 
-    /// SEQUENCE { OID id-ecPublicKey, OID namedCurve }.
-    private static byte[] ecAlgorithmIdentifier(byte[] curveOid) {
-        return tlv(0x30, concat(tlv(0x06, OID_EC), tlv(0x06, curveOid)));
+    /// `SEQUENCE { OID id-ecPublicKey, ECParameters }`.
+    ///
+    /// `ecParameters` is passed through whole rather than rebuilt, because
+    /// ECParameters is a CHOICE: usually a named-curve OID, but a complete
+    /// SEQUENCE describing the curve when the key was written with explicit
+    /// parameters. Both belong in this field verbatim.
+    private static byte[] ecAlgorithmIdentifier(byte[] ecParameters) {
+        return tlv(0x30, concat(tlv(0x06, OID_EC), ecParameters));
     }
 
     /// SEQUENCE { INTEGER 0, AlgorithmIdentifier, OCTET STRING privateKey }.
@@ -326,25 +331,30 @@ final class Pem {
         c.enter(0x30);
         byte[] version = c.element();
         byte[] privateKey = c.element();
-        byte[] curveOid = null;
+        byte[] ecParameters = null;
         byte[] tail = new byte[0];
         while (c.hasMore()) {
             int tag = c.peek();
             byte[] element = c.element();
             if (tag == 0xA0) {
+                // [0] wraps ECParameters, which is a CHOICE -- a named-curve
+                // OID or, for a key written with explicit parameters, a whole
+                // SEQUENCE describing the curve. Take it verbatim: reading an
+                // OID out of it would reject the explicit form, which is a
+                // valid SEC1 key.
                 Cursor parameters = new Cursor(element);
                 parameters.enter(0xA0);
-                curveOid = parameters.read(0x06);
+                ecParameters = parameters.element();
             } else {
                 tail = concat(tail, element);
             }
         }
-        if (curveOid == null) {
+        if (ecParameters == null) {
             throw new CryptoException("SEC1 EC private key names no curve; re-export it as PKCS#8 with: "
                     + "openssl pkcs8 -topk8 -nocrypt -in key.pem -out key_pkcs8.pem");
         }
         byte[] inner = tlv(0x30, concat(concat(version, privateKey), tail));
-        return wrapPkcs8(ecAlgorithmIdentifier(curveOid), inner);
+        return wrapPkcs8(ecAlgorithmIdentifier(ecParameters), inner);
     }
 
     private static byte[] tlv(int tag, byte[] content) {
