@@ -641,6 +641,28 @@ class LocationButtonRebuildTest extends UITestBase {
     }
 
     @Test
+    void aRetainedPeerStillOwnsItsCallbacks() {
+        RecordingBridge bridge = install();
+        LocationButton button = new LocationButton();
+        assertEquals(1, bridge.sessions.size());
+
+        // A setter rebuilds and the platform declines, so the peer already on
+        // screen is kept. Advancing the stamp anyway retired ITS callbacks
+        // while it was still the visible control, so a tap or a failure from
+        // the button the user can see was discarded as stale.
+        bridge.building = false;
+        button.setTextType(LocationButton.TEXT_USE_PRECISE_LOCATION);
+        assertTrue(button.getComponentAt(0) instanceof PeerComponent,
+                "the peer was kept");
+
+        bridge.sessions.get(0).onUnavailable.run();
+        drain();
+        assertTrue(button.isUnavailable(),
+                "the retained control's session failing is still this "
+                + "component's business");
+    }
+
+    @Test
     void aDeclinedRebuildKeepsTheControlItAlreadyHas() {
         RecordingBridge bridge = install();
         LocationButton button = new LocationButton();

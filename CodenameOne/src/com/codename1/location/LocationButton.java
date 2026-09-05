@@ -579,8 +579,23 @@ public class LocationButton extends Container {
             // Stamped before the control exists, because the callbacks are
             // handed to createButton and there is no later moment at which
             // this peer could be told which generation it belongs to.
-            final int generation = ++systemButtonGeneration;
-            return bridge.createButton(textType, backgroundColor, textColor,
+            // The stamp this control WOULD carry, taken but not yet in
+            // force. It becomes current only if a peer actually comes back,
+            // because a rebuild the platform declines keeps the peer already on
+            // screen -- and advancing the counter regardless retired THAT
+            // peer's callbacks while it was still the visible control. A tap
+            // on it, or its session failing, was then discarded as stale, so
+            // the button the user can see did nothing at all until some later
+            // attach replaced it.
+            //
+            // Assigned rather than rolled back: nothing is superseded until
+            // something supersedes it, and there is no window in which the
+            // counter says otherwise. Safe to defer because a null here means
+            // no view was built -- a bridge that FAILS to build one throws, and
+            // that path is below.
+            final int generation = systemButtonGeneration + 1;
+            PeerComponent peer = bridge.createButton(
+                    textType, backgroundColor, textColor,
                     new SuccessCallback<Boolean>() {
                         @Override
                         public void onSucess(Boolean granted) {
@@ -594,6 +609,10 @@ public class LocationButton extends Container {
                             systemButtonFailed(generation);
                         }
                     });
+            if (peer != null) {
+                systemButtonGeneration = generation;
+            }
+            return peer;
         } catch (Throwable failed) {
             // A port that said it SUPPORTS the control and then threw building
             // it has a failed session, not an absent feature -- so this is
