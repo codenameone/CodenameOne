@@ -153,13 +153,10 @@ final class IOSContinuityCallbacks {
     /// Hands an arrival to the framework, or holds it. Called on whatever thread the activity
     /// arrived on; the framework marshals what it needs to.
     private static boolean deliverToFramework(String activityType, String userInfoJson) {
-        // A plain read, and not a synchronized or volatile one. A review asked for safe
-        // publication here on the theory that this thread might still see null after the event
-        // thread installed the callback. Read what happens if it does: the arrival is RETAINED in
-        // pendingType/pendingJson below and false is returned, which is the same answer a decline
-        // gives -- and setCallback() drains those inline on every install. So the theoretical
-        // race costs a delivery deferred to the next install, not a lost activity, and the
-        // machinery to close it would be a lock on the path the OS calls for every Handoff.
+        // A plain read, and not a synchronized or volatile one. Two reviews have asked for safe
+        // publication here and the answer is the re-read at the bottom of this method rather than
+        // a lock -- see the comment there for why that closes the ordering, and why a lock would
+        // have to span a call into the event thread to add anything.
         ContinuityCallback c = callback;
         boolean claimed = false;
         if (c != null) {
@@ -181,6 +178,40 @@ final class IOSContinuityCallbacks {
         // cold-launch continuation into a lost one.
         pendingType = activityType;
         pendingJson = userInfoJson;
+        // And then LOOK AGAIN, because the callback may have been installed since the read above.
+        //
+        // The interleaving is real and ordering, not visibility: this thread reads `callback` as
+        // null, the event thread installs one and finds pendingType still null, and only then does
+        // this thread store it. The activity is left behind by the one installation that would
+        // have drained it, and nothing else is coming -- setCallback() runs at enable(), disable(),
+        // clear() and a bridge swap, so an app that does none of those again has lost the Handoff
+        // rather than deferred it.
+        //
+        // Closed by re-reading rather than by locking. One of the two orders must hold: either the
+        // event thread reads pendingType after the write above and drains it, or this read happens
+        // after the install and delivers it here. A lock would have to span the delivery to add
+        // anything, and that means calling into the framework -- and the event thread -- while
+        // holding it, which trades a lost activity for a deadlock.
+        ContinuityCallback late = callback;
+        if (late == null || late == c) { //NOPMD CompareObjectsWithEquals
+            // Nothing arrived in the window, or the same one that already declined it.
+            return false;
+        }
+        boolean lateClaimed = false;
+        try {
+            lateClaimed = late.continuationReceived(activityType, parse(userInfoJson));
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+        if (lateClaimed) {
+            // Taken after all, so the port lets go -- but only of THIS activity. A newer one
+            // stored by another arrival in the meantime is not ours to clear.
+            if (activityType != null && activityType.equals(pendingType)) {
+                pendingType = null;
+                pendingJson = null;
+            }
+            return true;
+        }
         return false;
     }
 

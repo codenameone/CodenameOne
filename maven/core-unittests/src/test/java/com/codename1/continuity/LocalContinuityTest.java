@@ -8034,6 +8034,40 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * An ordinary logout does not leave the account's screen held in a static.
+     *
+     * <p>clear() records the current form for one comparison -- applicationChoseTheScreen(),
+     * which exists for a route factory or a show callback that ends the session from inside
+     * restoreStack(). Outside that window nothing ever reads it, and it was recorded anyway: a
+     * strong reference to the signed-out account's whole component tree, and to whatever the
+     * application hung off it, reachable through a static for the rest of the next session.</p>
+     *
+     * <p>The sibling test above -- a login form the logout callback chose surviving the undo --
+     * is the other half of this: the comparison still has what it needs when a session really
+     * does end mid-restore.</p>
+     */
+    @EdtTest
+    public void anOrdinaryLogoutHoldsNoFormAfterwards() {
+        Continuity.setStateProvider(new RecordingProvider());
+        new Form("the signed-out account's screen").show();
+        flushSerialCalls();
+
+        Continuity.clear();
+
+        assertNull(Continuity.formAtSessionEndForTest(),
+                "the logout kept a reference to the account's screen, so its whole component "
+                        + "tree stays reachable through a static for the next session");
+
+        // disable() records it on the same terms, and is the other half of the documented logout.
+        new Form("still nothing restoring").show();
+        flushSerialCalls();
+        Continuity.disable();
+
+        assertNull(Continuity.formAtSessionEndForTest(),
+                "disable() kept a reference to the screen outside any restore");
+    }
+
+    /**
      * clear() empties the shelf, not only the slot.
      *
      * <p>clear() is a logout: nothing from before it survives. A shelved arrival is state from

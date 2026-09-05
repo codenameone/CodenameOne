@@ -263,6 +263,18 @@ public final class Continuity {
     /// show callback, so by the time restoreStack returns whatever the application did is already
     /// current and looks exactly like what the restore did. Sampling the display at the moment
     /// the session ended is the one point where the two are still distinguishable.
+    /// The screen that was showing when a session ended DURING a restore, or null.
+    ///
+    /// Recorded only while `applyingRestore` is set, and dropped as soon as the comparison that
+    /// wants it has run. Both halves are about what this field is: a strong reference to a Form,
+    /// which is a whole component tree and whatever the application hung off it.
+    ///
+    /// An ordinary logout used to fill it too -- clear() records the current screen whether or not
+    /// anything is restoring -- and nothing ever read it in that case, so the signed-out account's
+    /// entire UI stayed reachable through a static for the whole of the next session. The one
+    /// reader is applicationChoseTheScreen(), which exists for a route factory or a show callback
+    /// that ends the session from inside restoreStack(); outside that window there is no
+    /// comparison to make and no reason to hold the form.
     private static com.codename1.ui.Form formAtSessionEnd;
 
     /// Armed only while clear() drains whatever the port has been holding, and read by the
@@ -590,8 +602,9 @@ public final class Continuity {
             installCallback(true);
             return;
         }
-        // Sampled with the bump, not read later: see formAtSessionEnd.
-        formAtSessionEnd = Display.isInitialized()
+        // Sampled with the bump, not read later: see formAtSessionEnd. And only while a restore
+        // is in flight, which is the only thing that ever reads it -- see the gate's own comment.
+        formAtSessionEnd = applyingRestore && Display.isInitialized()
                 ? Display.getInstance().getCurrent() : null;
         lifecycle++;
         enabled = false;
@@ -1525,6 +1538,11 @@ public final class Continuity {
                 }
             } catch (Throwable t) {
                 Log.e(t);
+            } finally {
+                // The comparison is over, so the form goes. Holding it any longer keeps the
+                // previous account's whole component tree reachable through a static for the rest
+                // of the process, and nothing is going to ask about it again.
+                formAtSessionEnd = null;
             }
             outFailed[0] = true;
             return false;
@@ -1809,8 +1827,9 @@ public final class Continuity {
     /// One thing it cannot undo: a relay request already on the wire when this is called. Nothing
     /// in this process can recall that. What this guarantees is that nothing follows it.
     public static void clear() {
-        // Sampled with the bump, not read later: see formAtSessionEnd.
-        formAtSessionEnd = Display.isInitialized()
+        // Sampled with the bump, not read later: see formAtSessionEnd. And only while a restore
+        // is in flight, which is the only thing that ever reads it -- see the gate's own comment.
+        formAtSessionEnd = applyingRestore && Display.isInitialized()
                 ? Display.getInstance().getCurrent() : null;
         lifecycle++;
         parked = null;
@@ -3510,6 +3529,14 @@ public final class Continuity {
     /// be asked directly rather than through a platform.
     static ContinuityCallback callbackForTest() {
         return new Callback();
+    }
+
+    /// Test seam: the form a session-end recorded for the restore comparison, or null.
+    ///
+    /// The retention is the point of asking. This holds a whole component tree, and an ordinary
+    /// logout used to fill it for a comparison that only ever happens during a restore.
+    static com.codename1.ui.Form formAtSessionEndForTest() {
+        return formAtSessionEnd;
     }
 
     /// Test seam: parks a state, as a cold-launch arrival with no form yet does.
