@@ -5007,24 +5007,56 @@ public class IOSImplementation extends CodenameOneImplementation {
         return 4096;
     }
 
+    /// Whether a soft-ref value may be evicted to stay inside the budget.
+    ///
+    /// True only for values a caller can rebuild by asking again: a decoded
+    /// image and the pixel or byte arrays it comes from. Anything else is
+    /// assumed to be tracking a lifetime rather than caching a result, where
+    /// dropping the entry does not cost time, it reports a false death.
+    ///
+    /// Deliberately a whitelist. A new kind of value added here defaults to
+    /// being kept, which wastes memory; defaulting the other way would corrupt
+    /// whoever relied on it.
+    private static boolean isRebuildableSoftRef(Object o) {
+        return o instanceof com.codename1.ui.Image
+                || o instanceof int[]
+                || o instanceof byte[];
+    }
+
     private void trimSoftRefs() {
-        // size() > 1, not isEmpty(): a single value can be bigger than the whole
+        // Two conditions, each for its own reason.
+        //
+        // "> 1", not "not empty": a single value can be bigger than the whole
         // budget on its own -- a 3840x2160 decoded image is about 32MB against a
         // 24MB budget -- and evicting down to nothing threw away the entry
         // createSoftWeakRef had just inserted, so its key never resolved again
         // and the caller re-decoded the same image on every frame. Keeping the
-        // most recent entry means the cache can always produce a hit; the budget
+        // most recent one means the cache can always produce a hit; the budget
         // is a target for the SET of entries, not a hard cap on any one of them.
-        while (softRefBytes > SOFT_REF_BUDGET_BYTES && softReferenceMap.size() > 1) {
-            java.util.Iterator it = softReferenceMap.entrySet().iterator();
-            Map.Entry eldest = (Map.Entry) it.next();   // access-order: least recently used
-            Long charged = (Long) softRefCharged.remove(eldest.getKey());
+        //
+        // Counted over softRefCharged rather than softReferenceMap, because only
+        // charged entries may be evicted at all. Counting the whole table would
+        // let this loop believe it still had somewhere to go while every
+        // remaining entry was one it must not touch.
+        while (softRefBytes > SOFT_REF_BUDGET_BYTES && softRefCharged.size() > 1) {
+            Object victim = null;
+            java.util.Iterator it = softReferenceMap.keySet().iterator();
+            while (it.hasNext()) {
+                Object key = it.next();   // access-order: least recently used first
+                if (softRefCharged.containsKey(key)) {
+                    victim = key;
+                    break;
+                }
+            }
+            if (victim == null) {
+                break;
+            }
+            Long charged = (Long) softRefCharged.remove(victim);
             softRefBytes -= charged == null ? 0 : charged.longValue();
-            it.remove();
+            softReferenceMap.remove(victim);
         }
-        if (softReferenceMap.isEmpty()) {
+        if (softRefCharged.isEmpty()) {
             softRefBytes = 0;
-            softRefCharged.clear();
         }
     }
 
@@ -5063,13 +5095,31 @@ public class IOSImplementation extends CodenameOneImplementation {
             return key;
         }
         synchronized (softReferenceMap) {
-            // Measured HERE, while the caller still holds it and its peer is
-            // certainly alive, and remembered so eviction never has to ask again.
-            long charged = softRefSize(o);
             softReferenceMap.put(key, o);
-            softRefCharged.put(key, Long.valueOf(charged));
-            softRefBytes += charged;
-            trimSoftRefs();
+            // Charged only if it is the kind of value the budget exists for, and
+            // ONLY a charged entry can ever be evicted.
+            //
+            // This table is not only an image cache. createSoftWeakRef is the
+            // portable way to hold something weakly, and callers use it to track
+            // LIFETIME as well: JavascriptContext keeps its live JSObject
+            // wrappers here and reads a null extractHardRef as proof the wrapper
+            // was collected, releasing the underlying JavaScript object on that
+            // basis. Evicting one of those to reclaim space would tell it a live
+            // object had died, and the wrapper would go on pointing at released
+            // state. So eviction is confined to values that can simply be built
+            // again -- decoded images and the raw pixel or byte arrays behind
+            // them -- and everything else stays exactly as long as it did before
+            // any budget existed.
+            if (isRebuildableSoftRef(o)) {
+                // Measured HERE, while the caller still holds it and its peer is
+                // certainly alive, so eviction never has to ask again -- asking
+                // later read getWidth() off an image that had since been
+                // disposed.
+                long charged = softRefSize(o);
+                softRefCharged.put(key, Long.valueOf(charged));
+                softRefBytes += charged;
+                trimSoftRefs();
+            }
         }
         return key;
     }
