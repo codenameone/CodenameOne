@@ -15755,6 +15755,24 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetBottom___R_int(CN1_
 }
 
 JAVA_FLOAT com_codename1_impl_ios_IOSNative_getDisplayScale___R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_WATCH
+    // Not scaleValue on this slice. It is only ever assigned from
+    // [UIScreen mainScreen].scale, which the watch compiles out, so it stays at
+    // its initializer of 1 forever -- while CN1WatchRenderingView allocates its
+    // bitmap at w*scale by h*scale and draws through a matching scale CTM. The
+    // honest device-pixel ratio is therefore the rendering view's scale;
+    // reporting 1 makes callers build 1x bitmaps for a Retina watch.
+    CN1WatchRenderingView *watchView = [CN1WatchHost sharedHost].renderingView;
+    if (watchView != nil) {
+        CGFloat watchScale = [watchView backingScale];
+        if (watchScale > 0) {
+            return (JAVA_FLOAT)watchScale;
+        }
+    }
+    // Host not started yet: 0 means "not captured", which the Java caller
+    // answers by deferring to the portable implementation.
+    return (JAVA_FLOAT)0;
+#else
     // scaleValue, and nothing else: this file is shared with the Mac port, where
     // there is no UIScreen at all (it is NSScreen, whose scale is
     // backingScaleFactor). scaleValue is already the captured screen scale on
@@ -15762,6 +15780,7 @@ JAVA_FLOAT com_codename1_impl_ios_IOSNative_getDisplayScale___R_float(CN1_THREAD
     // captured yet", which the Java caller answers by deferring to the portable
     // implementation.
     return (JAVA_FLOAT)scaleValue;
+#endif
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayWidth___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
