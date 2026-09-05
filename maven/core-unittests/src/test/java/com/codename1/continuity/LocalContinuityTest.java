@@ -4813,6 +4813,57 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A bridge that reuses its map after the call does not change what gets restored.
+     *
+     * <p>ContinuityCallback lets a port call from any thread and says nothing about the map
+     * outliving the call, so a port that recycles one buffer per arrival -- or clears it once the
+     * call returns -- is within its rights. The off-EDT branch had already told that port the
+     * activity was CLAIMED while queuing only the reference, so the decision read whatever the
+     * bridge had put there since: a different state, or none.</p>
+     */
+    @EdtTest
+    public void aBridgeThatReusesItsMapDoesNotChangeWhatIsRestored() {
+        Continuity.enable();
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(true);
+        final ContinuityCallback callback = Continuity.callbackForTest();
+
+        // The map the "port" hands over, and then reuses for something else entirely.
+        final Map<String, Object> reused =
+                StateCodec.toMap(fromElsewhere("what was actually sent", 390L));
+        final java.util.concurrent.CountDownLatch returned =
+                new java.util.concurrent.CountDownLatch(1);
+        Display.getInstance().startThread(new Runnable() {
+            public void run() {
+                callback.continuationReceived(Continuity.getActivityType(), reused);
+                // Recycled the instant the call returns, exactly as a pooling bridge would.
+                reused.clear();
+                reused.put("device", "somebody-else");
+                reused.put("seq", "999");
+                returned.countDown();
+            }
+        }, "continuity recycling bridge").start();
+
+        for (int i = 0; i < 40 && returned.getCount() > 0; i++) {
+            pause(50L);
+            flushSerialCalls();
+        }
+        assertEquals(0L, returned.getCount(), "the bridge thread never returned");
+        for (int i = 0; i < 20 && provider.restored == null; i++) {
+            pause(50L);
+            flushSerialCalls();
+        }
+
+        assertNotNull(provider.restored,
+                "the claimed arrival was never delivered -- the queued decision read a map the "
+                        + "bridge had already emptied");
+        assertEquals("what was actually sent", provider.restored.get("note"),
+                "the payload delivered was not the one handed over, because the decision read "
+                        + "the bridge's buffer after it had been recycled");
+    }
+
+    /**
      * A background arrival before enable() is claimed AND kept, and the enable() delivers it.
      *
      * <p>This asserted the opposite -- that the callback declines rather than claims -- and that

@@ -3310,11 +3310,28 @@ public final class Continuity {
             // So the framework takes it and holds it itself. decide() parks an arrival that comes
             // before the application has chosen, and enable() drains that slot -- the retention
             // that used to be borrowed from the port now lives where the state does.
-            final Map<String, Object> info = userInfo;
+            // READ NOW, not when the decision runs. Queuing the caller's map keeps a reference
+            // to something the bridge owns: ContinuityCallback lets a port call from any thread
+            // and says nothing about the map outliving the call, so a port that recycles one
+            // buffer per arrival -- or clears it once this returns -- has the decision reading
+            // different contents than the ones it was handed. And this branch has ALREADY told
+            // the port the activity was claimed, so what gets restored is a different state, or
+            // none at all.
+            //
+            // fromMap() detaches it completely, which is why no copy helper is needed here:
+            // setPayload deep-copies, the routes are rebuilt into a new list, and everything else
+            // a payload may hold is immutable. What is queued is the framework's own object.
+            //
+            // The claim gets honest with it: a document that yields no state is declined rather
+            // than claimed, because nothing was taken.
+            final AppState arriving = StateCodec.fromMap(userInfo);
+            if (arriving == null) {
+                return false;
+            }
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
-                    decide(info, arrivedIn);
+                    decide(arriving, arrivedIn);
                 }
             });
             return true;
@@ -3343,6 +3360,24 @@ public final class Continuity {
             AppState state = StateCodec.fromMap(userInfo);
             if (state == null) {
                 return false;
+            }
+            return decide(state, arrivedIn);
+        }
+
+        /// The same decision once the document is a state of this framework's own.
+        ///
+        /// Re-asks the questions the caller already asked rather than trusting them: on the queued
+        /// path they were answered on another thread, and enable(), disable() or clear() can have
+        /// run in between.
+        private boolean decide(AppState state, int arrivedIn) {
+            if (lifecycle != arrivedIn) {
+                return true;
+            }
+            if (discardHeldArrival) {
+                return true;
+            }
+            if (!enabled && applicationHasChosen) {
+                return true;
             }
             if (!enabled) {
                 // NOTHING SAID YET, and the arrival is held HERE rather than left with the port.
