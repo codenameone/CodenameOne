@@ -178,6 +178,34 @@ final class LocationButtonManifestFragments {
      * @param name the permission
      * @return whether some live uses-permission element requests it
      */
+    // WHAT THIS COMPARISON IS, AND WHAT IT IS NOT.
+    //
+    // Lexical, on purpose. It reads the text of an attribute value and matches
+    // it against a permission name; it does not resolve what an XML PARSER
+    // would make of that text. So a manifest that spells the permission with a
+    // character reference -- android:name="android.permission.ACCESS&#95;
+    // BACKGROUND_LOCATION", which is legal XML that aapt resolves back to an
+    // underscore -- is not recognised here, and nor would CDATA or an entity
+    // declared in a DTD be. That is a true gap, not an oversight.
+    //
+    // It is left open because closing it properly means parsing, and this
+    // class hand-parses for reasons that have not changed: it is mirrored
+    // byte-for-byte into the BuildDaemon, which cannot take the dependency,
+    // and every lexical feature closed one at a time is another asymmetry to
+    // get wrong -- the namespace work in this file went round four times
+    // before every caller agreed with every other.
+    //
+    // And the cost of the gap is bounded in a way the namespace cases were
+    // not. This check exists to catch an HONEST contradiction and explain it
+    // to the developer who wrote it: it refuses their build and names the
+    // reason. Missing one does not hand anybody else anything -- the manifest
+    // merger still assembles the real manifest and Play still reads it -- it
+    // just means a developer who wrote their permission in a form no tool
+    // emits gets the manifest they asked for instead of an explanation. Nobody
+    // gains by evading a check whose only effect is to protect them.
+    //
+    // If this ever has to be a boundary rather than an explanation, the answer
+    // is a real parser on both sides of the mirror, not another special case.
     private static boolean declaresPermission(String text, String name) {
         if (text == null) {
             return false;
