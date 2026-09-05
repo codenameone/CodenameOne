@@ -7965,6 +7965,75 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * An arrival that landed while continuity was OFF does not join the session that follows.
+     *
+     * <p>clear() and disable() each advance the generation and enable() did not, so the interval
+     * between a logout and the login after it carried the same generation as the session that
+     * followed. A continuation reaching the callback during that interval captured that generation
+     * and queued its decision; the decision then ran after enable() had set the flag back, found
+     * its generation still current, and admitted the signed-out account's work into the account
+     * that had just signed in. The callback had already answered "claimed", so the bridge was
+     * entitled to have dropped the only other copy.</p>
+     *
+     * <p>The queued decision surviving across enable() is the whole scenario, so the test stages
+     * exactly that: deliver while off, enable, and only then let the event thread run.</p>
+     */
+    @EdtTest
+    public void anArrivalFromTheOffPeriodDoesNotJoinTheNextSession() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(true);
+        flushSerialCalls();
+
+        // The documented logout.
+        Continuity.clear();
+        Continuity.disable();
+        flushSerialCalls();
+        provider.restored = null;
+
+        // A continuation lands while continuity is off. The callback claims it and queues the
+        // decision, which has NOT run yet.
+        final ContinuityCallback c = Continuity.callbackForTest();
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("note", "the signed-out account's work");
+        final Map<String, Object> wire = StateCodec.toMap(new AppState()
+                .setPayload(payload).setDeviceId("phone").setSequence(9L)
+                .setTimestamp(System.currentTimeMillis()));
+        final boolean[] claimed = new boolean[1];
+        // A plain thread joined from here, NOT invokeAndBlock. The callback only queues its
+        // decision when it is called off the event thread -- on it, the decision is taken inline
+        // and this scenario cannot arise -- and invokeAndBlock keeps the event thread pumping, so
+        // the queued decision would run before the enable() below instead of across it. Joining
+        // holds the event thread still, which is what leaves the decision waiting.
+        Thread bridgeThread = new Thread(new Runnable() {
+            public void run() {
+                claimed[0] = c.continuationReceived(Continuity.getActivityType(), wire);
+            }
+        }, "bridge-off-edt");
+        bridgeThread.start();
+        try {
+            bridgeThread.join(4000L);
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
+        }
+        assertTrue(claimed[0],
+                "the arrival was not claimed off-EDT, so nothing was queued and this test stages "
+                        + "nothing");
+
+        // The login happens before the queued decision gets a turn.
+        Continuity.enable();
+        flushSerialCalls();
+        flushSerialCalls();
+
+        assertNull(provider.restored,
+                "work that arrived while continuity was off was admitted into the session that "
+                        + "followed, so the signed-out account's state reached the new one");
+        AppState left = Continuity.getRestorableState();
+        assertFalse(left != null && "phone".equals(left.getDeviceId()),
+                "the off-period arrival is on offer to the new session");
+    }
+
+    /**
      * clear() empties the shelf, not only the slot.
      *
      * <p>clear() is a logout: nothing from before it survives. A shelved arrival is state from

@@ -345,6 +345,26 @@ public final class Continuity {
                 recordDurable(e.getKey(), loaded);
             }
         }
+        // A NEW generation, because this is a new session and the off period had one of its own.
+        //
+        // clear() and disable() each advance it and enabling did not, so the interval between a
+        // logout and the login that follows carried the SAME generation as the session after it.
+        // An arrival that reached the callback while continuity was off captured that generation
+        // and queued its decision; the decision then ran after this method had set `enabled` back
+        // to true, found the generation it captured still current, and admitted the previous
+        // account's work into the one that just signed in. The callback had already answered
+        // "claimed", so the bridge was entitled to drop the only other copy.
+        //
+        // Advancing here is what makes the off period a session of its own: anything sampled
+        // during it is now stale, which is exactly what it is.
+        //
+        // BEFORE installCallback below, and that ordering is the whole of the distinction. A
+        // continuation the port DECLINED earlier and is still holding is re-offered during that
+        // call, samples the generation as it stands now, and is admitted -- which is what enabling
+        // is meant to pick up. One that was claimed and queued during the off period sampled the
+        // old one and is refused. Same mechanism, opposite answers, which is what the two cases
+        // deserve.
+        lifecycle++;
         enabled = true;
         applicationHasChosen = true;
         // Asking for what the port held: a continuation declined before this call is exactly what
