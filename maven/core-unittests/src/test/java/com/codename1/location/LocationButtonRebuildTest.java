@@ -92,9 +92,15 @@ class LocationButtonRebuildTest extends UITestBase {
         /** When false the bridge answers null, so the caller falls back. */
         private boolean building = true;
 
+        /** When true createButton throws, as a failing port would. */
+        private boolean throwing;
+
         public PeerComponent createButton(int textType, int backgroundColor,
                 int textColor, SuccessCallback<Boolean> onResult,
                 Runnable onUnavailable) {
+            if (throwing) {
+                throw new IllegalStateException("no native view");
+            }
             if (!building) {
                 return null;
             }
@@ -632,6 +638,37 @@ class LocationButtonRebuildTest extends UITestBase {
             drain();
         }
         assertTrue(condition.isSo(), "never settled: " + what);
+    }
+
+    @Test
+    void aSupportedControlThatThrowsIsUnavailableNotFallback() {
+        RecordingBridge bridge = install();
+        bridge.throwing = true;
+
+        // isSupported() says yes and construction then fails. That is a failed
+        // session, not a platform without the control: the ordinary fallback
+        // asks for persistent location, which an exclusive build refuses
+        // outright and a transactional one is trying not to need.
+        LocationButton button = new LocationButton();
+        assertTrue(button.isUnavailable(),
+                "a supported control that threw leaves the component "
+                + "unavailable, not falling back");
+        assertFalse(button.getComponentAt(0).isEnabled(),
+                "and what it shows is the disabled placeholder");
+    }
+
+    @Test
+    void aBridgeThatDeclinesStillFallsBack() {
+        // The other two outcomes are NOT failures. isSupported() false and a
+        // createButton that returns null are the platform saying "not here,
+        // not now", and both keep the ordinary fallback and its retry.
+        RecordingBridge bridge = install();
+        bridge.building = false;
+        LocationButton button = new LocationButton();
+        assertFalse(button.isUnavailable(),
+                "a null from createButton is not a failure");
+        assertTrue(button.getComponentAt(0).isEnabled(),
+                "and the fallback is live");
     }
 
     private static boolean wakePending() throws Exception {

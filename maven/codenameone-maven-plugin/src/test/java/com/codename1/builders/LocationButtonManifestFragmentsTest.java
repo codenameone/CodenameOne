@@ -162,6 +162,40 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void anUppercasedClassesJarIsNotTheClasspath() throws Exception {
+        // ZIP names are case-sensitive and the Android layout recognises
+        // classes.jar in exactly that spelling, so CLASSES.JAR is a resource
+        // nothing loads -- and reading a button reference out of one refuses a
+        // build over code that never runs, which is the same mistake as
+        // scanning assets/sample.jar.
+        File root = tempDir("cn1-lb-case");
+        ByteArrayOutputStream inner = new ByteArrayOutputStream();
+        ZipOutputStream innerZip = new ZipOutputStream(inner);
+        try {
+            innerZip.putNextEntry(new ZipEntry("com/example/AarForm.class"));
+            innerZip.write(constantPoolEntry(
+                    "com/codename1/location/LocationButton"));
+            innerZip.closeEntry();
+        } finally {
+            innerZip.close();
+        }
+        File aar = new File(root, "shouty.aar");
+        ZipOutputStream outerZip = new ZipOutputStream(
+                new FileOutputStream(aar));
+        try {
+            outerZip.putNextEntry(new ZipEntry("CLASSES.JAR"));
+            outerZip.write(inner.toByteArray());
+            outerZip.closeEntry();
+        } finally {
+            outerZip.close();
+        }
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "CLASSES.JAR is not on the classpath, so what is in it is not "
+                + "the application's use of the button");
+    }
+
+    @Test
     void aRemoveAllMarkerIsARemovalToo() {
         // removeAll is a removal to the merger. Reading it as an ordinary
         // declaration was worse than missing it: declareUncapped took the

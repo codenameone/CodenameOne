@@ -450,7 +450,15 @@ public class LocationButton extends Container {
             setBody(createUnavailablePlaceholder());
             return;
         }
-        setBody(createSystemButton());
+        PeerComponent system = createSystemButton();
+        if (unavailable) {
+            // Set by createSystemButton when a supported control threw while
+            // being built. The fallback is not the answer to that -- see the
+            // catch there.
+            setBody(createUnavailablePlaceholder());
+            return;
+        }
+        setBody(system);
     }
 
     /// Installs `replacement`, or the fallback button when it is null.
@@ -534,16 +542,19 @@ public class LocationButton extends Container {
 
     /// The platform's own button, or null when this device has none.
     private PeerComponent createSystemButton() {
+        LocationButtonBridge bridge;
         try {
-            // Inside the try, bridge lookup included. A port that answers this
-            // question by touching the platform can fail at it, and a component
-            // that cannot be constructed is worse than one that asks for the
-            // permission the ordinary way.
-            LocationButtonBridge bridge =
-                    Display.getInstance().getLocationButtonBridge();
-            if (bridge == null || !bridge.isSupported()) {
-                return null;
-            }
+            // ASKING can fail, and a port that cannot answer has, in effect,
+            // no system control -- which is what the fallback is for.
+            bridge = Display.getInstance().getLocationButtonBridge();
+        } catch (Throwable cannotAnswer) {
+            Log.e(cannotAnswer);
+            return null;
+        }
+        if (bridge == null || !bridge.isSupported()) {
+            return null;
+        }
+        try {
             // Stamped before the control exists, because the callbacks are
             // handed to createButton and there is no later moment at which
             // this peer could be told which generation it belongs to.
@@ -562,11 +573,27 @@ public class LocationButton extends Container {
                             systemButtonFailed(generation);
                         }
                     });
-        } catch (Throwable unavailable) {
-            // A port that reports itself supported and then cannot build the
-            // control leaves the app with no button at all, which is worse
-            // than a button that asks for the permission the ordinary way.
-            Log.e(unavailable);
+        } catch (Throwable failed) {
+            // A port that said it SUPPORTS the control and then threw building
+            // it has a failed session, not an absent feature -- so this is
+            // systemButtonFailed's case, and the answer is the one that method
+            // argues for at length: an exclusive build has the ordinary
+            // request refused outright by onlyForLocationButton, so the
+            // fallback could never produce a location, and a non-exclusive one
+            // would have its transactional flow quietly downgraded to the
+            // persistent grant this component exists to avoid asking for.
+            //
+            // An earlier comment here claimed the opposite -- that a button
+            // asking the ordinary way beats no button at all -- which
+            // contradicted systemButtonFailed two methods down for the same
+            // situation reached a different way.
+            //
+            // Note what does NOT come here: a bridge that answers false to
+            // isSupported, and a createButton that returns null. Those are the
+            // platform saying "not here, not now", and they keep the fallback
+            // and initComponent's retry. Only a throw is treated as a failure.
+            Log.e(failed);
+            unavailable = true;
             return null;
         }
     }

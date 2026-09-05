@@ -1497,8 +1497,20 @@ final class LocationButtonManifestFragments {
                 if (entry.isDirectory()) {
                     continue;
                 }
-                String lower = entry.getName()
-                        .toLowerCase(java.util.Locale.ROOT);
+                // The entry's own name, not a lowercased copy, for the
+                // classpath tests below. ZIP names are case-sensitive and the
+                // Android layout recognises classes.jar and libs/*.jar in
+                // exactly that spelling, so a resource called CLASSES.JAR is
+                // something nothing loads -- and reading a button reference out
+                // of one refused a build over code that never runs, which is
+                // the same mistake as scanning assets/sample.jar.
+                //
+                // Lowercase is still right for the .class suffix: that test
+                // asks what KIND of entry this is rather than whether the build
+                // consumes this exact path, and a plain jar's bytecode is on
+                // the classpath however it is spelled.
+                String name = entry.getName();
+                String lower = name.toLowerCase(java.util.Locale.ROOT);
                 // Only an aar's CLASSPATH jars. Gradle puts classes.jar and
                 // libs/*.jar of an aar on the application's classpath and
                 // nothing else, so a sample or tooling jar parked at
@@ -1509,10 +1521,11 @@ final class LocationButtonManifestFragments {
                 //
                 // Same rule as the manifest below, from the same source: what
                 // the build actually consumes is a short, known list.
-                boolean nested = isAar && lower.endsWith(".jar")
-                        && (lower.equals("classes.jar")
-                            || (lower.startsWith("libs/")
-                                && lower.indexOf('/', "libs/".length()) < 0));
+                boolean nested = isAar
+                        && (name.equals("classes.jar")
+                            || (name.startsWith("libs/")
+                                && name.endsWith(".jar")
+                                && name.indexOf('/', "libs/".length()) < 0));
                 // An aar's ROOT AndroidManifest.xml is MERGED into the
                 // application's, so a permission it asks for is a permission
                 // the app ships -- and a native location SDK asking for
@@ -1536,7 +1549,7 @@ final class LocationButtonManifestFragments {
                 // which happens later and elsewhere. The hint remains the
                 // developer's assertion that nothing but the button needs
                 // precise location; this checks what is in front of it.
-                boolean manifest = isAar && lower.equals("androidmanifest.xml");
+                boolean manifest = isAar && name.equals("AndroidManifest.xml");
                 // A loose .class inside an AAR is not on the classpath
                 // either -- an aar's bytecode lives in classes.jar, and a class
                 // file sitting anywhere else in the archive is a resource
