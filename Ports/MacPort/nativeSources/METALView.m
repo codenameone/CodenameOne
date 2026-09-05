@@ -725,10 +725,20 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         }
     }
     if (presentIdx < 0) {
-        // Everything is held. Blocking the paint thread is not an option -- that
-        // is the 16ms of start-up this path removed -- so take the turn anyway;
-        // that is no worse than the pure round robin this replaced.
-        presentIdx = cn1PresentIndex;
+        // Every surface is still held. Overwriting one anyway would undo the
+        // check just made, so drop the frame instead: the command buffer is
+        // still committed, and screenTexture is persistent -- Codename One
+        // queues only what changed, so the drawing is not lost and the next
+        // present carries it. Blocking to wait is not an option either; that
+        // wait was 16ms of start-up.
+        //
+        // This cannot starve: the window server holds the surface it is
+        // DISPLAYING, so at rest exactly one of the three is in use and the
+        // renderer always has somewhere to go. Reaching here at all means a
+        // handoff is in flight, which resolves on its own.
+        [self.commandBuffer commit];
+        self.commandBuffer = nil;
+        return NO;
     }
     cn1PresentIndex = (presentIdx + 1) % CN1_PRESENT_SURFACE_COUNT;
     id<MTLTexture> presentTexture = cn1PresentTextures[presentIdx];
