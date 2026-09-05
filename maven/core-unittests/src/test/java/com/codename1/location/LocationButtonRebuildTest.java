@@ -78,7 +78,11 @@ class LocationButtonRebuildTest extends UITestBase {
         /** Whatever the test installed, or null: a platform with nothing. */
         private LocationManager granted;
 
+        /** How often the GRANTED path was taken, which is the thing tested. */
+        private int grantedAsks;
+
         public LocationManager getGrantedLocationManager() {
+            grantedAsks++;
             return granted;
         }
 
@@ -217,16 +221,22 @@ class LocationButtonRebuildTest extends UITestBase {
     }
 
     @Test
-    void aFallbackTapSurvivesTheUpgradeToASystemButton() {
+    void aFallbackTapKeepsThePromptingManagerAcrossAnUpgrade() {
         RecordingBridge bridge = install();
-        ParkingManager manager = new ParkingManager();
-        bridge.granted = manager;
+        ParkingManager granted = new ParkingManager();
+        bridge.granted = granted;
+        // The ordinary manager, which is what a fallback tap is entitled to:
+        // it never had a platform grant, so its answer comes through the
+        // prompting path like any other Codename One location request.
+        ParkingManager ordinary = new ParkingManager();
+        ordinary.release();
+        implementation.setLocationManager(ordinary);
 
         // One real system button, which will hold the in-flight slot.
         LocationButton holder = new LocationButton();
         assertEquals(1, bridge.sessions.size());
 
-        // And one built while the bridge is answering null, so it carries the
+        // And one built while the bridge answers null, so it carries the
         // ordinary fallback button rather than a platform control.
         bridge.building = false;
         LocationButton fallbackButton = new LocationButton();
@@ -235,30 +245,33 @@ class LocationButtonRebuildTest extends UITestBase {
         // The holder is granted and its lookup parks, so anything else queues.
         bridge.sessions.get(0).onResult.onSucess(Boolean.TRUE);
         drain();
-        assertEquals(1, manager.lookups, "the holder's lookup is running");
+        assertEquals(1, granted.lookups, "the holder's lookup is running");
 
-        // The user taps the fallback. Its answer belongs to NO platform
-        // session: it means "go and get a location the usual way".
+        // The user taps the fallback, and the tap queues behind the holder.
         tapTarget.pressed();
         tapTarget.released();
         drain();
 
-        // And now a system button becomes available and replaces it, which is
-        // what initComponent does on every attach where the fallback shows.
+        // Now a system button becomes available and replaces the fallback,
+        // which is what initComponent does on every attach where the fallback
+        // is showing.
         bridge.building = true;
         fallbackButton.setTextType(LocationButton.TEXT_USE_PRECISE_LOCATION);
         assertEquals(2, bridge.sessions.size(), "the upgrade built a control");
 
-        manager.release();
+        granted.release();
         drain();
         drain();
 
-        // Counted as LOOKUPS, not as listener calls: a stale queue entry is
-        // ANSWERED with null, so a test that counts answers sees one either
-        // way and proves nothing. Serving is what the tap earned.
-        assertEquals(2, manager.lookups,
-                "a tap on the fallback has no session to be superseded, so "
-                + "upgrading the component must not turn it into a null");
+        // The tap must still be served -- it has no session to be superseded
+        // -- and served through the ORDINARY manager. Reading the body at
+        // service time sent it down the granted path instead, asking the
+        // platform for a session nobody opened.
+        assertEquals(1, ordinary.lookups,
+                "a queued fallback tap is served through the prompting "
+                + "manager, however the component was rebuilt while it waited");
+        assertEquals(1, bridge.grantedAsks,
+                "and the granted path is asked once, for the holder alone");
     }
 
     private RecordingBridge install() {

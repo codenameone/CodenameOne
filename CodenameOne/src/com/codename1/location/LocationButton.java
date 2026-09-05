@@ -756,7 +756,7 @@ public class LocationButton extends Container {
                     scheduleStaleWake();
                     return;
                 }
-                serveGrant();
+                serveGrant(generation);
             }
         });
     }
@@ -769,9 +769,9 @@ public class LocationButton extends Container {
     /// `getCurrentLocationSync` calls would have the second clear the first's
     /// listener, leaving the first to wait out its timeout with a fix
     /// available the whole time.
-    private void serveGrant() {
+    private void serveGrant(int generation) {
         inFlight = true;
-        final long generation = ++inFlightGeneration;
+        final long slot = ++inFlightGeneration;
         inFlightSince = System.currentTimeMillis();
         // The deadline this request is entitled to, plus room for the platform
         // to answer late. Generous on purpose: taking the slot from a request
@@ -779,7 +779,7 @@ public class LocationButton extends Container {
         inFlightDeadline = timeout + STALE_MARGIN;
         Location result = null;
         try {
-            LocationManager manager = grantedManager();
+            LocationManager manager = grantedManager(generation);
             if (manager != null) {
                 result = manager.getCurrentLocationSync(timeout);
             }
@@ -788,7 +788,7 @@ public class LocationButton extends Container {
         } finally {
             // Only if this request still owns the slot. A stale one that was
             // superseded and then returned used to clear its successor's.
-            if (inFlightGeneration == generation) {
+            if (inFlightGeneration == slot) {
                 inFlight = false;
             }
         }
@@ -806,7 +806,7 @@ public class LocationButton extends Container {
         }
         // Driving the queue is the OWNER's job. A superseded request doing it
         // would serve the next button while its successor is still running.
-        if (inFlightGeneration == generation) {
+        if (inFlightGeneration == slot) {
             serveNextWaiting();
         }
     }
@@ -871,7 +871,7 @@ public class LocationButton extends Container {
                     scheduleStaleWake();
                     return;
                 }
-                next.serveGrant();
+                next.serveGrant(next.waitingGeneration);
             }
         });
     }
@@ -995,8 +995,19 @@ public class LocationButton extends Container {
     /// #### Returns
     ///
     /// the manager to read a fix from, or null when there is none
-    private LocationManager grantedManager() {
-        if (body instanceof PeerComponent) {
+    private LocationManager grantedManager(int generation) {
+        // The REQUEST's origin, not the body's shape at the moment it is
+        // served. Those disagree exactly where it matters: a fallback tap can
+        // be queued behind another request, and initComponent can upgrade the
+        // component to a system button while it waits. Reading `body` then
+        // sent a tap that never had a platform grant down the granted path,
+        // which answers null for want of a session nobody opened -- and the
+        // ordinary prompt it was entitled to never happened.
+        //
+        // NO_SESSION is what the fallback stamps its answers with, so the
+        // stamp already carries this and nothing new has to be threaded
+        // through the queue.
+        if (generation != NO_SESSION) {
             // No fall-through from here. The bridge's contract says a null
             // manager means the platform has none and the caller treats that
             // as "no location" rather than as a reason to prompt -- and the
