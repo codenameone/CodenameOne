@@ -353,14 +353,29 @@ https://gist.github.com/shannah/b61b9b6b35ea0eac923a54163f5d4deb[client app] and
 https://github.com/shannah/cn1-iap-demo-server[server app]. The server is an
 ordinary JAX-RS application and runs on any servlet container.
 
-The one piece worth spelling out is that the client can't talk to
-`http://localhost`. On a device that name means the phone, so point it at the
+Two things about reaching that server from a device. The client can't talk to
+`http://localhost` -- on a device that name means the phone -- so point it at the
 address your machine has on the network:
 
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava018Snippet.java[tag=monetization-java-018,indent=0]
 ----
+
+And iOS refuses cleartext HTTP by default, so a plain `http://` address needs an
+App Transport Security exception through the `ios.plistInject` build hint:
+
+----
+<key>NSAppTransportSecurity</key>
+<dict>
+    <key>NSAllowsArbitraryLoads</key>
+    <true/>
+</dict>
+----
+
+WARNING: That exception turns off transport security for the whole app. It's
+here because the demo talks to a development server on your desk; a shipped app
+uses HTTPS and needs none of it.
 
 The server keeps receipts in a single table, and its shape is the whole storage
 contract between the two halves:
@@ -474,6 +489,8 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 *Test accounts.* Both stores let you nominate accounts that can buy without
-being charged, and both require the app to be uploaded before purchases work at
-all -- a build on your desk can't buy anything. Their docs cover the current
-mechanism; Google's has changed name twice.
+being charged. Apple's sandbox works against a development-signed build
+installed straight onto a device, and Google's license testers can buy from a
+sideloaded build once the package name and products match; it's Play's
+track-based testing that needs an uploaded artifact. Their docs cover the current
+mechanism, and Google's has changed name twice.
