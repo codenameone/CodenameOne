@@ -389,6 +389,16 @@ public final class Continuity {
         // cold-launch arrival: declined, retained by the port, and delivered by the enable()
         // that came with the login. Saying "no" before saying anything else is still saying it.
         applicationHasChosen = true;
+        // THIS class's held arrival, on BOTH paths and therefore before the split.
+        //
+        // Callback.decide() parks an arrival that reaches the seam before the application has
+        // chosen -- a synced-store listener installs that seam without enabling continuity -- so
+        // by the time a logged-out app says "off" there can be a copy here as well as at the
+        // port. The early return below drained only the port's, and enable() drains this slot on
+        // purpose, so the login restored a payload and routes that arrived before the application
+        // said it wanted none. The full path clears it too, a few lines down; hoisting it here
+        // covers both and says once that a disable() drops what is held.
+        parked = null;
         if (!enabled) {
             // A callback is installed even though nothing is being turned off, and it is the only
             // way to reach an arrival that is already waiting. iOS parks a cold-launch Handoff
@@ -412,7 +422,6 @@ public final class Continuity {
             // login restored a payload and routes that arrived before the application said it
             // wanted none. The path below clears it as part of ending the session; this one
             // returns before reaching that, which is the whole of the difference between them.
-            parked = null;
             installCallback(true);
             return;
         }
