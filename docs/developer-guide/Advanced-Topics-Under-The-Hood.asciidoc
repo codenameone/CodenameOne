@@ -1342,10 +1342,9 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/advancedto
 `NativeDropEvent` also reports whether the drag started inside this application, which is how a
 container that reorders its own items tells that case from an import.
 
-A complete runnable example lives in `Samples/samples/NativeDragAndDropSample`: it drags text
-out under three types at once, promises a file that's written only when a receiver asks for it,
-and accepts drops into two zones -- one that takes anything and reports what arrived, one
-filtered to files and to a copy.
+A complete runnable example lives in `Samples/samples/NativeDragAndDropSample`: one card drags
+plain text and HTML together so every receiver takes the best form it knows, another promises a
+file that's written only when a receiver asks for it, and a drop zone describes whatever arrives.
 
 ===== Where it works
 
