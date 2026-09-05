@@ -84,6 +84,14 @@ import com.codename1.ui.util.EventDispatcher;
 /// float[]. Fusing removes two GC-tracked objects per Style, which matters
 /// more than the bytes: mark cost scales with object COUNT.
 ///
+/// This only reaches a constructor that does NOT delegate with this(...):
+/// FusedConstructor.analyzeRaw bails on that shape, because the array stores are
+/// hidden inside the delegate. Style(Style) is therefore written out longhand
+/// rather than chaining, since it is the constructor UIManager calls for every
+/// component style and thus the only one whose fusion is worth anything.
+/// Re-chaining it would turn this annotation back into a no-op on the path that
+/// matters, silently and with no build error.
+///
 /// The contract holds here and must keep holding -- neither array may escape.
 /// Today nothing returns or reassigns either reference: every outside use
 /// (StyleParser) indexes elements, and the one call-argument use is a
@@ -365,8 +373,28 @@ public class Style {
     ///
     /// - `style`: the style to copy
     public Style(Style style) {
-        this(style.getFgColor(), style.getBgColor(), style.getFont(), style.getBgTransparency(),
-                style.getBgImage());
+        // Deliberately NOT a this(...) delegation, which is what makes @Fused
+        // reach this constructor at all. FusedConstructor.analyzeRaw bails on
+        // any same-class this() shape -- the array stores are hidden inside the
+        // delegate -- and this is the constructor UIManager uses for every
+        // component style, so with the delegation in place the annotation on
+        // this class did nothing on the only path that allocates in bulk.
+        // Written out, javac emits the padding and margin field initialisers
+        // directly here, which is the shape the analyzer accepts.
+        //
+        // The four lines below are the inlined equivalent of the chain this
+        // replaced: this(fgColor, bgColor, font, transparency, bgImage), which
+        // itself delegated to this(). The five getters read the OTHER style's
+        // fields and touch nothing here, so evaluating them after the field
+        // initialisers rather than before is not observable.
+        setPadding(3, 3, 3, 3);
+        setMargin(2, 2, 2, 2);
+        modifiedFlag = 0;
+        this.fgColor = style.getFgColor();
+        this.bgColor = style.getBgColor();
+        this.font = style.getFont();
+        this.transparency = style.getBgTransparency();
+        this.bgImage = style.getBgImage();
         setPadding(style.padding[Component.TOP],
                 style.padding[Component.BOTTOM],
                 style.padding[Component.LEFT],
