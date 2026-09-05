@@ -9073,17 +9073,51 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
 
+        return getLocationManagerWithoutPermissionPrompt();
+    }
+
+    /// The same manager {@link #getLocationManager()} returns, without the
+    /// permission checks that precede it.
+    ///
+    /// For a caller that ALREADY HOLDS the grant, which today means the system
+    /// location button: the platform hands it a session-scoped
+    /// ACCESS_FINE_LOCATION and the fix is fetched immediately afterwards, so
+    /// re-asking is at best redundant. It is not only redundant for an app that
+    /// also geofences -- the builder sets
+    /// android.requiresBackgroundLocationPermissionForAPI29 for such an app, and
+    /// getLocationManager() then asks for ACCESS_BACKGROUND_LOCATION, which from
+    /// API 30 means sending the user to a settings screen. Tapping a control
+    /// whose whole purpose is a one-time share and being asked to allow location
+    /// ALL THE TIME is the outcome the location button exists to prevent.
+    ///
+    /// This is the same reasoning getLocationButtonBridge() already carries for
+    /// BUILDING the button; this is the other half, for using it.
+    ///
+    /// #### Returns
+    ///
+    /// the platform location manager, asking for nothing
+    public com.codename1.location.LocationManager
+            getLocationManagerWithoutPermissionPrompt() {
         boolean includesPlayServices = Display.getInstance().getProperty("IncludeGPlayServices", "false").equals("true");
         if (includesPlayServices && hasAndroidMarket()) {
             try {
                 Class clazz = Class.forName("com.codename1.location.AndroidLocationPlayServiceManager");
-                return (com.codename1.location.LocationManager)clazz.getMethod("getInstance").invoke(null);
+                Object playServicesManager = clazz.getMethod("getInstance").invoke(null);
+                // instanceof rather than a cast inside the catch below. That
+                // shape says the cast's failure is handled, and on ParparVM a
+                // failed CHECKCAST does not throw -- it hands the wrong object
+                // on. Pre-existing, and this method is where it now lives, so
+                // it comes off the cast-semantics baseline rather than moving
+                // along it.
+                if (playServicesManager instanceof com.codename1.location.LocationManager) {
+                    return (com.codename1.location.LocationManager) playServicesManager;
+                }
             } catch (Exception e) {
-                return AndroidLocationManager.getInstance(getContext());
+                // Falls through to the platform manager below, which is what
+                // this catch always did.
             }
-        } else {
-            return AndroidLocationManager.getInstance(getContext());
         }
+        return AndroidLocationManager.getInstance(getContext());
     }
 
     private AndroidMotionSensorManager motionSensorManager;
@@ -15343,6 +15377,60 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } catch (Throwable t) {
             return null;
         }
+    }
+
+    /// The location-button bridge, resolved once. Null both before the first
+    /// lookup and when the optional package was not bundled, which is why
+    /// `locationButtonBridgeResolved` and not a null check decides whether to
+    /// look again.
+    private com.codename1.location.spi.LocationButtonBridge locationButtonBridge;
+
+    private boolean locationButtonBridgeResolved;
+
+    /// The bridge com.codename1.location.LocationButton uses to reach the
+    /// platform's own location button.
+    ///
+    /// Deliberately does NOT go through getLocationManager(): that asks for
+    /// ACCESS_FINE_LOCATION before it returns anything, and the whole point of
+    /// the location button is that building it must not ask for the permission
+    /// it exists to avoid holding.
+    ///
+    /// The implementation lives in a package the build deletes for apps that
+    /// never reference com.codename1.location.LocationButton -- it compiles
+    /// against androidx.core.locationbutton, which is only on the classpath
+    /// when AndroidGradleBuilder added the dependency -- so it is reached
+    /// reflectively, the same arrangement the ARCore-backed AR implementation
+    /// and the SQLCipher-backed database implementation use.
+    ///
+    /// Synchronized for the reason getNearbyBridge below is: two threads
+    /// reaching it first both built a bridge, and the loser's peer could
+    /// already be holding a platform session nothing could reach again.
+    @Override
+    public synchronized com.codename1.location.spi.LocationButtonBridge
+            getLocationButtonBridge() {
+        if (locationButtonBridgeResolved) {
+            return locationButtonBridge;
+        }
+        locationButtonBridgeResolved = true;
+        Object created;
+        try {
+            Class<?> clazz = Class.forName("com.codename1.impl.android"
+                    + ".locationbutton.AndroidLocationButtonBridge");
+            created = clazz.getConstructor().newInstance();
+        } catch (Throwable absent) {
+            // Not bundled in this app. Null is the honest answer, and
+            // LocationButton falls back to its own button.
+            return null;
+        }
+        // Cast outside the try. ParparVM does not throw on a failed cast, so a
+        // cast inside a block that catches Throwable is a cast whose failure
+        // nothing can handle; this file never reaches ParparVM, but the rule
+        // is cheap to keep and the instanceof reads no worse.
+        if (created instanceof com.codename1.location.spi.LocationButtonBridge) {
+            locationButtonBridge =
+                    (com.codename1.location.spi.LocationButtonBridge) created;
+        }
+        return locationButtonBridge;
     }
 
     private AndroidNearbyBridge nearbyBridge;

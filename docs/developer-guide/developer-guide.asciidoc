@@ -125,6 +125,8 @@ include::Calendar-Integration.asciidoc[]
 
 include::External-Surfaces.asciidoc[]
 
+include::Location.asciidoc[]
+
 include::Maps.asciidoc[]
 
 include::In-Car-Experiences.asciidoc[]

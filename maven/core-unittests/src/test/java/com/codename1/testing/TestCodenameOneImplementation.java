@@ -505,6 +505,24 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         nativeImageCacheSupported = supported;
     }
 
+    private com.codename1.location.spi.LocationButtonBridge locationButtonBridge;
+
+    /**
+     * Installs the bridge {@code LocationButton} will find, so a test can hand
+     * it a platform control that reports whatever the test needs. A port that
+     * has no bridge answers null, which is the default here too.
+     */
+    public void setLocationButtonBridge(
+            com.codename1.location.spi.LocationButtonBridge bridge) {
+        locationButtonBridge = bridge;
+    }
+
+    @Override
+    public com.codename1.location.spi.LocationButtonBridge
+            getLocationButtonBridge() {
+        return locationButtonBridge;
+    }
+
     public void resetTextSelectionTracking() {
         initializeTextSelectionCount = 0;
         deinitializeTextSelectionCount = 0;

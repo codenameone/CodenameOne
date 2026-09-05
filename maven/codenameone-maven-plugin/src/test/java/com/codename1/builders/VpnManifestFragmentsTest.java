@@ -69,10 +69,10 @@ class VpnManifestFragmentsTest {
         // before anything was compiled.
         assertEquals(34, AndroidGradleBuilder.TUNNEL_MIN_COMPILE_SDK);
         assertEquals(34, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
-                false, false, false, true),
+                false, false, false, true, false),
                 "a tunnel build is raised to an SDK that knows its type");
         assertEquals(28, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
-                false, false, false, false),
+                false, false, false, false, false),
                 "and an app without one keeps its legacy compile SDK");
     }
 

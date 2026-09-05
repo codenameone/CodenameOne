@@ -294,6 +294,29 @@ public abstract class LocationManager {
         }
     }
 
+    /// Removes `l` only if it is still the listener this manager holds.
+    ///
+    /// Under LISTENER_LOCK so the test and the removal cannot be split by the
+    /// EDT installing a different listener in between -- which is the whole
+    /// point: the only caller is a timed wait undoing ITS OWN subscription, and
+    /// it must not touch one somebody else made while it was parked.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to remove if it is still current
+    private void clearListenerIfStill(LocationListener l) {
+        synchronized (LISTENER_LOCK) {
+            // Reference identity is the question, not equality: "is the
+            // manager still holding the very listener this wait installed".
+            // A LocationListener is an application object with no equals
+            // contract, and two distinct listeners that happened to compare
+            // equal would be exactly the case this must not treat as the same.
+            if (listener == l) { //NOPMD CompareObjectsWithEquals
+                setLocationListener(null);
+            }
+        }
+    }
+
     /// Bind the LocationListener to get events
     protected abstract void bindListener();
 
@@ -357,6 +380,29 @@ public abstract class LocationManager {
         public void bind() {
             setLocationListener(this);
             Display.getInstance().invokeAndBlock(this);
+            if (!finished) {
+                // The wait ended without a fix, which means run() hit the
+                // timeout and broke out. Only the two callbacks below used to
+                // clear the listener, so a timed-out request left this LL bound
+                // as the manager's listener for the life of the process: the
+                // platform kept delivering updates nothing consumed, and the
+                // NEXT getCurrentLocationSync saw a non-null listener and took
+                // the getCurrentLocation() path instead of starting a fresh
+                // timed request.
+                //
+                // Latent until something actually passed a timeout -- the
+                // no-argument getCurrentLocationSync passes -1 and waits
+                // forever -- and LocationButton defaults to 30 seconds, which
+                // is what makes this reachable in ordinary use.
+                //
+                // Only when this LL is STILL the manager's listener. The wait
+                // runs through invokeAndBlock, so the EDT keeps pumping and the
+                // application can call setLocationListener(other) while we are
+                // parked here -- `finished` is false either way, so an
+                // unconditional clear tore down a listener the application had
+                // just installed and stopped its platform subscription.
+                clearListenerIfStill(this);
+            }
         }
 
         @Override

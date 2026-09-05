@@ -1,0 +1,117 @@
+name: Location button (Android 17 / API 37)
+
+# The Android location button is the one feature in the tree whose implementation NOTHING else
+# compiles.
+#
+# com/codename1/impl/android/locationbutton is excluded from the Android port jar on purpose: it
+# references androidx.core.locationbutton, which is only on the classpath of applications that
+# reference com.codename1.location.LocationButton, and AndroidGradleBuilder deletes the package for
+# everyone else. So a green port build says nothing about it, and the next thing to notice a broken
+# name would be a customer's Android build.
+#
+# Its dependency makes that worse than it is for the other deletable packages: the library is an
+# experimental Jetpack artifact at 1.0.0-alpha01, so a renamed method is a live possibility rather
+# than a theoretical one.
+#
+# This workflow compiles it the way an application build does -- against the REAL aar, and against
+# a real API 37 platform, which is the level the feature belongs to. It lives outside pr.yml
+# because it needs an Android SDK that the PR container does not carry, and because pr.yml's paths
+# filter excludes scripts/**.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'CodenameOne/src/com/codename1/location/**'
+      - 'Ports/Android/src/com/codename1/impl/android/locationbutton/**'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/LocationButtonManifestFragments.java'
+      - 'maven/android/pom.xml'
+      - 'scripts/ci/check-android-location-button-package-compiles.sh'
+      - '.github/workflows/location-button-android37.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'CodenameOne/src/com/codename1/location/**'
+      - 'Ports/Android/src/com/codename1/impl/android/locationbutton/**'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/LocationButtonManifestFragments.java'
+      - 'maven/android/pom.xml'
+      - 'scripts/ci/check-android-location-button-package-compiles.sh'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  location-button-api37:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      # JDK 17 FIRST, and the Android SDK set up while it is still the JAVA_HOME.
+      # android-actions/setup-android runs `sdkmanager --licenses`, and current cmdline-tools
+      # refuse to start on Java 8 with "This tool requires JDK 17 or later" -- so setting up JDK 8
+      # before the SDK kills the SDK step rather than anything to do with this feature.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install the Android 17 platform
+        # Android 17 ships as minor-versioned platform directories (android-37.0, android-37.1);
+        # every platform before it was a bare integer, so "platforms;android-37" is not a package
+        # and sdkmanager answers "Failed to find package".
+        #
+        # printf rather than `yes |`: under `set -o pipefail` a licence prompt that stops reading
+        # kills `yes` with SIGPIPE and the step fails for a reason that has nothing to do with the
+        # install.
+        run: |
+          set -eux
+          printf 'y\n%.0s' {1..50} | sdkmanager --install "platforms;android-37.0"
+          test -f "$ANDROID_HOME/platforms/android-37.0/android.jar"
+
+      # JDK 8 only now that the SDK is in place: the framework is built with 8. The check itself
+      # still needs 11 or newer -- the location button library ships Java 11 class files, which a
+      # javac 8 refuses outright with "class file has wrong version 55.0" -- and picks JDK 17 out
+      # of JAVA17_HOME below.
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-locationbutton-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-locationbutton
+            ${{ runner.os }}-m2
+
+      - name: Build the core and the Android port
+        # The check compiles the deletable package against the port's COMPILED classes rather than
+        # its sources, for the reason the SQLCipher check documents: the port needs a
+        # support-library classpath this check has no business assembling, and compiled classes
+        # carry the exact member visibility an application build links against.
+        #
+        # cn1-binaries is cloned by the reactor's own download-cn1-binaries profile when the
+        # directory is missing, so there is nothing to arrange here.
+        run: |
+          set -eux
+          mvn -B -f maven/pom.xml -Pcompile-android -pl android -am -DskipTests compile
+
+      - name: Type-check the location button package against API 37
+        # --require-api-37 rather than letting it fall back to the older android.jar the port is
+        # compiled against: the whole point of running this job is the platform, and a check that
+        # quietly degraded to a weaker one would report a green tick for something it did not do.
+        env:
+          JAVA17_HOME: ${{ env.JAVA_HOME_17_X64 }}
+        run: scripts/ci/check-android-location-button-package-compiles.sh --require-api-37

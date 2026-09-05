@@ -2165,6 +2165,19 @@ public abstract class Executor {
                                         scanner.usesClassMethod(owner, name);
                                         scanner.usesClassMethodWithBooleanArgument(
                                                 owner, name, arg);
+                                    }
+                                    // The DESCRIPTOR callback fires for
+                                    // <init> too, unlike the two above.
+                                    // Which overload was called is the whole
+                                    // question it exists to answer, and for a
+                                    // constructor it is the ONLY question --
+                                    // the name is always <init>, so a consumer
+                                    // telling new MapComponent() from
+                                    // new MapComponent(provider, centre, zoom)
+                                    // has nothing else to read. Excluding
+                                    // constructors made every descriptor-based
+                                    // constructor test unreachable.
+                                    if (name != null) {
                                         scanner.usesClassMethodWithDescriptor(
                                                 owner, name, descriptor);
                                     }
@@ -2190,6 +2203,19 @@ public abstract class Executor {
                                         scanner.usesClassMethod(owner, name);
                                         scanner.usesClassMethodWithBooleanArgument(
                                                 owner, name, arg);
+                                    }
+                                    // The DESCRIPTOR callback fires for
+                                    // <init> too, unlike the two above.
+                                    // Which overload was called is the whole
+                                    // question it exists to answer, and for a
+                                    // constructor it is the ONLY question --
+                                    // the name is always <init>, so a consumer
+                                    // telling new MapComponent() from
+                                    // new MapComponent(provider, centre, zoom)
+                                    // has nothing else to read. Excluding
+                                    // constructors made every descriptor-based
+                                    // constructor test unreachable.
+                                    if (name != null) {
                                         scanner.usesClassMethodWithDescriptor(
                                                 owner, name, descriptor);
                                     }
@@ -2262,13 +2288,21 @@ public abstract class Executor {
                                             scanner.usesClassMethodWithBooleanArgument(
                                                     h.getOwner(), h.getName(),
                                                     null);
-                                            // The Handle does carry the
-                                            // descriptor of the exact
-                                            // overload the reference was
-                                            // resolved against, so a
-                                            // MediaManager::createMedia
-                                            // reference is as selectable
-                                            // as a direct call.
+                                        }
+                                        // The DESCRIPTOR callback also for a
+                                        // CONSTRUCTOR reference. The Handle
+                                        // carries the descriptor of the exact
+                                        // overload the reference resolved
+                                        // against, so MediaManager::createMedia
+                                        // is as selectable as a direct call --
+                                        // and so is MapComponent::new, which
+                                        // the <init> exclusion above hid from
+                                        // every descriptor-based constructor
+                                        // test while ordinary NEW instructions
+                                        // were being reported correctly.
+                                        if (h != null
+                                                && !"<clinit>".equals(
+                                                        h.getName())) {
                                             scanner.usesClassMethodWithDescriptor(
                                                     h.getOwner(), h.getName(),
                                                     h.getDesc());

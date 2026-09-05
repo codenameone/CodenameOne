@@ -326,6 +326,8 @@ dialogs
 filesystem
 firebase
 framebuffer
+geofence
+geofences
 geofencing
 geocoder
 geohash
