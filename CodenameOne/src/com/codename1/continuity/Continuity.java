@@ -327,7 +327,16 @@ public final class Continuity {
                     AppState waiting = parked;
                     if (waiting != null && enabled) {
                         parked = null;
-                        dispatch(waiting);
+                        // Through admit(), not dispatch(). A port is allowed to retain the same
+                        // continuation it declined, so both it and this class can be holding one
+                        // copy each -- and installing the seam re-offers the port's while this
+                        // drains ours. admission is where (origin, sequence) deduplication lives,
+                        // so it is what makes the second copy a no-op; dispatching straight past
+                        // it ran the listeners and the provider twice on one arrival.
+                        //
+                        // The comment that justified parking said the two copies dedup at
+                        // admission. They only do if they both go through it.
+                        admit(waiting);
                     }
                 }
             });

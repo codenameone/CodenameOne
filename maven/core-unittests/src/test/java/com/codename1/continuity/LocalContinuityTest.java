@@ -4573,6 +4573,62 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A continuation held by BOTH the port and the framework is delivered once.
+     *
+     * <p>A port may retain the same continuation its pre-enable callback declined, so both it and
+     * this class can hold a copy. Enabling re-offers the port's and drains ours, and the drained
+     * one used to go straight to dispatch -- past the (origin, sequence) deduplication that
+     * admission exists for -- so the listeners and the provider ran twice on one arrival.</p>
+     *
+     * <p>The comment that justified parking said the two copies dedup at admission. They only do
+     * if they both go through it.</p>
+     */
+    @EdtTest
+    public void aContinuationHeldByBothThePortAndTheFrameworkIsDeliveredOnce() {
+        final java.util.concurrent.atomic.AtomicInteger restores =
+                new java.util.concurrent.atomic.AtomicInteger();
+        HoldingBridge holding = new HoldingBridge();
+        Continuity.setBridge(holding);
+        SyncedStoreListener listener = new SyncedStoreListener() {
+            public void storeChanged() {
+            }
+        };
+        try {
+            // The sync-only window: a seam exists, continuity does not.
+            SyncedStore.addChangeListener(listener);
+            Map<String, Object> info = StateCodec.toMap(fromElsewhere("held twice", 350L));
+            holding.pending = info;
+
+            // The framework takes and parks it, and the port keeps its own copy because the
+            // answer was a decline -- which is exactly what ContinuityBridge permits.
+            ContinuityCallback c = Continuity.callbackForTest();
+            c.continuationReceived(Continuity.getActivityType(), info);
+            flushSerialCalls();
+
+            Continuity.setStateProvider(new StateProvider() {
+                public Map<String, Object> saveState() {
+                    return new HashMap<String, Object>();
+                }
+
+                public void restoreState(Map<String, Object> payload) {
+                    restores.incrementAndGet();
+                }
+            });
+            for (int i = 0; i < 20 && restores.get() == 0; i++) {
+                pause(50L);
+                flushSerialCalls();
+            }
+
+            assertEquals(1, restores.get(),
+                    "one arrival was restored " + restores.get() + " times, because the copy this "
+                            + "class held went straight to dispatch and never met the "
+                            + "(origin, sequence) check that would have recognised the port's");
+        } finally {
+            SyncedStore.removeChangeListener(listener);
+        }
+    }
+
+    /**
      * An arrival is bound to the generation it ARRIVED in, not the one the decision runs in.
      *
      * <p>Every hop between the activity and the decision is a queue, and a logout already sitting
