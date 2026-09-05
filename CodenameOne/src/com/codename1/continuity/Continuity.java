@@ -316,6 +316,22 @@ public final class Continuity {
         // Asking for what the port held: a continuation declined before this call is exactly what
         // enabling is meant to pick up.
         installCallback(true);
+        // And what THIS class held. An arrival that reached the callback before the application
+        // enabled continuity is parked here rather than left with the port -- see Callback.decide
+        // -- so enabling has to look. On the next turn, because dispatch() runs application
+        // listeners and enable() is not the place to do that.
+        if (parked != null) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    AppState waiting = parked;
+                    if (waiting != null && enabled) {
+                        parked = null;
+                        dispatch(waiting);
+                    }
+                }
+            });
+        }
     }
 
     /// Hands the port a callback.
@@ -3190,91 +3206,87 @@ public final class Continuity {
             if (activityType == null || !activityType.equals(getActivityType())) {
                 return false;
             }
-            // MARSHALLED when this is not the event thread, and everything below then runs on it.
+            // The GENERATION, captured here, at the instant the arrival actually happened.
+            // Everything downstream queues at least once, and a logout already sitting on the
+            // event queue runs first -- so a generation read later is the generation AFTER the
+            // logout, every check passes, and the previous account's state is restored and
+            // persisted by a session that promised nothing from before it survives.
             //
-            // ContinuityCallback lets a port call this from any thread, and the decision below
-            // reads `enabled` and `applicationHasChosen`, which the event thread owns. Reading
-            // them from elsewhere used to be argued safe in one direction -- a decline is
-            // recoverable, because the port retains the activity and offers it again -- and that
-            // argument stopped holding when the "off" answer became a CLAIM: a claim drops the
-            // activity, so a stale read there loses an arrival outright rather than delaying it.
-            //
-            // Claimed on the way out, because that is the truth: this framework has taken the
-            // activity and will deal with it. Nothing else answers to this application's own
-            // activity type, which the check above has already established.
-            //
-            // Every port shipped here already marshals -- the iOS one hands over through
-            // callSerially, the simulator's hooks are dispatched on the event thread -- so this
-            // is the guarantee for a bridge written elsewhere, not a change to how ours behave.
-            if (Display.isInitialized() && !Display.getInstance().isEdt()) {
-                if (!applicationHasChosen) {
-                    // DECLINED, and nothing queued. The application has not said whether it wants
-                    // continuity, so the queued decision would decline too -- and claiming ahead
-                    // of a decline is a lie the port acts on: it lets go of an activity this
-                    // framework did not keep, so the enable() that follows a sync-only listener
-                    // has nothing to deliver and the cold-launch continuation is gone. Exactly
-                    // the loss the retention contract exists to prevent, reintroduced by the
-                    // marshalling that fixed the visibility problem.
-                    //
-                    // Safe to read from here, and it is the ONE flag that is: it goes false to
-                    // true once and never back, so a stale read answers false -- a decline, which
-                    // the port recovers from by offering the activity again the next time a
-                    // callback is installed. `enabled` has no such property, which is why the
-                    // decision below is marshalled rather than taken here.
-                    return false;
-                }
-                final Map<String, Object> info = userInfo;
-                Display.getInstance().callSerially(new Runnable() {
-                    @Override
-                    public void run() {
-                        decide(info);
-                    }
-                });
-                return true;
+            // Read from whatever thread the port called on. An int read from another thread
+            // yields a value the event thread wrote at some point and never a future one, so it
+            // can be stale-old but never stale-new: the worst it does is refuse an arrival that
+            // raced the logout exactly, which is the answer that side of the race wants.
+            final int arrivedIn = lifecycle;
+            if (!Display.isInitialized()) {
+                // No event thread to marshal to. Nothing else is running to race this, and
+                // deliver() holds the arrival for the EDT that is about to start.
+                return decide(userInfo, arrivedIn);
             }
-            return decide(userInfo);
+            if (Display.getInstance().isEdt()) {
+                return decide(userInfo, arrivedIn);
+            }
+            // CLAIMED, unconditionally, and the framework then keeps it -- which is what makes
+            // that honest. Answering anything state-dependent from here means reading fields the
+            // event thread owns: `enabled` is not monotonic, and `applicationHasChosen` only
+            // looked safe. Its stale value is false, which meant declining, and a decline is
+            // recoverable ONLY while some later install re-offers the activity -- after enable()
+            // has installed the callback there is no such install, so the decline stranded the
+            // arrival with a port that had already been told to let go, or lost it outright with
+            // one that does not retain.
+            //
+            // So the framework takes it and holds it itself. decide() parks an arrival that comes
+            // before the application has chosen, and enable() drains that slot -- the retention
+            // that used to be borrowed from the port now lives where the state does.
+            final Map<String, Object> info = userInfo;
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    decide(info, arrivedIn);
+                }
+            });
+            return true;
         }
 
         /// The decision itself, on the event thread -- or before there is one, where nothing else
         /// is running to race it and deliver() parks the arrival for the EDT that is starting.
-        private boolean decide(Map<String, Object> userInfo) {
+        private boolean decide(Map<String, Object> userInfo, int arrivedIn) {
+            if (lifecycle != arrivedIn) {
+                // clear() or disable() ran between the arrival and this decision. Claimed, so the
+                // port lets go: the state belongs to a session that has ended and nothing is
+                // going to want it.
+                return true;
+            }
             if (discardHeldArrival) {
                 // clear() is draining what the port held from before it. Claimed, which is what
                 // makes the port let go of it.
                 return true;
             }
-            if (!enabled) {
-                // The answer is the application's own choice, and the two states that share
-                // `enabled == false` want opposite ones.
-                //
-                // TRUE -- claimed, and therefore dropped -- when the application has said what it
-                // wants and right now that is "off". The port lets go of an activity that was
-                // handled, and nothing else answers to this application's own activity type, so
-                // taking it costs no other handler anything. Declining here instead parked the
-                // arrival with the port, and the next enable() -- installing a callback is what
-                // makes the port re-offer it -- delivered a state from the interval disable()
-                // documents as ignored.
-                //
-                // FALSE -- declined, and therefore RETAINED -- while the application has said
-                // nothing at all. That is the answer the iOS port is built for: it holds a
-                // declined activity and offers it again the next time a callback is installed,
-                // and enable() installs one. Claiming it instead threw it away, because admit()
-                // drops an arrival while the framework is disabled -- so an application that
-                // registers a SyncedStore listener before enabling continuity, which installs
-                // this same callback, lost a cold-launch Handoff for good.
-                //
-                // The two sides disagreed rather than one being wrong: this claimed everything of
-                // its own type so no other handler could take it, while the port's retention was
-                // written for a decline that never came.
-                //
-                // Both flags are read on the EVENT THREAD, which owns them -- see the
-                // marshalling in continuationReceived. They used to be read from whatever thread
-                // the port called on, argued safe because a decline is recoverable; that argument
-                // died the moment the "off" answer became a claim.
-                return applicationHasChosen;
+            if (!enabled && applicationHasChosen) {
+                // The application has said what it wants and right now that is "off". Claimed,
+                // and therefore dropped: the port lets go of an activity that was handled, and
+                // nothing else answers to this application's own activity type.
+                return true;
             }
             AppState state = StateCodec.fromMap(userInfo);
             if (state == null) {
+                return false;
+            }
+            if (!enabled) {
+                // NOTHING SAID YET, and the arrival is held HERE rather than left with the port.
+                //
+                // A store listener installs this seam without enabling continuity -- a key/value
+                // store is not consent to restore a route stack -- so a continuation that
+                // cold-launches the app can arrive with no one ready for it. That used to be a
+                // decline, and the port kept it and offered it again when a callback was next
+                // installed. Two things broke that: a decline reaches no port at all once this
+                // callback has claimed the arrival on another thread, and after enable() has
+                // installed the seam there is no later install to re-offer it.
+                //
+                // So the framework keeps it. enable() drains this slot, which is the same
+                // recovery the port used to provide, in the place that actually holds the state.
+                // False is still returned for a port that is holding one too: the two copies
+                // dedup on (origin, sequence) at admission.
+                parked = state;
                 return false;
             }
             deliver(state);

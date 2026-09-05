@@ -4573,17 +4573,77 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
-     * A background callback is not told an arrival was claimed when the decision will decline it.
+     * An arrival is bound to the generation it ARRIVED in, not the one the decision runs in.
      *
-     * <p>The marshalling that fixed cross-thread visibility answered "claimed" unconditionally,
-     * and the queued decision then declined -- because the application has not said whether it
-     * wants continuity. The bridge acts on the synchronous answer: it lets go of an activity the
-     * framework never kept, so the enable() that follows a sync-only listener has nothing to
-     * deliver and the cold-launch continuation is gone. That is the loss the retention contract
-     * exists to prevent.</p>
+     * <p>Every hop between the activity and the decision is a queue, and a logout already sitting
+     * on the event queue runs first. A generation read after those hops is the one AFTER the
+     * logout, so every later check passes and the previous account's state is restored and
+     * persisted by a session that promised nothing from before it survives -- clear() deliberately
+     * leaves continuity enabled, so nothing else refuses it.</p>
+     *
+     * <p>The iOS port used to add a hop of its own before the framework saw the arrival, which is
+     * why it now hands over directly and lets the framework marshal.</p>
      */
     @EdtTest
-    public void aBackgroundCallbackIsNotToldAnArrivalWasClaimedWhenItWillBeDeclined() {
+    public void anArrivalIsBoundToTheGenerationItArrivedIn() {
+        Continuity.enable();
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(true);
+        ContinuityCallback callback = Continuity.callbackForTest();
+        Map<String, Object> info = StateCodec.toMap(fromElsewhere("the previous account", 340L));
+
+        // From a BACKGROUND thread, which is the only shape that exercises this: the decision is
+        // queued, so it runs after the logout, and the generation it compares against has to have
+        // been captured when the activity arrived. Called on the event thread instead, the
+        // decision runs inline before the logout and deliver()'s own guard covers it -- a first
+        // version of this test did exactly that and passed with the check removed.
+        final ContinuityCallback c = callback;
+        final Map<String, Object> arriving = info;
+        final java.util.concurrent.CountDownLatch queued =
+                new java.util.concurrent.CountDownLatch(1);
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                Continuity.clear();
+            }
+        });
+        Display.getInstance().startThread(new Runnable() {
+            public void run() {
+                c.continuationReceived(Continuity.getActivityType(), arriving);
+                queued.countDown();
+            }
+        }, "continuity arrival").start();
+        for (int i = 0; i < 40 && queued.getCount() > 0; i++) {
+            pause(50L);
+            flushSerialCalls();
+        }
+        assertEquals(0L, queued.getCount(), "the arrival never reached the framework");
+        flushSerialCalls();
+        flushSerialCalls();
+
+        assertNull(provider.restored,
+                "a continuation that arrived before the logout was restored by the session after "
+                        + "it, because the generation was read once the logout had already run");
+        assertNull(Continuity.readSeenForTest().get("some-other-device"),
+                "it was marked durably too, so the origin's real states are refused after a "
+                        + "restart as already seen");
+    }
+
+    /**
+     * A background arrival before enable() is claimed AND kept, and the enable() delivers it.
+     *
+     * <p>This asserted the opposite -- that the callback declines rather than claims -- and that
+     * was right for a design where the PORT held the arrival. It stopped being right once the
+     * decline could not reach a port at all: after enable() has installed the seam there is no
+     * later install to re-offer anything, so a decline stranded the arrival or lost it outright
+     * with a bridge that does not retain.</p>
+     *
+     * <p>What must hold either way is that the arrival is not lost, and that is what this checks
+     * now: the framework claims it -- which is honest, because it then holds it itself -- and the
+     * enable() that follows a sync-only listener delivers it.</p>
+     */
+    @EdtTest
+    public void aBackgroundArrivalBeforeEnableIsKeptAndDeliveredByTheEnable() {
         // A sync-only application: the store listener installs the callback and continuity is
         // deliberately NOT enabled.
         SyncedStoreListener listener = new SyncedStoreListener() {
@@ -4612,9 +4672,21 @@ public class LocalContinuityTest extends UITestBase {
                 flushSerialCalls();
             }
             assertEquals(0L, done.getCount(), "the background caller never returned");
-            assertFalse(claimed.get(),
-                    "the framework told the port it had taken an arrival it then declined, so a "
-                            + "conforming bridge discards a continuation nothing is holding");
+            assertTrue(claimed.get(),
+                    "the framework declined instead of taking responsibility, and after enable() "
+                            + "installs the seam there is no later install to re-offer it -- so "
+                            + "the arrival is stranded with the port or lost outright");
+
+            // The claim has to be honest: enabling delivers what was kept.
+            RecordingProvider provider = new RecordingProvider();
+            Continuity.setStateProvider(provider);
+            for (int i = 0; i < 20 && provider.restored == null; i++) {
+                pause(50L);
+                flushSerialCalls();
+            }
+            assertNotNull(provider.restored,
+                    "the arrival was claimed and then never delivered, which is the one outcome "
+                            + "a claim must not produce -- the cold-launch continuation is gone");
         } finally {
             SyncedStore.removeChangeListener(listener);
         }

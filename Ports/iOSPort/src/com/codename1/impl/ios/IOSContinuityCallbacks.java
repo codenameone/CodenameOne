@@ -135,19 +135,24 @@ final class IOSContinuityCallbacks {
             pendingJson = userInfoJson;
             return true;
         }
-        final String type = activityType;
-        final String json = userInfoJson;
-        Display.getInstance().callSerially(new Runnable() {
-            @Override
-            public void run() {
-                deliverOnEdt(type, json);
-            }
-        });
-        return true;
+        // Handed over DIRECTLY, on this thread, and the framework does its own marshalling.
+        //
+        // This used to queue and answer true. The queue is where the arrival lost its place in
+        // time: Continuity binds a continuation to the lifecycle generation it arrived in, and a
+        // logout already sitting on the event queue runs first -- so the generation captured
+        // after this hop is the one AFTER the logout, and the previous account's state is
+        // restored and persisted by a session that promised nothing from before it survives.
+        // Calling through means the generation is read at the instant the activity actually
+        // arrived.
+        //
+        // The answer is the framework's own rather than an unconditional true, which is also what
+        // the delegate should be told.
+        return deliverToFramework(activityType, userInfoJson);
     }
 
-    /// Hands an arrival to the framework, or holds it. On the event thread.
-    private static void deliverOnEdt(String activityType, String userInfoJson) {
+    /// Hands an arrival to the framework, or holds it. Called on whatever thread the activity
+    /// arrived on; the framework marshals what it needs to.
+    private static boolean deliverToFramework(String activityType, String userInfoJson) {
         ContinuityCallback c = callback;
         boolean claimed = false;
         if (c != null) {
@@ -158,7 +163,7 @@ final class IOSContinuityCallbacks {
             }
         }
         if (claimed) {
-            return;
+            return true;
         }
         // Held, because DECLINED is not the same as "not ours". A callback is installed by
         // SyncedStore.addChangeListener() as well as by Continuity.enable(), and the store
@@ -169,6 +174,7 @@ final class IOSContinuityCallbacks {
         // cold-launch continuation into a lost one.
         pendingType = activityType;
         pendingJson = userInfoJson;
+        return false;
     }
 
     /// The synced store changed on another of the user's devices.
