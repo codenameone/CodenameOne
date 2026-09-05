@@ -425,6 +425,11 @@ static NSScreen *cn1ScreenAt(int monitor) {
 /// answers 0 until then. Anything else still marshals.
 static int cn1PrimaryScaleTimes100 = 0;
 
+/// Whether every attached screen has the same backing scale, so the primary
+/// one's answer holds for any of them. Published beside the scale above and
+/// re-published on a screen reconfiguration.
+static int cn1ScalesAreUniform = 0;
+
 /// Main thread only. Safe to call repeatedly; a screen reconfiguration re-runs it.
 void CN1MacPublishPrimaryScale(void) {
     if (![NSThread isMainThread]) {
@@ -438,6 +443,21 @@ void CN1MacPublishPrimaryScale(void) {
     if (s > 0) {
         __atomic_store_n(&cn1PrimaryScaleTimes100, (int)(s * 100), __ATOMIC_RELEASE);
     }
+    // And whether the primary one can stand in for any of them.
+    //
+    // The main window carries setFrameAutosaveName, so it reopens wherever it
+    // was last dragged -- not necessarily the primary display. Reporting the
+    // primary scale before the window has published its own is therefore a guess
+    // that a second monitor can make wrong. It cannot be wrong when every screen
+    // agrees, which is the ordinary case and worth keeping.
+    BOOL uniform = YES;
+    for (NSUInteger i = 1; i < screens.count; i++) {
+        if ([screens objectAtIndex:i].backingScaleFactor != s) {
+            uniform = NO;
+            break;
+        }
+    }
+    __atomic_store_n(&cn1ScalesAreUniform, uniform ? 1 : 0, __ATOMIC_RELEASE);
 }
 
 /// The main window's screen and that screen's scale, published together as one
@@ -509,6 +529,15 @@ int cn1MacPublishedScaleTimes100(void) {
         if (windowScale > 0) {
             return windowScale;
         }
+    }
+    // The primary screen only stands in while it cannot be the wrong one. The
+    // main window restores its saved frame and may open on another display
+    // entirely, so on a mixed-scale desktop this refuses rather than reporting a
+    // scale the window may not end up on -- 0 is "not captured", which the Java
+    // caller already answers by deferring to the portable implementation. A
+    // caller can see 0; it cannot see a confidently wrong ratio.
+    if (!__atomic_load_n(&cn1ScalesAreUniform, __ATOMIC_ACQUIRE)) {
+        return 0;
     }
     int primary = __atomic_load_n(&cn1PrimaryScaleTimes100, __ATOMIC_ACQUIRE);
     return primary > 0 ? primary : 0;
