@@ -148,6 +148,15 @@ public final class Continuity {
     /// than anything durable.
     private static final int MAX_SEEN = 64;
 
+    /// How many displaced arrivals the shelf keeps.
+    ///
+    /// Far smaller than MAX_SEEN, which bounds a map of longs: this one holds whole states,
+    /// payloads included, and the device ids that key it come off the wire. An unbounded shelf
+    /// lets a peer decide how much memory this process uses, so it is bounded and the OLDEST goes
+    /// -- the newest work is the work the user is most likely to still want. One entry per device
+    /// means this is a count of the user's devices, and eight is past any real account.
+    private static final int MAX_SHELVED = 8;
+
     /// How long to wait for the application to produce its first form before giving up on a
     /// continuation that cold-launched it. A launch that never produces one is a broken
     /// application, and restoring minutes later into whatever the user is doing by then is worse
@@ -210,6 +219,24 @@ public final class Continuity {
 
     /// A state that arrived and could not be shown yet.
     private static AppState parked;
+
+    /// Arrivals displaced from that slot by a state from a DIFFERENT device, newest per origin.
+    ///
+    /// The slot answers getRestorableState(), and one slot is the right shape for that -- the
+    /// application is asked about one thing at a time. It is the wrong shape for HOLDING, and
+    /// those are two different jobs that used to share the field. Two devices can each offer work
+    /// while automatic restoration is off, and the second arrival simply overwrote the first.
+    ///
+    /// That was survivable for as long as the port still had its copy: the framework declined
+    /// off-EDT, the port kept it, and installing a callback re-offered it. It stopped being
+    /// survivable when the callback started CLAIMING what it queues -- which it has to, because
+    /// the decision is made later on the EDT and the answer is owed now -- since a conforming
+    /// bridge is then entitled to drop its copy. Nothing would ever deliver that state again.
+    ///
+    /// So displacement shelves rather than drops, and getRestorableState() promotes the newest
+    /// shelved arrival once the slot empties. Bounded by how many devices the user has, one entry
+    /// each, aged out by getMaxAge() like everything else that waits.
+    private static final Map<String, AppState> shelved = new LinkedHashMap<String, AppState>();
 
     /// Which relay session the in-flight worker belongs to, bumped by `clear()`, `setRelay()` and
     /// `reset()`.
@@ -399,6 +426,7 @@ public final class Continuity {
         // said it wanted none. The full path clears it too, a few lines down; hoisting it here
         // covers both and says once that a disable() drops what is held.
         parked = null;
+        shelved.clear();
         if (!enabled) {
             // A callback is installed even though nothing is being turned off, and it is the only
             // way to reach an arrival that is already waiting. iOS parks a cold-launch Handoff
@@ -432,6 +460,7 @@ public final class Continuity {
         enabled = false;
         dirty = false;
         parked = null;
+        shelved.clear();
         // The relay session ends too. A checkpoint whose publish was deferred behind a fetch is
         // still sitting in the slot, and pollFinished() starts a publisher when that fetch lands
         // -- so without this a state queued before disable() went out on the wire after it had
@@ -921,26 +950,16 @@ public final class Continuity {
     ///
     /// the state, or null when there is nothing to restore or it is older than `getMaxAge()`
     public static AppState getRestorableState() {
-        AppState waiting = parked;
+        // Aged like a stored one, and the shelf with it. An arrival that could not be shown yet
+        // -- during a cold launch, say -- has time passing while it waits, so exempting it would
+        // have let exactly the expiry the application configured slip through on the one path
+        // where the delay is longest. nextOffer() applies that and promotes a shelved arrival
+        // once the slot empties; when everything on offer has expired we fall through to the
+        // stored checkpoint below, which is ordinary with automatic restore off and the user
+        // still navigating.
+        AppState waiting = nextOffer();
         if (waiting != null) {
-            // Aged like a stored one. A parked state is one that arrived from elsewhere and could
-            // not be shown yet -- during a cold launch, say -- and time passes while it waits, so
-            // exempting it would have let exactly the expiry the application configured slip
-            // through on the one path where the delay is longest.
-            if (isTooOld(waiting)) {
-                // Cleared, and then we keep looking. Returning null here reported "nothing to
-                // restore" while a perfectly valid local checkpoint sat in storage -- which is
-                // ordinary with automatic restore off and the user still navigating -- so a
-                // single restore() call told the application to show its initial screen instead.
-                parked = null;
-                // And the checkpoint that was waiting behind it goes out. The hold is there to
-                // protect the relay's only copy of a live arrival; this one has expired and will
-                // not be restored by anything, so holding a publication for it forever is just a
-                // checkpoint that never reaches the user's other devices.
-                startPublisher();
-            } else {
-                return waiting;
-            }
+            return waiting;
         }
         AppState stored = readStored();
         if (stored == null || isTooOld(stored)) {
@@ -1017,6 +1036,7 @@ public final class Continuity {
         // `failed` is the distinction `shown` cannot make. False means both "there was no form to
         // show, and that is success" and "this did not work", which need opposite handling here --
         // the same conflation that put two flags in capture() and in checkpoint().
+        settleShelved(state);
         if (supersedesParked(state)) {
             parked = null;
             // The slot is what holds a publication back; the decision has been made, so anything
@@ -1111,6 +1131,10 @@ public final class Continuity {
             if (parked == state) { //NOPMD CompareObjectsWithEquals
                 parked = null;
             }
+            // The shelf too: a state handed back here can be one the application kept from an
+            // earlier dispatch, whose copy was displaced into the shelf while it decided. Refusing
+            // the one in its hand and leaving the twin on offer would hand it straight back.
+            settleShelved(state);
             startPublisher();
             return false;
         }
@@ -1585,6 +1609,7 @@ public final class Continuity {
                 ? Display.getInstance().getCurrent() : null;
         lifecycle++;
         parked = null;
+        shelved.clear();
         dirty = false;
         // The PORT's held arrival too, not only this class's parked slot. A Handoff that
         // cold-launches a logged-out app reaches IOSContinuityCallbacks before anything has
@@ -2016,7 +2041,16 @@ public final class Continuity {
         // "null-check a static, then assign a static inside the branch" and reports it as a lazy
         // initializer, which this is not -- and the project's gate has no per-finding allow list,
         // so the shape is what has to change.
+        purgeShelf();
         AppState awaitingDecision = parked;
+        if (awaitingDecision == null) {
+            // The shelf holds publication back too. A displaced arrival's only copy is in this
+            // process just as much as the slot's is -- more so, since the port has already been
+            // told the framework took it -- so publishing over the relay's document while one
+            // waits loses it for good. Peeked, not taken: promotion belongs to
+            // getRestorableState(), which is where the application asks for the next one.
+            awaitingDecision = newestShelved();
+        }
         if (awaitingDecision != null) {
             // A fetched state is waiting on the user and has NOT been acknowledged. The relay
             // holds one document per user, so publishing now replaces the only copy of it that
@@ -2313,6 +2347,7 @@ public final class Continuity {
             // it, and the publication hold would go on withholding this device's checkpoints
             // behind it. Same shape as acknowledge() and expiry -- another way an arrival ends,
             // and every one of them has to release the slot.
+            settleShelved(state);
             AppState waiting = parked;
             if (waiting != null && state.getDeviceId().equals(waiting.getDeviceId())
                     && waiting.getSequence() <= state.getSequence()) {
@@ -2549,34 +2584,189 @@ public final class Continuity {
     /// is in the in-memory map from admission, so a redelivery in the same run is refused as
     /// already seen. Recorded as handled and then dropped.
     ///
-    /// So the mark goes with it. Only the in-memory one: durableSeen is written when a state
-    /// COMPLETES, and this one never did, so nothing durable claims it. Only when it still names
-    /// this state, so a newer mark for that origin is left alone.
+    /// So the displaced state goes to the shelf instead. Forgetting its admission mark -- which
+    /// is what this did before -- only permitted a redelivery that is not coming, because the
+    /// off-EDT callback claims what it queues and the port is free to let go of its copy. See the
+    /// `shelved` field.
     private static void placeOnOffer(AppState state) {
         AppState replaced = parked;
-        if (replaced == null || replaced == state) { //NOPMD CompareObjectsWithEquals
-            parked = state;
-            return;
-        }
-        String origin = replaced.getDeviceId();
-        if (origin != null && origin.length() > 0 && origin.equals(state.getDeviceId())) {
-            // SAME device, so this is supersession -- and supersession has a direction. The
-            // comment below has always said the newer sequence is the one worth showing, and
-            // nothing checked: arrivals do not necessarily land in the order they were sent, and
-            // a delayed sequence 10 landing after 11 moved the user BACKWARD. admit() has this
-            // check, but the pre-enable path does not go through admit(), so the states a
-            // synced-store listener's seam collects before enable() arrive here unordered and
-            // both copies have already been claimed from the port.
-            if (state.getSequence() < replaced.getSequence()) {
-                return;
+        if (replaced != null && replaced != state) { //NOPMD CompareObjectsWithEquals
+            if (isSameOrigin(replaced, state)) {
+                // SAME device, so this is supersession -- and supersession has a direction. The
+                // comment above has always said the newer sequence is the one worth showing, and
+                // nothing checked: arrivals do not necessarily land in the order they were sent,
+                // and a delayed sequence 10 landing after 11 moved the user BACKWARD. admit() has
+                // this check, but the pre-enable path does not go through admit(), so the states a
+                // synced-store listener's seam collects before enable() arrive here unordered and
+                // both copies have already been claimed from the port.
+                if (state.getSequence() < replaced.getSequence()) {
+                    return;
+                }
+            } else {
+                shelve(replaced);
             }
-            parked = state;
-            return;
         }
         parked = state;
-        Long mark = lastSeen.get(origin);
-        if (mark != null && mark.longValue() == replaced.getSequence()) {
-            lastSeen.remove(origin);
+        String origin = state.getDeviceId();
+        if (origin == null || origin.length() == 0) {
+            // Nothing to reconcile, and asking would be wrong: the shelf keys an unidentified
+            // state under a null origin, so looking one up here would pull back the state this
+            // call had just displaced -- and, if its sequence happened to be the higher of the
+            // two, hand it the slot and drop the arrival that displaced it.
+            return;
+        }
+        // The slot and the shelf never hold one origin twice. Whatever this origin had shelved is
+        // this arrival's predecessor -- or, if the two crossed on the wire, its successor, and
+        // then the newer one takes the slot back under the same direction rule as above.
+        AppState kept = shelved.remove(origin);
+        if (kept != null && kept != state //NOPMD CompareObjectsWithEquals
+                && kept.getSequence() > state.getSequence()) {
+            parked = kept;
+        }
+    }
+
+    /// Keeps a displaced arrival, newest per origin.
+    ///
+    /// One entry per device rather than a queue: an origin that has moved on has superseded its
+    /// own earlier state, which is the rule supersedesParked() already applies to the slot. So the
+    /// shelf grows with how many devices the user has, not with how many states they send -- and
+    /// then MAX_SHELVED bounds even that, because the device ids come off the wire and nothing
+    /// here gets to trust them.
+    private static void shelve(AppState state) {
+        String origin = state.getDeviceId();
+        if (origin == null || origin.length() == 0) {
+            // Not shelved at all. Everything the shelf does -- supersede, settle, promote -- is
+            // keyed by origin, so a state that does not say where it came from cannot take part
+            // in any of it. And it is never the arrival this exists for: a cross-device
+            // continuation always carries an id, and what reaches here without one is a state the
+            // application built and handed to restore(), which it still holds a reference to.
+            return;
+        }
+        AppState kept = shelved.get(origin);
+        if (kept != null && kept.getSequence() > state.getSequence()) {
+            return;
+        }
+        shelved.put(origin, state);
+        while (shelved.size() > MAX_SHELVED) {
+            AppState oldest = null;
+            Iterator<AppState> i = shelved.values().iterator();
+            while (i.hasNext()) {
+                AppState candidate = i.next();
+                if (oldest == null || candidate.getTimestamp() < oldest.getTimestamp()) {
+                    oldest = candidate;
+                }
+            }
+            if (oldest == null) {
+                // Unreachable while size() is over the cap, and the loop must not spin if it ever
+                // is not.
+                break;
+            }
+            shelved.remove(oldest.getDeviceId());
+        }
+    }
+
+    /// Whether two arrivals came from the same device.
+    ///
+    /// An absent origin is not a device: two states that both fail to say where they came from
+    /// are not each other's supersession, so they displace rather than replace.
+    private static boolean isSameOrigin(AppState a, AppState b) {
+        String origin = a.getDeviceId();
+        return origin != null && origin.length() > 0 && origin.equals(b.getDeviceId());
+    }
+
+    /// The arrival on offer: the slot, promoting the newest shelved one when it has emptied, and
+    /// expiring whatever has aged out on the way past.
+    ///
+    /// Expiry is applied HERE rather than when the state is shelved because getMaxAge() is
+    /// measured when the question is asked -- an arrival that was fresh when it was displaced can
+    /// be stale by the time the slot frees up, and that wait is exactly what the age is for.
+    private static AppState nextOffer() {
+        while (true) {
+            // Through a local, for the reason startPublisher() gives: PMD's NonThreadSafeSingleton
+            // matches the SHAPE of "null-check a static, then assign that static inside the
+            // branch" and reports it as a lazy initializer. This is a slot being refilled, not an
+            // instance being created, and the project's gate has no per-finding allow list.
+            AppState offer = parked;
+            if (offer == null) {
+                offer = takeShelved();
+                if (offer == null) {
+                    return null;
+                }
+                parked = offer;
+            }
+            if (!isTooOld(offer)) {
+                return offer;
+            }
+            // Cleared, and then we keep looking -- past the rest of the shelf and, in the caller,
+            // on to the stored checkpoint. Returning null at the first expired arrival reported
+            // "nothing to restore" while a perfectly valid state sat behind it.
+            parked = null;
+            // And the checkpoint that was waiting behind it goes out. The hold is there to
+            // protect the relay's only copy of a live arrival; this one has expired and will not
+            // be restored by anything, so holding a publication for it forever is just a
+            // checkpoint that never reaches the user's other devices.
+            startPublisher();
+        }
+    }
+
+    /// Removes and returns the newest shelved arrival, or null.
+    private static AppState takeShelved() {
+        AppState newest = newestShelved();
+        if (newest != null) {
+            shelved.remove(newest.getDeviceId());
+        }
+        return newest;
+    }
+
+    /// The newest shelved arrival without removing it, or null.
+    ///
+    /// Newest by the ORIGIN's clock. Sequences are per-device counters, so comparing one device's
+    /// against another's says nothing at all -- the timestamp is the only ordering two devices
+    /// share, and it is the one last-writer-wins already uses.
+    private static AppState newestShelved() {
+        AppState newest = null;
+        Iterator<AppState> i = shelved.values().iterator();
+        while (i.hasNext()) {
+            AppState candidate = i.next();
+            if (newest == null || candidate.getTimestamp() > newest.getTimestamp()) {
+                newest = candidate;
+            }
+        }
+        return newest;
+    }
+
+    /// Drops shelved arrivals that have aged past getMaxAge().
+    ///
+    /// Called from startPublisher() as well as nextOffer(), because the shelf holds publication
+    /// back the same way the slot does: without this, an application that never asks for a
+    /// restorable state would stop publishing for the rest of the process over an arrival that
+    /// expired hours ago.
+    private static void purgeShelf() {
+        if (shelved.isEmpty()) {
+            return;
+        }
+        Iterator<AppState> i = shelved.values().iterator();
+        while (i.hasNext()) {
+            if (isTooOld(i.next())) {
+                i.remove();
+            }
+        }
+    }
+
+    /// Drops whatever `state` settles from the shelf: the same origin, at or behind it.
+    ///
+    /// The shelf is subject to every way an arrival ends, exactly as the slot is -- a restore, an
+    /// acknowledgement, or a tombstone from that origin finishes its shelved state too. Missing
+    /// this would leave work on offer that the origin has already moved past, and hold this
+    /// device's checkpoints behind it.
+    private static void settleShelved(AppState state) {
+        String origin = state.getDeviceId();
+        if (origin == null || origin.length() == 0) {
+            return;
+        }
+        AppState kept = shelved.get(origin);
+        if (kept != null && kept.getSequence() <= state.getSequence()) {
+            shelved.remove(origin);
         }
     }
 
@@ -2797,6 +2987,7 @@ public final class Continuity {
                 recordDurable(from, seq);
             }
         }
+        settleShelved(state);
         if (supersedesParked(state)) {
             // The application has dealt with this arrival -- acknowledge() is the documented way
             // to decline one -- so the slot must not go on offering it through
@@ -3366,6 +3557,7 @@ public final class Continuity {
         maxAge = 0;
         deviceId = null;
         parked = null;
+        shelved.clear();
         dirty = false;
         waitingForWindow = false;
         applyingRestore = false;

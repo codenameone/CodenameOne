@@ -42,8 +42,10 @@ import org.junit.jupiter.api.BeforeEach;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -4872,9 +4874,13 @@ public class LocalContinuityTest extends UITestBase {
      *
      * <p>Returning false keeps an arrival on offer -- the documented prompt-then-restore pattern.
      * Do it for device A and then for device B before A is resolved and B replaced A in the slot,
-     * with A's mark still recorded, so A could never be offered again in that run. The
-     * bookkeeping that makes a replacement recoverable was added at two of the five places a
-     * state is put on offer, and this is one of the three it missed.</p>
+     * so A could never be offered again in that run.</p>
+     *
+     * <p>The first fix for this forgot A's admission mark, so a REDELIVERY could bring it back.
+     * That bet on a delivery which is not coming: the off-EDT callback claims what it queues --
+     * it has to, the decision is made later on the EDT and the port is owed an answer now -- so a
+     * conforming bridge is entitled to drop its copy the moment it hands over. A is kept on the
+     * shelf instead, and comes back with nothing redelivering it.</p>
      */
     @EdtTest
     public void aListenerHoldingTwoArrivalsDoesNotLoseTheFirst() {
@@ -4904,30 +4910,39 @@ public class LocalContinuityTest extends UITestBase {
         assertNull(Continuity.readSeenForTest().get("phone"),
                 "a durable mark was left for a held state that was never completed");
 
-        // The phone's work comes round again -- another Handoff, or the next relay read. It has
-        // to be offerable, because nothing ever dealt with it.
-        Continuity.deliver(fromPhone);
-        flushSerialCalls();
+        AppState onOffer = Continuity.getRestorableState();
+        assertNotNull(onOffer, "nothing is on offer at all");
+        assertEquals("tablet", onOffer.getDeviceId(),
+                "the newer arrival is not the one on offer");
+
+        // The user deals with the tablet's. NOTHING redelivers the phone's -- no second Handoff,
+        // no relay read -- and it still has to come back, because nothing ever dealt with it.
+        Continuity.acknowledge(onOffer);
         AppState back = Continuity.getRestorableState();
-        assertNotNull(back, "the phone's held state came back to nothing");
+        assertNotNull(back,
+                "the state the listener was holding for the phone was dropped when the tablet's "
+                        + "replaced it in the slot, and no redelivery is coming for it: the "
+                        + "callback claimed it off-EDT, so the port has let go of its copy");
         assertEquals("phone", back.getDeviceId(),
-                "the state the listener was holding for the phone was refused as already seen "
-                        + "after the tablet's replaced it, so it is lost for the rest of the run");
+                "the phone's held state was not what came back once the tablet's was settled");
+        assertEquals("from the phone", back.getPayload().get("note"),
+                "something with the phone's device id came back, but not its payload");
     }
 
     /**
-     * An offer replaced by one from ANOTHER device can be delivered again.
+     * An offer replaced by one from ANOTHER device is kept, not dropped.
      *
      * <p>The slot holds one arrival, which is right, and replacing it is right when the two come
      * from the same device -- that is supersession. Two different devices are not that: with
      * automatic restoration off both can be dispatched before the application calls restore(),
-     * and the second overwrote the first. That would be survivable if the first could come back,
-     * and it could not: its (origin, sequence) went into the in-memory map at admission, so a
-     * redelivery in the same run was refused as already seen. Recorded as handled and then
-     * dropped.</p>
+     * and the second overwrote the first.</p>
+     *
+     * <p>The displaced arrival goes to the shelf and is promoted when the slot empties. This test
+     * pins that it comes back WITHOUT a redelivery, which is the part the earlier mark-forgetting
+     * fix could not provide -- see the sibling test above for why no redelivery is coming.</p>
      */
     @EdtTest
-    public void anOfferReplacedByAnotherDeviceCanBeDeliveredAgain() {
+    public void anOfferReplacedByAnotherDeviceIsKeptRatherThanDropped() {
         RecordingProvider provider = new RecordingProvider();
         Continuity.setStateProvider(provider);
         Continuity.setAutoRestore(false);
@@ -4951,17 +4966,30 @@ public class LocalContinuityTest extends UITestBase {
         assertEquals("tablet", onOffer.getDeviceId(),
                 "the newer arrival is not the one on offer");
 
-        // The phone's state was dropped from the slot. It must not ALSO be remembered as handled,
-        // or the relay and the port can never offer it again for the rest of the run.
+        // The phone's state was displaced from the slot. It must not ALSO be remembered as
+        // handled, because nothing ever handled it.
         assertNull(Continuity.readSeenForTest().get("phone"),
                 "a durable mark was left for a state that was never completed");
-        Continuity.deliver(first);
-        flushSerialCalls();
+
+        Continuity.acknowledge(onOffer);
         AppState back = Continuity.getRestorableState();
-        assertNotNull(back, "the phone's state came back to nothing");
-        assertEquals("phone", back.getDeviceId(),
-                "the phone's state was refused as already seen, though it was dropped without "
-                        + "ever being handled -- so it is lost for the rest of the process");
+        assertNotNull(back,
+                "the phone's state was dropped when the tablet's took the slot, so it is lost for "
+                        + "the rest of the process");
+        assertEquals("phone", back.getDeviceId(), "the phone's state was not what came back");
+        assertEquals("from the phone", back.getPayload().get("note"),
+                "something with the phone's device id came back, but not its payload");
+
+        // And settling THAT one leaves nothing from elsewhere behind: the shelf is a hold for
+        // work that arrived, not a queue that grows. What may still be offered is this device's
+        // own stored checkpoint, which getRestorableState() falls through to and which is not
+        // what this is about.
+        Continuity.acknowledge(back);
+        AppState after = Continuity.getRestorableState();
+        assertTrue(after == null
+                        || (!"phone".equals(after.getDeviceId())
+                                && !"tablet".equals(after.getDeviceId())),
+                "an arrival from another device is still on offer after both were settled");
     }
 
     private static Map<String, Object> payloadWith(String note) {
@@ -7209,6 +7237,271 @@ public class LocalContinuityTest extends UITestBase {
         });
         assertTrue(r.sent.size() > before,
                 "the checkpoint stayed held behind work the origin had already cleared");
+    }
+
+    /**
+     * A tombstone also clears work that origin left on the SHELF.
+     *
+     * <p>The shelf holds an arrival displaced by one from another device, and every way an
+     * arrival ends has to reach it: an origin saying it has nothing any more settles its shelved
+     * state exactly as it settles its parked one. Missing this promoted work the origin had
+     * already cleared the moment the slot emptied -- the same "continue what you were doing?"
+     * over nothing at all that the tombstone rule exists to prevent, just deferred by one
+     * arrival.</p>
+     */
+    @EdtTest
+    public void aTombstoneClearsWorkAnOriginLeftOnTheShelf() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+
+        Continuity.deliver(foreign("phone", 111L));
+        flushSerialCalls();
+        // The tablet's takes the slot, so the phone's goes to the shelf.
+        Continuity.deliver(foreign("tablet", 1L));
+        flushSerialCalls();
+        // And then the phone says it has nothing.
+        Continuity.deliver(new AppState()
+                .setDeviceId("phone")
+                .setSequence(112L)
+                .setTimestamp(System.currentTimeMillis()));
+        flushSerialCalls();
+
+        AppState onOffer = Continuity.getRestorableState();
+        assertNotNull(onOffer, "the tablet's arrival is not on offer");
+        assertEquals("tablet", onOffer.getDeviceId(), "the wrong arrival is on offer");
+        Continuity.acknowledge(onOffer);
+
+        AppState left = Continuity.getRestorableState();
+        assertFalse(left != null && "phone".equals(left.getDeviceId()),
+                "work the phone cleared with a tombstone was promoted off the shelf once the "
+                        + "slot emptied, so the user is offered work that no longer exists");
+    }
+
+    /**
+     * A shelved arrival holds relay publication, exactly as a parked one does.
+     *
+     * <p>The hold exists because the arrival's only copy is in this process: the relay keeps one
+     * document per user, so publishing over it while a state waits on the user loses that state
+     * for good. That is MORE true of a shelved arrival than a parked one -- the port has already
+     * been told the framework took it, so nothing else has a copy at all -- and a hold that
+     * covered only the slot let the next checkpoint overwrite it the moment the slot emptied.</p>
+     */
+    @EdtTest
+    public void aShelvedArrivalHoldsRelayPublication() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+        final GatedRelay r = new GatedRelay();
+        Continuity.setRelay(r);
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitEntered();
+            }
+        });
+        r.release();
+        pause(300L);
+        final int before = r.sent.size();
+
+        Continuity.deliver(foreign("phone", 111L));
+        flushSerialCalls();
+        Continuity.deliver(foreign("tablet", 1L));
+        flushSerialCalls();
+
+        // The user deals with the tablet's, which empties the SLOT. The phone's is still on the
+        // shelf, so the hold has to survive.
+        AppState onOffer = Continuity.getRestorableState();
+        assertNotNull(onOffer, "the tablet's arrival is not on offer");
+        Continuity.acknowledge(onOffer);
+        Continuity.checkpoint();
+        pause(250L);
+        assertEquals(before, r.sent.size(),
+                "the checkpoint went out over the relay's only copy of the phone's arrival, "
+                        + "which is waiting on the shelf and exists nowhere else");
+
+        // And settling that one lets it go, or the hold would never end.
+        AppState fromShelf = Continuity.getRestorableState();
+        assertNotNull(fromShelf, "the phone's arrival was not promoted off the shelf");
+        assertEquals("phone", fromShelf.getDeviceId(), "the wrong arrival came off the shelf");
+        Continuity.acknowledge(fromShelf);
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitAnySince(before);
+            }
+        });
+        assertTrue(r.sent.size() > before,
+                "the publication stayed held after every arrival had been settled");
+    }
+
+    /**
+     * A shelved arrival expires like a parked one, and lets the publication go when it does.
+     *
+     * <p>getMaxAge() is measured when the question is asked, not when the state was displaced --
+     * an arrival that was fresh when another device took the slot can be long stale by the time
+     * that slot frees up. Exempting the shelf would have reintroduced the expiry hole on the one
+     * path where the wait is longest, and left the hold in place for ever behind it.</p>
+     */
+    @EdtTest
+    public void aShelvedArrivalExpiresLikeAParkedOne() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+        final GatedRelay r = new GatedRelay();
+        Continuity.setRelay(r);
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitEntered();
+            }
+        });
+        r.release();
+        pause(300L);
+        final int before = r.sent.size();
+
+        AppState phone = foreign("phone", 111L);
+        AppState tablet = foreign("tablet", 1L);
+        Continuity.parkForTest(phone);
+        Continuity.parkForTest(tablet);
+        // The user deals with the tablet's, so the SLOT is empty and only the shelf is holding.
+        Continuity.acknowledge(tablet);
+        Continuity.checkpoint();
+        pause(250L);
+        assertEquals(before, r.sent.size(),
+                "the shelved arrival is not holding the checkpoint back, so there is no hold for "
+                        + "expiry to release and the rest of this proves nothing");
+
+        // Now it ages out -- and NOTHING asks for a restorable state. An application that never
+        // calls getRestorableState() is the case the slot's own expiry cannot cover: asking is
+        // what discards a parked state, so a shelf that expired only on the way past would have
+        // withheld this device's checkpoints for the rest of the process.
+        Continuity.setMaxAge(1L);
+        Continuity.checkpoint();
+        pause(250L);
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitAnySince(before);
+            }
+        });
+        assertTrue(r.sent.size() > before,
+                "the checkpoint stayed held behind a shelved arrival that had already expired, "
+                        + "and nothing was ever going to ask for it");
+
+        AppState left = Continuity.getRestorableState();
+        assertFalse(left != null && "phone".equals(left.getDeviceId()),
+                "an expired shelved arrival was still promoted and offered");
+        Continuity.setMaxAge(0L);
+    }
+
+    /**
+     * The shelf is bounded, and drops the OLDEST when it overflows.
+     *
+     * <p>The shelf holds whole states, payloads included, and the device ids that key it come off
+     * the wire -- so an unbounded one lets whatever is on the other end of the relay decide how
+     * much memory this process uses. Keeping the most recent arrivals is the trade: the newest
+     * work is the work the user is most likely to still want.</p>
+     */
+    @EdtTest
+    public void theShelfIsBoundedAndDropsTheOldest() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+
+        // Explicit, strictly increasing timestamps: several foreign() calls can land in one
+        // millisecond, and "oldest" would then be whichever the iterator reached first.
+        long base = System.currentTimeMillis() - 20000L;
+        for (int i = 0; i < 12; i++) {
+            Map<String, Object> payload = new HashMap<String, Object>();
+            payload.put("note", "device " + i);
+            Continuity.parkForTest(new AppState()
+                    .setPayload(payload)
+                    .setDeviceId("device-" + i)
+                    .setSequence(1L)
+                    .setTimestamp(base + i));
+        }
+
+        // Drain everything the shelf and the slot are still holding.
+        Set<String> offered = new HashSet<String>();
+        for (int i = 0; i < 20; i++) {
+            AppState next = Continuity.getRestorableState();
+            if (next == null || !String.valueOf(next.getDeviceId()).startsWith("device-")) {
+                break;
+            }
+            offered.add(next.getDeviceId());
+            Continuity.acknowledge(next);
+        }
+
+        assertEquals(9, offered.size(),
+                "the shelf kept " + offered.size() + " arrivals beside the slot's, so twelve "
+                        + "devices on one account can grow it without limit: " + offered);
+        assertTrue(offered.contains("device-11"), "the newest arrival was not kept");
+        assertFalse(offered.contains("device-0"),
+                "the oldest arrival was kept and something newer was dropped instead");
+    }
+
+    /**
+     * A state with no origin never reaches the shelf.
+     *
+     * <p>Everything the shelf does -- supersede, settle, promote -- is keyed by device id, and a
+     * state that does not say where it came from cannot take part in any of it. Keying one under
+     * a null origin looked harmless and was not: with two unidentified states in a row, the same
+     * call that shelved the first looked a null origin straight back up, pulled it out again, and
+     * -- its sequence being the higher of the two -- handed it the slot and dropped the arrival
+     * that had just displaced it. The loss this mechanism exists to prevent, produced by the
+     * mechanism.</p>
+     *
+     * <p>What reaches placeOnOffer() without an id is a state the application built and handed to
+     * restore(), which it still holds its own reference to -- never a continuation, which always
+     * carries one. So it is left out of the shelf entirely rather than given a synthetic key.</p>
+     */
+    @EdtTest
+    public void aStateWithNoOriginNeverReachesTheShelf() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+
+        // Two of the application's own states in a row -- restore() re-offers one it could not
+        // apply -- the first with the HIGHER sequence, which is what made the swap visible.
+        Map<String, Object> first = new HashMap<String, Object>();
+        first.put("note", "displaced");
+        Continuity.parkForTest(new AppState()
+                .setPayload(first).setSequence(99L)
+                .setTimestamp(System.currentTimeMillis()));
+        Map<String, Object> second = new HashMap<String, Object>();
+        second.put("note", "arrived last");
+        Continuity.parkForTest(new AppState()
+                .setPayload(second).setSequence(5L)
+                .setTimestamp(System.currentTimeMillis()));
+
+        AppState onOffer = Continuity.getRestorableState();
+        assertNotNull(onOffer, "nothing is on offer at all");
+        assertEquals("arrived last", onOffer.getPayload().get("note"),
+                "the unidentified state was pulled back out of the shelf it had just been put "
+                        + "into, and its higher sequence took the slot from the arrival that "
+                        + "displaced it");
+    }
+
+    /**
+     * clear() empties the shelf, not only the slot.
+     *
+     * <p>clear() is a logout: nothing from before it survives. A shelved arrival is state from
+     * the previous account sitting in memory, so leaving it there would let the login that
+     * follows promote the signed-out user's work into the next account -- the same leak that
+     * clearing only this class's slot and not the port's already produced once.</p>
+     */
+    @EdtTest
+    public void clearEmptiesTheShelfAsWellAsTheSlot() {
+        Continuity.setStateProvider(new RecordingProvider());
+        Continuity.setAutoRestore(false);
+
+        Continuity.deliver(foreign("phone", 111L));
+        flushSerialCalls();
+        Continuity.deliver(foreign("tablet", 1L));
+        flushSerialCalls();
+
+        Continuity.clear();
+
+        AppState left = Continuity.getRestorableState();
+        assertNull(left,
+                "an arrival from before the logout survived clear() on the shelf, so the login "
+                        + "that follows restores the previous account's work");
     }
 
     /**
