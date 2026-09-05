@@ -747,3 +747,90 @@ SpinnerStyle {
     cn1-background-type: cn1-image-scaled-fit;
 }
 /* end::svg-transcoder-css-003[] */
+
+/* tag::psd-theme[] */
+TitleContainer {
+    background-image: url(images/background.jpg);
+    cn1-background-type: cn1-image-scaled-fill;
+    cn1-source-dpi: 320;
+    padding: 8mm 3mm 2mm 3mm;
+    margin: 0;
+}
+
+/* The camera artwork is fetched by name at runtime rather than set as a
+   background, so it needs a selector to get it into the theme at all. This one
+   is never applied to anything; naming the images here is what bundles them. */
+PsdImages {
+    background-image: url(images/camera.png),
+        url(images/camera-button.png);
+    cn1-source-dpi: 320;
+}
+
+Title {
+    background-color: transparent;
+    color: #ffffff;
+    font-family: "native:MainThin";
+    font-size: 3.5mm;
+    padding: 1mm;
+    margin: 0;
+    border: none;
+}
+
+TitleCommand {
+    cn1-derive: Title;
+}
+
+RedCommand, RedCommand.pressed, RedCommand.selected {
+    cn1-derive: Title;
+    color: #f73267;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+}
+
+TitleArea {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+    border: none;
+}
+
+TextField, TextField.selected {
+    background-color: #ffffff;
+    font-family: "native:MainLight";
+    font-size: 2mm;
+    padding: 2mm;
+    margin: 0;
+    border: none;
+}
+
+TextHint {
+    cn1-derive: TextField;
+    color: #4d606f;
+}
+
+SouthButton, SouthButton.pressed, SouthButton.selected {
+    background-color: #f73267;
+    color: #ffffff;
+    text-align: center;
+    font-family: "native:MainThin";
+    font-size: 3mm;
+    padding: 2mm 1mm 2mm 1mm;
+    margin: 0;
+}
+
+CameraButton, CameraButton.pressed, CameraButton.selected {
+    background-color: transparent;
+    text-align: center;
+    padding: 3mm 1mm 1mm 1mm;
+    margin: 1mm;
+}
+
+/* The separator is an empty Label, so the line is the style: a background
+   colour and just enough padding to give it height. */
+Separator {
+    background-color: #f5f5f5;
+    padding: 0.2mm 0 0 0;
+    margin: 1mm 0 1mm 0;
+    border: none;
+}
+/* end::psd-theme[] */
