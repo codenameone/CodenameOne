@@ -2102,6 +2102,20 @@ public class UIManager {
             }
         }
 
+        // Everything above merged into themeProps, so the style-definition index
+        // and the $Dark key list it carries describe the theme as it was BEFORE
+        // this call and have to go.
+        //
+        // themeGeneration does not cover this. A theme carrying
+        // @includeNativeBool re-enters here through installNativeTheme, and that
+        // nested install bumps the generation while only the native properties
+        // are loaded -- then this outer call merges the application's own keys,
+        // including its $Dark ones, on top without bumping anything. An index
+        // built during the nested window therefore knew only the native theme's
+        // dark keys, and every application dark style resolved afterwards was
+        // reported as having no dark definition and built light. The same is
+        // true of the @overlayThemes merges just above.
+        styleDefinitionCache = null;
     }
 
     /// Theme entries can be bound to a named theme constant via a
