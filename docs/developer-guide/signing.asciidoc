@@ -276,8 +276,8 @@ surfaces later, as a build that can't match a profile to the application.
 The development profile has to name every device you intend to install on. A
 device registered after the profile was generated isn't covered by it, so the
 profile has to be regenerated and downloaded again. An `Ad Hoc` distribution
-profile works the same way. Only an App Store profile names no devices, because
-there the store does the installing rather than you.
+profile works the same way. The profiles that name no devices are the ones where
+you aren't the one doing the installing: App Store, and enterprise in-house.
 
 Apple issues certificates as `.cer` files, and the build servers need `.p12`
 files. On a Mac, double-clicking a `.cer` imports it into Keychain Access, and
