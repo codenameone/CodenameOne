@@ -1127,10 +1127,13 @@ final class LocationButtonManifestFragments {
         if (manifest == null) {
             return;
         }
-        String text;
-        try {
-            text = new String(manifest, "UTF-8");
-        } catch (java.io.UnsupportedEncodingException impossible) {
+        // Decoded by its BOM, not assumed UTF-8. A UTF-16 manifest read as
+        // UTF-8 comes back as replacement characters and NULs, and the
+        // permission it asks for then matches nothing -- which fails in the
+        // dangerous direction: the archive's background-location request goes
+        // unseen and the exclusive build is accepted over it.
+        String text = decodeXml(manifest);
+        if (text == null) {
             return;
         }
         // A binary (aapt-compiled) manifest is not XML and this will simply not
@@ -1139,6 +1142,52 @@ final class LocationButtonManifestFragments {
         // table by accident.
         if (declaresBackgroundLocation(text)) {
             found.background = true;
+        }
+    }
+
+    /**
+     * Decodes XML bytes using the byte order mark, defaulting to UTF-8.
+     *
+     * <p>Covers the encodings a byte order mark can name, which is what an
+     * archive's manifest realistically uses. An XML declaration naming some
+     * other encoding without a mark is not honoured, and that is a miss in the
+     * safe direction only insofar as it is rare -- it is written down here
+     * rather than assumed away.</p>
+     *
+     * @param bytes the file
+     * @return its text, or null when no charset here can read it
+     */
+    private static String decodeXml(byte[] bytes) {
+        String charset = "UTF-8";
+        int skip = 0;
+        if (bytes.length >= 2) {
+            int b0 = bytes[0] & 0xff;
+            int b1 = bytes[1] & 0xff;
+            if (b0 == 0xfe && b1 == 0xff) {
+                charset = "UTF-16BE";
+                skip = 2;
+            } else if (b0 == 0xff && b1 == 0xfe) {
+                charset = "UTF-16LE";
+                skip = 2;
+            } else if (b0 == 0 && b1 != 0) {
+                // No mark, but a UTF-16BE document starts with a NUL before
+                // the '<' of its first tag.
+                charset = "UTF-16BE";
+            } else if (b0 != 0 && b1 == 0) {
+                charset = "UTF-16LE";
+            } else if (bytes.length >= 3 && b0 == 0xef && b1 == 0xbb
+                    && (bytes[2] & 0xff) == 0xbf) {
+                skip = 3;
+            }
+        }
+        try {
+            return new String(bytes, skip, bytes.length - skip, charset);
+        } catch (java.io.UnsupportedEncodingException unsupported) {
+            try {
+                return new String(bytes, "UTF-8");
+            } catch (java.io.UnsupportedEncodingException impossible) {
+                return null;
+            }
         }
     }
 
@@ -1584,7 +1633,17 @@ final class LocationButtonManifestFragments {
      */
     static boolean isNestedInsideFramework(String text) {
         String outer = outerClassName(text);
-        return outer != null && isFrameworkClass(outer);
+        // isFrameworkOwner on the outer, not isFrameworkClass, because nesting
+        // goes deeper than one level: an anonymous class inside an anonymous
+        // class -- LocationButton$7$1, which is the Runnable inside the
+        // TimerTask inside scheduleStaleWake -- reports LocationButton$7 as its
+        // outer, and that is not on the list. Only the top-level type is.
+        //
+        // Sound here in a way the bare name test is not, because METADATA has
+        // already established that this class really is nested; all the name is
+        // being asked for is which top-level type it belongs to. A class that
+        // is not nested never reaches this line.
+        return outer != null && isFrameworkOwner(outer);
     }
 
     /** Skips a u2 count followed by that many fixed-size entries. */

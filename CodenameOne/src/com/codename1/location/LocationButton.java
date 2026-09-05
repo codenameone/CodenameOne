@@ -177,6 +177,16 @@ public class LocationButton extends Container {
     private static long inFlightSince;
     private static long inFlightDeadline;
 
+    /// Which request currently owns the shared slot.
+    ///
+    /// Incremented every time a request takes it. A request that went stale and
+    /// was superseded still returns eventually, and its completion must not
+    /// clear the flag its successor is holding: that would let a third button
+    /// into serveGrant beside the running one, which is the exact overlap the
+    /// flag exists to prevent. Each request compares this token before it
+    /// clears anything.
+    private static long inFlightGeneration;
+
     /// Buttons whose grant arrived while another button was being served.
     ///
     /// Static for the same reason [#inFlight] is, and a list rather than a
@@ -660,6 +670,7 @@ public class LocationButton extends Container {
     /// available the whole time.
     private void serveGrant() {
         inFlight = true;
+        final long generation = ++inFlightGeneration;
         inFlightSince = System.currentTimeMillis();
         // The deadline this request is entitled to, plus room for the platform
         // to answer late. Generous on purpose: taking the slot from a request
@@ -674,7 +685,11 @@ public class LocationButton extends Container {
         } catch (Throwable err) {
             Log.e(err);
         } finally {
-            inFlight = false;
+            // Only if this request still owns the slot. A stale one that was
+            // superseded and then returned used to clear its successor's.
+            if (inFlightGeneration == generation) {
+                inFlight = false;
+            }
         }
         // Only if the session did not fail underneath us. getCurrentLocationSync
         // blocks through invokeAndBlock, so the EDT keeps pumping and
@@ -683,10 +698,16 @@ public class LocationButton extends Container {
         // again here would answer one tap twice, which is the listener contract
         // broken in the way callers notice least and trust most: a completion
         // they already handled, arriving a second time with a different value.
+        // Fired regardless of ownership: this tap asked a question and got an
+        // answer, and a request that lost the slot still deserves to report.
         if (!unavailable) {
             fire(result);
         }
-        serveNextWaiting();
+        // Driving the queue is the OWNER's job. A superseded request doing it
+        // would serve the next button while its successor is still running.
+        if (inFlightGeneration == generation) {
+            serveNextWaiting();
+        }
     }
 
     /// Starts the next queued button, if any.
@@ -721,10 +742,14 @@ public class LocationButton extends Container {
                 }
                 if (inFlight && !inFlightIsStale()) {
                     // Somebody else got in first; back to the queue rather
-                    // than into a second concurrent request.
+                    // than into a second concurrent request. And schedule the
+                    // wake again: serveNextWaiting cancelled the pending one on
+                    // the way in, so without this the requeued button waits on
+                    // a tap that may never come.
                     if (!WAITING.contains(next)) {
                         WAITING.add(next);
                     }
+                    scheduleStaleWake();
                     return;
                 }
                 next.serveGrant();

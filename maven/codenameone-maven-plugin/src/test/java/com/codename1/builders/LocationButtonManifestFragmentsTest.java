@@ -24,6 +24,8 @@ package com.codename1.builders;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Opcodes;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -524,6 +526,44 @@ class LocationButtonManifestFragmentsTest {
         }
         assertFalse(LocationButtonManifestFragments
                 .isFrameworkClass("com/example/MyForm.class"));
+    }
+
+    @Test
+    void aClassNestedTwoLevelsDeepInsideTheFrameworkIsStillTheFrameworks()
+            throws Exception {
+        // Nesting is not one level. scheduleStaleWake puts a Runnable inside a
+        // TimerTask, so the framework really does contain LocationButton$7$1,
+        // whose InnerClasses attribute names LocationButton$7 as its outer --
+        // and THAT is not on the list, only the top-level type is. Resolving
+        // one level and stopping reported the class as application code, which
+        // is the P0 direction: every Android build refused.
+        //
+        // Built here rather than read from the framework tree so the guard does
+        // not evaporate the day that anonymous class is refactored away. The
+        // sibling LocationButtonMarkerCoverageTest covers the real one.
+        ClassWriter w = new ClassWriter(0);
+        w.visit(Opcodes.V1_8, Opcodes.ACC_SUPER,
+                "com/codename1/location/LocationButton$7$1", null,
+                "java/lang/Object", new String[] {"java/lang/Runnable"});
+        w.visitInnerClass("com/codename1/location/LocationButton$7$1",
+                "com/codename1/location/LocationButton$7", null, 0);
+        w.visitEnd();
+        String text = new String(w.toByteArray(), StandardCharsets.ISO_8859_1);
+        assertTrue(LocationButtonManifestFragments
+                .isNestedInsideFramework(text),
+                "a class nested two levels inside LocationButton is the "
+                + "framework's, however deep the nesting goes");
+
+        // And the predicate still declines a class that is genuinely nobody
+        // else's: nesting inside an application class stays application code.
+        ClassWriter app = new ClassWriter(0);
+        app.visit(Opcodes.V1_8, Opcodes.ACC_SUPER, "com/example/MyForm$1$1",
+                null, "java/lang/Object", null);
+        app.visitInnerClass("com/example/MyForm$1$1", "com/example/MyForm$1",
+                null, 0);
+        app.visitEnd();
+        assertFalse(LocationButtonManifestFragments.isNestedInsideFramework(
+                new String(app.toByteArray(), StandardCharsets.ISO_8859_1)));
     }
 
     @Test
@@ -1361,5 +1401,24 @@ class LocationButtonManifestFragmentsTest {
         assertTrue(LocationButtonManifestFragments
                 .scanForLocationUsage(root).usesButton(),
                 "a plain jar's classes are its classpath");
+    }
+    /** A UTF-16 manifest asks for the permission just as plainly. */
+    @Test
+    void aUtf16ManifestIsDecoded() throws Exception {
+        File root = Files.createTempDirectory("cn1-lb-utf16").toFile();
+        File aar = new File(root, "utf16.aar");
+        String xml = "<manifest><uses-permission android:name=\"android"
+                + ".permission.ACCESS_BACKGROUND_LOCATION\" /></manifest>";
+        ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(aar));
+        try {
+            zip.putNextEntry(new ZipEntry("AndroidManifest.xml"));
+            zip.write(xml.getBytes("UnicodeBig"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                .declaresBackgroundLocation(),
+                "a UTF-16 manifest must be read, not mangled");
     }
 }
