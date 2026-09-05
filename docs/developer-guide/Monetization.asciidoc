@@ -350,12 +350,16 @@ In this section you'll describe the general workflow of subscription management 
 
 A complete demo exists as two projects: a
 https://gist.github.com/shannah/b61b9b6b35ea0eac923a54163f5d4deb[client app] and a
-https://github.com/shannah/cn1-iap-demo-server[server app]. The server needs a
-Java EE application server rather than a servlet container: alongside its JAX-RS
-endpoints it uses a `@Stateless` bean and a container-managed `@Schedule` job to
-revalidate subscriptions, and neither Tomcat nor Jetty supplies those on its own.
+https://github.com/shannah/cn1-iap-demo-server[server app].
 
-Two things about reaching that server from a device. The client can't talk to
+*The client.* The link is a single source file rather than a project, so create a
+Codename One project and paste it into your main class, adjusting the package and
+class name to match. It uses `RESTfulWebServiceClient`, which isn't part of the
+core API, so add the
+https://github.com/shannah/cn1-generic-webservice-client[Generic Web Service Client]
+cn1lib as a dependency -- see <<How to use cn1libs>>.
+
+Two things about reaching the server from a device. The client can't talk to
 `http://localhost` -- on a device that name means the phone -- so point it at the
 address your machine has on the network:
 
@@ -379,14 +383,23 @@ WARNING: That exception turns off transport security for the whole app. It's
 here because the demo talks to a development server on your desk; a shipped app
 uses HTTPS and needs none of it.
 
-The server keeps receipts in a single table, and its shape is the whole storage
-contract between the two halves:
+*The server.* It needs a Java EE application server rather than a servlet
+container: alongside its JAX-RS endpoints it uses a `@Stateless` bean and a
+container-managed `@Schedule` job to revalidate subscriptions, and neither Tomcat
+nor Jetty supplies those on its own.
+
+Create a database and a `RECEIPTS` table in it. The shape of that table is the
+whole storage contract between the two halves:
 
 [source,sql]
 ----
 include::../demos/common/src/main/snippets/developer-guide/monetization.sql[tag=monetization-sql-001,indent=0]
 ----
 
+Then point the server's persistence unit at that database, by setting the data
+source in its `persistence.xml` to the one your application server exposes for
+it. Creating the table isn't enough on its own -- until the persistence unit
+names the right data source, the server's `EntityManager` never reaches it.
 
 ==== Looking at the source of the app
 
