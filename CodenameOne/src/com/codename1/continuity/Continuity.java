@@ -3803,6 +3803,20 @@ public final class Continuity {
                 // clear() or disable() ran between the arrival and this decision. Claimed, so the
                 // port lets go: the state belongs to a session that has ended and nothing is
                 // going to want it.
+                //
+                // NOT volatile, and deliberately. This framework is single threaded on the event
+                // thread; `lifecycle` is written there and nowhere else, and the value compared
+                // here was sampled ONCE when the activity arrived rather than re-read in a loop.
+                // A review asked for safe publication on the theory that a bridge calling from a
+                // long-lived background thread could keep observing a stale generation across a
+                // clear-then-enable. No port does that -- iOS is called per activity by the OS,
+                // which is itself a synchronizing hand-off; Android never reaches this seam; the
+                // simulator's bridge calls on the event thread -- and the direction of the error
+                // is the safe one either way: a stale generation DROPS an arrival, which the
+                // origin re-advertises and the relay still holds, while the opposite mistake
+                // restores an ended session's work into the account that replaced it. Making the
+                // field volatile would put cross-thread machinery into core to make an unlikely
+                // failure fail in the worse direction.
                 return true;
             }
             if (discardHeldArrival) {

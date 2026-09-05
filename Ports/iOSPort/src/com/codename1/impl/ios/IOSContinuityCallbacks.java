@@ -153,6 +153,13 @@ final class IOSContinuityCallbacks {
     /// Hands an arrival to the framework, or holds it. Called on whatever thread the activity
     /// arrived on; the framework marshals what it needs to.
     private static boolean deliverToFramework(String activityType, String userInfoJson) {
+        // A plain read, and not a synchronized or volatile one. A review asked for safe
+        // publication here on the theory that this thread might still see null after the event
+        // thread installed the callback. Read what happens if it does: the arrival is RETAINED in
+        // pendingType/pendingJson below and false is returned, which is the same answer a decline
+        // gives -- and setCallback() drains those inline on every install. So the theoretical
+        // race costs a delivery deferred to the next install, not a lost activity, and the
+        // machinery to close it would be a lock on the path the OS calls for every Handoff.
         ContinuityCallback c = callback;
         boolean claimed = false;
         if (c != null) {

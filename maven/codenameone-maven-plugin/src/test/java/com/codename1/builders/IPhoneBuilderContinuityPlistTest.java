@@ -257,6 +257,53 @@ class IPhoneBuilderContinuityPlistTest {
     }
 
     /**
+     * A declaration spelled with ordinary plist formatting is still a string declaration.
+     *
+     * <p>{@code <string >} opens a string exactly as {@code <string>} does, and a comment may sit
+     * between the key and its value. Both are ordinary plist; a literal startsWith() answered "not
+     * a string" to each, and withContinuityActivityType() then refused the declaration as
+     * non-string and failed a build that was correct -- worse than the silent mismatch the same
+     * reader would produce elsewhere. The container tags a few hundred lines up were made
+     * structural for this exact reason; this was the last literal check beside them.</p>
+     */
+    @Test
+    void anOddlySpelledStringDeclarationIsStillAString() throws BuildException {
+        String spaced = "<key>CN1ContinuityActivityType</key><string >"
+                + CONTINUITY_TYPE + "</string >";
+        assertEquals(spaced, IPhoneBuilder.withContinuityActivityType(spaced, CONTINUITY_TYPE),
+                "a declaration written as <string > was refused as a non-string value");
+
+        String commented = "<key>CN1ContinuityActivityType</key><!-- ours --><string>"
+                + CONTINUITY_TYPE + "</string>";
+        assertEquals(commented,
+                IPhoneBuilder.withContinuityActivityType(commented, CONTINUITY_TYPE),
+                "a comment between the key and its value made the value unreadable");
+    }
+
+    /**
+     * Two live root CN1ContinuityActivityType declarations are refused rather than half-read.
+     *
+     * <p>The same trap NSUserActivityTypes and UIApplicationSceneManifest are already refused for,
+     * on the neighbouring key: a property list takes the LAST of a duplicated key while every
+     * lookup here answers with the first, so an agreeing first declaration is left alone while the
+     * delegate reads a different second one. The generated array then advertises one type and the
+     * native side accepts another, which is Handoff silently dead.</p>
+     */
+    @Test
+    void twoLiveContinuityTypeDeclarationsAreRefused() {
+        String inject = "<key>CN1ContinuityActivityType</key><string>" + CONTINUITY_TYPE
+                + "</string><key>CN1ContinuityActivityType</key>"
+                + "<string>com.other.app.continuity</string>";
+
+        try {
+            IPhoneBuilder.withContinuityActivityType(inject, CONTINUITY_TYPE);
+            fail("a duplicated CN1ContinuityActivityType must not be read from the first one");
+        } catch (BuildException expected) {
+            assertTrue(expected.getMessage().contains("twice"), expected.getMessage());
+        }
+    }
+
+    /**
      * A NSUserActivityTypes whose value is not an array is refused once a continuity type depends
      * on it.
      *

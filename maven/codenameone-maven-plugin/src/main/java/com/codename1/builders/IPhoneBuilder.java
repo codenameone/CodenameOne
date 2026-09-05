@@ -11723,6 +11723,19 @@ public class IPhoneBuilder extends Executor {
         // Refused rather than left alone when it disagrees, exactly as CN1DocumentsAppGroup is,
         // because this is not a hint. An injected key naming a different type has the delegate
         // rejecting the application's own continuations while iOS goes on offering them.
+        // Two live root declarations of the key, refused for the reason NSUserActivityTypes and
+        // UIApplicationSceneManifest already are: a property list takes the LAST of a duplicated
+        // key while every lookup here answers with the first, so an agreeing first declaration
+        // would be left alone while the delegate reads a different second one -- the generated
+        // array advertising one type and the native side accepting another, which is Handoff
+        // silently dead. The scalar case was left out of the round that refused the array; it is
+        // the same trap on the neighbouring key.
+        if (inject != null
+                && plistMemberDuplicated(inject, 0, inject.length(), "CN1ContinuityActivityType")) {
+            throw new BuildException("ios.plistInject declares CN1ContinuityActivityType twice. A "
+                    + "property list takes the last of a duplicated key, so this build cannot "
+                    + "tell which value the delegate will read. Leave one of them.");
+        }
         String injected = topLevelPlistString(inject, "CN1ContinuityActivityType");
         if (injected == null && declaresTopLevelPlistKey(inject, "CN1ContinuityActivityType")) {
             // Declared, but not as a string. topLevelPlistString answers null for an array, a
@@ -13072,15 +13085,34 @@ public class IPhoneBuilder extends Executor {
             return null;
         }
         String value = plist.substring(range[0], range[1]).trim();
-        if (value.startsWith("<true")) {
+        // The element's NAME, not its spelling. "<string >" opens a string exactly as "<string>"
+        // does, and a comment or a processing instruction may sit between the key and its value
+        // -- all three are ordinary plist, and a literal startsWith() answered "not a string" to
+        // every one of them. withContinuityActivityType() then refused the declaration as
+        // non-string and FAILED A CORRECT BUILD, which is worse than the silent mismatch this
+        // method's other readers would have got.
+        //
+        // The same structural rule the container tags a few hundred lines up already follow:
+        // plistElementIndex() was made to see "<array >" for this reason, and this was the last
+        // literal check left beside it.
+        String name = nextElementName(value, 0);
+        if ("true".equals(name)) {
             return "true";
         }
-        if (value.startsWith("<false")) {
+        if ("false".equals(name)) {
             return "false";
         }
-        if (!value.startsWith("<string>") || !value.endsWith("</string>")) {
+        if (!"string".equals(name)) {
             return null;
         }
+        int open = plistElementIndex(value, "string", 0);
+        int contentStart = open < 0 ? -1 : plistOpenTagEnd(value, open);
+        int contentEnd = contentStart < 0
+                ? -1 : plistCloseElementIndex(value, "string", contentStart);
+        if (contentEnd < 0) {
+            return null;
+        }
+        value = "<string>" + value.substring(contentStart, contentEnd) + "</string>";
         // The element's CONTENT through the shared resolver, not a slice of its serialization.
         // A plist author may spell a value with character references -- "com&#46;example.app" --
         // or wrap it in CDATA, or put a comment inside the element, and Foundation reads all
@@ -13092,6 +13124,17 @@ public class IPhoneBuilder extends Executor {
         // The key side of this method already resolves the same way -- plistMemberRange compares
         // key names through this helper -- so the two halves were answering one question two
         // different ways.
+        //
+        // TRIMMED, and it stays trimmed. A review asked for the exact value on the grounds that
+        // Foundation preserves padding inside a <string>, so "<string> com.example.app </string>"
+        // would compare equal to the unpadded type here and leave a fragment whose delegate reads
+        // the padded one. True, and not worth what closing it costs: this method is the shared
+        // reader for every top-level plist string in this builder -- entitlement values, bundle
+        // ids, the container identifier -- and making it significant-whitespace would change what
+        // all of them accept for the sake of an activity type somebody wrote with spaces around
+        // it. The failure it leaves is a Handoff that does not work in an app whose plist says
+        // something the author did not mean, which is diagnosable; the failure it would introduce
+        // is spread across every other key this reads.
         String content = WatchNativeBuilder.plistStringContentExact(
                 value.substring("<string>".length(), value.length() - "</string>".length()));
         return content == null ? null : content.trim();
