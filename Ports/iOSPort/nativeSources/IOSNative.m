@@ -20876,6 +20876,23 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_la
     // the store holds the value afterwards". It is also the only part that can be established
     // from in here: a store at its key or size limit drops the write while reporting nothing, and
     // whether iCloud goes on to propagate it is not knowable from inside this call.
+    //
+    // Nor is the ENTITLEMENT ANDed in here, which a review asked for on the grounds that a build
+    // with ios.continuity.sync=false keeps a local store and so reports a write that can never
+    // leave the device. Both halves of that are true and the conclusion does not follow.
+    //
+    // An application deciding whether to offer the feature asks isSyncedStoreSupported(), and that
+    // already answers NO for an unentitled build -- it returns `resolved != nil &&
+    // cn1ContinuitySyncEntitled` precisely so a build without the entitlement cannot mistake
+    // itself for one that has it. The fallback the review is worried about is selected by that
+    // call, not by this one.
+    //
+    // And put() documents its answer as "true when the store holds the value afterwards", which
+    // is the only thing establishable from in here: whether iCloud goes on to propagate is not.
+    // Gating this on the entitlement is the same mistake that was removed from three layers at
+    // once -- IOSNative.m, IOSContinuityBridge and SyncedStore -- where it made every call
+    // unreachable and a transient probe answer report failure for a value the store was holding
+    // and would have propagated. Putting it back in one of them restores a third of that bug.
     NSString *back = [store stringForKey:k];
     if (back != nil && [back isEqualToString:v]) {
         result = JAVA_TRUE;
