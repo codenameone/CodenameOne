@@ -501,6 +501,35 @@ class PemKeyTest extends UITestBase {
                 PrivateKey.fromPem(EC_SEC1_EXPLICIT).getEncoded());
     }
 
+    private static byte[] hex(String s) {
+        String h = s.replace(" ", "");
+        byte[] out = new byte[h.length() / 2];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = (byte) Integer.parseInt(h.substring(i * 2, i * 2 + 2), 16);
+        }
+        return out;
+    }
+
+    @Test
+    void aContainerMissingItsMandatoryFieldsIsRejected() {
+        // A well-formed AlgorithmIdentifier and nothing else looks exactly like
+        // the start of an SPKI. Classifying on the first child alone returned a
+        // key carrying no public value, which then failed in the platform
+        // bridge with the opaque error this class exists to replace.
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(
+                pem("PUBLIC KEY", Base64.encodeNoNewline(
+                        hex("300f 300d 0609 2a864886f70d010101 0500")))));
+
+        // the same omission on the private side: no privateKey OCTET STRING
+        assertThrows(CryptoException.class, () -> PrivateKey.fromPem(
+                pem("PRIVATE KEY", Base64.encodeNoNewline(
+                        hex("3012 020100 300d 0609 2a864886f70d010101 0500")))));
+
+        // RSAPrivateKey's nine INTEGER fields are all mandatory
+        assertThrows(CryptoException.class, () -> PrivateKey.fromPem(
+                pem("PRIVATE KEY", Base64.encodeNoNewline(hex("3009 020100 020101 020102")))));
+    }
+
     @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,

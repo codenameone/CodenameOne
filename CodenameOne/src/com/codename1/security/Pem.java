@@ -150,44 +150,57 @@ final class Pem {
                 + "; only RSA and EC keys are supported");
     }
 
-    /// Classifies a key blob by the tags of the outer SEQUENCE's children,
-    /// which is the only thing available for input that arrived as bare base64
-    /// and so carries no label:
+    /// Classifies a key blob by walking the outer SEQUENCE's children, which
+    /// is the only thing available for input that arrived as bare base64 and so
+    /// carries no label.
     ///
-    /// - `SEQUENCE` first -> SubjectPublicKeyInfo
-    /// - `INTEGER, SEQUENCE` -> PKCS#8 PrivateKeyInfo
-    /// - `INTEGER, OCTET STRING` -> SEC1 ECPrivateKey
-    /// - `INTEGER, INTEGER` -> PKCS#1, and RSAPublicKey is exactly the two
-    ///   fields `{ n, e }` where RSAPrivateKey carries nine
+    /// Every mandatory field is checked, not just the first: a blob holding a
+    /// well-formed AlgorithmIdentifier and nothing else looks exactly like the
+    /// start of an SPKI, and classifying on that alone returned a key with no
+    /// public value in it, which then failed in the platform bridge with the
+    /// opaque error this class exists to replace.
     private static int shapeOf(byte[] der) {
         Cursor c = new Cursor(der);
         c.enter(0x30);
         if (!c.hasMore()) {
             return SHAPE_UNKNOWN;
         }
-        int first = c.peek();
-        if (first == 0x30) {
-            return SHAPE_SPKI;
+        if (c.peek() == 0x30) {
+            // SubjectPublicKeyInfo ::= SEQUENCE { AlgorithmIdentifier, BIT STRING }
+            c.skip();
+            return c.hasMore() && c.peek() == 0x03 ? SHAPE_SPKI : SHAPE_UNKNOWN;
         }
-        if (first != 0x02) {
+        if (c.peek() != 0x02) {
             return SHAPE_UNKNOWN;
         }
         c.skip();
         if (!c.hasMore()) {
             return SHAPE_UNKNOWN;
         }
-        int second = c.peek();
-        if (second == 0x30) {
-            return SHAPE_PKCS8;
+        if (c.peek() == 0x30) {
+            // PrivateKeyInfo ::= SEQUENCE { INTEGER, AlgorithmIdentifier, OCTET STRING }
+            c.skip();
+            return c.hasMore() && c.peek() == 0x04 ? SHAPE_PKCS8 : SHAPE_UNKNOWN;
         }
-        if (second == 0x04) {
+        if (c.peek() == 0x04) {
+            // ECPrivateKey ::= SEQUENCE { INTEGER, OCTET STRING, [0], [1] }
             return SHAPE_SEC1;
         }
-        if (second != 0x02) {
+        if (c.peek() != 0x02) {
             return SHAPE_UNKNOWN;
         }
-        c.skip();
-        return c.hasMore() ? SHAPE_PKCS1_PRIVATE : SHAPE_PKCS1_PUBLIC;
+        // PKCS#1. RSAPublicKey is exactly { modulus, publicExponent };
+        // RSAPrivateKey's nine INTEGER fields are all mandatory, and a
+        // multi-prime key adds an otherPrimeInfos SEQUENCE after them.
+        int integers = 1;
+        while (c.hasMore() && c.peek() == 0x02) {
+            c.skip();
+            integers++;
+        }
+        if (integers == 2 && !c.hasMore()) {
+            return SHAPE_PKCS1_PUBLIC;
+        }
+        return integers >= 9 ? SHAPE_PKCS1_PRIVATE : SHAPE_UNKNOWN;
     }
 
     /// Returns the label of the first armored block, or `null` when the input
