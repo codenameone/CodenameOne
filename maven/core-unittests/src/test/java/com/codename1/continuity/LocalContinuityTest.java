@@ -7832,6 +7832,52 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * Installing a relay reads it ONCE, however the session happened to start.
+     *
+     * <p>setRelay() enables continuity when it is the first thing to, and enable() polls as the
+     * last thing it does -- so an unconditional poll here read twice: the second call found a poll
+     * already running, set pollAgain, and pollFinished() issued another GET. Two sequential reads
+     * for one setup, and a relay whose document changed between them handed the application two
+     * different snapshots and navigated the user twice.</p>
+     *
+     * <p>Both orders are checked, because the fix turns on which of the two started the session
+     * and getting it backwards would leave a newly installed relay unread.</p>
+     */
+    @EdtTest
+    public void installingARelayReadsItExactlyOnce() {
+        // setRelay() is what starts the session here: no provider has been set.
+        final GatedRelay first = new GatedRelay();
+        Continuity.setRelay(first);
+        // awaitFetched, not awaitEntered: the gate is on PUBLISH, and no provider is set here so
+        // nothing ever publishes. Waiting on the wrong one hangs rather than fails.
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                first.awaitFetched(1);
+            }
+        });
+        // And then a moment longer, which is the whole point: a second GET queued behind the
+        // first arrives after it, so an assertion made the instant the first lands cannot see it.
+        pause(500L);
+        assertEquals(1, first.fetches(),
+                "installing a relay read it more than once: enable() polls when it starts the "
+                        + "session, and the poll beside it queued a second GET behind the first");
+
+        // And the other order: already enabled, so enable() does nothing and this call has to be
+        // the one that asks the new endpoint.
+        final GatedRelay second = new GatedRelay();
+        Continuity.setRelay(second);
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                second.awaitFetched(1);
+            }
+        });
+        pause(500L);
+        assertEquals(1, second.fetches(),
+                "a relay installed while continuity was already running was never read, so the "
+                        + "new endpoint's state is not discovered until something else polls");
+    }
+
+    /**
      * clear() empties the shelf, not only the slot.
      *
      * <p>clear() is a logout: nothing from before it survives. A shelved arrival is state from

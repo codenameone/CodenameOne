@@ -657,8 +657,21 @@ public final class Continuity {
         endRelaySession();
         relay = r;
         if (r != null) {
+            // Whether THIS call is the one that starts the session decides who does the reading.
+            //
+            // enable() returns early when continuity is already on, and it polls as the last
+            // thing it does when it is not -- so an unconditional poll here made the first
+            // installation read twice: the second call found `polling` already true, set
+            // pollAgain, and pollFinished() then issued a second GET. Two sequential reads for
+            // one setup, and if the relay's document changed between them the application was
+            // handed two different snapshots and navigated twice.
+            boolean wasEnabled = enabled;
             enable();
-            pollRelay();
+            if (wasEnabled) {
+                // Already running, so enable() did nothing at all. A new endpoint is a new source
+                // and nothing else is going to ask it.
+                pollRelay();
+            }
         }
     }
 
