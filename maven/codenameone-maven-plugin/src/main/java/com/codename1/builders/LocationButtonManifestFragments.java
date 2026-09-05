@@ -535,7 +535,12 @@ final class LocationButtonManifestFragments {
             return xPermissions;
         }
         String element = xPermissions.substring(start, end + 1);
-        int[] existing = findAttribute(element, "android:usesPermissionFlags");
+        // Namespaced like the name beside it. A project may bind the Android
+        // namespace to an alias in its own android.xpermissions block, and the
+        // literal lookup then reported no existing flags and added a SECOND
+        // attribute beside the one already there.
+        int[] existing = findNamespacedAttribute(element, xPermissions,
+                ANDROID_NS, "android", "usesPermissionFlags");
         String replacement;
         if (existing == null) {
             // Before the element's own close, whatever shape it has: the
@@ -591,7 +596,14 @@ final class LocationButtonManifestFragments {
             return xPermissions;
         }
         String element = xPermissions.substring(start, end + 1);
-        int[] cap = findAttribute(element, "android:maxSdkVersion");
+        // Namespaced, for the reason activePermissionIndex above already is:
+        // it FOUND the aliased declaration, and a literal lookup here then
+        // missed the cap on it and returned the block unchanged. No uncapped
+        // duplicate is added either, so the button silently lost fine location
+        // above API 30 -- which is the whole failure this method exists to
+        // prevent, reintroduced one attribute to the left.
+        int[] cap = findNamespacedAttribute(element, xPermissions, ANDROID_NS,
+                "android", "maxSdkVersion");
         if (cap == null) {
             return xPermissions;
         }

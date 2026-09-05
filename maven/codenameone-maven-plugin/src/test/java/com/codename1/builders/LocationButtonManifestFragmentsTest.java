@@ -114,6 +114,48 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void anAliasedFlagIsAddedToRatherThanDuplicated() {
+        // Same shape as the test above, with the namespace bound to an alias.
+        // The literal lookup found no existing flags on it and wrote a SECOND
+        // attribute beside the one already there -- two usesPermissionFlags on
+        // one element, which is not a thing a manifest may contain.
+        String existing = "    <uses-permission xmlns:a=\"http://schemas."
+                + "android.com/apk/res/android\" a:name=\"android.permission."
+                + "ACCESS_FINE_LOCATION\" a:usesPermissionFlags=\""
+                + "neverForLocation\" />\n";
+        String out = LocationButtonManifestFragments.addPermissionFlag(
+                existing, LocationButtonManifestFragments.FINE_LOCATION,
+                LocationButtonManifestFragments.ONLY_FOR_LOCATION_BUTTON);
+        assertTrue(out.contains("neverForLocation|onlyForLocationButton"), out);
+        assertEquals(1, count(out, "usesPermissionFlags"),
+                "one flags attribute on the element, not two: " + out);
+    }
+
+    @Test
+    void widensAnAliasedCapAndFlagsAnAliasedDeclaration() {
+        // android.xpermissions is the developer's own XML, and binding the
+        // Android namespace to an alias in it is valid. activePermissionIndex
+        // already FOUND such a declaration, so a literal lookup for the cap
+        // beside it missed the attribute and returned the block untouched --
+        // no widening, and no uncapped duplicate added either, which is the
+        // silent loss of fine location above API 30 that this whole method
+        // exists to prevent.
+        String aliased = "    <uses-permission xmlns:a=\"http://schemas."
+                + "android.com/apk/res/android\" a:name=\"android.permission."
+                + "ACCESS_FINE_LOCATION\" a:maxSdkVersion=\"30\" />\n";
+        String out = LocationButtonManifestFragments.inject(aliased, true);
+        assertEquals(1, count(out, "android.permission.ACCESS_FINE_LOCATION"),
+                out);
+        assertFalse(out.contains("maxSdkVersion"),
+                "the aliased cap must be removed, not left in place: " + out);
+        assertTrue(out.contains("onlyForLocationButton"),
+                "and the aliased declaration is the one that gets flagged: "
+                + out);
+        assertEquals(1, count(out, "onlyForLocationButton"),
+                "flagged once, not once per spelling: " + out);
+    }
+
+    @Test
     void widensACappedFineLocationAndStillFlagsIt() {
         String wifi = "    <uses-permission android:name=\""
                 + "android.permission.ACCESS_FINE_LOCATION\""
