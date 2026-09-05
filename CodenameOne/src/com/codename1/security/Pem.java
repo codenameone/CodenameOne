@@ -37,7 +37,7 @@ import com.codename1.util.StringUtil;
 /// factories on [PublicKey] and [PrivateKey].
 final class Pem {
     private static final String BEGIN = "-----BEGIN ";
-    private static final String END = "-----END";
+    private static final String END = "-----END ";
     private static final String DASHES = "-----";
 
     /// OID 1.2.840.113549.1.1.1 -- rsaEncryption.
@@ -176,8 +176,17 @@ final class Pem {
         } else {
             int labelEnd = pem.indexOf(DASHES, pem.indexOf(BEGIN) + BEGIN.length());
             int bodyStart = labelEnd + DASHES.length();
-            int bodyEnd = pem.indexOf(END, bodyStart);
-            base64 = bodyEnd < 0 ? pem.substring(bodyStart) : pem.substring(bodyStart, bodyEnd);
+            // RFC 7468 requires the footer to repeat the header's label. Stopping
+            // at any "-----END" would accept a file whose blocks have been
+            // spliced together (BEGIN PUBLIC KEY closed by END PRIVATE KEY), and
+            // running to end-of-input would accept one that was cut off before
+            // its footer ever arrived.
+            String footer = END + label + DASHES;
+            int bodyEnd = pem.indexOf(footer, bodyStart);
+            if (bodyEnd < 0) {
+                throw new CryptoException("malformed PEM: no matching " + footer + " footer");
+            }
+            base64 = pem.substring(bodyStart, bodyEnd);
         }
         // Base64.decode tolerates the line breaks but nothing else, and answers
         // null rather than throwing when it meets a character it cannot map.

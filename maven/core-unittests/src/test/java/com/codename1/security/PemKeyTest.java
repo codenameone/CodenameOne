@@ -359,6 +359,19 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void footerMustMatchTheHeaderLabel() {
+        // RFC 7468. A block closed by someone else's footer is a spliced file,
+        // and one with no footer was cut off; neither should load silently.
+        String spliced = "-----BEGIN PUBLIC KEY-----\n" + RSA_SPKI + "\n-----END PRIVATE KEY-----\n";
+        CryptoException mismatched = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(spliced));
+        assertTrue(mismatched.getMessage().contains("-----END PUBLIC KEY-----"), mismatched.getMessage());
+
+        String headerOnly = "-----BEGIN PUBLIC KEY-----\n" + RSA_SPKI + "\n";
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(headerOnly));
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));
