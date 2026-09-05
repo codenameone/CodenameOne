@@ -808,7 +808,10 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     METALView *presentView = self;
     const int completedIdx = presentIdx;
     [self.commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
-        if (atomic_load_explicit(&presentView->cn1PresentGeneration, memory_order_acquire) == frameGeneration) {
+        // One load for both decisions below, so they cannot disagree.
+        int currentGeneration = atomic_load_explicit(&presentView->cn1PresentGeneration,
+                                                     memory_order_acquire);
+        if (currentGeneration == frameGeneration) {
             [CATransaction begin];
             [CATransaction setDisableActions:YES];
             // Re-assigned every frame: the assignment is what marks the layer
@@ -816,10 +819,17 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
             presentLayer.contents = (id)presented;
             [CATransaction commit];
         }
-        // Always, whatever the generation check decided: the GPU is finished
-        // with this surface either way, and leaving the flag set would retire
-        // the slot permanently.
-        atomic_store_explicit(&presentView->cn1PresentInFlight[completedIdx], 0, memory_order_release);
+        // Only while this is still the generation that set it. A resize
+        // rebuilds the surfaces and zeroes every flag, so by the time an older
+        // frame lands, the slot with this index is a DIFFERENT surface that a
+        // newer frame may already have claimed -- clearing it then would
+        // advertise a surface whose own blit is still in flight, which is the
+        // reuse this flag exists to stop. Nothing leaks by skipping it: the
+        // rebuild already cleared what this frame set.
+        if (currentGeneration == frameGeneration) {
+            atomic_store_explicit(&presentView->cn1PresentInFlight[completedIdx], 0,
+                                  memory_order_release);
+        }
         CFRelease(presented);
     }];
     [self.commandBuffer commit];
