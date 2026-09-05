@@ -226,10 +226,22 @@ final class Pem {
             // the RFC actually specifies while the platform accepted it. Both
             // spellings are taken; the field is dropped by the version-0
             // rewrite either way.
+            boolean hasPublicKey = false;
             if (c.hasMore() && (c.peek() == 0x81 || c.peek() == 0xA1)) {
                 c.skip();
+                hasPublicKey = true;
             }
-            return c.hasMore() ? SHAPE_UNKNOWN : SHAPE_PKCS8;
+            if (c.hasMore()) {
+                return SHAPE_UNKNOWN;
+            }
+            // RFC 5958 only allows publicKey in a version-1 key, and the
+            // version-0 path returns the bytes untouched -- so a version-0
+            // container carrying one was handed to the platform with a field
+            // its own version forbids.
+            if (hasPublicKey && !isVersion(firstInteger, 1)) {
+                return SHAPE_UNKNOWN;
+            }
+            return SHAPE_PKCS8;
         }
         if (c.peek() == 0x04) {
             // ECPrivateKey ::= SEQUENCE { INTEGER, OCTET STRING, [0], [1] }
@@ -540,6 +552,14 @@ final class Pem {
         }
         if (c.hasMore() && c.peek() == 0xA1) {
             publicKey = c.element();
+            // The wrapper is copied into the rewrapped key, so what is inside
+            // it has to be checked here or it is never checked at all.
+            Cursor wrapper = new Cursor(publicKey);
+            wrapper.enter(0xA1);
+            if (wrapper.consume(0x03) == 0 || wrapper.hasMore()) {
+                throw new CryptoException("malformed SEC1 EC private key: the public key field "
+                        + "is not a single BIT STRING");
+            }
         }
         if (c.hasMore()) {
             throw new CryptoException("malformed SEC1 EC private key: unexpected field 0x"

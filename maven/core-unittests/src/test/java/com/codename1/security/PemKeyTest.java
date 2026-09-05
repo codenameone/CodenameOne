@@ -880,6 +880,46 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void aPublicKeyFieldRequiresVersionOne() {
+        // RFC 5958 only allows publicKey in a version-1 key, and the version-0
+        // path returns the bytes untouched -- so a version-0 container carrying
+        // one reached the platform with a field its own version forbids.
+        byte[] canonical = der(RSA_PKCS8);
+        byte[] field = {(byte) 0x81, 8, 0, 0, 0, 0, 0, 0, 0, 0};
+        byte[] content = new byte[canonical.length - 4 + field.length];
+        System.arraycopy(canonical, 4, content, 0, canonical.length - 4);
+        System.arraycopy(field, 0, content, canonical.length - 4, field.length);
+        byte[] blob = new byte[content.length + 4];
+        blob[0] = 0x30;
+        blob[1] = (byte) 0x82;
+        blob[2] = (byte) (content.length >> 8);
+        blob[3] = (byte) content.length;
+        System.arraycopy(content, 0, blob, 4, content.length);
+
+        assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(blob))));
+    }
+
+    @Test
+    void sec1PublicKeyWrapperMustHoldOneBitString() {
+        // the [1] wrapper is copied into the rewrapped key, so what is inside it
+        // has to be checked here or it is never checked at all
+        byte[] content = hex("020101"
+                + "0420" + "0000000000000000000000000000000000000000000000000000000000000000"
+                + "A00A" + "06082a8648ce3d030107"
+                + "A1020500");
+        byte[] blob = new byte[content.length + 2];
+        blob[0] = 0x30;
+        blob[1] = (byte) content.length;
+        System.arraycopy(content, 0, blob, 2, content.length);
+
+        assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem(EC_SEC1_LABEL, Base64.encodeNoNewline(blob))));
+        // the real key, which does carry a [1] BIT STRING, still converts
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(pem(EC_SEC1_LABEL, EC_SEC1)).getEncoded());
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));
