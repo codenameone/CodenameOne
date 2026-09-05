@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ShieldNetworkGuard.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.shield</a> &gt; <span class="el_source">ShieldNetworkGuard.java</span></div><h1>ShieldNetworkGuard.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.shield;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Log;
+import com.codename1.io.NetworkGuard;
+import com.codename1.security.shield.spi.ShieldEngineRegistry;
+import java.io.IOException;
+
+/// Connects [AppShield] to the network stack.
+///
+/// This is what makes [ShieldConfig#protect(String, HostPolicy)] mean anything: without a guard
+/// installed, registering a host would configure a policy that nothing ever consults, and tokens
+/// would only ever be attached by an app calling [AppShield#attach(ConnectionRequest)] by hand.
+/// Installed once from [AppShield#init(ShieldConfig)].
+///
+/// The class stays package-private -- apps configure behaviour through [ShieldConfig], and there
+/// is nothing here to subclass or reconfigure. The *instance* is reachable through
+/// [AppShield#getNetworkGuard()], because [com.codename1.io.NetworkManager] holds one guard and
+/// an app that needs its own has to be able to delegate to this one rather than displace it.
+<span class="fc" id="L42">final class ShieldNetworkGuard implements NetworkGuard {</span>
+
+    @Override
+    public void beforeRequest(ConnectionRequest request) throws IOException {
+        // Also clears the header when the host is not protected, which is what
+        // stops a token following a cross-host redirect.
+<span class="fc" id="L48">        AppShield.attach(request);</span>
+<span class="fc" id="L49">    }</span>
+
+    @Override
+    public boolean isCertificateCheckRequired(String url) {
+<span class="fc" id="L53">        String host = AppShield.hostOf(url);</span>
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">        if (host == null || !AppShield.policyFor(host).isEnforcePins()) {</span>
+<span class="fc" id="L55">            return false;</span>
+        }
+        // Only ask for the richer certificate details when a pin set actually
+        // covers this host -- collecting them has a per-connection cost, and an
+        // unpinned host must be left completely alone.
+<span class="nc" id="L60">        return AppShield.getPinSet().isEnforcedFor(host);</span>
+    }
+
+    @Override
+    public void checkCertificates(ConnectionRequest request,
+            ConnectionRequest.SSLCertificate[] certificates) throws IOException {
+<span class="nc" id="L66">        String host = AppShield.hostOf(request.getUrl());</span>
+<span class="nc bnc" id="L67" title="All 4 branches missed.">        if (host == null || !AppShield.policyFor(host).isEnforcePins()) {</span>
+<span class="nc" id="L68">            return;</span>
+        }
+<span class="nc bnc" id="L70" title="All 4 branches missed.">        if (certificates == null || certificates.length == 0) {</span>
+            // The iOS contract explicitly allows an empty array when the chain is not
+            // available from the TLS cache. That is &quot;we did not see a certificate&quot;, not
+            // &quot;we saw a wrong one&quot; -- and reporting a mismatch would fail a perfectly
+            // good cached connection with a PIN_MISMATCH naming a certificate nobody
+            // observed. Pinning fails open on unavailability everywhere else in this
+            // design; this is the same rule.
+<span class="nc" id="L77">            return;</span>
+        }
+<span class="nc" id="L79">        String[] spki = new String[certificates.length];</span>
+<span class="nc" id="L80">        String[] certs = new String[spki.length];</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        for (int i = 0; i &lt; spki.length; i++) {</span>
+<span class="nc" id="L82">            spki[i] = certificates[i].getPublicKeyDigest();</span>
+<span class="nc" id="L83">            certs[i] = certificates[i].getFingerprint();</span>
+        }
+        boolean ok;
+        try {
+            // Local and non-blocking by contract: on iOS this runs on the TLS
+            // delegate thread with the handshake held open.
+<span class="nc" id="L89">            ok = ShieldEngineRegistry.getEngine().verifyPins(host, spki, certs);</span>
+<span class="nc" id="L90">        } catch (Throwable t) {</span>
+            // A crash in pin comparison must not fail closed by accident. A real
+            // mismatch is reported as false, not thrown.
+<span class="nc" id="L93">            Log.e(t);</span>
+<span class="nc" id="L94">            return;</span>
+<span class="nc" id="L95">        }</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (!ok) {</span>
+<span class="nc" id="L97">            throw new ShieldException(ShieldStatus.PIN_MISMATCH,</span>
+                    &quot;The certificate chain presented by &quot; + host
+                    + &quot; matched none of its configured pins&quot;);
+        }
+<span class="nc" id="L101">    }</span>
+
+    @Override
+    public String[] interestingResponseHeaders() {
+<span class="fc" id="L105">        return new String[] {AppShield.REJECT_HEADER};</span>
+    }
+
+    @Override
+    public void afterResponse(ConnectionRequest request, int responseCode, String[] headers) {
+<span class="nc bnc" id="L110" title="All 4 branches missed.">        if (responseCode != 401 &amp;&amp; responseCode != 403) {</span>
+<span class="nc" id="L111">            return;</span>
+        }
+<span class="nc" id="L113">        String host = AppShield.hostOf(request.getUrl());</span>
+<span class="nc bnc" id="L114" title="All 4 branches missed.">        if (host == null || !AppShield.policyFor(host).isAttachToken()) {</span>
+<span class="nc" id="L115">            return;</span>
+        }
+        // Only when the backend says it was the *token* it rejected. A protected
+        // API usually also carries ordinary user authorization, so an expired
+        // login or a plain permission denial is a 401/403 that has nothing to do
+        // with attestation -- re-attesting on every one of those would push a
+        // client into rate limiting precisely while it is already failing to log
+        // in.
+<span class="nc bnc" id="L123" title="All 6 branches missed.">        if (headers == null || headers.length == 0 || headers[0] == null) {</span>
+<span class="nc" id="L124">            return;</span>
+        }
+<span class="nc" id="L126">        AppShield.invalidateToken();</span>
+<span class="nc" id="L127">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

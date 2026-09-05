@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PrivateKey.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">PrivateKey.java</span></div><h1>PrivateKey.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+import com.codename1.util.StringUtil;
+
+/// A private key -- paired with a [PublicKey] to form a key pair. Carries the
+/// algorithm name (&quot;RSA&quot; or &quot;EC&quot;) and the encoded key bytes.
+///
+/// PEM files (`-----BEGIN PRIVATE KEY-----`) go through [#fromPem], which
+/// strips the armor and decodes the base64 for you; [#fromPkcs8] is the lower
+/// level entry point for callers that already hold the DER bytes.
+public final class PrivateKey extends Key {
+
+    PrivateKey(String algorithm, byte[] encoded, String format) {
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        super(algorithm, encoded, format == null ? &quot;PKCS#8&quot; : format);</span>
+<span class="fc" id="L37">    }</span>
+
+    /// Wraps a PKCS#8 DER blob. This is the format produced by `openssl
+    /// pkcs8 -topk8 -nocrypt`.
+    public static PrivateKey fromPkcs8(String algorithm, byte[] pkcs8Der) {
+<span class="fc" id="L42">        return new PrivateKey(algorithm, pkcs8Der, &quot;PKCS#8&quot;);</span>
+    }
+
+    /// Convenience: build an RSA [PrivateKey] from a [#fromPkcs8] PKCS#8 blob.
+    public static PrivateKey rsa(byte[] pkcs8Der) {
+<span class="nc" id="L47">        return fromPkcs8(PublicKey.RSA, pkcs8Der);</span>
+    }
+
+    /// Parses a PEM-encoded private key, determining the algorithm from the key
+    /// itself:
+    ///
+    /// ```java
+    /// InputStream is = Display.getInstance().getResourceAsStream(MyApp.class, &quot;/private.pem&quot;);
+    /// PrivateKey key = PrivateKey.fromPem(Util.readInputStream(is));
+    /// ```
+    ///
+    /// Accepts a `PRIVATE KEY` (PKCS#8) block and also the older
+    /// `RSA PRIVATE KEY` (PKCS#1) and `EC PRIVATE KEY` (SEC1) blocks, which are
+    /// rewrapped as PKCS#8 here -- so a key straight out of `ssh-keygen -m PEM`
+    /// or `openssl ecparam -genkey` works without a conversion step. Bare
+    /// base64 with no `-----BEGIN-----` armor is accepted too.
+    ///
+    /// A passphrase-encrypted key (`ENCRYPTED PRIVATE KEY`) is rejected with a
+    /// [CryptoException] naming the command that decrypts it; so is a key that
+    /// is neither RSA nor EC.
+    ///
+    /// The bytes behind a private key are sensitive -- do not log the result of
+    /// `getEncoded()`.
+    public static PrivateKey fromPem(String pem) {
+<span class="fc" id="L71">        byte[] der = Pem.toPkcs8(pem);</span>
+<span class="fc" id="L72">        return fromPkcs8(Pem.algorithm(der), der);</span>
+    }
+
+    /// [#fromPem] over the raw bytes of a `.pem` file, so a stream read with
+    /// `Util.readInputStream` can be passed straight in. The bytes are decoded
+    /// as UTF-8.
+    public static PrivateKey fromPem(byte[] pem) {
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (pem == null) {</span>
+<span class="nc" id="L80">            throw new CryptoException(&quot;pem must not be null&quot;);</span>
+        }
+<span class="nc" id="L82">        return fromPem(StringUtil.newString(pem));</span>
+    }
+
+    /// [#fromPem] with the algorithm supplied by the caller rather than read
+    /// from the key. Use this only for a key whose algorithm OID this class
+    /// does not recognize but the platform does.
+    public static PrivateKey fromPem(String algorithm, String pem) {
+<span class="nc" id="L89">        return fromPkcs8(algorithm, Pem.toPkcs8(pem));</span>
+    }
+
+    /// [#fromPem(String,String)] over the raw bytes of a `.pem` file.
+    public static PrivateKey fromPem(String algorithm, byte[] pem) {
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        if (pem == null) {</span>
+<span class="nc" id="L95">            throw new CryptoException(&quot;pem must not be null&quot;);</span>
+        }
+<span class="nc" id="L97">        return fromPem(algorithm, StringUtil.newString(pem));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

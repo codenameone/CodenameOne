@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LocationManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.location</a> &gt; <span class="el_source">LocationManager.java</span></div><h1>LocationManager.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.location;
+
+import com.codename1.io.Log;
+import com.codename1.ui.Display;
+
+import java.io.IOException;
+
+/// The LocationManager is the main entry to retrieveLocation or to bind  a LocationListener,
+/// **important:** in order to use location on iOS you will need to define the build
+/// argument `ios.locationUsageDescription`.
+/// This build argument should be used to describe to Apple &amp; the users why you need to use the location
+/// functionality.
+///
+/// Trivial one time usage of location data can look like this sample:
+///
+/// ```java
+/// Location position = LocationManager.getLocationManager().getCurrentLocationSync();
+/// ```
+///
+/// You can also track location in the foreground using API calls like this:
+///
+/// ```java
+/// public class MyListener implements LocationListener {
+///     public void locationUpdated(Location location) {
+///         // update UI etc.
+///     }
+///
+///     public void providerStateChanged(int newState) {
+///         // handle status changes/errors appropriately
+///     }
+/// }
+/// LocationManager.getLocationManager().setLocationListener(new MyListener());
+/// ```
+///
+/// The sample below demonstrates the usage of the background geofencing API:
+///
+/// ```java
+/// // File: GeofenceListenerImpl.java
+/// public class GeofenceListenerImpl implements GeofenceListener {
+/// @Override
+///     public void onExit(String id) {
+///     }
+/// @Override
+///     public void onEntered(String id) {
+///         if(!Display.getInstance().isMinimized()) {
+///             Display.getInstance().callSerially(() -&gt; {
+///                 Dialog.show(&quot;Welcome&quot;, &quot;Thanks for arriving&quot;, &quot;OK&quot;, null);
+///             });
+///         } else {
+///             LocalNotification ln = new LocalNotification();
+///             ln.setId(&quot;LnMessage&quot;);
+///             ln.setAlertTitle(&quot;Welcome&quot;);
+///             ln.setAlertBody(&quot;Thanks for arriving!&quot;);
+///             Display.getInstance().scheduleLocalNotification(ln, System.currentTimeMillis() + 10, LocalNotification.REPEAT_NONE);
+///         }
+///     }
+/// }
+/// ```
+///
+/// ```java
+/// // File: GeofenceSample.java
+/// Geofence gf = new Geofence(&quot;test&quot;, loc, 100, 100000);
+/// LocationManager.getLocationManager().addGeoFencing(GeofenceListenerImpl.class, gf);
+/// ```
+<span class="fc" id="L87">public abstract class LocationManager {</span>
+
+    public static final int AVAILABLE = 0;
+    public static final int OUT_OF_SERVICE = 1;
+    public static final int TEMPORARILY_UNAVAILABLE = 2;
+<span class="fc" id="L92">    private static final Object LISTENER_LOCK = new Object();</span>
+    private static LocationListener listener;
+    private static Class backgroundlistener;
+    private LocationRequest request;
+<span class="fc" id="L96">    private int status = TEMPORARILY_UNAVAILABLE;</span>
+
+    /// Gets the LocationManager instance
+    public static LocationManager getLocationManager() {
+<span class="fc" id="L100">        return Display.getInstance().getLocationManager();</span>
+    }
+
+    /// Gets the Manager status: AVAILABLE, OUT_OF_SERVICE or TEMPORARILY_UNAVAILABLE
+    ///
+    /// #### Returns
+    ///
+    /// the status of the LoactionManager
+    public int getStatus() {
+<span class="fc" id="L109">        return status;</span>
+    }
+
+    /// Allows the implementation to set the status of the location
+    ///
+    /// #### Parameters
+    ///
+    /// - `status`: the new status
+    protected void setStatus(int status) {
+<span class="fc" id="L118">        this.status = status;</span>
+<span class="fc" id="L119">    }</span>
+
+    /// Gets the current Location of the device, in most cases this uses the GPS. Notice! This method
+    /// will only return a valid value after the location listener callback returns
+    ///
+    /// #### Returns
+    ///
+    /// a Location Object
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if Location cannot be retrieve from the device
+    public abstract Location getCurrentLocation() throws IOException;
+
+    protected final LocationListener getListener() {
+<span class="nc" id="L134">        return listener;</span>
+    }
+
+    /// Returns the current location synchronously, this is useful if you just want
+    /// to know the location NOW and don't care about tracking location. Notice that
+    /// this method will block until a result is returned so you might want to use something
+    /// like InfiniteProgress while this is running
+    ///
+    /// #### Returns
+    ///
+    /// the current location or null in case of an error
+    public Location getCurrentLocationSync() {
+<span class="nc" id="L146">        return getCurrentLocationSync(-1);</span>
+    }
+
+    /// Returns the current location synchronously, this is useful if you just want
+    /// to know the location NOW and don't care about tracking location. Notice that
+    /// this method will block until a result is returned so you might want to use something
+    /// like InfiniteProgress while this is running
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: timeout in milliseconds or -1 to never timeout
+    ///
+    /// #### Returns
+    ///
+    /// the current location or null in case of an error
+    public Location getCurrentLocationSync(long timeout) {
+        try {
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            if (listener == null) {</span>
+<span class="fc" id="L164">                LL l = new LL();</span>
+<span class="fc" id="L165">                l.timeout = timeout;</span>
+<span class="fc" id="L166">                l.bind();</span>
+<span class="fc" id="L167">                return l.result;</span>
+            }
+<span class="fc" id="L169">            return getCurrentLocation();</span>
+<span class="nc" id="L170">        } catch (IOException err) {</span>
+<span class="nc" id="L171">            Log.e(err);</span>
+<span class="nc" id="L172">            return null;</span>
+        }
+    }
+
+    /// Gets the last known Location of the device.
+    ///
+    /// #### Returns
+    ///
+    /// a Location Object
+    public abstract Location getLastKnownLocation();
+
+    /// Sets a LocationListener on the device, use this method if you need to be
+    /// updated on the device Locations rather then calling getCurrentLocation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: @param l   a LocationListener or null to stop the current listener
+    /// from getting updates
+    ///
+    /// - `req`: @param req provide the settings in which we are interested to get updates
+    /// to the Listener.
+    public void setLocationListener(final LocationListener l, LocationRequest req) {
+<span class="fc" id="L194">        setLocationListener(l);</span>
+<span class="fc" id="L195">        request = req;</span>
+<span class="fc" id="L196">    }</span>
+
+    /// Adds a geo fence listener to gets an event once the device is in/out of
+    /// the Geofence range.
+    /// The GeoFence events can arrive in the background therefore it is
+    /// recommended to check the app state before deciding how to process this event.
+    /// Use Display.isMinimized() to know if the app is currently running.
+    /// if isGeofenceSupported() returns false this method does nothing
+    ///
+    /// **NOTE:** For iOS you must include the `ios.background_modes` build hint with a value that includes &quot;location&quot; for geofencing to work.
+    ///
+    /// #### Parameters
+    ///
+    /// - `geofenceListenerClass`: @param geofenceListenerClass a Class that implements the GeofenceListener interface
+    /// this class must have an empty constructor
+    ///
+    /// - `gf`: a Geofence to track
+    public void addGeoFencing(Class geofenceListenerClass, Geofence gf) {
+<span class="nc" id="L214">    }</span>
+
+    /// Stop tracking a Geofence
+    /// if isGeofenceSupported() returns false this method does nothing
+    ///
+    /// **NOTE:** For iOS you must include the `ios.background_modes` build hint with a value that includes &quot;location&quot; for geofencing to work.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: a Geofence id to stop tracking
+    public void removeGeoFencing(String id) {
+<span class="nc" id="L225">    }</span>
+
+    /// Allows the implementation to notify the location listener of changes to location
+    ///
+    /// #### Returns
+    ///
+    /// location listener instance
+    protected LocationListener getLocationListener() {
+<span class="fc" id="L233">        return listener;</span>
+    }
+
+    /// Sets a LocationListener on the device, use this method if you need to be
+    /// updated on the device Locations rather then calling getCurrentLocation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: @param l a LocationListener or null to stop the current listener
+    /// from getting updates
+    public void setLocationListener(final LocationListener l) {
+<span class="fc" id="L244">        synchronized (LISTENER_LOCK) {</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            if (listener != null) {</span>
+<span class="fc" id="L246">                clearListener();</span>
+<span class="fc" id="L247">                request = null;</span>
+<span class="fc" id="L248">                status = TEMPORARILY_UNAVAILABLE;</span>
+            }
+<span class="fc" id="L250">            listener = l;</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">            if (l == null) {</span>
+<span class="fc" id="L252">                return;</span>
+            }
+<span class="fc" id="L254">            bindListener();</span>
+<span class="fc" id="L255">        }</span>
+<span class="fc" id="L256">    }</span>
+
+    /// Gets the LocationRequest
+    protected LocationRequest getRequest() {
+<span class="fc" id="L260">        return request;</span>
+    }
+
+    /// Gets the LocationListener class that handles background location updates.
+    ///
+    /// **NOTE:** For iOS you must include the
+    /// `ios.background_modes` build hint with a value that includes
+    /// &quot;location&quot; for background locations to work.
+    protected Class getBackgroundLocationListener() {
+<span class="fc" id="L269">        return backgroundlistener;</span>
+    }
+
+    /// Use this method to track background location updates when the application
+    /// is not running anymore.
+    /// Do not perform long operations here, iOS wake-up time is very short(around 10 seconds).
+    /// Notice this listener can sends events also when the app is in the foreground, therefore
+    /// it is recommended to check the app state before deciding how to process this event.
+    /// Use Display.isMinimized() to know if the app is currently running.
+    ///
+    /// #### Parameters
+    ///
+    /// - `locationListener`: @param locationListener a class that implements the LocationListener interface
+    /// this class must have an empty constructor since the underlying implementation will
+    /// try to create an instance and invoke the locationUpdated method
+    public void setBackgroundLocationListener(Class locationListener) {
+<span class="fc" id="L285">        synchronized (LISTENER_LOCK) {</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">            if (backgroundlistener != null) {</span>
+<span class="fc" id="L287">                clearBackgroundListener();</span>
+            }
+<span class="fc" id="L289">            backgroundlistener = locationListener;</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">            if (locationListener == null) {</span>
+<span class="fc" id="L291">                return;</span>
+            }
+<span class="fc" id="L293">            bindBackgroundListener();</span>
+<span class="fc" id="L294">        }</span>
+<span class="fc" id="L295">    }</span>
+
+    /// Bind the LocationListener to get events
+    protected abstract void bindListener();
+
+    /// Stop deliver events for the LocationListener
+    protected abstract void clearListener();
+
+    /// Bind the Background LocationListener to get events
+    protected void bindBackgroundListener() {
+<span class="nc" id="L305">    }</span>
+
+    /// Stop deliver events for the Background LocationListener
+    protected void clearBackgroundListener() {
+<span class="nc" id="L309">    }</span>
+
+    /// Returns true if the platform is able to detect if the GPS is on or off.
+    /// see also isGPSEnabled()
+    ///
+    /// #### Returns
+    ///
+    /// true if platform is able to detect GPS on/off
+    public boolean isGPSDetectionSupported() {
+<span class="nc" id="L318">        return false;</span>
+    }
+
+    /// Returns true if the platform is able to track background location.
+    ///
+    /// **NOTE:** For iOS you must include the `ios.background_modes` build hint with a value that includes &quot;location&quot; for background locations to work.
+    ///
+    /// #### Returns
+    ///
+    /// true if platform supports background location
+    public boolean isBackgroundLocationSupported() {
+<span class="nc" id="L329">        return false;</span>
+    }
+
+    /// Returns true if the platform supports Geofence
+    ///
+    /// **NOTE:** For iOS you must include the `ios.background_modes` build hint with a value that includes &quot;location&quot; for geofencing to work.
+    ///
+    /// #### Returns
+    ///
+    /// true if platform supports Geofence
+    public boolean isGeofenceSupported() {
+<span class="nc" id="L340">        return false;</span>
+    }
+
+    /// Returns GPS on/off state if isGPSDetectionSupported() returns true
+    ///
+    /// #### Returns
+    ///
+    /// true if GPS is on
+    public boolean isGPSEnabled() {
+<span class="fc" id="L349">        throw new RuntimeException(&quot;GPS Detection is not supported&quot;);</span>
+    }
+
+<span class="fc" id="L352">    class LL implements Runnable, LocationListener {</span>
+        Location result;
+        boolean finished;
+        long timeout;
+
+        public void bind() {
+<span class="fc" id="L358">            setLocationListener(this);</span>
+<span class="fc" id="L359">            Display.getInstance().invokeAndBlock(this);</span>
+<span class="fc" id="L360">        }</span>
+
+        @Override
+        public void locationUpdated(Location location) {
+<span class="fc" id="L364">            result = location;</span>
+<span class="fc" id="L365">            finished = true;</span>
+<span class="fc" id="L366">            setLocationListener(null);</span>
+<span class="fc" id="L367">        }</span>
+
+        @Override
+        public void providerStateChanged(int newState) {
+<span class="nc bnc" id="L371" title="All 2 branches missed.">            if (newState == AVAILABLE) {</span>
+                try {
+<span class="nc" id="L373">                    result = getCurrentLocation();</span>
+<span class="nc" id="L374">                } catch (IOException err) {</span>
+<span class="nc" id="L375">                    Log.e(err);</span>
+<span class="nc" id="L376">                    result = null;</span>
+<span class="nc" id="L377">                }</span>
+            } else {
+<span class="nc" id="L379">                result = null;</span>
+            }
+<span class="nc" id="L381">            finished = true;</span>
+<span class="nc" id="L382">            setLocationListener(null);</span>
+<span class="nc" id="L383">        }</span>
+
+        @Override
+        public void run() {
+<span class="fc" id="L387">            long start = System.currentTimeMillis();</span>
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">            while (!finished) {</span>
+                try {
+<span class="nc" id="L390">                    Thread.sleep(20);</span>
+<span class="nc" id="L391">                } catch (InterruptedException er) {</span>
+<span class="nc" id="L392">                }</span>
+<span class="nc bnc" id="L393" title="All 4 branches missed.">                if (timeout &gt; -1 &amp;&amp; System.currentTimeMillis() - start &gt; timeout) {</span>
+<span class="nc" id="L394">                    break;</span>
+                }
+            }
+<span class="fc" id="L397">        }</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

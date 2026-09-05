@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SensorScanSettings.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health.sensors</a> &gt; <span class="el_source">SensorScanSettings.java</span></div><h1>SensorScanSettings.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.sensors;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// Which sensors to look for and for how long.
+<span class="fc" id="L30">public final class SensorScanSettings {</span>
+
+<span class="fc" id="L32">    private final List&lt;HealthSensorProfile&gt; profiles =</span>
+            new ArrayList&lt;HealthSensorProfile&gt;();
+<span class="fc" id="L34">    private int timeoutMillis = 15000;</span>
+    private boolean lowPower;
+
+    /// Looks for devices advertising this profile. Add several to scan for
+    /// more than one kind at once; adding none scans for every profile
+    /// this framework understands.
+    public SensorScanSettings addProfile(HealthSensorProfile profile) {
+<span class="nc bnc" id="L41" title="All 4 branches missed.">        if (profile != null &amp;&amp; !profiles.contains(profile)) {</span>
+<span class="nc" id="L42">            profiles.add(profile);</span>
+        }
+<span class="nc" id="L44">        return this;</span>
+    }
+
+    /// The profiles being scanned for, empty meaning all of them.
+    public List&lt;HealthSensorProfile&gt; getProfiles() {
+<span class="fc" id="L49">        return Collections.unmodifiableList(profiles);</span>
+    }
+
+    /// Stops the scan after this many milliseconds. Defaults to 15
+    /// seconds.
+    ///
+    /// A bounded scan is not a convenience: BLE scanning is one of the
+    /// most expensive things an app can do to a phone's battery, and both
+    /// platforms throttle or silently stop an app that scans
+    /// indefinitely.
+
+    /// How long to scan before giving up.
+    ///
+    /// The [Duration] form of [#setTimeoutMillis(int)], which is the type the rest of
+    /// the framework speaks; the millis form stays for the ports and the
+    /// wire format.
+    public SensorScanSettings setTimeout(java.time.Duration value) {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L67">            throw new IllegalArgumentException(&quot;a duration is required&quot;);</span>
+        }
+        // Range-checked before the narrowing. A duration beyond
+        // Integer.MAX_VALUE milliseconds -- about 24.9 days -- wrapped
+        // negative, and a negative here does not mean &quot;very long&quot;: the scan
+        // timeout reads it as disabled and leaves an expensive BLE scan
+        // running, and the batch and staleness windows read it as zero and
+        // flush every sample or treat every cached one as stale.
+<span class="pc bpc" id="L75" title="1 of 4 branches missed.">        if (value.toMillis() &gt; Integer.MAX_VALUE || value.toMillis() &lt; 0) {</span>
+<span class="fc" id="L76">            throw new IllegalArgumentException(</span>
+                    &quot;a duration here must be between zero and &quot;
+                            + Integer.MAX_VALUE + &quot; milliseconds, got &quot;
+<span class="fc" id="L79">                            + value.toMillis());</span>
+        }
+<span class="fc" id="L81">        return setTimeoutMillis((int) value.toMillis());</span>
+    }
+
+    /// How long to scan before giving up, as a [Duration].
+    public java.time.Duration getTimeout() {
+<span class="nc" id="L86">        return java.time.Duration.ofMillis(getTimeoutMillis());</span>
+    }
+
+    public SensorScanSettings setTimeoutMillis(int timeoutMillis) {
+<span class="fc" id="L90">        this.timeoutMillis = timeoutMillis;</span>
+<span class="fc" id="L91">        return this;</span>
+    }
+
+    /// The scan timeout in milliseconds.
+    public int getTimeoutMillis() {
+<span class="fc" id="L96">        return timeoutMillis;</span>
+    }
+
+    /// Scans at a lower duty cycle, trading discovery latency for battery.
+    /// Worth setting when scanning in the background or for a long time.
+    public SensorScanSettings setLowPower(boolean lowPower) {
+<span class="fc" id="L102">        this.lowPower = lowPower;</span>
+<span class="fc" id="L103">        return this;</span>
+    }
+
+    /// `true` when a low-power scan was requested.
+    public boolean isLowPower() {
+<span class="fc" id="L108">        return lowPower;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

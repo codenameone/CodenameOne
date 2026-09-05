@@ -1,0 +1,421 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Timeline.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.animations</a> &gt; <span class="el_source">Timeline.java</span></div><h1>Timeline.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.ui.animations;
+
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.Painter;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
+
+/// A timeline represents the motions of animation objects
+///
+/// @author Shai Almog
+public final class Timeline extends Image implements Animation, Painter {
+    AnimationObject[] animations;
+    private int time;
+    private int duration;
+    private Dimension size;
+    private Dimension scaledTo;
+<span class="fc" id="L42">    private long currentTime = -1;</span>
+
+    /// Inidicates the minimal delay between animation frames allowing the CPU to rest.
+    /// Increase this number to increase general device performance, decrease it to speed
+    /// the animation.
+<span class="fc" id="L47">    private int animationDelay = 100;</span>
+
+    private boolean pause;
+
+<span class="fc" id="L51">    private boolean loop = true;</span>
+
+    private Timeline() {
+<span class="fc" id="L54">        super(null);</span>
+<span class="fc" id="L55">    }</span>
+
+    /// Create a new timeline animation
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration of the animation in milliseconds
+    ///
+    /// - `animations`: the animation objects that are part of this timeline
+    ///
+    /// - `size`: @param size       size of the animation in virtual pixels, if the size differs the animation would be
+    /// scaled on the fly
+    ///
+    /// #### Returns
+    ///
+    /// the new timeline instance
+    public static Timeline createTimeline(int duration, AnimationObject[] animations, Dimension size) {
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (duration &lt;= 0) {</span>
+<span class="nc" id="L73">            throw new IllegalArgumentException(&quot;Illegal duration &quot; + duration);</span>
+        }
+<span class="fc" id="L75">        Timeline t = new Timeline();</span>
+<span class="fc" id="L76">        t.duration = duration;</span>
+<span class="fc" id="L77">        t.animations = animations;</span>
+<span class="fc" id="L78">        t.size = size;</span>
+<span class="fc" id="L79">        return t;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void lock() {
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (animations != null) {</span>
+<span class="nc" id="L86">            int alen = animations.length;</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="nc" id="L88">                animations[iter].lock();</span>
+            }
+        }
+<span class="nc" id="L91">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void unlock() {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (animations != null) {</span>
+<span class="nc" id="L97">            int alen = animations.length;</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="nc" id="L99">                animations[iter].unlock();</span>
+            }
+        }
+<span class="nc" id="L102">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public int[] getRGB() {
+<span class="nc" id="L107">        Image i = Image.createImage(getWidth(), getHeight());</span>
+<span class="nc" id="L108">        paint(i.getGraphics(), new Rectangle(0, 0, getWidth(), getHeight()));</span>
+<span class="nc" id="L109">        return i.getRGB();</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public int[] getRGBCached() {
+<span class="nc" id="L115">        return getRGB();</span>
+    }
+
+    /// Adds an animation object to show using this timeline
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: animation object featured in this timeline
+    public void addAnimation(AnimationObject o) {
+<span class="fc" id="L124">        AnimationObject[] n = new AnimationObject[animations.length + 1];</span>
+<span class="fc" id="L125">        System.arraycopy(animations, 0, n, 0, animations.length);</span>
+<span class="fc" id="L126">        n[animations.length] = o;</span>
+<span class="fc" id="L127">        animations = n;</span>
+<span class="fc" id="L128">    }</span>
+
+    /// Returns the time of the timeline
+    ///
+    /// #### Returns
+    ///
+    /// the time of the timeline in ms starting from 0
+    public int getTime() {
+<span class="fc" id="L136">        return time;</span>
+    }
+
+    /// Set the time of the timeline
+    ///
+    /// #### Parameters
+    ///
+    /// - `time`: the time of the timeline in ms starting from 0
+    public void setTime(int time) {
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (!pause) {</span>
+<span class="pc bpc" id="L146" title="2 of 4 branches missed.">            if (time &gt;= 0 &amp;&amp; time &lt;= duration) {</span>
+<span class="fc" id="L147">                this.time = time;</span>
+<span class="fc" id="L148">                currentTime = AnimationTime.now();</span>
+            }
+        }
+<span class="fc" id="L151">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public boolean isAnimation() {
+<span class="nc" id="L156">        return true;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean animate() {
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (!pause) {</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            if (currentTime &lt; 0) {</span>
+<span class="fc" id="L164">                currentTime = AnimationTime.now();</span>
+<span class="fc" id="L165">                setTime(0);</span>
+<span class="fc" id="L166">                return true;</span>
+            } else {
+<span class="fc" id="L168">                long newCurrentTime = AnimationTime.now();</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                if (newCurrentTime - currentTime &gt;= animationDelay) {</span>
+<span class="fc" id="L170">                    int newTime = (int) (time + (newCurrentTime - currentTime));</span>
+<span class="fc" id="L171">                    currentTime = newCurrentTime;</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">                    if (newTime &gt; duration) {</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">                        if (!loop) {</span>
+<span class="nc" id="L174">                            return false;</span>
+                        }
+<span class="nc" id="L176">                        newTime = 0;</span>
+                    }
+<span class="fc" id="L178">                    setTime(newTime);</span>
+<span class="fc" id="L179">                    return true;</span>
+                }
+            }
+        }
+<span class="nc" id="L183">        return false;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void paint(Graphics g) {
+<span class="nc" id="L189">        paint(g, null);</span>
+<span class="nc" id="L190">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void paint(Graphics g, Rectangle rect) {
+<span class="nc" id="L195">        float scaleX = 1;</span>
+<span class="nc" id="L196">        float scaleY = 1;</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        if (rect != null) {</span>
+<span class="nc" id="L198">            scaleX = ((float) rect.getSize().getWidth()) / ((float) size.getWidth());</span>
+<span class="nc" id="L199">            scaleY = ((float) rect.getSize().getHeight()) / ((float) size.getHeight());</span>
+        }
+<span class="nc" id="L201">        paintScaled(g, scaleX, scaleY);</span>
+<span class="nc" id="L202">    }</span>
+
+    private void paintScaled(Graphics g, float scaleX, float scaleY) {
+<span class="nc" id="L205">        int alen = animations.length;</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="nc" id="L207">            int s = animations[iter].getStartTime();</span>
+<span class="nc bnc" id="L208" title="All 4 branches missed.">            if (s &gt; -1 &amp;&amp; s &gt; time) {</span>
+<span class="nc" id="L209">                continue;</span>
+            }
+<span class="nc" id="L211">            int e = animations[iter].getEndTime();</span>
+<span class="nc bnc" id="L212" title="All 4 branches missed.">            if (e &gt; -1 &amp;&amp; e &lt; time) {</span>
+<span class="nc" id="L213">                continue;</span>
+            }
+<span class="nc" id="L215">            animations[iter].setTime(time);</span>
+<span class="nc" id="L216">            animations[iter].draw(g, scaleX, scaleY);</span>
+        }
+<span class="nc" id="L218">    }</span>
+
+    /// Inidicates the minimal delay between animation frames allowing the CPU to rest.
+    /// Increase this number to increase general device performance, decrease it to speed
+    /// the animation.
+    ///
+    /// #### Returns
+    ///
+    /// the animationDelay
+    public int getAnimationDelay() {
+<span class="nc" id="L228">        return animationDelay;</span>
+    }
+
+    /// Inidicates the minimal delay between animation frames allowing the CPU to rest.
+    /// Increase this number to increase general device performance, decrease it to speed
+    /// the animation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `animationDelay`: the animationDelay to set
+    public void setAnimationDelay(int animationDelay) {
+<span class="fc" id="L239">        this.animationDelay = animationDelay;</span>
+<span class="fc" id="L240">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
+<span class="nc" id="L245">        g.translate(x, y);</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        if (scaledTo != null) {</span>
+<span class="nc" id="L247">            float scaleX = ((float) scaledTo.getWidth()) / ((float) size.getWidth());</span>
+<span class="nc" id="L248">            float scaleY = ((float) scaledTo.getHeight()) / ((float) size.getHeight());</span>
+<span class="nc" id="L249">            paintScaled(g, scaleX, scaleY);</span>
+<span class="nc" id="L250">        } else {</span>
+<span class="nc" id="L251">            paint(g);</span>
+        }
+<span class="nc" id="L253">        g.translate(-x, -y);</span>
+<span class="nc" id="L254">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
+<span class="nc" id="L259">        g.translate(x, y);</span>
+<span class="nc" id="L260">        float scaleX = ((float) w) / ((float) size.getWidth());</span>
+<span class="nc" id="L261">        float scaleY = ((float) h) / ((float) size.getHeight());</span>
+<span class="nc" id="L262">        paintScaled(g, scaleX, scaleY);</span>
+<span class="nc" id="L263">        g.translate(-x, -y);</span>
+<span class="nc" id="L264">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public int getWidth() {
+<span class="nc bnc" id="L269" title="All 2 branches missed.">        if (scaledTo != null) {</span>
+<span class="nc" id="L270">            return scaledTo.getWidth();</span>
+        }
+<span class="nc" id="L272">        return size.getWidth();</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public int getHeight() {
+<span class="nc bnc" id="L278" title="All 2 branches missed.">        if (scaledTo != null) {</span>
+<span class="nc" id="L279">            return scaledTo.getHeight();</span>
+        }
+<span class="nc" id="L281">        return size.getHeight();</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Image scaled(int width, int height) {
+<span class="nc" id="L287">        Timeline t = new Timeline();</span>
+<span class="nc" id="L288">        t.animationDelay = animationDelay;</span>
+<span class="nc" id="L289">        t.animations = animations;</span>
+<span class="nc" id="L290">        t.currentTime = currentTime;</span>
+<span class="nc" id="L291">        t.duration = duration;</span>
+<span class="nc" id="L292">        t.size = size;</span>
+<span class="nc" id="L293">        t.time = time;</span>
+<span class="nc" id="L294">        t.scaledTo = new Dimension(width, height);</span>
+<span class="nc" id="L295">        return t;</span>
+    }
+
+    /// Returns true when the timeline is paused
+    ///
+    /// #### Returns
+    ///
+    /// the pause state
+    public boolean isPause() {
+<span class="nc" id="L304">        return pause;</span>
+    }
+
+    /// Indicate that the application is paused
+    ///
+    /// #### Parameters
+    ///
+    /// - `pause`: true to pause the application
+    public void setPause(boolean pause) {
+<span class="nc" id="L313">        this.pause = pause;</span>
+<span class="nc" id="L314">    }</span>
+
+    /// Returns the duration of the entire timeline in milliseconds
+    ///
+    /// #### Returns
+    ///
+    /// the duration
+    public int getDuration() {
+<span class="fc" id="L322">        return duration;</span>
+    }
+
+    /// Returns the pixel based unscaled dimentions of this timeline
+    ///
+    /// #### Returns
+    ///
+    /// the size
+    public Dimension getSize() {
+<span class="fc" id="L331">        return size;</span>
+    }
+
+    /// Returns the number of animation objects in this timeline
+    ///
+    /// #### Returns
+    ///
+    /// the number of animations
+    public int getAnimationCount() {
+<span class="fc" id="L340">        return animations.length;</span>
+    }
+
+    /// Returns the animation object in the given offset
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the offset of the animation
+    ///
+    /// #### Returns
+    ///
+    /// the animation object
+    public AnimationObject getAnimation(int i) {
+<span class="fc" id="L353">        return animations[i];</span>
+    }
+
+    /// Returns the animation object at the given X/Y coordinate in the timeline
+    /// for the current frame. This allows functionality such as responding to pointer
+    /// events on the resource editor. Notice that this method is not efficient since it tests
+    /// the pixel opacity which is a pretty expensive operation...
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x location in the timeline
+    ///
+    /// - `y`: the y location in the timeline
+    ///
+    /// #### Returns
+    ///
+    /// an animation object or null if no animation object is at that position.
+    public AnimationObject getAnimationAt(int x, int y) {
+<span class="nc" id="L371">        int alen = animations.length;</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">        for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="nc" id="L373">            float scaleX = 1;</span>
+<span class="nc" id="L374">            float scaleY = 1;</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">            if (scaledTo != null) {</span>
+<span class="nc" id="L376">                scaleX = ((float) scaledTo.getWidth()) / ((float) size.getWidth());</span>
+<span class="nc" id="L377">                scaleY = ((float) scaledTo.getHeight()) / ((float) size.getHeight());</span>
+            }
+<span class="nc" id="L379">            int w = (int) (animations[iter].getWidth() * scaleX);</span>
+<span class="nc" id="L380">            int h = (int) (animations[iter].getHeight() * scaleY);</span>
+<span class="nc" id="L381">            int ax = (int) (animations[iter].getX() * scaleX);</span>
+<span class="nc" id="L382">            int ay = (int) (animations[iter].getY() * scaleY);</span>
+<span class="nc bnc" id="L383" title="All 2 branches missed.">            if (Rectangle.intersects(ax, ay, w, h, x, y, 1, 1)) {</span>
+                // we now need to check if the pixel at that position is not transparent
+<span class="nc" id="L385">                int[] rgb = animations[iter].getImage().scaled(w, h).getRGB();</span>
+<span class="nc" id="L386">                int relativeX = x - ax;</span>
+<span class="nc" id="L387">                int relativeY = y - ay;</span>
+<span class="nc" id="L388">                int offset = relativeX + (relativeY * h);</span>
+<span class="nc bnc" id="L389" title="All 6 branches missed.">                if (offset &gt;= 0 &amp;&amp; offset &lt; rgb.length &amp;&amp; (rgb[offset] &amp; 0xff000000) != 0) {</span>
+<span class="nc" id="L390">                    return animations[iter];</span>
+                }
+            }
+        }
+<span class="nc" id="L394">        return null;</span>
+    }
+
+    /// Indicates if the image should loop
+    ///
+    /// #### Returns
+    ///
+    /// the loop
+    public boolean isLoop() {
+<span class="fc" id="L403">        return loop;</span>
+    }
+
+    /// Indicates if the image should loop
+    ///
+    /// #### Parameters
+    ///
+    /// - `loop`: the loop to set
+    public void setLoop(boolean loop) {
+<span class="fc" id="L412">        this.loop = loop;</span>
+<span class="fc" id="L413">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public boolean requiresDrawImage() {
+<span class="nc" id="L418">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

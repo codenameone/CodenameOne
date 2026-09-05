@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VisionOptions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai.vision</a> &gt; <span class="el_source">VisionOptions.java</span></div><h1>VisionOptions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.vision;
+
+/// Common analyzer configuration. An analyzer captures the supplied options
+/// when constructed; reuse it for frames needing the same backend, confidence
+/// threshold, and result limit.
+///
+/// ```java
+/// ImageLabeler labeler = new ImageLabeler(new VisionOptions()
+///         .minimumConfidence(0.6f)   // drop guesses below 60%
+///         .maximumResults(5));       // keep the top five labels
+/// ```
+///
+/// The analyzer snapshots these values, so mutating the options object
+/// afterwards changes nothing -- construct a second analyzer instead. Not
+/// every analyzer reads every setting: {@link #textScript(TextScript)} applies
+/// only to {@link TextRecognizer}, and a backend may ignore a limit it has no
+/// way to enforce.
+<span class="fc" id="L40">public final class VisionOptions {</span>
+<span class="fc" id="L41">    private VisionBackend backend = VisionBackends.auto();</span>
+    private float minimumConfidence;
+    private int maximumResults;
+    private TextScript textScript;
+
+    /// @param value selector, or {@code null} to restore automatic selection
+    /// @return this options object
+    public VisionOptions backend(VisionBackend value) {
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        backend = value == null ? VisionBackends.auto() : value;</span>
+<span class="fc" id="L50">        return this;</span>
+    }
+
+    /// Selects the writing system {@link TextRecognizer} should read. Analyzers
+    /// other than the text recognizer ignore it.
+    ///
+    /// @param value script selector, or {@code null} for the platform default
+    ///        (Latin)
+    /// @return this options object
+    public VisionOptions textScript(TextScript value) {
+<span class="fc" id="L60">        textScript = value;</span>
+<span class="fc" id="L61">        return this;</span>
+    }
+
+    /// Sets the confidence threshold, clamped to 0..1. NaN has no meaningful
+    /// ordering and is rejected instead of being passed to platform detectors.
+    /// @param value requested threshold
+    /// @return this options object
+    /// @throws IllegalArgumentException if {@code value} is NaN
+    public VisionOptions minimumConfidence(float value) {
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (Float.isNaN(value)) {</span>
+<span class="fc" id="L71">            throw new IllegalArgumentException(</span>
+                    &quot;minimum confidence must be a number&quot;);
+        }
+<span class="fc" id="L74">        minimumConfidence = Math.max(0, Math.min(1, value));</span>
+<span class="fc" id="L75">        return this;</span>
+    }
+
+    /// Sets a non-negative result limit; zero means backend default/unlimited.
+    /// @param value requested limit
+    /// @return this options object
+    public VisionOptions maximumResults(int value) {
+<span class="fc" id="L82">        maximumResults = Math.max(0, value);</span>
+<span class="fc" id="L83">        return this;</span>
+    }
+
+    /// @return selected backend, never {@code null}
+    public VisionBackend getBackend() {
+<span class="fc" id="L88">        return backend;</span>
+    }
+
+    /// @return confidence threshold in the range 0..1
+    public float getMinimumConfidence() {
+<span class="fc" id="L93">        return minimumConfidence;</span>
+    }
+
+    /// @return non-negative result limit; zero means backend default/unlimited
+    public int getMaximumResults() {
+<span class="fc" id="L98">        return maximumResults;</span>
+    }
+
+    /// @return the selected writing system, or {@code null} for the platform
+    ///         default
+    public TextScript getTextScript() {
+<span class="fc" id="L104">        return textScript;</span>
+    }
+
+    VisionOptions snapshot() {
+<span class="fc" id="L108">        return new VisionOptions().backend(backend)</span>
+<span class="fc" id="L109">                .minimumConfidence(minimumConfidence)</span>
+<span class="fc" id="L110">                .maximumResults(maximumResults)</span>
+<span class="fc" id="L111">                .textScript(textScript);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

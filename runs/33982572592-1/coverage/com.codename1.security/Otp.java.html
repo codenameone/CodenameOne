@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Otp.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">Otp.java</span></div><h1>Otp.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+/// Counter-based (HOTP, RFC 4226) and time-based (TOTP, RFC 6238) one-time
+/// password generators. Compatible with any standard authenticator app
+/// (Google Authenticator, Microsoft Authenticator, 1Password, etc.).
+///
+/// #### Generate a 6-digit Google-Authenticator-compatible code
+///
+/// ```java
+/// byte[] secret = Base32.decode(&quot;JBSWY3DPEHPK3PXP&quot;); // shared secret
+/// String code = Otp.totp(secret); // default 6 digits, 30 second step,
+///                                 // SHA-1, current time
+/// ```
+///
+/// #### Verify a code (allowing +/-1 step of clock skew)
+///
+/// ```java
+/// boolean ok = Otp.verifyTotp(secret, userInput, 1);
+/// ```
+public final class Otp {
+
+    private Otp() {}
+
+    /// Generates an HOTP code (RFC 4226) using SHA-1 and the given digit count.
+    ///
+    /// #### Parameters
+    ///
+    /// - `secret`: the shared secret
+    ///
+    /// - `counter`: the moving factor -- caller is responsible for incrementing
+    ///   it after every successful authentication
+    ///
+    /// - `digits`: number of decimal digits in the output (typically 6, may
+    ///   be 6, 7 or 8)
+    public static String hotp(byte[] secret, long counter, int digits) {
+<span class="fc" id="L58">        return hotp(secret, counter, digits, Hash.SHA1);</span>
+    }
+
+    /// Generates an HOTP code with a configurable hash algorithm. Most
+    /// authenticator apps assume SHA-1; only override if the issuer publishes a
+    /// different `algorithm` parameter in its provisioning URI.
+    public static String hotp(byte[] secret, long counter, int digits, String hashAlgorithm) {
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">        if (digits &lt; 1 || digits &gt; 10) {</span>
+<span class="fc" id="L66">            throw new CryptoException(&quot;digits must be between 1 and 10&quot;);</span>
+        }
+<span class="fc" id="L68">        byte[] counterBytes = new byte[8];</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (int i = 7; i &gt;= 0; i--) {</span>
+<span class="fc" id="L70">            counterBytes[i] = (byte) (counter &amp; 0xff);</span>
+<span class="fc" id="L71">            counter &gt;&gt;&gt;= 8;</span>
+        }
+<span class="fc" id="L73">        byte[] mac = Hmac.create(hashAlgorithm, secret).doFinal(counterBytes);</span>
+        // RFC 4226 dynamic truncation
+<span class="fc" id="L75">        int offset = mac[mac.length - 1] &amp; 0x0f;</span>
+<span class="fc" id="L76">        int code = ((mac[offset] &amp; 0x7f) &lt;&lt; 24)</span>
+                 | ((mac[offset + 1] &amp; 0xff) &lt;&lt; 16)
+                 | ((mac[offset + 2] &amp; 0xff) &lt;&lt; 8)
+                 | (mac[offset + 3] &amp; 0xff);
+<span class="fc" id="L80">        int mod = 1;</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        for (int i = 0; i &lt; digits; i++) {</span>
+<span class="fc" id="L82">            mod *= 10;</span>
+        }
+<span class="fc" id="L84">        code %= mod;</span>
+<span class="fc" id="L85">        return pad(Integer.toString(code), digits);</span>
+    }
+
+    /// Generates a TOTP code (RFC 6238) for the current system time, using
+    /// SHA-1, 6 digits and a 30-second step.
+    public static String totp(byte[] secret) {
+<span class="nc" id="L91">        return totp(secret, System.currentTimeMillis(), 30, 6, Hash.SHA1);</span>
+    }
+
+    /// Generates a TOTP code for the current system time with a custom digit
+    /// count and step size.
+    public static String totp(byte[] secret, int digits, int stepSeconds) {
+<span class="nc" id="L97">        return totp(secret, System.currentTimeMillis(), stepSeconds, digits, Hash.SHA1);</span>
+    }
+
+    /// Generates a TOTP code with full control over all parameters.
+    ///
+    /// #### Parameters
+    ///
+    /// - `secret`: shared secret
+    ///
+    /// - `currentTimeMillis`: timestamp to derive the code from
+    ///
+    /// - `stepSeconds`: window size -- 30 in the vast majority of deployments
+    ///
+    /// - `digits`: number of decimal digits in the output (typically 6 or 8)
+    ///
+    /// - `hashAlgorithm`: hash to use -- almost always [Hash#SHA1]
+    public static String totp(byte[] secret, long currentTimeMillis, int stepSeconds,
+                              int digits, String hashAlgorithm) {
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (stepSeconds &lt;= 0) {</span>
+<span class="nc" id="L116">            throw new CryptoException(&quot;stepSeconds must be positive&quot;);</span>
+        }
+<span class="fc" id="L118">        long counter = (currentTimeMillis / 1000L) / stepSeconds;</span>
+<span class="fc" id="L119">        return hotp(secret, counter, digits, hashAlgorithm);</span>
+    }
+
+    /// Verifies a TOTP code, allowing `tolerance` steps of clock skew on either
+    /// side of `now` (so a tolerance of 1 will accept the previous, current
+    /// and next code).
+    public static boolean verifyTotp(byte[] secret, String code, int tolerance) {
+<span class="nc" id="L126">        return verifyTotp(secret, code, tolerance,</span>
+<span class="nc" id="L127">                System.currentTimeMillis(), 30, 6, Hash.SHA1);</span>
+    }
+
+    /// Builds the canonical `otpauth://totp/...` URI that authenticator apps
+    /// (Google Authenticator, Microsoft Authenticator, 1Password, Authy, ...)
+    /// consume when the user scans a QR code on your enrolment screen. The
+    /// format is documented at
+    /// &lt;https://github.com/google/google-authenticator/wiki/Key-Uri-Format&gt;.
+    ///
+    /// Render the returned string as a QR code (server-side render, or a
+    /// QR-generation cn1lib) and show it to the user; they scan it, the
+    /// authenticator stores `secret` against the `issuer:accountName` label,
+    /// and from then on it produces six-digit codes that match
+    /// [#totp(byte[])] on your side using the same `secret`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `issuer`: the human-readable service name shown in the authenticator
+    ///   (&quot;Acme Bank&quot;). Must not contain a `:`.
+    ///
+    /// - `accountName`: the user's identifier within your service
+    ///   (&quot;alice@example.com&quot;). Must not contain a `:`.
+    ///
+    /// - `secret`: shared secret (the bytes you also pass to
+    ///   [#totp(byte[])]) -- encoded as Base32 in the URI per the spec.
+    ///
+    /// - `digits`: number of digits in each code (typically 6).
+    ///
+    /// - `stepSeconds`: time-step size, typically 30.
+    ///
+    /// - `hashAlgorithm`: hash, typically [Hash#SHA1] for authenticator
+    ///   compatibility. SHA-256 and SHA-512 are accepted but not all
+    ///   authenticator apps support them.
+    public static String otpauthUri(String issuer, String accountName, byte[] secret,
+                                    int digits, int stepSeconds, String hashAlgorithm) {
+<span class="pc bpc" id="L162" title="1 of 4 branches missed.">        if (issuer == null || issuer.indexOf(':') &gt;= 0) {</span>
+<span class="fc" id="L163">            throw new CryptoException(&quot;issuer must be non-null and must not contain ':'&quot;);</span>
+        }
+<span class="pc bpc" id="L165" title="1 of 4 branches missed.">        if (accountName == null || accountName.indexOf(':') &gt;= 0) {</span>
+<span class="fc" id="L166">            throw new CryptoException(&quot;accountName must be non-null and must not contain ':'&quot;);</span>
+        }
+<span class="fc" id="L168">        String alg = uriAlgorithm(hashAlgorithm);</span>
+<span class="fc" id="L169">        StringBuilder b = new StringBuilder(128);</span>
+<span class="fc" id="L170">        b.append(&quot;otpauth://totp/&quot;);</span>
+<span class="fc" id="L171">        appendUriComponent(b, issuer);</span>
+<span class="fc" id="L172">        b.append(':');</span>
+<span class="fc" id="L173">        appendUriComponent(b, accountName);</span>
+<span class="fc" id="L174">        b.append(&quot;?secret=&quot;);</span>
+<span class="fc" id="L175">        b.append(Base32.encode(secret).replace(&quot;=&quot;, &quot;&quot;));</span>
+<span class="fc" id="L176">        b.append(&quot;&amp;issuer=&quot;);</span>
+<span class="fc" id="L177">        appendUriComponent(b, issuer);</span>
+<span class="fc" id="L178">        b.append(&quot;&amp;algorithm=&quot;);</span>
+<span class="fc" id="L179">        b.append(alg);</span>
+<span class="fc" id="L180">        b.append(&quot;&amp;digits=&quot;);</span>
+<span class="fc" id="L181">        b.append(digits);</span>
+<span class="fc" id="L182">        b.append(&quot;&amp;period=&quot;);</span>
+<span class="fc" id="L183">        b.append(stepSeconds);</span>
+<span class="fc" id="L184">        return b.toString();</span>
+    }
+
+    /// Convenience overload using the typical 6 digits / 30 seconds / SHA-1
+    /// settings most authenticator apps expect.
+    public static String otpauthUri(String issuer, String accountName, byte[] secret) {
+<span class="fc" id="L190">        return otpauthUri(issuer, accountName, secret, 6, 30, Hash.SHA1);</span>
+    }
+
+    private static String uriAlgorithm(String hashAlgorithm) {
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        String n = hashAlgorithm == null ? &quot;&quot; : MessageDigestImpl.normalise(hashAlgorithm);</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (&quot;SHA1&quot;.equals(n)) {</span>
+<span class="fc" id="L196">            return &quot;SHA1&quot;;</span>
+        }
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        if (&quot;SHA256&quot;.equals(n)) {</span>
+<span class="nc" id="L199">            return &quot;SHA256&quot;;</span>
+        }
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        if (&quot;SHA512&quot;.equals(n)) {</span>
+<span class="nc" id="L202">            return &quot;SHA512&quot;;</span>
+        }
+<span class="nc" id="L204">        throw new CryptoException(&quot;unsupported OTP URI algorithm: &quot; + hashAlgorithm);</span>
+    }
+
+    /// Minimal RFC 3986 percent-encoder for URI path / query segments. The
+    /// Google Authenticator KeyUri format only ever contains issuer + account
+    /// name written by the host app, so we only need to escape the small set
+    /// of unsafe characters that show up there in practice.
+    private static void appendUriComponent(StringBuilder out, String s) {
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L213">            char c = s.charAt(i);</span>
+<span class="pc bpc" id="L214" title="5 of 20 branches missed.">            boolean unreserved = (c &gt;= 'A' &amp;&amp; c &lt;= 'Z')</span>
+                    || (c &gt;= 'a' &amp;&amp; c &lt;= 'z')
+                    || (c &gt;= '0' &amp;&amp; c &lt;= '9')
+                    || c == '-' || c == '_' || c == '.' || c == '~';
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            if (unreserved) {</span>
+<span class="fc" id="L219">                out.append(c);</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">            } else if (c &lt; 0x80) {</span>
+<span class="fc" id="L221">                appendPercent(out, c);</span>
+            } else {
+                // UTF-8 encode multi-byte chars
+<span class="nc bnc" id="L224" title="All 2 branches missed.">                if (c &lt; 0x800) {</span>
+<span class="nc" id="L225">                    appendPercent(out, 0xc0 | (c &gt;&gt;&gt; 6));</span>
+<span class="nc" id="L226">                    appendPercent(out, 0x80 | (c &amp; 0x3f));</span>
+                } else {
+<span class="nc" id="L228">                    appendPercent(out, 0xe0 | (c &gt;&gt;&gt; 12));</span>
+<span class="nc" id="L229">                    appendPercent(out, 0x80 | ((c &gt;&gt;&gt; 6) &amp; 0x3f));</span>
+<span class="nc" id="L230">                    appendPercent(out, 0x80 | (c &amp; 0x3f));</span>
+                }
+            }
+        }
+<span class="fc" id="L234">    }</span>
+
+    private static void appendPercent(StringBuilder out, int b) {
+<span class="fc" id="L237">        out.append('%');</span>
+<span class="fc" id="L238">        out.append(HEX[(b &gt;&gt;&gt; 4) &amp; 0x0f]);</span>
+<span class="fc" id="L239">        out.append(HEX[b &amp; 0x0f]);</span>
+<span class="fc" id="L240">    }</span>
+
+<span class="fc" id="L242">    private static final char[] HEX = {</span>
+            '0', '1', '2', '3', '4', '5', '6', '7',
+            '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+    };
+
+    /// Verifies a TOTP code with full parameter control.
+    public static boolean verifyTotp(byte[] secret, String code, int tolerance,
+                                     long currentTimeMillis, int stepSeconds,
+                                     int digits, String hashAlgorithm) {
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (code == null) {</span>
+<span class="nc" id="L252">            return false;</span>
+        }
+<span class="fc" id="L254">        long counter = (currentTimeMillis / 1000L) / stepSeconds;</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        for (int s = -tolerance; s &lt;= tolerance; s++) {</span>
+<span class="fc" id="L256">            String candidate = hotp(secret, counter + s, digits, hashAlgorithm);</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">            if (constantTimeEqualsString(candidate, code.trim())) {</span>
+<span class="fc" id="L258">                return true;</span>
+            }
+        }
+<span class="fc" id="L261">        return false;</span>
+    }
+
+    private static boolean constantTimeEqualsString(String a, String b) {
+<span class="pc bpc" id="L265" title="3 of 6 branches missed.">        if (a == null || b == null || a.length() != b.length()) {</span>
+<span class="nc" id="L266">            return false;</span>
+        }
+<span class="fc" id="L268">        int diff = 0;</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        for (int i = 0; i &lt; a.length(); i++) {</span>
+<span class="fc" id="L270">            diff |= (a.charAt(i) ^ b.charAt(i));</span>
+        }
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        return diff == 0;</span>
+    }
+
+    private static String pad(String s, int digits) {
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        if (s.length() &gt;= digits) {</span>
+<span class="fc" id="L277">            return s;</span>
+        }
+<span class="fc" id="L279">        StringBuilder b = new StringBuilder(digits);</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        for (int i = s.length(); i &lt; digits; i++) {</span>
+<span class="fc" id="L281">            b.append('0');</span>
+        }
+<span class="fc" id="L283">        b.append(s);</span>
+<span class="fc" id="L284">        return b.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

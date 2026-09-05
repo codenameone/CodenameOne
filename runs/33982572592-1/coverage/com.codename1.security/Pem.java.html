@@ -1,0 +1,562 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Pem.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">Pem.java</span></div><h1>Pem.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+import com.codename1.util.Base64;
+import com.codename1.util.StringUtil;
+
+/// PEM (RFC 7468) decoding for [PublicKey] and [PrivateKey].
+///
+/// The platform crypto bridge only accepts X.509/SubjectPublicKeyInfo and
+/// PKCS#8 DER, but the files people actually have on disk are PEM: base64
+/// wrapped in `-----BEGIN ...-----` armor, and often in the older PKCS#1 or
+/// SEC1 container rather than the one the bridge wants. This class absorbs
+/// both differences so callers do not have to run `openssl` first.
+///
+/// Nothing here is exposed publicly; the entry points are the `fromPem`
+/// factories on [PublicKey] and [PrivateKey].
+final class Pem {
+    private static final int SHAPE_SPKI = 0;
+    private static final int SHAPE_PKCS8 = 1;
+    private static final int SHAPE_PKCS1_PUBLIC = 2;
+    private static final int SHAPE_PKCS1_PRIVATE = 3;
+    private static final int SHAPE_SEC1 = 4;
+    private static final int SHAPE_UNKNOWN = 5;
+
+    private static final String BEGIN = &quot;-----BEGIN &quot;;
+    private static final String END = &quot;-----END &quot;;
+    private static final String DASHES = &quot;-----&quot;;
+
+    /// OID 1.2.840.113549.1.1.1 -- rsaEncryption.
+<span class="fc" id="L51">    private static final byte[] OID_RSA = {</span>
+        (byte) 0x2A, (byte) 0x86, (byte) 0x48, (byte) 0x86, (byte) 0xF7,
+        (byte) 0x0D, (byte) 0x01, (byte) 0x01, (byte) 0x01
+    };
+
+    /// OID 1.2.840.10045.2.1 -- id-ecPublicKey.
+<span class="fc" id="L57">    private static final byte[] OID_EC = {</span>
+        (byte) 0x2A, (byte) 0x86, (byte) 0x48, (byte) 0xCE, (byte) 0x3D,
+        (byte) 0x02, (byte) 0x01
+    };
+
+    private Pem() {
+    }
+
+    /// Decodes `pem` to X.509/SubjectPublicKeyInfo DER.
+    ///
+    /// Accepts a `PUBLIC KEY` block, a PKCS#1 `RSA PUBLIC KEY` block (rewrapped
+    /// here), or bare base64 with no armor at all.
+    static byte[] toSpki(String pem) {
+<span class="fc" id="L70">        String label = label(pem);</span>
+<span class="fc" id="L71">        byte[] der = body(pem, label);</span>
+<span class="fc bfc" id="L72" title="All 6 branches covered.">        if (label != null &amp;&amp; !&quot;PUBLIC KEY&quot;.equals(label) &amp;&amp; !&quot;RSA PUBLIC KEY&quot;.equals(label)) {</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            if (&quot;CERTIFICATE&quot;.equals(label)) {</span>
+<span class="fc" id="L74">                throw new CryptoException(&quot;this is a certificate, not a public key; &quot;</span>
+                        + &quot;extract the key with: openssl x509 -in cert.pem -pubkey -noout&quot;);
+            }
+<span class="nc" id="L77">            throw new CryptoException(&quot;not a public key PEM block: -----BEGIN &quot; + label + &quot;-----&quot;);</span>
+        }
+        // The container is settled by the DER's own shape rather than by the
+        // label, so unarmored input accepts exactly what armored input does.
+<span class="fc" id="L81">        int shape = shapeOf(der);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (shape == SHAPE_SPKI) {</span>
+<span class="fc" id="L83">            return der;</span>
+        }
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (shape == SHAPE_PKCS1_PUBLIC) {</span>
+            // PKCS#1 RSAPublicKey -&gt; SubjectPublicKeyInfo. The BIT STRING needs
+            // a leading zero byte for &quot;no unused bits in the final octet&quot;.
+<span class="fc" id="L88">            byte[] bitString = new byte[der.length + 1];</span>
+<span class="fc" id="L89">            System.arraycopy(der, 0, bitString, 1, der.length);</span>
+<span class="fc" id="L90">            return tlv(0x30, concat(rsaAlgorithmIdentifier(), tlv(0x03, bitString)));</span>
+        }
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (shape == SHAPE_UNKNOWN) {</span>
+<span class="fc" id="L93">            throw new CryptoException(&quot;unrecognized public key container&quot;);</span>
+        }
+<span class="fc" id="L95">        throw new CryptoException(&quot;this is a private key, not a public key&quot;);</span>
+    }
+
+    /// Decodes `pem` to PKCS#8 PrivateKeyInfo DER.
+    ///
+    /// Accepts a `PRIVATE KEY` block, the older PKCS#1 `RSA PRIVATE KEY` and
+    /// SEC1 `EC PRIVATE KEY` blocks (rewrapped here), or bare base64 with no
+    /// armor at all.
+    static byte[] toPkcs8(String pem) {
+<span class="fc" id="L104">        String label = label(pem);</span>
+<span class="fc" id="L105">        byte[] der = body(pem, label);</span>
+<span class="fc bfc" id="L106" title="All 4 branches covered.">        if (label != null &amp;&amp; !&quot;PRIVATE KEY&quot;.equals(label)</span>
+<span class="fc bfc" id="L107" title="All 4 branches covered.">                &amp;&amp; !&quot;RSA PRIVATE KEY&quot;.equals(label) &amp;&amp; !&quot;EC PRIVATE KEY&quot;.equals(label)) {</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (&quot;ENCRYPTED PRIVATE KEY&quot;.equals(label)) {</span>
+<span class="fc" id="L109">                throw new CryptoException(&quot;this private key is passphrase-encrypted; decrypt it first with: &quot;</span>
+                        + &quot;openssl pkcs8 -topk8 -nocrypt -in key.pem -out key_pkcs8.pem&quot;);
+            }
+<span class="fc" id="L112">            throw new CryptoException(&quot;not a private key PEM block: -----BEGIN &quot; + label + &quot;-----&quot;);</span>
+        }
+<span class="fc" id="L114">        int shape = shapeOf(der);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (shape == SHAPE_PKCS8) {</span>
+<span class="fc" id="L116">            return der;</span>
+        }
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (shape == SHAPE_PKCS1_PRIVATE) {</span>
+<span class="fc" id="L119">            return wrapPkcs8(rsaAlgorithmIdentifier(), der);</span>
+        }
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (shape == SHAPE_SEC1) {</span>
+<span class="fc" id="L122">            return sec1ToPkcs8(der);</span>
+        }
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (shape == SHAPE_UNKNOWN) {</span>
+<span class="fc" id="L125">            throw new CryptoException(&quot;unrecognized private key container&quot;);</span>
+        }
+<span class="fc" id="L127">        throw new CryptoException(&quot;this is a public key, not a private key&quot;);</span>
+    }
+
+    /// Reads the algorithm OID out of an SPKI or PKCS#8 blob and maps it to the
+    /// name the crypto bridge expects ([PublicKey#RSA] or [PublicKey#EC]).
+    ///
+    /// Both containers reach the AlgorithmIdentifier the same way once an
+    /// optional leading version INTEGER is skipped, so one walk covers both.
+    static String algorithm(byte[] der) {
+<span class="fc" id="L136">        Cursor c = new Cursor(der);</span>
+<span class="fc" id="L137">        c.enter(0x30);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (c.peek() == 0x02) {</span>
+<span class="fc" id="L139">            c.skip();</span>
+        }
+<span class="fc" id="L141">        c.enter(0x30);</span>
+<span class="fc" id="L142">        byte[] oid = c.read(0x06);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (equal(oid, OID_RSA)) {</span>
+<span class="fc" id="L144">            return PublicKey.RSA;</span>
+        }
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (equal(oid, OID_EC)) {</span>
+<span class="fc" id="L147">            return PublicKey.EC;</span>
+        }
+<span class="nc" id="L149">        throw new CryptoException(&quot;unsupported key algorithm OID &quot; + oidToString(oid)</span>
+                + &quot;; only RSA and EC keys are supported&quot;);
+    }
+
+    /// Classifies a key blob by walking the outer SEQUENCE's children, which
+    /// is the only thing available for input that arrived as bare base64 and so
+    /// carries no label.
+    ///
+    /// Every mandatory field is checked, not just the first: a blob holding a
+    /// well-formed AlgorithmIdentifier and nothing else looks exactly like the
+    /// start of an SPKI, and classifying on that alone returned a key with no
+    /// public value in it, which then failed in the platform bridge with the
+    /// opaque error this class exists to replace.
+    private static int shapeOf(byte[] der) {
+<span class="fc" id="L163">        Cursor c = new Cursor(der);</span>
+<span class="fc" id="L164">        c.enter(0x30);</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (!c.hasMore()) {</span>
+<span class="nc" id="L166">            return SHAPE_UNKNOWN;</span>
+        }
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        if (c.peek() == 0x30) {</span>
+            // SubjectPublicKeyInfo ::= SEQUENCE { AlgorithmIdentifier, BIT STRING }
+<span class="fc" id="L170">            c.skip();</span>
+<span class="fc bfc" id="L171" title="All 4 branches covered.">            return c.hasMore() &amp;&amp; c.peek() == 0x03 ? SHAPE_SPKI : SHAPE_UNKNOWN;</span>
+        }
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (c.peek() != 0x02) {</span>
+<span class="nc" id="L174">            return SHAPE_UNKNOWN;</span>
+        }
+<span class="fc" id="L176">        c.skip();</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (!c.hasMore()) {</span>
+<span class="nc" id="L178">            return SHAPE_UNKNOWN;</span>
+        }
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (c.peek() == 0x30) {</span>
+            // PrivateKeyInfo ::= SEQUENCE { INTEGER, AlgorithmIdentifier, OCTET STRING }
+<span class="fc" id="L182">            c.skip();</span>
+<span class="fc bfc" id="L183" title="All 4 branches covered.">            return c.hasMore() &amp;&amp; c.peek() == 0x04 ? SHAPE_PKCS8 : SHAPE_UNKNOWN;</span>
+        }
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        if (c.peek() == 0x04) {</span>
+            // ECPrivateKey ::= SEQUENCE { INTEGER, OCTET STRING, [0], [1] }
+<span class="fc" id="L187">            return SHAPE_SEC1;</span>
+        }
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if (c.peek() != 0x02) {</span>
+<span class="nc" id="L190">            return SHAPE_UNKNOWN;</span>
+        }
+        // PKCS#1. RSAPublicKey is exactly { modulus, publicExponent };
+        // RSAPrivateKey's nine INTEGER fields are all mandatory, and a
+        // multi-prime key adds an otherPrimeInfos SEQUENCE after them.
+<span class="fc" id="L195">        int integers = 1;</span>
+<span class="pc bpc" id="L196" title="1 of 4 branches missed.">        while (c.hasMore() &amp;&amp; c.peek() == 0x02) {</span>
+<span class="fc" id="L197">            c.skip();</span>
+<span class="fc" id="L198">            integers++;</span>
+        }
+<span class="pc bpc" id="L200" title="1 of 4 branches missed.">        if (integers == 2 &amp;&amp; !c.hasMore()) {</span>
+<span class="fc" id="L201">            return SHAPE_PKCS1_PUBLIC;</span>
+        }
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        return integers &gt;= 9 ? SHAPE_PKCS1_PRIVATE : SHAPE_UNKNOWN;</span>
+    }
+
+    /// Returns the label of the first armored block, or `null` when the input
+    /// carries no armor and is therefore treated as bare base64.
+    private static String label(String pem) {
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (pem == null) {</span>
+<span class="nc" id="L210">            throw new CryptoException(&quot;pem must not be null&quot;);</span>
+        }
+<span class="fc" id="L212">        int begin = pem.indexOf(BEGIN);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (begin &lt; 0) {</span>
+<span class="fc" id="L214">            return null;</span>
+        }
+<span class="fc" id="L216">        int labelStart = begin + BEGIN.length();</span>
+<span class="fc" id="L217">        int labelEnd = pem.indexOf(DASHES, labelStart);</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (labelEnd &lt; 0) {</span>
+<span class="fc" id="L219">            throw new CryptoException(&quot;malformed PEM: -----BEGIN line is not terminated&quot;);</span>
+        }
+<span class="fc" id="L221">        return pem.substring(labelStart, labelEnd).trim();</span>
+    }
+
+    /// Base64-decodes the payload between the armor lines (or the whole input
+    /// when `label` is null).
+    private static byte[] body(String pem, String label) {
+        String base64;
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (label == null) {</span>
+<span class="fc" id="L229">            base64 = pem;</span>
+        } else {
+<span class="fc" id="L231">            int labelEnd = pem.indexOf(DASHES, pem.indexOf(BEGIN) + BEGIN.length());</span>
+<span class="fc" id="L232">            int bodyStart = labelEnd + DASHES.length();</span>
+            // RFC 7468 requires the footer to repeat the header's label. Stopping
+            // at any &quot;-----END&quot; would accept a file whose blocks have been
+            // spliced together (BEGIN PUBLIC KEY closed by END PRIVATE KEY), and
+            // running to end-of-input would accept one that was cut off before
+            // its footer ever arrived.
+<span class="fc" id="L238">            String footer = END + label + DASHES;</span>
+<span class="fc" id="L239">            int bodyEnd = pem.indexOf(footer, bodyStart);</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            if (bodyEnd &lt; 0) {</span>
+<span class="fc" id="L241">                throw new CryptoException(&quot;malformed PEM: no matching &quot; + footer + &quot; footer&quot;);</span>
+            }
+<span class="fc" id="L243">            base64 = pem.substring(bodyStart, bodyEnd);</span>
+        }
+<span class="fc" id="L245">        requireStrictBase64(base64);</span>
+        // Base64.decode tolerates the line breaks but nothing else, and answers
+        // null rather than throwing when it meets a character it cannot map.
+<span class="fc" id="L248">        byte[] der = Base64.decode(StringUtil.getBytes(base64));</span>
+<span class="pc bpc" id="L249" title="2 of 4 branches missed.">        if (der == null || der.length == 0) {</span>
+<span class="nc" id="L250">            throw new CryptoException(&quot;malformed PEM: the body is not valid base64&quot;);</span>
+        }
+<span class="fc" id="L252">        requireWholeElement(der);</span>
+<span class="fc" id="L253">        return der;</span>
+    }
+
+    /// Checks the body is well-formed base64 before it is decoded.
+    ///
+    /// [Base64#decode] stops at the first `=` and never looks at what follows,
+    /// so a body of `&lt;valid base64&gt;=&lt;anything&gt;` decodes to the intact prefix and
+    /// is accepted. A spliced or corrupted file would load silently on the
+    /// strength of its first half, so padding is required to be the last thing
+    /// in the body.
+    private static void requireStrictBase64(String base64) {
+<span class="fc" id="L264">        int symbols = 0;</span>
+<span class="fc" id="L265">        int padding = 0;</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        for (int i = 0; i &lt; base64.length(); i++) {</span>
+<span class="fc" id="L267">            char c = base64.charAt(i);</span>
+<span class="pc bpc" id="L268" title="1 of 8 branches missed.">            if (c == '\n' || c == '\r' || c == ' ' || c == '\t') {</span>
+<span class="nc" id="L269">                continue;</span>
+            }
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            if (c == '=') {</span>
+<span class="fc" id="L272">                padding++;</span>
+<span class="fc" id="L273">                continue;</span>
+            }
+<span class="fc bfc" id="L275" title="All 2 branches covered.">            if (padding &gt; 0) {</span>
+<span class="fc" id="L276">                throw new CryptoException(&quot;malformed PEM: content follows the base64 padding&quot;);</span>
+            }
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            if (!isBase64(c)) {</span>
+<span class="fc" id="L279">                throw new CryptoException(&quot;malformed PEM: '&quot; + c + &quot;' is not a base64 character&quot;);</span>
+            }
+<span class="fc" id="L281">            symbols++;</span>
+        }
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (padding &gt; 2) {</span>
+<span class="nc" id="L284">            throw new CryptoException(&quot;malformed PEM: too much base64 padding&quot;);</span>
+        }
+<span class="fc bfc" id="L286" title="All 4 branches covered.">        if (symbols == 0 || ((symbols + padding) &amp; 3) != 0) {</span>
+<span class="fc" id="L287">            throw new CryptoException(&quot;malformed PEM: the base64 body is truncated&quot;);</span>
+        }
+<span class="fc" id="L289">    }</span>
+
+    private static boolean isBase64(char c) {
+<span class="pc bpc" id="L292" title="2 of 16 branches missed.">        return (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') || (c &gt;= 'a' &amp;&amp; c &lt;= 'z')</span>
+                || (c &gt;= '0' &amp;&amp; c &lt;= '9') || c == '+' || c == '/';
+    }
+
+    /// Checks that the decoded body is exactly one complete DER element.
+    ///
+    /// Without this a truncated or padded key still parses far enough to name
+    /// its algorithm, and the damage only surfaces later as the platform's
+    /// opaque &quot;invalid key format&quot; -- which is the failure this class exists to
+    /// stop callers from having to diagnose.
+    private static void requireWholeElement(byte[] der) {
+<span class="fc" id="L303">        Cursor c = new Cursor(der);</span>
+<span class="fc" id="L304">        c.skip();</span>
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">        if (c.hasMore()) {</span>
+<span class="nc" id="L306">            throw new CryptoException(&quot;malformed key: &quot; + (der.length - c.position())</span>
+                    + &quot; trailing bytes after the key&quot;);
+        }
+<span class="fc" id="L309">    }</span>
+
+    /// SEQUENCE { OID rsaEncryption, NULL } -- PKCS#1 keys always carry NULL
+    /// parameters.
+    private static byte[] rsaAlgorithmIdentifier() {
+<span class="fc" id="L314">        return tlv(0x30, concat(tlv(0x06, OID_RSA), tlv(0x05, new byte[0])));</span>
+    }
+
+    /// `SEQUENCE { OID id-ecPublicKey, ECParameters }`.
+    ///
+    /// `ecParameters` is passed through whole rather than rebuilt, because
+    /// ECParameters is a CHOICE: usually a named-curve OID, but a complete
+    /// SEQUENCE describing the curve when the key was written with explicit
+    /// parameters. Both belong in this field verbatim.
+    private static byte[] ecAlgorithmIdentifier(byte[] ecParameters) {
+<span class="fc" id="L324">        return tlv(0x30, concat(tlv(0x06, OID_EC), ecParameters));</span>
+    }
+
+    /// SEQUENCE { INTEGER 0, AlgorithmIdentifier, OCTET STRING privateKey }.
+    private static byte[] wrapPkcs8(byte[] algorithmIdentifier, byte[] privateKey) {
+<span class="fc" id="L329">        byte[] version = tlv(0x02, new byte[] {0});</span>
+<span class="fc" id="L330">        return tlv(0x30, concat(concat(version, algorithmIdentifier), tlv(0x04, privateKey)));</span>
+    }
+
+    /// Converts a SEC1 `ECPrivateKey` --
+    /// `SEQUENCE { INTEGER 1, OCTET STRING privateKey, [0] parameters, [1] publicKey }`
+    /// -- into a PKCS#8 PrivateKeyInfo.
+    ///
+    /// The curve is named only in the `[0] parameters` field here, so it has to
+    /// be lifted out into the PKCS#8 AlgorithmIdentifier. RFC 5915 section 3
+    /// then says the field should not be repeated inside the wrapped key, so it
+    /// is dropped rather than carried along -- which is also what
+    /// `openssl pkcs8 -topk8` emits, byte for byte.
+    private static byte[] sec1ToPkcs8(byte[] sec1) {
+<span class="fc" id="L343">        Cursor c = new Cursor(sec1);</span>
+<span class="fc" id="L344">        c.enter(0x30);</span>
+<span class="fc" id="L345">        byte[] version = c.element();</span>
+<span class="fc" id="L346">        byte[] privateKey = c.element();</span>
+<span class="fc" id="L347">        byte[] ecParameters = null;</span>
+<span class="fc" id="L348">        byte[] tail = new byte[0];</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        while (c.hasMore()) {</span>
+<span class="fc" id="L350">            int tag = c.peek();</span>
+<span class="fc" id="L351">            byte[] element = c.element();</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">            if (tag == 0xA0) {</span>
+                // [0] wraps ECParameters, which is a CHOICE -- a named-curve
+                // OID or, for a key written with explicit parameters, a whole
+                // SEQUENCE describing the curve. Take it verbatim: reading an
+                // OID out of it would reject the explicit form, which is a
+                // valid SEC1 key.
+<span class="fc" id="L358">                Cursor parameters = new Cursor(element);</span>
+<span class="fc" id="L359">                parameters.enter(0xA0);</span>
+<span class="fc" id="L360">                ecParameters = parameters.element();</span>
+<span class="fc" id="L361">            } else {</span>
+<span class="fc" id="L362">                tail = concat(tail, element);</span>
+            }
+<span class="fc" id="L364">        }</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">        if (ecParameters == null) {</span>
+<span class="nc" id="L366">            throw new CryptoException(&quot;SEC1 EC private key names no curve; re-export it as PKCS#8 with: &quot;</span>
+                    + &quot;openssl pkcs8 -topk8 -nocrypt -in key.pem -out key_pkcs8.pem&quot;);
+        }
+<span class="fc" id="L369">        byte[] inner = tlv(0x30, concat(concat(version, privateKey), tail));</span>
+<span class="fc" id="L370">        return wrapPkcs8(ecAlgorithmIdentifier(ecParameters), inner);</span>
+    }
+
+    private static byte[] tlv(int tag, byte[] content) {
+<span class="fc" id="L374">        byte[] length = encodeLength(content.length);</span>
+<span class="fc" id="L375">        byte[] out = new byte[1 + length.length + content.length];</span>
+<span class="fc" id="L376">        out[0] = (byte) tag;</span>
+<span class="fc" id="L377">        System.arraycopy(length, 0, out, 1, length.length);</span>
+<span class="fc" id="L378">        System.arraycopy(content, 0, out, 1 + length.length, content.length);</span>
+<span class="fc" id="L379">        return out;</span>
+    }
+
+    private static byte[] encodeLength(int length) {
+<span class="fc bfc" id="L383" title="All 2 branches covered.">        if (length &lt; 0x80) {</span>
+<span class="fc" id="L384">            return new byte[] {(byte) length};</span>
+        }
+<span class="fc" id="L386">        int bytes = 1;</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        for (int v = length; v &gt; 0xFF; v &gt;&gt;= 8) {</span>
+<span class="fc" id="L388">            bytes++;</span>
+        }
+<span class="fc" id="L390">        byte[] out = new byte[bytes + 1];</span>
+<span class="fc" id="L391">        out[0] = (byte) (0x80 | bytes);</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">        for (int i = 0; i &lt; bytes; i++) {</span>
+<span class="fc" id="L393">            out[out.length - 1 - i] = (byte) ((length &gt;&gt; (8 * i)) &amp; 0xFF);</span>
+        }
+<span class="fc" id="L395">        return out;</span>
+    }
+
+    private static byte[] concat(byte[] a, byte[] b) {
+<span class="fc" id="L399">        byte[] out = new byte[a.length + b.length];</span>
+<span class="fc" id="L400">        System.arraycopy(a, 0, out, 0, a.length);</span>
+<span class="fc" id="L401">        System.arraycopy(b, 0, out, a.length, b.length);</span>
+<span class="fc" id="L402">        return out;</span>
+    }
+
+    private static boolean equal(byte[] a, byte[] b) {
+<span class="fc bfc" id="L406" title="All 2 branches covered.">        if (a.length != b.length) {</span>
+<span class="fc" id="L407">            return false;</span>
+        }
+<span class="fc bfc" id="L409" title="All 2 branches covered.">        for (int i = 0; i &lt; a.length; i++) {</span>
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">            if (a[i] != b[i]) {</span>
+<span class="nc" id="L411">                return false;</span>
+            }
+        }
+<span class="fc" id="L414">        return true;</span>
+    }
+
+    /// Renders an OID's content bytes as dotted decimal, so an unsupported
+    /// algorithm names itself in the exception rather than being &quot;invalid&quot;.
+    private static String oidToString(byte[] oid) {
+<span class="nc bnc" id="L420" title="All 2 branches missed.">        if (oid.length == 0) {</span>
+<span class="nc" id="L421">            return &quot;?&quot;;</span>
+        }
+<span class="nc" id="L423">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L424">        int first = oid[0] &amp; 0xFF;</span>
+<span class="nc" id="L425">        sb.append(first / 40).append('.').append(first % 40);</span>
+<span class="nc" id="L426">        long value = 0;</span>
+<span class="nc bnc" id="L427" title="All 2 branches missed.">        for (int i = 1; i &lt; oid.length; i++) {</span>
+<span class="nc" id="L428">            int b = oid[i] &amp; 0xFF;</span>
+<span class="nc" id="L429">            value = (value &lt;&lt; 7) | (b &amp; 0x7F);</span>
+<span class="nc bnc" id="L430" title="All 2 branches missed.">            if ((b &amp; 0x80) == 0) {</span>
+<span class="nc" id="L431">                sb.append('.').append(value);</span>
+<span class="nc" id="L432">                value = 0;</span>
+            }
+        }
+<span class="nc" id="L435">        return sb.toString();</span>
+    }
+
+    /// A read-only walk over a DER blob. Deliberately minimal: it only needs to
+    /// step into SEQUENCE/context tags and read an OID, never to decode values.
+    ///
+    /// Every read is bounded by `end`, the end of the element the cursor is
+    /// currently inside, which [#enter] narrows as it descends. Bounding
+    /// against the whole blob instead would let a read escape its parent: an
+    /// AlgorithmIdentifier declared as `30 00` followed by an OID that really
+    /// belongs to the enclosing SEQUENCE would be walked as though the OID were
+    /// its own, and the malformed key would be reported as valid RSA. The walk
+    /// only ever descends, so `end` never has to be restored.
+    private static final class Cursor {
+        private final byte[] der;
+        private int pos;
+        private int end;
+
+<span class="fc" id="L453">        Cursor(byte[] der) {</span>
+<span class="fc" id="L454">            this.der = der;</span>
+<span class="fc" id="L455">            this.end = der.length;</span>
+<span class="fc" id="L456">        }</span>
+
+        /// Tag of the element at the cursor, without consuming it.
+        int peek() {
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">            if (pos &gt;= end) {</span>
+<span class="nc" id="L461">                throw new CryptoException(&quot;malformed key: truncated DER&quot;);</span>
+            }
+<span class="fc" id="L463">            return der[pos] &amp; 0xFF;</span>
+        }
+
+        /// Consumes a constructed element's header, leaving the cursor on its
+        /// first child and narrowing the walk to that element's contents.
+        void enter(int expectedTag) {
+<span class="fc" id="L469">            expect(expectedTag);</span>
+<span class="fc" id="L470">            int length = length();</span>
+<span class="fc" id="L471">            requireRoom(length);</span>
+<span class="fc" id="L472">            end = pos + length;</span>
+<span class="fc" id="L473">        }</span>
+
+        /// Consumes an element whole, contents included.
+        void skip() {
+<span class="fc" id="L477">            peek();</span>
+<span class="fc" id="L478">            pos++;</span>
+            // length() advances pos past the length bytes, so its result has to
+            // be read into a local first -- &quot;pos += length()&quot; would capture the
+            // old pos and throw that advance away.
+<span class="fc" id="L482">            int length = length();</span>
+<span class="fc" id="L483">            requireRoom(length);</span>
+<span class="fc" id="L484">            pos += length;</span>
+<span class="fc" id="L485">        }</span>
+
+        /// Offset of the cursor within the blob.
+        int position() {
+<span class="nc" id="L489">            return pos;</span>
+        }
+
+        /// True while the cursor has not reached the end of the element it is
+        /// inside.
+        boolean hasMore() {
+<span class="fc bfc" id="L495" title="All 2 branches covered.">            return pos &lt; end;</span>
+        }
+
+        /// Consumes an element whole and returns its bytes, tag and length
+        /// included, so it can be re-emitted verbatim.
+        byte[] element() {
+<span class="fc" id="L501">            int start = pos;</span>
+<span class="fc" id="L502">            skip();</span>
+<span class="fc" id="L503">            byte[] out = new byte[pos - start];</span>
+<span class="fc" id="L504">            System.arraycopy(der, start, out, 0, out.length);</span>
+<span class="fc" id="L505">            return out;</span>
+        }
+
+        /// Consumes a primitive element and returns its contents.
+        byte[] read(int expectedTag) {
+<span class="fc" id="L510">            expect(expectedTag);</span>
+<span class="fc" id="L511">            int length = length();</span>
+<span class="fc" id="L512">            requireRoom(length);</span>
+<span class="fc" id="L513">            byte[] out = new byte[length];</span>
+<span class="fc" id="L514">            System.arraycopy(der, pos, out, 0, length);</span>
+<span class="fc" id="L515">            pos += length;</span>
+<span class="fc" id="L516">            return out;</span>
+        }
+
+        /// Checks `length` bytes are available before the end of the enclosing
+        /// element. Phrased as a subtraction rather than &quot;pos + length &gt; end&quot;:
+        /// a declared length near Integer.MAX_VALUE makes that sum overflow to
+        /// a negative number, which slips past the check and reaches an
+        /// allocation.
+        private void requireRoom(int length) {
+<span class="fc bfc" id="L525" title="All 2 branches covered.">            if (length &gt; end - pos) {</span>
+<span class="fc" id="L526">                throw new CryptoException(&quot;malformed key: truncated DER&quot;);</span>
+            }
+<span class="fc" id="L528">        }</span>
+
+        private void expect(int expectedTag) {
+<span class="pc bpc" id="L531" title="1 of 2 branches missed.">            if (peek() != expectedTag) {</span>
+<span class="nc" id="L532">                throw new CryptoException(&quot;malformed key: expected DER tag 0x&quot;</span>
+<span class="nc" id="L533">                        + Integer.toHexString(expectedTag) + &quot; but found 0x&quot;</span>
+<span class="nc" id="L534">                        + Integer.toHexString(peek()));</span>
+            }
+<span class="fc" id="L536">            pos++;</span>
+<span class="fc" id="L537">        }</span>
+
+        private int length() {
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">            if (pos &gt;= end) {</span>
+<span class="nc" id="L541">                throw new CryptoException(&quot;malformed key: truncated DER&quot;);</span>
+            }
+<span class="fc" id="L543">            int first = der[pos++] &amp; 0xFF;</span>
+<span class="fc bfc" id="L544" title="All 2 branches covered.">            if (first &lt; 0x80) {</span>
+<span class="fc" id="L545">                return first;</span>
+            }
+<span class="fc" id="L547">            int count = first &amp; 0x7F;</span>
+<span class="pc bpc" id="L548" title="2 of 6 branches missed.">            if (count == 0 || count &gt; 4 || count &gt; end - pos) {</span>
+<span class="fc" id="L549">                throw new CryptoException(&quot;malformed key: bad DER length&quot;);</span>
+            }
+<span class="fc" id="L551">            int value = 0;</span>
+<span class="fc bfc" id="L552" title="All 2 branches covered.">            for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L553">                value = (value &lt;&lt; 8) | (der[pos++] &amp; 0xFF);</span>
+            }
+<span class="pc bpc" id="L555" title="1 of 2 branches missed.">            if (value &lt; 0) {</span>
+<span class="nc" id="L556">                throw new CryptoException(&quot;malformed key: bad DER length&quot;);</span>
+            }
+<span class="fc" id="L558">            return value;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

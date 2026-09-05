@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HealthChangeBatch.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">HealthChangeBatch.java</span></div><h1>HealthChangeBatch.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// A set of changes since the last time a subscription was drained.
+/// Delivered to [HealthChangeListener] in the foreground and to
+/// [HealthBackgroundListener] after a background relaunch.
+public final class HealthChangeBatch {
+
+    private final String subscriptionId;
+    private final List&lt;HealthDataType&gt; types;
+    private final List&lt;HealthSample&gt; added;
+    private final List&lt;String&gt; deletedSampleIds;
+    private final boolean resyncRequired;
+    private final HealthAnchor anchor;
+    private final long deadlineMillis;
+    private final boolean more;
+
+    /// Creates a batch. Called by [HealthStore]; the lists are copied
+    /// defensively.
+    public HealthChangeBatch(String subscriptionId,
+            List&lt;HealthDataType&gt; types, List&lt;HealthSample&gt; added,
+            List&lt;String&gt; deletedSampleIds, boolean resyncRequired,
+<span class="fc" id="L48">            HealthAnchor anchor, long deadlineMillis, boolean more) {</span>
+<span class="fc" id="L49">        this.subscriptionId = subscriptionId;</span>
+<span class="fc" id="L50">        this.types = copyTypes(types);</span>
+<span class="fc" id="L51">        this.added = copySamples(added);</span>
+<span class="fc" id="L52">        this.deletedSampleIds = copyIds(deletedSampleIds);</span>
+<span class="fc" id="L53">        this.resyncRequired = resyncRequired;</span>
+<span class="fc" id="L54">        this.anchor = anchor;</span>
+<span class="fc" id="L55">        this.deadlineMillis = deadlineMillis;</span>
+<span class="fc" id="L56">        this.more = more;</span>
+<span class="fc" id="L57">    }</span>
+
+    private static List&lt;HealthDataType&gt; copyTypes(List&lt;HealthDataType&gt; in) {
+<span class="fc" id="L60">        List&lt;HealthDataType&gt; out = new ArrayList&lt;HealthDataType&gt;();</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (in != null) {</span>
+<span class="fc" id="L62">            out.addAll(in);</span>
+        }
+<span class="fc" id="L64">        return out;</span>
+    }
+
+    private static List&lt;HealthSample&gt; copySamples(List&lt;HealthSample&gt; in) {
+<span class="fc" id="L68">        List&lt;HealthSample&gt; out = new ArrayList&lt;HealthSample&gt;();</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (in != null) {</span>
+<span class="fc" id="L70">            out.addAll(in);</span>
+        }
+<span class="fc" id="L72">        return out;</span>
+    }
+
+    private static List&lt;String&gt; copyIds(List&lt;String&gt; in) {
+<span class="fc" id="L76">        List&lt;String&gt; out = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (in != null) {</span>
+<span class="fc" id="L78">            out.addAll(in);</span>
+        }
+<span class="fc" id="L80">        return out;</span>
+    }
+
+    /// The subscription this batch belongs to.
+    public String getSubscriptionId() {
+<span class="fc" id="L85">        return subscriptionId;</span>
+    }
+
+    /// The types covered by this batch.
+    public List&lt;HealthDataType&gt; getTypes() {
+<span class="fc" id="L90">        return Collections.unmodifiableList(types);</span>
+    }
+
+    /// Samples added or updated since the last drain. Empty when the
+    /// subscription set [SubscriptionRequest#setDeliverSamples(boolean)]
+    /// to false, and empty when [#isResyncRequired()].
+    public List&lt;HealthSample&gt; getAdded() {
+<span class="fc" id="L97">        return Collections.unmodifiableList(added);</span>
+    }
+
+    /// Identifiers of samples removed since the last drain.
+    public List&lt;String&gt; getDeletedSampleIds() {
+<span class="fc" id="L102">        return Collections.unmodifiableList(deletedSampleIds);</span>
+    }
+
+    /// `true` when the platform cursor was lost and incremental delivery
+    /// cannot continue -- a Health Connect change token older than 30
+    /// days, or an iOS anchor rejected after a restore from backup.
+    ///
+    /// [#getAdded()] is empty in that case. The app must do a full
+    /// time-range read to catch up; nothing else will deliver the missed
+    /// data.
+    public boolean isResyncRequired() {
+<span class="fc" id="L113">        return resyncRequired;</span>
+    }
+
+    /// The cursor after this batch. Persisted by [HealthStore]
+    /// automatically; exposed for apps that checkpoint against their own
+    /// server -- see [HealthAnchor].
+    public HealthAnchor getAnchor() {
+<span class="fc" id="L120">        return anchor;</span>
+    }
+
+    /// Roughly how much wall-clock time the listener has before the OS may
+    /// suspend the process, in milliseconds. About 5000 on an iOS
+    /// background relaunch; `Long.MAX_VALUE` in the foreground.
+    ///
+    /// Do cheap bookkeeping inside a background delivery -- accumulate a
+    /// counter, stash an identifier -- and leave network calls for the
+    /// next foreground.
+    public long getDeadlineMillis() {
+<span class="fc" id="L131">        return deadlineMillis;</span>
+    }
+
+    /// `true` when more changes were available than
+    /// [SubscriptionRequest#getMaxSamplesPerBatch()] allowed. The
+    /// remainder arrives in the next delivery, or immediately on
+    /// [HealthStore#drainChanges()].
+    public boolean hasMore() {
+<span class="fc" id="L139">        return more;</span>
+    }
+
+    /// `true` when nothing changed and no resync is needed.
+    public boolean isEmpty() {
+<span class="nc bnc" id="L144" title="All 4 branches missed.">        return !resyncRequired &amp;&amp; added.isEmpty()</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">                &amp;&amp; deletedSampleIds.isEmpty();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L150">        return &quot;HealthChangeBatch[&quot; + subscriptionId + &quot; +&quot; + added.size()</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                + &quot; -&quot; + deletedSampleIds.size()</span>
+                + (resyncRequired ? &quot; RESYNC&quot; : &quot;&quot;) + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

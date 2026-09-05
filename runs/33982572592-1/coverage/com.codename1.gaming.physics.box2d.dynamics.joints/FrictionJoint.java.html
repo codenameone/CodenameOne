@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FrictionJoint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics.joints</a> &gt; <span class="el_source">FrictionJoint.java</span></div><h1>FrictionJoint.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+/// Created at 7:27:32 AM Jan 20, 2011
+package com.codename1.gaming.physics.box2d.dynamics.joints;
+
+import com.codename1.gaming.physics.box2d.common.Mat22;
+import com.codename1.gaming.physics.box2d.common.MathUtils;
+import com.codename1.gaming.physics.box2d.common.Rot;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.gaming.physics.box2d.dynamics.SolverData;
+import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
+
+/// @author Daniel Murphy
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">public class FrictionJoint extends Joint {</span>
+
+  private final Vec2 m_localAnchorA;
+  private final Vec2 m_localAnchorB;
+
+  // Solver shared
+  private final Vec2 m_linearImpulse;
+  private float m_angularImpulse;
+  private float m_maxForce;
+  private float m_maxTorque;
+
+  // Solver temp
+  private int m_indexA;
+  private int m_indexB;
+<span class="fc" id="L49">  private final Vec2 m_rA = new Vec2();</span>
+<span class="fc" id="L50">  private final Vec2 m_rB = new Vec2();</span>
+<span class="fc" id="L51">  private final Vec2 m_localCenterA = new Vec2();</span>
+<span class="fc" id="L52">  private final Vec2 m_localCenterB = new Vec2();</span>
+  private float m_invMassA;
+  private float m_invMassB;
+  private float m_invIA;
+  private float m_invIB;
+<span class="fc" id="L57">  private final Mat22 m_linearMass = new Mat22();</span>
+  private float m_angularMass;
+
+  protected FrictionJoint(IWorldPool argWorldPool, FrictionJointDef def) {
+<span class="fc" id="L61">    super(argWorldPool, def);</span>
+<span class="fc" id="L62">    m_localAnchorA = new Vec2(def.localAnchorA);</span>
+<span class="fc" id="L63">    m_localAnchorB = new Vec2(def.localAnchorB);</span>
+
+<span class="fc" id="L65">    m_linearImpulse = new Vec2();</span>
+<span class="fc" id="L66">    m_angularImpulse = 0.0f;</span>
+
+<span class="fc" id="L68">    m_maxForce = def.maxForce;</span>
+<span class="fc" id="L69">    m_maxTorque = def.maxTorque;</span>
+<span class="fc" id="L70">  }</span>
+
+  public Vec2 getLocalAnchorA() {
+<span class="nc" id="L73">    return m_localAnchorA;</span>
+  }
+
+  public Vec2 getLocalAnchorB() {
+<span class="nc" id="L77">    return m_localAnchorB;</span>
+  }
+
+  public void getAnchorA(Vec2 argOut) {
+<span class="fc" id="L81">    m_bodyA.getWorldPointToOut(m_localAnchorA, argOut);</span>
+<span class="fc" id="L82">  }</span>
+
+  public void getAnchorB(Vec2 argOut) {
+<span class="nc" id="L85">    m_bodyB.getWorldPointToOut(m_localAnchorB, argOut);</span>
+<span class="nc" id="L86">  }</span>
+
+  public void getReactionForce(float inv_dt, Vec2 argOut) {
+<span class="nc" id="L89">    argOut.set(m_linearImpulse).mulLocal(inv_dt);</span>
+<span class="nc" id="L90">  }</span>
+
+  public float getReactionTorque(float inv_dt) {
+<span class="nc" id="L93">    return inv_dt * m_angularImpulse;</span>
+  }
+
+  public void setMaxForce(float force) {
+<span class="nc bnc" id="L97" title="All 4 branches missed.">    assert (force &gt;= 0.0f);</span>
+<span class="nc" id="L98">    m_maxForce = force;</span>
+<span class="nc" id="L99">  }</span>
+
+  public float getMaxForce() {
+<span class="nc" id="L102">    return m_maxForce;</span>
+  }
+
+  public void setMaxTorque(float torque) {
+<span class="nc bnc" id="L106" title="All 4 branches missed.">    assert (torque &gt;= 0.0f);</span>
+<span class="nc" id="L107">    m_maxTorque = torque;</span>
+<span class="nc" id="L108">  }</span>
+
+  public float getMaxTorque() {
+<span class="nc" id="L111">    return m_maxTorque;</span>
+  }
+
+  /// @see com.codename1.gaming.physics.box2d.dynamics.joints.Joint#initVelocityConstraints(com.codename1.gaming.physics.box2d.dynamics.TimeStep)
+  public void initVelocityConstraints(final SolverData data) {
+<span class="fc" id="L116">    m_indexA = m_bodyA.m_islandIndex;</span>
+<span class="fc" id="L117">    m_indexB = m_bodyB.m_islandIndex;</span>
+<span class="fc" id="L118">    m_localCenterA.set(m_bodyA.m_sweep.localCenter);</span>
+<span class="fc" id="L119">    m_localCenterB.set(m_bodyB.m_sweep.localCenter);</span>
+<span class="fc" id="L120">    m_invMassA = m_bodyA.m_invMass;</span>
+<span class="fc" id="L121">    m_invMassB = m_bodyB.m_invMass;</span>
+<span class="fc" id="L122">    m_invIA = m_bodyA.m_invI;</span>
+<span class="fc" id="L123">    m_invIB = m_bodyB.m_invI;</span>
+
+<span class="fc" id="L125">    float aA = data.positions[m_indexA].a;</span>
+<span class="fc" id="L126">    Vec2 vA = data.velocities[m_indexA].v;</span>
+<span class="fc" id="L127">    float wA = data.velocities[m_indexA].w;</span>
+
+<span class="fc" id="L129">    float aB = data.positions[m_indexB].a;</span>
+<span class="fc" id="L130">    Vec2 vB = data.velocities[m_indexB].v;</span>
+<span class="fc" id="L131">    float wB = data.velocities[m_indexB].w;</span>
+
+
+<span class="fc" id="L134">    final Vec2 temp = pool.popVec2();</span>
+<span class="fc" id="L135">    final Rot qA = pool.popRot();</span>
+<span class="fc" id="L136">    final Rot qB = pool.popRot();</span>
+
+<span class="fc" id="L138">    qA.set(aA);</span>
+<span class="fc" id="L139">    qB.set(aB);</span>
+
+    // Compute the effective mass matrix.
+<span class="fc" id="L142">    Rot.mulToOutUnsafe(qA, temp.set(m_localAnchorA).subLocal(m_localCenterA), m_rA);</span>
+<span class="fc" id="L143">    Rot.mulToOutUnsafe(qB, temp.set(m_localAnchorB).subLocal(m_localCenterB), m_rB);</span>
+
+    // J = [-I -r1_skew I r2_skew]
+    // [ 0 -1 0 1]
+    // r_skew = [-ry; rx]
+
+    // Matlab
+    // K = [ mA+r1y^2*iA+mB+r2y^2*iB, -r1y*iA*r1x-r2y*iB*r2x, -r1y*iA-r2y*iB]
+    // [ -r1y*iA*r1x-r2y*iB*r2x, mA+r1x^2*iA+mB+r2x^2*iB, r1x*iA+r2x*iB]
+    // [ -r1y*iA-r2y*iB, r1x*iA+r2x*iB, iA+iB]
+
+<span class="fc" id="L154">    float mA = m_invMassA, mB = m_invMassB;</span>
+<span class="fc" id="L155">    float iA = m_invIA, iB = m_invIB;</span>
+
+<span class="fc" id="L157">    final Mat22 K = pool.popMat22();</span>
+<span class="fc" id="L158">    K.ex.x = mA + mB + iA * m_rA.y * m_rA.y + iB * m_rB.y * m_rB.y;</span>
+<span class="fc" id="L159">    K.ex.y = -iA * m_rA.x * m_rA.y - iB * m_rB.x * m_rB.y;</span>
+<span class="fc" id="L160">    K.ey.x = K.ex.y;</span>
+<span class="fc" id="L161">    K.ey.y = mA + mB + iA * m_rA.x * m_rA.x + iB * m_rB.x * m_rB.x;</span>
+
+<span class="fc" id="L163">    K.invertToOut(m_linearMass);</span>
+
+<span class="fc" id="L165">    m_angularMass = iA + iB;</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">    if (m_angularMass &gt; 0.0f) {</span>
+<span class="fc" id="L167">      m_angularMass = 1.0f / m_angularMass;</span>
+    }
+
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">    if (data.step.warmStarting) {</span>
+      // Scale impulses to support a variable time step.
+<span class="fc" id="L172">      m_linearImpulse.mulLocal(data.step.dtRatio);</span>
+<span class="fc" id="L173">      m_angularImpulse *= data.step.dtRatio;</span>
+
+<span class="fc" id="L175">      final Vec2 P = pool.popVec2();</span>
+<span class="fc" id="L176">      P.set(m_linearImpulse);</span>
+
+<span class="fc" id="L178">      temp.set(P).mulLocal(mA);</span>
+<span class="fc" id="L179">      vA.subLocal(temp);</span>
+<span class="fc" id="L180">      wA -= iA * (Vec2.cross(m_rA, P) + m_angularImpulse);</span>
+
+<span class="fc" id="L182">      temp.set(P).mulLocal(mB);</span>
+<span class="fc" id="L183">      vB.addLocal(temp);</span>
+<span class="fc" id="L184">      wB += iB * (Vec2.cross(m_rB, P) + m_angularImpulse);</span>
+
+<span class="fc" id="L186">      pool.pushVec2(1);</span>
+<span class="fc" id="L187">    } else {</span>
+<span class="nc" id="L188">      m_linearImpulse.setZero();</span>
+<span class="nc" id="L189">      m_angularImpulse = 0.0f;</span>
+    }
+//    data.velocities[m_indexA].v.set(vA);
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">    if( data.velocities[m_indexA].w != wA) {</span>
+<span class="nc bnc" id="L193" title="All 4 branches missed.">      assert(data.velocities[m_indexA].w != wA);</span>
+    }
+<span class="fc" id="L195">    data.velocities[m_indexA].w = wA;</span>
+//    data.velocities[m_indexB].v.set(vB);
+<span class="fc" id="L197">    data.velocities[m_indexB].w = wB;</span>
+
+<span class="fc" id="L199">    pool.pushRot(2);</span>
+<span class="fc" id="L200">    pool.pushVec2(1);</span>
+<span class="fc" id="L201">    pool.pushMat22(1);</span>
+<span class="fc" id="L202">  }</span>
+
+  public void solveVelocityConstraints(final SolverData data) {
+<span class="fc" id="L205">    Vec2 vA = data.velocities[m_indexA].v;</span>
+<span class="fc" id="L206">    float wA = data.velocities[m_indexA].w;</span>
+<span class="fc" id="L207">    Vec2 vB = data.velocities[m_indexB].v;</span>
+<span class="fc" id="L208">    float wB = data.velocities[m_indexB].w;</span>
+
+<span class="fc" id="L210">    float mA = m_invMassA, mB = m_invMassB;</span>
+<span class="fc" id="L211">    float iA = m_invIA, iB = m_invIB;</span>
+
+<span class="fc" id="L213">    float h = data.step.dt;</span>
+
+    // Solve angular friction
+    {
+<span class="fc" id="L217">      float Cdot = wB - wA;</span>
+<span class="fc" id="L218">      float impulse = -m_angularMass * Cdot;</span>
+
+<span class="fc" id="L220">      float oldImpulse = m_angularImpulse;</span>
+<span class="fc" id="L221">      float maxImpulse = h * m_maxTorque;</span>
+<span class="fc" id="L222">      m_angularImpulse = MathUtils.clamp(m_angularImpulse + impulse, -maxImpulse, maxImpulse);</span>
+<span class="fc" id="L223">      impulse = m_angularImpulse - oldImpulse;</span>
+
+<span class="fc" id="L225">      wA -= iA * impulse;</span>
+<span class="fc" id="L226">      wB += iB * impulse;</span>
+    }
+
+    // Solve linear friction
+    {
+<span class="fc" id="L231">      final Vec2 Cdot = pool.popVec2();</span>
+<span class="fc" id="L232">      final Vec2 temp = pool.popVec2();</span>
+
+<span class="fc" id="L234">      Vec2.crossToOutUnsafe(wA, m_rA, temp);</span>
+<span class="fc" id="L235">      Vec2.crossToOutUnsafe(wB, m_rB, Cdot);</span>
+<span class="fc" id="L236">      Cdot.addLocal(vB).subLocal(vA).subLocal(temp);</span>
+
+<span class="fc" id="L238">      final Vec2 impulse = pool.popVec2();</span>
+<span class="fc" id="L239">      Mat22.mulToOutUnsafe(m_linearMass, Cdot, impulse);</span>
+<span class="fc" id="L240">      impulse.negateLocal();</span>
+
+
+<span class="fc" id="L243">      final Vec2 oldImpulse = pool.popVec2();</span>
+<span class="fc" id="L244">      oldImpulse.set(m_linearImpulse);</span>
+<span class="fc" id="L245">      m_linearImpulse.addLocal(impulse);</span>
+
+<span class="fc" id="L247">      float maxImpulse = h * m_maxForce;</span>
+
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">      if (m_linearImpulse.lengthSquared() &gt; maxImpulse * maxImpulse) {</span>
+<span class="nc" id="L250">        m_linearImpulse.normalize();</span>
+<span class="nc" id="L251">        m_linearImpulse.mulLocal(maxImpulse);</span>
+      }
+
+<span class="fc" id="L254">      impulse.set(m_linearImpulse).subLocal(oldImpulse);</span>
+
+<span class="fc" id="L256">      temp.set(impulse).mulLocal(mA);</span>
+<span class="fc" id="L257">      vA.subLocal(temp);</span>
+<span class="fc" id="L258">      wA -= iA * Vec2.cross(m_rA, impulse);</span>
+
+<span class="fc" id="L260">      temp.set(impulse).mulLocal(mB);</span>
+<span class="fc" id="L261">      vB.addLocal(temp);</span>
+<span class="fc" id="L262">      wB += iB * Vec2.cross(m_rB, impulse);</span>
+      
+    }
+
+//    data.velocities[m_indexA].v.set(vA);
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">    if( data.velocities[m_indexA].w != wA) {</span>
+<span class="nc bnc" id="L268" title="All 4 branches missed.">      assert(data.velocities[m_indexA].w != wA);</span>
+    }
+<span class="fc" id="L270">    data.velocities[m_indexA].w = wA;</span>
+   
+//    data.velocities[m_indexB].v.set(vB);
+<span class="fc" id="L273">    data.velocities[m_indexB].w = wB;</span>
+
+<span class="fc" id="L275">    pool.pushVec2(4);</span>
+<span class="fc" id="L276">  }</span>
+
+  public boolean solvePositionConstraints(final SolverData data) {
+<span class="fc" id="L279">    return true;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

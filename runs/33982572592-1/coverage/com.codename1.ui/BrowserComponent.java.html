@@ -1,0 +1,2444 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BrowserComponent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">BrowserComponent.java</span></div><h1>BrowserComponent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
+import com.codename1.io.URL;
+import com.codename1.io.Util;
+import com.codename1.processing.Result;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.BrowserNavigationCallback;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.Base64;
+import com.codename1.util.Callback;
+import com.codename1.util.CallbackAdapter;
+import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
+import com.codename1.util.regex.StringReader;
+
+import java.io.IOException;
+import java.net.URI;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Hashtable;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.Set;
+import java.util.Timer;
+import java.util.Vector;
+
+/// The browser component is an interface to an embeddable native platform browser on platforms
+/// that support embedding the native browser in place, if you need wide compatibility and flexibility
+/// you should check out the HTMLComponent which provides a lightweight 100% cross platform
+/// web component.
+///
+/// This component will only work on platforms that support embedding a native browser which
+/// exclude earlier versions of Blackberry devices and J2ME devices.
+///
+/// Its recommended that you place this component in a fixed position (none scrollable) on the screen without other
+/// focusable components to prevent confusion between focus authority and allow the component to scroll
+/// itself rather than CodenameOne making that decision for it.
+///
+/// On Android this component might show a native progress indicator dialog. You can disable that functionality
+/// using the `Display.getInstance().setProperty(&quot;WebLoadingHidden&quot;, &quot;true&quot;);` call.
+///
+/// The following code shows the basic usage of the `BrowserComponent`:
+///
+/// ```java
+/// Form hi = new Form(&quot;Browser&quot;, new BorderLayout());
+/// BrowserComponent browser = new BrowserComponent();
+/// browser.setURL(&quot;https://www.codenameone.com/&quot;);
+/// hi.add(BorderLayout.CENTER, browser);
+/// ```
+///
+/// Debugging on Android
+///
+/// You can use [Chrome's remote debugging features](https://developers.google.com/web/tools/chrome-devtools/remote-debugging/webviews) to debug the contents of a BrowserComponent.  On Android 4.4 (KitKat)
+/// and higher, you will need to define the &quot;android.webContentsDebuggingEnabled&quot; display property in order for this to work.  You can define this inside your app's init() method:
+///
+/// `````java Display.getInstance().setProperty(&quot;android.webContentsDebuggingEnabled&quot;, &quot;true&quot;); `````
+///
+/// @author Shai Almog
+public class BrowserComponent extends Container {
+    /// Browser property key to control whether links with `target=&quot;_blank&quot;` or `target=&quot;_new&quot;`
+    /// should be followed in the current browser view. Defaults to `true`.
+    public static final String BROWSER_PROPERTY_FOLLOW_TARGET_BLANK = &quot;BrowserComponent.followTargetBlank&quot;;
+    /// Browser property key to pin the appearance (light/dark) of the native web widget regardless
+    /// of the device-wide setting. This drives the `prefers-color-scheme` CSS media query and the
+    /// user-agent rendering of form controls and default backgrounds inside the page. Accepted
+    /// values are `&quot;light&quot;`, `&quot;dark&quot;` and `&quot;auto&quot;` (follow the device, the default). Use it via
+    /// `browser.setProperty(BrowserComponent.BROWSER_PROPERTY_INTERFACE_STYLE, &quot;light&quot;)`.
+    /// Currently honored on iOS (WKWebView); platforms that do not support pinning the web-view
+    /// appearance ignore it.
+    public static final String BROWSER_PROPERTY_INTERFACE_STYLE = &quot;BrowserComponent.interfaceStyle&quot;;
+    /// String constant for web event listener `com.codename1.ui.events.ActionListener)`
+    public static final String onStart = &quot;onStart&quot;;
+    /// String constant for web event listener `com.codename1.ui.events.ActionListener)`
+    public static final String onLoad = &quot;onLoad&quot;;
+    /// String constant for web event listener `com.codename1.ui.events.ActionListener)`
+    public static final String onError = &quot;onError&quot;;
+    /// String constant for web event listener.  Use this event types to register to receive messages
+    /// in a cross-domain-safe way from the web page.  To send a message from the webpage, the page should
+    /// include a function like:
+    ///
+    /// ```java
+    /// `function postToCN1(msg) {
+    /// if (window.cn1PostMessage) {
+    /// // Case 1: Running inside native app in a WebView
+    /// window.cn1PostMessage(msg);` else {
+    /// // Case 2: Running inside a Javascript app in an iframe
+    /// window.parent.postMessage(msg, '*');
+    /// }
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// Receiving a message:
+    ///
+    /// ```java
+    /// `myBrowserComponent.addWebEventListener(BrowserComponent.onMessage, e-&gt;{
+    /// CN.callSerially(()-&gt;{
+    /// Log.p(&quot;Message: &quot;+e.getSource());
+    /// Dialog.show(&quot;Here&quot;, (String)e.getSource(), &quot;OK&quot;, null);`);
+    ///   });
+    /// }
+    /// ```
+    public static final String onMessage = &quot;onMessage&quot;;
+    private static final String RETURN_URL_PREFIX = &quot;/!cn1return/&quot;;
+<span class="fc" id="L135">    private final Object readyLock = new Object();</span>
+<span class="fc" id="L136">    private final Container placeholder = new Container();</span>
+<span class="fc" id="L137">    private final LinkedList&lt;Runnable&gt; onReady = new LinkedList&lt;Runnable&gt;();</span>
+    SuccessCallback&lt;JSRef&gt; messageCallback;
+    private Hashtable listeners;
+    private PeerComponent internal;
+<span class="fc" id="L141">    private boolean pinchToZoom = true;</span>
+<span class="fc" id="L142">    private boolean nativeScrolling = true;</span>
+<span class="fc" id="L143">    private boolean ready = false;</span>
+<span class="fc" id="L144">    private boolean fireCallbacksOnEdt = true;</span>
+<span class="fc" id="L145">    private BrowserNavigationCallback browserNavigationCallback = new AlwaysTrueShouldNavigateCallback();</span>
+    /// List of registered browser navigation callbacks.
+    private Vector&lt;BrowserNavigationCallback&gt; browserNavigationCallbacks;
+    private Hashtable&lt;Integer, SuccessCallback&lt;JSRef&gt;&gt; returnValueCallbacks;
+
+    /// The clock armed for a scripted call that has not answered yet.
+    ///
+    /// Held so an answer can stop it. The timer runs on a thread of its own that is not
+    /// a daemon, and its task holds this component, the callback and the script, so a
+    /// call that replied promptly still kept all of it alive until a timeout it never
+    /// needed -- once per execute(), which a page calling in a loop turns into a pile of
+    /// threads that can also keep a JavaSE process from exiting.
+    ///
+    /// Keyed by the id of the call it belongs to, not by the callback: one callback
+    /// object can be handed to two overlapping calls, and keying by it made the second
+    /// displace the first -- leaving that first clock uncancellable, and letting it
+    /// later find the second call's registration and report a timeout against it at the
+    /// wrong deadline.
+    private Hashtable&lt;Integer, Timer&gt; returnValueTimeouts;
+<span class="fc" id="L164">    private int nextReturnValueCallbackId = 0;</span>
+    private String tmpUrl;
+    /// Sets of callbacks that are registered to persist for multiple calls.
+    private Set jsCallbacks;
+
+    /// This constructor will work as expected when a browser component is supported, see isNativeBrowserSupported()
+<span class="fc" id="L170">    public BrowserComponent() {</span>
+<span class="fc" id="L171">        setUIIDFinal(&quot;BrowserComponent&quot;);</span>
+<span class="fc" id="L172">        putClientProperty(&quot;BrowserComponent.useWKWebView&quot;, &quot;true&quot;.equals(Display.getInstance().getProperty(&quot;BrowserComponent.useWKWebView&quot;, &quot;true&quot;)));</span>
+<span class="fc" id="L173">        setLayout(new BorderLayout());</span>
+<span class="fc" id="L174">        addComponent(BorderLayout.CENTER, placeholder);</span>
+<span class="fc" id="L175">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L178">                PeerComponent c = Display.impl.createBrowserComponent(BrowserComponent.this);</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                if (c == null) {</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">                    if (CN.isSimulator()) {</span>
+<span class="nc" id="L181">                        Log.p(&quot;Failed to create the browser component.  Please ensure that you are either using a JDK that has JavaFX (e.g. ZuluFX), or that you have installed the Codename One CEF component.  See https://www.codenameone.com/blog/big-changes-jcef.html for more information&quot;);</span>
+                    } else {
+<span class="nc" id="L183">                        Log.p(&quot;Failed to create browser component.  This platform may not support the native browser component&quot;);</span>
+                    }
+<span class="nc" id="L185">                    return;</span>
+                }
+<span class="fc" id="L187">                internal = c;</span>
+<span class="fc" id="L188">                removeComponent(placeholder);</span>
+<span class="fc" id="L189">                addComponent(BorderLayout.CENTER, internal);</span>
+
+<span class="fc" id="L191">                onReady();</span>
+<span class="fc" id="L192">                revalidateLater();</span>
+<span class="fc" id="L193">            }</span>
+        });
+<span class="fc" id="L195">        onReady(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L198">                Style s = internal.getUnselectedStyle();</span>
+<span class="fc" id="L199">                s.setPadding(0, 0, 0, 0);</span>
+<span class="fc" id="L200">                s.setMargin(0, 0, 0, 0);</span>
+<span class="fc" id="L201">                s.setBgTransparency(255);</span>
+
+<span class="fc" id="L203">                s = getUnselectedStyle();</span>
+<span class="fc" id="L204">                s.setPadding(0, 0, 0, 0);</span>
+<span class="fc" id="L205">            }</span>
+        });
+
+
+<span class="fc" id="L209">        addWebEventListener(onStart, new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L212">                installMessageListener();</span>
+<span class="fc" id="L213">            }</span>
+
+        });
+
+<span class="fc" id="L217">    }</span>
+
+    /// Decodes a URL
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: The string to decode.
+    ///
+    /// - `enc`: The encoding.  E.g. UTF-8
+    ///
+    /// #### Returns
+    ///
+    /// The decoded URL.
+    private static String decodeURL(String s, String enc) {
+
+<span class="fc" id="L232">        boolean needToChange = false;</span>
+<span class="fc" id="L233">        int numChars = s.length();</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        StringBuilder sb = new StringBuilder(numChars &gt; 500 ? numChars / 2 : numChars);</span>
+<span class="fc" id="L235">        int i = 0;</span>
+
+        char c;
+<span class="fc" id="L238">        byte[] bytes = null;</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        while (i &lt; numChars) {</span>
+<span class="fc" id="L240">            c = s.charAt(i);</span>
+<span class="pc bpc" id="L241" title="1 of 3 branches missed.">            switch (c) {</span>
+                case '+':
+<span class="nc" id="L243">                    sb.append(' ');</span>
+<span class="nc" id="L244">                    i++;</span>
+<span class="nc" id="L245">                    needToChange = true;</span>
+<span class="nc" id="L246">                    break;</span>
+                case '%':
+                    /*
+                     * Starting with this instance of %, process all
+                     * consecutive substrings of the form %xy. Each
+                     * substring %xy will yield a byte. Convert all
+                     * consecutive  bytes obtained this way to whatever
+                     * character(s) they represent in the provided
+                     * encoding.
+                     */
+
+                    try {
+
+                        // (numChars-i)/3 is an upper bound for the number
+                        // of remaining bytes
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                        if (bytes == null) {</span>
+<span class="fc" id="L262">                            bytes = new byte[(numChars - i) / 3];</span>
+                        }
+<span class="fc" id="L264">                        int pos = 0;</span>
+
+<span class="fc bfc" id="L266" title="All 4 branches covered.">                        while (((i + 2) &lt; numChars) &amp;&amp;</span>
+                                (c == '%')) {
+<span class="fc" id="L268">                            int v = Integer.parseInt(s.substring(i + 1, i + 3), 16);</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                            if (v &lt; 0) {</span>
+<span class="nc" id="L270">                                throw new IllegalArgumentException(&quot;URLDecoder: Illegal hex characters in escape (%) pattern - negative value&quot;);</span>
+                            }
+<span class="fc" id="L272">                            bytes[pos++] = (byte) v;</span>
+<span class="fc" id="L273">                            i += 3;</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">                            if (i &lt; numChars) {</span>
+<span class="fc" id="L275">                                c = s.charAt(i);</span>
+                            }
+<span class="fc" id="L277">                        }</span>
+
+                        // A trailing, incomplete byte encoding such as
+                        // &quot;%x&quot; will cause an exception to be thrown
+
+<span class="pc bpc" id="L282" title="1 of 4 branches missed.">                        if ((i &lt; numChars) &amp;&amp; (c == '%')) {</span>
+<span class="nc" id="L283">                            throw new IllegalArgumentException(</span>
+                                    &quot;URLDecoder: Incomplete trailing escape (%) pattern&quot;);
+                        }
+                        try {
+<span class="fc" id="L287">                            sb.append(new String(bytes, 0, pos, enc));</span>
+<span class="nc" id="L288">                        } catch (Throwable t) {</span>
+<span class="nc" id="L289">                            throw new RuntimeException(t.getMessage(), t);</span>
+<span class="fc" id="L290">                        }</span>
+<span class="nc" id="L291">                    } catch (NumberFormatException e) {</span>
+<span class="nc" id="L292">                        throw new IllegalArgumentException(</span>
+                                &quot;URLDecoder: Illegal hex characters in escape (%) pattern - &quot;
+<span class="nc" id="L294">                                        + e.getMessage(), e);</span>
+<span class="fc" id="L295">                    }</span>
+<span class="fc" id="L296">                    needToChange = true;</span>
+<span class="fc" id="L297">                    break;</span>
+                default:
+<span class="fc" id="L299">                    sb.append(c);</span>
+<span class="fc" id="L300">                    i++;</span>
+<span class="fc" id="L301">                    break;</span>
+            }
+        }
+
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">        return (needToChange ? sb.toString() : s);</span>
+    }
+
+    /// Returns true if the platform supports embedding a native browser component
+    ///
+    /// #### Returns
+    ///
+    /// true if native browsing is supported
+    public static boolean isNativeBrowserSupported() {
+<span class="fc" id="L314">        return Display.impl.isNativeBrowserComponentSupported();</span>
+    }
+
+
+    /// Injects parameters into a Javascript string expression.  This will quote strings properly.  The
+    /// expression should include placeholders for each parameter of the form ${0}, ${1}, etc..
+    ///
+    /// #### Parameters
+    ///
+    /// - `jsExpression`: The javascript expression with placeholders to inject parameters.
+    ///
+    /// - `params`
+    ///
+    /// #### Returns
+    ///
+    /// The expression with placeholders replaced by parameters.
+    public static String injectParameters(String jsExpression, Object... params) {
+<span class="fc" id="L331">        int i = 0;</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        for (Object param : params) {</span>
+
+<span class="fc" id="L334">            String pattern = &quot;${&quot; + i + &quot;}&quot;;</span>
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">            if (param == null) {</span>
+<span class="nc" id="L336">                jsExpression = StringUtil.replaceAll(jsExpression, pattern, &quot;null&quot;);</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">            } else if (param instanceof String) {</span>
+<span class="fc" id="L338">                jsExpression = StringUtil.replaceAll(jsExpression, pattern, quote((String) param));</span>
+<span class="nc bnc" id="L339" title="All 2 branches missed.">            } else if (param instanceof JSProxy) {</span>
+<span class="nc" id="L340">                jsExpression = StringUtil.replaceAll(jsExpression, pattern, ((JSProxy) param).self);</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">            } else if (param instanceof JSExpression) {</span>
+<span class="nc" id="L342">                jsExpression = ((JSExpression) param).expression;</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">            } else if (param instanceof JSRef) {</span>
+<span class="nc" id="L344">                JSRef jsr = (JSRef) param;</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">                if (jsr.isNull()) {</span>
+<span class="nc" id="L346">                    jsExpression = StringUtil.replaceAll(jsExpression, pattern, &quot;null&quot;);</span>
+<span class="nc bnc" id="L347" title="All 2 branches missed.">                } else if (jsr.getJSType() == JSType.STRING) {</span>
+<span class="nc" id="L348">                    jsExpression = StringUtil.replaceAll(jsExpression, pattern, quote(jsr.getValue()));</span>
+<span class="nc bnc" id="L349" title="All 4 branches missed.">                } else if (jsr.getJSType() == JSType.FUNCTION || jsr.getJSType() == JSType.OBJECT) {</span>
+<span class="nc" id="L350">                    throw new IllegalArgumentException(&quot;Cannot inject JSRefs of functions or objects as parameters in JS expressions&quot;);</span>
+                } else {
+<span class="nc" id="L352">                    jsExpression = StringUtil.replaceAll(jsExpression, pattern, jsr.getValue());</span>
+                }
+<span class="nc" id="L354">            } else {</span>
+<span class="nc" id="L355">                jsExpression = StringUtil.replaceAll(jsExpression, pattern, String.valueOf(param));</span>
+            }
+<span class="fc" id="L357">            i++;</span>
+        }
+<span class="fc" id="L359">        return jsExpression;</span>
+    }
+
+    /// Produce a string in double quotes with backslash sequences in all the
+    /// right places. A backslash will be inserted within &lt;/, allowing JSON
+    /// text to be delivered in HTML. In JSON text, a string cannot contain a
+    /// control character or an unescaped quote or backslash.
+    ///
+    /// #### Parameters
+    ///
+    /// - `string`: A String
+    ///
+    /// #### Returns
+    ///
+    /// A String correctly formatted for insertion in a JSON text.
+    private static String quote(String string) {
+<span class="pc bpc" id="L375" title="2 of 4 branches missed.">        if (string == null || string.length() == 0) {</span>
+<span class="nc" id="L376">            return &quot;\&quot;\&quot;&quot;;</span>
+        }
+
+        char b;
+<span class="fc" id="L380">        char c = 0;</span>
+        int i;
+<span class="fc" id="L382">        int len = string.length();</span>
+<span class="fc" id="L383">        StringBuilder sb = new StringBuilder(len + 4);</span>
+        String t;
+
+<span class="fc" id="L386">        sb.append('&quot;');</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        for (i = 0; i &lt; len; i += 1) {</span>
+<span class="fc" id="L388">            b = c;</span>
+<span class="fc" id="L389">            c = string.charAt(i);</span>
+<span class="pc bpc" id="L390" title="7 of 8 branches missed.">            switch (c) {</span>
+                case '\\':
+                case '&quot;':
+<span class="nc" id="L393">                    sb.append('\\');</span>
+<span class="nc" id="L394">                    sb.append(c);</span>
+<span class="nc" id="L395">                    break;</span>
+                case '/':
+<span class="nc bnc" id="L397" title="All 2 branches missed.">                    if (b == '&lt;') {</span>
+<span class="nc" id="L398">                        sb.append('\\');</span>
+                    }
+<span class="nc" id="L400">                    sb.append(c);</span>
+<span class="nc" id="L401">                    break;</span>
+                case '\b':
+<span class="nc" id="L403">                    sb.append(&quot;\\b&quot;);</span>
+<span class="nc" id="L404">                    break;</span>
+                case '\t':
+<span class="nc" id="L406">                    sb.append(&quot;\\t&quot;);</span>
+<span class="nc" id="L407">                    break;</span>
+                case '\n':
+<span class="nc" id="L409">                    sb.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L410">                    break;</span>
+                case '\f':
+<span class="nc" id="L412">                    sb.append(&quot;\\f&quot;);</span>
+<span class="nc" id="L413">                    break;</span>
+                case '\r':
+<span class="nc" id="L415">                    sb.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L416">                    break;</span>
+                default:
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">                    if (c &lt; ' ') {</span>
+<span class="nc" id="L419">                        t = &quot;000&quot; + Integer.toHexString(c);</span>
+<span class="nc" id="L420">                        sb.append(&quot;\\u&quot; + t.substring(t.length() - 4));</span>
+                    } else {
+<span class="fc" id="L422">                        sb.append(c);</span>
+                    }
+            }
+        }
+<span class="fc" id="L426">        sb.append('&quot;');</span>
+<span class="fc" id="L427">        return sb.toString();</span>
+    }
+
+    /// This method creates a [data URI](http://en.wikipedia.org/wiki/Data_URI_scheme)
+    /// which allows developers creating HTML for local use to embed local images into the HTML by
+    /// appending them as a URI. E.g. instead of referencing a file or URL just load the image data
+    /// and place the contents of this string into the src attribute.
+    ///
+    /// This is the easiest way to get an HTML with local images to work on all mobile platforms.
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`: data of an image
+    ///
+    /// - `mime`: the mime type of the image e.g. image/png
+    ///
+    /// #### Returns
+    ///
+    /// a data URL that can be placed into the img src attribute in HTML e.g. data:image/png;base64,encodedData
+    ///
+    public static String createDataURI(byte[] data, String mime) {
+<span class="nc" id="L448">        return &quot;data:&quot; + mime + &quot;;base64,&quot; + Base64.encodeNoNewline(data);</span>
+    }
+
+    PeerComponent getInternal() {
+<span class="fc" id="L452">        return internal;</span>
+    }
+
+    /// Checks if javascript callbacks are run on the EDT.
+    ///
+    /// #### Returns
+    ///
+    /// True if javascript callbacks are run on the EDT.
+    ///
+    /// #### See also
+    ///
+    /// - #setFireCallbacksOnEdt(boolean)
+    public boolean isFireCallbacksOnEdt() {
+<span class="nc" id="L465">        return fireCallbacksOnEdt;</span>
+    }
+
+    /// Sets whether javascript callbacks should be run on the EDT.  Default is true.
+    ///
+    /// #### Parameters
+    ///
+    /// - `edt`: True if callbacks should be run on EDT.  False if they should be run on the platform's main thread.
+    ///
+    public void setFireCallbacksOnEdt(boolean edt) {
+<span class="nc" id="L475">        this.fireCallbacksOnEdt = edt;</span>
+<span class="nc" id="L476">    }</span>
+
+    /// Async method for capturing a screenshot of the browser content.  Currently only supported
+    /// in the simulator.  Also, only displays the visible rectangle of the BrowserComponent,
+    /// not the entire page.
+    ///
+    /// #### Returns
+    ///
+    /// AsyncResource resolving to an Image of the webview contents.
+    ///
+    public AsyncResource&lt;Image&gt; captureScreenshot() {
+<span class="nc bnc" id="L487" title="All 2 branches missed.">        if (internal != null) {</span>
+<span class="nc" id="L488">            AsyncResource&lt;Image&gt; i = Display.impl.captureBrowserScreenshot(internal);</span>
+<span class="nc bnc" id="L489" title="All 2 branches missed.">            if (i != null) {</span>
+<span class="nc" id="L490">                return i;</span>
+            }
+        }
+<span class="nc" id="L493">        AsyncResource&lt;Image&gt; out = new AsyncResource&lt;Image&gt;();</span>
+<span class="nc bnc" id="L494" title="All 2 branches missed.">        if (internal != null) {</span>
+<span class="nc" id="L495">            out.complete(internal.toImage());</span>
+        } else {
+<span class="nc" id="L497">            out.complete(toImage());</span>
+        }
+<span class="nc" id="L499">        return out;</span>
+    }
+
+    /// The browser navigation callback interface allows handling a case where
+    /// a URL invocation can be delegated to Java code. This allows binding
+    /// Java side functionality to JavaScript functionality in the same
+    /// way PhoneGap/Cordova work
+    ///
+    /// #### Returns
+    ///
+    /// the callback interface
+    ///
+    /// #### Deprecated
+    ///
+    /// Call `#fireBrowserNavigationCallbacks(java.lang.String)` to determine whether navigation should occur for a particulr URL.
+    public BrowserNavigationCallback getBrowserNavigationCallback() {
+<span class="fc" id="L515">        return this.browserNavigationCallback;</span>
+    }
+
+    /// Set the browser navigation callback which allows handling a case where
+    /// a URL invocation can be delegated to Java code. This allows binding
+    /// Java side functionality to JavaScript functionality in the same
+    /// way PhoneGap/Cordova work
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: the callback interface
+    ///
+    /// #### Deprecated
+    ///
+    /// Use {@link #addBrowserNavigationCallback(com.codename1.ui.events.BrowserNavigationCallback)} instead.
+    public void setBrowserNavigationCallback(BrowserNavigationCallback callback) {
+<span class="fc" id="L531">        this.browserNavigationCallback = callback;</span>
+<span class="fc" id="L532">    }</span>
+
+    private Vector&lt;BrowserNavigationCallback&gt; browserNavigationCallbacks() {
+<span class="pc bpc" id="L535" title="1 of 2 branches missed.">        if (browserNavigationCallbacks == null) {</span>
+<span class="fc" id="L536">            browserNavigationCallbacks = new Vector&lt;BrowserNavigationCallback&gt;();</span>
+        }
+<span class="fc" id="L538">        return browserNavigationCallbacks;</span>
+    }
+
+    /// Adds a navigation callback.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: The callback to call before navigating to a URL.
+    public void addBrowserNavigationCallback(BrowserNavigationCallback callback) {
+<span class="fc" id="L547">        browserNavigationCallbacks().add(callback);</span>
+<span class="fc" id="L548">    }</span>
+
+    /// Removes a navigation callback.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: The callback to call before navigating to a URL.
+    public void removeBrowserNavigationCallback(BrowserNavigationCallback callback) {
+<span class="nc bnc" id="L556" title="All 2 branches missed.">        if (browserNavigationCallbacks != null) {</span>
+<span class="nc" id="L557">            browserNavigationCallbacks().remove(callback);</span>
+        }
+<span class="nc" id="L559">    }</span>
+
+    private Hashtable&lt;Integer, SuccessCallback&lt;JSRef&gt;&gt; returnValueCallbacks() {
+<span class="fc bfc" id="L562" title="All 2 branches covered.">        if (returnValueCallbacks == null) {</span>
+<span class="fc" id="L563">            returnValueCallbacks = new Hashtable&lt;Integer, SuccessCallback&lt;JSRef&gt;&gt;();</span>
+        }
+<span class="fc" id="L565">        return returnValueCallbacks;</span>
+    }
+
+    private int addReturnValueCallback(SuccessCallback&lt;JSRef&gt; callback) {
+<span class="fc" id="L569">        int id = nextReturnValueCallbackId++;</span>
+<span class="pc bpc" id="L570" title="1 of 2 branches missed.">        while (returnValueCallbacks().containsKey(id)) {</span>
+<span class="nc" id="L571">            id++;</span>
+        }
+<span class="fc" id="L573">        returnValueCallbacks().put(id, callback);</span>
+<span class="fc" id="L574">        nextReturnValueCallbackId = id + 1;</span>
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">        if (nextReturnValueCallbackId &gt; 10000) {</span>
+<span class="nc" id="L576">            nextReturnValueCallbackId = 0;</span>
+        }
+<span class="fc" id="L578">        return id;</span>
+    }
+
+    private SuccessCallback&lt;JSRef&gt; popReturnValueCallback(int id) {
+<span class="pc bpc" id="L582" title="1 of 2 branches missed.">        if (returnValueCallbacks != null) {</span>
+<span class="fc" id="L583">            SuccessCallback&lt;JSRef&gt; callback = returnValueCallbacks.remove(id);</span>
+<span class="pc bpc" id="L584" title="1 of 2 branches missed.">            if (callback != null) {</span>
+                // The answer arrived, so the clock waiting for it has nothing left to
+                // report. Stopping it is what lets its thread end and this component go.
+<span class="fc" id="L587">                cancelReturnValueTimeout(id);</span>
+            }
+<span class="fc" id="L589">            return callback;</span>
+        }
+<span class="nc" id="L591">        return null;</span>
+    }
+
+    /// Stops and forgets the clock armed for one scripted call, if there is one.
+    private void cancelReturnValueTimeout(int callbackId) {
+<span class="fc bfc" id="L596" title="All 2 branches covered.">        if (returnValueTimeouts == null) {</span>
+<span class="fc" id="L597">            return;</span>
+        }
+<span class="fc" id="L599">        Timer clock = returnValueTimeouts.remove(Integer.valueOf(callbackId));</span>
+<span class="pc bpc" id="L600" title="1 of 2 branches missed.">        if (clock != null) {</span>
+<span class="fc" id="L601">            clock.cancel();</span>
+        }
+<span class="fc" id="L603">    }</span>
+
+    @Override
+    protected void deinitialize() {
+<span class="fc" id="L607">        uninstallMessageListener();</span>
+
+<span class="fc" id="L609">        super.deinitialize();</span>
+<span class="fc" id="L610">    }</span>
+
+    /// Calls the postMessage() method on the webpage's window object.
+    ///
+    /// This is useful mainly for the Javascript port so that you don't have to worry about
+    /// cross-domain issues, as postMessage() is supported cross-domain.
+    ///
+    /// To receive a message, the web page should register a &quot;message&quot; event listener, just as
+    /// it would to receive messages from other windows in the browser.  See [MDN docs for postMessage()](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage)
+    /// for more information.
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: The message to send.
+    ///
+    /// - `targetOrigin`: The target origin of the message.  E.g. http://example.com:1234
+    ///
+    public void postMessage(final String message, final String targetOrigin) {
+<span class="pc bpc" id="L628" title="1 of 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L629">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L632">                    postMessage(message, targetOrigin);</span>
+<span class="nc" id="L633">                }</span>
+            });
+<span class="nc" id="L635">            return;</span>
+        }
+<span class="pc bpc" id="L637" title="1 of 2 branches missed.">        if (!Display.impl.postMessage(internal, message, targetOrigin)) {</span>
+<span class="fc" id="L638">            execute(&quot;window.postMessage(${0}, ${1})&quot;, new Object[]{message, targetOrigin});</span>
+        }
+<span class="fc" id="L640">    }</span>
+
+    private void installMessageListener() {
+<span class="pc bpc" id="L643" title="1 of 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L644">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L647">                    installMessageListener();</span>
+<span class="nc" id="L648">                }</span>
+            });
+<span class="nc" id="L650">            return;</span>
+        }
+<span class="pc bpc" id="L652" title="1 of 2 branches missed.">        if (!Display.impl.installMessageListener(internal)) {</span>
+
+<span class="fc" id="L654">            messageCallback = new SuccessCallback&lt;JSRef&gt;() {</span>
+                @Override
+                public void onSucess(JSRef value) {
+<span class="nc" id="L657">                    fireWebEvent(onMessage, new ActionEvent(value.toString()));</span>
+<span class="nc" id="L658">                }</span>
+            };
+
+<span class="fc" id="L661">            addJSCallback(&quot;window.cn1PostMessage = function(msg){ callback.onSuccess(msg);};&quot;, messageCallback);</span>
+        }
+<span class="fc" id="L663">    }</span>
+
+    private void uninstallMessageListener() {
+<span class="fc bfc" id="L666" title="All 2 branches covered.">        if (internal == null) {</span>
+<span class="fc" id="L667">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L670">                    uninstallMessageListener();</span>
+<span class="fc" id="L671">                }</span>
+            });
+<span class="fc" id="L673">            return;</span>
+        }
+<span class="fc" id="L675">        Display.impl.installMessageListener(internal);</span>
+<span class="fc" id="L676">    }</span>
+
+    /// Fires all of the registered browser navigation callbacks against the provided URL.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL to fire the navigation callbacks against.
+    ///
+    /// #### Returns
+    ///
+    /// True if all of the callbacks say that they can browse.  False otherwise.
+    public boolean fireBrowserNavigationCallbacks(String url) {
+<span class="pc bpc" id="L688" title="2 of 4 branches missed.">        boolean shouldNavigate = browserNavigationCallback == null || browserNavigationCallback.shouldNavigate(url);</span>
+<span class="fc bfc" id="L689" title="All 2 branches covered.">        if (browserNavigationCallbacks != null) {</span>
+<span class="fc bfc" id="L690" title="All 2 branches covered.">            for (BrowserNavigationCallback cb : browserNavigationCallbacks) {</span>
+<span class="pc bpc" id="L691" title="1 of 2 branches missed.">                if (!cb.shouldNavigate(url)) {</span>
+<span class="fc" id="L692">                    shouldNavigate = false;</span>
+                }
+<span class="fc" id="L694">            }</span>
+        }
+<span class="pc bpc" id="L696" title="2 of 4 branches missed.">        if (!url.startsWith(&quot;javascript:&quot;) &amp;&amp; url.indexOf(RETURN_URL_PREFIX) != -1) {</span>
+            //System.out.println(&quot;Received browser navigation callback &quot;+url);
+<span class="fc" id="L698">            String result = decodeURL(url.substring(url.indexOf(RETURN_URL_PREFIX) + RETURN_URL_PREFIX.length()), &quot;UTF-8&quot;);</span>
+            //System.out.println(&quot;After decode &quot;+result);
+<span class="fc" id="L700">            Result structResult = Result.fromContent(result, Result.JSON);</span>
+<span class="fc" id="L701">            int callbackId = structResult.getAsInteger(&quot;callbackId&quot;);</span>
+<span class="fc" id="L702">            final String value = structResult.getAsString(&quot;value&quot;);</span>
+<span class="fc" id="L703">            final String type = structResult.getAsString(&quot;type&quot;);</span>
+<span class="fc" id="L704">            final String errorMessage = structResult.getAsString(&quot;errorMessage&quot;);</span>
+<span class="fc" id="L705">            final SuccessCallback&lt;JSRef&gt; callback = popReturnValueCallback(callbackId);</span>
+<span class="pc bpc" id="L706" title="1 of 4 branches missed.">            if (jsCallbacks != null &amp;&amp; jsCallbacks.contains(callback)) {</span>
+                // If this is a registered callback, then we treat it more like
+                // an event listener, and we retain it for future callbacks.
+<span class="fc" id="L709">                returnValueCallbacks.put(callbackId, callback);</span>
+            }
+<span class="pc bpc" id="L711" title="1 of 2 branches missed.">            if (callback != null) {</span>
+<span class="pc bpc" id="L712" title="1 of 2 branches missed.">                if (errorMessage != null) {</span>
+<span class="nc bnc" id="L713" title="All 2 branches missed.">                    if (fireCallbacksOnEdt) {</span>
+<span class="nc" id="L714">                        Display.getInstance().callSerially(new FireNavigationCallbackRunnable(callback, errorMessage));</span>
+                    } else {
+<span class="nc bnc" id="L716" title="All 2 branches missed.">                        if (callback instanceof Callback) {</span>
+<span class="nc" id="L717">                            ((Callback) callback).onError(this, new RuntimeException(errorMessage), 0, errorMessage);</span>
+
+                        }
+                    }
+
+                } else {
+<span class="pc bpc" id="L723" title="1 of 2 branches missed.">                    if (fireCallbacksOnEdt) {</span>
+<span class="fc" id="L724">                        Display.getInstance().callSerially(new NavigationCallbackRunnable(callback, value, type));</span>
+                    } else {
+<span class="nc" id="L726">                        callback.onSucess(new JSRef(value, type));</span>
+                    }
+
+                }
+            } else {
+<span class="nc" id="L731">                Log.e(new RuntimeException(&quot;Received return value from javascript, but no callback could be found for that ID&quot;));</span>
+            }
+<span class="fc" id="L733">            shouldNavigate = false;</span>
+        }
+<span class="fc" id="L735">        return shouldNavigate;</span>
+    }
+
+    private void onReady(final Runnable r) {
+<span class="pc bpc" id="L739" title="1 of 2 branches missed.">        if (!CN.isEdt()) {</span>
+<span class="nc" id="L740">            CN.callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L743">                    onReady(r);</span>
+<span class="nc" id="L744">                }</span>
+            });
+<span class="nc" id="L746">            return;</span>
+        }
+<span class="fc" id="L748">        onReady.add(r);</span>
+<span class="pc bpc" id="L749" title="1 of 2 branches missed.">        if (internal != null) {</span>
+<span class="nc bnc" id="L750" title="All 2 branches missed.">            while (!onReady.isEmpty()) {</span>
+<span class="nc" id="L751">                onReady.remove(0).run();</span>
+            }
+        }
+<span class="fc" id="L754">    }</span>
+
+    private void onReady() {
+<span class="pc bpc" id="L757" title="1 of 2 branches missed.">        if (internal != null) {</span>
+<span class="fc bfc" id="L758" title="All 2 branches covered.">            while (!onReady.isEmpty()) {</span>
+<span class="fc" id="L759">                onReady.remove(0).run();</span>
+            }
+        }
+<span class="fc" id="L762">    }</span>
+
+    /// Uses invokeAndBlock to wait until the BrowserComponent is ready.  The browser component
+    /// is considered to be ready once the onLoad event has been fired for the first page.
+    public void waitForReady() {
+<span class="nc bnc" id="L767" title="All 2 branches missed.">        while (!ready) {</span>
+<span class="nc" id="L768">            Display.getInstance().invokeAndBlock(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L771">                    synchronized (readyLock) {</span>
+<span class="nc" id="L772">                        Util.wait(readyLock, 1000);</span>
+<span class="nc" id="L773">                    }</span>
+<span class="nc" id="L774">                }</span>
+            });
+        }
+<span class="nc" id="L777">    }</span>
+
+    /// Registers a callback to be run when the BrowserComponent is &quot;ready&quot;.  The browser component
+    /// is considered to be ready once the onLoad event has been fired on the first page.
+    /// If this method is called after the browser component is already &quot;ready&quot;, then the callback
+    /// will be executed immediately.  Otherwise it will be called in the first onLoad event.
+    ///
+    /// #### Parameters
+    ///
+    /// - `onReady`: Callback to be executed when the browser component is ready.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### See also
+    ///
+    /// - #waitForReady()
+    public BrowserComponent ready(final SuccessCallback&lt;BrowserComponent&gt; onReady) {
+<span class="fc bfc" id="L796" title="All 2 branches covered.">        if (ready) {</span>
+<span class="fc" id="L797">            onReady.onSucess(this);</span>
+        } else {
+<span class="fc" id="L799">            ActionListener l = new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L802">                    removeWebEventListener(onStart, this);</span>
+<span class="fc" id="L803">                    onReady.onSucess(BrowserComponent.this);</span>
+<span class="fc" id="L804">                }</span>
+            };
+<span class="fc" id="L806">            addWebEventListener(onStart, l);</span>
+        }
+<span class="fc" id="L808">        return this;</span>
+    }
+
+    /// Returns a promise that will complete when the browser component is &quot;ready&quot;.  It is considered to be
+    /// ready once it has received the start or load event from at least one page.  Default timeout is 5000ms.
+    ///
+    /// #### Returns
+    ///
+    /// AsyncResouce that will complete when the browser component is ready.
+    ///
+    public AsyncResource&lt;BrowserComponent&gt; ready() {
+<span class="nc" id="L819">        return ready(5000);</span>
+    }
+
+    /// Returns a promise that will complete when the browser component is &quot;ready&quot;.  It is considered to be
+    /// ready once it has received the start or load event from at least one page.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: Timeout in milliseconds to wait.
+    ///
+    /// #### Returns
+    ///
+    /// AsyncResouce that will complete when the browser component is ready.
+    ///
+    public AsyncResource&lt;BrowserComponent&gt; ready(int timeout) {
+<span class="fc" id="L834">        final AsyncResource&lt;BrowserComponent&gt; out = new AsyncResource&lt;BrowserComponent&gt;();</span>
+
+<span class="pc bpc" id="L836" title="1 of 2 branches missed.">        if (ready) {</span>
+<span class="nc" id="L837">            out.complete(this);</span>
+        } else {
+<span class="fc" id="L839">            final LoadWrapper w = new LoadWrapper();</span>
+<span class="pc bpc" id="L840" title="1 of 2 branches missed.">            if (timeout &gt; 0) {</span>
+<span class="fc" id="L841">                w.timer = CN.setTimeout(timeout, new Runnable() {</span>
+                    @Override
+                    public void run() {
+<span class="nc" id="L844">                        w.timer = null;</span>
+<span class="nc bnc" id="L845" title="All 2 branches missed.">                        if (w.l != null) {</span>
+<span class="nc" id="L846">                            removeWebEventListener(onStart, w.l);</span>
+<span class="nc" id="L847">                            removeWebEventListener(onLoad, w.l);</span>
+                        }
+<span class="nc bnc" id="L849" title="All 2 branches missed.">                        if (!out.isDone()) {</span>
+<span class="nc" id="L850">                            out.error(new RuntimeException(&quot;Timeout exceeded waiting for browser component to be ready&quot;));</span>
+                        }
+<span class="nc" id="L852">                    }</span>
+
+                });
+            }
+<span class="fc" id="L856">            w.l = new ActionListener&lt;ActionEvent&gt;() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L859">                    w.l = null;</span>
+<span class="pc bpc" id="L860" title="1 of 2 branches missed.">                    if (w.timer != null) {</span>
+<span class="fc" id="L861">                        w.timer.cancel();</span>
+<span class="fc" id="L862">                        w.timer = null;</span>
+                    }
+<span class="fc" id="L864">                    removeWebEventListener(onStart, this);</span>
+<span class="fc" id="L865">                    removeWebEventListener(onLoad, this);</span>
+
+<span class="pc bpc" id="L867" title="1 of 2 branches missed.">                    if (!out.isDone()) {</span>
+<span class="fc" id="L868">                        out.complete(BrowserComponent.this);</span>
+                    }
+<span class="fc" id="L870">                }</span>
+            };
+<span class="fc" id="L872">            addWebEventListener(onStart, w.l);</span>
+<span class="fc" id="L873">            addWebEventListener(onLoad, w.l);</span>
+        }
+<span class="fc" id="L875">        return out;</span>
+    }
+
+    /// This method allows customizing the properties of a web view in various ways including platform specific settings.
+    /// When a property isn't supported by a specific platform it is just ignored.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: see the documentation with the CodenameOne Implementation for further details
+    ///
+    /// - `value`: see the documentation with the CodenameOne Implementation for further details
+    public void setProperty(final String key, final Object value) {
+<span class="nc bnc" id="L887" title="All 2 branches missed.">        if (internal == null) {</span>
+
+<span class="nc" id="L889">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L892">                    setProperty(key, value);</span>
+<span class="nc" id="L893">                }</span>
+            });
+<span class="nc" id="L895">            return;</span>
+        }
+<span class="nc" id="L897">        Display.impl.setBrowserProperty(internal, key, value);</span>
+<span class="nc" id="L898">    }</span>
+
+    /// The page title
+    ///
+    /// #### Returns
+    ///
+    /// the title
+    public String getTitle() {
+<span class="nc bnc" id="L906" title="All 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L907">            return null;</span>
+        }
+<span class="nc" id="L909">        return Display.impl.getBrowserTitle(internal);</span>
+    }
+
+    /// The page URL
+    ///
+    /// #### Returns
+    ///
+    /// the URL
+    public String getURL() {
+<span class="pc bpc" id="L918" title="1 of 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L919">            return tmpUrl;</span>
+        }
+<span class="fc" id="L921">        return Display.impl.getBrowserURL(internal);</span>
+    }
+
+    /// Sets the page URL, jar: URL's must be supported by the implementation
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL
+    public void setURL(final String url) {
+<span class="fc bfc" id="L930" title="All 2 branches covered.">        if (internal == null) {</span>
+<span class="fc" id="L931">            tmpUrl = url;</span>
+<span class="fc" id="L932">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L935">                    setURL(url);</span>
+<span class="fc" id="L936">                }</span>
+            });
+<span class="fc" id="L938">            return;</span>
+        }
+<span class="fc" id="L940">        Display.impl.setBrowserURL(internal, url);</span>
+<span class="fc" id="L941">    }</span>
+
+    /// Sets the page URL.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL to the page to display.
+    public void setURL(URL url) {
+<span class="nc" id="L949">        setURL(url.toString());</span>
+<span class="nc" id="L950">    }</span>
+
+    /// Sets the page URL.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uri`: URI to the page to display.
+    public void setURL(URI uri) {
+<span class="nc" id="L958">        setURL(uri.toString());</span>
+<span class="nc" id="L959">    }</span>
+
+    /// Sets the page URL, jar: URL's must be supported by the implementation. Notice this API isn't supported
+    /// in all platforms see `#isURLWithCustomHeadersSupported()`
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL
+    ///
+    /// - `headers`: headers to push into the request for the url
+    public void setURL(final String url, final Map&lt;String, String&gt; headers) {
+<span class="nc bnc" id="L970" title="All 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L971">            tmpUrl = url;</span>
+<span class="nc" id="L972">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L975">                    setURL(url, headers);</span>
+<span class="nc" id="L976">                }</span>
+            });
+<span class="nc" id="L978">            return;</span>
+        }
+<span class="nc" id="L980">        Display.impl.setBrowserURL(internal, url, headers);</span>
+<span class="nc" id="L981">    }</span>
+
+    /// Returns true if the method `java.util.Map)` is supported
+    ///
+    /// #### Returns
+    ///
+    /// false by default
+    public boolean isURLWithCustomHeadersSupported() {
+<span class="nc" id="L989">        return Display.impl.isURLWithCustomHeadersSupported();</span>
+    }
+
+    /// Sets the page URL while respecting the hierarchy of the html
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL
+    public void setURLHierarchy(final String url) throws IOException {
+<span class="fc bfc" id="L998" title="All 2 branches covered.">        if (internal == null) {</span>
+<span class="fc" id="L999">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+                    try {
+<span class="fc" id="L1003">                        setURLHierarchy(url);</span>
+<span class="nc" id="L1004">                    } catch (IOException ex) {</span>
+<span class="nc" id="L1005">                        Log.e(ex);</span>
+<span class="fc" id="L1006">                    }</span>
+<span class="fc" id="L1007">                }</span>
+            });
+<span class="fc" id="L1009">            return;</span>
+        }
+<span class="fc" id="L1011">        Display.impl.setBrowserPageInHierarchy(internal, url);</span>
+<span class="fc" id="L1012">    }</span>
+
+    /// Reload the current page
+    public void reload() {
+<span class="nc bnc" id="L1016" title="All 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L1017">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L1020">                    reload();</span>
+<span class="nc" id="L1021">                }</span>
+            });
+<span class="nc" id="L1023">            return;</span>
+        }
+<span class="nc" id="L1025">        Display.impl.browserReload(internal);</span>
+<span class="nc" id="L1026">    }</span>
+
+    /// Indicates whether back is currently available
+    ///
+    /// #### Returns
+    ///
+    /// true if back should work
+    public boolean hasBack() {
+<span class="nc bnc" id="L1034" title="All 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L1035">            return false;</span>
+        }
+<span class="nc" id="L1037">        return Display.impl.browserHasBack(internal);</span>
+    }
+
+    /// Indicates whether forward is currently available
+    ///
+    /// #### Returns
+    ///
+    /// true if forward should work
+    public boolean hasForward() {
+<span class="nc bnc" id="L1046" title="All 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L1047">            return false;</span>
+        }
+<span class="nc" id="L1049">        return Display.impl.browserHasForward(internal);</span>
+    }
+
+    /// Navigates back in the history
+    public void back() {
+<span class="nc bnc" id="L1054" title="All 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L1055">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L1058">                    back();</span>
+<span class="nc" id="L1059">                }</span>
+            });
+<span class="nc" id="L1061">            return;</span>
+        }
+<span class="nc" id="L1063">        Display.impl.browserBack(internal);</span>
+<span class="nc" id="L1064">    }</span>
+
+    /// Navigates forward in the history
+    public void forward() {
+<span class="nc bnc" id="L1068" title="All 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L1069">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L1072">                    forward();</span>
+<span class="nc" id="L1073">                }</span>
+            });
+<span class="nc" id="L1075">            return;</span>
+        }
+<span class="nc" id="L1077">        Display.impl.browserForward(internal);</span>
+<span class="nc" id="L1078">    }</span>
+
+    /// Clears navigation history
+    public void clearHistory() {
+<span class="nc bnc" id="L1082" title="All 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L1083">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L1086">                    clearHistory();</span>
+<span class="nc" id="L1087">                }</span>
+            });
+<span class="nc" id="L1089">            return;</span>
+        }
+<span class="nc" id="L1091">        Display.impl.browserClearHistory(internal);</span>
+<span class="nc" id="L1092">    }</span>
+
+    /// This method is unreliable and is only here for consistency with setPinchToZoomEnabled,
+    /// it will not return whether the platform supports pinch since this is very hard to detect
+    /// properly.
+    ///
+    /// #### Returns
+    ///
+    /// the last value for setPinchToZoomEnabled
+    public boolean isPinchToZoomEnabled() {
+<span class="nc" id="L1102">        return pinchToZoom;</span>
+    }
+
+    /// Some platforms require that you enable pinch to zoom explicitly. This method has no
+    /// effect if pinch to zoom isn't supported by the platform
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: true to enable pinch to zoom, false to disable it
+    public void setPinchToZoomEnabled(final boolean e) {
+<span class="nc" id="L1112">        pinchToZoom = e;</span>
+<span class="nc bnc" id="L1113" title="All 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L1114">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L1117">                    setPinchToZoomEnabled(e);</span>
+<span class="nc" id="L1118">                }</span>
+            });
+<span class="nc" id="L1120">            return;</span>
+        }
+<span class="nc" id="L1122">        Display.impl.setPinchToZoomEnabled(internal, e);</span>
+<span class="nc" id="L1123">    }</span>
+
+    /// This method is unreliable and is only here for consistency with setNativeScrollingEnabled.
+    ///
+    /// #### Returns
+    ///
+    /// the last value for setNativeScrollingEnabled
+    public boolean isNativeScrollingEnabled() {
+<span class="nc" id="L1131">        return nativeScrolling;</span>
+    }
+
+    /// This flag allows disabling the native browser scrolling on platforms that support it
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to enable native scrolling, notice that non-native scrolling might be problematic
+    public void setNativeScrollingEnabled(final boolean b) {
+<span class="nc" id="L1140">        nativeScrolling = b;</span>
+<span class="nc bnc" id="L1141" title="All 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L1142">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L1145">                    setNativeScrollingEnabled(b);</span>
+<span class="nc" id="L1146">                }</span>
+            });
+<span class="nc" id="L1148">            return;</span>
+        }
+<span class="nc" id="L1150">        Display.impl.setNativeBrowserScrollingEnabled(internal, b);</span>
+<span class="nc" id="L1151">    }</span>
+
+    /// Shows the given HTML in the native viewer
+    ///
+    /// #### Parameters
+    ///
+    /// - `html`: HTML web page
+    ///
+    /// - `baseUrl`: base URL to associate with the HTML
+    public void setPage(final String html, final String baseUrl) {
+<span class="fc bfc" id="L1161" title="All 2 branches covered.">        if (internal == null) {</span>
+<span class="fc" id="L1162">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L1165">                    setPage(html, baseUrl);</span>
+<span class="fc" id="L1166">                }</span>
+            });
+<span class="fc" id="L1168">            return;</span>
+        }
+<span class="fc" id="L1170">        Display.impl.setBrowserPage(internal, html, baseUrl);</span>
+<span class="fc" id="L1171">    }</span>
+
+    private EventDispatcher getEventDispatcher(String type, boolean autoCreate) {
+<span class="fc bfc" id="L1174" title="All 2 branches covered.">        if (listeners == null) {</span>
+<span class="pc bpc" id="L1175" title="1 of 2 branches missed.">            if (!autoCreate) {</span>
+<span class="nc" id="L1176">                return null;</span>
+            }
+<span class="fc" id="L1178">            listeners = new Hashtable();</span>
+<span class="fc" id="L1179">            EventDispatcher ev = new EventDispatcher();</span>
+<span class="fc" id="L1180">            listeners.put(type, ev);</span>
+<span class="fc" id="L1181">            return ev;</span>
+        }
+<span class="fc" id="L1183">        EventDispatcher ev = (EventDispatcher) listeners.get(type);</span>
+<span class="fc bfc" id="L1184" title="All 2 branches covered.">        if (ev == null) {</span>
+<span class="fc bfc" id="L1185" title="All 2 branches covered.">            if (autoCreate) {</span>
+<span class="fc" id="L1186">                ev = new EventDispatcher();</span>
+<span class="fc" id="L1187">                listeners.put(type, ev);</span>
+            }
+        }
+<span class="fc" id="L1190">        return ev;</span>
+    }
+
+    /// Adds a listener to the given event type name, event type names are platform specific but some
+    /// must be fired for all platforms and will invoke the action listener when the appropriate event loads
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: platform specific but must support: onStart, onLoad, onError
+    ///
+    /// - `listener`: callback for the event
+    public void addWebEventListener(String type, ActionListener listener) {
+<span class="fc" id="L1202">        getEventDispatcher(type, true).addListener(listener);</span>
+<span class="fc" id="L1203">    }</span>
+
+    /// Removes the listener, see addWebEventListener for details
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: see addWebEventListener for details
+    ///
+    /// - `listener`: see addWebEventListener for details
+    public void removeWebEventListener(String type, ActionListener listener) {
+<span class="fc" id="L1213">        EventDispatcher e = getEventDispatcher(type, false);</span>
+<span class="pc bpc" id="L1214" title="1 of 2 branches missed.">        if (e != null) {</span>
+<span class="fc" id="L1215">            e.removeListener(listener);</span>
+<span class="fc bfc" id="L1216" title="All 2 branches covered.">            if (!e.hasListeners()) {</span>
+<span class="fc" id="L1217">                listeners.remove(type);</span>
+            }
+        }
+<span class="fc" id="L1220">    }</span>
+
+    /// Cancel the loading of the current page
+    public void stop() {
+<span class="nc bnc" id="L1224" title="All 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L1225">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L1228">                    stop();</span>
+<span class="nc" id="L1229">                }</span>
+            });
+<span class="nc" id="L1231">            return;</span>
+        }
+<span class="nc" id="L1233">        Display.impl.browserStop(internal);</span>
+<span class="nc" id="L1234">    }</span>
+
+    /// Release native resources of this Browser Component
+    public void destroy() {
+<span class="nc bnc" id="L1238" title="All 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L1239">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L1242">                    destroy();</span>
+<span class="nc" id="L1243">                }</span>
+            });
+<span class="nc" id="L1245">            return;</span>
+        }
+<span class="nc" id="L1247">        Display.impl.browserDestroy(internal);</span>
+<span class="nc" id="L1248">    }</span>
+
+    /// Used internally by the implementation to fire an event from the native browser widget
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the type of the event
+    ///
+    /// - `ev`: the event
+    public void fireWebEvent(String type, ActionEvent ev) {
+<span class="fc bfc" id="L1258" title="All 2 branches covered.">        if (onLoad.equals(type)) {</span>
+<span class="fc" id="L1259">            synchronized (readyLock) {</span>
+<span class="fc" id="L1260">                ready = true;</span>
+<span class="fc" id="L1261">                readyLock.notifyAll();</span>
+<span class="fc" id="L1262">            }</span>
+        }
+<span class="fc" id="L1264">        EventDispatcher e = getEventDispatcher(type, false);</span>
+<span class="fc bfc" id="L1265" title="All 2 branches covered.">        if (e != null) {</span>
+<span class="fc" id="L1266">            e.fireActionEvent(ev);</span>
+        }
+<span class="fc" id="L1268">    }</span>
+
+    /// Executes the given JavaScript string within the current context
+    ///
+    /// #### Parameters
+    ///
+    /// - `javaScript`: the JavaScript string
+    public void execute(final String javaScript) {
+<span class="fc bfc" id="L1276" title="All 2 branches covered.">        if (internal == null) {</span>
+<span class="fc" id="L1277">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L1280">                    execute(javaScript);</span>
+<span class="fc" id="L1281">                }</span>
+            });
+<span class="fc" id="L1283">            return;</span>
+        }
+<span class="fc" id="L1285">        Display.impl.browserExecute(internal, javaScript);</span>
+<span class="fc" id="L1286">    }</span>
+
+    /// Executes given javascript string within current context.
+    ///
+    /// #### Parameters
+    ///
+    /// - `js`: The javascript to execute.
+    ///
+    /// - `params`: @param params Parameters to inject into the javascript expression.  The expression should contain placeholders of the form ${0 }, ${1 }, etc... to be replaced.  See `java.lang.Object...)` for more information about injected parameters.
+    ///               by parameters.
+    public void execute(String js, Object[] params) {
+<span class="fc" id="L1297">        execute(injectParameters(js, params));</span>
+<span class="fc" id="L1298">    }</span>
+
+    /// Executes the given JavaScript and returns a result string from the underlying platform
+    /// where applicable.
+    ///
+    /// **Note**: Some platforms use `Display#invokeAndBlock(java.lang.Runnable)` inside this method which is very costly. Try to avoid this synchronous method, and
+    /// prefer to use one of the asynchronous versions.  E.g. `com.codename1.util.SuccessCallback)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `javaScript`: the JavaScript code to execute
+    ///
+    /// #### Returns
+    ///
+    /// the string returned from the Javascript call
+    public String executeAndReturnString(String javaScript) {
+<span class="fc bfc" id="L1314" title="All 2 branches covered.">        while (internal == null) {</span>
+<span class="fc" id="L1315">            CN.invokeAndBlock(new ShortSleepRunnable());</span>
+        }
+<span class="pc bpc" id="L1317" title="1 of 2 branches missed.">        if (Display.impl.supportsBrowserExecuteAndReturnString(internal)) {</span>
+<span class="fc" id="L1318">            return Display.impl.browserExecuteAndReturnString(internal, javaScript);</span>
+        } else {
+<span class="nc" id="L1320">            return executeAndWait(&quot;callback.onSuccess(eval(${0}))&quot;, javaScript).toString();</span>
+
+        }
+    }
+
+    /// Executes the given javascript and returns the result string from the underlying platform.
+    ///
+    /// **Note**: Some platforms use `Display#invokeAndBlock(java.lang.Runnable)` inside this method which is very costly. Try to avoid this synchronous method, and
+    /// prefer to use one of the asynchronous versions.  E.g. `com.codename1.util.SuccessCallback)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `javaScript`: The javascript to execute.
+    ///
+    /// - `params`: Parameters to inject into the javascript expression.  The expression should contain placeholders of the form ${0 }, ${1 }, etc... to be replaced.  See `java.lang.Object...)` for more information about injected parameters.
+    ///
+    /// #### Returns
+    ///
+    /// The result as a string.
+    ///
+    public String executeAndReturnString(String javaScript, Object[] params) {
+<span class="nc" id="L1341">        return executeAndReturnString(injectParameters(javaScript, params));</span>
+    }
+
+    /// Creates a proxy for a Javascript object that makes it easier to call methods, retrieve,
+    /// and manipulate properties on the object.
+    public JSProxy createJSProxy(String javascriptExpression) {
+<span class="fc" id="L1347">        return new JSProxy(javascriptExpression);</span>
+    }
+
+    /// Asynchronously executes the provided javascript expression. The expression may provide a callback
+    /// which you can call inside the expression directly.
+    ///
+    /// Example
+    ///
+    /// **Getting the window object.**
+    ///
+    /// ```java
+    /// `bc.execute(&quot;callback.onSuccess(window)&quot;, value -&gt; {
+    /// System.out.println(&quot;value=&quot;+value+&quot;; type=&quot;+value.getJSType());
+    /// // value=[object Window]; type=OBJECT`);
+    /// }
+    /// ```
+    ///
+    /// **Getting an Integer**
+    ///
+    /// ```java
+    /// `bc.execute(&quot;callback.onSuccess(1+2)&quot;, value -&gt; {
+    /// System.out.println(&quot;value=&quot;+value.getInt()+&quot;; type=&quot;+value.getJSType());
+    /// // value=3; type=NUMBER`);
+    /// }
+    /// ```
+    ///
+    /// **Getting a String**
+    ///
+    /// ```java
+    /// `bc.execute(&quot;callback.onSuccess('hello world')&quot;,value -&gt; {
+    /// System.out.println(&quot;value=&quot;+value+&quot;; type=&quot;+value.getJSType());
+    /// // value=hello world; type=STRING`
+    /// );
+    /// }
+    /// ```
+    ///
+    /// **After a Javascript Timeout**
+    ///
+    /// Since this call is asynchronous, the javascript code can wait to call the
+    /// callback to any time in the future - e.g. after a timeout, after an ajax response,
+    /// in some event handler, etc..  The CN1 UI will not be blocked, the provided callback
+    /// will be called at the appropriate time on the EDT.
+    ///
+    /// ```java
+    /// `bc.execute(&quot;setTimeout(function(){callback.onSuccess('hello world')`, 1500)&quot;,
+    /// value -&gt; {
+    /// System.out.println(&quot;value=&quot;+value+&quot;; type=&quot;+value.getJSType());
+    /// // value=hello world; type=STRING
+    /// }
+    /// );
+    /// }
+    /// ```
+    ///
+    /// **NOTE: The callback can only be called once, so you shouldn't use this method to register
+    /// a callback with an event listener that will be called repeatedly.  If you want to register a Java
+    /// callback with a Javascript event, you should use the `com.codename1.util.Callback)` method
+    /// instead.**
+    ///
+    /// #### Parameters
+    ///
+    /// - `js`: The javascript expression.  If you want to receive any result from this expression, the expression itself must include a call to callback.onSuccess(value).
+    ///
+    /// - `callback`: The callback.  You should call this directly from Javascript.  You can call either `callback.onSuccess(value)` or `callback.onError(message,code)`.
+    public void execute(String js, SuccessCallback&lt;JSRef&gt; callback) {
+<span class="fc bfc" id="L1411" title="All 2 branches covered.">        SuccessCallback&lt;JSRef&gt; target = callback == null</span>
+                ? new CallbackAdapter&lt;JSRef&gt;() : callback;
+<span class="fc" id="L1413">        executeWithCallbackId(js, addReturnValueCallback(target));</span>
+<span class="fc" id="L1414">    }</span>
+
+    /// Sends a scripted call whose reply is already registered under `callbackId`.
+    ///
+    /// Split out so that a caller which needs to know the id before the call goes out
+    /// can reserve it first. A timeout is one: its clock has to be armed before the
+    /// script can answer, and it has to be able to name the execution it belongs to.
+    ///
+    /// #### Parameters
+    ///
+    /// - `js`: the javascript expression
+    ///
+    /// - `callbackId`: the id the reply will arrive under
+    private void executeWithCallbackId(String js, int callbackId) {
+<span class="fc" id="L1428">        StringBuilder fullJs = new StringBuilder();</span>
+<span class="pc bpc" id="L1429" title="1 of 2 branches missed.">        String isSimulator = Display.getInstance().isSimulator() ? &quot;true&quot; : &quot;false&quot;;</span>
+<span class="fc" id="L1430">        fullJs</span>
+<span class="fc" id="L1431">                .append(&quot;(function(){&quot;)</span>
+                //.append(&quot;cn1application.log('we are here');&quot;)
+<span class="fc" id="L1433">                .append(&quot;var BASE_URL='https://www.codenameone.com&quot;).append(RETURN_URL_PREFIX).append(&quot;';&quot;)</span>
+<span class="fc" id="L1434">                .append(&quot;function doCallback(val) { &quot;)</span>
+                //.append(&quot;cn1application.log('in doCallback');&quot;)
+<span class="fc" id="L1436">                .append(&quot;  var url = BASE_URL + encodeURIComponent(JSON.stringify(val));&quot;)</span>
+<span class="fc" id="L1437">                .append(&quot;  if (window.cefQuery) { window.cefQuery({request:'shouldNavigate:'+url, onSuccess: function(response){}, onFailure:function(error_code, error_message) { console.log(error_message)}});}&quot;)</span>
+<span class="fc" id="L1438">                .append(&quot;  else if (window.cn1application &amp;&amp; window.cn1application.shouldNavigate) { window.cn1application.shouldNavigate(url) } else if (&quot; + isSimulator + &quot;) {window._cn1ready = window._cn1ready || []; window._cn1ready.push(function(){window.cn1application.shouldNavigate(url)});} else {window.location.href=url}&quot;)</span>
+<span class="fc" id="L1439">                .append(&quot;} &quot;)</span>
+<span class="fc" id="L1440">                .append(&quot;var result = {value:null, type:null, errorMessage:null, errorCode:0, callbackId:&quot;).append(callbackId).append(&quot;};&quot;)</span>
+<span class="fc" id="L1441">                .append(&quot;var callback = {&quot;)</span>
+<span class="fc" id="L1442">                .append(&quot;  onSucess: function(val) { this.onSuccess(val);}, &quot;)</span>
+<span class="fc" id="L1443">                .append(&quot;  onSuccess: function(val) { result.value = val; result.type = typeof(val); if (val !== null &amp;&amp; typeof val === 'object') {result.value = val.toString();} doCallback(result);}, &quot;)</span>
+<span class="fc" id="L1444">                .append(&quot;  onError: function(message, code) { if (message instanceof Error) {result.errorMessage = message.message; result.errorCode = 0;} else {result.errorMessage = message; result.errorCode = code;} doCallback(result);}&quot;)</span>
+<span class="fc" id="L1445">                .append(&quot;};&quot;)</span>
+
+<span class="fc" id="L1447">                .append(&quot;try { &quot;).append(js).append(&quot;} catch (e) {try {callback.onError(e.message, 0);} catch (e2) {callback.onError('Unknown error', 0);}}&quot;)</span>
+
+<span class="fc" id="L1449">                .append(&quot;})();&quot;);</span>
+<span class="fc" id="L1450">        execute(fullJs.toString());</span>
+
+<span class="fc" id="L1452">    }</span>
+
+    /// Execute javascript with a timeout.  If timeout is reached before callback is run,
+    /// then the callback's onError method is run (if callback is a Callback).  If callback isn't a Callback
+    /// (i.e. has no onError(), then this will log an error, and call the onSucess method with a null arg.
+    ///
+    /// #### Parameters
+    ///
+    /// - `js`: The javascript to execute
+    ///
+    /// - `timeout`: The timeout in milliseconds.
+    ///
+    /// - `callback`: The callback
+    public void execute(int timeout, final String js, final SuccessCallback&lt;JSRef&gt; callback) {
+<span class="pc bpc" id="L1466" title="2 of 4 branches missed.">        if (callback == null || timeout &lt;= 0) {</span>
+<span class="nc" id="L1467">            execute(js, callback);</span>
+<span class="nc" id="L1468">            return;</span>
+        }
+        // Reserved before the call goes out, so the clock can name the execution it
+        // belongs to. Arming afterwards would be a race in the other direction: a reply
+        // that arrives first retires the callback, and the clock armed after it would
+        // have nothing left to cancel it.
+<span class="fc" id="L1474">        final int callbackId = addReturnValueCallback(callback);</span>
+        // Not tied to a surface at all. A UITimer is driven by the painting of the
+        // top level it is registered on, so binding it to the browser's own window
+        // -- which is the only surface that could be right -- stopped the clock the
+        // moment that window was hidden or minimized: the timeout this method
+        // documents then arrived when the window came back, or never. This one is a
+        // plain timer that hands the callback to the event thread when it fires,
+        // whatever is on screen by then.
+<span class="fc" id="L1482">        Timer clock = Display.getInstance().setTimeout(timeout, new Runnable() {</span>
+
+            @Override
+            public void run() {
+                // This clock has fired, so it is spent whatever it decides below.
+<span class="fc" id="L1487">                cancelReturnValueTimeout(callbackId);</span>
+                // This execution's own registration, by id. Looking the callback up by
+                // value found whichever execution happened to hold it, which for a
+                // callback handed to two overlapping calls was the wrong one -- and it
+                // then reported a timeout against that one at this one's deadline.
+<span class="fc" id="L1492">                SuccessCallback&lt;JSRef&gt; pending =</span>
+<span class="fc" id="L1493">                        returnValueCallbacks().get(Integer.valueOf(callbackId));</span>
+<span class="pc bpc" id="L1494" title="1 of 2 branches missed.">                if (pending == null) {</span>
+<span class="nc" id="L1495">                    return;</span>
+                }
+<span class="pc bpc" id="L1497" title="3 of 4 branches missed.">                if (jsCallbacks == null || !jsCallbacks.contains(pending)) {</span>
+<span class="fc" id="L1498">                    returnValueCallbacks.remove(Integer.valueOf(callbackId));</span>
+                }
+<span class="pc bpc" id="L1500" title="1 of 2 branches missed.">                if (pending instanceof Callback) {</span>
+<span class="fc" id="L1501">                    ((Callback) pending).onError(BrowserComponent.this, new RuntimeException(&quot;Javascript execution timeout&quot;), 1, &quot;Javascript execution timeout&quot;);</span>
+                } else {
+<span class="nc" id="L1503">                    Log.e(new RuntimeException(&quot;Javascript execution timeout while running &quot; + js));</span>
+<span class="nc" id="L1504">                    pending.onSucess(null);</span>
+                }
+<span class="fc" id="L1506">            }</span>
+
+        });
+        // Kept so an answer can stop it -- see returnValueTimeouts.
+<span class="fc bfc" id="L1510" title="All 2 branches covered.">        if (returnValueTimeouts == null) {</span>
+<span class="fc" id="L1511">            returnValueTimeouts = new Hashtable&lt;Integer, Timer&gt;();</span>
+        }
+<span class="fc" id="L1513">        returnValueTimeouts.put(Integer.valueOf(callbackId), clock);</span>
+<span class="fc" id="L1514">        executeWithCallbackId(js, callbackId);</span>
+<span class="fc" id="L1515">    }</span>
+
+    /// Executes Javascript expression.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: The timeout in ms
+    ///
+    /// - `js`: The javascript expression to execute.
+    ///
+    /// - `params`: @param params   Parameters to inject into the javascript expression.  The expression should contain placeholders of the form ${0 }, ${1 }, etc... to be replaced.  See `java.lang.Object...)` for more information about injected parameters.
+    ///                 by parameters.
+    ///
+    /// - `callback`: Callback to call when complete.
+    public void execute(int timeout, String js, Object[] params, SuccessCallback&lt;JSRef&gt; callback) {
+<span class="nc" id="L1530">        execute(timeout, injectParameters(js, params), callback);</span>
+<span class="nc" id="L1531">    }</span>
+
+    /// Executes Javascript expression.
+    ///
+    /// #### Parameters
+    ///
+    /// - `js`: The javascript expression to execute.
+    ///
+    /// - `params`: @param params   Parameters to inject into the javascript expression.  The expression should contain placeholders of the form ${0 }, ${1 }, etc... to be replaced.  See `java.lang.Object...)` for more information about injected parameters.
+    ///                 by parameters.
+    ///
+    /// - `callback`: Callback to call when complete.
+    public void execute(String js, Object[] params, SuccessCallback&lt;JSRef&gt; callback) {
+<span class="fc" id="L1544">        execute(injectParameters(js, params), callback);</span>
+<span class="fc" id="L1545">    }</span>
+
+    private Set jsCallbacks() {
+<span class="pc bpc" id="L1548" title="1 of 2 branches missed.">        if (jsCallbacks == null) {</span>
+<span class="fc" id="L1549">            jsCallbacks = new HashSet();</span>
+        }
+<span class="fc" id="L1551">        return jsCallbacks;</span>
+    }
+
+    /// Registers a Java method as a callback in javascript.  The callback argument
+    /// can be referenced inside the javascript expression so that it can be fired when certain events occur.
+    ///
+    /// Examples
+    ///
+    /// **Register a Callback to be called whenever a button is clicked**
+    ///
+    /// ```java
+    /// `bc.addJSCallback(&quot;someButton.addEventListener('click', function(){callback.onSuccess('hello world')`)&quot;, new Callback() {
+    /// public void onSucess(JSRef value) {
+    /// System.out.println(&quot;Received click: &quot;+value);
+    /// }
+    /// });
+    /// }
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `installJs`
+    ///
+    /// - `callback`
+    public void addJSCallback(String installJs, SuccessCallback&lt;JSRef&gt; callback) {
+<span class="fc" id="L1576">        jsCallbacks().add(callback);</span>
+<span class="fc" id="L1577">        execute(installJs, callback);</span>
+<span class="fc" id="L1578">    }</span>
+
+    /// Registers Java method as a callback in Javascript.  The callback argument
+    /// can be referenced inside the javascript expression so that it can be fired when certain events occur.
+    ///
+    /// #### Parameters
+    ///
+    /// - `installJs`: The javascript expression. to run.
+    ///
+    /// - `params`: @param params    Parameters to inject into the javascript expression.  The expression should contain placeholders of the form ${0 }, ${1 }, etc... to be replaced.  See `java.lang.Object...)` for more information about injected parameters.
+    ///                  by parameters.
+    ///
+    /// - `callback`: The callback to call on completion.
+    public void addJSCallback(String installJs, Object[] params, SuccessCallback&lt;JSRef&gt; callback) {
+<span class="nc" id="L1592">        addJSCallback(injectParameters(installJs, params), callback);</span>
+<span class="nc" id="L1593">    }</span>
+
+    /// Removes a JS callback that was added via the `com.codename1.util.SuccessCallback)` method.
+    ///
+    /// Note: This won't unregister any callbacks from the Javascript environment.  You'll need to perform your
+    /// own additional cleanup in Javascript if this callback is registered in any event handlers.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: The callback to remove.
+    public void removeJSCallback(Callback&lt;JSRef&gt; callback) {
+<span class="nc bnc" id="L1604" title="All 2 branches missed.">        if (jsCallbacks != null) {</span>
+<span class="nc" id="L1605">            jsCallbacks.remove(callback);</span>
+        }
+<span class="nc" id="L1607">    }</span>
+
+    public void removeJSCallback(SuccessCallback&lt;JSRef&gt; callback) {
+<span class="nc bnc" id="L1610" title="All 2 branches missed.">        if (jsCallbacks != null) {</span>
+<span class="nc" id="L1611">            jsCallbacks.remove(callback);</span>
+        }
+<span class="nc" id="L1613">    }</span>
+
+    /// This uses invokeAndBlock to wait for the result of the given javascript expression.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: Timeout in milliseconds.
+    ///
+    /// - `js`: The javascript expression.
+    ///
+    /// - `params`: Parameters to inject in the expression.  See `java.lang.Object...)` for details.
+    ///
+    /// #### Returns
+    ///
+    /// The result.
+    public JSRef executeAndWait(int timeout, String js, Object... params) {
+<span class="nc" id="L1629">        return executeAndWait(timeout, injectParameters(js, params));</span>
+    }
+
+    /// This uses invokeAndBlock to wait for the result of the given javascript expression.
+    ///
+    /// #### Parameters
+    ///
+    /// - `js`: The javascript expression.
+    ///
+    /// - `params`: Parameters to inject in the expression.  See `java.lang.Object...)` for details.
+    ///
+    /// #### Returns
+    ///
+    /// The result.
+    public JSRef executeAndWait(String js, Object... params) {
+<span class="nc" id="L1644">        return executeAndWait(0, js, params);</span>
+    }
+
+    /// This uses invokeAndBlock to wait for the result of the given javascript expression.  It is extremely important
+    /// that the js expression calls either `callback.onSuccess(value)` or `literalcallback.onError(message, code)`
+    /// at some point, or this method will never return.
+    ///
+    /// `#executeAndWait(java.lang.String)` vs `#executeAndReturnString(java.lang.String)`
+    ///
+    /// `#executeAndReturnString(java.lang.String)` is also blocking, but it uses javascript eval
+    /// to return the value of the expression.  Therefore it can't return the result of any asynchronous operations.
+    ///
+    /// `#executeAndWait(java.lang.String)` is built directly on top of `com.codename1.util.SuccessCallback)`
+    /// which is fully asynchronous, and allows you to specify where and when you call the callback within the
+    /// javascript code. This means that you **must** explicitly call either `callback.onSuccess(value)` or `literalcallback.onError(message, code)`
+    /// at some point in the Javascript expression - or the method will block indefinitely.
+    ///
+    /// #### Parameters
+    ///
+    /// - `js`: The javascript expression to execute.  You must call `callback.onSuccess(value)` with the result that you want to have returned.
+    ///
+    /// #### Returns
+    ///
+    /// The result that is returned from javascript when it calls `callback.onSuccess(value)`
+    public JSRef executeAndWait(String js) {
+<span class="nc" id="L1669">        return executeAndWait(0, js);</span>
+    }
+
+    /// This uses invokeAndBlock to wait for the result of the given javascript expression.  It is extremely important
+    /// that the js expression calls either `callback.onSuccess(value)` or `literalcallback.onError(message, code)`
+    /// at some point, or this method will never return.
+    ///
+    /// `#executeAndWait(java.lang.String)` vs `#executeAndReturnString(java.lang.String)`
+    ///
+    /// `#executeAndReturnString(java.lang.String)` is also blocking, but it uses javascript eval
+    /// to return the value of the expression.  Therefore it can't return the result of any asynchronous operations.
+    ///
+    /// `#executeAndWait(java.lang.String)` is built directly on top of `com.codename1.util.SuccessCallback)`
+    /// which is fully asynchronous, and allows you to specify where and when you call the callback within the
+    /// javascript code. This means that you **must** explicitly call either `callback.onSuccess(value)` or `literalcallback.onError(message, code)`
+    /// at some point in the Javascript expression - or the method will block indefinitely.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: Timeout in ms
+    ///
+    /// - `js`: The javascript expression to execute.  You must call `callback.onSuccess(value)` with the result that you want to have returned.
+    ///
+    /// #### Returns
+    ///
+    /// The result that is returned from javascript when it calls `callback.onSuccess(value)`
+    public JSRef executeAndWait(int timeout, String js) {
+<span class="fc" id="L1696">        final ExecuteResult res = new ExecuteResult();</span>
+<span class="fc" id="L1697">        execute(timeout, js, new WaitCallback(res));</span>
+
+<span class="fc bfc" id="L1699" title="All 2 branches covered.">        while (!res.complete) {</span>
+<span class="fc" id="L1700">            Display.getInstance().invokeAndBlock(new WaitRunnable(res));</span>
+        }
+<span class="pc bpc" id="L1702" title="1 of 2 branches missed.">        if (res.error != null) {</span>
+<span class="nc" id="L1703">            throw new RuntimeException(res.error.getMessage());</span>
+        } else {
+<span class="fc" id="L1705">            return res.value;</span>
+        }
+    }
+
+    /// Allows exposing the given object to JavaScript code so the JavaScript code can invoke methods
+    /// and access fields on the given object. Notice that on RIM devices which don't support reflection
+    /// this object must implement the propriatery Scriptable interface
+    /// http://www.blackberry.com/developers/docs/5.0.0api/net/rim/device/api/script/Scriptable.html
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the object to invoke, notice all public fields and methods would be exposed to JavaScript
+    ///
+    /// - `name`: the name to expose within JavaScript
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated this doesn't work in most platforms see issue 459 for details, use the setBrowserNavigationCallback
+    /// method instead
+    public void exposeInJavaScript(final Object o, final String name) {
+<span class="nc bnc" id="L1725" title="All 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L1726">            onReady(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L1729">                    exposeInJavaScript(o, name);</span>
+<span class="nc" id="L1730">                }</span>
+            });
+<span class="nc" id="L1732">            return;</span>
+        }
+<span class="nc" id="L1734">        Display.impl.browserExposeInJavaScript(internal, o, name);</span>
+<span class="nc" id="L1735">    }</span>
+
+    /// Sets a client property on this component. BrowserComponent supports several
+    /// special client properties that control platform-specific behavior.
+    ///
+    /// #### HTML5/JavaScript Port Client Properties
+    ///
+    /// - **`HTML5Peer.removeOnDeinitialize`** (Boolean): Controls whether the underlying
+    ///   iframe is removed from the DOM when the component is deinitialized.
+    ///   
+    ///   When a Dialog is shown, the parent Form is deinitialized, which normally causes
+    ///   BrowserComponent's iframe to be removed from the DOM. When the Dialog is dismissed,
+    ///   the Form is re-shown but the iframe must be recreated from scratch, losing all
+    ///   JavaScript state (editor content, event listeners, etc.).
+    ///   
+    ///   Setting this to `Boolean.FALSE` preserves the iframe in the DOM across
+    ///   deinitialization cycles, which is essential for:
+    ///   - WebRTC connections that break when removed from DOM
+    ///   - Editors and interactive components that need to preserve state
+    ///   - Any app that shows dialogs over a BrowserComponent
+    ///   
+    ///   Example:
+    ///   ```java
+    ///   BrowserComponent browser = new BrowserComponent();
+    ///   browser.putClientProperty(&quot;HTML5Peer.removeOnDeinitialize&quot;, Boolean.FALSE);
+    ///   ```
+    ///
+    /// - **`BrowserComponent.firebug`** (Boolean): Enables debug mode with Firebug
+    ///   console integration (development only).
+    ///
+    /// @param key the client property key
+    /// @param value the client property value
+    @Override
+    public void putClientProperty(String key, Object value) {
+<span class="fc" id="L1769">        super.putClientProperty(key, value);</span>
+<span class="pc bpc" id="L1770" title="1 of 2 branches missed.">        if (&quot;HTML5Peer.removeOnDeinitialize&quot;.equals(key)) {</span>
+<span class="nc bnc" id="L1771" title="All 2 branches missed.">            if (internal != null) {</span>
+<span class="nc" id="L1772">                internal.putClientProperty(key, value);</span>
+            }
+        }
+
+<span class="fc" id="L1776">    }</span>
+
+    /// Indicates if debug mode is set (might have no effect though)
+    ///
+    /// #### Returns
+    ///
+    /// true if debug mode was activated
+    public boolean isDebugMode() {
+<span class="nc" id="L1784">        return Boolean.TRUE.equals(getClientProperty(&quot;BrowserComponent.firebug&quot;));</span>
+    }
+
+    /// Toggles debug mode for the browser component which helps detect coding errors in the JavaScript
+    /// bridge logic
+    ///
+    /// #### Parameters
+    ///
+    /// - `mode`: true to debug false otherwise, this might have no effect in some platforms
+    public void setDebugMode(boolean mode) {
+<span class="nc bnc" id="L1794" title="All 2 branches missed.">        if (mode) {</span>
+<span class="nc" id="L1795">            putClientProperty(&quot;BrowserComponent.firebug&quot;, Boolean.TRUE);</span>
+<span class="nc" id="L1796">            putClientProperty(&quot;BrowserComponent.ios.debug&quot;, Boolean.TRUE);</span>
+        } else {
+<span class="nc" id="L1798">            putClientProperty(&quot;BrowserComponent.firebug&quot;, null);</span>
+<span class="nc" id="L1799">            putClientProperty(&quot;BrowserComponent.ios.debug&quot;, null);</span>
+        }
+<span class="nc" id="L1801">    }</span>
+
+    /// Enum with the possible types for a `JSRef` object.
+<span class="fc" id="L1804">    public enum JSType {</span>
+<span class="fc" id="L1805">        OBJECT(&quot;object&quot;),</span>
+<span class="fc" id="L1806">        FUNCTION(&quot;function&quot;),</span>
+<span class="fc" id="L1807">        NUMBER(&quot;number&quot;),</span>
+<span class="fc" id="L1808">        STRING(&quot;string&quot;),</span>
+<span class="fc" id="L1809">        UNDEFINED(&quot;undefined&quot;),</span>
+<span class="fc" id="L1810">        BOOLEAN(&quot;boolean&quot;);</span>
+
+        // values() doesn't work great on iOS builds
+<span class="fc" id="L1813">        private static final JSType[] values = {</span>
+                OBJECT, FUNCTION, NUMBER, STRING, UNDEFINED, BOOLEAN
+        };
+
+        private final String typeOfValue;
+
+<span class="fc" id="L1819">        JSType(String val) {</span>
+<span class="fc" id="L1820">            typeOfValue = val;</span>
+<span class="fc" id="L1821">        }</span>
+
+        /// Gets the corresponding JSType for the given string type.
+        ///
+        /// #### Parameters
+        ///
+        /// - `type`: The string type as returned by the typeof operator.  Possible input values are 'object', 'function', 'number', 'boolean', and 'undefined'
+        ///
+        /// #### Returns
+        ///
+        /// the enum corresponding to the type
+        public static JSType get(String type) {
+<span class="pc bpc" id="L1833" title="1 of 2 branches missed.">            for (JSType t : values) {</span>
+<span class="fc bfc" id="L1834" title="All 2 branches covered.">                if (t.typeOfValue.equals(type)) {</span>
+<span class="fc" id="L1835">                    return t;</span>
+                }
+            }
+<span class="nc" id="L1838">            return UNDEFINED;</span>
+        }
+    }
+
+<span class="fc" id="L1842">    static class LoadWrapper {</span>
+        Timer timer;
+        ActionListener&lt;ActionEvent&gt; l;
+    }
+
+    /// A wrapper class for a Javascript value that is returned via the `com.codename1.util.Callback)`
+    /// method.  This supports all Javascript primitive types.  See `JSType` for a list of the types.
+    public static class JSRef {
+
+        /// The string value of the javascript variable.
+        private final String value;
+
+        /// The string type of the javascript variable.  This is the result returned by the javascript typeof operator.
+        /// See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/typeof
+        private final String type;
+
+        /// Creates a new JSRef object.
+        ///
+        /// #### Parameters
+        ///
+        /// - `value`: The string value of the javascript variable.
+        ///
+        /// - `type`: The string type of the variable as returned by the typeof operator.
+<span class="fc" id="L1865">        public JSRef(String value, String type) {</span>
+<span class="fc" id="L1866">            this.value = value;</span>
+<span class="fc" id="L1867">            this.type = type;</span>
+
+<span class="fc" id="L1869">        }</span>
+
+        /// Gets the javascript value as a string.
+        ///
+        /// #### Returns
+        ///
+        /// The string value of the reference.
+        public String getValue() {
+<span class="fc" id="L1877">            return value;</span>
+        }
+
+        /// Returns the type of the value.
+        public JSType getJSType() {
+<span class="fc" id="L1882">            return JSType.get(type);</span>
+        }
+
+        /// Gets the value as an integer.
+        public int getInt() {
+<span class="nc" id="L1887">            return (int) Double.parseDouble(value);</span>
+        }
+
+        /// Gets teh value as a double.
+        public double getDouble() {
+<span class="fc" id="L1892">            return Double.parseDouble(value);</span>
+        }
+
+        /// Gets the value as a boolean.
+        public boolean getBoolean() {
+<span class="nc" id="L1897">            return Boolean.parseBoolean(value);</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L1902">            return value;</span>
+        }
+
+        /// Checks if the variable is null
+        public boolean isNull() {
+<span class="nc bnc" id="L1907" title="All 2 branches missed.">            return value == null;</span>
+        }
+
+
+    }
+
+    /// A wrapper class for a literal javascript expression that can be passed as an
+    /// arg in `java.lang.Object[])`.
+    public static class JSExpression {
+
+        private final String expression;
+
+        /// Creates a literal javascript expression.
+        ///
+        /// #### Parameters
+        ///
+        /// - `expression`: The javascript expression.
+<span class="fc" id="L1924">        public JSExpression(String expression) {</span>
+<span class="fc" id="L1925">            this.expression = expression;</span>
+<span class="fc" id="L1926">        }</span>
+
+        /// Gets the javascript expression as a string.
+        ///
+        /// #### Returns
+        ///
+        /// The javascript literal expression.
+        @Override
+        public String toString() {
+<span class="fc" id="L1935">            return expression;</span>
+        }
+    }
+
+    private static class FireNavigationCallbackRunnable implements Runnable {
+        private final SuccessCallback&lt;JSRef&gt; callback;
+        private final String errorMessage;
+
+<span class="nc" id="L1943">        public FireNavigationCallbackRunnable(SuccessCallback&lt;JSRef&gt; callback, String errorMessage) {</span>
+<span class="nc" id="L1944">            this.callback = callback;</span>
+<span class="nc" id="L1945">            this.errorMessage = errorMessage;</span>
+<span class="nc" id="L1946">        }</span>
+
+        @Override
+        public void run() {
+<span class="nc bnc" id="L1950" title="All 2 branches missed.">            if (callback instanceof Callback) {</span>
+<span class="nc" id="L1951">                ((Callback) callback).onError(this, new RuntimeException(errorMessage), 0, errorMessage);</span>
+
+            }
+<span class="nc" id="L1954">        }</span>
+    }
+
+    private static class WaitRunnable implements Runnable {
+
+        private final ExecuteResult res;
+
+<span class="fc" id="L1961">        public WaitRunnable(ExecuteResult res) {</span>
+<span class="fc" id="L1962">            this.res = res;</span>
+<span class="fc" id="L1963">        }</span>
+
+        @Override
+        public void run() {
+<span class="fc" id="L1967">            Util.wait(res, 1000);</span>
+<span class="fc" id="L1968">        }</span>
+
+    }
+
+    private static class WaitCallback implements Callback&lt;JSRef&gt; {
+
+        private final ExecuteResult res;
+
+<span class="fc" id="L1976">        public WaitCallback(ExecuteResult res) {</span>
+<span class="fc" id="L1977">            this.res = res;</span>
+<span class="fc" id="L1978">        }</span>
+
+        @Override
+        public void onSucess(JSRef value) {
+<span class="fc" id="L1982">            synchronized (res) {</span>
+<span class="fc" id="L1983">                res.complete = true;</span>
+<span class="fc" id="L1984">                res.value = value;</span>
+<span class="fc" id="L1985">                res.notifyAll();</span>
+<span class="fc" id="L1986">            }</span>
+<span class="fc" id="L1987">        }</span>
+
+        @Override
+        public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+<span class="nc" id="L1991">            synchronized (res) {</span>
+<span class="nc" id="L1992">                res.complete = true;</span>
+<span class="nc" id="L1993">                res.error = err;</span>
+<span class="nc" id="L1994">                res.notifyAll();</span>
+<span class="nc" id="L1995">            }</span>
+<span class="nc" id="L1996">        }</span>
+    }
+
+    private static class ShortSleepRunnable implements Runnable {
+        @Override
+        public void run() {
+<span class="fc" id="L2002">            Util.sleep(50);</span>
+<span class="fc" id="L2003">        }</span>
+    }
+
+    private static class NavigationCallbackRunnable implements Runnable {
+
+        private final SuccessCallback&lt;JSRef&gt; callback;
+        private final String value;
+        private final String type;
+
+<span class="fc" id="L2012">        public NavigationCallbackRunnable(SuccessCallback&lt;JSRef&gt; callback, String value, String type) {</span>
+<span class="fc" id="L2013">            this.callback = callback;</span>
+<span class="fc" id="L2014">            this.value = value;</span>
+<span class="fc" id="L2015">            this.type = type;</span>
+<span class="fc" id="L2016">        }</span>
+
+        @Override
+        public void run() {
+<span class="fc" id="L2020">            callback.onSucess(new JSRef(value, type));</span>
+<span class="fc" id="L2021">        }</span>
+
+    }
+
+    private static class AlwaysTrueShouldNavigateCallback implements BrowserNavigationCallback {
+        @Override
+        public boolean shouldNavigate(String url) {
+<span class="fc" id="L2028">            return true;</span>
+        }
+    }
+
+    private static class ExecuteResult {
+        JSRef value;
+        Throwable error;
+        boolean complete;
+    }
+
+    /// A thin wrapper around a Javascript variable that makes it easier to
+    /// call methods on that variable.
+    public class JSProxy {
+
+        /// The javascript variable name.  This can be any javascript expression that resolves
+        /// to an object.
+        private final String self;
+
+        /// Creats a new proxy.
+        ///
+        /// #### Parameters
+        ///
+        /// - `self`: @param self The javascript expression that should resolve to the object that this
+        ///             will proxy.  E.g. &quot;window&quot;, or &quot;document.getElementById('mybutton')&quot;.  The expression
+        ///             is just stored as a string and is 'resolved' when calls are made on the proxy.
+<span class="fc" id="L2053">        private JSProxy(String self) {</span>
+<span class="fc" id="L2054">            this.self = self;</span>
+<span class="fc" id="L2055">        }</span>
+
+        /// Calls a method on this javascript object.
+        ///
+        /// #### Parameters
+        ///
+        /// - `timeout`: The timeout in ms
+        ///
+        /// - `method`: The method name.
+        ///
+        /// - `args`: Arguments to pass to the method.
+        ///
+        /// - `callback`: Callback with the result of the method.
+        public void call(int timeout, String method, Object[] args, SuccessCallback&lt;JSRef&gt; callback) {
+<span class="fc" id="L2069">            StringBuilder js = new StringBuilder();</span>
+<span class="fc" id="L2070">            js.append(&quot;callback.onSuccess(&quot; + self + &quot;.&quot; + method + &quot;(&quot;);</span>
+<span class="fc" id="L2071">            int len = args.length;</span>
+<span class="fc bfc" id="L2072" title="All 2 branches covered.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="pc bpc" id="L2073" title="1 of 2 branches missed.">                if (i &gt; 0) {</span>
+<span class="nc" id="L2074">                    js.append(&quot;, &quot;);</span>
+                }
+<span class="fc" id="L2076">                js.append(&quot;${&quot; + i + &quot;}&quot;);</span>
+            }
+<span class="fc" id="L2078">            js.append(&quot;))&quot;);</span>
+<span class="fc" id="L2079">            execute(js.toString(), args, callback);</span>
+<span class="fc" id="L2080">        }</span>
+
+        /// Calls a method on this javascript object.
+        ///
+        /// #### Parameters
+        ///
+        /// - `method`: The method name.
+        ///
+        /// - `args`: Arguments to pass to the method.
+        ///
+        /// - `callback`: Callback with the result of the method.
+        public void call(String method, Object[] args, SuccessCallback&lt;JSRef&gt; callback) {
+<span class="fc" id="L2092">            call(0, method, args, callback);</span>
+<span class="fc" id="L2093">        }</span>
+
+        /// Calls method on this javascript object and waits for the result using
+        /// invokeAndBlock.
+        ///
+        /// #### Parameters
+        ///
+        /// - `timeout`: The timeout in ms
+        ///
+        /// - `method`: The method name.
+        ///
+        /// - `args`: Arguments for the method.
+        ///
+        /// #### Returns
+        ///
+        /// JSRef with the result of the method call.
+        public JSRef callAndWait(int timeout, String method, Object[] args) {
+<span class="nc" id="L2110">            StringBuilder js = new StringBuilder();</span>
+<span class="nc" id="L2111">            js.append(&quot;callback.onSuccess(&quot; + self + &quot;.&quot; + method + &quot;(&quot;);</span>
+<span class="nc" id="L2112">            int len = args.length;</span>
+<span class="nc bnc" id="L2113" title="All 2 branches missed.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc bnc" id="L2114" title="All 2 branches missed.">                if (i &gt; 0) {</span>
+<span class="nc" id="L2115">                    js.append(&quot;, &quot;);</span>
+                }
+<span class="nc" id="L2117">                js.append(&quot;${&quot; + i + &quot;}&quot;);</span>
+            }
+<span class="nc" id="L2119">            js.append(&quot;))&quot;);</span>
+<span class="nc" id="L2120">            return executeAndWait(timeout, js.toString(), args);</span>
+        }
+
+        /// Calls method on this javascript object and waits for the result using
+        /// invokeAndBlock.
+        ///
+        /// #### Parameters
+        ///
+        /// - `method`: The method name.
+        ///
+        /// - `args`: Arguments for the method.
+        ///
+        /// #### Returns
+        ///
+        /// JSRef with the result of the method call.
+        public JSRef callAndWait(String method, Object[] args) {
+<span class="nc" id="L2136">            return callAndWait(0, method, args);</span>
+        }
+
+        /// Gets a property of this javascript object.
+        ///
+        /// #### Parameters
+        ///
+        /// - `timeout`: Timeout in ms
+        ///
+        /// - `property`: The property name.
+        ///
+        /// - `callback`: Callback with the property value.
+        public void get(int timeout, String property, SuccessCallback&lt;JSRef&gt; callback) {
+
+<span class="nc" id="L2150">            execute(timeout, &quot;callback.onSuccess(&quot; + self + &quot;.&quot; + property + &quot;)&quot;, callback);</span>
+<span class="nc" id="L2151">        }</span>
+
+        /// Gets a property of this javascript object.
+        ///
+        /// #### Parameters
+        ///
+        /// - `property`: The property name.
+        ///
+        /// - `callback`: Callback with the property value.
+        public void get(String property, SuccessCallback&lt;JSRef&gt; callback) {
+<span class="nc" id="L2161">            get(0, property, callback);</span>
+<span class="nc" id="L2162">        }</span>
+
+        /// Gets multiple properties as a batch.
+        ///
+        /// #### Parameters
+        ///
+        /// - `timeout`: Timeout in ms
+        ///
+        /// - `properties`: List of property names to retrieve.
+        ///
+        /// - `callback`
+        public void get(int timeout, Collection&lt;String&gt; properties, final SuccessCallback&lt;Map&lt;String, JSRef&gt;&gt; callback) {
+<span class="nc" id="L2174">            StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L2175">            sb.append(&quot;(function(){var outmap={};var prop=null; var propval=null;&quot;);</span>
+<span class="nc bnc" id="L2176" title="All 2 branches missed.">            for (String prop : properties) {</span>
+<span class="nc" id="L2177">                sb.append(&quot;prop='&quot;).append(prop).append(&quot;';&quot;);</span>
+<span class="nc" id="L2178">                sb.append(&quot;propval=&quot;).append(self).append(&quot;[prop]&quot;);</span>
+<span class="nc" id="L2179">                sb.append(&quot;outmap[prop] = {value:propval, type:typeof(propval)};&quot;);</span>
+<span class="nc" id="L2180">            }</span>
+<span class="nc" id="L2181">            sb.append(&quot;callback.onSuccess(JSON.stringify(outmap))})()&quot;);</span>
+<span class="nc" id="L2182">            execute(timeout, sb.toString(), new SuccessCallback&lt;JSRef&gt;() {</span>
+
+                @Override
+                public void onSucess(JSRef value) {
+<span class="nc" id="L2186">                    JSONParser p = new JSONParser();</span>
+                    try {
+<span class="nc" id="L2188">                        Map m = p.parseJSON(new StringReader(value.getValue()));</span>
+<span class="nc" id="L2189">                        Map&lt;String, JSRef&gt; out = new HashMap&lt;String, JSRef&gt;();</span>
+<span class="nc bnc" id="L2190" title="All 2 branches missed.">                        for (Object entryObj : m.entrySet()) {</span>
+<span class="nc" id="L2191">                            Map.Entry entry = (Map.Entry) entryObj;</span>
+<span class="nc" id="L2192">                            String prop = (String) entry.getKey();</span>
+<span class="nc" id="L2193">                            Map propVal = (Map) entry.getValue();</span>
+<span class="nc" id="L2194">                            out.put(prop, new JSRef((String) propVal.get(&quot;value&quot;), (String) propVal.get(&quot;type&quot;)));</span>
+<span class="nc" id="L2195">                        }</span>
+<span class="nc" id="L2196">                        callback.onSucess(out);</span>
+<span class="nc" id="L2197">                    } catch (Exception ex) {</span>
+<span class="nc" id="L2198">                        Log.e(ex);</span>
+<span class="nc bnc" id="L2199" title="All 2 branches missed.">                        if (callback instanceof Callback) {</span>
+<span class="nc" id="L2200">                            ((Callback) callback).onError(BrowserComponent.this, ex, 0, ex.getMessage());</span>
+                        } else {
+<span class="nc" id="L2202">                            callback.onSucess(null);</span>
+                        }
+<span class="nc" id="L2204">                    }</span>
+<span class="nc" id="L2205">                }</span>
+
+            });
+
+<span class="nc" id="L2209">        }</span>
+
+        /// Gets a property of this javascript object and waits for the result
+        /// using invokeAndBlock.
+        ///
+        /// #### Parameters
+        ///
+        /// - `property`: The property to retrieve.
+        ///
+        /// #### Returns
+        ///
+        /// The property value.
+        public void get(Collection&lt;String&gt; properties, final SuccessCallback&lt;Map&lt;String, JSRef&gt;&gt; callback) {
+<span class="nc" id="L2222">            get(0, properties, callback);</span>
+<span class="nc" id="L2223">        }</span>
+
+        /// Gets a property of this javascript object and waits for the result
+        /// using invokeAndBlock.
+        ///
+        /// #### Parameters
+        ///
+        /// - `timeout`: The timeout in ms
+        ///
+        /// - `property`: The property to retrieve.
+        ///
+        /// #### Returns
+        ///
+        /// The property value.
+        public JSRef getAndWait(int timeout, String property) {
+
+<span class="nc" id="L2239">            return executeAndWait(timeout, &quot;callback.onSuccess(&quot; + self + &quot;.&quot; + property + &quot;)&quot;);</span>
+        }
+
+        /// Gets a property of this javascript object and waits for the result
+        /// using invokeAndBlock.
+        ///
+        /// #### Parameters
+        ///
+        /// - `property`: The property to retrieve.
+        ///
+        /// #### Returns
+        ///
+        /// The property value.
+        public JSRef getAndWait(String property) {
+<span class="nc" id="L2253">            return getAndWait(0, property);</span>
+        }
+
+        /// Gets multiple properties on this object in a batch.
+        ///
+        /// #### Parameters
+        ///
+        /// - `timeout`: The timeout in ms
+        ///
+        /// - `properties`: The property names to get.
+        public Map&lt;String, JSRef&gt; getAndWait(int timeout, Collection&lt;String&gt; properties) {
+<span class="nc" id="L2264">            StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L2265">            sb.append(&quot;(function(){var outmap={};var prop=null; var propval=null;&quot;);</span>
+<span class="nc bnc" id="L2266" title="All 2 branches missed.">            for (String prop : properties) {</span>
+<span class="nc" id="L2267">                sb.append(&quot;prop='&quot;).append(prop).append(&quot;';&quot;);</span>
+<span class="nc" id="L2268">                sb.append(&quot;propval=&quot;).append(self).append(&quot;[prop]&quot;);</span>
+<span class="nc" id="L2269">                sb.append(&quot;outmap[prop] = {value:propval, type:typeof(propval)};&quot;);</span>
+<span class="nc" id="L2270">            }</span>
+<span class="nc" id="L2271">            sb.append(&quot;callback.onSuccess(JSON.stringify(outmap))})()&quot;);</span>
+<span class="nc" id="L2272">            JSRef value = executeAndWait(timeout, sb.toString());</span>
+<span class="nc" id="L2273">            JSONParser p = new JSONParser();</span>
+            try {
+<span class="nc" id="L2275">                Map m = p.parseJSON(new StringReader(value.getValue()));</span>
+<span class="nc" id="L2276">                Map&lt;String, JSRef&gt; out = new HashMap&lt;String, JSRef&gt;();</span>
+<span class="nc bnc" id="L2277" title="All 2 branches missed.">                for (Object entryObj : m.entrySet()) {</span>
+<span class="nc" id="L2278">                    Map.Entry entry = (Map.Entry) entryObj;</span>
+<span class="nc" id="L2279">                    String prop = (String) entry.getKey();</span>
+<span class="nc" id="L2280">                    Map propVal = (Map) entry.getValue();</span>
+<span class="nc" id="L2281">                    out.put(prop, new JSRef((String) propVal.get(&quot;value&quot;), (String) propVal.get(&quot;type&quot;)));</span>
+<span class="nc" id="L2282">                }</span>
+<span class="nc" id="L2283">                return out;</span>
+<span class="nc" id="L2284">            } catch (RuntimeException e) {</span>
+<span class="nc" id="L2285">                throw e;</span>
+<span class="nc" id="L2286">            } catch (Exception ex) {</span>
+<span class="nc" id="L2287">                Log.e(ex);</span>
+<span class="nc" id="L2288">                throw new RuntimeException(ex.getMessage(), ex);</span>
+            }
+        }
+
+        /// Gets multiple properties on this object in a batch.
+        ///
+        /// #### Parameters
+        ///
+        /// - `properties`
+        public Map&lt;String, JSRef&gt; getAndWait(Collection&lt;String&gt; properties) {
+<span class="nc" id="L2298">            return getAndWait(0, properties);</span>
+        }
+
+
+        /// Sets a property.
+        ///
+        /// #### Parameters
+        ///
+        /// - `timeout`: The timeout in ms
+        ///
+        /// - `property`: The property name.
+        ///
+        /// - `value`: The property value.
+        public void set(int timeout, String property, Object value) {
+<span class="nc" id="L2312">            set(timeout, property, value, null);</span>
+<span class="nc" id="L2313">        }</span>
+
+        /// Sets a property.
+        ///
+        /// #### Parameters
+        ///
+        /// - `property`: The property name.
+        ///
+        /// - `value`: The property value.
+        public void set(String property, Object value) {
+<span class="nc" id="L2323">            set(0, property, value);</span>
+<span class="nc" id="L2324">        }</span>
+
+        /// Sets a property on this javascript object.
+        ///
+        /// #### Parameters
+        ///
+        /// - `timeout`: The timeout in ms.
+        ///
+        /// - `property`: The property name to set.
+        ///
+        /// - `value`: The property value.
+        ///
+        /// - `callback`: Callback which is called when complete
+        public void set(int timeout, String property, Object value, SuccessCallback&lt;JSRef&gt; callback) {
+<span class="nc" id="L2338">            execute(timeout, self + &quot;['&quot; + property + &quot;']=${0}; callback.onSuccess(undefined);&quot;, new Object[]{value}, callback);</span>
+<span class="nc" id="L2339">        }</span>
+
+        /// Sets a property on this javascript object.
+        ///
+        /// #### Parameters
+        ///
+        /// - `property`: The property name to set.
+        ///
+        /// - `value`: The property value.
+        ///
+        /// - `callback`: Callback which is called when complete
+        public void set(String property, Object value, SuccessCallback&lt;JSRef&gt; callback) {
+<span class="nc" id="L2351">            set(0, property, value, callback);</span>
+<span class="nc" id="L2352">        }</span>
+
+        /// Sets multiple properties in a single batch.
+        ///
+        /// #### Parameters
+        ///
+        /// - `timeout`: The timeout in ms
+        ///
+        /// - `properties`: The properties to set.
+        ///
+        /// - `callback`: Callback called when operation is completed.
+        public void set(int timeout, Map&lt;String, Object&gt; properties, SuccessCallback&lt;JSRef&gt; callback) {
+<span class="nc" id="L2364">            StringBuilder js = new StringBuilder();</span>
+<span class="nc" id="L2365">            Object[] params = new Object[properties.size()];</span>
+<span class="nc" id="L2366">            int i = 0;</span>
+<span class="nc bnc" id="L2367" title="All 2 branches missed.">            for (Map.Entry&lt;String, Object&gt; entry : properties.entrySet()) {</span>
+<span class="nc" id="L2368">                js.append(&quot;self['&quot;).append(entry.getKey()).append(&quot;']=${&quot;).append(i).append(&quot;};&quot;);</span>
+<span class="nc" id="L2369">                params[i] = entry.getValue();</span>
+<span class="nc" id="L2370">                i++;</span>
+<span class="nc" id="L2371">            }</span>
+<span class="nc" id="L2372">            js.append(&quot;callback.onSuccess(undefined)&quot;);</span>
+<span class="nc" id="L2373">            execute(timeout, js.toString(), params, callback);</span>
+<span class="nc" id="L2374">        }</span>
+
+        /// Sets multiple properties in a single batch.
+        ///
+        /// #### Parameters
+        ///
+        /// - `properties`: The properties to set.
+        ///
+        /// - `callback`: Callback called when operation is completed.
+        public void set(Map&lt;String, Object&gt; properties, SuccessCallback&lt;JSRef&gt; callback) {
+<span class="nc" id="L2384">            set(0, properties, callback);</span>
+<span class="nc" id="L2385">        }</span>
+
+        /// Sets multiple properties in a single batch.
+        ///
+        /// #### Parameters
+        ///
+        /// - `timeout`: Timeout in ms
+        ///
+        /// - `properties`: The properties to set on this object.
+        public void setAndWait(int timeout, Map&lt;String, Object&gt; properties) {
+<span class="nc" id="L2395">            StringBuilder js = new StringBuilder();</span>
+<span class="nc" id="L2396">            Object[] params = new Object[properties.size()];</span>
+<span class="nc" id="L2397">            int i = 0;</span>
+<span class="nc bnc" id="L2398" title="All 2 branches missed.">            for (Map.Entry&lt;String, Object&gt; entry : properties.entrySet()) {</span>
+<span class="nc" id="L2399">                js.append(&quot;self['&quot;).append(entry.getKey()).append(&quot;']=${&quot;).append(i).append(&quot;};&quot;);</span>
+<span class="nc" id="L2400">                params[i] = entry.getValue();</span>
+<span class="nc" id="L2401">                i++;</span>
+<span class="nc" id="L2402">            }</span>
+<span class="nc" id="L2403">            js.append(&quot;callback.onSuccess(undefined)&quot;);</span>
+<span class="nc" id="L2404">            executeAndWait(timeout, js.toString(), params);</span>
+<span class="nc" id="L2405">        }</span>
+
+        /// Sets multiple properties in a single batch.
+        ///
+        /// #### Parameters
+        ///
+        /// - `properties`: The properties to set on this object.
+        public void setAndWait(Map&lt;String, Object&gt; properties) {
+<span class="nc" id="L2413">            setAndWait(0, properties);</span>
+<span class="nc" id="L2414">        }</span>
+
+        /// Sets a property on this javascript object and waits for it to complete using invokeAndBlock.
+        ///
+        /// #### Parameters
+        ///
+        /// - `timeout`: The timeout in ms.
+        ///
+        /// - `property`: The property name to set.
+        ///
+        /// - `value`: The value to set.
+        public void setAndWait(int timeout, String property, Object value) {
+
+<span class="nc" id="L2427">            executeAndWait(timeout, self + &quot;.&quot; + property + &quot;=${0}; callback.onSuccess(undefined);&quot;, value);</span>
+<span class="nc" id="L2428">        }</span>
+
+        /// Sets a property on this javascript object and waits for it to complete using invokeAndBlock.
+        ///
+        /// #### Parameters
+        ///
+        /// - `property`: The property name to set.
+        ///
+        /// - `value`: The value to set.
+        public void setAndWait(String property, Object value) {
+<span class="nc" id="L2438">            setAndWait(0, property, value);</span>
+<span class="nc" id="L2439">        }</span>
+
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

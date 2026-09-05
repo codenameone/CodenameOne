@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ARPose.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ar</a> &gt; <span class="el_source">ARPose.java</span></div><h1>ARPose.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ar;
+
+import com.codename1.gpu.Quaternion;
+
+/// An immutable rigid transform - a rotation followed by a translation - that
+/// positions something in AR world space. Poses use the AR coordinate
+/// convention shared by ARKit and ARCore: units are meters, the coordinate
+/// system is right-handed with Y pointing up and -Z pointing forward from the
+/// initial camera direction.
+///
+/// The rotation is stored as a unit quaternion `(qx, qy, qz, qw)` compatible
+/// with `com.codename1.gpu.Quaternion`; the translation is `(tx, ty, tz)`.
+/// `toMatrix(float[])` produces the equivalent column-major 4x4 matrix, ready
+/// for `com.codename1.gpu.Matrix4` math.
+public final class ARPose {
+    /// The identity pose: no rotation, located at the world origin.
+<span class="fc" id="L39">    public static final ARPose IDENTITY = new ARPose(0, 0, 0, 0, 0, 0, 1);</span>
+
+    private final float tx;
+    private final float ty;
+    private final float tz;
+    private final float qx;
+    private final float qy;
+    private final float qz;
+    private final float qw;
+
+    /// Creates a pose from a translation and a rotation quaternion. The
+    /// quaternion is normalized defensively; a zero quaternion becomes the
+    /// identity rotation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tx`, `ty`, `tz`: the translation in meters
+    ///
+    /// - `qx`, `qy`, `qz`, `qw`: the rotation quaternion
+<span class="fc" id="L58">    public ARPose(float tx, float ty, float tz, float qx, float qy, float qz, float qw) {</span>
+<span class="fc" id="L59">        this.tx = tx;</span>
+<span class="fc" id="L60">        this.ty = ty;</span>
+<span class="fc" id="L61">        this.tz = tz;</span>
+<span class="fc" id="L62">        float len = (float) Math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (len == 0.0f) {</span>
+<span class="fc" id="L64">            this.qx = 0;</span>
+<span class="fc" id="L65">            this.qy = 0;</span>
+<span class="fc" id="L66">            this.qz = 0;</span>
+<span class="fc" id="L67">            this.qw = 1;</span>
+        } else {
+<span class="fc" id="L69">            float inv = 1.0f / len;</span>
+<span class="fc" id="L70">            this.qx = qx * inv;</span>
+<span class="fc" id="L71">            this.qy = qy * inv;</span>
+<span class="fc" id="L72">            this.qz = qz * inv;</span>
+<span class="fc" id="L73">            this.qw = qw * inv;</span>
+        }
+<span class="fc" id="L75">    }</span>
+
+    /// Extracts a pose from a column-major 4x4 transform matrix whose upper
+    /// left 3x3 is a pure rotation (no scale or shear).
+    ///
+    /// #### Parameters
+    ///
+    /// - `m16`: the column-major matrix, 16 floats
+    ///
+    /// #### Returns
+    ///
+    /// the equivalent pose
+    public static ARPose fromMatrix(float[] m16) {
+<span class="fc" id="L88">        float m00 = m16[0];</span>
+<span class="fc" id="L89">        float m10 = m16[1];</span>
+<span class="fc" id="L90">        float m20 = m16[2];</span>
+<span class="fc" id="L91">        float m01 = m16[4];</span>
+<span class="fc" id="L92">        float m11 = m16[5];</span>
+<span class="fc" id="L93">        float m21 = m16[6];</span>
+<span class="fc" id="L94">        float m02 = m16[8];</span>
+<span class="fc" id="L95">        float m12 = m16[9];</span>
+<span class="fc" id="L96">        float m22 = m16[10];</span>
+<span class="fc" id="L97">        float trace = m00 + m11 + m22;</span>
+        float x;
+        float y;
+        float z;
+        float w;
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (trace &gt; 0.0f) {</span>
+<span class="fc" id="L103">            float s = (float) Math.sqrt(trace + 1.0f) * 2.0f;</span>
+<span class="fc" id="L104">            w = 0.25f * s;</span>
+<span class="fc" id="L105">            x = (m21 - m12) / s;</span>
+<span class="fc" id="L106">            y = (m02 - m20) / s;</span>
+<span class="fc" id="L107">            z = (m10 - m01) / s;</span>
+<span class="pc bnc" id="L108" title="All 4 branches missed.">        } else if (m00 &gt; m11 &amp;&amp; m00 &gt; m22) {</span>
+<span class="nc" id="L109">            float s = (float) Math.sqrt(1.0f + m00 - m11 - m22) * 2.0f;</span>
+<span class="nc" id="L110">            w = (m21 - m12) / s;</span>
+<span class="nc" id="L111">            x = 0.25f * s;</span>
+<span class="nc" id="L112">            y = (m01 + m10) / s;</span>
+<span class="nc" id="L113">            z = (m02 + m20) / s;</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        } else if (m11 &gt; m22) {</span>
+<span class="nc" id="L115">            float s = (float) Math.sqrt(1.0f + m11 - m00 - m22) * 2.0f;</span>
+<span class="nc" id="L116">            w = (m02 - m20) / s;</span>
+<span class="nc" id="L117">            x = (m01 + m10) / s;</span>
+<span class="nc" id="L118">            y = 0.25f * s;</span>
+<span class="nc" id="L119">            z = (m12 + m21) / s;</span>
+<span class="nc" id="L120">        } else {</span>
+<span class="nc" id="L121">            float s = (float) Math.sqrt(1.0f + m22 - m00 - m11) * 2.0f;</span>
+<span class="nc" id="L122">            w = (m10 - m01) / s;</span>
+<span class="nc" id="L123">            x = (m02 + m20) / s;</span>
+<span class="nc" id="L124">            y = (m12 + m21) / s;</span>
+<span class="nc" id="L125">            z = 0.25f * s;</span>
+        }
+<span class="fc" id="L127">        return new ARPose(m16[12], m16[13], m16[14], x, y, z, w);</span>
+    }
+
+    /// The X component of the translation in meters.
+    public float getTx() {
+<span class="fc" id="L132">        return tx;</span>
+    }
+
+    /// The Y component of the translation in meters.
+    public float getTy() {
+<span class="fc" id="L137">        return ty;</span>
+    }
+
+    /// The Z component of the translation in meters.
+    public float getTz() {
+<span class="fc" id="L142">        return tz;</span>
+    }
+
+    /// The X component of the rotation quaternion.
+    public float getQx() {
+<span class="nc" id="L147">        return qx;</span>
+    }
+
+    /// The Y component of the rotation quaternion.
+    public float getQy() {
+<span class="nc" id="L152">        return qy;</span>
+    }
+
+    /// The Z component of the rotation quaternion.
+    public float getQz() {
+<span class="nc" id="L157">        return qz;</span>
+    }
+
+    /// The W component of the rotation quaternion.
+    public float getQw() {
+<span class="fc" id="L162">        return qw;</span>
+    }
+
+    /// Writes this pose as a column-major 4x4 transform matrix into `out16`,
+    /// compatible with `com.codename1.gpu.Matrix4`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out16`: the destination array, 16 floats
+    public void toMatrix(float[] out16) {
+<span class="fc" id="L172">        float[] q = {qx, qy, qz, qw};</span>
+<span class="fc" id="L173">        Quaternion.toMatrix(q, out16);</span>
+<span class="fc" id="L174">        out16[12] = tx;</span>
+<span class="fc" id="L175">        out16[13] = ty;</span>
+<span class="fc" id="L176">        out16[14] = tz;</span>
+<span class="fc" id="L177">    }</span>
+
+    /// Returns this pose as a newly allocated column-major 4x4 transform
+    /// matrix.
+    public float[] toMatrix() {
+<span class="fc" id="L182">        float[] m = new float[16];</span>
+<span class="fc" id="L183">        toMatrix(m);</span>
+<span class="fc" id="L184">        return m;</span>
+    }
+
+    /// Composes this pose with a pose expressed in this pose's local frame,
+    /// returning `this * local`. Use it to convert an offset relative to an
+    /// anchor into world space.
+    ///
+    /// #### Parameters
+    ///
+    /// - `local`: the pose in this pose's local coordinate frame
+    ///
+    /// #### Returns
+    ///
+    /// the composed pose in the frame this pose is expressed in
+    public ARPose transform(ARPose local) {
+<span class="fc" id="L199">        float[] q = {qx, qy, qz, qw};</span>
+<span class="fc" id="L200">        float[] lq = {local.qx, local.qy, local.qz, local.qw};</span>
+<span class="fc" id="L201">        float[] rq = new float[4];</span>
+<span class="fc" id="L202">        Quaternion.multiply(q, lq, rq);</span>
+<span class="fc" id="L203">        float[] t = {local.tx, local.ty, local.tz};</span>
+<span class="fc" id="L204">        Quaternion.rotateVector(q, t);</span>
+<span class="fc" id="L205">        return new ARPose(tx + t[0], ty + t[1], tz + t[2], rq[0], rq[1], rq[2], rq[3]);</span>
+    }
+
+    /// Transforms the point stored in `xyzInOut` (3 floats) from this pose's
+    /// local frame to the frame this pose is expressed in, writing the result
+    /// back in place.
+    ///
+    /// #### Parameters
+    ///
+    /// - `xyzInOut`: the point to transform, modified in place
+    public void transformPoint(float[] xyzInOut) {
+<span class="fc" id="L216">        float[] q = {qx, qy, qz, qw};</span>
+<span class="fc" id="L217">        Quaternion.rotateVector(q, xyzInOut);</span>
+<span class="fc" id="L218">        xyzInOut[0] += tx;</span>
+<span class="fc" id="L219">        xyzInOut[1] += ty;</span>
+<span class="fc" id="L220">        xyzInOut[2] += tz;</span>
+<span class="fc" id="L221">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L225">        return &quot;ARPose(t=[&quot; + tx + &quot;, &quot; + ty + &quot;, &quot; + tz + &quot;], q=[&quot;</span>
+                + qx + &quot;, &quot; + qy + &quot;, &quot; + qz + &quot;, &quot; + qw + &quot;])&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

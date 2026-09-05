@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SecureRandom.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">SecureRandom.java</span></div><h1>SecureRandom.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+import com.codename1.io.Util;
+
+/// Cryptographically secure random number generator. Delegates to the
+/// platform's native CSPRNG (`/dev/urandom` on Unix-style systems, the
+/// Windows BCryptGenRandom on Windows, `SecRandomCopyBytes` on iOS, the
+/// hardware RNG on devices that expose one).
+///
+/// Use this class -- not `java.util.Random` or `Math.random()` -- whenever the
+/// output is going to be used as a key, nonce, salt, session token, password
+/// reset code or any other security-sensitive value.
+///
+/// #### Example
+///
+/// ```java
+/// byte[] iv = SecureRandom.bytes(12); // AES-GCM nonce
+/// int code  = SecureRandom.intBelow(1_000_000); // 6-digit code
+/// ```
+public final class SecureRandom {
+
+    private SecureRandom() {}
+
+    /// Returns a fresh `length`-byte array filled with secure random bytes.
+    public static byte[] bytes(int length) {
+<span class="fc" id="L48">        byte[] out = new byte[length];</span>
+<span class="fc" id="L49">        fill(out);</span>
+<span class="fc" id="L50">        return out;</span>
+    }
+
+    /// Fills `out` with secure random bytes.
+    public static void fill(byte[] out) {
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (out == null) {</span>
+<span class="nc" id="L56">            throw new CryptoException(&quot;out must not be null&quot;);</span>
+        }
+        try {
+<span class="fc" id="L59">            Util.secureRandomBytes(out);</span>
+<span class="nc" id="L60">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L61">            throw new CryptoException(re.getMessage(), re);</span>
+<span class="fc" id="L62">        }</span>
+<span class="fc" id="L63">    }</span>
+
+    /// Returns a uniformly distributed random int in `[0, bound)`. `bound`
+    /// must be positive.
+    public static int intBelow(int bound) {
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (bound &lt;= 0) {</span>
+<span class="nc" id="L69">            throw new CryptoException(&quot;bound must be positive&quot;);</span>
+        }
+        // Rejection sampling to avoid modulo bias.
+<span class="fc" id="L72">        byte[] buf = new byte[4];</span>
+        while (true) {
+<span class="fc" id="L74">            fill(buf);</span>
+<span class="fc" id="L75">            int v = ((buf[0] &amp; 0x7f) &lt;&lt; 24)</span>
+                    | ((buf[1] &amp; 0xff) &lt;&lt; 16)
+                    | ((buf[2] &amp; 0xff) &lt;&lt; 8)
+                    | (buf[3] &amp; 0xff);
+<span class="fc" id="L79">            int m = v % bound;</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            if (v - m + (bound - 1) &gt;= 0) {</span>
+<span class="fc" id="L81">                return m;</span>
+            }
+<span class="nc" id="L83">        }</span>
+    }
+
+    /// Returns a uniformly distributed random long in `[0, bound)`. `bound`
+    /// must be positive.
+    public static long longBelow(long bound) {
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (bound &lt;= 0) {</span>
+<span class="nc" id="L90">            throw new CryptoException(&quot;bound must be positive&quot;);</span>
+        }
+<span class="nc" id="L92">        byte[] buf = new byte[8];</span>
+        while (true) {
+<span class="nc" id="L94">            fill(buf);</span>
+<span class="nc" id="L95">            long v = ((long) (buf[0] &amp; 0x7f) &lt;&lt; 56)</span>
+                    | ((long) (buf[1] &amp; 0xff) &lt;&lt; 48)
+                    | ((long) (buf[2] &amp; 0xff) &lt;&lt; 40)
+                    | ((long) (buf[3] &amp; 0xff) &lt;&lt; 32)
+                    | ((long) (buf[4] &amp; 0xff) &lt;&lt; 24)
+                    | ((long) (buf[5] &amp; 0xff) &lt;&lt; 16)
+                    | ((long) (buf[6] &amp; 0xff) &lt;&lt; 8)
+                    | (long) (buf[7] &amp; 0xff);
+<span class="nc" id="L103">            long m = v % bound;</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            if (v - m + (bound - 1) &gt;= 0) {</span>
+<span class="nc" id="L105">                return m;</span>
+            }
+<span class="nc" id="L107">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

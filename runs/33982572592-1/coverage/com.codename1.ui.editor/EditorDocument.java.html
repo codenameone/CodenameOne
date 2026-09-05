@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EditorDocument.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">EditorDocument.java</span></div><h1>EditorDocument.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.editor;
+
+/// The plain text backing store shared by the pure Codename One editors. The document keeps the full
+/// text in a single buffer addressed by a linear UTF-16 offset space and derives a cached line index
+/// (the start offset of every logical line) on demand for rendering and hit testing.
+///
+/// A single buffer keeps offset arithmetic trivial (offsets are direct buffer indices) which is exactly
+/// what the caret, selection, undo stack and the platform text input source all operate on. Line
+/// oriented feature layers (syntax highlighting, the gutter) sit on top of the line index.
+public class EditorDocument {
+<span class="fc" id="L34">    private final StringBuilder buf = new StringBuilder(); // NOPMD - intentional owned buffer</span>
+    private String cachedText;
+<span class="fc" id="L36">    private int[] lineStarts = new int[]{0};</span>
+<span class="fc" id="L37">    private int lineCount = 1;</span>
+<span class="fc" id="L38">    private boolean linesDirty = true;</span>
+
+    // The whole text as a String, cached between edits. Reading substrings from a String avoids
+    // StringBuilder.substring which the ParparVM (iOS) minimal runtime does not implement.
+    private String text() {
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (cachedText == null) {</span>
+<span class="fc" id="L44">            cachedText = buf.toString();</span>
+        }
+<span class="fc" id="L46">        return cachedText;</span>
+    }
+
+    /// Creates an empty document.
+<span class="fc" id="L50">    public EditorDocument() {</span>
+<span class="fc" id="L51">    }</span>
+
+    /// Creates a document initialized with the supplied text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the initial text, or null for an empty document
+<span class="fc" id="L58">    public EditorDocument(String text) {</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (text != null) {</span>
+<span class="fc" id="L60">            buf.append(normalizeText(text));</span>
+        }
+<span class="fc" id="L62">        linesDirty = true;</span>
+<span class="fc" id="L63">        cachedText = null;</span>
+<span class="fc" id="L64">    }</span>
+
+    /// Normalizes platform line endings into the document's canonical LF representation.
+    public static String normalizeText(String text) {
+        // collapse CRLF / CR to LF so the linear offset space matches what the platform delivers
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (text.indexOf('\r') &lt; 0) {</span>
+<span class="fc" id="L70">            return text;</span>
+        }
+<span class="fc" id="L72">        StringBuilder sb = new StringBuilder(text.length());</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L74">            char c = text.charAt(i);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            if (c == '\r') {</span>
+<span class="pc bpc" id="L76" title="1 of 4 branches missed.">                if (i + 1 &lt; text.length() &amp;&amp; text.charAt(i + 1) == '\n') {</span>
+<span class="fc" id="L77">                    continue;</span>
+                }
+<span class="fc" id="L79">                sb.append('\n');</span>
+            } else {
+<span class="fc" id="L81">                sb.append(c);</span>
+            }
+        }
+<span class="fc" id="L84">        return sb.toString();</span>
+    }
+
+    /// Returns the total number of UTF-16 characters in the document.
+    public int length() {
+<span class="fc" id="L89">        return buf.length();</span>
+    }
+
+    /// Returns the full document text.
+    public String getText() {
+<span class="fc" id="L94">        return text();</span>
+    }
+
+    /// Returns the character at the given offset.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: a valid offset in `[0, length())`
+    public char charAt(int offset) {
+<span class="fc" id="L103">        return buf.charAt(offset);</span>
+    }
+
+    /// Returns the substring in `[start, end)`.
+    public String substring(int start, int end) {
+<span class="fc" id="L108">        return text().substring(start, end);</span>
+    }
+
+    /// Replaces the entire document content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the new text, or null to clear the document
+    public void setText(String text) {
+<span class="fc" id="L117">        buf.setLength(0);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (text != null) {</span>
+<span class="fc" id="L119">            buf.append(normalizeText(text));</span>
+        }
+<span class="fc" id="L121">        linesDirty = true;</span>
+<span class="fc" id="L122">        cachedText = null;</span>
+<span class="fc" id="L123">    }</span>
+
+    /// Inserts text at the given offset.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the insertion offset in `[0, length()]`
+    ///
+    /// - `text`: the text to insert
+    public void insert(int offset, String text) {
+<span class="pc bpc" id="L133" title="1 of 4 branches missed.">        if (text == null || text.length() == 0) {</span>
+<span class="fc" id="L134">            return;</span>
+        }
+<span class="fc" id="L136">        buf.insert(offset, normalizeText(text));</span>
+<span class="fc" id="L137">        linesDirty = true;</span>
+<span class="fc" id="L138">        cachedText = null;</span>
+<span class="fc" id="L139">    }</span>
+
+    /// Deletes the range `[start, end)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: inclusive start offset
+    ///
+    /// - `end`: exclusive end offset
+    public void delete(int start, int end) {
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (start &gt;= end) {</span>
+<span class="fc" id="L150">            return;</span>
+        }
+<span class="fc" id="L152">        buf.delete(start, end);</span>
+<span class="fc" id="L153">        linesDirty = true;</span>
+<span class="fc" id="L154">        cachedText = null;</span>
+<span class="fc" id="L155">    }</span>
+
+    /// Clamps an arbitrary offset into the valid range `[0, length()]`.
+    public int clamp(int offset) {
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (offset &lt; 0) {</span>
+<span class="fc" id="L160">            return 0;</span>
+        }
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (offset &gt; buf.length()) {</span>
+<span class="fc" id="L163">            return buf.length();</span>
+        }
+<span class="fc" id="L165">        return offset;</span>
+    }
+
+    private void ensureLines() {
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (!linesDirty) {</span>
+<span class="fc" id="L170">            return;</span>
+        }
+<span class="fc" id="L172">        int count = 1;</span>
+<span class="fc" id="L173">        int len = buf.length();</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (buf.charAt(i) == '\n') {</span>
+<span class="fc" id="L176">                count++;</span>
+            }
+        }
+<span class="fc" id="L179">        int[] starts = new int[count];</span>
+<span class="fc" id="L180">        starts[0] = 0;</span>
+<span class="fc" id="L181">        int idx = 1;</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            if (buf.charAt(i) == '\n') {</span>
+<span class="fc" id="L184">                starts[idx++] = i + 1;</span>
+            }
+        }
+<span class="fc" id="L187">        lineStarts = starts;</span>
+<span class="fc" id="L188">        lineCount = count;</span>
+<span class="fc" id="L189">        linesDirty = false;</span>
+<span class="fc" id="L190">    }</span>
+
+    /// Returns the number of logical lines (always at least one).
+    public int getLineCount() {
+<span class="fc" id="L194">        ensureLines();</span>
+<span class="fc" id="L195">        return lineCount;</span>
+    }
+
+    /// Returns the start offset of the given line.
+    ///
+    /// #### Parameters
+    ///
+    /// - `line`: a zero based line index in `[0, getLineCount())`
+    public int getLineStart(int line) {
+<span class="fc" id="L204">        ensureLines();</span>
+<span class="fc" id="L205">        return lineStarts[line];</span>
+    }
+
+    /// Returns the end offset (exclusive, not counting the trailing newline) of the given line.
+    ///
+    /// #### Parameters
+    ///
+    /// - `line`: a zero based line index in `[0, getLineCount())`
+    public int getLineEnd(int line) {
+<span class="fc" id="L214">        ensureLines();</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        if (line + 1 &lt; lineCount) {</span>
+<span class="fc" id="L216">            return lineStarts[line + 1] - 1;</span>
+        }
+<span class="fc" id="L218">        return buf.length();</span>
+    }
+
+    /// Returns the text of the given line without its trailing newline.
+    ///
+    /// #### Parameters
+    ///
+    /// - `line`: a zero based line index in `[0, getLineCount())`
+    public String getLineText(int line) {
+<span class="fc" id="L227">        return text().substring(getLineStart(line), getLineEnd(line));</span>
+    }
+
+    /// Returns the zero based line index containing the given offset.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: an offset in `[0, length()]`
+    public int lineOfOffset(int offset) {
+<span class="fc" id="L236">        ensureLines();</span>
+<span class="fc" id="L237">        int lo = 0;</span>
+<span class="fc" id="L238">        int hi = lineCount - 1;</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        while (lo &lt; hi) {</span>
+<span class="fc" id="L240">            int mid = (lo + hi + 1) &gt;&gt;&gt; 1;</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">            if (lineStarts[mid] &lt;= offset) {</span>
+<span class="fc" id="L242">                lo = mid;</span>
+            } else {
+<span class="fc" id="L244">                hi = mid - 1;</span>
+            }
+<span class="fc" id="L246">        }</span>
+<span class="fc" id="L247">        return lo;</span>
+    }
+
+    /// Returns the column (offset within its line) for the given absolute offset.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: an offset in `[0, length()]`
+    public int columnOfOffset(int offset) {
+<span class="fc" id="L256">        return offset - getLineStart(lineOfOffset(offset));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

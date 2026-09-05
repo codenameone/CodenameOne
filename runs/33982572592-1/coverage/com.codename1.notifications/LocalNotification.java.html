@@ -1,0 +1,869 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LocalNotification.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.notifications</a> &gt; <span class="el_source">LocalNotification.java</span></div><h1>LocalNotification.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.notifications;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// Local notifications are user notifications that are scheduled by the app itself. They
+/// are very similar to push notifications, except that they originate locally, rather than
+/// remotely.
+///
+/// They enable an app that isnt running in the foreground to let its users know it
+/// has information for them. The information could be a message, an impending calendar
+/// event, or new data on a remote server. They can display an alert message or
+/// they can badge the app icon. They can also play a sound when the alert or badge
+/// number is shown.
+///
+/// When users are notified that the app has a message, event, or other data for them,
+/// they can launch the app and see the details. They can also choose to ignore the notification,
+/// in which case the app is not activated.
+///
+/// This class encapsulates a single notification (though the notification can
+/// be repeating).
+///
+/// Usage
+/// ```java
+/// // File: GeofenceListenerImpl.java
+/// public class GeofenceListenerImpl implements GeofenceListener {
+/// @Override
+///     public void onExit(String id) {
+///     }
+/// @Override
+///     public void onEntered(String id) {
+///         if(!Display.getInstance().isMinimized()) {
+///             Display.getInstance().callSerially(() -&gt; {
+///                 Dialog.show(&quot;Welcome&quot;, &quot;Thanks for arriving&quot;, &quot;OK&quot;, null);
+///             });
+///         } else {
+///             LocalNotification ln = new LocalNotification();
+///             ln.setId(&quot;LnMessage&quot;);
+///             ln.setAlertTitle(&quot;Welcome&quot;);
+///             ln.setAlertBody(&quot;Thanks for arriving!&quot;);
+///             Display.getInstance().scheduleLocalNotification(ln, System.currentTimeMillis() + 10, LocalNotification.REPEAT_NONE);
+///         }
+///     }
+/// }
+/// ```
+///
+/// ```java
+/// // File: GeofenceSample.java
+/// Geofence gf = new Geofence(&quot;test&quot;, loc, 100, 100000);
+/// LocationManager.getLocationManager().addGeoFencing(GeofenceListenerImpl.class, gf);
+/// ```
+///
+/// **Android Note:** The default image that is used on the android top status bar
+/// and on the notification itself is the App's icon.  However Android 5 and above will only display
+/// this image as a silhouette using alpha pixels.  This will result in many icons appearing to be
+/// a blank white square.  In such cases you can provide an alternate image to be displayed instead.
+/// Place a 24x24 image named &quot;ic_stat_notify.png&quot; in your project's native/android
+/// directory, and this image will be used instead.
+/// @author shannah
+///
+/// #### See also
+///
+/// - com.codename1.ui.Display#scheduleLocalNotification(LocalNotification n, long firstTime, int repeat)
+///
+/// - com.codename1.ui.Display#cancelLocalNotification(java.lang.String id)
+<span class="fc" id="L88">public class LocalNotification {</span>
+
+    /// Constant used in `#setRepeatType(int)` to indicate that this
+    /// notification should not be repeated.
+    public static final int REPEAT_NONE = 0;
+
+    /// Constant used in `#setRepeatType(int)` to indicate that this
+    /// notification should be repeated every 1 minute.
+    public static final int REPEAT_MINUTE = 1;
+
+    /// Constant used in `#setRepeatType(int)` to indicate that this
+    /// notification should be repeated every hour.
+    public static final int REPEAT_HOUR = 3;
+
+    /// Constant used in `#setRepeatType(int)` to indicate that this
+    /// notification should be repeated every day.
+    public static final int REPEAT_DAY = 4;
+
+    /// Constant used in `#setRepeatType(int)` to indicate that this
+    /// notification should be repeated every week.
+    public static final int REPEAT_WEEK = 5;
+
+    // We don't support month or year right now because it is too complicated
+    // to keep track of leap years, and days in month on platforms that only 
+    // support repeat by milliseconds etc..
+
+<span class="fc" id="L114">    private String id = &quot;&quot;;</span>
+<span class="fc" id="L115">    private int badgeNumber = -1;</span>
+<span class="fc" id="L116">    private String alertBody = &quot;&quot;;</span>
+<span class="fc" id="L117">    private String alertTitle = &quot;&quot;;</span>
+<span class="fc" id="L118">    private String alertSound = &quot;&quot;;</span>
+<span class="fc" id="L119">    private String alertImage = &quot;&quot;;</span>
+    private boolean foreground;
+
+    private String channelId;
+    private String groupId;
+    private boolean groupSummary;
+    private boolean fullScreenIntent;
+    private boolean timeSensitive;
+    private boolean ongoing;
+    private int progressMax;
+    private int progress;
+    private boolean progressIndeterminate;
+    private String customViewLayout;
+<span class="fc" id="L132">    private final List&lt;Action&gt; actions = new ArrayList&lt;Action&gt;();</span>
+    private MessagingStyle messagingStyle;
+
+    /// Gets the badge number to set for this notification.
+    ///
+    /// #### Returns
+    ///
+    /// the badgeNumber
+    public int getBadgeNumber() {
+<span class="fc" id="L141">        return badgeNumber;</span>
+    }
+
+    /// Gets the badge number to set for this notification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `badgeNumber`: the badgeNumber to set
+    public void setBadgeNumber(int badgeNumber) {
+<span class="fc" id="L150">        this.badgeNumber = badgeNumber;</span>
+<span class="fc" id="L151">    }</span>
+
+    /// Gets the alert body to be displayed for this notification.
+    ///
+    /// #### Returns
+    ///
+    /// the alertBody
+    public String getAlertBody() {
+<span class="fc" id="L159">        return alertBody;</span>
+    }
+
+    /// Sets the alert body to be displayed for this notification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `alertBody`: the alertBody to set
+    public void setAlertBody(String alertBody) {
+<span class="fc" id="L168">        this.alertBody = alertBody;</span>
+<span class="fc" id="L169">    }</span>
+
+    /// Gets the alert title to be displayed for this notification.
+    ///
+    /// #### Returns
+    ///
+    /// the alertTitle
+    public String getAlertTitle() {
+<span class="fc" id="L177">        return alertTitle;</span>
+    }
+
+    /// Sets the alert title to be displayed for this notification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `alertTitle`: the alertTitle to set
+    public void setAlertTitle(String alertTitle) {
+<span class="fc" id="L186">        this.alertTitle = alertTitle;</span>
+<span class="fc" id="L187">    }</span>
+
+    /// Gets the alert sound to be sounded when the notification arrives.  This
+    /// should refer to a sound file that is bundled in the default package of your
+    /// app.
+    ///
+    /// #### Returns
+    ///
+    /// the alertSound
+    public String getAlertSound() {
+<span class="fc" id="L197">        return alertSound;</span>
+    }
+
+    /// Sets the alert sound to be sounded when the notification arrives.  This
+    /// should refer to a sound file that is bundled in the default package of your
+    /// app.
+    /// The name of the file must start with the &quot;notification_sound&quot; prefix.
+    ///
+    /// `````java LocalNotification n = new LocalNotification(); n.setAlertSound(&quot;/notification_sound_bells.mp3&quot;); `````
+    ///
+    /// #### Parameters
+    ///
+    /// - `alertSound`: the alertSound to set
+    public void setAlertSound(String alertSound) {
+<span class="fc" id="L211">        this.alertSound = alertSound;</span>
+<span class="fc" id="L212">    }</span>
+
+    /// Gets the ID of the notification.  The ID is the only information that is
+    /// passed to `LocalNotificationCallback#localNotificationReceived(java.lang.String)`
+    /// so you can use it as a lookup key to retrieve the rest of the information as required
+    /// from storage or some other mechanism.
+    ///
+    /// The ID can also be used to cancel the notification later using `com.codename1.ui.Display#cancelLocalNotification(java.lang.String)`
+    ///
+    /// #### Returns
+    ///
+    /// the id
+    public String getId() {
+<span class="fc" id="L225">        return id;</span>
+    }
+
+    /// Sets the ID of the notification.  The ID is the only information that is
+    /// passed to `LocalNotificationCallback#localNotificationReceived(java.lang.String)`
+    /// so you can use it as a lookup key to retrieve the rest of the information as required
+    /// from storage or some other mechanism.
+    ///
+    /// The ID can also be used to cancel the notification later using `com.codename1.ui.Display#cancelLocalNotification(java.lang.String)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the id to set
+    public void setId(String id) {
+<span class="fc" id="L239">        this.id = id;</span>
+<span class="fc" id="L240">    }</span>
+
+    /// Gets the notification image
+    ///
+    /// #### Returns
+    ///
+    /// image path
+    public String getAlertImage() {
+<span class="fc" id="L248">        return alertImage;</span>
+    }
+
+    /// Sets an image to be displayed on the platform notifications bar, if the underlying platform
+    /// supports image displaying otherwise the image will be ignored.
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: a path to the image, the image needs to be placed in the app root.
+    public void setAlertImage(String image) {
+<span class="fc" id="L258">        this.alertImage = image;</span>
+<span class="fc" id="L259">    }</span>
+
+    /// Checks whether this notification will be displayed in the device's notification center even when the app is in the foreground.
+    ///
+    /// #### Returns
+    ///
+    /// True if the notification will display in the device's notification center even when the app is in the foreground.
+    ///
+    public boolean isForeground() {
+<span class="fc" id="L268">        return foreground;</span>
+    }
+
+    /// Set whether this notification should be displayed in the device's notification center even when the app is
+    /// in the foreground.
+    ///
+    /// #### Parameters
+    ///
+    /// - `foreground`: True to display this notification in the notification center even when the app is in the foreground.
+    ///
+    public void setForeground(boolean foreground) {
+<span class="fc" id="L279">        this.foreground = foreground;</span>
+<span class="fc" id="L280">    }</span>
+
+    /// Gets the notification channel id this notification is posted to. Channels are an
+    /// Android concept; see `NotificationChannelBuilder`. On platforms without channels
+    /// this value is ignored.
+    ///
+    /// #### Returns
+    ///
+    /// the channel id, or null
+    public String getChannelId() {
+<span class="fc" id="L290">        return channelId;</span>
+    }
+
+    /// Sets the notification channel id this notification is posted to.
+    ///
+    /// #### Parameters
+    ///
+    /// - `channelId`: the channel id
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setChannelId(String channelId) {
+<span class="fc" id="L303">        this.channelId = channelId;</span>
+<span class="fc" id="L304">        return this;</span>
+    }
+
+    /// Convenience alias for `#setAlertSound(String)` that returns this notification for
+    /// chaining.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sound`: the alert sound file path
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setSound(String sound) {
+<span class="nc" id="L318">        setAlertSound(sound);</span>
+<span class="nc" id="L319">        return this;</span>
+    }
+
+    /// Gets the group id used to bundle related notifications together in the shade.
+    ///
+    /// #### Returns
+    ///
+    /// the group id, or null
+    public String getGroupId() {
+<span class="fc" id="L328">        return groupId;</span>
+    }
+
+    /// Assigns this notification to a group. Notifications sharing a group id are
+    /// visually bundled. On iOS the group id maps to the notification thread identifier.
+    ///
+    /// #### Parameters
+    ///
+    /// - `groupId`: the group id
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setGroup(String groupId) {
+<span class="fc" id="L342">        this.groupId = groupId;</span>
+<span class="fc" id="L343">        return this;</span>
+    }
+
+    /// Returns true if this notification is the summary for its group.
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a group summary
+    public boolean isGroupSummary() {
+<span class="fc" id="L352">        return groupSummary;</span>
+    }
+
+    /// Marks this notification as the summary of its group (Android). The summary is the
+    /// single entry shown when the group is collapsed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `groupSummary`: true to make this notification the group summary
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setGroupSummary(boolean groupSummary) {
+<span class="fc" id="L366">        this.groupSummary = groupSummary;</span>
+<span class="fc" id="L367">        return this;</span>
+    }
+
+    /// Returns true if this notification should launch a full screen intent.
+    ///
+    /// #### Returns
+    ///
+    /// true if a full screen intent is requested
+    public boolean isFullScreenIntent() {
+<span class="fc" id="L376">        return fullScreenIntent;</span>
+    }
+
+    /// Requests that this notification launch a full screen intent (Android), used for
+    /// high priority interruptions such as incoming calls or alarms. Ignored on platforms
+    /// that do not support it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fullScreenIntent`: true to request a full screen intent
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setFullScreenIntent(boolean fullScreenIntent) {
+<span class="fc" id="L391">        this.fullScreenIntent = fullScreenIntent;</span>
+<span class="fc" id="L392">        return this;</span>
+    }
+
+    /// Returns true if this notification is marked time sensitive.
+    ///
+    /// #### Returns
+    ///
+    /// true if time sensitive
+    public boolean isTimeSensitive() {
+<span class="fc" id="L401">        return timeSensitive;</span>
+    }
+
+    /// Marks this notification as time sensitive so it can break through Focus modes
+    /// (iOS) or be treated with elevated importance (Android). Requires the corresponding
+    /// permission to have been requested.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeSensitive`: true to mark the notification time sensitive
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setTimeSensitive(boolean timeSensitive) {
+<span class="fc" id="L416">        this.timeSensitive = timeSensitive;</span>
+<span class="fc" id="L417">        return this;</span>
+    }
+
+    /// Returns true if this notification is ongoing.
+    ///
+    /// #### Returns
+    ///
+    /// true if ongoing
+    public boolean isOngoing() {
+<span class="fc" id="L426">        return ongoing;</span>
+    }
+
+    /// Marks this notification as ongoing (Android), meaning it cannot be dismissed by
+    /// the user and represents background activity in progress. Ignored on platforms that
+    /// do not support it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ongoing`: true to make the notification ongoing
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setOngoing(boolean ongoing) {
+<span class="fc" id="L441">        this.ongoing = ongoing;</span>
+<span class="fc" id="L442">        return this;</span>
+    }
+
+    /// Returns the maximum value of the progress bar, or 0 if no progress bar is shown.
+    ///
+    /// #### Returns
+    ///
+    /// the progress maximum
+    public int getProgressMax() {
+<span class="fc" id="L451">        return progressMax;</span>
+    }
+
+    /// Returns the current progress value.
+    ///
+    /// #### Returns
+    ///
+    /// the current progress
+    public int getProgress() {
+<span class="fc" id="L460">        return progress;</span>
+    }
+
+    /// Shows a determinate progress bar on this notification (Android).
+    ///
+    /// #### Parameters
+    ///
+    /// - `max`: the maximum progress value
+    ///
+    /// - `current`: the current progress value
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setProgress(int max, int current) {
+<span class="fc" id="L475">        this.progressMax = max;</span>
+<span class="fc" id="L476">        this.progress = current;</span>
+<span class="fc" id="L477">        this.progressIndeterminate = false;</span>
+<span class="fc" id="L478">        return this;</span>
+    }
+
+    /// Returns true if the progress bar is indeterminate.
+    ///
+    /// #### Returns
+    ///
+    /// true if the progress bar is indeterminate
+    public boolean isProgressIndeterminate() {
+<span class="fc" id="L487">        return progressIndeterminate;</span>
+    }
+
+    /// Shows an indeterminate (spinning) progress bar on this notification (Android).
+    ///
+    /// #### Parameters
+    ///
+    /// - `indeterminate`: true to show an indeterminate progress bar
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setIndeterminateProgress(boolean indeterminate) {
+<span class="fc" id="L500">        this.progressIndeterminate = indeterminate;</span>
+<span class="fc" id="L501">        return this;</span>
+    }
+
+    /// Gets the custom view layout name used to render this notification.
+    ///
+    /// #### Returns
+    ///
+    /// the custom view layout name, or null
+    public String getCustomView() {
+<span class="fc" id="L510">        return customViewLayout;</span>
+    }
+
+    /// Sets a custom view layout name for this notification. On Android this maps to a
+    /// RemoteViews layout bundled in the native resources. On iOS a custom view is
+    /// rendered by a notification content extension keyed by the notification category.
+    /// Ignored on platforms that do not support custom notification views.
+    ///
+    /// #### Parameters
+    ///
+    /// - `customViewLayout`: the layout name
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setCustomView(String customViewLayout) {
+<span class="fc" id="L526">        this.customViewLayout = customViewLayout;</span>
+<span class="fc" id="L527">        return this;</span>
+    }
+
+    /// Adds an action button to this notification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `action`: the action to add
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification addAction(Action action) {
+<span class="fc" id="L540">        actions.add(action);</span>
+<span class="fc" id="L541">        return this;</span>
+    }
+
+    /// Adds a simple action button to this notification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the action id reported back when the user taps the action
+    ///
+    /// - `title`: the button label
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification addAction(String id, String title) {
+<span class="fc" id="L556">        return addAction(new Action(id, title));</span>
+    }
+
+    /// Adds a quick reply action with an inline text input field. When the user submits
+    /// a reply the entered text is reported back via `com.codename1.push.PushContent#getTextResponse()`
+    /// alongside the action id.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the action id reported back when the user submits the reply
+    ///
+    /// - `title`: the button label
+    ///
+    /// - `placeholder`: placeholder text shown in the text input field
+    ///
+    /// - `replyButtonText`: the label for the send button
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification addInputAction(String id, String title, String placeholder, String replyButtonText) {
+<span class="fc" id="L577">        Action a = new Action(id, title);</span>
+<span class="fc" id="L578">        a.textInputPlaceholder = placeholder;</span>
+<span class="fc" id="L579">        a.textInputButtonText = replyButtonText;</span>
+<span class="fc" id="L580">        return addAction(a);</span>
+    }
+
+    /// Returns the list of action buttons configured on this notification.
+    ///
+    /// #### Returns
+    ///
+    /// the actions, never null
+    public List&lt;Action&gt; getActions() {
+<span class="fc" id="L589">        return actions;</span>
+    }
+
+    /// Configures this notification to render as a conversation (messaging style)
+    /// notification. Returns the `MessagingStyle` so messages can be added fluently.
+    ///
+    /// #### Parameters
+    ///
+    /// - `selfDisplayName`: the name representing the device user in the conversation
+    ///
+    /// #### Returns
+    ///
+    /// the messaging style for further configuration
+    public MessagingStyle asMessagingStyle(String selfDisplayName) {
+<span class="fc" id="L603">        this.messagingStyle = new MessagingStyle(selfDisplayName);</span>
+<span class="fc" id="L604">        return this.messagingStyle;</span>
+    }
+
+    /// Returns the messaging style configured on this notification, or null if this is
+    /// not a messaging style notification.
+    ///
+    /// #### Returns
+    ///
+    /// the messaging style, or null
+    public MessagingStyle getMessagingStyle() {
+<span class="fc" id="L614">        return messagingStyle;</span>
+    }
+
+    /// A single action button attached to a local notification. An action may optionally
+    /// include an inline text input (quick reply) by setting a placeholder and reply
+    /// button text via `LocalNotification#addInputAction(String, String, String, String)`.
+    public static class Action {
+        private final String id;
+        private final String title;
+        private String icon;
+        private String textInputPlaceholder;
+        private String textInputButtonText;
+
+        /// Creates an action.
+        ///
+        /// #### Parameters
+        ///
+        /// - `id`: the action id reported back when the user taps the action
+        ///
+        /// - `title`: the button label
+<span class="fc" id="L634">        public Action(String id, String title) {</span>
+<span class="fc" id="L635">            this.id = id;</span>
+<span class="fc" id="L636">            this.title = title;</span>
+<span class="fc" id="L637">        }</span>
+
+        /// Creates an action with an icon.
+        ///
+        /// The icon is a platform resource NAME, not a numeric id (Codename One has no
+        /// numeric resource ids). On Android it is the name of a drawable bundled in the
+        /// `native/android` folder (the build copies it into `res/drawable`), resolved at
+        /// runtime by name; the file extension is optional and ignored. iOS notification
+        /// action buttons do not display icons, so the value is ignored there.
+        ///
+        /// #### Parameters
+        ///
+        /// - `id`: the action id reported back when the user taps the action
+        ///
+        /// - `title`: the button label
+        ///
+        /// - `icon`: the drawable resource name for the action (Android only)
+<span class="fc" id="L654">        public Action(String id, String title, String icon) {</span>
+<span class="fc" id="L655">            this.id = id;</span>
+<span class="fc" id="L656">            this.title = title;</span>
+<span class="fc" id="L657">            this.icon = icon;</span>
+<span class="fc" id="L658">        }</span>
+
+        /// Returns the action id.
+        ///
+        /// #### Returns
+        ///
+        /// the action id
+        public String getId() {
+<span class="fc" id="L666">            return id;</span>
+        }
+
+        /// Returns the button label.
+        ///
+        /// #### Returns
+        ///
+        /// the title
+        public String getTitle() {
+<span class="fc" id="L675">            return title;</span>
+        }
+
+        /// Returns the drawable resource name used for the action icon on Android, or null.
+        /// See `Action#Action(String, String, String)` for how it is resolved.
+        ///
+        /// #### Returns
+        ///
+        /// the drawable resource name, or null
+        public String getIcon() {
+<span class="fc" id="L685">            return icon;</span>
+        }
+
+        /// Returns the placeholder text for the inline text input, or null when the
+        /// action has no text input.
+        ///
+        /// #### Returns
+        ///
+        /// the text input placeholder, or null
+        public String getTextInputPlaceholder() {
+<span class="fc" id="L695">            return textInputPlaceholder;</span>
+        }
+
+        /// Returns the label of the reply button for the inline text input, or null when
+        /// the action has no text input.
+        ///
+        /// #### Returns
+        ///
+        /// the reply button text, or null
+        public String getTextInputButtonText() {
+<span class="fc" id="L705">            return textInputButtonText;</span>
+        }
+
+        /// Returns true if this action has an inline text input (quick reply).
+        ///
+        /// #### Returns
+        ///
+        /// true if this is a text input action
+        public boolean isTextInput() {
+<span class="pc bpc" id="L714" title="1 of 4 branches missed.">            return textInputPlaceholder != null || textInputButtonText != null;</span>
+        }
+    }
+
+    /// Describes a conversation (messaging style) notification. A messaging style
+    /// notification renders a sequence of chat messages, each attributed to a sender,
+    /// and is the recommended presentation for chat and messaging apps.
+    public static class MessagingStyle {
+        private final String selfDisplayName;
+        private String conversationTitle;
+        private boolean groupConversation;
+<span class="fc" id="L725">        private final List&lt;Message&gt; messages = new ArrayList&lt;Message&gt;();</span>
+
+        /// Creates a messaging style.
+        ///
+        /// #### Parameters
+        ///
+        /// - `selfDisplayName`: the name representing the device user
+<span class="fc" id="L732">        public MessagingStyle(String selfDisplayName) {</span>
+<span class="fc" id="L733">            this.selfDisplayName = selfDisplayName;</span>
+<span class="fc" id="L734">        }</span>
+
+        /// Sets the conversation title shown above the messages.
+        ///
+        /// #### Parameters
+        ///
+        /// - `t`: the conversation title
+        ///
+        /// #### Returns
+        ///
+        /// this messaging style for chaining
+        public MessagingStyle conversationTitle(String t) {
+<span class="fc" id="L746">            this.conversationTitle = t;</span>
+<span class="fc" id="L747">            return this;</span>
+        }
+
+        /// Marks the conversation as a group conversation (more than two participants).
+        ///
+        /// #### Parameters
+        ///
+        /// - `b`: true if this is a group conversation
+        ///
+        /// #### Returns
+        ///
+        /// this messaging style for chaining
+        public MessagingStyle groupConversation(boolean b) {
+<span class="fc" id="L760">            this.groupConversation = b;</span>
+<span class="fc" id="L761">            return this;</span>
+        }
+
+        /// Adds a message to the conversation.
+        ///
+        /// #### Parameters
+        ///
+        /// - `text`: the message text
+        ///
+        /// - `timestamp`: the message timestamp in milliseconds since the epoch
+        ///
+        /// - `senderName`: the display name of the sender, or null for the device user
+        ///
+        /// #### Returns
+        ///
+        /// this messaging style for chaining
+        public MessagingStyle addMessage(String text, long timestamp, String senderName) {
+<span class="fc" id="L778">            messages.add(new Message(text, timestamp, senderName));</span>
+<span class="fc" id="L779">            return this;</span>
+        }
+
+        /// Returns the name representing the device user.
+        ///
+        /// #### Returns
+        ///
+        /// the self display name
+        public String getSelfDisplayName() {
+<span class="fc" id="L788">            return selfDisplayName;</span>
+        }
+
+        /// Returns the conversation title.
+        ///
+        /// #### Returns
+        ///
+        /// the conversation title, or null
+        public String getConversationTitle() {
+<span class="fc" id="L797">            return conversationTitle;</span>
+        }
+
+        /// Returns true if this is a group conversation.
+        ///
+        /// #### Returns
+        ///
+        /// true if a group conversation
+        public boolean isGroupConversation() {
+<span class="fc" id="L806">            return groupConversation;</span>
+        }
+
+        /// Returns the messages in the conversation.
+        ///
+        /// #### Returns
+        ///
+        /// the messages, never null
+        public List&lt;Message&gt; getMessages() {
+<span class="fc" id="L815">            return messages;</span>
+        }
+
+        /// A single message within a messaging style notification.
+        public static class Message {
+            private final String text;
+            private final long timestamp;
+            private final String senderName;
+
+            /// Creates a message.
+            ///
+            /// #### Parameters
+            ///
+            /// - `text`: the message text
+            ///
+            /// - `timestamp`: the timestamp in milliseconds since the epoch
+            ///
+            /// - `senderName`: the sender display name, or null for the device user
+<span class="fc" id="L833">            public Message(String text, long timestamp, String senderName) {</span>
+<span class="fc" id="L834">                this.text = text;</span>
+<span class="fc" id="L835">                this.timestamp = timestamp;</span>
+<span class="fc" id="L836">                this.senderName = senderName;</span>
+<span class="fc" id="L837">            }</span>
+
+            /// Returns the message text.
+            ///
+            /// #### Returns
+            ///
+            /// the text
+            public String getText() {
+<span class="nc" id="L845">                return text;</span>
+            }
+
+            /// Returns the message timestamp.
+            ///
+            /// #### Returns
+            ///
+            /// the timestamp in milliseconds since the epoch
+            public long getTimestamp() {
+<span class="fc" id="L854">                return timestamp;</span>
+            }
+
+            /// Returns the sender display name.
+            ///
+            /// #### Returns
+            ///
+            /// the sender name, or null for the device user
+            public String getSenderName() {
+<span class="fc" id="L863">                return senderName;</span>
+            }
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,1413 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AccessibilityManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.accessibility</a> &gt; <span class="el_source">AccessibilityManager.java</span></div><h1>AccessibilityManager.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.accessibility;
+
+import com.codename1.ui.Button;
+import com.codename1.ui.CheckBox;
+import com.codename1.ui.Component;
+import com.codename1.ui.CN;
+import com.codename1.ui.Container;
+import com.codename1.ui.Desktop;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Label;
+import com.codename1.ui.RadioButton;
+import com.codename1.ui.Slider;
+import com.codename1.ui.Window;
+import com.codename1.ui.Tabs;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextField;
+import com.codename1.ui.TopLevelContainer;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.table.Table;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Builds, caches, diffs, and dispatches actions for the portable semantic tree.
+///
+/// The tree is always constructed on the Codename One EDT. Native ports read the
+/// last immutable snapshot and post actions through {@link #performAction(long, String, Object)},
+/// so native accessibility threads never synchronously enter application code.
+public final class AccessibilityManager {
+    public static final int CHANGE_STRUCTURE = 1;
+    public static final int CHANGE_CONTENT = 2;
+    public static final int CHANGE_STATE = 4;
+    public static final int CHANGE_VALUE = 8;
+    public static final int CHANGE_BOUNDS = 16;
+    public static final int CHANGE_FOCUS = 32;
+    public static final int CHANGE_ACTIONS = 64;
+    public static final int CHANGE_LIVE_REGION = 128;
+    public static final int CHANGE_PANE = 256;
+    public static final int CHANGE_ALL = 0x7fffffff;
+
+<span class="fc" id="L68">    private static final AccessibilityManager INSTANCE = new AccessibilityManager();</span>
+<span class="fc" id="L69">    private long nextId = 1;</span>
+    private long generation;
+    private boolean refreshScheduled;
+    /// The root currently being walked, so the walk cannot dirty the tree it is itself
+    /// producing. Describing a component asks it what it says, and some of those
+    /// questions mutate: `List.getAccessibilityItemText` runs the shared cell renderer,
+    /// whose `setText`/`setIcon` invalidate accessibility in turn. Left alone that is a
+    /// fixed point with no fixed point -- every pass marks its own result stale and
+    /// queues another, which on a port that projects eagerly never stops.
+    ///
+    /// Only this root is exempt. An invalidation naming a *different* surface during the
+    /// walk is real news -- it cannot have been produced by the tree being built -- and
+    /// is queued as usual, which is what keeps a second window from going stale behind
+    /// a refresh of the first.
+    private Container buildingRoot;
+<span class="fc" id="L84">    private int pendingChanges = CHANGE_ALL;</span>
+    /// The root the cached snapshot describes. A `Container` rather than a `Form`,
+    /// because a `com.codename1.ui.Window` is a root in its own right.
+    private Container snapshotRoot;
+
+    /// Snapshots for roots other than the most recent one, so a screen reader moving
+    /// between two windows does not rebuild both trees on every hop. Bounded, and
+    /// cleared whole by `#invalidate(Component, int)` -- staleness is tracked per root,
+    /// because per root dirtiness is a second thing to get wrong.
+<span class="fc" id="L93">    private final LinkedHashMap&lt;Container, AccessibilityTreeSnapshot&gt; snapshotsByRoot =</span>
+            new LinkedHashMap&lt;Container, AccessibilityTreeSnapshot&gt;();
+
+    /// How many roots' snapshots to keep.
+    private static final int MAX_CACHED_ROOTS = 8;
+
+    /// Roots invalidated since the pending refresh was scheduled, all of which it has
+    /// to rebuild rather than only the one that scheduled it.
+    /// The roots waiting to be rebuilt, each with the changes recorded against it.
+    ///
+    /// Per root rather than one shared mask: the mask is handed to the port with the
+    /// surface it describes, and a port acts on the bits. On iOS a pane change is a
+    /// screen-change notification, so forwarding the union to every queued surface moved
+    /// the reader's focus on a window where nothing of the sort had happened. Ordered,
+    /// so surfaces are still rebuilt in the order they went stale.
+<span class="fc" id="L108">    private final LinkedHashMap&lt;Container, Integer&gt; pendingRoots =</span>
+            new LinkedHashMap&lt;Container, Integer&gt;();
+
+    /// Whether a mutation with no resolvable surface is waiting for the refresh. Not
+    /// the same as an empty queue, which is also what disposing every queued root
+    /// leaves behind.
+    private boolean pendingRootlessRefresh;
+
+    /// The cached roots whose trees are stale.
+    ///
+    /// Staleness used to be one flag for the whole manager, which is wrong the moment
+    /// there is more than one surface: invalidating one root and then rebuilding
+    /// another cleared it, and the first root's cached tree was handed back as though
+    /// it were current. A rebuild clears only the root it rebuilt.
+<span class="fc" id="L122">    private final ArrayList&lt;Container&gt; dirtyRoots = new ArrayList&lt;Container&gt;();</span>
+
+    /// Queues every surface known to be alive, so the refresh rebuilds all of them
+    /// rather than picking one.
+    ///
+    /// Its own method rather than inline in `#invalidate(Component, int)`: the loop
+    /// walks a generic collection, and the compiler's cast for that would sit inside
+    /// that method's catch of Throwable -- which ParparVM does not raise for a failed
+    /// cast, so the repository's cast-semantics gate rejects it.
+    private void queueEveryLiveRoot(int changeType) {
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (Container root : snapshotsByRoot.keySet()) {</span>
+<span class="fc" id="L133">            queueRoot(root, changeType);</span>
+<span class="fc" id="L134">        }</span>
+        // The open windows, not only the ones already described. A cache holds what has
+        // been asked for, and the moment this exists to serve -- assistive technology
+        // starting after an application has opened several windows -- is exactly the
+        // moment nothing has been. Taking the cache as the census left every one of
+        // those windows empty until something in it happened to change.
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (Desktop.isSupported()) {</span>
+<span class="fc" id="L141">            Window[] open = Desktop.getInstance().getWindows();</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            for (Window w : open) {</span>
+<span class="fc" id="L143">                queueRoot(w, changeType);</span>
+            }
+        }
+        // The main form as well as the focused surface. When a window has focus these
+        // are two different things, and the form behind it is no less live for it.
+<span class="fc" id="L148">        Form main = Display.getInstance().getCurrent();</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (main != null) {</span>
+<span class="fc" id="L150">            queueRoot(main, changeType);</span>
+        }
+<span class="fc" id="L152">        TopLevelContainer current = CN.getCurrentTopLevel();</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        Container currentRoot = current == null ? null : current.asContainer();</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (currentRoot != null) {</span>
+<span class="fc" id="L155">            queueRoot(currentRoot, changeType);</span>
+        }
+<span class="fc" id="L157">    }</span>
+
+    /// Records a change against a root, keeping whatever was already recorded for it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the surface that changed
+    ///
+    /// - `changeType`: the bits to add to its mask
+    private void queueRoot(Container root, int changeType) {
+<span class="fc" id="L167">        Integer existing = pendingRoots.get(root);</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        pendingRoots.put(root, Integer.valueOf(</span>
+<span class="fc" id="L169">                existing == null ? changeType : existing.intValue() | changeType));</span>
+<span class="fc" id="L170">    }</span>
+
+    /// How many roots are currently recorded as stale.
+    ///
+    /// #### Returns
+    ///
+    /// the size of the dirty set
+    public synchronized int dirtyRootCount() {
+<span class="fc" id="L178">        return dirtyRoots.size();</span>
+    }
+
+    /// A tree describing nothing.
+    ///
+    /// For a surface that no longer exists. A port can outlive a window -- an
+    /// accessibility bridge is held by the platform and asked for its tree after the
+    /// window it describes has been disposed -- and the alternatives are both wrong:
+    /// the last tree built anywhere belongs to some other window, and rebuilding is
+    /// impossible with nothing to walk.
+    ///
+    /// #### Returns
+    ///
+    /// an empty snapshot, never null
+    public synchronized AccessibilityTreeSnapshot emptySnapshot() {
+<span class="fc" id="L193">        generation++;</span>
+<span class="fc" id="L194">        return new AccessibilityTreeSnapshot(generation,</span>
+<span class="fc" id="L195">                Collections.&lt;Long&gt;emptyList(),</span>
+<span class="fc" id="L196">                Collections.&lt;Long, AccessibilityNodeSnapshot&gt;emptyMap());</span>
+    }
+
+    /// How many roots currently have a cached tree.
+    ///
+    /// #### Returns
+    ///
+    /// the size of the snapshot cache
+    public synchronized int cachedRootCount() {
+<span class="fc" id="L205">        return snapshotsByRoot.size();</span>
+    }
+
+    /// Marks a root's tree stale.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root, or null for every cached one
+    private void markDirty(Container root) {
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (root == null) {</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            for (Container cached : snapshotsByRoot.keySet()) {</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">                if (!dirtyRoots.contains(cached)) {</span>
+<span class="fc" id="L217">                    dirtyRoots.add(cached);</span>
+                }
+<span class="fc" id="L219">            }</span>
+<span class="fc" id="L220">            return;</span>
+        }
+        // Only a root that actually has a cached tree. Marking one that has none
+        // achieves nothing -- a cache miss rebuilds it anyway -- and this list is held
+        // by a singleton, so recording every form the application has ever shown, which
+        // is what Display.setCurrent invalidating each new one amounts to, pinned every
+        // one of them and its whole component hierarchy for the life of the process.
+        // Only a disposed window ever releases a root explicitly.
+<span class="fc bfc" id="L228" title="All 4 branches covered.">        if (snapshotsByRoot.containsKey(root) &amp;&amp; !dirtyRoots.contains(root)) {</span>
+<span class="fc" id="L229">            dirtyRoots.add(root);</span>
+        }
+<span class="fc" id="L231">    }</span>
+<span class="fc" id="L232">    private AccessibilityTreeSnapshot snapshot = new AccessibilityTreeSnapshot(</span>
+<span class="fc" id="L233">            0, Collections.&lt;Long&gt;emptyList(), Collections.&lt;Long, AccessibilityNodeSnapshot&gt;emptyMap());</span>
+
+<span class="fc" id="L235">    private AccessibilityManager() {</span>
+<span class="fc" id="L236">    }</span>
+
+    public static AccessibilityManager getInstance() {
+<span class="fc" id="L239">        return INSTANCE;</span>
+    }
+
+    public synchronized void invalidate(Component component, int changeType) {
+<span class="fc" id="L243">        pendingChanges |= changeType;</span>
+        // Deliberately not clearing the per-root cache. The eager refresh below
+        // rebuilds one root, so emptying all of them would leave every other surface
+        // with nothing to hand an off-EDT reader until that surface happened to mutate
+        // -- a screen reader on another window would lose its whole tree. Correctness
+        // on the EDT does not depend on the clear either: the root is marked stale and
+        // rebuilt there, and the rebuild overwrites the entry it replaces. Off the EDT
+        // a stale tree for the right surface is the documented contract; an empty one
+        // is not.
+        // The root the changed component actually lives on, not whatever form happens
+        // to be current: a change inside a window used to schedule a rebuild of the
+        // main form's tree instead, so the window's own tree stayed stale.
+        // A null component is invalidateAll(): every surface is stale, not the focused
+        // one. Substituting the current top level here turned an all-root invalidation
+        // into a single-root refresh of whichever window happened to have focus, and
+        // the rebuild then cleared the global dirty flag -- so a window that asked for
+        // accessibility while unfocused was left with nothing until it next changed.
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        final boolean allRoots = component == null;</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        TopLevelContainer changedTop = allRoots ? null : component.getTopLevelContainer();</span>
+<span class="fc bfc" id="L262" title="All 4 branches covered.">        if (changedTop == null &amp;&amp; !allRoots) {</span>
+<span class="fc" id="L263">            changedTop = CN.getCurrentTopLevel();</span>
+        }
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        final Container refreshRoot = changedTop == null ? null : changedTop.asContainer();</span>
+<span class="fc bfc" id="L266" title="All 6 branches covered.">        if (!allRoots &amp;&amp; refreshRoot != null</span>
+                &amp;&amp; refreshRoot == buildingRoot) { //NOPMD CompareObjectsWithEquals
+            // Provoked by the walk of this very root -- see buildingRoot. The tree being
+            // built already reflects it, and marking that tree stale is what made the
+            // pass queue itself from its own output.
+<span class="fc" id="L271">            return;</span>
+        }
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        markDirty(allRoots ? null : refreshRoot);</span>
+        try {
+            // Most mutations only need to make the cached snapshot stale. Ports
+            // that can pull the tree do so on demand, and ports such as Android
+            // opt into eager projection only while assistive technology is active.
+            // This keeps layout, scrolling, and text setters at O(1) when nobody
+            // is consuming the semantic tree.
+<span class="fc bfc" id="L280" title="All 2 branches covered.">            if (!Display.getInstance().isAccessibilityTreeUpdateRequired()) {</span>
+<span class="fc" id="L281">                return;</span>
+            }
+            // Queued rather than captured. A second invalidation on another root
+            // while this one is still pending used to be swallowed by the
+            // refreshScheduled flag: the callback rebuilt only the root it had closed
+            // over, and the other root was never rebuilt at all, so its tree stayed
+            // stale for good -- which off-EDT screen readers, now
+            // that they are handed their own surface's tree, would have read forever.
+            // Not capped. The list holds one entry per distinct root, and it is
+            // drained by the refresh, so it is bounded by the number of live surfaces
+            // -- while a cap would silently drop the earliest window's refresh and
+            // leave it stale, which is the defect this queue exists to fix. The
+            // snapshot cache is capped because it holds whole trees; this holds
+            // references to containers that are alive anyway.
+<span class="fc bfc" id="L295" title="All 2 branches covered.">            if (allRoots) {</span>
+<span class="fc" id="L296">                queueEveryLiveRoot(changeType);</span>
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">            } else if (refreshRoot == null) {</span>
+                // A mutation whose component belongs to no surface at all. Recorded
+                // separately from the queue, because an empty queue can also mean every
+                // root that was in it has since been disposed -- and clearing every
+                // cached surface is right for the first and destroys every other
+                // window's tree for the second.
+<span class="nc" id="L303">                pendingRootlessRefresh = true;</span>
+            } else {
+<span class="fc" id="L305">                queueRoot(refreshRoot, changeType);</span>
+            }
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            if (!refreshScheduled) {</span>
+<span class="fc" id="L308">                refreshScheduled = true;</span>
+<span class="fc" id="L309">                Display.getInstance().callSerially(new RefreshPass());</span>
+            }
+<span class="nc" id="L311">        } catch (Throwable ignored) {</span>
+            // Display may not be initialized yet while an application constructs its first form.
+<span class="nc" id="L313">            refreshScheduled = false;</span>
+<span class="fc" id="L314">        }</span>
+<span class="fc" id="L315">    }</span>
+
+    /// One drain of the refresh queue, and the re-post that keeps it honest.
+    ///
+    /// Named rather than anonymous because it re-schedules itself: snapshots are built
+    /// outside the lock, so an invalidation arriving during a pass finds the queue
+    /// already emptied and `refreshScheduled` still set, and schedules nothing of its
+    /// own. Clearing the flag without looking left that root stale until some unrelated
+    /// later invalidation happened to come along.
+<span class="fc" id="L324">    private final class RefreshPass implements Runnable {</span>
+        @Override
+        public void run() {
+            int changes;
+            ArrayList&lt;Container&gt; roots;
+            ArrayList&lt;Integer&gt; masks;
+            boolean rootless;
+<span class="fc" id="L331">            synchronized (AccessibilityManager.this) {</span>
+                // Taken, not just read. The rebuilds below used to clear this as a
+                // side effect, so a bit arriving while this pass was walking an earlier
+                // root was wiped before the pass it queued could report it -- losing the
+                // pane change VoiceOver needs to move focus to a newly opened pane.
+<span class="fc" id="L336">                changes = pendingChanges;</span>
+<span class="fc" id="L337">                pendingChanges = 0;</span>
+<span class="fc" id="L338">                roots = new ArrayList&lt;Container&gt;(pendingRoots.keySet());</span>
+<span class="fc" id="L339">                masks = new ArrayList&lt;Integer&gt;(pendingRoots.values());</span>
+<span class="fc" id="L340">                pendingRoots.clear();</span>
+<span class="fc" id="L341">                rootless = pendingRootlessRefresh;</span>
+<span class="fc" id="L342">                pendingRootlessRefresh = false;</span>
+<span class="fc" id="L343">            }</span>
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">            if (rootless) {</span>
+<span class="nc" id="L345">                getSnapshotForRoot(null);</span>
+            }
+<span class="fc" id="L347">            int count = roots.size();</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">            for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="fc" id="L349">                synchronized (AccessibilityManager.this) {</span>
+                    // Marked stale again for each one in turn, so none is
+                    // served out of the cache this refresh exists to replace.
+<span class="fc" id="L352">                    markDirty(roots.get(iter));</span>
+<span class="fc" id="L353">                }</span>
+<span class="fc" id="L354">                getSnapshotForRoot(roots.get(iter));</span>
+            }
+            boolean again;
+<span class="fc" id="L357">            synchronized (AccessibilityManager.this) {</span>
+                // Anything queued while this pass was running. The flag stays set
+                // across the re-post, because it is still scheduled -- clearing it
+                // first would let a third invalidation queue a second pass for the
+                // same work.
+<span class="pc bpc" id="L362" title="1 of 4 branches missed.">                again = !pendingRoots.isEmpty() || pendingRootlessRefresh;</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">                if (!again) {</span>
+<span class="fc" id="L364">                    refreshScheduled = false;</span>
+                }
+<span class="fc" id="L366">            }</span>
+            // Named per surface. A port that pushes the tree into a native view needs
+            // to know which one it just described: told only that something changed, it
+            // reads whatever was rebuilt last and installs that on the main view, so a
+            // change inside a window replaced the main surface's elements with the
+            // window's. Ports with one surface, and ports that pull, are unaffected --
+            // the two argument form forwards to the old one by default.
+<span class="fc bfc" id="L373" title="All 2 branches covered.">            if (count == 0) {</span>
+<span class="fc" id="L374">                Display.getInstance().accessibilityTreeChanged(changes);</span>
+            } else {
+<span class="fc bfc" id="L376" title="All 2 branches covered.">                for (int iter = 0; iter &lt; count; iter++) {</span>
+                    // Its own changes, not the union. A port acts on these bits -- iOS
+                    // reads a pane change as &quot;move the reader to the top of this screen&quot;
+                    // -- so handing one surface's bits to another moved the reader on a
+                    // window where nothing had happened.
+<span class="fc" id="L381">                    Display.getInstance().accessibilityTreeChanged(</span>
+<span class="fc" id="L382">                            masks.get(iter).intValue(), windowIdOf(roots.get(iter)));</span>
+                }
+            }
+<span class="fc bfc" id="L385" title="All 2 branches covered.">            if (again) {</span>
+<span class="fc" id="L386">                Display.getInstance().callSerially(this);</span>
+            }
+<span class="fc" id="L388">        }</span>
+    }
+
+    public void invalidateAll() {
+<span class="fc" id="L392">        invalidate(null, CHANGE_ALL);</span>
+<span class="fc" id="L393">    }</span>
+
+    public AccessibilityTreeSnapshot getCurrentSnapshot() {
+<span class="fc" id="L396">        synchronized (this) {</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">            if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L398">                return snapshot;</span>
+            }
+<span class="fc" id="L400">        }</span>
+<span class="fc" id="L401">        return getSnapshot(CN.getCurrentTopLevel());</span>
+    }
+
+    /// The accessibility tree for a top level, which may be a
+    /// `com.codename1.ui.Window` rather than a `Form`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to describe, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the snapshot, never null
+    public AccessibilityTreeSnapshot getSnapshot(TopLevelContainer top) {
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">        return getSnapshotForRoot(top == null ? null : top.asContainer());</span>
+    }
+
+    /// Drops any snapshot cached for a root that is going away.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root being disposed
+    public synchronized void releaseRoot(Container root) {
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">        if (root == null) {</span>
+<span class="nc" id="L425">            return;</span>
+        }
+<span class="fc" id="L427">        snapshotsByRoot.remove(root);</span>
+<span class="fc" id="L428">        rootWasShowing.remove(root);</span>
+<span class="fc" id="L429">        dirtyRoots.remove(root);</span>
+        // Out of the refresh queue as well, or a refresh already scheduled would walk
+        // a hierarchy that has just been destroyed and cache a tree for it -- putting
+        // back exactly what this method exists to take away.
+<span class="fc" id="L433">        pendingRoots.remove(root);</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        if (snapshotRoot == root) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L435">            snapshotRoot = null;</span>
+            // The snapshot itself, not only the reference to its root. It holds a node
+            // per component of a hierarchy that has just been destroyed, and it is what
+            // off-EDT accessibility callers are handed -- so a late screen reader query
+            // would read, or act on, a window that is gone.
+<span class="fc" id="L440">            generation++;</span>
+<span class="fc" id="L441">            snapshot = new AccessibilityTreeSnapshot(generation,</span>
+<span class="fc" id="L442">                    Collections.&lt;Long&gt;emptyList(),</span>
+<span class="fc" id="L443">                    Collections.&lt;Long, AccessibilityNodeSnapshot&gt;emptyMap());</span>
+            // Nothing is marked stale here: the root that was is gone, and every other
+            // surface's tree is still exactly as current as it was.
+        }
+<span class="fc" id="L447">    }</span>
+
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    public synchronized AccessibilityTreeSnapshot getSnapshot(Form form) {
+<span class="fc" id="L451">        return getSnapshotForRoot(form);</span>
+    }
+
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    private synchronized AccessibilityTreeSnapshot getSnapshotForRoot(Container form) {
+        // Walking a live lightweight component hierarchy off the Codename One
+        // EDT is unsafe. Native bridges on other threads receive an immutable
+        // snapshot; active bridges arrange eager refreshes on the EDT.
+<span class="fc bfc" id="L459" title="All 2 branches covered.">        if (!Display.getInstance().isEdt()) {</span>
+            // The one cached for the surface actually being asked about. An
+            // invalidation rebuilds a single root and then notifies every window
+            // bridge, so the most recently built tree usually belongs to a different
+            // window -- handing that back would have a screen reader on one window
+            // announce, and act on, another window's contents. An empty tree when
+            // nothing has been built for this root yet, because &quot;nothing known here&quot;
+            // is recoverable on the next refresh and describing the wrong window
+            // is not.
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">            if (form == null) {</span>
+<span class="nc" id="L469">                return snapshot;</span>
+            }
+<span class="fc" id="L471">            AccessibilityTreeSnapshot cached = snapshotsByRoot.get(form);</span>
+<span class="fc bfc" id="L472" title="All 2 branches covered.">            if (cached != null) {</span>
+<span class="fc" id="L473">                return cached;</span>
+            }
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">            return form == snapshotRoot ? snapshot //NOPMD CompareObjectsWithEquals</span>
+                    : new AccessibilityTreeSnapshot(generation,
+<span class="fc" id="L477">                            Collections.&lt;Long&gt;emptyList(),</span>
+<span class="fc" id="L478">                            Collections.&lt;Long, AccessibilityNodeSnapshot&gt;emptyMap());</span>
+        }
+        // This root's staleness, not the manager's. Asking the global flag meant that
+        // rebuilding one surface declared every other surface fresh, and the next pull
+        // for one of them was answered out of a cache that had already been invalidated.
+<span class="fc bfc" id="L483" title="All 2 branches covered.">        if (!dirtyRoots.contains(form)) {</span>
+<span class="fc bfc" id="L484" title="All 2 branches covered.">            if (form == snapshotRoot) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L485">                return snapshot;</span>
+            }
+<span class="fc" id="L487">            AccessibilityTreeSnapshot cached = snapshotsByRoot.get(form);</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">            if (cached != null) {</span>
+<span class="fc" id="L489">                snapshot = cached;</span>
+<span class="fc" id="L490">                snapshotRoot = form;</span>
+<span class="fc" id="L491">                return snapshot;</span>
+            }
+        }
+<span class="pc bpc" id="L494" title="1 of 2 branches missed.">        if (form == null) {</span>
+<span class="nc" id="L495">            generation++;</span>
+<span class="nc" id="L496">            AccessibilityTreeSnapshot emptySnapshot = new AccessibilityTreeSnapshot(</span>
+<span class="nc" id="L497">                    generation, Collections.&lt;Long&gt;emptyList(),</span>
+<span class="nc" id="L498">                    Collections.&lt;Long, AccessibilityNodeSnapshot&gt;emptyMap());</span>
+<span class="nc" id="L499">            snapshot = emptySnapshot;</span>
+<span class="nc" id="L500">            snapshotRoot = null;</span>
+<span class="nc" id="L501">            snapshotsByRoot.clear();</span>
+<span class="nc" id="L502">            rootWasShowing.clear();</span>
+<span class="nc" id="L503">            dirtyRoots.clear();</span>
+            // The bits are not cleared by building a tree. They describe changes that
+            // have not been announced yet, and only the refresh pass announces them --
+            // clearing here wiped whatever had arrived while that pass was running.
+<span class="nc" id="L507">            return snapshot;</span>
+        }
+
+<span class="fc" id="L510">        List&lt;BuildNode&gt; roots = new ArrayList&lt;BuildNode&gt;();</span>
+<span class="fc" id="L511">        List&lt;Long&gt; rootIds = new ArrayList&lt;Long&gt;();</span>
+<span class="fc" id="L512">        LinkedHashMap&lt;Long, AccessibilityNodeSnapshot&gt; nodes = new LinkedHashMap&lt;Long, AccessibilityNodeSnapshot&gt;();</span>
+        // Saved and restored rather than cleared, so a nested build -- a component
+        // getter that asks for a tree while this one is being walked -- cannot hand the
+        // outer walk back an unguarded state for the rest of its own run.
+<span class="fc" id="L516">        Container outerRoot = buildingRoot;</span>
+<span class="fc" id="L517">        buildingRoot = form;</span>
+        try {
+<span class="fc" id="L519">            resolveComponent(form, roots);</span>
+<span class="fc" id="L520">            sortTree(roots);</span>
+<span class="fc" id="L521">            freeze(roots, -1, rootIds, nodes);</span>
+        } finally {
+<span class="fc" id="L523">            buildingRoot = outerRoot;</span>
+        }
+<span class="fc" id="L525">        generation++;</span>
+<span class="fc" id="L526">        AccessibilityTreeSnapshot updatedSnapshot = new AccessibilityTreeSnapshot(generation, rootIds, nodes);</span>
+<span class="fc" id="L527">        snapshot = updatedSnapshot;</span>
+<span class="fc" id="L528">        snapshotRoot = form;</span>
+        // Whether this surface was the one on screen when it was described. That is what
+        // separates a surface the application has since navigated away from -- whose
+        // retained ids must stop working -- from one that was never on screen to begin
+        // with, which is a form being prepared, or one shown a moment ago that the event
+        // thread has not made current yet. Both of those are live surfaces a caller acts
+        // on legitimately, and they are indistinguishable from the navigated-away one by
+        // asking only whether it is showing now.
+<span class="fc" id="L536">        rootWasShowing.put(form, Boolean.valueOf(isShowingRoot(form)));</span>
+<span class="fc" id="L537">        snapshotsByRoot.put(form, updatedSnapshot);</span>
+<span class="fc" id="L538">        evictStaleRoots();</span>
+<span class="fc" id="L539">        dirtyRoots.remove(form);</span>
+<span class="fc" id="L540">        return snapshot;</span>
+    }
+
+    /// Trims the cache without ever dropping a surface the user can still see.
+    ///
+    /// The cap is here because a root is only released explicitly when a window is
+    /// disposed -- an application walking through fifty forms would otherwise keep a
+    /// frozen tree for every one of them. But evicting by age alone dropped live
+    /// windows once there were more of them than the cap, and an off-EDT reader on an
+    /// evicted window is handed an empty tree, which is a screen reader losing the
+    /// whole hierarchy. So age decides only among the surfaces that are no longer
+    /// showing; when every entry is still showing the cache is allowed to exceed the
+    /// cap, which is bounded anyway by how many surfaces can exist at once.
+    private void evictStaleRoots() {
+<span class="fc bfc" id="L554" title="All 2 branches covered.">        while (snapshotsByRoot.size() &gt; MAX_CACHED_ROOTS) {</span>
+<span class="fc" id="L555">            Container evictable = null;</span>
+<span class="fc bfc" id="L556" title="All 2 branches covered.">            for (Container root : snapshotsByRoot.keySet()) {</span>
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">                boolean showing = root instanceof TopLevelContainer</span>
+<span class="fc bfc" id="L558" title="All 2 branches covered.">                        &amp;&amp; ((TopLevelContainer) root).isTopLevelShowing();</span>
+<span class="fc bfc" id="L559" title="All 2 branches covered.">                if (!showing) {</span>
+<span class="fc" id="L560">                    evictable = root;</span>
+<span class="fc" id="L561">                    break;</span>
+                }
+<span class="fc" id="L563">            }</span>
+<span class="fc bfc" id="L564" title="All 2 branches covered.">            if (evictable == null) {</span>
+<span class="fc" id="L565">                return;</span>
+            }
+<span class="fc" id="L567">            snapshotsByRoot.remove(evictable);</span>
+<span class="fc" id="L568">            rootWasShowing.remove(evictable);</span>
+            // And out of the dirty set with it. Dirtiness is only ever recorded for a
+            // root that has a cached tree, so an entry left behind here describes a
+            // tree that no longer exists -- and because a form never releases its root
+            // explicitly, that entry would hold the form and its whole hierarchy for
+            // good.
+<span class="fc" id="L574">            dirtyRoots.remove(evictable);</span>
+<span class="fc" id="L575">        }</span>
+<span class="fc" id="L576">    }</span>
+
+    private AccessibilityNodeSnapshot findNode(long nodeId) {
+        // The tree most recently built, whatever it describes. Gating this one on the
+        // root being current as well refused an action the moment a caller performed one
+        // straight after showing a form -- the device suite does exactly that, and the
+        // surface is not current at that instant. The hazard reported was ids surviving
+        // in the *cached* trees below, which is where the check belongs.
+        // Unless that surface has since been taken off screen. A window hidden without
+        // being disposed stays the last tree built, and its ids went on resolving here
+        // -- so a reader holding one could press a button on a window nobody can see.
+<span class="fc bfc" id="L587" title="All 2 branches covered.">        AccessibilityNodeSnapshot node = isWithdrawnRoot(snapshotRoot)</span>
+<span class="fc" id="L588">                ? null : snapshot.getNode(nodeId);</span>
+<span class="fc bfc" id="L589" title="All 2 branches covered.">        if (node != null) {</span>
+<span class="fc" id="L590">            return node;</span>
+        }
+        for (Map.Entry&lt;Container, AccessibilityTreeSnapshot&gt; cached
+<span class="fc bfc" id="L593" title="All 2 branches covered.">                : snapshotsByRoot.entrySet()) {</span>
+            // Only surfaces that are actually on screen. A tree stays cached after the
+            // main form has navigated away -- deliberately, so a live secondary window
+            // keeps its own -- and an id retained from the old one still resolved here,
+            // so a reader could invoke a command on a form nobody can see any more.
+<span class="fc bfc" id="L598" title="All 2 branches covered.">            if (!isShowingRoot(cached.getKey())) {</span>
+<span class="fc" id="L599">                continue;</span>
+            }
+<span class="fc" id="L601">            node = cached.getValue().getNode(nodeId);</span>
+<span class="fc bfc" id="L602" title="All 2 branches covered.">            if (node != null) {</span>
+<span class="fc" id="L603">                return node;</span>
+            }
+<span class="fc" id="L605">        }</span>
+<span class="fc" id="L606">        return null;</span>
+    }
+
+    /// The surface a rebuilt root belongs to, zero for the application's main one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root that was rebuilt, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the window id, or zero for a form
+    private static int windowIdOf(Container root) {
+<span class="fc bfc" id="L619" title="All 2 branches covered.">        return root instanceof Window ? ((Window) root).getWindowId() : 0;</span>
+    }
+
+    /// Whether a root has been taken off screen since its tree was built.
+    ///
+    /// Only a window can be: the platform maps it and unmaps it again, and once it is
+    /// unmapped an id retained from it must not act on it. A form's showing flag cannot
+    /// answer this question -- it means &quot;is the current surface&quot;, which is equally false
+    /// for a form being prepared off screen and for the instant between `Form#show()` and
+    /// the event thread processing it. Both are live surfaces a caller legitimately acts
+    /// on, which is why the check below is the wrong one to apply here.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root that owns the most recently built tree, may be null
+    ///
+    /// #### Returns
+    ///
+    /// true when it is a window that is no longer on screen
+    private boolean isWithdrawnRoot(Container root) {
+<span class="fc bfc" id="L639" title="All 2 branches covered.">        if (root instanceof Window) {</span>
+<span class="fc bfc" id="L640" title="All 2 branches covered.">            return !((Window) root).isWindowShowing();</span>
+        }
+        // A form, which has no mapped/unmapped state of its own: it is withdrawn when it
+        // was the surface on screen at the time it was described and is not any more.
+        // This root's own history, not the last-built tree's. The question is asked of
+        // whichever surface owns the action being performed, which is routinely not the
+        // one described most recently -- an action resolved from a cached tree for the
+        // form on screen, while the latest tree belongs to one being prepared off it.
+        // Answered from a single flag, that action was measured against the wrong
+        // surface's history entirely.
+<span class="fc" id="L650">        Boolean described = rootWasShowing.get(root);</span>
+<span class="pc bpc" id="L651" title="1 of 6 branches missed.">        return described != null &amp;&amp; described.booleanValue() &amp;&amp; !isShowingRoot(root);</span>
+    }
+
+    /// Whether `#snapshotRoot` was the surface on screen when its tree was built.
+    /// Whether each described root was the surface on screen when its tree was built.
+    ///
+    /// Kept beside the trees themselves and dropped with them, because it answers for the
+    /// root it is recorded against rather than for whichever one was described last.
+<span class="fc" id="L659">    private final LinkedHashMap&lt;Container, Boolean&gt; rootWasShowing =</span>
+            new LinkedHashMap&lt;Container, Boolean&gt;();
+
+    /// Whether a cached root is a surface the user can currently see.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the cached root, may be null
+    ///
+    /// #### Returns
+    ///
+    /// true when it is a top level and it is showing
+    private static boolean isShowingRoot(Container root) {
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">        return root instanceof TopLevelContainer</span>
+<span class="fc bfc" id="L673" title="All 2 branches covered.">                &amp;&amp; ((TopLevelContainer) root).isTopLevelShowing();</span>
+    }
+
+    public synchronized int getPendingChanges() {
+<span class="fc" id="L677">        return pendingChanges;</span>
+    }
+
+    public boolean performAction(long nodeId, String actionId, final Object argument) {
+        final AccessibilityNodeSnapshot node;
+        final AccessibilityAction action;
+<span class="fc" id="L683">        synchronized (this) {</span>
+            // Across every cached surface, not just the last one built. Off-EDT
+            // readers are now handed their own window's tree, so the node they act on
+            // routinely comes from a snapshot other than the current one -- resolving
+            // only against that one would leave every button on a secondary window
+            // inert.
+<span class="fc" id="L689">            node = findNode(nodeId);</span>
+<span class="fc bfc" id="L690" title="All 2 branches covered.">            action = node == null ? null : node.getAction(actionId);</span>
+<span class="fc" id="L691">        }</span>
+<span class="pc bpc" id="L692" title="2 of 6 branches missed.">        if (node == null || action == null || !action.isEnabled()) {</span>
+<span class="fc" id="L693">            return false;</span>
+        }
+<span class="fc" id="L695">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+                // Asked again here, not only when the id was resolved. A window can be
+                // hidden or disposed between the two, and the action would then press a
+                // button on a surface that has gone. The question is the same narrow one
+                // the lookup asks -- has this surface been taken off screen -- rather
+                // than &quot;is it showing&quot;, which is equally false for a form that was never
+                // shown and is a live surface a caller acts on.
+<span class="fc" id="L704">                Component target = node.getComponent();</span>
+<span class="pc bpc" id="L705" title="1 of 2 branches missed.">                TopLevelContainer top = target == null ? null : target.getTopLevelContainer();</span>
+                // No surface at all means the component has been taken out of the
+                // hierarchy since the id was resolved -- a rebuilt form, a list that
+                // replaced its rows. Pressing it then acts on something no longer on
+                // screen just as surely as a hidden window does. A form that has not
+                // been shown yet is not this: its components still answer with it.
+<span class="fc bfc" id="L711" title="All 4 branches covered.">                if (top == null || isWithdrawnRoot(top.asContainer())) {</span>
+<span class="fc" id="L712">                    return;</span>
+                }
+<span class="fc" id="L714">                action.perform(target, argument);</span>
+<span class="fc" id="L715">                invalidate(target, CHANGE_STATE | CHANGE_VALUE | CHANGE_CONTENT);</span>
+<span class="fc" id="L716">            }</span>
+        });
+<span class="fc" id="L718">        return true;</span>
+    }
+
+    private long idFor(Component component) {
+<span class="fc" id="L722">        AccessibilityNode semantics = component.getSemantics();</span>
+<span class="fc" id="L723">        long id = semantics.getInternalId();</span>
+<span class="fc bfc" id="L724" title="All 2 branches covered.">        if (id == 0) {</span>
+<span class="fc" id="L725">            id = nextId++;</span>
+<span class="fc" id="L726">            semantics.setInternalId(id);</span>
+        }
+<span class="fc" id="L728">        return id;</span>
+    }
+
+    private long idForVirtual(Component host, String path) {
+<span class="fc" id="L732">        AccessibilityNode semantics = host.getSemantics();</span>
+<span class="fc" id="L733">        Long id = semantics.getInternalVirtualId(path);</span>
+<span class="fc bfc" id="L734" title="All 2 branches covered.">        if (id == null) {</span>
+<span class="fc" id="L735">            id = Long.valueOf(nextId++);</span>
+<span class="fc" id="L736">            semantics.putInternalVirtualId(path, id.longValue());</span>
+        }
+<span class="fc" id="L738">        return id.longValue();</span>
+    }
+
+    private void resolveComponent(Component component, List&lt;BuildNode&gt; destination) {
+<span class="pc bpc" id="L742" title="2 of 8 branches missed.">        if (component == null || (!(component instanceof Form) &amp;&amp; !component.isVisible()) || component.isHidden(true)) {</span>
+<span class="fc" id="L743">            return;</span>
+        }
+<span class="fc" id="L745">        AccessibilityNode config = component.getSemantics();</span>
+<span class="fc" id="L746">        AccessibilityGrouping grouping = config.getGrouping();</span>
+<span class="pc bpc" id="L747" title="1 of 2 branches missed.">        if (grouping == AccessibilityGrouping.EXCLUDE_SUBTREE) {</span>
+<span class="nc" id="L748">            return;</span>
+        }
+
+<span class="fc" id="L751">        BuildNode node = buildComponentNode(component, config);</span>
+<span class="fc" id="L752">        List&lt;BuildNode&gt; children = new ArrayList&lt;BuildNode&gt;();</span>
+<span class="pc bpc" id="L753" title="1 of 4 branches missed.">        if (grouping != AccessibilityGrouping.LEAF &amp;&amp; component instanceof Container) {</span>
+<span class="fc" id="L754">            Container container = (Container) component;</span>
+<span class="fc bfc" id="L755" title="All 2 branches covered.">            for (int i = 0; i &lt; container.getComponentCount(); i++) {</span>
+<span class="fc" id="L756">                resolveComponent(container.getComponentAt(i), children);</span>
+            }
+        }
+<span class="pc bpc" id="L759" title="1 of 2 branches missed.">        if (grouping != AccessibilityGrouping.LEAF) {</span>
+<span class="fc" id="L760">            addVirtualChildren(component, config, &quot;custom&quot;, children);</span>
+<span class="fc bfc" id="L761" title="All 2 branches covered.">            if (component instanceof com.codename1.ui.List) {</span>
+<span class="fc" id="L762">                addListChildren((com.codename1.ui.List) component, children);</span>
+            }
+        }
+
+<span class="fc" id="L766">        boolean expose = shouldExpose(component, config, node);</span>
+<span class="fc bfc" id="L767" title="All 2 branches covered.">        if (grouping == AccessibilityGrouping.EXCLUDE) {</span>
+<span class="fc" id="L768">            expose = false;</span>
+        }
+<span class="fc bfc" id="L770" title="All 2 branches covered.">        if (grouping == AccessibilityGrouping.MERGE_DESCENDANTS) {</span>
+<span class="fc" id="L771">            String merged = collectLabels(children);</span>
+<span class="pc bpc" id="L772" title="1 of 2 branches missed.">            if (isEmpty(node.builder.label)) {</span>
+<span class="fc" id="L773">                node.builder.label = merged;</span>
+<span class="nc bnc" id="L774" title="All 2 branches missed.">            } else if (!isEmpty(merged)) {</span>
+<span class="nc" id="L775">                node.builder.description = join(node.builder.description, merged);</span>
+            }
+<span class="fc" id="L777">            children.clear();</span>
+<span class="fc" id="L778">            expose = true;</span>
+        }
+<span class="pc bpc" id="L780" title="2 of 4 branches missed.">        if (grouping == AccessibilityGrouping.LEAF || grouping == AccessibilityGrouping.GROUP) {</span>
+<span class="nc" id="L781">            expose = true;</span>
+        }
+
+<span class="fc bfc" id="L784" title="All 2 branches covered.">        if (expose) {</span>
+<span class="fc" id="L785">            node.children.addAll(children);</span>
+<span class="fc" id="L786">            destination.add(node);</span>
+        } else {
+<span class="fc" id="L788">            destination.addAll(children);</span>
+        }
+<span class="fc" id="L790">    }</span>
+
+    private BuildNode buildComponentNode(final Component component, AccessibilityNode config) {
+<span class="fc" id="L793">        BuildNode out = new BuildNode();</span>
+<span class="fc" id="L794">        out.id = idFor(component);</span>
+<span class="fc" id="L795">        out.builder.id = out.id;</span>
+<span class="fc" id="L796">        out.builder.component = component;</span>
+<span class="fc" id="L797">        out.builder.identifier = config.getIdentifier();</span>
+<span class="fc" id="L798">        out.builder.label = firstNonEmpty(config.getLabel(), component.getAccessibilityText());</span>
+<span class="fc" id="L799">        out.builder.hint = config.getHint();</span>
+<span class="fc" id="L800">        out.builder.description = config.getDescription();</span>
+<span class="fc" id="L801">        out.builder.value = config.getValue();</span>
+<span class="fc" id="L802">        out.builder.validationError = config.getValidationError();</span>
+<span class="fc" id="L803">        out.builder.paneTitle = config.getPaneTitle();</span>
+<span class="fc" id="L804">        out.builder.roleDescription = config.getRoleDescription();</span>
+<span class="fc bfc" id="L805" title="All 2 branches covered.">        out.builder.role = config.getRole() == AccessibilityRole.NONE ? inferRole(component) : config.getRole();</span>
+<span class="fc" id="L806">        out.builder.checked = inferChecked(component, config);</span>
+<span class="fc" id="L807">        out.builder.liveRegion = config.getLiveRegion();</span>
+<span class="fc bfc" id="L808" title="All 2 branches covered.">        out.builder.range = config.getRange() == null ? inferRange(component) : config.getRange();</span>
+<span class="fc" id="L809">        out.builder.collectionInfo =</span>
+<span class="pc bpc" id="L810" title="1 of 2 branches missed.">                config.getCollectionInfo() == null ? inferCollection(component) : config.getCollectionInfo();</span>
+<span class="pc bpc" id="L811" title="1 of 2 branches missed.">        out.builder.collectionItemInfo = config.getCollectionItemInfo() == null ? inferCollectionItem(component)</span>
+<span class="pc" id="L812">                                                                                : config.getCollectionItemInfo();</span>
+<span class="fc" id="L813">        out.builder.bounds = componentBounds(component);</span>
+<span class="fc" id="L814">        out.builder.selected = config.getSelected();</span>
+<span class="pc bpc" id="L815" title="1 of 2 branches missed.">        if (out.builder.selected == null) {</span>
+<span class="fc" id="L816">            applyInferredSelected(component, out.builder);</span>
+        }
+<span class="fc" id="L818">        out.builder.expanded = config.getExpanded();</span>
+<span class="fc" id="L819">        out.builder.enabled =</span>
+<span class="pc bpc" id="L820" title="1 of 2 branches missed.">                config.getEnabled() == null ? Boolean.valueOf(component.isEnabled()) : config.getEnabled();</span>
+<span class="fc" id="L821">        out.builder.invalid = config.getInvalid();</span>
+<span class="fc" id="L822">        out.builder.busy = config.getBusy();</span>
+<span class="fc" id="L823">        out.builder.readOnly = config.getReadOnly();</span>
+<span class="fc" id="L824">        out.builder.required = config.getRequired();</span>
+<span class="fc" id="L825">        out.builder.multiline = config.getMultiline();</span>
+<span class="fc" id="L826">        out.builder.obscured = config.getObscured();</span>
+<span class="fc" id="L827">        applyInferredTextStates(component, out.builder);</span>
+<span class="fc" id="L828">        out.builder.pressed = config.getPressed();</span>
+<span class="fc" id="L829">        out.builder.current = config.getCurrent();</span>
+<span class="pc bpc" id="L830" title="2 of 4 branches missed.">        out.builder.modal = config.isModal() || component instanceof Dialog;</span>
+<span class="fc bfc" id="L831" title="All 4 branches covered.">        out.builder.focusable = component.isFocusable() || isInteractiveRole(out.builder.role);</span>
+<span class="fc" id="L832">        out.builder.focused = component.hasFocus();</span>
+<span class="fc" id="L833">        out.builder.headingLevel = config.getHeadingLevel();</span>
+<span class="fc" id="L834">        out.builder.sortKey = config.getSortKey();</span>
+<span class="fc" id="L835">        out.builder.traversalBefore = config.getTraversalBefore();</span>
+<span class="fc" id="L836">        out.builder.traversalAfter = config.getTraversalAfter();</span>
+<span class="fc" id="L837">        out.builder.actions.addAll(config.getActions());</span>
+<span class="fc" id="L838">        addDefaultActions(component, out.builder);</span>
+<span class="pc bpc" id="L839" title="1 of 4 branches missed.">        if (component instanceof Form &amp;&amp; isEmpty(out.builder.paneTitle)) {</span>
+<span class="fc" id="L840">            out.builder.paneTitle = ((Form) component).getTitle();</span>
+        }
+<span class="fc" id="L842">        out.component = component;</span>
+<span class="fc" id="L843">        return out;</span>
+    }
+
+    private void addVirtualChildren(Component host, AccessibilityNode config, String path,
+                                    List&lt;BuildNode&gt; destination) {
+<span class="fc" id="L848">        List&lt;AccessibilityNode&gt; virtual = new ArrayList&lt;AccessibilityNode&gt;();</span>
+<span class="fc" id="L849">        virtual.addAll(config.getChildren());</span>
+<span class="pc bpc" id="L850" title="1 of 2 branches missed.">        if (config.getChildProvider() != null) {</span>
+<span class="nc" id="L851">            List&lt;AccessibilityNode&gt; provided = config.getChildProvider().getAccessibilityChildren(host);</span>
+<span class="nc bnc" id="L852" title="All 2 branches missed.">            if (provided != null) {</span>
+<span class="nc" id="L853">                virtual.addAll(provided);</span>
+            }
+        }
+<span class="pc bpc" id="L856" title="1 of 2 branches missed.">        for (int i = 0; i &lt; virtual.size(); i++) {</span>
+<span class="nc" id="L857">            AccessibilityNode child = virtual.get(i);</span>
+<span class="nc" id="L858">            String key = child.getVirtualKey();</span>
+<span class="nc bnc" id="L859" title="All 2 branches missed.">            if (isEmpty(key)) {</span>
+<span class="nc" id="L860">                key = &quot;index-&quot; + i;</span>
+            }
+<span class="nc" id="L862">            BuildNode resolved = buildVirtualNode(host, child, path + &quot;/&quot; + key);</span>
+<span class="nc" id="L863">            addVirtualChildren(host, child, path + &quot;/&quot; + key, resolved.children);</span>
+<span class="nc" id="L864">            destination.add(resolved);</span>
+        }
+<span class="fc" id="L866">    }</span>
+
+    private BuildNode buildVirtualNode(Component host, AccessibilityNode config, String path) {
+<span class="fc" id="L869">        BuildNode out = new BuildNode();</span>
+<span class="fc" id="L870">        out.id = idForVirtual(host, path);</span>
+<span class="fc" id="L871">        out.builder.id = out.id;</span>
+<span class="fc" id="L872">        out.builder.component = host;</span>
+<span class="fc" id="L873">        out.builder.virtualKey = config.getVirtualKey();</span>
+<span class="fc" id="L874">        out.builder.identifier = config.getIdentifier();</span>
+<span class="fc" id="L875">        out.builder.label = config.getLabel();</span>
+<span class="fc" id="L876">        out.builder.hint = config.getHint();</span>
+<span class="fc" id="L877">        out.builder.description = config.getDescription();</span>
+<span class="fc" id="L878">        out.builder.value = config.getValue();</span>
+<span class="fc" id="L879">        out.builder.validationError = config.getValidationError();</span>
+<span class="fc" id="L880">        out.builder.paneTitle = config.getPaneTitle();</span>
+<span class="fc" id="L881">        out.builder.roleDescription = config.getRoleDescription();</span>
+<span class="pc bpc" id="L882" title="1 of 2 branches missed.">        out.builder.role = config.getRole() == AccessibilityRole.NONE ? AccessibilityRole.GENERIC : config.getRole();</span>
+<span class="fc" id="L883">        out.builder.checked = config.getChecked();</span>
+<span class="fc" id="L884">        out.builder.liveRegion = config.getLiveRegion();</span>
+<span class="fc" id="L885">        out.builder.range = config.getRange();</span>
+<span class="fc" id="L886">        out.builder.collectionInfo = config.getCollectionInfo();</span>
+<span class="fc" id="L887">        out.builder.collectionItemInfo = config.getCollectionItemInfo();</span>
+<span class="fc" id="L888">        out.builder.bounds = virtualBounds(host, config.getBounds());</span>
+<span class="fc" id="L889">        out.builder.selected = config.getSelected();</span>
+<span class="fc" id="L890">        out.builder.expanded = config.getExpanded();</span>
+<span class="pc bpc" id="L891" title="1 of 2 branches missed.">        out.builder.enabled = config.getEnabled() == null ? Boolean.valueOf(host.isEnabled()) : config.getEnabled();</span>
+<span class="fc" id="L892">        out.builder.invalid = config.getInvalid();</span>
+<span class="fc" id="L893">        out.builder.busy = config.getBusy();</span>
+<span class="fc" id="L894">        out.builder.readOnly = config.getReadOnly();</span>
+<span class="fc" id="L895">        out.builder.required = config.getRequired();</span>
+<span class="fc" id="L896">        out.builder.multiline = config.getMultiline();</span>
+<span class="fc" id="L897">        out.builder.obscured = config.getObscured();</span>
+<span class="fc" id="L898">        out.builder.pressed = config.getPressed();</span>
+<span class="fc" id="L899">        out.builder.current = config.getCurrent();</span>
+<span class="fc" id="L900">        out.builder.modal = config.isModal();</span>
+<span class="pc bpc" id="L901" title="3 of 4 branches missed.">        out.builder.focusable = !config.getActions().isEmpty() || isInteractiveRole(out.builder.role);</span>
+<span class="fc" id="L902">        out.builder.headingLevel = config.getHeadingLevel();</span>
+<span class="fc" id="L903">        out.builder.sortKey = config.getSortKey();</span>
+<span class="fc" id="L904">        out.builder.actions.addAll(config.getActions());</span>
+<span class="fc" id="L905">        out.component = host;</span>
+<span class="fc" id="L906">        return out;</span>
+    }
+
+    private void addListChildren(final com.codename1.ui.List list, List&lt;BuildNode&gt; destination) {
+<span class="fc" id="L910">        int size = list.size();</span>
+<span class="fc" id="L911">        int[] visibleItems = list.getAccessibilityVisibleItemIndices();</span>
+<span class="fc bfc" id="L912" title="All 2 branches covered.">        for (int i : visibleItems) {</span>
+<span class="fc" id="L913">            final int index = i;</span>
+<span class="fc" id="L914">            AccessibilityNode item = new AccessibilityNode(&quot;item-&quot; + i)</span>
+<span class="fc" id="L915">                                             .setRole(AccessibilityRole.LIST_ITEM)</span>
+<span class="fc" id="L916">                                             .setLabel(list.getAccessibilityItemText(i))</span>
+<span class="fc bfc" id="L917" title="All 2 branches covered.">                                             .setSelected(Boolean.valueOf(i == list.getSelectedIndex()))</span>
+<span class="fc" id="L918">                                             .setCollectionItemInfo(new AccessibilityCollectionItemInfo(</span>
+                                                     i, 1, 0, 1, i + 1, size, 1, false))
+<span class="fc" id="L920">                                             .setBounds(list.getAccessibilityItemBounds(i, new Rectangle()))</span>
+<span class="fc" id="L921">                                             .addAction(new AccessibilityAction(AccessibilityAction.ACTIVATE, null,</span>
+                                                                                new ListActivateHandler(list, index)));
+<span class="fc" id="L923">            destination.add(buildVirtualNode(list, item, &quot;list/item-&quot; + i));</span>
+        }
+<span class="fc" id="L925">    }</span>
+
+    private void addDefaultActions(final Component component, AccessibilityNodeSnapshot.Builder builder) {
+<span class="pc bpc" id="L928" title="1 of 4 branches missed.">        if (component.isFocusable() &amp;&amp; !hasAction(builder.actions, AccessibilityAction.FOCUS)) {</span>
+<span class="fc" id="L929">            builder.actions.add(new AccessibilityAction(AccessibilityAction.FOCUS, null, FocusHandler.INSTANCE));</span>
+        }
+<span class="pc bpc" id="L931" title="1 of 4 branches missed.">        if (component instanceof Button &amp;&amp; !hasAction(builder.actions, AccessibilityAction.ACTIVATE)) {</span>
+<span class="fc" id="L932">            builder.actions.add(new AccessibilityAction(AccessibilityAction.ACTIVATE, null, ActivateHandler.INSTANCE));</span>
+        }
+<span class="fc bfc" id="L934" title="All 2 branches covered.">        if (component instanceof Slider) {</span>
+<span class="fc" id="L935">            final Slider slider = (Slider) component;</span>
+<span class="pc bpc" id="L936" title="2 of 4 branches missed.">            if (slider.isEditable() &amp;&amp; !hasAction(builder.actions, AccessibilityAction.INCREMENT)) {</span>
+<span class="fc" id="L937">                builder.actions.add(new AccessibilityAction(AccessibilityAction.INCREMENT, null,</span>
+                                                            new SliderAdjustmentHandler(slider, 1)));
+            }
+<span class="pc bpc" id="L940" title="2 of 4 branches missed.">            if (slider.isEditable() &amp;&amp; !hasAction(builder.actions, AccessibilityAction.DECREMENT)) {</span>
+<span class="fc" id="L941">                builder.actions.add(new AccessibilityAction(AccessibilityAction.DECREMENT, null,</span>
+                                                            new SliderAdjustmentHandler(slider, -1)));
+            }
+        }
+<span class="fc bfc" id="L945" title="All 2 branches covered.">        if (component instanceof com.codename1.ui.List) {</span>
+<span class="fc" id="L946">            final com.codename1.ui.List list = (com.codename1.ui.List) component;</span>
+<span class="pc bpc" id="L947" title="2 of 4 branches missed.">            if (list.size() &gt; 0 &amp;&amp; !hasAction(builder.actions, AccessibilityAction.SCROLL_FORWARD)) {</span>
+<span class="fc" id="L948">                builder.actions.add(new AccessibilityAction(AccessibilityAction.SCROLL_FORWARD, null,</span>
+                                                            new ListScrollHandler(list, 1)));
+            }
+<span class="pc bpc" id="L951" title="2 of 4 branches missed.">            if (list.size() &gt; 0 &amp;&amp; !hasAction(builder.actions, AccessibilityAction.SCROLL_BACKWARD)) {</span>
+<span class="fc" id="L952">                builder.actions.add(new AccessibilityAction(AccessibilityAction.SCROLL_BACKWARD, null,</span>
+                                                            new ListScrollHandler(list, -1)));
+            }
+        }
+<span class="fc bfc" id="L956" title="All 2 branches covered.">        if (component instanceof TextArea) {</span>
+<span class="fc" id="L957">            final TextArea text = (TextArea) component;</span>
+<span class="pc bpc" id="L958" title="1 of 2 branches missed.">            if (!hasAction(builder.actions, AccessibilityAction.FOCUS)) {</span>
+<span class="nc" id="L959">                builder.actions.add(new AccessibilityAction(AccessibilityAction.FOCUS, null, FocusHandler.INSTANCE));</span>
+            }
+<span class="pc bpc" id="L961" title="2 of 4 branches missed.">            if (text.isEditable() &amp;&amp; !hasAction(builder.actions, AccessibilityAction.SET_TEXT)) {</span>
+<span class="fc" id="L962">                builder.actions.add(</span>
+                        new AccessibilityAction(AccessibilityAction.SET_TEXT, null, new SetTextHandler(text)));
+            }
+        }
+<span class="fc" id="L966">    }</span>
+
+    private AccessibilityRole inferRole(Component component) {
+<span class="pc bpc" id="L969" title="1 of 2 branches missed.">        if (component.getParent() instanceof Table) {</span>
+<span class="nc bnc" id="L970" title="All 2 branches missed.">            return ((Table) component.getParent()).getCellRow(component) &lt; 0 ? AccessibilityRole.COLUMN_HEADER</span>
+                                                                             : AccessibilityRole.CELL;
+        }
+<span class="fc" id="L973">        Tabs tabOwner = tabPanelOwner(component);</span>
+<span class="pc bpc" id="L974" title="1 of 2 branches missed.">        if (tabOwner != null) {</span>
+<span class="nc" id="L975">            return AccessibilityRole.TAB_PANEL;</span>
+        }
+<span class="pc bpc" id="L977" title="1 of 2 branches missed.">        if (component instanceof Dialog) {</span>
+<span class="nc" id="L978">            return AccessibilityRole.DIALOG;</span>
+        }
+<span class="pc bpc" id="L980" title="1 of 2 branches missed.">        if (component instanceof RadioButton) {</span>
+<span class="nc" id="L981">            return AccessibilityRole.RADIO_BUTTON;</span>
+        }
+<span class="fc bfc" id="L983" title="All 2 branches covered.">        if (component instanceof CheckBox) {</span>
+<span class="fc" id="L984">            return AccessibilityRole.CHECKBOX;</span>
+        }
+<span class="fc bfc" id="L986" title="All 2 branches covered.">        if (component instanceof Button) {</span>
+<span class="pc bpc" id="L987" title="1 of 2 branches missed.">            if (isTabButton((Button) component)) {</span>
+<span class="nc" id="L988">                return AccessibilityRole.TAB;</span>
+            }
+<span class="pc bpc" id="L990" title="1 of 2 branches missed.">            return ((Button) component).isToggle() ? AccessibilityRole.TOGGLE_BUTTON : AccessibilityRole.BUTTON;</span>
+        }
+<span class="fc bfc" id="L992" title="All 2 branches covered.">        if (component instanceof Slider) {</span>
+<span class="pc bpc" id="L993" title="1 of 2 branches missed.">            return ((Slider) component).isEditable() ? AccessibilityRole.SLIDER : AccessibilityRole.PROGRESS_BAR;</span>
+        }
+<span class="fc bfc" id="L995" title="All 2 branches covered.">        if (component instanceof TextField) {</span>
+<span class="fc" id="L996">            return AccessibilityRole.TEXT_FIELD;</span>
+        }
+<span class="pc bpc" id="L998" title="1 of 2 branches missed.">        if (component instanceof TextArea) {</span>
+<span class="nc" id="L999">            return AccessibilityRole.TEXT_FIELD;</span>
+        }
+<span class="fc bfc" id="L1001" title="All 2 branches covered.">        if (component instanceof com.codename1.ui.List) {</span>
+<span class="fc" id="L1002">            return AccessibilityRole.LIST;</span>
+        }
+<span class="pc bpc" id="L1004" title="1 of 2 branches missed.">        if (component instanceof Table) {</span>
+<span class="nc" id="L1005">            return AccessibilityRole.GRID;</span>
+        }
+<span class="pc bpc" id="L1007" title="1 of 2 branches missed.">        if (component instanceof Tabs) {</span>
+<span class="nc" id="L1008">            return AccessibilityRole.TAB_LIST;</span>
+        }
+<span class="fc bfc" id="L1010" title="All 2 branches covered.">        if (component instanceof Form) {</span>
+<span class="fc" id="L1011">            return AccessibilityRole.GENERIC;</span>
+        }
+<span class="fc bfc" id="L1013" title="All 2 branches covered.">        if (component instanceof Label) {</span>
+<span class="fc" id="L1014">            return AccessibilityRole.STATIC_TEXT;</span>
+        }
+<span class="fc" id="L1016">        return AccessibilityRole.NONE;</span>
+    }
+
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    private boolean isTabButton(Button button) {
+<span class="fc" id="L1021">        Container parent = button.getParent();</span>
+<span class="fc bfc" id="L1022" title="All 2 branches covered.">        while (parent != null) {</span>
+<span class="fc" id="L1023">            Container owner = parent.getParent();</span>
+<span class="pc bpc" id="L1024" title="3 of 4 branches missed.">            if (owner instanceof Tabs &amp;&amp; ((Tabs) owner).getTabsContainer() == parent) {</span>
+<span class="nc" id="L1025">                return true;</span>
+            }
+<span class="fc" id="L1027">            parent = parent.getParent();</span>
+<span class="fc" id="L1028">        }</span>
+<span class="fc" id="L1029">        return false;</span>
+    }
+
+    private AccessibilityCheckedState inferChecked(Component component, AccessibilityNode config) {
+<span class="fc bfc" id="L1033" title="All 2 branches covered.">        if (config.getChecked() != AccessibilityCheckedState.UNSPECIFIED) {</span>
+<span class="fc" id="L1034">            return config.getChecked();</span>
+        }
+<span class="pc bpc" id="L1036" title="1 of 4 branches missed.">        if (component instanceof CheckBox || component instanceof RadioButton) {</span>
+<span class="pc bpc" id="L1037" title="1 of 2 branches missed.">            return ((Button) component).isSelected() ? AccessibilityCheckedState.CHECKED</span>
+                                                     : AccessibilityCheckedState.UNCHECKED;
+        }
+<span class="fc" id="L1040">        return AccessibilityCheckedState.UNSPECIFIED;</span>
+    }
+
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    private void applyInferredSelected(Component component, AccessibilityNodeSnapshot.Builder builder) {
+<span class="pc bpc" id="L1045" title="2 of 6 branches missed.">        if (component instanceof Button &amp;&amp; (((Button) component).isToggle() || isTabButton((Button) component))) {</span>
+<span class="nc" id="L1046">            builder.selected = Boolean.valueOf(((Button) component).isSelected());</span>
+<span class="nc" id="L1047">            return;</span>
+        }
+<span class="fc" id="L1049">        Tabs tabOwner = tabPanelOwner(component);</span>
+<span class="pc bpc" id="L1050" title="1 of 2 branches missed.">        if (tabOwner != null) {</span>
+<span class="nc bnc" id="L1051" title="All 2 branches missed.">            builder.selected = Boolean.valueOf(tabOwner.getSelectedComponent() == component);</span>
+        }
+<span class="fc" id="L1053">    }</span>
+
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    private Tabs tabPanelOwner(Component component) {
+<span class="fc" id="L1057">        Container parent = component.getParent();</span>
+<span class="pc bpc" id="L1058" title="1 of 4 branches missed.">        if (parent != null &amp;&amp; parent.getParent() instanceof Tabs) {</span>
+<span class="nc" id="L1059">            Tabs tabs = (Tabs) parent.getParent();</span>
+<span class="nc bnc" id="L1060" title="All 2 branches missed.">            if (tabs.getContentPane() == parent) {</span>
+<span class="nc" id="L1061">                return tabs;</span>
+            }
+        }
+<span class="fc" id="L1064">        return null;</span>
+    }
+
+    private AccessibilityRange inferRange(Component component) {
+<span class="fc bfc" id="L1068" title="All 2 branches covered.">        if (component instanceof Slider) {</span>
+<span class="fc" id="L1069">            Slider slider = (Slider) component;</span>
+<span class="fc" id="L1070">            return new AccessibilityRange(slider.getMinValue(), slider.getMaxValue(), slider.getProgress(),</span>
+<span class="fc" id="L1071">                                          slider.getIncrements(), null);</span>
+        }
+<span class="fc" id="L1073">        return null;</span>
+    }
+
+    private AccessibilityCollectionInfo inferCollection(Component component) {
+<span class="fc bfc" id="L1077" title="All 2 branches covered.">        if (component instanceof com.codename1.ui.List) {</span>
+<span class="fc" id="L1078">            return new AccessibilityCollectionInfo(((com.codename1.ui.List) component).size(), 1, false,</span>
+                                                   AccessibilityCollectionInfo.SELECTION_SINGLE);
+        }
+<span class="pc bpc" id="L1081" title="1 of 2 branches missed.">        if (component instanceof Table) {</span>
+<span class="nc" id="L1082">            Table table = (Table) component;</span>
+<span class="nc" id="L1083">            return new AccessibilityCollectionInfo(table.getModel().getRowCount(), table.getModel().getColumnCount(),</span>
+                                                   false, AccessibilityCollectionInfo.SELECTION_SINGLE);
+        }
+<span class="pc bpc" id="L1086" title="1 of 2 branches missed.">        if (component instanceof Tabs) {</span>
+<span class="nc" id="L1087">            return new AccessibilityCollectionInfo(1, ((Tabs) component).getTabCount(), false,</span>
+                                                   AccessibilityCollectionInfo.SELECTION_SINGLE);
+        }
+<span class="fc" id="L1090">        return null;</span>
+    }
+
+    private AccessibilityCollectionItemInfo inferCollectionItem(Component component) {
+<span class="pc bpc" id="L1094" title="1 of 2 branches missed.">        if (component.getParent() instanceof Table) {</span>
+<span class="nc" id="L1095">            Table table = (Table) component.getParent();</span>
+<span class="nc" id="L1096">            int sourceRow = table.getCellRow(component);</span>
+<span class="nc bnc" id="L1097" title="All 4 branches missed.">            int row = sourceRow &lt; 0 ? 0 : sourceRow + (table.isIncludeHeader() ? 1 : 0);</span>
+<span class="nc" id="L1098">            int column = table.getCellColumn(component);</span>
+<span class="nc bnc" id="L1099" title="All 2 branches missed.">            return new AccessibilityCollectionItemInfo(row, 1, column, 1, column + 1, table.getModel().getColumnCount(),</span>
+                                                       1, sourceRow &lt; 0);
+        }
+<span class="fc" id="L1102">        return null;</span>
+    }
+
+    private void applyInferredTextStates(Component component, AccessibilityNodeSnapshot.Builder builder) {
+<span class="fc bfc" id="L1106" title="All 2 branches covered.">        if (!(component instanceof TextArea)) {</span>
+<span class="fc" id="L1107">            return;</span>
+        }
+<span class="fc" id="L1109">        TextArea text = (TextArea) component;</span>
+<span class="pc bpc" id="L1110" title="1 of 2 branches missed.">        if (builder.readOnly == null) {</span>
+<span class="pc bpc" id="L1111" title="1 of 2 branches missed.">            builder.readOnly = Boolean.valueOf(!text.isEditable());</span>
+        }
+<span class="pc bpc" id="L1113" title="1 of 2 branches missed.">        if (builder.multiline == null) {</span>
+<span class="pc bpc" id="L1114" title="2 of 4 branches missed.">            builder.multiline = Boolean.valueOf(!(component instanceof TextField) || text.getRows() &gt; 1);</span>
+        }
+<span class="pc bpc" id="L1116" title="1 of 2 branches missed.">        if (builder.obscured == null) {</span>
+<span class="fc bfc" id="L1117" title="All 2 branches covered.">            builder.obscured = Boolean.valueOf((text.getConstraint() &amp; TextArea.PASSWORD) != 0);</span>
+        }
+<span class="fc" id="L1119">    }</span>
+
+    private boolean shouldExpose(Component component, AccessibilityNode config, BuildNode node) {
+<span class="fc bfc" id="L1122" title="All 2 branches covered.">        if (component instanceof Form) {</span>
+<span class="fc" id="L1123">            return true;</span>
+        }
+<span class="fc bfc" id="L1125" title="All 2 branches covered.">        if (config.hasExplicitConfiguration()) {</span>
+<span class="fc" id="L1126">            return true;</span>
+        }
+<span class="fc bfc" id="L1128" title="All 2 branches covered.">        return node.builder.role != AccessibilityRole.NONE &amp;&amp;</span>
+<span class="pc bpc" id="L1129" title="2 of 6 branches missed.">                (!isEmpty(node.builder.label) || !isEmpty(node.builder.value) || node.builder.focusable ||</span>
+<span class="pc bnc" id="L1130" title="All 6 branches missed.">                 !node.builder.actions.isEmpty() || node.builder.collectionInfo != null || node.builder.range != null);</span>
+    }
+
+    private Rectangle componentBounds(Component component) {
+<span class="fc" id="L1134">        Rectangle bounds = new Rectangle(component.getAbsoluteX() + component.getScrollX(),</span>
+<span class="fc" id="L1135">                                         component.getAbsoluteY() + component.getScrollY(), component.getWidth(),</span>
+<span class="fc" id="L1136">                                         component.getHeight());</span>
+<span class="fc" id="L1137">        Container parent = component.getParent();</span>
+<span class="pc bpc" id="L1138" title="1 of 6 branches missed.">        while (parent != null &amp;&amp; bounds.getWidth() &gt; 0 &amp;&amp; bounds.getHeight() &gt; 0) {</span>
+<span class="fc" id="L1139">            Rectangle clip =</span>
+<span class="fc" id="L1140">                    new Rectangle(parent.getAbsoluteX() + parent.getScrollX(),</span>
+<span class="fc" id="L1141">                                  parent.getAbsoluteY() + parent.getScrollY(), parent.getWidth(), parent.getHeight());</span>
+<span class="fc" id="L1142">            intersect(bounds, clip);</span>
+<span class="fc" id="L1143">            parent = parent.getParent();</span>
+<span class="fc" id="L1144">        }</span>
+<span class="fc" id="L1145">        return bounds;</span>
+    }
+
+    private Rectangle virtualBounds(Component host, Rectangle relative) {
+<span class="pc bpc" id="L1149" title="1 of 2 branches missed.">        if (relative == null) {</span>
+<span class="nc" id="L1150">            return componentBounds(host);</span>
+        }
+<span class="fc" id="L1152">        Rectangle bounds = new Rectangle(host.getAbsoluteX() + host.getScrollX() + relative.getX(),</span>
+<span class="fc" id="L1153">                                         host.getAbsoluteY() + host.getScrollY() + relative.getY(), relative.getWidth(),</span>
+<span class="fc" id="L1154">                                         relative.getHeight());</span>
+<span class="fc" id="L1155">        intersect(bounds, componentBounds(host));</span>
+<span class="fc" id="L1156">        return bounds;</span>
+    }
+
+    private void intersect(Rectangle target, Rectangle clip) {
+<span class="fc" id="L1160">        int x1 = Math.max(target.getX(), clip.getX());</span>
+<span class="fc" id="L1161">        int y1 = Math.max(target.getY(), clip.getY());</span>
+<span class="fc" id="L1162">        int x2 = Math.min(target.getX() + target.getWidth(), clip.getX() + clip.getWidth());</span>
+<span class="fc" id="L1163">        int y2 = Math.min(target.getY() + target.getHeight(), clip.getY() + clip.getHeight());</span>
+<span class="fc" id="L1164">        target.setBounds(x1, y1, Math.max(0, x2 - x1), Math.max(0, y2 - y1));</span>
+<span class="fc" id="L1165">    }</span>
+
+    private void sortTree(List&lt;BuildNode&gt; nodes) {
+<span class="fc" id="L1168">        Collections.sort(nodes, SortKeyComparator.INSTANCE);</span>
+<span class="fc" id="L1169">        applyRelativeOrder(nodes);</span>
+<span class="fc bfc" id="L1170" title="All 2 branches covered.">        for (BuildNode node : nodes) {</span>
+<span class="fc" id="L1171">            sortTree(node.children);</span>
+<span class="fc" id="L1172">        }</span>
+<span class="fc" id="L1173">    }</span>
+
+    private void applyRelativeOrder(List&lt;BuildNode&gt; nodes) {
+<span class="fc" id="L1176">        int remainingPasses = nodes.size();</span>
+<span class="fc bfc" id="L1177" title="All 2 branches covered.">        while (remainingPasses &gt; 0) {</span>
+<span class="fc" id="L1178">            boolean changed = false;</span>
+<span class="fc bfc" id="L1179" title="All 2 branches covered.">            for (int i = 0; i &lt; nodes.size(); i++) {</span>
+<span class="fc" id="L1180">                BuildNode node = nodes.get(i);</span>
+<span class="fc" id="L1181">                int target = indexOf(nodes, node.builder.traversalBefore);</span>
+<span class="pc bpc" id="L1182" title="3 of 4 branches missed.">                if (target &gt;= 0 &amp;&amp; i &gt; target) {</span>
+<span class="nc" id="L1183">                    nodes.remove(i);</span>
+<span class="nc" id="L1184">                    nodes.add(target, node);</span>
+<span class="nc" id="L1185">                    changed = true;</span>
+<span class="nc" id="L1186">                    break;</span>
+                }
+<span class="fc" id="L1188">                target = indexOf(nodes, node.builder.traversalAfter);</span>
+<span class="pc bpc" id="L1189" title="3 of 4 branches missed.">                if (target &gt;= 0 &amp;&amp; i &lt; target) {</span>
+<span class="nc" id="L1190">                    nodes.remove(i);</span>
+<span class="nc" id="L1191">                    nodes.add(Math.min(target, nodes.size()), node);</span>
+<span class="nc" id="L1192">                    changed = true;</span>
+<span class="nc" id="L1193">                    break;</span>
+                }
+            }
+<span class="pc bpc" id="L1196" title="1 of 2 branches missed.">            if (!changed) {</span>
+<span class="fc" id="L1197">                return;</span>
+            }
+<span class="nc" id="L1199">            remainingPasses--;</span>
+<span class="nc" id="L1200">        }</span>
+<span class="fc" id="L1201">    }</span>
+
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    private int indexOf(List&lt;BuildNode&gt; nodes, Component component) {
+<span class="pc bpc" id="L1205" title="1 of 2 branches missed.">        if (component == null) {</span>
+<span class="fc" id="L1206">            return -1;</span>
+        }
+<span class="nc bnc" id="L1208" title="All 2 branches missed.">        for (int i = 0; i &lt; nodes.size(); i++) {</span>
+<span class="nc bnc" id="L1209" title="All 2 branches missed.">            if (nodes.get(i).component == component) {</span>
+<span class="nc" id="L1210">                return i;</span>
+            }
+        }
+<span class="nc" id="L1213">        return -1;</span>
+    }
+
+    private void freeze(List&lt;BuildNode&gt; source, long parentId, List&lt;Long&gt; childIds,
+                        LinkedHashMap&lt;Long, AccessibilityNodeSnapshot&gt; nodes) {
+<span class="fc bfc" id="L1218" title="All 2 branches covered.">        for (BuildNode node : source) {</span>
+<span class="fc" id="L1219">            node.builder.parentId = parentId;</span>
+<span class="fc bfc" id="L1220" title="All 2 branches covered.">            for (BuildNode child : node.children) {</span>
+<span class="fc" id="L1221">                node.builder.childIds.add(Long.valueOf(child.id));</span>
+<span class="fc" id="L1222">            }</span>
+<span class="fc" id="L1223">            AccessibilityNodeSnapshot frozen = new AccessibilityNodeSnapshot(node.builder);</span>
+<span class="fc" id="L1224">            nodes.put(Long.valueOf(node.id), frozen);</span>
+<span class="fc" id="L1225">            childIds.add(Long.valueOf(node.id));</span>
+<span class="fc" id="L1226">            List&lt;Long&gt; ignored = new ArrayList&lt;Long&gt;();</span>
+<span class="fc" id="L1227">            freeze(node.children, node.id, ignored, nodes);</span>
+<span class="fc" id="L1228">        }</span>
+<span class="fc" id="L1229">    }</span>
+
+    private String collectLabels(List&lt;BuildNode&gt; nodes) {
+<span class="fc" id="L1232">        String value = null;</span>
+<span class="fc bfc" id="L1233" title="All 2 branches covered.">        for (BuildNode node : nodes) {</span>
+<span class="fc" id="L1234">            value = join(value, node.builder.label);</span>
+<span class="fc" id="L1235">            value = join(value, collectLabels(node.children));</span>
+<span class="fc" id="L1236">        }</span>
+<span class="fc" id="L1237">        return value;</span>
+    }
+
+    private static boolean hasAction(List&lt;AccessibilityAction&gt; actions, String id) {
+<span class="fc bfc" id="L1241" title="All 2 branches covered.">        for (AccessibilityAction action : actions) {</span>
+<span class="fc bfc" id="L1242" title="All 2 branches covered.">            if (id.equals(action.getId())) {</span>
+<span class="fc" id="L1243">                return true;</span>
+            }
+<span class="fc" id="L1245">        }</span>
+<span class="fc" id="L1246">        return false;</span>
+    }
+
+    private static boolean isInteractiveRole(AccessibilityRole role) {
+<span class="pc bpc" id="L1250" title="13 of 28 branches missed.">        return role == AccessibilityRole.BUTTON || role == AccessibilityRole.TOGGLE_BUTTON ||</span>
+                role == AccessibilityRole.CHECKBOX || role == AccessibilityRole.RADIO_BUTTON ||
+                role == AccessibilityRole.SWITCH || role == AccessibilityRole.LINK ||
+                role == AccessibilityRole.TEXT_FIELD || role == AccessibilityRole.SEARCH_FIELD ||
+                role == AccessibilityRole.SLIDER || role == AccessibilityRole.TAB ||
+                role == AccessibilityRole.MENU_ITEM || role == AccessibilityRole.SPIN_BUTTON ||
+                role == AccessibilityRole.COMBO_BOX || role == AccessibilityRole.TREE_ITEM;
+    }
+
+    private static String firstNonEmpty(String first, String second) {
+<span class="fc bfc" id="L1260" title="All 2 branches covered.">        return !isEmpty(first) ? first : second;</span>
+    }
+
+    private static String join(String first, String second) {
+<span class="fc bfc" id="L1264" title="All 2 branches covered.">        if (isEmpty(first)) {</span>
+<span class="fc" id="L1265">            return second;</span>
+        }
+<span class="fc bfc" id="L1267" title="All 2 branches covered.">        if (isEmpty(second)) {</span>
+<span class="fc" id="L1268">            return first;</span>
+        }
+<span class="fc" id="L1270">        return first + &quot;, &quot; + second;</span>
+    }
+
+    private static boolean isEmpty(String value) {
+<span class="pc bpc" id="L1274" title="1 of 4 branches missed.">        return value == null || value.length() == 0;</span>
+    }
+
+<span class="fc" id="L1277">    private static final class BuildNode {</span>
+        long id;
+        Component component;
+<span class="fc" id="L1280">        AccessibilityNodeSnapshot.Builder builder = new AccessibilityNodeSnapshot.Builder();</span>
+<span class="fc" id="L1281">        List&lt;BuildNode&gt; children = new ArrayList&lt;BuildNode&gt;();</span>
+    }
+
+    private static final class SortKeyComparator implements Comparator&lt;BuildNode&gt; {
+<span class="fc" id="L1285">        private static final SortKeyComparator INSTANCE = new SortKeyComparator();</span>
+
+        @Override
+        public int compare(BuildNode a, BuildNode b) {
+<span class="fc" id="L1289">            boolean an = Double.isNaN(a.builder.sortKey);</span>
+<span class="fc" id="L1290">            boolean bn = Double.isNaN(b.builder.sortKey);</span>
+<span class="pc bpc" id="L1291" title="1 of 4 branches missed.">            if (an &amp;&amp; bn) {</span>
+<span class="fc" id="L1292">                return 0;</span>
+            }
+<span class="pc bpc" id="L1294" title="1 of 2 branches missed.">            if (an) {</span>
+<span class="nc" id="L1295">                return 1;</span>
+            }
+<span class="fc bfc" id="L1297" title="All 2 branches covered.">            if (bn) {</span>
+<span class="fc" id="L1298">                return -1;</span>
+            }
+<span class="fc" id="L1300">            return Double.compare(a.builder.sortKey, b.builder.sortKey);</span>
+        }
+    }
+
+    private static final class FocusHandler implements AccessibilityAction.Handler {
+<span class="fc" id="L1305">        private static final FocusHandler INSTANCE = new FocusHandler();</span>
+
+        @Override
+        public boolean perform(Component source, Object argument) {
+<span class="nc bnc" id="L1309" title="All 2 branches missed.">            if (!source.isEnabled()) {</span>
+<span class="nc" id="L1310">                return false;</span>
+            }
+<span class="nc" id="L1312">            source.requestFocus();</span>
+<span class="nc" id="L1313">            return true;</span>
+        }
+    }
+
+    private static final class ActivateHandler implements AccessibilityAction.Handler {
+<span class="fc" id="L1318">        private static final ActivateHandler INSTANCE = new ActivateHandler();</span>
+
+        @Override
+        public boolean perform(Component source, Object argument) {
+<span class="pc bpc" id="L1322" title="1 of 2 branches missed.">            if (!source.isEnabled()) {</span>
+<span class="nc" id="L1323">                return false;</span>
+            }
+<span class="fc" id="L1325">            source.keyReleased(Display.getInstance().getKeyCode(Display.GAME_FIRE));</span>
+<span class="fc" id="L1326">            return true;</span>
+        }
+    }
+
+    private static final class ListActivateHandler implements AccessibilityAction.Handler {
+        private final com.codename1.ui.List list;
+        private final int index;
+
+<span class="fc" id="L1334">        private ListActivateHandler(com.codename1.ui.List list, int index) {</span>
+<span class="fc" id="L1335">            this.list = list;</span>
+<span class="fc" id="L1336">            this.index = index;</span>
+<span class="fc" id="L1337">        }</span>
+
+        @Override
+        public boolean perform(Component source, Object argument) {
+<span class="nc bnc" id="L1341" title="All 2 branches missed.">            if (!list.isEnabled()) {</span>
+<span class="nc" id="L1342">                return false;</span>
+            }
+<span class="nc" id="L1344">            list.setSelectedIndex(index);</span>
+<span class="nc" id="L1345">            list.keyReleased(Display.getInstance().getKeyCode(Display.GAME_FIRE));</span>
+<span class="nc" id="L1346">            return true;</span>
+        }
+    }
+
+    private static final class ListScrollHandler implements AccessibilityAction.Handler {
+        private final com.codename1.ui.List list;
+        private final int direction;
+
+<span class="fc" id="L1354">        private ListScrollHandler(com.codename1.ui.List list, int direction) {</span>
+<span class="fc" id="L1355">            this.list = list;</span>
+<span class="fc" id="L1356">            this.direction = direction;</span>
+<span class="fc" id="L1357">        }</span>
+
+        @Override
+        public boolean perform(Component source, Object argument) {
+<span class="nc bnc" id="L1361" title="All 4 branches missed.">            if (!list.isEnabled() || list.size() == 0) {</span>
+<span class="nc" id="L1362">                return false;</span>
+            }
+<span class="nc" id="L1364">            int selected = list.getSelectedIndex();</span>
+<span class="nc bnc" id="L1365" title="All 2 branches missed.">            if (selected &lt; 0) {</span>
+<span class="nc bnc" id="L1366" title="All 2 branches missed.">                selected = direction &gt; 0 ? 0 : list.size() - 1;</span>
+            } else {
+<span class="nc" id="L1368">                selected = Math.max(0, Math.min(list.size() - 1, selected + direction));</span>
+            }
+<span class="nc bnc" id="L1370" title="All 2 branches missed.">            if (selected == list.getSelectedIndex()) {</span>
+<span class="nc" id="L1371">                return false;</span>
+            }
+<span class="nc" id="L1373">            list.setSelectedIndex(selected);</span>
+<span class="nc" id="L1374">            return true;</span>
+        }
+    }
+
+    private static final class SliderAdjustmentHandler implements AccessibilityAction.Handler {
+        private final Slider slider;
+        private final int direction;
+
+<span class="fc" id="L1382">        private SliderAdjustmentHandler(Slider slider, int direction) {</span>
+<span class="fc" id="L1383">            this.slider = slider;</span>
+<span class="fc" id="L1384">            this.direction = direction;</span>
+<span class="fc" id="L1385">        }</span>
+
+        @Override
+        public boolean perform(Component source, Object argument) {
+<span class="nc" id="L1389">            int increment = Math.max(1, slider.getIncrements());</span>
+<span class="nc" id="L1390">            int value = slider.getProgress() + direction * increment;</span>
+<span class="nc" id="L1391">            slider.setProgress(Math.max(slider.getMinValue(), Math.min(slider.getMaxValue(), value)));</span>
+<span class="nc" id="L1392">            return true;</span>
+        }
+    }
+
+    private static final class SetTextHandler implements AccessibilityAction.Handler {
+        private final TextArea text;
+
+<span class="fc" id="L1399">        private SetTextHandler(TextArea text) {</span>
+<span class="fc" id="L1400">            this.text = text;</span>
+<span class="fc" id="L1401">        }</span>
+
+        @Override
+        public boolean perform(Component source, Object argument) {
+<span class="pc bpc" id="L1405" title="1 of 2 branches missed.">            if (!(argument instanceof String)) {</span>
+<span class="nc" id="L1406">                return false;</span>
+            }
+<span class="fc" id="L1408">            text.setText((String) argument);</span>
+<span class="fc" id="L1409">            return true;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

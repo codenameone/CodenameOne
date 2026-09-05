@@ -1,0 +1,1442 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpanMultiButton.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">SpanMultiButton.java</span></div><h1>SpanMultiButton.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2020, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ui.Button;
+import com.codename1.ui.ButtonGroup;
+import com.codename1.ui.CheckBox;
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Font;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.RadioButton;
+import com.codename1.ui.SelectableIconHolder;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextHolder;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.plaf.UIManager;
+
+import static com.codename1.ui.ComponentSelector.$;
+
+/// A powerful button like component that allows multiple rows/and an icon to be added
+/// every row/icon can have its own UIID. Internally the multi-button is a container with
+/// a lead component. Up to 4 rows are supported.
+///
+/// It's like `MultiButton`, but it breaks lines.
+///
+/// ```java
+/// Form hi = new Form(&quot;Test SpanMultiButton&quot;, BoxLayout.y());
+///
+/// Image icon = FontImage.createMaterial(FontImage.MATERIAL_WARNING, &quot;Button&quot;, 3.0f);
+/// Image emblem = FontImage.createMaterial(FontImage.MATERIAL_ARROW_FORWARD, &quot;Button&quot;, 3.0f);
+///
+/// SpanMultiButton twoLinesNoIcon = new SpanMultiButton(&quot;SpanMultiButton&quot;);
+/// twoLinesNoIcon.setTextLine2(&quot;Line 2 long - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.&quot;);
+/// SpanMultiButton oneLineIconEmblem = new SpanMultiButton(&quot;Icon + Emblem&quot;);
+/// oneLineIconEmblem.setIcon(icon);
+/// oneLineIconEmblem.setEmblem(emblem);
+/// SpanMultiButton twoLinesIconEmblem = new SpanMultiButton(&quot;Icon + Emblem&quot;);
+/// twoLinesIconEmblem.setIcon(icon);
+/// twoLinesIconEmblem.setEmblem(emblem);
+/// twoLinesIconEmblem.setTextLine2(&quot;Line 2 long - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.&quot;);
+///
+/// SpanMultiButton twoLinesIconEmblemHorizontal = new SpanMultiButton(&quot;Icon + Emblem&quot;);
+/// twoLinesIconEmblemHorizontal.setIcon(icon);
+/// twoLinesIconEmblemHorizontal.setEmblem(emblem);
+/// twoLinesIconEmblemHorizontal.setTextLine2(&quot;Line 2 Horizontal&quot;);
+/// twoLinesIconEmblemHorizontal.setHorizontalLayout(true);
+///
+/// SpanMultiButton twoLinesIconCheckBox = new SpanMultiButton(&quot;CheckBox&quot;);
+/// twoLinesIconCheckBox.setIcon(icon);
+/// twoLinesIconCheckBox.setCheckBox(true);
+/// twoLinesIconCheckBox.setTextLine2(&quot;Line 2 long - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.&quot;);
+///
+/// SpanMultiButton fourLinesIcon = new SpanMultiButton(&quot;With Icon&quot;);
+/// fourLinesIcon.setIcon(icon);
+/// fourLinesIcon.setTextLine2(&quot;Line 2 - Lorem ipsum dolor sit amet, consectetur adipiscing elit&quot;);
+/// fourLinesIcon.setTextLine3(&quot;Line 3 - sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.&quot;);
+/// fourLinesIcon.setTextLine4(&quot;Line 4 - Excepteur sint occaecat cupidatat non proident&quot;);
+///
+/// oneLineIconEmblem.addActionListener(l -&gt; ToastBar.showInfoMessage(&quot;Hello 1&quot;));
+/// twoLinesNoIcon.addActionListener(l -&gt; ToastBar.showInfoMessage(&quot;Hello 2&quot;));
+/// twoLinesIconEmblem.addActionListener(l -&gt; ToastBar.showInfoMessage(&quot;Hello 3&quot;));
+/// twoLinesIconEmblemHorizontal.addActionListener(l -&gt; ToastBar.showInfoMessage(&quot;Hello 4&quot;));
+/// twoLinesIconCheckBox.addActionListener(l -&gt; ToastBar.showInfoMessage(&quot;Hello 5&quot;));
+/// fourLinesIcon.addActionListener(l -&gt; ToastBar.showInfoMessage(&quot;Hello 6&quot;));
+///
+/// hi.add(oneLineIconEmblem).
+/// add(twoLinesNoIcon).
+/// add(twoLinesIconEmblem).
+/// add(twoLinesIconEmblemHorizontal).
+/// add(twoLinesIconCheckBox).
+/// add(fourLinesIcon);
+/// hi.show();
+/// ```
+///
+/// @author Francesco Galgani
+///
+/// #### See also
+///
+/// - MultiButton
+public class SpanMultiButton extends Container implements ActionSource, SelectableIconHolder, TextHolder {
+<span class="fc" id="L108">    private final TextArea firstRow = new TextArea();</span>
+<span class="fc" id="L109">    private final TextArea secondRow = new TextArea();</span>
+<span class="fc" id="L110">    private final TextArea thirdRow = new TextArea();</span>
+<span class="fc" id="L111">    private final TextArea forthRow = new TextArea();</span>
+<span class="fc" id="L112">    private final Button icon = new Button();</span>
+<span class="fc" id="L113">    private Button emblem = new Button();</span>
+    private boolean invert;
+    private String group;
+    private boolean shouldLocalize;
+    private int gap;
+
+    /// Initializes a multibutton with the first line of text
+    ///
+    /// #### Parameters
+    ///
+    /// - `line1`: first line of text
+    public SpanMultiButton(String line1) {
+<span class="fc" id="L125">        this();</span>
+<span class="fc" id="L126">        setTextLine1(line1);</span>
+<span class="fc" id="L127">    }</span>
+
+    /// Default constructor allowing the designer to create an instance of this class
+<span class="fc" id="L130">    public SpanMultiButton() {</span>
+<span class="fc" id="L131">        setUIIDFinal(&quot;MultiButton&quot;);</span>
+
+<span class="fc" id="L133">        firstRow.setActAsLabel(true);</span>
+<span class="fc" id="L134">        firstRow.setGrowByContent(true);</span>
+<span class="fc" id="L135">        firstRow.setUIID(&quot;MultiLine1&quot;);</span>
+<span class="fc" id="L136">        firstRow.setEditable(false);</span>
+<span class="fc" id="L137">        firstRow.setFocusable(false);</span>
+
+<span class="fc" id="L139">        secondRow.setActAsLabel(true);</span>
+<span class="fc" id="L140">        secondRow.setGrowByContent(true);</span>
+<span class="fc" id="L141">        secondRow.setUIID(&quot;MultiLine2&quot;);</span>
+<span class="fc" id="L142">        secondRow.setEditable(false);</span>
+<span class="fc" id="L143">        secondRow.setFocusable(false);</span>
+
+<span class="fc" id="L145">        thirdRow.setActAsLabel(true);</span>
+<span class="fc" id="L146">        thirdRow.setGrowByContent(true);</span>
+<span class="fc" id="L147">        thirdRow.setUIID(&quot;MultiLine3&quot;);</span>
+<span class="fc" id="L148">        thirdRow.setEditable(false);</span>
+<span class="fc" id="L149">        thirdRow.setFocusable(false);</span>
+
+<span class="fc" id="L151">        forthRow.setActAsLabel(true);</span>
+<span class="fc" id="L152">        forthRow.setGrowByContent(true);</span>
+<span class="fc" id="L153">        forthRow.setUIID(&quot;MultiLine4&quot;);</span>
+<span class="fc" id="L154">        forthRow.setEditable(false);</span>
+<span class="fc" id="L155">        forthRow.setFocusable(false);</span>
+
+<span class="fc" id="L157">        secondRow.setHidden(true);</span>
+<span class="fc" id="L158">        thirdRow.setHidden(true);</span>
+<span class="fc" id="L159">        forthRow.setHidden(true);</span>
+
+<span class="fc" id="L161">        setLayout(new BorderLayout());</span>
+<span class="fc" id="L162">        setFocusable(true);</span>
+<span class="fc" id="L163">        BorderLayout bl = new BorderLayout();</span>
+        //bl.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+<span class="fc" id="L165">        Container iconContainer = new Container(bl);</span>
+<span class="fc" id="L166">        iconContainer.addComponent(BorderLayout.CENTER, icon);</span>
+<span class="fc" id="L167">        Container labels = new Container(new BoxLayout(BoxLayout.Y_AXIS));</span>
+<span class="fc" id="L168">        Container labelsBorder = new Container(new BorderLayout());</span>
+<span class="fc" id="L169">        labelsBorder.addComponent(BorderLayout.SOUTH, labels);</span>
+<span class="fc" id="L170">        addComponent(BorderLayout.CENTER, labelsBorder);</span>
+<span class="fc" id="L171">        addComponent(BorderLayout.WEST, iconContainer);</span>
+<span class="fc" id="L172">        bl = new BorderLayout();</span>
+        //bl.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+<span class="fc" id="L174">        Container emblemContainer = new Container(bl);</span>
+<span class="fc" id="L175">        emblemContainer.addComponent(BorderLayout.CENTER, emblem);</span>
+<span class="fc" id="L176">        addComponent(BorderLayout.EAST, emblemContainer);</span>
+<span class="fc" id="L177">        labelsBorder.addComponent(BorderLayout.CENTER, firstRow);</span>
+<span class="fc" id="L178">        labels.addComponent(secondRow);</span>
+<span class="fc" id="L179">        labels.addComponent(thirdRow);</span>
+<span class="fc" id="L180">        labels.addComponent(forthRow);</span>
+<span class="fc" id="L181">        firstRow.setName(&quot;Line1&quot;);</span>
+<span class="fc" id="L182">        secondRow.setName(&quot;Line2&quot;);</span>
+<span class="fc" id="L183">        thirdRow.setName(&quot;Line3&quot;);</span>
+<span class="fc" id="L184">        forthRow.setName(&quot;Line4&quot;);</span>
+<span class="fc" id="L185">        icon.setName(&quot;icon&quot;);</span>
+<span class="fc" id="L186">        icon.setUIID(&quot;Label&quot;);</span>
+<span class="fc" id="L187">        emblem.setName(&quot;emblem&quot;);</span>
+<span class="fc" id="L188">        emblem.setUIID(&quot;Emblem&quot;);</span>
+<span class="fc" id="L189">        setLeadComponent(emblem);</span>
+<span class="fc" id="L190">        Image i = UIManager.getInstance().getThemeImageConstant(&quot;defaultEmblemImage&quot;);</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (i != null) {</span>
+<span class="nc" id="L192">            emblem.setIcon(i);</span>
+        }
+<span class="fc" id="L194">        icon.bindStateTo(emblem);</span>
+<span class="fc" id="L195">        updateGap();</span>
+<span class="fc" id="L196">    }</span>
+
+    /// Indicates if the lines are grouped together on this button
+    public boolean isLinesTogetherMode() {
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        return firstRow.getParent() == secondRow.getParent(); //NOPMD CompareObjectsWithEquals</span>
+    }
+
+    /// Changes the layout so the lines of the button are grouped together
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: true to group the lines together
+    public void setLinesTogetherMode(boolean l) {
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (l != isLinesTogetherMode()) {</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">            if (l) {</span>
+<span class="fc" id="L211">                firstRow.getParent().removeComponent(firstRow);</span>
+<span class="fc" id="L212">                Container p = secondRow.getParent();</span>
+<span class="fc" id="L213">                p.addComponent(0, firstRow);</span>
+<span class="fc" id="L214">                Container pp = p.getParent();</span>
+<span class="fc" id="L215">                pp.removeComponent(p);</span>
+<span class="fc" id="L216">                pp.addComponent(BorderLayout.CENTER, p);</span>
+<span class="fc" id="L217">            } else {</span>
+<span class="nc" id="L218">                secondRow.getParent().removeComponent(secondRow);</span>
+<span class="nc" id="L219">                thirdRow.getParent().addComponent(0, secondRow);</span>
+            }
+        }
+<span class="fc" id="L222">    }</span>
+
+    /// Allows us to gain direct access to the icon component so we can set it directly without going
+    /// via the other methods, this is especially useful for classes such as the ImageDownloadService
+    /// which can then update the icon seamlessly.
+    ///
+    /// #### Returns
+    ///
+    /// the component used internally to represent the icon
+    public Label getIconComponent() {
+<span class="fc" id="L232">        return icon;</span>
+    }
+
+    /// Adds an action listener
+    ///
+    /// #### Parameters
+    ///
+    /// - `al`: the action listener
+    @Override
+    public void addActionListener(ActionListener al) {
+<span class="fc" id="L242">        emblem.addActionListener(al);</span>
+<span class="fc" id="L243">    }</span>
+
+    /// Removes an action listener
+    ///
+    /// #### Parameters
+    ///
+    /// - `al`: the action listener
+    @Override
+    public void removeActionListener(ActionListener al) {
+<span class="fc" id="L252">        emblem.removeActionListener(al);</span>
+<span class="fc" id="L253">    }</span>
+
+    /// {@inheritDoc }
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    @Override
+    public void addLongPressListener(ActionListener l) {
+<span class="nc" id="L262">        emblem.addLongPressListener(l);</span>
+<span class="nc" id="L263">    }</span>
+
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    @Override
+    public void removeLongPressListener(ActionListener l) {
+<span class="nc" id="L272">        emblem.removeLongPressListener(l);</span>
+<span class="nc" id="L273">    }</span>
+
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    @Override
+    public void addPointerPressedListener(ActionListener l) {
+<span class="nc" id="L282">        emblem.addPointerPressedListener(l);</span>
+<span class="nc" id="L283">    }</span>
+
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    @Override
+    public void removePointerPressedListener(ActionListener l) {
+<span class="nc" id="L292">        emblem.removePointerPressedListener(l);</span>
+<span class="nc" id="L293">    }</span>
+
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    @Override
+    public void addPointerReleasedListener(ActionListener l) {
+<span class="nc" id="L302">        emblem.addPointerReleasedListener(l);</span>
+<span class="nc" id="L303">    }</span>
+
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    @Override
+    public void removePointerReleasedListener(ActionListener l) {
+<span class="nc" id="L312">        emblem.removePointerReleasedListener(l);</span>
+<span class="nc" id="L313">    }</span>
+
+    /// Returns the command for the emblem
+    ///
+    /// #### Returns
+    ///
+    /// the command instance
+    public Command getCommand() {
+<span class="nc" id="L321">        return emblem.getCommand();</span>
+    }
+
+    /// Sets the command for the component, it doesn't affe
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the command
+    public void setCommand(Command c) {
+<span class="nc" id="L330">        Image img = emblem.getIcon();</span>
+<span class="nc" id="L331">        emblem.setCommand(c);</span>
+<span class="nc" id="L332">        emblem.setIcon(img);</span>
+<span class="nc" id="L333">        emblem.setText(&quot;&quot;);</span>
+<span class="nc" id="L334">    }</span>
+
+    /// Returns true if this is a checkbox button
+    ///
+    /// #### Returns
+    ///
+    /// true for a checkbox button
+    public boolean isCheckBox() {
+<span class="fc" id="L342">        return emblem instanceof CheckBox;</span>
+    }
+
+    /// Turns the multi-button into a checkbox multi-button
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true for a checkbox multi-button
+    public void setCheckBox(boolean b) {
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">        if (b != isCheckBox()) {</span>
+<span class="fc" id="L352">            Container par = emblem.getParent();</span>
+<span class="fc" id="L353">            Button old = emblem;</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">            if (b) {</span>
+<span class="fc" id="L355">                emblem = new CheckBox();</span>
+            } else {
+<span class="fc" id="L357">                emblem = new Button();</span>
+            }
+<span class="fc" id="L359">            emblem.setUIID(old.getUIID());</span>
+<span class="fc" id="L360">            emblem.setName(old.getName());</span>
+<span class="fc" id="L361">            java.util.List actionListeners = (java.util.List) old.getListeners();</span>
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">            if (actionListeners != null) {</span>
+<span class="nc bnc" id="L363" title="All 2 branches missed.">                for (int iter = 0; iter &lt; actionListeners.size(); iter++) {</span>
+<span class="nc" id="L364">                    emblem.addActionListener((ActionListener) actionListeners.get(iter));</span>
+                }
+            }
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">            if (old.getCommand() != null) {</span>
+<span class="nc" id="L368">                Image img = old.getIcon();</span>
+<span class="nc" id="L369">                emblem.setCommand(old.getCommand());</span>
+<span class="nc" id="L370">                emblem.setText(&quot;&quot;);</span>
+<span class="nc" id="L371">                emblem.setIcon(img);</span>
+<span class="nc" id="L372">            } else {</span>
+<span class="fc" id="L373">                emblem.setText(old.getText());</span>
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">                if (old.getIcon() != null) {</span>
+<span class="nc" id="L375">                    emblem.setIcon(old.getIcon());</span>
+                }
+            }
+<span class="fc" id="L378">            par.replace(old, emblem, null);</span>
+<span class="fc" id="L379">            setLeadComponent(emblem);</span>
+        }
+<span class="fc" id="L381">    }</span>
+
+    /// Returns true if this is a radio button
+    ///
+    /// #### Returns
+    ///
+    /// true for a radio button
+    public boolean isRadioButton() {
+<span class="fc" id="L389">        return emblem instanceof RadioButton;</span>
+    }
+
+    /// Turns the multi-button into a radio multi-button
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true for a radio multi-button
+    public void setRadioButton(boolean b) {
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">        if (b != isRadioButton()) {</span>
+<span class="fc" id="L399">            Container par = emblem.getParent();</span>
+<span class="fc" id="L400">            Button old = emblem;</span>
+<span class="fc bfc" id="L401" title="All 2 branches covered.">            if (b) {</span>
+<span class="fc" id="L402">                emblem = new RadioButton();</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">                if (group != null) {</span>
+<span class="nc" id="L404">                    ((RadioButton) emblem).setGroup(group);</span>
+                }
+            } else {
+<span class="fc" id="L407">                emblem = new Button();</span>
+            }
+<span class="fc" id="L409">            emblem.setName(old.getName());</span>
+<span class="fc" id="L410">            emblem.setUIID(old.getUIID());</span>
+<span class="fc" id="L411">            java.util.List actionListeners = (java.util.List) old.getListeners();</span>
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">            if (actionListeners != null) {</span>
+<span class="nc bnc" id="L413" title="All 2 branches missed.">                for (int iter = 0; iter &lt; actionListeners.size(); iter++) {</span>
+<span class="nc" id="L414">                    emblem.addActionListener((ActionListener) actionListeners.get(iter));</span>
+                }
+            }
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">            if (old.getCommand() != null) {</span>
+<span class="nc" id="L418">                Image img = old.getIcon();</span>
+<span class="nc" id="L419">                emblem.setCommand(old.getCommand());</span>
+<span class="nc" id="L420">                emblem.setText(&quot;&quot;);</span>
+<span class="nc" id="L421">                emblem.setIcon(img);</span>
+            }
+<span class="fc" id="L423">            par.replace(old, emblem, null);</span>
+<span class="fc" id="L424">            setLeadComponent(emblem);</span>
+<span class="fc" id="L425">            emblem.setShowEvenIfBlank(true);</span>
+        }
+<span class="fc" id="L427">    }</span>
+
+    /// Returns true if the checkbox/radio button is selected
+    ///
+    /// #### Returns
+    ///
+    /// true if the checkbox/radio button is selected
+    public boolean isSelected() {
+<span class="pc bpc" id="L435" title="2 of 6 branches missed.">        return (emblem instanceof RadioButton || emblem instanceof CheckBox) &amp;&amp; emblem.isSelected();</span>
+    }
+
+    /// Toggles the selected state for the radio button/check box modes
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true for checked false for unchecked
+    public void setSelected(boolean b) {
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">        if (emblem instanceof RadioButton) {</span>
+<span class="nc" id="L445">            ((RadioButton) emblem).setSelected(b);</span>
+<span class="nc" id="L446">            return;</span>
+        }
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">        if (emblem instanceof CheckBox) {</span>
+<span class="fc" id="L449">            ((CheckBox) emblem).setSelected(b);</span>
+        }
+<span class="fc" id="L451">    }</span>
+
+    /// Indicates whether the first two labels are be side by side
+    ///
+    /// #### Returns
+    ///
+    /// true if the first two labels are side by side
+    public boolean isHorizontalLayout() {
+<span class="fc" id="L459">        return secondRow.getParent().getLayout() instanceof FlowLayout;</span>
+    }
+
+    /// Indicates the first two labels should be side by side
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to place the first two labels side by side
+    public void setHorizontalLayout(boolean b) {
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">        if (isHorizontalLayout() != b) {</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">            if (isHorizontalLayout()) {</span>
+<span class="fc" id="L470">                secondRow.getParent().getParent().removeComponent(secondRow.getParent());</span>
+            }
+<span class="fc" id="L472">            secondRow.getParent().removeComponent(secondRow);</span>
+<span class="fc bfc" id="L473" title="All 2 branches covered.">            if (b) {</span>
+<span class="fc" id="L474">                Container wrapper = new Container();</span>
+<span class="fc" id="L475">                Container c = firstRow.getParent();</span>
+<span class="fc" id="L476">                wrapper.addComponent(secondRow);</span>
+<span class="fc" id="L477">                c.addComponent(BorderLayout.EAST, wrapper);</span>
+<span class="fc" id="L478">            } else {</span>
+<span class="fc" id="L479">                Container c = thirdRow.getParent();</span>
+<span class="fc" id="L480">                c.addComponent(0, secondRow);</span>
+            }
+        }
+<span class="fc" id="L483">    }</span>
+
+    /// Inverts the order of the first two entries so the second line appears first.
+    /// This only works in horizontal mode!
+    ///
+    /// #### Returns
+    ///
+    /// true when the second row entry should be placed before the first entry
+    public boolean isInvertFirstTwoEntries() {
+<span class="fc" id="L492">        return invert;</span>
+    }
+
+    /// Inverts the order of the first two entries so the second line appears first.
+    /// This only works in horizontal mode!
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to place the second row entry as the first entry
+    public void setInvertFirstTwoEntries(boolean b) {
+<span class="pc bpc" id="L502" title="1 of 2 branches missed.">        if (b != invert) {</span>
+<span class="fc" id="L503">            invert = b;</span>
+<span class="fc bfc" id="L504" title="All 2 branches covered.">            if (isHorizontalLayout()) {</span>
+<span class="fc" id="L505">                Container c = firstRow.getParent();</span>
+<span class="fc" id="L506">                c.removeComponent(secondRow);</span>
+<span class="pc bpc" id="L507" title="1 of 2 branches missed.">                if (invert) {</span>
+<span class="fc" id="L508">                    c.addComponent(BorderLayout.WEST, secondRow);</span>
+                } else {
+<span class="nc" id="L510">                    c.addComponent(BorderLayout.EAST, secondRow);</span>
+                }
+            }
+        }
+<span class="fc" id="L514">    }</span>
+
+    /// Returns the content of the row
+    ///
+    /// #### Returns
+    ///
+    /// the text
+    public String getTextLine1() {
+<span class="fc" id="L522">        return firstRow.getText();</span>
+    }
+
+    /// Sets the content of the row
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: text to set
+    public void setTextLine1(String t) {
+<span class="pc bpc" id="L531" title="1 of 2 branches missed.">        t = shouldLocalize ? getUIManager().localize(t, t) : t;</span>
+<span class="fc" id="L532">        firstRow.setText(t);</span>
+<span class="fc" id="L533">        firstRow.setColumns(t.length() + 1);</span>
+<span class="fc" id="L534">        firstRow.setHidden(false);</span>
+<span class="fc" id="L535">    }</span>
+
+    /// Returns the name of the row
+    ///
+    /// #### Returns
+    ///
+    /// the name
+    public String getNameLine1() {
+<span class="fc" id="L543">        return firstRow.getName();</span>
+    }
+
+    /// Sets the name of the row (important for use in generic renderers)
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: name to set
+    public void setNameLine1(String t) {
+<span class="fc" id="L552">        firstRow.setName(t);</span>
+<span class="fc" id="L553">    }</span>
+
+    /// Returns the UIID of the row
+    ///
+    /// #### Returns
+    ///
+    /// the UIID
+    public String getUIIDLine1() {
+<span class="fc" id="L561">        return firstRow.getUIID();</span>
+    }
+
+    /// Sets the UIID of the row
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: UIID to set
+    public void setUIIDLine1(String t) {
+<span class="fc" id="L570">        firstRow.setUIID(t);</span>
+<span class="fc" id="L571">    }</span>
+
+    /// Returns the content of the row
+    ///
+    /// #### Returns
+    ///
+    /// the text
+    public String getTextLine2() {
+<span class="fc" id="L579">        return secondRow.getText();</span>
+    }
+
+    /// Sets the content of the row
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: text to set
+    public void setTextLine2(String t) {
+<span class="pc bpc" id="L588" title="1 of 2 branches missed.">        t = shouldLocalize ? getUIManager().localize(t, t) : t;</span>
+<span class="fc" id="L589">        secondRow.setText(t);</span>
+<span class="fc" id="L590">        secondRow.setColumns(t.length() + 1);</span>
+<span class="fc" id="L591">        secondRow.setHidden(false);</span>
+<span class="fc" id="L592">    }</span>
+
+    /// Returns the name of the row
+    ///
+    /// #### Returns
+    ///
+    /// the name
+    public String getNameLine2() {
+<span class="fc" id="L600">        return secondRow.getName();</span>
+    }
+
+    /// Sets the name of the row (important for use in generic renderers
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: name to set
+    public void setNameLine2(String t) {
+<span class="fc" id="L609">        secondRow.setName(t);</span>
+<span class="fc" id="L610">    }</span>
+
+    /// Returns the UIID of the row
+    ///
+    /// #### Returns
+    ///
+    /// the UIID
+    public String getUIIDLine2() {
+<span class="fc" id="L618">        return secondRow.getUIID();</span>
+    }
+
+    /// Sets the UIID of the row
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: UIID to set
+    public void setUIIDLine2(String t) {
+<span class="fc" id="L627">        secondRow.setUIID(t);</span>
+<span class="fc" id="L628">    }</span>
+
+    /// Removes the content of the row
+    public void removeTextLine1() {
+<span class="fc" id="L632">        firstRow.setText(&quot;&quot;);</span>
+<span class="fc" id="L633">        firstRow.setHidden(true);</span>
+<span class="fc" id="L634">    }</span>
+
+    /// Removes the content of the row
+    public void removeTextLine2() {
+<span class="fc" id="L638">        secondRow.setText(&quot;&quot;);</span>
+<span class="fc" id="L639">        secondRow.setHidden(true);</span>
+<span class="fc" id="L640">    }</span>
+
+    /// Removes the content of the row
+    public void removeTextLine3() {
+<span class="fc" id="L644">        thirdRow.setText(&quot;&quot;);</span>
+<span class="fc" id="L645">        thirdRow.setHidden(true);</span>
+<span class="fc" id="L646">    }</span>
+
+    /// Removes the content of the row
+    public void removeTextLine4() {
+<span class="fc" id="L650">        forthRow.setText(&quot;&quot;);</span>
+<span class="fc" id="L651">        forthRow.setHidden(true);</span>
+<span class="fc" id="L652">    }</span>
+
+    /// Returns the content of the row
+    ///
+    /// #### Returns
+    ///
+    /// the text
+    public String getTextLine3() {
+<span class="fc" id="L660">        return thirdRow.getText();</span>
+    }
+
+    /// Sets the content of the row
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: text to set
+    public void setTextLine3(String t) {
+<span class="pc bpc" id="L669" title="1 of 2 branches missed.">        t = shouldLocalize ? getUIManager().localize(t, t) : t;</span>
+<span class="fc" id="L670">        thirdRow.setText(t);</span>
+<span class="fc" id="L671">        thirdRow.setColumns(t.length() + 1);</span>
+<span class="fc" id="L672">        thirdRow.setHidden(false);</span>
+<span class="fc" id="L673">    }</span>
+
+    /// Returns the name of the row
+    ///
+    /// #### Returns
+    ///
+    /// the name
+    public String getNameLine3() {
+<span class="fc" id="L681">        return thirdRow.getName();</span>
+    }
+
+    /// Sets the name of the row (important for use in generic renderers
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: name to set
+    public void setNameLine3(String t) {
+<span class="fc" id="L690">        thirdRow.setName(t);</span>
+<span class="fc" id="L691">    }</span>
+
+    /// Returns the UIID of the row
+    ///
+    /// #### Returns
+    ///
+    /// the UIID
+    public String getUIIDLine3() {
+<span class="fc" id="L699">        return thirdRow.getUIID();</span>
+    }
+
+    /// Sets the UIID of the row
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: UIID to set
+    public void setUIIDLine3(String t) {
+<span class="fc" id="L708">        thirdRow.setUIID(t);</span>
+<span class="fc" id="L709">    }</span>
+
+    /// Returns the content of the row
+    ///
+    /// #### Returns
+    ///
+    /// the text
+    public String getTextLine4() {
+<span class="fc" id="L717">        return forthRow.getText();</span>
+    }
+
+    /// Sets the content of the row
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: text to set
+    public void setTextLine4(String t) {
+<span class="pc bpc" id="L726" title="1 of 2 branches missed.">        t = shouldLocalize ? getUIManager().localize(t, t) : t;</span>
+<span class="fc" id="L727">        forthRow.setText(t);</span>
+<span class="fc" id="L728">        forthRow.setColumns(t.length() + 1);</span>
+<span class="fc" id="L729">        forthRow.setHidden(false);</span>
+<span class="fc" id="L730">    }</span>
+
+    /// Returns the name of the row
+    ///
+    /// #### Returns
+    ///
+    /// the name
+    public String getNameLine4() {
+<span class="fc" id="L738">        return forthRow.getName();</span>
+    }
+
+    /// Sets the name of the row (important for use in generic renderers
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: name to set
+    public void setNameLine4(String t) {
+<span class="fc" id="L747">        forthRow.setName(t);</span>
+<span class="fc" id="L748">    }</span>
+
+    /// Returns the UIID of the row
+    ///
+    /// #### Returns
+    ///
+    /// the UIID
+    public String getUIIDLine4() {
+<span class="fc" id="L756">        return forthRow.getUIID();</span>
+    }
+
+    /// Sets the UIID of the row
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: UIID to set
+    public void setUIIDLine4(String t) {
+<span class="fc" id="L765">        forthRow.setUIID(t);</span>
+<span class="fc" id="L766">    }</span>
+
+    /// Returns the icon image
+    ///
+    /// #### Returns
+    ///
+    /// the image instance
+    @Override
+    public Image getIcon() {
+<span class="fc" id="L775">        return icon.getIcon();</span>
+    }
+
+    /// Sets the icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the icon
+    @Override
+    public void setIcon(Image i) {
+<span class="fc" id="L785">        icon.setIcon(i);</span>
+<span class="fc" id="L786">        updateGap();</span>
+<span class="fc" id="L787">    }</span>
+
+    /// Returns the emblem image
+    ///
+    /// #### Returns
+    ///
+    /// the image instance
+    public Image getEmblem() {
+<span class="fc" id="L795">        return emblem.getIcon();</span>
+    }
+
+    /// Sets the emblem
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the icon
+    public void setEmblem(Image i) {
+<span class="fc" id="L804">        emblem.setIcon(i);</span>
+<span class="fc" id="L805">    }</span>
+
+    /// Returns the icon position based on border layout constraints
+    ///
+    /// #### Returns
+    ///
+    /// position either North/South/East/West
+    public String getIconPosition() {
+<span class="fc" id="L813">        return (String) getLayout().getComponentConstraint(icon.getParent());</span>
+    }
+
+    /// Sets the icon position based on border layout constraints
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: position either North/South/East/West
+    public void setIconPosition(String t) {
+<span class="fc" id="L822">        String ip = getEmblemPosition();</span>
+<span class="pc bpc" id="L823" title="2 of 4 branches missed.">        if (ip != null &amp;&amp; ip.equals(t)) {</span>
+<span class="nc" id="L824">            String ep = getIconPosition();</span>
+<span class="nc" id="L825">            removeComponent(icon.getParent());</span>
+<span class="nc" id="L826">            setEmblemPosition(ep);</span>
+<span class="nc" id="L827">        } else {</span>
+<span class="fc" id="L828">            removeComponent(icon.getParent());</span>
+        }
+<span class="fc" id="L830">        addComponent(t, icon.getParent());</span>
+<span class="fc" id="L831">        updateGap();</span>
+<span class="fc" id="L832">        revalidateLater();</span>
+<span class="fc" id="L833">    }</span>
+
+    /// Returns the emblem position based on border layout constraints
+    ///
+    /// #### Returns
+    ///
+    /// position either North/South/East/West
+    public String getEmblemPosition() {
+<span class="fc" id="L841">        return (String) getLayout().getComponentConstraint(emblem.getParent());</span>
+    }
+
+    /// Sets the emblem position based on border layout constraints
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: position either North/South/East/West
+    public void setEmblemPosition(String t) {
+<span class="fc" id="L850">        String ip = getIconPosition();</span>
+<span class="pc bpc" id="L851" title="2 of 4 branches missed.">        if (ip != null &amp;&amp; ip.equals(t)) {</span>
+<span class="nc" id="L852">            String ep = getEmblemPosition();</span>
+<span class="nc" id="L853">            removeComponent(emblem.getParent());</span>
+<span class="nc" id="L854">            setIconPosition(ep);</span>
+<span class="nc" id="L855">        } else {</span>
+<span class="fc" id="L856">            removeComponent(emblem.getParent());</span>
+        }
+<span class="fc" id="L858">        addComponent(t, emblem.getParent());</span>
+<span class="fc" id="L859">        revalidateLater();</span>
+<span class="fc" id="L860">    }</span>
+
+    /// Returns the name of the icon
+    ///
+    /// #### Returns
+    ///
+    /// the name
+    public String getIconName() {
+<span class="nc" id="L868">        return icon.getName();</span>
+    }
+
+    /// Sets the name of the icon (important for use in generic renderers
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: name to set
+    public void setIconName(String t) {
+<span class="nc" id="L877">        icon.setName(t);</span>
+<span class="nc" id="L878">    }</span>
+
+    /// Returns the UIID of the Icon
+    ///
+    /// #### Returns
+    ///
+    /// the UIID
+    @Override
+    public String getIconUIID() {
+<span class="fc" id="L887">        return icon.getUIID();</span>
+    }
+
+    /// Sets the UIID of the icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: UIID to set
+    @Override
+    public void setIconUIID(String t) {
+<span class="fc" id="L897">        icon.setUIID(t);</span>
+<span class="fc" id="L898">        updateGap();</span>
+<span class="fc" id="L899">    }</span>
+
+    /// Returns the name of the emblem
+    ///
+    /// #### Returns
+    ///
+    /// the name
+    public String getEmblemName() {
+<span class="nc" id="L907">        return emblem.getName();</span>
+    }
+
+    /// Sets the name of the emblem (important for use in generic renderers
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: name to set
+    public void setEmblemName(String t) {
+<span class="nc" id="L916">        emblem.setName(t);</span>
+<span class="nc" id="L917">    }</span>
+
+    /// Returns the UIID of the Emblem
+    ///
+    /// #### Returns
+    ///
+    /// the UIID
+    public String getEmblemUIID() {
+<span class="fc" id="L925">        return emblem.getUIID();</span>
+    }
+
+    /// Sets the UIID of the emblem
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: UIID to set
+    public void setEmblemUIID(String t) {
+<span class="fc" id="L934">        emblem.setUIID(t);</span>
+<span class="fc" id="L935">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyNames() {
+<span class="fc" id="L940">        return new String[]{</span>
+                &quot;line1&quot;, &quot;line2&quot;, &quot;line3&quot;, &quot;line4&quot;, &quot;name1&quot;, &quot;name2&quot;, &quot;name3&quot;, &quot;name4&quot;,
+                &quot;uiid1&quot;, &quot;uiid2&quot;, &quot;uiid3&quot;, &quot;uiid4&quot;, &quot;icon&quot;, &quot;iconName&quot;, &quot;iconUiid&quot;, &quot;iconPosition&quot;,
+                &quot;emblem&quot;, &quot;emblemName&quot;, &quot;emblemUiid&quot;, &quot;emblemPosition&quot;, &quot;horizontalLayout&quot;,
+                &quot;invertFirstTwoEntries&quot;, &quot;checkBox&quot;, &quot;radioButton&quot;, &quot;group&quot;, &quot;selected&quot;,
+                &quot;maskName&quot;
+        };
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getPropertyTypes() {
+<span class="fc" id="L952">        return new Class[]{</span>
+                String.class, // line1
+                String.class, // line2
+                String.class, // line3
+                String.class, // line4
+                String.class, // name1
+                String.class, // name2
+                String.class, // name3
+                String.class, // name4
+                String.class, // uiid1
+                String.class, // uiid2
+                String.class, // uiid3
+                String.class, // uiid4
+                Image.class, // icon
+                String.class, // iconName
+                String.class, // iconUiid
+                String.class, // iconPosition
+                Image.class, // emblem
+                String.class, // emblemName
+                String.class, // emblemUiid
+                String.class, // emblemPosition
+                Boolean.class,
+                Boolean.class,
+                Boolean.class,
+                Boolean.class,
+                String.class, // group
+                Boolean.class, // selected
+                String.class
+        };
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="pc bpc" id="L986" title="1 of 2 branches missed.">        if (&quot;line1&quot;.equals(name)) {</span>
+<span class="fc" id="L987">            return getTextLine1();</span>
+        }
+<span class="nc bnc" id="L989" title="All 2 branches missed.">        if (&quot;line2&quot;.equals(name)) {</span>
+<span class="nc" id="L990">            return getTextLine2();</span>
+        }
+<span class="nc bnc" id="L992" title="All 2 branches missed.">        if (&quot;line3&quot;.equals(name)) {</span>
+<span class="nc" id="L993">            return getTextLine3();</span>
+        }
+<span class="nc bnc" id="L995" title="All 2 branches missed.">        if (&quot;line4&quot;.equals(name)) {</span>
+<span class="nc" id="L996">            return getTextLine4();</span>
+        }
+<span class="nc bnc" id="L998" title="All 2 branches missed.">        if (&quot;name1&quot;.equals(name)) {</span>
+<span class="nc" id="L999">            return getNameLine1();</span>
+        }
+<span class="nc bnc" id="L1001" title="All 2 branches missed.">        if (&quot;name2&quot;.equals(name)) {</span>
+<span class="nc" id="L1002">            return getNameLine2();</span>
+        }
+<span class="nc bnc" id="L1004" title="All 2 branches missed.">        if (&quot;name3&quot;.equals(name)) {</span>
+<span class="nc" id="L1005">            return getNameLine3();</span>
+        }
+<span class="nc bnc" id="L1007" title="All 2 branches missed.">        if (&quot;name4&quot;.equals(name)) {</span>
+<span class="nc" id="L1008">            return getNameLine4();</span>
+        }
+<span class="nc bnc" id="L1010" title="All 2 branches missed.">        if (&quot;uiid1&quot;.equals(name)) {</span>
+<span class="nc" id="L1011">            return getUIIDLine1();</span>
+        }
+<span class="nc bnc" id="L1013" title="All 2 branches missed.">        if (&quot;uiid2&quot;.equals(name)) {</span>
+<span class="nc" id="L1014">            return getUIIDLine2();</span>
+        }
+<span class="nc bnc" id="L1016" title="All 2 branches missed.">        if (&quot;uiid3&quot;.equals(name)) {</span>
+<span class="nc" id="L1017">            return getUIIDLine3();</span>
+        }
+<span class="nc bnc" id="L1019" title="All 2 branches missed.">        if (&quot;uiid4&quot;.equals(name)) {</span>
+<span class="nc" id="L1020">            return getUIIDLine4();</span>
+        }
+<span class="nc bnc" id="L1022" title="All 2 branches missed.">        if (&quot;icon&quot;.equals(name)) {</span>
+<span class="nc" id="L1023">            return getIcon();</span>
+        }
+<span class="nc bnc" id="L1025" title="All 2 branches missed.">        if (&quot;iconName&quot;.equals(name)) {</span>
+<span class="nc" id="L1026">            return getIconName();</span>
+        }
+<span class="nc bnc" id="L1028" title="All 2 branches missed.">        if (&quot;iconUiid&quot;.equals(name)) {</span>
+<span class="nc" id="L1029">            return getIconUIID();</span>
+        }
+<span class="nc bnc" id="L1031" title="All 2 branches missed.">        if (&quot;iconPosition&quot;.equals(name)) {</span>
+<span class="nc" id="L1032">            return getIconPosition();</span>
+        }
+<span class="nc bnc" id="L1034" title="All 2 branches missed.">        if (&quot;emblem&quot;.equals(name)) {</span>
+<span class="nc" id="L1035">            return getEmblem();</span>
+        }
+<span class="nc bnc" id="L1037" title="All 2 branches missed.">        if (&quot;emblemName&quot;.equals(name)) {</span>
+<span class="nc" id="L1038">            return getEmblemName();</span>
+        }
+<span class="nc bnc" id="L1040" title="All 2 branches missed.">        if (&quot;emblemUiid&quot;.equals(name)) {</span>
+<span class="nc" id="L1041">            return getEmblemUIID();</span>
+        }
+<span class="nc bnc" id="L1043" title="All 2 branches missed.">        if (&quot;emblemPosition&quot;.equals(name)) {</span>
+<span class="nc" id="L1044">            return getEmblemPosition();</span>
+        }
+<span class="nc bnc" id="L1046" title="All 2 branches missed.">        if (&quot;horizontalLayout&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L1047" title="All 2 branches missed.">            if (isHorizontalLayout()) {</span>
+<span class="nc" id="L1048">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L1050">            return Boolean.FALSE;</span>
+        }
+<span class="nc bnc" id="L1052" title="All 2 branches missed.">        if (&quot;invertFirstTwoEntries&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L1053" title="All 2 branches missed.">            if (isInvertFirstTwoEntries()) {</span>
+<span class="nc" id="L1054">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L1056">            return Boolean.FALSE;</span>
+        }
+<span class="nc bnc" id="L1058" title="All 2 branches missed.">        if (&quot;checkBox&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L1059" title="All 2 branches missed.">            if (isCheckBox()) {</span>
+<span class="nc" id="L1060">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L1062">            return Boolean.FALSE;</span>
+        }
+<span class="nc bnc" id="L1064" title="All 2 branches missed.">        if (&quot;radioButton&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L1065" title="All 2 branches missed.">            if (isRadioButton()) {</span>
+<span class="nc" id="L1066">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L1068">            return Boolean.FALSE;</span>
+        }
+<span class="nc bnc" id="L1070" title="All 2 branches missed.">        if (&quot;group&quot;.equals(name)) {</span>
+<span class="nc" id="L1071">            return getGroup();</span>
+        }
+<span class="nc bnc" id="L1073" title="All 2 branches missed.">        if (&quot;selected&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L1074" title="All 2 branches missed.">            if (isSelected()) {</span>
+<span class="nc" id="L1075">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L1077">            return Boolean.FALSE;</span>
+        }
+<span class="nc bnc" id="L1079" title="All 2 branches missed.">        if (&quot;maskName&quot;.equals(name)) {</span>
+<span class="nc" id="L1080">            return getMaskName();</span>
+        }
+<span class="nc" id="L1082">        return null;</span>
+    }
+
+    /// Sets the line 1 text
+    /// {@inheritDoc}
+    @Override
+    public String getText() {
+<span class="fc" id="L1089">        return getTextLine1();</span>
+    }
+
+    /// Returns the line 1 text
+    /// {@inheritDoc}
+    @Override
+    public void setText(String text) {
+<span class="fc" id="L1096">        setTextLine1(text);</span>
+<span class="fc" id="L1097">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="pc bpc" id="L1102" title="1 of 2 branches missed.">        if (&quot;line1&quot;.equals(name)) {</span>
+<span class="fc" id="L1103">            setTextLine1((String) value);</span>
+<span class="fc" id="L1104">            return null;</span>
+        }
+<span class="nc bnc" id="L1106" title="All 2 branches missed.">        if (&quot;line2&quot;.equals(name)) {</span>
+<span class="nc" id="L1107">            setTextLine2((String) value);</span>
+<span class="nc" id="L1108">            return null;</span>
+        }
+<span class="nc bnc" id="L1110" title="All 2 branches missed.">        if (&quot;line3&quot;.equals(name)) {</span>
+<span class="nc" id="L1111">            setTextLine3((String) value);</span>
+<span class="nc" id="L1112">            return null;</span>
+        }
+<span class="nc bnc" id="L1114" title="All 2 branches missed.">        if (&quot;line4&quot;.equals(name)) {</span>
+<span class="nc" id="L1115">            setTextLine4((String) value);</span>
+<span class="nc" id="L1116">            return null;</span>
+        }
+<span class="nc bnc" id="L1118" title="All 2 branches missed.">        if (&quot;name1&quot;.equals(name)) {</span>
+<span class="nc" id="L1119">            setNameLine1((String) value);</span>
+<span class="nc" id="L1120">            return null;</span>
+        }
+<span class="nc bnc" id="L1122" title="All 2 branches missed.">        if (&quot;name2&quot;.equals(name)) {</span>
+<span class="nc" id="L1123">            setNameLine2((String) value);</span>
+<span class="nc" id="L1124">            return null;</span>
+        }
+<span class="nc bnc" id="L1126" title="All 2 branches missed.">        if (&quot;name3&quot;.equals(name)) {</span>
+<span class="nc" id="L1127">            setNameLine3((String) value);</span>
+<span class="nc" id="L1128">            return null;</span>
+        }
+<span class="nc bnc" id="L1130" title="All 2 branches missed.">        if (&quot;name4&quot;.equals(name)) {</span>
+<span class="nc" id="L1131">            setNameLine4((String) value);</span>
+<span class="nc" id="L1132">            return null;</span>
+        }
+<span class="nc bnc" id="L1134" title="All 2 branches missed.">        if (&quot;uiid1&quot;.equals(name)) {</span>
+<span class="nc" id="L1135">            setUIIDLine1((String) value);</span>
+<span class="nc" id="L1136">            return null;</span>
+        }
+<span class="nc bnc" id="L1138" title="All 2 branches missed.">        if (&quot;uiid2&quot;.equals(name)) {</span>
+<span class="nc" id="L1139">            setUIIDLine2((String) value);</span>
+<span class="nc" id="L1140">            return null;</span>
+        }
+<span class="nc bnc" id="L1142" title="All 2 branches missed.">        if (&quot;uiid3&quot;.equals(name)) {</span>
+<span class="nc" id="L1143">            setUIIDLine3((String) value);</span>
+<span class="nc" id="L1144">            return null;</span>
+        }
+<span class="nc bnc" id="L1146" title="All 2 branches missed.">        if (&quot;uiid4&quot;.equals(name)) {</span>
+<span class="nc" id="L1147">            setUIIDLine4((String) value);</span>
+<span class="nc" id="L1148">            return null;</span>
+        }
+<span class="nc bnc" id="L1150" title="All 2 branches missed.">        if (&quot;icon&quot;.equals(name)) {</span>
+<span class="nc" id="L1151">            setIcon((Image) value);</span>
+<span class="nc" id="L1152">            return null;</span>
+        }
+<span class="nc bnc" id="L1154" title="All 2 branches missed.">        if (&quot;iconUiid&quot;.equals(name)) {</span>
+<span class="nc" id="L1155">            setIconUIID((String) value);</span>
+<span class="nc" id="L1156">            return null;</span>
+        }
+<span class="nc bnc" id="L1158" title="All 2 branches missed.">        if (&quot;iconName&quot;.equals(name)) {</span>
+<span class="nc" id="L1159">            setIconName((String) value);</span>
+<span class="nc" id="L1160">            return null;</span>
+        }
+<span class="nc bnc" id="L1162" title="All 2 branches missed.">        if (&quot;iconPosition&quot;.equals(name)) {</span>
+<span class="nc" id="L1163">            setIconPosition((String) value);</span>
+<span class="nc" id="L1164">            return null;</span>
+        }
+<span class="nc bnc" id="L1166" title="All 2 branches missed.">        if (&quot;emblem&quot;.equals(name)) {</span>
+<span class="nc" id="L1167">            setEmblem((Image) value);</span>
+<span class="nc" id="L1168">            return null;</span>
+        }
+<span class="nc bnc" id="L1170" title="All 2 branches missed.">        if (&quot;emblemUiid&quot;.equals(name)) {</span>
+<span class="nc" id="L1171">            setEmblemUIID((String) value);</span>
+<span class="nc" id="L1172">            return null;</span>
+        }
+<span class="nc bnc" id="L1174" title="All 2 branches missed.">        if (&quot;emblemName&quot;.equals(name)) {</span>
+<span class="nc" id="L1175">            setEmblemName((String) value);</span>
+<span class="nc" id="L1176">            return null;</span>
+        }
+<span class="nc bnc" id="L1178" title="All 2 branches missed.">        if (&quot;emblemPosition&quot;.equals(name)) {</span>
+<span class="nc" id="L1179">            setEmblemPosition((String) value);</span>
+<span class="nc" id="L1180">            return null;</span>
+        }
+<span class="nc bnc" id="L1182" title="All 2 branches missed.">        if (&quot;horizontalLayout&quot;.equals(name)) {</span>
+<span class="nc" id="L1183">            setHorizontalLayout(((Boolean) value).booleanValue());</span>
+<span class="nc" id="L1184">            return null;</span>
+        }
+<span class="nc bnc" id="L1186" title="All 2 branches missed.">        if (&quot;invertFirstTwoEntries&quot;.equals(name)) {</span>
+<span class="nc" id="L1187">            setInvertFirstTwoEntries(((Boolean) value).booleanValue());</span>
+<span class="nc" id="L1188">            return null;</span>
+        }
+<span class="nc bnc" id="L1190" title="All 2 branches missed.">        if (&quot;checkBox&quot;.equals(name)) {</span>
+<span class="nc" id="L1191">            setCheckBox(((Boolean) value).booleanValue());</span>
+<span class="nc" id="L1192">            return null;</span>
+        }
+<span class="nc bnc" id="L1194" title="All 2 branches missed.">        if (&quot;radioButton&quot;.equals(name)) {</span>
+<span class="nc" id="L1195">            setRadioButton(((Boolean) value).booleanValue());</span>
+<span class="nc" id="L1196">            return null;</span>
+        }
+<span class="nc bnc" id="L1198" title="All 2 branches missed.">        if (&quot;group&quot;.equals(name)) {</span>
+<span class="nc" id="L1199">            setGroup((String) value);</span>
+<span class="nc" id="L1200">            return null;</span>
+        }
+<span class="nc bnc" id="L1202" title="All 2 branches missed.">        if (&quot;selected&quot;.equals(name)) {</span>
+<span class="nc" id="L1203">            setSelected(((Boolean) value).booleanValue());</span>
+<span class="nc" id="L1204">            return null;</span>
+        }
+<span class="nc bnc" id="L1206" title="All 2 branches missed.">        if (&quot;maskName&quot;.equals(name)) {</span>
+<span class="nc" id="L1207">            setMaskName((String) value);</span>
+<span class="nc" id="L1208">            return null;</span>
+        }
+<span class="nc" id="L1210">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /// Indicates the group for the radio button
+    ///
+    /// #### Returns
+    ///
+    /// the group
+    public String getGroup() {
+<span class="fc" id="L1219">        return group;</span>
+    }
+
+    /// Indicates the group for the radio button
+    ///
+    /// #### Parameters
+    ///
+    /// - `group`: the group to set
+    public void setGroup(String group) {
+<span class="fc" id="L1228">        this.group = group;</span>
+<span class="pc bpc" id="L1229" title="1 of 2 branches missed.">        if (emblem instanceof RadioButton) {</span>
+<span class="fc" id="L1230">            ((RadioButton) emblem).setGroup(group);</span>
+        }
+<span class="fc" id="L1232">    }</span>
+
+    /// Sets the button group for a radio button mode multibutton
+    ///
+    /// #### Parameters
+    ///
+    /// - `bg`: the button group
+    public void setGroup(ButtonGroup bg) {
+<span class="nc" id="L1240">        bg.add((RadioButton) emblem);</span>
+<span class="nc" id="L1241">    }</span>
+
+    /// Set the mask name for the icon
+    ///
+    /// #### Returns
+    ///
+    /// the maskName
+    public String getMaskName() {
+<span class="fc" id="L1249">        return icon.getMaskName();</span>
+    }
+
+    /// The mask name for the icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `maskName`: the maskName to set
+    public void setMaskName(String maskName) {
+<span class="fc" id="L1258">        icon.setMaskName(maskName);</span>
+<span class="fc" id="L1259">    }</span>
+
+    /// Indicates if text should be localized when set to the component, by default
+    /// all text is localized so this allows disabling automatic localization for
+    /// a specific component.
+    ///
+    /// #### Returns
+    ///
+    /// the shouldLocalize value
+    public boolean isShouldLocalize() {
+<span class="fc" id="L1269">        return shouldLocalize;</span>
+    }
+
+    /// Indicates if text should be localized when set to the component, by default
+    /// all text is localized so this allows disabling automatic localization for
+    /// a specific component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shouldLocalize`: the shouldLocalize to set
+    public void setShouldLocalize(boolean shouldLocalize) {
+<span class="fc" id="L1280">        this.shouldLocalize = shouldLocalize;</span>
+<span class="fc" id="L1281">    }</span>
+
+    /// {@inheritDoc }
+    ///
+    @Override
+    public int getGap() {
+<span class="fc" id="L1287">        return gap;</span>
+    }
+
+    /// {@inheritDoc }
+    ///
+    @Override
+    public void setGap(int gap) {
+<span class="pc bpc" id="L1294" title="1 of 2 branches missed.">        if (gap != this.gap) {</span>
+<span class="fc" id="L1295">            this.gap = gap;</span>
+<span class="fc" id="L1296">            updateGap();</span>
+        }
+<span class="fc" id="L1298">    }</span>
+
+    /// {@inheritDoc }
+    ///
+    @Override
+    public int getTextPosition() {
+<span class="fc" id="L1304">        String iconPosition = getIconPosition();</span>
+<span class="pc bpc" id="L1305" title="1 of 2 branches missed.">        if (BorderLayout.NORTH.equals(iconPosition)) {</span>
+<span class="nc" id="L1306">            return Component.BOTTOM;</span>
+        }
+<span class="pc bpc" id="L1308" title="1 of 2 branches missed.">        if (BorderLayout.SOUTH.equals(iconPosition)) {</span>
+<span class="fc" id="L1309">            return Component.TOP;</span>
+        }
+<span class="nc bnc" id="L1311" title="All 2 branches missed.">        if (BorderLayout.EAST.equals(iconPosition)) {</span>
+<span class="nc" id="L1312">            return Component.LEFT;</span>
+        }
+<span class="nc bnc" id="L1314" title="All 2 branches missed.">        if (BorderLayout.WEST.equals(iconPosition)) {</span>
+<span class="nc" id="L1315">            return Component.RIGHT;</span>
+        }
+<span class="nc" id="L1317">        return Component.LEFT;</span>
+
+    }
+
+    /// {@inheritDoc }
+    ///
+    @Override
+    public void setTextPosition(int textPosition) {
+<span class="pc bpc" id="L1325" title="4 of 5 branches missed.">        switch (textPosition) {</span>
+            case Component.TOP:
+<span class="fc" id="L1327">                setIconPosition(BorderLayout.SOUTH);</span>
+<span class="fc" id="L1328">                break;</span>
+            case Component.BOTTOM:
+<span class="nc" id="L1330">                setIconPosition(BorderLayout.NORTH);</span>
+<span class="nc" id="L1331">                break;</span>
+            case Component.LEFT:
+<span class="nc" id="L1333">                setIconPosition(BorderLayout.EAST);</span>
+<span class="nc" id="L1334">                break;</span>
+            case Component.RIGHT:
+<span class="nc" id="L1336">                setIconPosition(BorderLayout.WEST);</span>
+<span class="nc" id="L1337">                break;</span>
+            default:
+<span class="nc" id="L1339">                setIconPosition(BorderLayout.EAST);</span>
+        }
+
+<span class="fc" id="L1342">    }</span>
+
+    private void updateGap() {
+<span class="fc bfc" id="L1345" title="All 2 branches covered.">        if (getIcon() == null) {</span>
+<span class="fc" id="L1346">            $(icon).setMargin(0);</span>
+<span class="pc bpc" id="L1347" title="1 of 2 branches missed.">        } else if (BorderLayout.NORTH.equals(getIconPosition())) {</span>
+<span class="nc" id="L1348">            $(icon).selectAllStyles().setMargin(0, 0, gap, 0);</span>
+<span class="pc bpc" id="L1349" title="1 of 2 branches missed.">        } else if (BorderLayout.SOUTH.equals(getIconPosition())) {</span>
+<span class="nc" id="L1350">            $(icon).selectAllStyles().setMargin(gap, 0, 0, 0);</span>
+<span class="pc bpc" id="L1351" title="1 of 2 branches missed.">        } else if (BorderLayout.EAST.equals(getIconPosition())) {</span>
+<span class="nc" id="L1352">            $(icon).selectAllStyles().setMargin(0, 0, 0, gap);</span>
+<span class="pc bpc" id="L1353" title="1 of 2 branches missed.">        } else if (BorderLayout.WEST.equals(getIconPosition())) {</span>
+<span class="fc" id="L1354">            $(icon).selectAllStyles().setMargin(0, gap, 0, 0);</span>
+        }
+<span class="fc" id="L1356">    }</span>
+
+
+    @Override
+    public Component getIconStyleComponent() {
+<span class="nc" id="L1361">        return icon;</span>
+    }
+
+    /// {@inheritDoc}
+    ///
+    @Override
+    public void setMaterialIcon(char c, float size) {
+<span class="nc" id="L1368">        icon.setMaterialIcon(c, size);</span>
+<span class="nc" id="L1369">    }</span>
+
+    /// {@inheritDoc}
+    ///
+    @Override
+    public void setFontIcon(Font font, char c, float size) {
+<span class="nc" id="L1375">        icon.setFontIcon(font, c, size);</span>
+<span class="nc" id="L1376">    }</span>
+
+    /// {@inheritDoc }
+    ///
+    @Override
+    public Image getRolloverIcon() {
+<span class="nc" id="L1382">        return icon.getRolloverIcon();</span>
+    }
+
+    /// {@inheritDoc }
+    ///
+    @Override
+    public void setRolloverIcon(Image arg0) {
+<span class="nc" id="L1389">        icon.setRolloverIcon(arg0);</span>
+<span class="nc" id="L1390">    }</span>
+
+    /// {@inheritDoc }
+    ///
+    @Override
+    public Image getPressedIcon() {
+<span class="nc" id="L1396">        return icon.getPressedIcon();</span>
+    }
+
+    /// {@inheritDoc }
+    ///
+    @Override
+    public void setPressedIcon(Image arg0) {
+<span class="nc" id="L1403">        icon.setPressedIcon(arg0);</span>
+<span class="nc" id="L1404">    }</span>
+
+    /// {@inheritDoc }
+    ///
+    @Override
+    public Image getDisabledIcon() {
+<span class="nc" id="L1410">        return icon.getDisabledIcon();</span>
+    }
+
+    /// {@inheritDoc }
+    ///
+    @Override
+    public void setDisabledIcon(Image arg0) {
+<span class="nc" id="L1417">        icon.setDisabledIcon(arg0);</span>
+<span class="nc" id="L1418">    }</span>
+
+    /// {@inheritDoc }
+    ///
+    @Override
+    public Image getRolloverPressedIcon() {
+<span class="nc" id="L1424">        return icon.getRolloverPressedIcon();</span>
+    }
+
+    /// {@inheritDoc }
+    ///
+    @Override
+    public void setRolloverPressedIcon(Image icn) {
+<span class="nc" id="L1431">        icon.setRolloverPressedIcon(icn);</span>
+<span class="nc" id="L1432">    }</span>
+
+    /// {@inheritDoc }
+    ///
+    @Override
+    public Image getIconFromState() {
+<span class="nc" id="L1438">        return icon.getIconFromState();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

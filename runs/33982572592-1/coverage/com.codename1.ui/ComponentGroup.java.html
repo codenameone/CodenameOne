@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ComponentGroup.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">ComponentGroup.java</span></div><h1>ComponentGroup.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.Layout;
+
+/// A component group is a container that applies the given UIID to a set of components within it
+/// and gives the same UIID with &quot;First&quot;/&quot;Last&quot; prepended to the first and last components. E.g.
+/// by default the  GroupElement UIID is applied so the first and last elements would have the
+/// GroupElementFirst/GroupElementLast UIID's applied to them. If a group has only one element
+/// the word &quot;Only&quot; is appended to the element UIID as in GroupElementOnly.
+///
+/// **Important!!!** A component group does nothing by default unless explicitly activated by
+/// the theme by enabling the ComponentGroupBool constant (by default, this can be customized via the groupFlag property).
+/// This allows logical grouping without changing the UI for themes that don't need grouping.
+///
+/// This container uses box X/Y layout (defaults to Y), other layout managers shouldn't be used
+/// since this container relies on the specific behavior of the box layout.
+///
+/// Check out this sample code:
+///
+/// ```java
+/// hi.add(&quot;Three Labels&quot;).
+///         add(ComponentGroup.enclose(new Label(&quot;GroupElementFirst UIID&quot;), new Label(&quot;GroupElement UIID&quot;), new Label(&quot;GroupElementLast UIID&quot;))).
+///         add(&quot;One Label&quot;).
+///         add(ComponentGroup.enclose(new Label(&quot;GroupElementOnly UIID&quot;))).
+///         add(&quot;Three Buttons&quot;).
+///         add(ComponentGroup.enclose(new Button(&quot;ButtonGroupFirst UIID&quot;), new Button(&quot;ButtonGroup UIID&quot;), new Button(&quot;ButtonGroupLast UIID&quot;))).
+///         add(&quot;One Button&quot;).
+///         add(ComponentGroup.enclose(new Button(&quot;ButtonGroupOnly UIID&quot;)));
+/// ```
+///
+/// @author Shai Almog
+public class ComponentGroup extends Container {
+<span class="fc" id="L57">    private String elementUIID = &quot;GroupElement&quot;;</span>
+<span class="fc" id="L58">    private String buttonUIID = &quot;ButtonGroup&quot;;</span>
+<span class="fc" id="L59">    private String groupFlag = &quot;ComponentGroupBool&quot;;</span>
+    private boolean uiidsDirty;
+    private boolean forceGroup;
+
+    /// Default constructor
+    public ComponentGroup() {
+<span class="fc" id="L65">        super(new BoxLayout(BoxLayout.Y_AXIS));</span>
+<span class="fc" id="L66">        setUIIDFinal(&quot;ComponentGroup&quot;);</span>
+<span class="fc" id="L67">    }</span>
+
+    /// Shorthand method for wrapping the given components in a vertical component group
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the components to add into a newly created group
+    ///
+    /// #### Returns
+    ///
+    /// the newly created group
+    public static ComponentGroup enclose(Component... cmp) {
+<span class="fc" id="L79">        ComponentGroup c = new ComponentGroup();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (Component cc : cmp) {</span>
+<span class="fc" id="L81">            c.add(cc);</span>
+        }
+<span class="fc" id="L83">        return c;</span>
+    }
+
+    /// Shorthand method for wrapping the given components in a horizontal component group
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the components to add into a newly created group
+    ///
+    /// #### Returns
+    ///
+    /// the newly created group
+    public static ComponentGroup encloseHorizontal(Component... cmp) {
+<span class="fc" id="L96">        ComponentGroup c = new ComponentGroup();</span>
+<span class="fc" id="L97">        c.setHorizontal(true);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        for (Component cc : cmp) {</span>
+<span class="fc" id="L99">            c.add(cc);</span>
+        }
+<span class="fc" id="L101">        return c;</span>
+    }
+
+    private void reverseRadio(Component cmp) {
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (cmp instanceof ComboBox) {</span>
+<span class="nc" id="L106">            ((ComboBox) cmp).setActAsSpinnerDialog(uiidsDirty);</span>
+        }
+<span class="fc" id="L108">    }</span>
+
+    @Override
+    void insertComponentAt(int index, Object con, Component cmp) {
+<span class="fc" id="L112">        super.insertComponentAt(index, con, cmp);</span>
+<span class="fc" id="L113">        updateUIIDs();</span>
+<span class="fc" id="L114">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void refreshTheme(boolean merge) {
+<span class="fc" id="L119">        super.refreshTheme(merge);</span>
+<span class="fc" id="L120">        boolean ignoreGroup = getUIManager().isThemeConstant(groupFlag, false);</span>
+<span class="pc bpc" id="L121" title="2 of 4 branches missed.">        if (ignoreGroup || forceGroup) {</span>
+<span class="fc" id="L122">            updateUIIDs();</span>
+        } else {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">            if (uiidsDirty) {</span>
+<span class="nc" id="L125">                uiidsDirty = false;</span>
+<span class="nc" id="L126">                int count = getComponentCount();</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="nc" id="L128">                    restoreUIID(getComponentAt(iter));</span>
+                }
+            }
+        }
+<span class="fc" id="L132">    }</span>
+
+    @Override
+    void removeComponentImpl(Component cmp) {
+<span class="fc" id="L136">        super.removeComponentImpl(cmp);</span>
+
+        // restore original UIID
+<span class="fc" id="L139">        Object o = cmp.getClientProperty(&quot;$origUIID&quot;);</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (o != null) {</span>
+<span class="fc" id="L141">            cmp.setUIID((String) o);</span>
+        }
+<span class="fc" id="L143">        updateUIIDs();</span>
+<span class="fc" id="L144">    }</span>
+
+    private String elementPrefix(Component c) {
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (c.getClass() == Button.class) {</span>
+<span class="fc" id="L148">            return buttonUIID;</span>
+        } else {
+<span class="nc" id="L150">            return elementUIID;</span>
+        }
+    }
+
+    private void updateUIIDs() {
+<span class="pc bpc" id="L155" title="1 of 4 branches missed.">        if (!(getUIManager().isThemeConstant(groupFlag, false) || forceGroup)) {</span>
+<span class="fc" id="L156">            return;</span>
+        }
+<span class="fc" id="L158">        int count = getComponentCount();</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (count &gt; 0) {</span>
+<span class="fc" id="L160">            uiidsDirty = true;</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            if (count == 1) {</span>
+<span class="fc" id="L162">                Component c = getComponentAt(0);</span>
+<span class="fc" id="L163">                updateUIID(elementPrefix(c) + &quot;Only&quot;, c);</span>
+<span class="fc" id="L164">            } else {</span>
+<span class="fc" id="L165">                Component c = getComponentAt(0);</span>
+<span class="fc" id="L166">                updateUIID(elementPrefix(c) + &quot;First&quot;, c);</span>
+<span class="fc" id="L167">                c = getComponentAt(count - 1);</span>
+<span class="fc" id="L168">                updateUIID(elementPrefix(c) + &quot;Last&quot;, c);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                for (int iter = 1; iter &lt; count - 1; iter++) {</span>
+<span class="fc" id="L170">                    c = getComponentAt(iter);</span>
+<span class="fc" id="L171">                    updateUIID(elementPrefix(c), c);</span>
+                }
+            }
+        }
+<span class="fc" id="L175">    }</span>
+
+    private void updateUIID(String newUIID, Component c) {
+<span class="fc" id="L178">        Object o = c.getClientProperty(&quot;$origUIID&quot;);</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (o == null) {</span>
+<span class="fc" id="L180">            c.putClientProperty(&quot;$origUIID&quot;, c.getUIID());</span>
+        }
+<span class="fc" id="L182">        c.setUIID(newUIID);</span>
+<span class="fc" id="L183">        reverseRadio(c);</span>
+<span class="fc" id="L184">    }</span>
+
+    private void restoreUIID(Component c) {
+<span class="nc" id="L187">        String o = (String) c.getClientProperty(&quot;$origUIID&quot;);</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        if (o != null) {</span>
+<span class="nc" id="L189">            c.setUIID(o);</span>
+        }
+<span class="nc" id="L191">        reverseRadio(c);</span>
+<span class="nc" id="L192">    }</span>
+
+    /// Indicates that the component group should be horizontal by using the BoxLayout Y
+    ///
+    /// #### Returns
+    ///
+    /// the horizontal
+    public boolean isHorizontal() {
+<span class="fc" id="L200">        Layout l = getLayout();</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (l instanceof BoxLayout) {</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            return ((BoxLayout) l).getAxis() == BoxLayout.X_AXIS;</span>
+        }
+<span class="nc" id="L204">        return false;</span>
+    }
+
+    /// Indicates that the component group should be horizontal by using the BoxLayout Y
+    ///
+    /// #### Parameters
+    ///
+    /// - `horizontal`: the horizontal to set
+    public void setHorizontal(boolean horizontal) {
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        if (horizontal != isHorizontal()) {</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (horizontal) {</span>
+<span class="fc" id="L215">                setLayout(new BoxLayout(BoxLayout.X_AXIS));</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                if (&quot;GroupElement&quot;.equals(elementUIID)) {</span>
+<span class="fc" id="L217">                    elementUIID = &quot;ToggleButton&quot;;</span>
+<span class="fc" id="L218">                    buttonUIID = &quot;ToggleButton&quot;;</span>
+<span class="fc" id="L219">                    updateUIIDs();</span>
+                }
+            } else {
+<span class="fc" id="L222">                setLayout(new BoxLayout(BoxLayout.Y_AXIS));</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">                if (&quot;ToggleButton&quot;.equals(elementUIID)) {</span>
+<span class="fc" id="L224">                    elementUIID = &quot;GroupElement&quot;;</span>
+<span class="fc" id="L225">                    buttonUIID = &quot;ButtonGroup&quot;;</span>
+<span class="fc" id="L226">                    updateUIIDs();</span>
+                }
+            }
+        }
+<span class="fc" id="L230">    }</span>
+
+    /// The UIID to apply to the elements within this container
+    ///
+    /// #### Returns
+    ///
+    /// the elementUIID
+    public String getElementUIID() {
+<span class="nc" id="L238">        return elementUIID;</span>
+    }
+
+    /// The UIID to apply to the elements within this container
+    ///
+    /// #### Parameters
+    ///
+    /// - `elementUIID`: the elementUIID to set
+    public void setElementUIID(String elementUIID) {
+<span class="nc" id="L247">        this.elementUIID = elementUIID;</span>
+<span class="nc" id="L248">        buttonUIID = elementUIID;</span>
+<span class="nc" id="L249">        updateUIIDs();</span>
+<span class="nc" id="L250">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyNames() {
+<span class="nc" id="L255">        return new String[]{&quot;elementUIID&quot;, &quot;displayName&quot;, &quot;horizontal&quot;, &quot;groupFlag&quot;, &quot;forceGroup&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L261">        return new Class[]{String.class, String.class, Boolean.class, String.class, Boolean.class};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L267" title="All 2 branches missed.">        if (&quot;elementUIID&quot;.equals(name)) {</span>
+<span class="nc" id="L268">            return getElementUIID();</span>
+        }
+<span class="nc bnc" id="L270" title="All 2 branches missed.">        if (&quot;horizontal&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">            if (isHorizontal()) {</span>
+<span class="nc" id="L272">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L274">            return Boolean.FALSE;</span>
+        }
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        if (&quot;groupFlag&quot;.equals(name)) {</span>
+<span class="nc" id="L277">            return groupFlag;</span>
+        }
+<span class="nc bnc" id="L279" title="All 2 branches missed.">        if (&quot;forceGroup&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">            return forceGroup ? Boolean.TRUE : Boolean.FALSE;</span>
+        }
+<span class="nc" id="L282">        return null;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L288" title="All 2 branches missed.">        if (&quot;elementUIID&quot;.equals(name)) {</span>
+<span class="nc" id="L289">            setElementUIID((String) value);</span>
+<span class="nc" id="L290">            return null;</span>
+        }
+<span class="nc bnc" id="L292" title="All 2 branches missed.">        if (&quot;horizontal&quot;.equals(name)) {</span>
+<span class="nc" id="L293">            setHorizontal(((Boolean) value).booleanValue());</span>
+<span class="nc" id="L294">            return null;</span>
+        }
+<span class="nc bnc" id="L296" title="All 2 branches missed.">        if (&quot;groupFlag&quot;.equals(name)) {</span>
+<span class="nc" id="L297">            setGroupFlag(groupFlag);</span>
+<span class="nc" id="L298">            return null;</span>
+        }
+<span class="nc bnc" id="L300" title="All 2 branches missed.">        if (&quot;forceGroup&quot;.equals(name)) {</span>
+<span class="nc" id="L301">            forceGroup = ((Boolean) value).booleanValue();</span>
+<span class="nc" id="L302">            return null;</span>
+        }
+<span class="nc" id="L304">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /// The group flag allows changing the flag that activates this group, from ComponentGroupBool to any
+    /// arbitrary flag. This allows a developer/designer to enable grouping for a specific type of components
+    /// (e.g. for horizontal Toggle Buttons) yet disable it for vertical lists of components.
+    ///
+    /// #### Returns
+    ///
+    /// the groupFlag
+    public String getGroupFlag() {
+<span class="nc" id="L315">        return groupFlag;</span>
+    }
+
+    /// The group flag allows changing the flag that activates this group, from ComponentGroupBool to any
+    /// arbitrary flag. This allows a developer/designer to enable grouping for a specific type of components
+    /// (e.g. for horizontal Toggle Buttons) yet disable it for vertical lists of components.
+    ///
+    /// #### Parameters
+    ///
+    /// - `groupFlag`: the groupFlag to set
+    public void setGroupFlag(String groupFlag) {
+<span class="nc" id="L326">        this.groupFlag = groupFlag;</span>
+<span class="nc" id="L327">    }</span>
+
+    /// Component grouping can be an element from the theme but can be forced manually
+    /// for a specific group
+    ///
+    /// #### Returns
+    ///
+    /// the forceGroup
+    public boolean isForceGroup() {
+<span class="nc" id="L336">        return forceGroup;</span>
+    }
+
+    /// Component grouping can be an element from the theme but can be forced manually
+    /// for a specific group
+    ///
+    /// #### Parameters
+    ///
+    /// - `forceGroup`: the forceGroup to set
+    public void setForceGroup(boolean forceGroup) {
+<span class="fc" id="L346">        this.forceGroup = forceGroup;</span>
+<span class="fc" id="L347">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

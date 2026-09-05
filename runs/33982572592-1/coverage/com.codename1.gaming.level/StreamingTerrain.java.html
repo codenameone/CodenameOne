@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StreamingTerrain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.level</a> &gt; <span class="el_source">StreamingTerrain.java</span></div><h1>StreamingTerrain.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming.level;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// An unbounded `Terrain` that pages `TerrainChunk`s in and out through a `ChunkProvider`,
+/// keeping at most `#getCacheSize()` chunks resident (LRU). World cell coordinates may be
+/// negative; each maps to a chunk and a local cell. Call `#streamAround(int,int,int)` as the
+/// player moves to pre-load nearby chunks and evict (saving dirty) far ones.
+public class StreamingTerrain implements Terrain {
+    private final ChunkProvider provider;
+    private final LinkedHashMap&lt;Long, TerrainChunk&gt; loaded;
+    private int cacheSize;
+
+    public StreamingTerrain() {
+<span class="fc" id="L41">        this(new MemoryChunkProvider(), 64);</span>
+<span class="fc" id="L42">    }</span>
+
+<span class="fc" id="L44">    public StreamingTerrain(ChunkProvider provider, int cacheSize) {</span>
+<span class="fc" id="L45">        this.provider = provider;</span>
+<span class="fc" id="L46">        this.cacheSize = Math.max(4, cacheSize);</span>
+<span class="fc" id="L47">        this.loaded = new LinkedHashMap&lt;Long, TerrainChunk&gt;(16, 0.75f, true) {</span>
+            @Override
+            protected boolean removeEldestEntry(Map.Entry&lt;Long, TerrainChunk&gt; eldest) {
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                if (size() &gt; StreamingTerrain.this.cacheSize) {</span>
+<span class="fc" id="L51">                    TerrainChunk c = eldest.getValue();</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">                    if (c.isDirty()) {</span>
+<span class="fc" id="L53">                        StreamingTerrain.this.provider.saveChunk(c);</span>
+<span class="fc" id="L54">                        c.clearDirty();</span>
+                    }
+<span class="fc" id="L56">                    return true;</span>
+                }
+<span class="fc" id="L58">                return false;</span>
+            }
+        };
+<span class="fc" id="L61">    }</span>
+
+    public int getCacheSize() {
+<span class="nc" id="L64">        return cacheSize;</span>
+    }
+
+    public StreamingTerrain setCacheSize(int cacheSize) {
+<span class="nc" id="L68">        this.cacheSize = Math.max(4, cacheSize);</span>
+<span class="nc" id="L69">        return this;</span>
+    }
+
+    public ChunkProvider getProvider() {
+<span class="nc" id="L73">        return provider;</span>
+    }
+
+    static int floorDiv(int a, int b) {
+<span class="fc" id="L77">        int q = a / b;</span>
+<span class="pc bpc" id="L78" title="1 of 8 branches missed.">        if ((a % b != 0) &amp;&amp; ((a &lt; 0) != (b &lt; 0))) {</span>
+<span class="fc" id="L79">            q--;</span>
+        }
+<span class="fc" id="L81">        return q;</span>
+    }
+
+    private static int floorMod(int a, int b) {
+<span class="fc" id="L85">        int r = a % b;</span>
+<span class="pc bpc" id="L86" title="1 of 8 branches missed.">        if (r != 0 &amp;&amp; ((a &lt; 0) != (b &lt; 0))) {</span>
+<span class="fc" id="L87">            r += b;</span>
+        }
+<span class="fc" id="L89">        return r;</span>
+    }
+
+    private static long key(int cx, int cz) {
+<span class="fc" id="L93">        return (((long) cx) &lt;&lt; 32) ^ (cz &amp; 0xffffffffL);</span>
+    }
+
+    /// Returns the resident chunk for the given chunk coords, loading it on demand.
+    public TerrainChunk chunk(int cx, int cz) {
+<span class="fc" id="L98">        Long k = Long.valueOf(key(cx, cz));</span>
+<span class="fc" id="L99">        TerrainChunk c = loaded.get(k);</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (c == null) {</span>
+<span class="fc" id="L101">            c = provider.loadChunk(cx, cz);</span>
+<span class="fc" id="L102">            loaded.put(k, c);</span>
+        }
+<span class="fc" id="L104">        return c;</span>
+    }
+
+    private TerrainChunk chunkForCell(int x, int z) {
+<span class="fc" id="L108">        return chunk(floorDiv(x, TerrainChunk.SIZE), floorDiv(z, TerrainChunk.SIZE));</span>
+    }
+
+    @Override
+    public float getHeight(int x, int z) {
+<span class="fc" id="L113">        return chunkForCell(x, z).getHeight(floorMod(x, TerrainChunk.SIZE), floorMod(z, TerrainChunk.SIZE));</span>
+    }
+
+    @Override
+    public void setHeight(int x, int z, float height) {
+<span class="fc" id="L118">        chunkForCell(x, z).setHeight(floorMod(x, TerrainChunk.SIZE), floorMod(z, TerrainChunk.SIZE), height);</span>
+<span class="fc" id="L119">    }</span>
+
+    @Override
+    public boolean hasGround(int x, int z) {
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        return getHeight(x, z) != NO_GROUND;</span>
+    }
+
+    @Override
+    public String getMaterial(int x, int z) {
+<span class="fc" id="L128">        return chunkForCell(x, z).getMaterial(floorMod(x, TerrainChunk.SIZE), floorMod(z, TerrainChunk.SIZE));</span>
+    }
+
+    @Override
+    public void setMaterial(int x, int z, String materialId) {
+<span class="fc" id="L133">        chunkForCell(x, z).setMaterial(floorMod(x, TerrainChunk.SIZE), floorMod(z, TerrainChunk.SIZE), materialId);</span>
+<span class="fc" id="L134">    }</span>
+
+    @Override
+    public List&lt;TerrainFeature&gt; features() {
+<span class="fc" id="L138">        List&lt;TerrainFeature&gt; all = new ArrayList&lt;TerrainFeature&gt;();</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (TerrainChunk c : loaded.values()) {</span>
+<span class="fc" id="L140">            all.addAll(c.features());</span>
+<span class="fc" id="L141">        }</span>
+<span class="fc" id="L142">        return all;</span>
+    }
+
+    @Override
+    public void addFeature(TerrainFeature feature) {
+<span class="fc" id="L147">        chunkForCell((int) Math.floor(feature.getX()), (int) Math.floor(feature.getZ())).features().add(feature);</span>
+<span class="fc" id="L148">        chunkForCell((int) Math.floor(feature.getX()), (int) Math.floor(feature.getZ())).touch();</span>
+<span class="fc" id="L149">    }</span>
+
+    @Override
+    public boolean isBounded() {
+<span class="fc" id="L153">        return false;</span>
+    }
+
+    @Override
+    public int getCols() {
+<span class="fc" id="L158">        return -1;</span>
+    }
+
+    @Override
+    public int getRows() {
+<span class="nc" id="L163">        return -1;</span>
+    }
+
+    /// Pre-loads the (2*radius+1)^2 chunks around the given cell so movement is seamless; the
+    /// LRU cache evicts (and saves) chunks that fall out of range.
+    public void streamAround(int cellX, int cellZ, int radius) {
+<span class="nc" id="L169">        int ccx = floorDiv(cellX, TerrainChunk.SIZE);</span>
+<span class="nc" id="L170">        int ccz = floorDiv(cellZ, TerrainChunk.SIZE);</span>
+        // touch in nearest-first order so the farthest become the LRU eviction candidates
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        for (int r = 0; r &lt;= radius; r++) {</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            for (int dz = -r; dz &lt;= r; dz++) {</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">                for (int dx = -r; dx &lt;= r; dx++) {</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                    if (Math.max(Math.abs(dx), Math.abs(dz)) == r) {</span>
+<span class="nc" id="L176">                        chunk(ccx + dx, ccz + dz);</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L181">    }</span>
+
+    /// Persists every dirty resident chunk through the provider.
+    public void flush() {
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        for (TerrainChunk c : loaded.values()) {</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">            if (c.isDirty()) {</span>
+<span class="nc" id="L187">                provider.saveChunk(c);</span>
+<span class="nc" id="L188">                c.clearDirty();</span>
+            }
+<span class="nc" id="L190">        }</span>
+<span class="nc" id="L191">    }</span>
+
+    public int loadedChunkCount() {
+<span class="fc" id="L194">        return loaded.size();</span>
+    }
+
+    /// The currently-resident chunks (snapshot) -- used to persist a small region inline.
+    public List&lt;TerrainChunk&gt; residentChunks() {
+<span class="fc" id="L199">        return new ArrayList&lt;TerrainChunk&gt;(loaded.values());</span>
+    }
+
+    /// A trivial in-memory provider: remembers chunks it has seen, generates empty flat-grass
+    /// chunks otherwise. Useful as a default and for tests.
+<span class="fc" id="L204">    public static final class MemoryChunkProvider implements ChunkProvider {</span>
+<span class="fc" id="L205">        private final Map&lt;Long, TerrainChunk&gt; store = new HashMap&lt;Long, TerrainChunk&gt;();</span>
+
+        @Override
+        public TerrainChunk loadChunk(int cx, int cz) {
+<span class="fc" id="L209">            TerrainChunk c = store.get(Long.valueOf(key(cx, cz)));</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            return c != null ? c : new TerrainChunk(cx, cz);</span>
+        }
+
+        @Override
+        public void saveChunk(TerrainChunk chunk) {
+<span class="fc" id="L215">            store.put(Long.valueOf(key(chunk.getChunkX(), chunk.getChunkZ())), chunk);</span>
+<span class="fc" id="L216">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

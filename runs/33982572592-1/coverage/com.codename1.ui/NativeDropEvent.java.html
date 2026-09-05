@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeDropEvent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">NativeDropEvent.java</span></div><h1>NativeDropEvent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+
+package com.codename1.ui;
+
+import com.codename1.ui.events.ActionEvent;
+
+/// One step of a native operating system drag passing over, or landing on, a component that was
+/// marked as a native drop target with `Component#setNativeDropTarget(boolean)`.
+///
+/// The payload is a `ClipboardContent` -- the same shape a paste produces -- so a component that
+/// already knows how to paste knows how to accept a drop. Inspect
+/// `ClipboardContent#getMimeTypes()` and take the richest representation you understand, exactly
+/// as you would for a paste.
+///
+/// The x and y inherited from `ActionEvent` are absolute screen coordinates within the surface
+/// the drag is over, so `Component#getAbsoluteX()` and `Component#getAbsoluteY()` convert them
+/// to component coordinates.
+///
+/// #### Accepting
+///
+/// A drag event tells the operating system whether the drop would be allowed and what would
+/// happen. Call `#accept(int)` with one of the actions in `#getAllowedActions()` to show the
+/// user the corresponding cursor, or `#reject()` to refuse. A target that never calls either
+/// accepts `NativeDragOperation#ACTION_COPY` when the source allows it, which is what most
+/// targets want.
+public final class NativeDropEvent extends ActionEvent {
+    private final ClipboardContent content;
+    private final int allowedActions;
+    private final boolean local;
+    private final Component target;
+    private int acceptedAction;
+
+    /// Creates a drop event.
+    ///
+    /// #### Parameters
+    ///
+    /// - `target`: the component the drag is over
+    ///
+    /// - `type`: the event type
+    ///
+    /// - `content`: the dragged payload
+    ///
+    /// - `x`: the absolute x position of the pointer
+    ///
+    /// - `y`: the absolute y position of the pointer
+    ///
+    /// - `allowedActions`: the actions the drag source permits
+    ///
+    /// - `local`: true when the drag started inside this application
+    NativeDropEvent(Component target, Type type, ClipboardContent content, int x, int y,
+            int allowedActions, boolean local) {
+<span class="fc" id="L74">        super(target, type, x, y);</span>
+<span class="fc" id="L75">        this.target = target;</span>
+<span class="fc" id="L76">        this.content = content;</span>
+<span class="fc" id="L77">        this.allowedActions = allowedActions;</span>
+<span class="fc" id="L78">        this.local = local;</span>
+<span class="fc" id="L79">        this.acceptedAction = defaultAction(permittedActions());</span>
+<span class="fc" id="L80">    }</span>
+
+    /// Picks the action a target that expresses no preference gets: a copy when the source
+    /// allows one, otherwise whichever single action it does allow.
+    private static int defaultAction(int allowedActions) {
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if ((allowedActions &amp; NativeDragOperation.ACTION_COPY) != 0) {</span>
+<span class="fc" id="L86">            return NativeDragOperation.ACTION_COPY;</span>
+        }
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if ((allowedActions &amp; NativeDragOperation.ACTION_MOVE) != 0) {</span>
+<span class="fc" id="L89">            return NativeDragOperation.ACTION_MOVE;</span>
+        }
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if ((allowedActions &amp; NativeDragOperation.ACTION_LINK) != 0) {</span>
+<span class="nc" id="L92">            return NativeDragOperation.ACTION_LINK;</span>
+        }
+<span class="fc" id="L94">        return NativeDragOperation.ACTION_NONE;</span>
+    }
+
+    /// Returns the dragged payload.
+    ///
+    /// Read from it while handling the drop. See
+    /// `Component#nativeDrop(com.codename1.ui.NativeDropEvent)` for what a representation
+    /// may be backed by, and for how long.
+    public ClipboardContent getContent() {
+<span class="fc" id="L103">        return content;</span>
+    }
+
+    /// Returns the component the drag is over.
+    public Component getTarget() {
+<span class="nc" id="L108">        return target;</span>
+    }
+
+    /// Returns the bit set of actions that may be agreed to here and now, which is what
+    /// `#accept(int)` will take.
+    ///
+    /// The source's permissions are where it starts, narrowed by anything that has since
+    /// narrowed them. A desktop modifier is the usual one: a source offering a copy and a
+    /// move while the user holds the key for a move is offering a move *now*, and reporting
+    /// both would invite a target to accept the copy the user has just said they do not
+    /// want. That is the question this answers -- what may be accepted -- and it is the same
+    /// answer on the enter, the over and the drop, so a target reads one thing throughout a
+    /// drag rather than one thing while hovering and another at the end.
+    ///
+    /// It is not a way to ask what the source would have permitted in the absence of the
+    /// user's choice; nothing carries that, and a target that acted on it would be acting
+    /// against the choice.
+    public int getAllowedActions() {
+<span class="fc" id="L126">        return allowedActions;</span>
+    }
+
+    /// Returns true when the drag started inside this application rather than in another
+    /// application or on the desktop. A target that reorders its own items usually only wants
+    /// to handle local drags, and a target that imports foreign data usually only wants the
+    /// rest.
+    public boolean isLocal() {
+<span class="fc" id="L134">        return local;</span>
+    }
+
+    /// Returns the file paths carried by the drag, or null when it carries none. This is the
+    /// representation a drag out of a file manager or off the desktop arrives with.
+    public String[] getFiles() {
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        return content == null ? null : content.getFiles();</span>
+    }
+
+    /// Returns the plain text carried by the drag, or null when it carries none.
+    public String getText() {
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        return content == null ? null : content.getText(ClipboardContent.MIME_TEXT);</span>
+    }
+
+    /// Returns the action this target has accepted, or `NativeDragOperation#ACTION_NONE` when
+    /// it has refused the drop.
+    public int getAcceptedAction() {
+<span class="fc" id="L151">        return acceptedAction;</span>
+    }
+
+    /// Accepts the drag, telling the operating system what dropping here would do. An action
+    /// the source does not allow is refused rather than silently substituted, because showing
+    /// the user a move cursor for a drag that can only copy is worse than showing no cursor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `action`: one of `NativeDragOperation#ACTION_COPY`, `NativeDragOperation#ACTION_MOVE`
+    ///   or `NativeDragOperation#ACTION_LINK`
+    public void accept(int action) {
+        // Exactly one, and one that is permitted. A listener passing the whole set back --
+        // accept(getAllowedActions()) is the obvious thing to write -- used to have that set
+        // stored as though it were an action, and the ports then each read it their own way:
+        // the iOS mapping quietly chose the move out of copy-or-move. There is no such thing
+        // as agreeing to two actions, so a set is a refusal, as an unpermitted action is.
+<span class="fc bfc" id="L168" title="All 4 branches covered.">        boolean single = action != NativeDragOperation.ACTION_NONE</span>
+                &amp;&amp; (action &amp; (action - 1)) == 0;
+<span class="fc bfc" id="L170" title="All 4 branches covered.">        acceptedAction = single &amp;&amp; (action &amp; permittedActions()) == action</span>
+                ? action : NativeDragOperation.ACTION_NONE;
+<span class="fc" id="L172">    }</span>
+
+    /// What may actually be agreed to here: what the source offers, narrowed by what the
+    /// target said it accepts.
+    ///
+    /// Both halves, because a target that declared itself copy-only and then accepted a move
+    /// in a listener used to have that move honoured -- and a move is the source deleting its
+    /// copy. The declaration is what made this component eligible for the drag in the first
+    /// place, and it is what the framework's own default already respects; a listener widening
+    /// past it is a contradiction, and the safe reading of a contradiction is a refusal, which
+    /// is what accept() already does for an action the source never offered.
+    private int permittedActions() {
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        return target == null ? allowedActions : allowedActions &amp; target.getAcceptedDropActions();</span>
+    }
+
+    /// Refuses the drag, so the user sees a &quot;no drop&quot; cursor over this component and no drop
+    /// event is delivered.
+    public void reject() {
+<span class="fc" id="L190">        acceptedAction = NativeDragOperation.ACTION_NONE;</span>
+<span class="fc" id="L191">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Barcode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai.vision</a> &gt; <span class="el_source">Barcode.java</span></div><h1>Barcode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.vision;
+
+/// Portable barcode observation with normalized geometry. Format names are
+/// backend-neutral constants such as {@code QR_CODE}, {@code DATA_MATRIX},
+/// {@code CODE_128}, and {@code EAN_13}; unknown symbologies use
+/// {@code UNKNOWN}. Corner points are ordered around the code when supplied
+/// by the backend and may be empty when geometry is unavailable.
+public final class Barcode {
+    private final String value;
+    private final String format;
+    private final byte[] rawBytes;
+    private final VisionRect bounds;
+    private final VisionPoint[] corners;
+    private final VisionMetadata metadata;
+
+    /// Creates a barcode without backend metadata.
+    /// @param value decoded display value, or {@code null}
+    /// @param format normalized symbology name
+    /// @param rawBytes original payload bytes when available
+    /// @param bounds normalized top-left-origin bounds
+    /// @param corners normalized corner points
+    public Barcode(String value, String format, byte[] rawBytes,
+                   VisionRect bounds, VisionPoint[] corners) {
+<span class="fc" id="L46">        this(value, format, rawBytes, bounds, corners, null);</span>
+<span class="fc" id="L47">    }</span>
+
+    /// Creates a complete barcode observation.
+    /// @param value decoded display value, or {@code null}
+    /// @param format normalized symbology name
+    /// @param rawBytes original payload bytes when available
+    /// @param bounds normalized top-left-origin bounds
+    /// @param corners normalized corner points
+    /// @param metadata backend identity and optional diagnostic values
+    public Barcode(String value, String format, byte[] rawBytes,
+                   VisionRect bounds, VisionPoint[] corners,
+<span class="fc" id="L58">                   VisionMetadata metadata) {</span>
+<span class="fc" id="L59">        this.value = value;</span>
+<span class="fc" id="L60">        this.format = format;</span>
+<span class="fc" id="L61">        this.rawBytes = copy(rawBytes);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        this.bounds = bounds == null ? VisionRect.EMPTY : bounds;</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (corners == null) {</span>
+<span class="fc" id="L64">            this.corners = new VisionPoint[0];</span>
+        } else {
+<span class="nc" id="L66">            this.corners = new VisionPoint[corners.length];</span>
+<span class="nc" id="L67">            System.arraycopy(corners, 0, this.corners, 0, corners.length);</span>
+        }
+<span class="fc" id="L69">        this.metadata = metadata;</span>
+<span class="fc" id="L70">    }</span>
+
+    /// @return decoded display value, or {@code null} when decoding failed
+    public String getValue() {
+<span class="fc" id="L74">        return value;</span>
+    }
+
+    /// @return normalized symbology name, never a vendor numeric identifier
+    public String getFormat() {
+<span class="fc" id="L79">        return format;</span>
+    }
+
+    /// @return a defensive copy of payload bytes, or {@code null} if unavailable
+    public byte[] getRawBytes() {
+<span class="nc" id="L84">        return copy(rawBytes);</span>
+    }
+
+    /// @return normalized top-left-origin bounds
+    public VisionRect getBounds() {
+<span class="nc" id="L89">        return bounds;</span>
+    }
+
+    /// @return defensive copy of normalized corners; possibly empty
+    public VisionPoint[] getCorners() {
+<span class="nc" id="L94">        VisionPoint[] out = new VisionPoint[corners.length];</span>
+<span class="nc" id="L95">        System.arraycopy(corners, 0, out, 0, corners.length);</span>
+<span class="nc" id="L96">        return out;</span>
+    }
+
+    /// @return backend metadata, or {@code null} for manually created results
+    public VisionMetadata getMetadata() {
+<span class="fc" id="L101">        return metadata;</span>
+    }
+
+    private static byte[] copy(byte[] value) {
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="fc" id="L106">            return null;</span>
+        }
+<span class="nc" id="L108">        byte[] out = new byte[value.length];</span>
+<span class="nc" id="L109">        System.arraycopy(value, 0, out, 0, value.length);</span>
+<span class="nc" id="L110">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

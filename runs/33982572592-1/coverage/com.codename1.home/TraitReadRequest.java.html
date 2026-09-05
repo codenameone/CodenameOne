@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TraitReadRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.home</a> &gt; <span class="el_source">TraitReadRequest.java</span></div><h1>TraitReadRequest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.home;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// Which traits to read, and how fresh they have to be.
+///
+/// ```java
+/// TraitReadRequest req = new TraitReadRequest()
+///         .add(lamp, lamp.getPrimaryService(), Trait.ON_OFF)
+///         .add(lamp, lamp.getPrimaryService(), Trait.BRIGHTNESS);
+/// SmartHome.getInstance().read(req).onResult((readings, err) -&gt; { ... });
+/// ```
+///
+/// #### Batch, because the boundary is the cost
+///
+/// Reading four traits off one lamp as four calls is four round trips to the
+/// platform and, on Matter, potentially four radio exchanges with a
+/// battery-powered device. One request carrying four traits is one of each.
+/// Where a request exceeds [SmartHome#getMaxReadBatchSize()] it is split for
+/// you and the readings are recombined, so there is no size a caller has to
+/// stay under -- but there is a real reason to fill it.
+<span class="fc" id="L46">public final class TraitReadRequest {</span>
+
+<span class="fc" id="L48">    private final List&lt;String&gt; accessoryIds = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L49">    private final List&lt;String&gt; serviceIds = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L50">    private final List&lt;Trait&gt; traits = new ArrayList&lt;Trait&gt;();</span>
+<span class="fc" id="L51">    private boolean allowCached = true;</span>
+
+    /// Adds one trait on one service.
+    ///
+    /// #### Parameters
+    ///
+    /// - `accessory`: the accessory to read
+    ///
+    /// - `service`: the service on it
+    ///
+    /// - `trait`: the trait to read
+    ///
+    /// #### Returns
+    ///
+    /// this request, for chaining
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when any argument is `null`
+    public TraitReadRequest add(Accessory accessory, AccessoryService service,
+            Trait trait) {
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (accessory == null) {</span>
+<span class="nc" id="L73">            throw new IllegalArgumentException(&quot;accessory is required&quot;);</span>
+        }
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (service == null) {</span>
+<span class="nc" id="L76">            throw new IllegalArgumentException(&quot;service is required&quot;);</span>
+        }
+<span class="fc" id="L78">        return add(accessory.getId(), service.getId(), trait);</span>
+    }
+
+    /// Adds one trait on one service, by identifier.
+    ///
+    /// The identifier form exists for code working from persisted ids that has
+    /// not re-fetched the graph. It skips the
+    /// [AccessoryService#supports(Trait)] check the snapshot would have
+    /// allowed, so an unsupported trait surfaces as a
+    /// [HomeError#TRAIT_NOT_SUPPORTED] reading rather than as an argument
+    /// error.
+    ///
+    /// #### Parameters
+    ///
+    /// - `accessoryId`: the accessory to read
+    ///
+    /// - `serviceId`: the service on it
+    ///
+    /// - `trait`: the trait to read
+    ///
+    /// #### Returns
+    ///
+    /// this request, for chaining
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when any argument is `null` or empty
+    public TraitReadRequest add(String accessoryId, String serviceId,
+            Trait trait) {
+<span class="pc bpc" id="L107" title="2 of 4 branches missed.">        if (accessoryId == null || accessoryId.length() == 0) {</span>
+<span class="nc" id="L108">            throw new IllegalArgumentException(&quot;accessory id is required&quot;);</span>
+        }
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">        if (serviceId == null || serviceId.length() == 0) {</span>
+<span class="nc" id="L111">            throw new IllegalArgumentException(&quot;service id is required&quot;);</span>
+        }
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (trait == null) {</span>
+<span class="nc" id="L114">            throw new IllegalArgumentException(&quot;trait is required&quot;);</span>
+        }
+<span class="fc" id="L116">        accessoryIds.add(accessoryId);</span>
+<span class="fc" id="L117">        serviceIds.add(serviceId);</span>
+<span class="fc" id="L118">        traits.add(trait);</span>
+<span class="fc" id="L119">        return this;</span>
+    }
+
+    /// Adds every trait one service exposes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `accessory`: the accessory to read
+    ///
+    /// - `service`: the service whose traits to read
+    ///
+    /// #### Returns
+    ///
+    /// this request, for chaining
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when either argument is `null`
+    public TraitReadRequest addAll(Accessory accessory,
+            AccessoryService service) {
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (accessory == null) {</span>
+<span class="nc" id="L140">            throw new IllegalArgumentException(&quot;accessory is required&quot;);</span>
+        }
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        if (service == null) {</span>
+<span class="nc" id="L143">            throw new IllegalArgumentException(&quot;service is required&quot;);</span>
+        }
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        for (TraitConstraint c : service.getConstraints()) {</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">            if (c.isReadable()) {</span>
+<span class="nc" id="L147">                add(accessory.getId(), service.getId(), c.getTrait());</span>
+            }
+<span class="nc" id="L149">        }</span>
+<span class="nc" id="L150">        return this;</span>
+    }
+
+    /// Whether the platform may answer from its own cache.
+    ///
+    /// `true` by default, which is almost always right: both platforms keep a
+    /// current view of accessory state and answering from it is instant and
+    /// costs a battery-powered accessory nothing. Set `false` only when you
+    /// genuinely need to force the radio -- a diagnostic screen, a &quot;refresh&quot;
+    /// the user explicitly asked for -- and expect it to be slower and to fail
+    /// more often, because it can no longer paper over an accessory that is
+    /// briefly unreachable.
+    ///
+    /// Backends that have no cache to bypass ignore this.
+    ///
+    /// #### Parameters
+    ///
+    /// - `allowCached`: whether cached values are acceptable
+    ///
+    /// #### Returns
+    ///
+    /// this request, for chaining
+    public TraitReadRequest setAllowCached(boolean allowCached) {
+<span class="fc" id="L173">        this.allowCached = allowCached;</span>
+<span class="fc" id="L174">        return this;</span>
+    }
+
+    /// Whether the platform may answer from its own cache.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when cached values are acceptable
+    public boolean isAllowCached() {
+<span class="fc" id="L183">        return allowCached;</span>
+    }
+
+    /// How many traits this request asks for.
+    ///
+    /// #### Returns
+    ///
+    /// the count, zero for an empty request
+    public int size() {
+<span class="fc" id="L192">        return traits.size();</span>
+    }
+
+    /// Whether this request asks for nothing.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when nothing has been added
+    public boolean isEmpty() {
+<span class="fc" id="L201">        return traits.isEmpty();</span>
+    }
+
+    /// The accessory ids, positionally aligned with [#getServiceIds()] and
+    /// [#getTraits()].
+    ///
+    /// #### Returns
+    ///
+    /// an immutable list
+    public List&lt;String&gt; getAccessoryIds() {
+<span class="fc" id="L211">        return Collections.unmodifiableList(accessoryIds);</span>
+    }
+
+    /// The service ids, positionally aligned with [#getAccessoryIds()] and
+    /// [#getTraits()].
+    ///
+    /// #### Returns
+    ///
+    /// an immutable list
+    public List&lt;String&gt; getServiceIds() {
+<span class="fc" id="L221">        return Collections.unmodifiableList(serviceIds);</span>
+    }
+
+    /// The traits, positionally aligned with [#getAccessoryIds()] and
+    /// [#getServiceIds()].
+    ///
+    /// #### Returns
+    ///
+    /// an immutable list
+    public List&lt;Trait&gt; getTraits() {
+<span class="fc" id="L231">        return Collections.unmodifiableList(traits);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

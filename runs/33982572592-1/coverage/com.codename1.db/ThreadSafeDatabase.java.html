@@ -1,0 +1,789 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ThreadSafeDatabase.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.db</a> &gt; <span class="el_source">ThreadSafeDatabase.java</span></div><h1>ThreadSafeDatabase.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.db;
+
+import com.codename1.util.EasyThread;
+import com.codename1.util.RunnableWithResultSync;
+
+import java.io.IOException;
+
+/// Confines a database and its cursors to a single thread.
+///
+/// A `Database` is not thread safe, and neither are the cursors it hands out. Wrapping one in this
+/// class routes every call through one worker thread, so several application threads can share a
+/// connection without coordinating.
+///
+/// ```java
+/// Database db = new ThreadSafeDatabase(Database.openOrCreate(&quot;shared.db&quot;));
+/// ```
+///
+/// The cost is that every call is a thread handoff, so a tight loop over a large result set is
+/// meaningfully slower than using a connection per thread. Prefer one database per thread when the
+/// threads do not actually need to share state.
+///
+/// This class used to be deprecated, on the grounds that platform specific behaviour had defeated
+/// it. That behaviour has since been fixed: the iOS port no longer closes SQLite handles from the
+/// garbage collector thread, and it opens each connection in serialised mode rather than trying to
+/// configure the whole process.
+///
+/// @author Shai Almog
+public class ThreadSafeDatabase extends Database {
+    private final Database underlying;
+    private final EasyThread et;
+
+    /// Guards against a second close. The worker is killed by the first one, so a synchronous
+    /// hand-off afterwards would queue work nothing is left to run and block forever.
+    ///
+    /// Only ever read or written while holding `#dispatchLock`.
+    private boolean closed;
+
+    /// Serializes the closed check against the hand-off it guards.
+    ///
+    /// Testing the flag and queueing the work have to be one step. Otherwise two threads both see
+    /// an open database, one of them closes it and kills the worker, and the other hands its task
+    /// to a worker that is already gone and waits for a result that can never arrive. This class
+    /// exists to be shared between threads, so that race is its main use case rather than an
+    /// exotic one.
+    ///
+    /// Holding the lock across the hand-off costs nothing: the worker is a single thread and the
+    /// hand-off is synchronous, so calls were already serialized. It is safe because no task
+    /// queued here calls back into this wrapper -- every task body runs against `#underlying`.
+<span class="fc" id="L72">    private final Object dispatchLock = new Object();</span>
+
+    /// Wraps the given database with a threadsafe version
+    ///
+    /// #### Parameters
+    ///
+    /// - `db`: the database
+<span class="fc" id="L79">    public ThreadSafeDatabase(Database db) {</span>
+<span class="fc" id="L80">        underlying = db;</span>
+<span class="fc" id="L81">        et = EasyThread.start(&quot;Database&quot;);</span>
+<span class="fc" id="L82">    }</span>
+
+    /// Returns the underlying easy thread we can use to pipe tasks to the db thread
+    ///
+    /// #### Returns
+    ///
+    /// the easy thread object
+    public EasyThread getThread() {
+<span class="fc" id="L90">        return et;</span>
+    }
+
+
+    @Override
+    public void beginTransaction() throws IOException {
+<span class="fc" id="L96">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="fc" id="L99">                underlying.beginTransaction();</span>
+<span class="fc" id="L100">            }</span>
+        });
+<span class="fc" id="L102">    }</span>
+
+    /// Refuses to hand work to a worker that has been killed.
+    ///
+    /// Guarding only close() was not enough: every other method still queued work and waited
+    /// synchronously, so closing a cursor after its owning database had closed -- an ordinary
+    /// cleanup order -- blocked forever instead of throwing.
+    ///
+    /// Call only while holding `#dispatchLock`, and queue the work it guards without releasing it.
+    /// Refuses a hand-off to a worker that has already finished.
+    ///
+    /// `close()` from the worker itself asks it to stop once its queue drains, so a call that
+    /// passed `#checkOpen()` a moment earlier can arrive after it has gone. EasyThread reports
+    /// that rather than accepting work nothing will run; this turns it into the error the caller
+    /// would have had a moment later.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the worker has stopped
+    private void requireLiveWorker() throws IOException {
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (et.isFinished()) {</span>
+<span class="nc" id="L123">            throw new IOException(&quot;This database has been closed&quot;);</span>
+        }
+<span class="fc" id="L125">    }</span>
+
+    /// The same answer, for a refusal that arrives from the hand-off rather than from the check.
+    ///
+    /// Between reading that the worker is still accepting work and handing it some, the worker
+    /// can decide to leave. EasyThread says so rather than queueing for a thread that has gone,
+    /// and this is that refusal in the wrapper's own terms.
+    ///
+    /// #### Parameters
+    ///
+    /// - `refused`: what EasyThread raised
+    ///
+    /// #### Returns
+    ///
+    /// the error to throw
+    private static IOException closedDuringHandoff(IllegalStateException refused) {
+<span class="nc" id="L141">        return new IOException(&quot;This database has been closed&quot;, refused);</span>
+    }
+
+    private void checkOpen() throws IOException {
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (closed) {</span>
+<span class="fc" id="L146">            throw new IOException(&quot;This database has been closed&quot;);</span>
+        }
+<span class="fc" id="L148">    }</span>
+
+    private void invokeWithException(final RunnableWithIOException r) throws IOException {
+        Object err;
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (et.isThisIt()) {</span>
+            // Before the lock, not inside it. Already on the worker -- which getThread() hands out,
+            // so a task running there can reach this -- handing work to that worker and waiting
+            // for it is a deadlock on its own. Taking dispatchLock first makes it worse: another
+            // thread can hold the lock while waiting for this worker, so this call would block on
+            // the lock and that one on the worker, with neither able to move. The thread asking is
+            // the thread that would do the work, so it does the work, and reads `closed` without
+            // the lock -- there is one worker, so a close cannot be running on it concurrently.
+<span class="nc" id="L160">            checkOpen();</span>
+<span class="nc" id="L161">            r.run();</span>
+<span class="nc" id="L162">            return;</span>
+        }
+<span class="fc" id="L164">        synchronized (dispatchLock) {</span>
+<span class="fc" id="L165">            checkOpen();</span>
+            // A worker that has been asked to stop refuses new work rather than queueing it for
+            // nobody. That can only be reached by a caller which passed the check above before
+            // close() set the flag, and the answer it deserves is the one the check gives. The
+            // refusal can also arrive from the hand-off itself, a moment later, which is why the
+            // call below is wrapped as well.
+<span class="fc" id="L171">            requireLiveWorker();</span>
+            try {
+<span class="fc" id="L173">                err = et.run(new RunnableWithResultSync&lt;Object&gt;() {</span>
+                    @Override
+                    @SuppressWarnings(&quot;PMD.UnnecessaryLocalBeforeReturn&quot;)
+                    public Object run() {
+                        try {
+<span class="fc" id="L178">                            r.run();</span>
+<span class="fc" id="L179">                            return null;</span>
+<span class="nc" id="L180">                        } catch (Throwable err) {</span>
+                            // Throwable, not IOException. Anything escaping this callback is
+                            // caught by the worker's own loop, which never delivers a result, so
+                            // the caller waits forever holding dispatchLock and every later call
+                            // queues behind it. An unchecked exception from the engine -- Android
+                            // raises CursorIndexOutOfBoundsException for a bad column, for one --
+                            // is enough to wedge the whole wrapper. Carrying it back keeps that a
+                            // thrown error.
+<span class="nc" id="L188">                            return err;</span>
+                        }
+                    }
+                });
+<span class="nc" id="L192">            } catch (IllegalStateException refused) {</span>
+<span class="nc" id="L193">                throw closedDuringHandoff(refused);</span>
+<span class="fc" id="L194">            }</span>
+<span class="fc" id="L195">        }</span>
+<span class="fc" id="L196">        rethrow(err);</span>
+<span class="fc" id="L197">    }</span>
+
+    /// Re-raises whatever the worker carried back, preserving its kind.
+    ///
+    /// An unchecked exception is rethrown as itself so callers see the same failure they would
+    /// from an unwrapped database; anything else that is not an IOException is wrapped, because
+    /// this API promises IOException.
+    private static void rethrow(Object err) throws IOException {
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (err == null) {</span>
+<span class="fc" id="L206">            return;</span>
+        }
+<span class="nc bnc" id="L208" title="All 2 branches missed.">        if (err instanceof IOException) {</span>
+<span class="nc" id="L209">            throw (IOException) err;</span>
+        }
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if (err instanceof RuntimeException) {</span>
+<span class="nc" id="L212">            throw (RuntimeException) err;</span>
+        }
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (err instanceof Error) {</span>
+<span class="nc" id="L215">            throw (Error) err;</span>
+        }
+<span class="nc" id="L217">        throw new IOException(((Throwable) err).getMessage(), (Throwable) err);</span>
+    }
+
+    private Object invokeWithException(final RunnableWithResponseOrIOException r) throws IOException {
+        Object ret;
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        if (et.isThisIt()) {</span>
+            // Before the lock; see the other invokeWithException for why both matter.
+<span class="nc" id="L224">            checkOpen();</span>
+<span class="nc" id="L225">            return r.run();</span>
+        }
+<span class="fc" id="L227">        synchronized (dispatchLock) {</span>
+<span class="fc" id="L228">            checkOpen();</span>
+<span class="fc" id="L229">            requireLiveWorker();</span>
+            try {
+<span class="fc" id="L231">                ret = et.run(new RunnableWithResultSync&lt;Object&gt;() {</span>
+                    @Override
+                    @SuppressWarnings(&quot;PMD.UnnecessaryLocalBeforeReturn&quot;)
+                    public Object run() {
+                        try {
+<span class="fc" id="L236">                            return r.run();</span>
+<span class="nc" id="L237">                        } catch (Throwable err) {</span>
+                            // See invokeWithException above: an escape here wedges the wrapper.
+<span class="nc" id="L239">                            return new Failure(err);</span>
+                        }
+                    }
+                });
+<span class="nc" id="L243">            } catch (IllegalStateException refused) {</span>
+<span class="nc" id="L244">                throw closedDuringHandoff(refused);</span>
+<span class="fc" id="L245">            }</span>
+<span class="fc" id="L246">        }</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">        if (ret instanceof Failure) {</span>
+<span class="nc" id="L248">            rethrow(((Failure) ret).cause);</span>
+        }
+<span class="fc" id="L250">        return ret;</span>
+    }
+
+    /// Distinguishes a failure carried back from the worker from a result that happens to be a
+    /// Throwable, which a query returning one as a value could otherwise be mistaken for.
+    private static final class Failure {
+        private final Throwable cause;
+
+<span class="nc" id="L258">        Failure(Throwable cause) {</span>
+<span class="nc" id="L259">            this.cause = cause;</span>
+<span class="nc" id="L260">        }</span>
+    }
+
+    @Override
+    public void commitTransaction() throws IOException {
+<span class="fc" id="L265">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="fc" id="L268">                underlying.commitTransaction();</span>
+<span class="fc" id="L269">            }</span>
+        });
+<span class="fc" id="L271">    }</span>
+
+    @Override
+    public void rollbackTransaction() throws IOException {
+<span class="nc" id="L275">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="nc" id="L278">                underlying.rollbackTransaction();</span>
+<span class="nc" id="L279">            }</span>
+        });
+<span class="nc" id="L281">    }</span>
+
+    @Override
+    public boolean isInTransaction() {
+        // beginTransaction() runs against the underlying database, so it moves that object's
+        // flag, not this wrapper's. Without delegating, the wrapper always reported false --
+        // including immediately after a successful begin -- and a caller trusting it would skip
+        // the commit or rollback it still owed.
+        //
+        // Read under the dispatch lock, but without handing work to the worker. The lock is what
+        // publishes the write: every transaction call runs inside it, so acquiring it here gives
+        // the happens-before that a plain read of another thread's field does not, and without it
+        // a polling thread could keep seeing stale state indefinitely.
+        //
+        // Deliberately not a dispatch. This is the one method on Database with no IOException, so
+        // it reads as a cheap accessor and callers poll it from the event thread; queueing work
+        // would park that thread behind whatever statement is running, which on Android is an
+        // ANR. Taking the lock can still wait for an in-flight call, but only for as long as that
+        // call holds it, and the answer is then current rather than stale.
+<span class="nc bnc" id="L300" title="All 2 branches missed.">        if (et.isThisIt()) {</span>
+            // Already on the worker, so the lock buys nothing and can cost everything: another
+            // thread may hold it while waiting for this worker, and blocking here would leave the
+            // two waiting on each other. The publishing this comment describes is not needed on
+            // this path either -- the writes were made by this same thread.
+<span class="nc" id="L305">            return underlying.isInTransaction();</span>
+        }
+<span class="nc" id="L307">        synchronized (dispatchLock) {</span>
+<span class="nc" id="L308">            return underlying.isInTransaction();</span>
+        }
+    }
+
+    @Override
+    public void changeKey(final DatabaseConfig config) throws IOException {
+        // Without this the wrapper inherits the base implementation, which always reports
+        // NOT_SUPPORTED, so a wrapped database could never be re-keyed however capable the
+        // underlying port is.
+<span class="nc" id="L317">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="nc" id="L320">                underlying.changeKey(config);</span>
+<span class="nc" id="L321">            }</span>
+        });
+<span class="nc" id="L323">    }</span>
+
+    /// Closes the database on the worker, and shuts the worker down.
+    ///
+    /// Idempotent, and synchronous: it returns with the database closed, so a `delete()` on the
+    /// next line does not race it. If the worker was stopped from outside -- `getThread()` is
+    /// public, and both `kill()` and `killWhenIdle()` on it are calls anybody can make -- this
+    /// waits for the work that worker had already accepted before closing the database itself,
+    /// rather than closing it underneath an operation that is still running.
+    @Override
+    public void close() throws IOException {
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        if (et.isThisIt()) {</span>
+            // Before the lock, for the reason invokeWithException gives: another thread can hold
+            // dispatchLock while waiting for this worker, and blocking on it here would leave
+            // neither able to move. One worker means no close can be running on it concurrently,
+            // so the flag is read and set without the lock.
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">            if (closed) {</span>
+<span class="nc" id="L340">                return;</span>
+            }
+<span class="fc" id="L342">            closed = true;</span>
+            try {
+<span class="fc" id="L344">                underlying.close();</span>
+            } finally {
+                // In a finally, because a close can fail -- the browser port reports a failed
+                // OPFS flush that way -- and the wrapper is closed either way. Leaving the worker
+                // alive there would keep the thread and everything it retains for the life of the
+                // process, and getThread() would still hand callers a thread that services work
+                // against a database that is gone.
+                //
+                // Asked to stop once its queue is empty, rather than killed. kill() stops the
+                // worker after the current task -- which is this one -- and everything behind it
+                // is dropped, including a call from a thread that took dispatchLock and passed
+                // checkOpen before the flag above was set. That caller waits for an answer that
+                // never comes.
+                //
+                // Draining instead runs those calls, which fail against the closed database, and
+                // the thread then ends. One that arrives after the thread has gone is refused by
+                // EasyThread rather than queued for nobody, and the refusal is turned into the
+                // same &quot;closed&quot; IOException the check above raises.
+<span class="fc" id="L362">                et.killWhenIdle();</span>
+            }
+<span class="fc" id="L364">            return;</span>
+        }
+<span class="fc" id="L366">        synchronized (dispatchLock) {</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">            if (closed) {</span>
+                // close() is idempotent by contract, and after the first call there is no worker
+                // left to service the hand-off below.
+<span class="fc" id="L370">                return;</span>
+            }
+            // Flip the flag and shut down without releasing the lock, so a concurrent operation
+            // either queues before this point or is rejected by checkOpen() after it. In between
+            // it would hand work to a dead worker and wait on it forever.
+<span class="fc" id="L375">            closed = true;</span>
+            // Synchronous on purpose. EasyThread.run(Runnable) is fire and forget, so this used to
+            // return while the database was still open, and a delete() on the next line would race
+            // it and fail with the file still in use.
+            Object failure;
+            try {
+<span class="fc" id="L381">                failure = handOffClose();</span>
+<span class="fc" id="L382">            } catch (IllegalStateException refused) {</span>
+                // The worker has already stopped, which means another close got there first: the
+                // worker's own path closes the database before it asks the thread to drain, and
+                // this call arrived after the thread had gone. Every other entry point turns this
+                // refusal into &quot;this database has been closed&quot;, but close() is idempotent by
+                // contract, so here it is not an error to report.
+                //
+                // Closed directly rather than assumed closed, because a refusal is all this can
+                // observe and a worker can also stop without having closed anything --
+                // getThread() is public, and killWhenIdle() on it is a call anybody can make.
+                //
+                // Waited for first, because a refusal does not mean the worker has gone.
+                // EasyThread stops accepting the moment a stop is asked for, while the tasks it
+                // already took keep running -- against this database. Closing here and then is
+                // the concurrent use this wrapper exists to prevent, and it can leave an
+                // operation that was already under way failing or half done. Once the worker has
+                // left its loop there is nothing to race with, and closing an already closed
+                // database does nothing.
+<span class="fc" id="L400">                et.awaitFinished();</span>
+<span class="fc" id="L401">                underlying.close();</span>
+<span class="fc" id="L402">                return;</span>
+<span class="fc" id="L403">            }</span>
+            // The worker is shut down either way. A close that failed still leaves this wrapper
+            // closed, so there is nothing to retry - but the caller has to be told, because on
+            // some ports a failing close means the data never reached storage.
+            //
+            // Drained rather than killed, as on the worker's own path. Anything handed to the
+            // worker through getThread() while the close above was running has been accepted, and
+            // kill() would end the loop with those tasks still in it: a synchronous caller would
+            // wait for a result that never comes, and an asynchronous one would lose its work
+            // without being told.
+<span class="fc" id="L413">            et.killWhenIdle();</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">            if (failure instanceof Failure) {</span>
+<span class="nc" id="L415">                rethrow(((Failure) failure).cause);</span>
+            }
+<span class="fc" id="L417">        }</span>
+<span class="fc" id="L418">    }</span>
+
+    /// Closes the underlying database on the worker and reports what happened.
+    ///
+    /// Synchronous on purpose. EasyThread.run(Runnable) is fire and forget, so this used to
+    /// return while the database was still open, and a delete() on the next line would race it
+    /// and fail with the file still in use.
+    ///
+    /// #### Returns
+    ///
+    /// null, or a Failure carrying what the close threw
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: if the worker has already stopped and cannot take the work
+    private Object handOffClose() {
+<span class="fc" id="L434">        return et.run(new RunnableWithResultSync&lt;Object&gt;() {</span>
+            @Override
+            public Object run() {
+                try {
+<span class="fc" id="L438">                    underlying.close();</span>
+<span class="fc" id="L439">                    return null;</span>
+<span class="nc" id="L440">                } catch (Exception err) {</span>
+<span class="nc" id="L441">                    return new Failure(err);</span>
+<span class="nc" id="L442">                } catch (Error err) {</span>
+                    // Wrapped, and caught in two clauses rather than as Throwable with an
+                    // instanceof test, because PMD forbids both that and returning a caught
+                    // local directly. Letting either escape is far worse than reporting it:
+                    // the worker's own loop would swallow it without delivering a result,
+                    // and this call is synchronous and holds dispatchLock, so close()
+                    // would block forever and never shut the worker down.
+<span class="nc" id="L449">                    return new Failure(err);</span>
+                }
+            }
+        });
+    }
+
+    @Override
+    public void execute(final String sql) throws IOException {
+<span class="fc" id="L457">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="fc" id="L460">                underlying.execute(sql);</span>
+<span class="fc" id="L461">            }</span>
+        });
+<span class="fc" id="L463">    }</span>
+
+    @Override
+    public void execute(final String sql, final String[] params) throws IOException {
+<span class="nc" id="L467">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="nc" id="L470">                underlying.execute(sql, params);</span>
+<span class="nc" id="L471">            }</span>
+        });
+<span class="nc" id="L473">    }</span>
+
+    @Override
+    public Cursor executeQuery(final String sql, final String[] params) throws IOException {
+<span class="nc" id="L477">        final Cursor[] curs = new Cursor[1];</span>
+<span class="nc" id="L478">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="nc" id="L481">                curs[0] = underlying.executeQuery(sql, params);</span>
+<span class="nc" id="L482">            }</span>
+        });
+<span class="nc" id="L484">        return new CursorWrapper(curs[0]);</span>
+    }
+
+    @Override
+    public Cursor executeQuery(final String sql) throws IOException {
+<span class="fc" id="L489">        final Cursor[] curs = new Cursor[1];</span>
+<span class="fc" id="L490">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="fc" id="L493">                curs[0] = underlying.executeQuery(sql);</span>
+<span class="fc" id="L494">            }</span>
+        });
+<span class="fc" id="L496">        return new CursorWrapper(curs[0]);</span>
+    }
+
+    @Override
+    public Cursor executeQuery(final String sql, final Object... params) throws IOException {
+<span class="fc" id="L501">        final Cursor[] curs = new Cursor[1];</span>
+<span class="fc" id="L502">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="fc" id="L505">                curs[0] = underlying.executeQuery(sql, params);</span>
+<span class="fc" id="L506">            }</span>
+        });
+<span class="fc" id="L508">        return new CursorWrapper(curs[0]);</span>
+    }
+
+    @Override
+    public void execute(final String sql, final Object... params) throws IOException {
+<span class="fc" id="L513">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="fc" id="L516">                underlying.execute(sql, params);</span>
+<span class="fc" id="L517">            }</span>
+        });
+<span class="fc" id="L519">    }</span>
+
+    interface RunnableWithIOException {
+        // PMD Fix (UnnecessaryModifier): Interface methods are implicitly public.
+        void run() throws IOException;
+    }
+
+    interface RunnableWithResponseOrIOException {
+        // PMD Fix (UnnecessaryModifier): Interface methods are implicitly public.
+        Object run() throws IOException;
+    }
+
+    private class RowWrapper implements RowExt {
+        private final Row underlyingRow;
+
+<span class="fc" id="L534">        public RowWrapper(Row underlyingRow) {</span>
+<span class="fc" id="L535">            this.underlyingRow = underlyingRow;</span>
+<span class="fc" id="L536">        }</span>
+
+        @Override
+        public byte[] getBlob(final int index) throws IOException {
+<span class="nc" id="L540">            return (byte[]) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L543">                    return underlyingRow.getBlob(index);</span>
+                }
+            });
+        }
+
+        @Override
+        public double getDouble(final int index) throws IOException {
+<span class="nc" id="L550">            return (Double) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L553">                    return underlyingRow.getDouble(index);</span>
+                }
+            });
+        }
+
+        @Override
+        public float getFloat(final int index) throws IOException {
+<span class="nc" id="L560">            return (Float) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L563">                    return underlyingRow.getFloat(index);</span>
+                }
+            });
+        }
+
+        @Override
+        public int getInteger(final int index) throws IOException {
+<span class="fc" id="L570">            return (Integer) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="fc" id="L573">                    return underlyingRow.getInteger(index);</span>
+                }
+            });
+        }
+
+        @Override
+        public long getLong(final int index) throws IOException {
+<span class="nc" id="L580">            return (Long) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L583">                    return underlyingRow.getLong(index);</span>
+                }
+            });
+        }
+
+        @Override
+        public short getShort(final int index) throws IOException {
+<span class="nc" id="L590">            return (Short) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L593">                    return underlyingRow.getShort(index);</span>
+                }
+            });
+        }
+
+        @Override
+        public String getString(final int index) throws IOException {
+<span class="nc" id="L600">            return (String) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L603">                    return underlyingRow.getString(index);</span>
+                }
+            });
+        }
+
+
+        @Override
+        public boolean wasNull() throws IOException {
+<span class="nc" id="L611">            return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L614">                    return Database.wasNull(underlyingRow);</span>
+                }
+            });
+        }
+    }
+
+    /// Implements `CursorExt` as well as `Cursor`, because every cursor a Codename One port
+    /// returns implements it and the wrapper is documented as transparent. Without it a wrapped
+    /// cursor silently lost the capability: `Database#count(Cursor)` answered -1 even on Android,
+    /// where the exact count is already known, and the extension calls bypassed the worker
+    /// thread this class exists to funnel everything through.
+    private class CursorWrapper implements CursorExt {
+        private final Cursor underlyingCursor;
+
+<span class="fc" id="L628">        public CursorWrapper(Cursor underlyingCursor) {</span>
+<span class="fc" id="L629">            this.underlyingCursor = underlyingCursor;</span>
+<span class="fc" id="L630">        }</span>
+
+        @Override
+        public boolean first() throws IOException {
+<span class="nc" id="L634">            return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L637">                    return underlyingCursor.first();</span>
+                }
+            });
+        }
+
+        @Override
+        public boolean last() throws IOException {
+<span class="nc" id="L644">            return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L647">                    return underlyingCursor.last();</span>
+                }
+            });
+        }
+
+        @Override
+        public boolean next() throws IOException {
+<span class="fc" id="L654">            return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="fc" id="L657">                    return underlyingCursor.next();</span>
+                }
+            });
+        }
+
+        @Override
+        public boolean prev() throws IOException {
+<span class="nc" id="L664">            return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L667">                    return underlyingCursor.prev();</span>
+                }
+            });
+        }
+
+        @Override
+        public int getColumnIndex(final String columnName) throws IOException {
+<span class="nc" id="L674">            return (Integer) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L677">                    return underlyingCursor.getColumnIndex(columnName);</span>
+                }
+            });
+        }
+
+        @Override
+        public String getColumnName(final int columnIndex) throws IOException {
+<span class="nc" id="L684">            return (String) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L687">                    return underlyingCursor.getColumnName(columnIndex);</span>
+                }
+            });
+        }
+
+        @Override
+        public int getColumnCount() throws IOException {
+<span class="nc" id="L694">            return (Integer) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L697">                    return underlyingCursor.getColumnCount();</span>
+                }
+            });
+        }
+
+        @Override
+        public int getPosition() throws IOException {
+<span class="nc" id="L704">            return (Integer) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L707">                    return underlyingCursor.getPosition();</span>
+                }
+            });
+        }
+
+        @Override
+        public boolean position(final int row) throws IOException {
+<span class="nc" id="L714">            return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L717">                    return underlyingCursor.position(row);</span>
+                }
+            });
+        }
+
+        @Override
+        public void beforeFirst() throws IOException {
+<span class="nc" id="L724">            invokeWithException(new RunnableWithIOException() {</span>
+                @Override
+                public void run() throws IOException {
+<span class="nc" id="L727">                    Database.beforeFirst(underlyingCursor);</span>
+<span class="nc" id="L728">                }</span>
+            });
+<span class="nc" id="L730">        }</span>
+
+        @Override
+        public int getCount() throws IOException {
+<span class="nc" id="L734">            Integer count = (Integer) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L737">                    return Integer.valueOf(Database.count(underlyingCursor));</span>
+                }
+            });
+            // -1 is the documented &quot;cannot say cheaply&quot; answer, so it is also the right answer if
+            // the dispatch ever hands back nothing.
+<span class="nc bnc" id="L742" title="All 2 branches missed.">            return count == null ? -1 : count.intValue();</span>
+        }
+
+        @Override
+        public void close() throws IOException {
+<span class="pc bpc" id="L747" title="1 of 2 branches missed.">            if (et.isThisIt()) {</span>
+                // Before the lock, like every other entry point: another thread can hold
+                // dispatchLock while waiting for this worker, so taking it here would leave the
+                // two waiting on each other. The read of `closed` is safe for the same reason --
+                // one worker, so no close can be running on it concurrently.
+<span class="nc bnc" id="L752" title="All 2 branches missed.">                if (closed) {</span>
+<span class="nc" id="L753">                    return;</span>
+                }
+<span class="nc" id="L755">                underlyingCursor.close();</span>
+<span class="nc" id="L756">                return;</span>
+            }
+            // Under the lock so the database cannot close between the check and the hand-off,
+            // which would turn this no-op into a spurious &quot;database has been closed&quot;. The monitor
+            // is reentrant, so the nested acquisition inside invokeWithException is free.
+<span class="fc" id="L761">            synchronized (dispatchLock) {</span>
+<span class="pc bpc" id="L762" title="1 of 2 branches missed.">                if (closed) {</span>
+                    // Closing the database already invalidated its cursors, and cursor close is
+                    // idempotent, so closing one afterwards is a no-op rather than an error.
+                    // Closing the cursor after the database is an ordinary cleanup order.
+<span class="nc" id="L766">                    return;</span>
+                }
+<span class="fc" id="L768">                invokeWithException(new RunnableWithIOException() {</span>
+                    @Override
+                    public void run() throws IOException {
+<span class="fc" id="L771">                        underlyingCursor.close();</span>
+<span class="fc" id="L772">                    }</span>
+                });
+<span class="fc" id="L774">            }</span>
+<span class="fc" id="L775">        }</span>
+
+        @Override
+        public Row getRow() throws IOException {
+<span class="fc" id="L779">            return new RowWrapper((Row) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="fc" id="L782">                    return underlyingCursor.getRow();</span>
+                }
+            }));
+        }
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

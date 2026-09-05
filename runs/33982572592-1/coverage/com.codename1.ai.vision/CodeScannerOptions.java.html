@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CodeScannerOptions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai.vision</a> &gt; <span class="el_source">CodeScannerOptions.java</span></div><h1>CodeScannerOptions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.vision;
+
+import com.codename1.camera.CameraFacing;
+
+/// Configuration for {@link CodeScanner#scan(CodeScannerOptions)}. Every
+/// setting has a working default, so an application usually changes only the
+/// wording and the accepted symbologies.
+///
+/// ```java
+/// CodeScanner.scan(new CodeScannerOptions()
+///         .title(&quot;Scan the ticket&quot;)
+///         .hint(&quot;Hold the QR code inside the frame&quot;)
+///         .formats(BarcodeFormat.QR_CODE, BarcodeFormat.AZTEC))
+///     .ready(code -&gt; {
+///         if (code == null) {
+///             return;              // the user pressed back
+///         }
+///         admit(code.getValue());
+///     })
+///     .except(error -&gt; Log.e(error));
+/// ```
+<span class="fc" id="L44">public final class CodeScannerOptions {</span>
+<span class="fc" id="L45">    private String title = &quot;Scan&quot;;</span>
+<span class="fc" id="L46">    private String hint = &quot;Point the camera at a code&quot;;</span>
+<span class="fc" id="L47">    private String[] formats = new String[0];</span>
+<span class="fc" id="L48">    private CameraFacing facing = CameraFacing.BACK;</span>
+<span class="fc" id="L49">    private boolean torchButton = true;</span>
+    private VisionOptions visionOptions;
+
+    /// Sets the scanner form's title.
+    ///
+    /// @param value the title, or {@code null} for no title
+    /// @return this options object
+    public CodeScannerOptions title(String value) {
+<span class="nc" id="L57">        title = value;</span>
+<span class="nc" id="L58">        return this;</span>
+    }
+
+    /// Sets the instruction shown below the preview.
+    ///
+    /// @param value the instruction, or {@code null} to show none
+    /// @return this options object
+    public CodeScannerOptions hint(String value) {
+<span class="nc" id="L66">        hint = value;</span>
+<span class="nc" id="L67">        return this;</span>
+    }
+
+    /// Restricts which symbologies are accepted, using the
+    /// {@link BarcodeFormat} constants. A code in any other format is ignored
+    /// and scanning continues, which is what an application that expects a
+    /// specific kind of code wants: a stray product barcode in the frame does
+    /// not end the scan. The default accepts every format the backend decodes.
+    ///
+    /// This filters results rather than configuring the detector, so it does
+    /// not make scanning faster.
+    ///
+    /// @param values accepted format constants; empty or {@code null} accepts
+    ///        every format
+    /// @return this options object
+    public CodeScannerOptions formats(String... values) {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (values == null) {</span>
+<span class="fc" id="L84">            formats = new String[0];</span>
+        } else {
+<span class="fc" id="L86">            formats = new String[values.length];</span>
+<span class="fc" id="L87">            System.arraycopy(values, 0, formats, 0, values.length);</span>
+        }
+<span class="fc" id="L89">        return this;</span>
+    }
+
+    /// Selects which camera the scanner opens.
+    ///
+    /// @param value the camera to use, or {@code null} for the back camera
+    /// @return this options object
+    public CodeScannerOptions facing(CameraFacing value) {
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        facing = value == null ? CameraFacing.BACK : value;</span>
+<span class="nc" id="L98">        return this;</span>
+    }
+
+    /// Whether to offer a torch toggle. The button appears only when the open
+    /// camera actually has a flash, so leaving this enabled is safe. The
+    /// default is {@code true}.
+    ///
+    /// @param value whether the toggle may be shown
+    /// @return this options object
+    public CodeScannerOptions torchButton(boolean value) {
+<span class="nc" id="L108">        torchButton = value;</span>
+<span class="nc" id="L109">        return this;</span>
+    }
+
+    /// Passes analyzer options through to the underlying
+    /// {@link BarcodeScanner}, which is how an iOS build selects
+    /// {@link VisionBackends#mlKitBarcodeScanning()} instead of Apple Vision.
+    ///
+    /// @param value analyzer configuration, or {@code null} for the defaults
+    /// @return this options object
+    public CodeScannerOptions visionOptions(VisionOptions value) {
+<span class="nc" id="L119">        visionOptions = value;</span>
+<span class="nc" id="L120">        return this;</span>
+    }
+
+    /// @return the scanner form's title, possibly {@code null}
+    public String getTitle() {
+<span class="fc" id="L125">        return title;</span>
+    }
+
+    /// @return the instruction shown below the preview, possibly {@code null}
+    public String getHint() {
+<span class="fc" id="L130">        return hint;</span>
+    }
+
+    /// @return defensive copy of the accepted formats; empty accepts all
+    public String[] getFormats() {
+<span class="fc" id="L135">        String[] out = new String[formats.length];</span>
+<span class="fc" id="L136">        System.arraycopy(formats, 0, out, 0, formats.length);</span>
+<span class="fc" id="L137">        return out;</span>
+    }
+
+    /// @return the camera the scanner opens
+    public CameraFacing getFacing() {
+<span class="fc" id="L142">        return facing;</span>
+    }
+
+    /// @return whether a torch toggle may be shown
+    public boolean isTorchButton() {
+<span class="fc" id="L147">        return torchButton;</span>
+    }
+
+    /// @return the analyzer configuration, or {@code null} for the defaults
+    public VisionOptions getVisionOptions() {
+<span class="fc" id="L152">        return visionOptions;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

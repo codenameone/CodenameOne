@@ -1,0 +1,795 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Inflate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.gzip</a> &gt; <span class="el_source">Inflate.java</span></div><h1>Inflate.java</h1><pre class="source lang-java linenums">/* -*-mode:java; c-basic-offset:2; -*- */
+/*
+Copyright (c) 2000-2011 ymnk, JCraft,Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright 
+     notice, this list of conditions and the following disclaimer in 
+     the documentation and/or other materials provided with the distribution.
+
+  3. The names of the authors may not be used to endorse or promote products
+     derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL JCRAFT,
+INC. OR ANY CONTRIBUTORS TO THIS SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * This program is based on zlib-1.1.3, so all credit should go authors
+ * Jean-loup Gailly(jloup@gzip.org) and Mark Adler(madler@alumni.caltech.edu)
+ * and contributors of zlib.
+ */
+
+package com.codename1.io.gzip;
+
+final class Inflate {
+
+    static final int Z_NO_FLUSH = 0;
+    static final int Z_PARTIAL_FLUSH = 1;
+    static final int Z_SYNC_FLUSH = 2;
+    static final int Z_FULL_FLUSH = 3;
+    static final int Z_FINISH = 4;
+    static final int INFLATE_ANY = 0x40000000;
+    // preset dictionary flag in zlib header
+    static final private int PRESET_DICT = 0x20;
+    static final private int Z_DEFLATED = 8;
+    static final private int Z_OK = 0;
+    static final private int Z_STREAM_END = 1;
+    static final private int Z_NEED_DICT = 2;
+    static final private int Z_STREAM_ERROR = -2;
+    static final private int Z_DATA_ERROR = -3;
+    static final private int Z_BUF_ERROR = -5;
+    static final private int DICT4 = 2;    // four dictionary check bytes to go
+    static final private int DICT3 = 3;    // three dictionary check bytes to go
+    static final private int DICT2 = 4;    // two dictionary check bytes to go
+    static final private int DICT1 = 5;    // one dictionary check byte to go
+    static final private int DICT0 = 6;    // waiting for inflateSetDictionary
+    static final private int BLOCKS = 7;   // decompressing blocks
+    static final private int CHECK4 = 8;   // four check bytes to go
+    static final private int CHECK3 = 9;   // three check bytes to go
+    static final private int CHECK2 = 10;  // two check bytes to go
+    static final private int CHECK1 = 11;  // one check byte to go
+    static final private int DONE = 12;    // finished check, done
+    static final private int BAD = 13;     // got an error--stay here
+    static final private int HEAD = 14;
+    static final private int LENGTH = 15;
+    static final private int TIME = 16;
+    static final private int OS = 17;
+    static final private int EXLEN = 18;
+    static final private int EXTRA = 19;
+    static final private int NAME = 20;
+    static final private int COMMENT = 21;
+    static final private int HCRC = 22;
+    static final private int FLAGS = 23;
+<span class="fc" id="L76">    static private final byte[] mark = {(byte) 0, (byte) 0, (byte) 0xff, (byte) 0xff};</span>
+    private final ZStream z;
+
+<span class="fc" id="L79">    @SuppressWarnings(&quot;PMD.SingularField&quot;)</span>
+    private final byte[] crcbuf = new byte[4];
+    int mode;                            // current inflate mode
+    // mode dependent information
+    int method;        // if FLAGS, method byte
+    // if CHECK, check values to compare
+<span class="fc" id="L85">    long was = -1;           // computed check value</span>
+    long need;               // stream check value
+    // 0: no wrapper
+    // 1: zlib header
+    // 2: gzip header
+    // 4: auto detection
+    // if BAD, inflateSync's marker bytes count
+    int marker;
+    // mode independent information
+    int wrap;          // flag for no wrapper
+    int wbits;            // log2(window size)  (8..15, defaults to 15)
+    InfBlocks blocks;     // current inflate_blocks state
+<span class="fc" id="L97">    GZIPHeader gheader = null;</span>
+
+    @SuppressWarnings(&quot;PMD.SingularField&quot;)
+    private int flags;
+<span class="fc" id="L101">    private int need_bytes = -1;</span>
+<span class="fc" id="L102">    private java.io.ByteArrayOutputStream tmp_string = null;</span>
+
+<span class="fc" id="L104">    Inflate(ZStream z) {</span>
+<span class="fc" id="L105">        this.z = z;</span>
+<span class="fc" id="L106">    }</span>
+
+    int inflateReset() {
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (z == null) {</span>
+<span class="nc" id="L110">            return Z_STREAM_ERROR;</span>
+        }
+
+<span class="fc" id="L113">        z.totalIn = z.totalOut = 0;</span>
+<span class="fc" id="L114">        z.msg = null;</span>
+<span class="fc" id="L115">        this.mode = HEAD;</span>
+<span class="fc" id="L116">        this.need_bytes = -1;</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (this.blocks != null) {</span>
+<span class="fc" id="L118">            this.blocks.reset();</span>
+        }
+<span class="fc" id="L120">        return Z_OK;</span>
+    }
+
+    int inflateEnd() {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (blocks != null) {</span>
+<span class="nc" id="L125">            blocks.free();</span>
+        }
+<span class="nc" id="L127">        return Z_OK;</span>
+    }
+
+    int inflateInit(int w) {
+<span class="fc" id="L131">        z.msg = null;</span>
+<span class="fc" id="L132">        blocks = null;</span>
+
+        // handle undocumented wrap option (no zlib header or check)
+<span class="fc" id="L135">        wrap = 0;</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (w &lt; 0) {</span>
+<span class="nc" id="L137">            w = -w;</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        } else if ((w &amp; INFLATE_ANY) != 0) {</span>
+<span class="nc" id="L139">            wrap = 4;</span>
+<span class="nc" id="L140">            w &amp;= ~INFLATE_ANY;</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">            if (w &lt; 48) {</span>
+<span class="nc" id="L142">                w &amp;= 15;</span>
+            }
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        } else if ((w &amp; ~31) != 0) { // for example, DEF_WBITS + 32</span>
+<span class="nc" id="L145">            wrap = 4;               // zlib and gzip wrapped data should be accepted.</span>
+<span class="nc" id="L146">            w &amp;= 15;</span>
+        } else {
+<span class="fc" id="L148">            wrap = (w &gt;&gt; 4) + 1;</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            if (w &lt; 48) {</span>
+<span class="fc" id="L150">                w &amp;= 15;</span>
+            }
+        }
+
+<span class="pc bpc" id="L154" title="2 of 4 branches missed.">        if (w &lt; 8 || w &gt; 15) {</span>
+<span class="nc" id="L155">            inflateEnd();</span>
+<span class="nc" id="L156">            return Z_STREAM_ERROR;</span>
+        }
+
+        // set window size
+<span class="fc" id="L160">        wbits = w;</span>
+
+<span class="fc" id="L162">        this.blocks = new InfBlocks(z, 1 &lt;&lt; w);</span>
+
+        // reset state
+<span class="fc" id="L165">        inflateReset();</span>
+
+<span class="fc" id="L167">        return Z_OK;</span>
+    }
+
+    @SuppressWarnings(&quot;PMD.UnnecessaryLocalBeforeReturn&quot;)
+    int inflate(int f) {
+        int r;
+        int b;
+
+<span class="pc bpc" id="L175" title="2 of 4 branches missed.">        if (z == null || z.nextIn == null) {</span>
+<span class="nc bnc" id="L176" title="All 4 branches missed.">            if (f == Z_FINISH &amp;&amp; this.mode == HEAD) {</span>
+<span class="nc" id="L177">                return Z_OK;</span>
+            }
+<span class="nc" id="L179">            return Z_STREAM_ERROR;</span>
+        }
+
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        f = f == Z_FINISH ? Z_BUF_ERROR : Z_OK;</span>
+<span class="fc" id="L183">        r = Z_BUF_ERROR;</span>
+        while (true) {
+
+<span class="pc bpc" id="L186" title="18 of 23 branches missed.">            switch (this.mode) {</span>
+                case HEAD:
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">                    if (wrap == 0) {</span>
+<span class="nc" id="L189">                        this.mode = BLOCKS;</span>
+<span class="nc" id="L190">                        break;</span>
+                    }
+
+                    try {
+<span class="fc" id="L194">                        r = readBytes(2, r, f);</span>
+<span class="nc" id="L195">                    } catch (Return e) {</span>
+<span class="nc" id="L196">                        return e.r;</span>
+<span class="fc" id="L197">                    }</span>
+
+<span class="pc bpc" id="L199" title="3 of 6 branches missed.">                    if ((wrap == 4 || (wrap &amp; 2) != 0) &amp;&amp;</span>
+                            this.need == 0x8b1fL) {   // gzip header
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">                        if (wrap == 4) {</span>
+<span class="nc" id="L202">                            wrap = 2;</span>
+                        }
+<span class="fc" id="L204">                        z.adler = new CRC32();</span>
+<span class="fc" id="L205">                        checksum(2, this.need);</span>
+
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                        if (gheader == null) {</span>
+<span class="fc" id="L208">                            gheader = new GZIPHeader();</span>
+                        }
+
+<span class="fc" id="L211">                        this.mode = FLAGS;</span>
+<span class="fc" id="L212">                        break;</span>
+                    }
+
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                    if ((wrap &amp; 2) != 0) {</span>
+<span class="nc" id="L216">                        this.mode = BAD;</span>
+<span class="nc" id="L217">                        z.msg = &quot;incorrect header check&quot;;</span>
+<span class="nc" id="L218">                        break;</span>
+                    }
+
+<span class="nc" id="L221">                    flags = 0;</span>
+
+<span class="nc" id="L223">                    this.method = ((int) this.need) &amp; 0xff;</span>
+<span class="nc" id="L224">                    b = ((int) (this.need &gt;&gt; 8)) &amp; 0xff;</span>
+
+<span class="nc bnc" id="L226" title="All 6 branches missed.">                    if (((wrap &amp; 1) == 0 ||  // check if zlib header allowed</span>
+                            (((this.method &lt;&lt; 8) + b) % 31) != 0) &amp;&amp;
+                            (this.method &amp; 0xf) != Z_DEFLATED) {
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                        if (wrap == 4) {</span>
+<span class="nc" id="L230">                            z.nextInIndex -= 2;</span>
+<span class="nc" id="L231">                            z.availIn += 2;</span>
+<span class="nc" id="L232">                            z.totalIn -= 2;</span>
+<span class="nc" id="L233">                            wrap = 0;</span>
+<span class="nc" id="L234">                            this.mode = BLOCKS;</span>
+<span class="nc" id="L235">                            break;</span>
+                        }
+<span class="nc" id="L237">                        this.mode = BAD;</span>
+<span class="nc" id="L238">                        z.msg = &quot;incorrect header check&quot;;</span>
+                        // since zlib 1.2, it is allowted to inflateSync for this case.
+          /*
+          this.marker = 5;       // can't try inflateSync
+          */
+<span class="nc" id="L243">                        break;</span>
+                    }
+
+<span class="nc bnc" id="L246" title="All 2 branches missed.">                    if ((this.method &amp; 0xf) != Z_DEFLATED) {</span>
+<span class="nc" id="L247">                        this.mode = BAD;</span>
+<span class="nc" id="L248">                        z.msg = &quot;unknown compression method&quot;;</span>
+                        // since zlib 1.2, it is allowted to inflateSync for this case.
+      /*
+          this.marker = 5;       // can't try inflateSync
+      */
+<span class="nc" id="L253">                        break;</span>
+                    }
+
+<span class="nc bnc" id="L256" title="All 2 branches missed.">                    if (wrap == 4) {</span>
+<span class="nc" id="L257">                        wrap = 1;</span>
+                    }
+
+<span class="nc bnc" id="L260" title="All 2 branches missed.">                    if ((this.method &gt;&gt; 4) + 8 &gt; this.wbits) {</span>
+<span class="nc" id="L261">                        this.mode = BAD;</span>
+<span class="nc" id="L262">                        z.msg = &quot;invalid window size&quot;;</span>
+                        // since zlib 1.2, it is allowted to inflateSync for this case.
+      /*
+          this.marker = 5;       // can't try inflateSync
+      */
+<span class="nc" id="L267">                        break;</span>
+                    }
+
+<span class="nc" id="L270">                    z.adler = new Adler32();</span>
+
+<span class="nc bnc" id="L272" title="All 2 branches missed.">                    if ((b &amp; PRESET_DICT) == 0) {</span>
+<span class="nc" id="L273">                        this.mode = BLOCKS;</span>
+<span class="nc" id="L274">                        break;</span>
+                    }
+<span class="nc" id="L276">                    this.mode = DICT4;</span>
+                case DICT4:
+
+<span class="nc bnc" id="L279" title="All 2 branches missed.">                    if (z.availIn == 0) {</span>
+<span class="nc" id="L280">                        return r;</span>
+                    }
+<span class="nc" id="L282">                    z.availIn--;</span>
+<span class="nc" id="L283">                    z.totalIn++;</span>
+<span class="nc" id="L284">                    this.need = ((long) (z.nextIn[z.nextInIndex++] &amp; 0xff) &lt;&lt; 24) &amp; 0xff000000L;</span>
+<span class="nc" id="L285">                    this.mode = DICT3;</span>
+                case DICT3:
+
+<span class="nc bnc" id="L288" title="All 2 branches missed.">                    if (z.availIn == 0) {</span>
+<span class="nc" id="L289">                        return r;</span>
+                    }
+<span class="nc" id="L291">                    r = f;</span>
+
+<span class="nc" id="L293">                    z.availIn--;</span>
+<span class="nc" id="L294">                    z.totalIn++;</span>
+<span class="nc" id="L295">                    this.need += ((z.nextIn[z.nextInIndex++] &amp; 0xff) &lt;&lt; 16) &amp; 0xff0000L;</span>
+<span class="nc" id="L296">                    this.mode = DICT2;</span>
+                case DICT2:
+
+<span class="nc bnc" id="L299" title="All 2 branches missed.">                    if (z.availIn == 0) {</span>
+<span class="nc" id="L300">                        return r;</span>
+                    }
+<span class="nc" id="L302">                    r = f;</span>
+
+<span class="nc" id="L304">                    z.availIn--;</span>
+<span class="nc" id="L305">                    z.totalIn++;</span>
+<span class="nc" id="L306">                    this.need += ((z.nextIn[z.nextInIndex++] &amp; 0xff) &lt;&lt; 8) &amp; 0xff00L;</span>
+<span class="nc" id="L307">                    this.mode = DICT1;</span>
+                case DICT1:
+
+<span class="nc bnc" id="L310" title="All 2 branches missed.">                    if (z.availIn == 0) {</span>
+<span class="nc" id="L311">                        return r;</span>
+                    }
+
+<span class="nc" id="L314">                    z.availIn--;</span>
+<span class="nc" id="L315">                    z.totalIn++;</span>
+<span class="nc" id="L316">                    this.need += (z.nextIn[z.nextInIndex++] &amp; 0xffL);</span>
+<span class="nc" id="L317">                    z.adler.reset(this.need);</span>
+<span class="nc" id="L318">                    this.mode = DICT0;</span>
+<span class="nc" id="L319">                    return Z_NEED_DICT;</span>
+                case DICT0:
+<span class="nc" id="L321">                    this.mode = BAD;</span>
+<span class="nc" id="L322">                    z.msg = &quot;need dictionary&quot;;</span>
+<span class="nc" id="L323">                    this.marker = 0;       // can try inflateSync</span>
+<span class="nc" id="L324">                    return Z_STREAM_ERROR;</span>
+                case BLOCKS:
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">                    if (this.blocks != null) {</span>
+<span class="fc" id="L327">                        r = this.blocks.proc(r);</span>
+                    }
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">                    if (r == Z_DATA_ERROR) {</span>
+<span class="nc" id="L330">                        this.mode = BAD;</span>
+<span class="nc" id="L331">                        this.marker = 0;     // can try inflateSync</span>
+<span class="nc" id="L332">                        break;</span>
+                    }
+<span class="fc bfc" id="L334" title="All 2 branches covered.">                    if (r == Z_OK) {</span>
+<span class="fc" id="L335">                        r = f;</span>
+                    }
+<span class="fc bfc" id="L337" title="All 2 branches covered.">                    if (r != Z_STREAM_END) {</span>
+<span class="fc" id="L338">                        return r;</span>
+                    }
+<span class="fc" id="L340">                    r = f;</span>
+<span class="fc" id="L341">                    this.was = z.adler.getValue();</span>
+<span class="fc" id="L342">                    this.blocks.reset();</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">                    if (this.wrap == 0) {</span>
+<span class="nc" id="L344">                        this.mode = DONE;</span>
+<span class="nc" id="L345">                        break;</span>
+                    }
+<span class="fc" id="L347">                    this.mode = CHECK4;</span>
+                case CHECK4:
+
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">                    if (z.availIn == 0) {</span>
+<span class="nc" id="L351">                        return r;</span>
+                    }
+<span class="fc" id="L353">                    r = f;</span>
+
+<span class="fc" id="L355">                    z.availIn--;</span>
+<span class="fc" id="L356">                    z.totalIn++;</span>
+<span class="fc" id="L357">                    this.need = ((long) (z.nextIn[z.nextInIndex++] &amp; 0xff) &lt;&lt; 24) &amp; 0xff000000L;</span>
+<span class="fc" id="L358">                    this.mode = CHECK3;</span>
+                case CHECK3:
+
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">                    if (z.availIn == 0) {</span>
+<span class="nc" id="L362">                        return r;</span>
+                    }
+<span class="fc" id="L364">                    r = f;</span>
+
+<span class="fc" id="L366">                    z.availIn--;</span>
+<span class="fc" id="L367">                    z.totalIn++;</span>
+<span class="fc" id="L368">                    this.need += ((z.nextIn[z.nextInIndex++] &amp; 0xff) &lt;&lt; 16) &amp; 0xff0000L;</span>
+<span class="fc" id="L369">                    this.mode = CHECK2;</span>
+                case CHECK2:
+
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">                    if (z.availIn == 0) {</span>
+<span class="nc" id="L373">                        return r;</span>
+                    }
+<span class="fc" id="L375">                    r = f;</span>
+
+<span class="fc" id="L377">                    z.availIn--;</span>
+<span class="fc" id="L378">                    z.totalIn++;</span>
+<span class="fc" id="L379">                    this.need += ((z.nextIn[z.nextInIndex++] &amp; 0xff) &lt;&lt; 8) &amp; 0xff00L;</span>
+<span class="fc" id="L380">                    this.mode = CHECK1;</span>
+                case CHECK1:
+
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">                    if (z.availIn == 0) {</span>
+<span class="nc" id="L384">                        return r;</span>
+                    }
+<span class="fc" id="L386">                    r = f;</span>
+
+<span class="fc" id="L388">                    z.availIn--;</span>
+<span class="fc" id="L389">                    z.totalIn++;</span>
+<span class="fc" id="L390">                    this.need += (z.nextIn[z.nextInIndex++] &amp; 0xffL);</span>
+
+<span class="pc bpc" id="L392" title="1 of 2 branches missed.">                    if (flags != 0) {  // gzip</span>
+<span class="fc" id="L393">                        this.need = ((this.need &amp; 0xff000000) &gt;&gt; 24 |</span>
+                                (this.need &amp; 0x00ff0000) &gt;&gt; 8 |
+                                (this.need &amp; 0x0000ff00) &lt;&lt; 8 |
+                                (this.need &amp; 0x0000ffff) &lt;&lt; 24) &amp; 0xffffffffL;
+                    }
+
+<span class="pc bpc" id="L399" title="1 of 2 branches missed.">                    if (((int) (this.was)) != ((int) (this.need))) {</span>
+<span class="nc" id="L400">                        z.msg = &quot;incorrect data check&quot;;</span>
+                        // chack is delayed
+          /*
+          this.mode = BAD;
+          this.marker = 5;       // can't try inflateSync
+          break;
+      */
+<span class="pc bpc" id="L407" title="2 of 4 branches missed.">                    } else if (flags != 0 &amp;&amp; gheader != null) {</span>
+<span class="fc" id="L408">                        gheader.crc = this.need;</span>
+                    }
+
+<span class="fc" id="L411">                    this.mode = LENGTH;</span>
+                case LENGTH:
+<span class="pc bpc" id="L413" title="2 of 4 branches missed.">                    if (wrap != 0 &amp;&amp; flags != 0) {</span>
+
+                        try {
+<span class="fc" id="L416">                            r = readBytes(4, r, f);</span>
+<span class="nc" id="L417">                        } catch (Return e) {</span>
+<span class="nc" id="L418">                            return e.r;</span>
+<span class="fc" id="L419">                        }</span>
+
+<span class="pc bpc" id="L421" title="3 of 4 branches missed.">                        if (z.msg != null &amp;&amp; &quot;incorrect data check&quot;.equals(z.msg)) {</span>
+<span class="nc" id="L422">                            this.mode = BAD;</span>
+<span class="nc" id="L423">                            this.marker = 5;       // can't try inflateSync</span>
+<span class="nc" id="L424">                            break;</span>
+                        }
+
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">                        if (this.need != (z.totalOut &amp; 0xffffffffL)) {</span>
+<span class="nc" id="L428">                            z.msg = &quot;incorrect length check&quot;;</span>
+<span class="nc" id="L429">                            this.mode = BAD;</span>
+<span class="nc" id="L430">                            break;</span>
+                        }
+<span class="fc" id="L432">                        z.msg = null;</span>
+                    } else {
+<span class="nc bnc" id="L434" title="All 4 branches missed.">                        if (z.msg != null &amp;&amp; &quot;incorrect data check&quot;.equals(z.msg)) {</span>
+<span class="nc" id="L435">                            this.mode = BAD;</span>
+<span class="nc" id="L436">                            this.marker = 5;       // can't try inflateSync</span>
+<span class="nc" id="L437">                            break;</span>
+                        }
+                    }
+
+<span class="fc" id="L441">                    this.mode = DONE;</span>
+                case DONE:
+<span class="fc" id="L443">                    return Z_STREAM_END;</span>
+                case BAD:
+<span class="nc" id="L445">                    return Z_DATA_ERROR;</span>
+
+                case FLAGS:
+
+                    try {
+<span class="fc" id="L450">                        r = readBytes(2, r, f);</span>
+<span class="nc" id="L451">                    } catch (Return e) {</span>
+<span class="nc" id="L452">                        return e.r;</span>
+<span class="fc" id="L453">                    }</span>
+
+<span class="fc" id="L455">                    flags = ((int) this.need) &amp; 0xffff;</span>
+
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">                    if ((flags &amp; 0xff) != Z_DEFLATED) {</span>
+<span class="nc" id="L458">                        z.msg = &quot;unknown compression method&quot;;</span>
+<span class="nc" id="L459">                        this.mode = BAD;</span>
+<span class="nc" id="L460">                        break;</span>
+                    }
+<span class="pc bpc" id="L462" title="1 of 2 branches missed.">                    if ((flags &amp; 0xe000) != 0) {</span>
+<span class="nc" id="L463">                        z.msg = &quot;unknown header flags set&quot;;</span>
+<span class="nc" id="L464">                        this.mode = BAD;</span>
+<span class="nc" id="L465">                        break;</span>
+                    }
+
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">                    if ((flags &amp; 0x0200) != 0) {</span>
+<span class="nc" id="L469">                        checksum(2, this.need);</span>
+                    }
+
+<span class="fc" id="L472">                    this.mode = TIME;</span>
+
+                case TIME:
+                    try {
+<span class="fc" id="L476">                        r = readBytes(4, r, f);</span>
+<span class="nc" id="L477">                    } catch (Return e) {</span>
+<span class="nc" id="L478">                        return e.r;</span>
+<span class="fc" id="L479">                    }</span>
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">                    if (gheader != null) {</span>
+<span class="fc" id="L481">                        gheader.setModifiedTime(this.need);</span>
+                    }
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">                    if ((flags &amp; 0x0200) != 0) {</span>
+<span class="nc" id="L484">                        checksum(4, this.need);</span>
+                    }
+<span class="fc" id="L486">                    this.mode = OS;</span>
+                case OS:
+                    try {
+<span class="fc" id="L489">                        r = readBytes(2, r, f);</span>
+<span class="nc" id="L490">                    } catch (Return e) {</span>
+<span class="nc" id="L491">                        return e.r;</span>
+<span class="fc" id="L492">                    }</span>
+<span class="pc bpc" id="L493" title="1 of 2 branches missed.">                    if (gheader != null) {</span>
+<span class="fc" id="L494">                        gheader.os = (((int) this.need) &gt;&gt; 8) &amp; 0xff;</span>
+                    }
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">                    if ((flags &amp; 0x0200) != 0) {</span>
+<span class="nc" id="L497">                        checksum(2, this.need);</span>
+                    }
+<span class="fc" id="L499">                    this.mode = EXLEN;</span>
+                case EXLEN:
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">                    if ((flags &amp; 0x0400) != 0) {</span>
+                        try {
+<span class="nc" id="L503">                            r = readBytes(2, r, f);</span>
+<span class="nc" id="L504">                        } catch (Return e) {</span>
+<span class="nc" id="L505">                            return e.r;</span>
+<span class="nc" id="L506">                        }</span>
+<span class="nc bnc" id="L507" title="All 2 branches missed.">                        if (gheader != null) {</span>
+<span class="nc" id="L508">                            gheader.extra = new byte[((int) this.need) &amp; 0xffff];</span>
+                        }
+<span class="nc bnc" id="L510" title="All 2 branches missed.">                        if ((flags &amp; 0x0200) != 0) {</span>
+<span class="nc" id="L511">                            checksum(2, this.need);</span>
+                        }
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">                    } else if (gheader != null) {</span>
+<span class="fc" id="L514">                        gheader.extra = null;</span>
+                    }
+<span class="fc" id="L516">                    this.mode = EXTRA;</span>
+
+                case EXTRA:
+<span class="pc bpc" id="L519" title="1 of 2 branches missed.">                    if ((flags &amp; 0x0400) != 0) {</span>
+                        try {
+<span class="nc" id="L521">                            r = readBytes(r, f);</span>
+<span class="nc bnc" id="L522" title="All 2 branches missed.">                            if (gheader != null) {</span>
+<span class="nc" id="L523">                                byte[] foo = tmp_string.toByteArray();</span>
+<span class="nc" id="L524">                                tmp_string = null;</span>
+<span class="nc bnc" id="L525" title="All 2 branches missed.">                                if (foo.length == gheader.extra.length) {</span>
+<span class="nc" id="L526">                                    System.arraycopy(foo, 0, gheader.extra, 0, foo.length);</span>
+                                } else {
+<span class="nc" id="L528">                                    z.msg = &quot;bad extra field length&quot;;</span>
+<span class="nc" id="L529">                                    this.mode = BAD;</span>
+<span class="nc" id="L530">                                    break;</span>
+                                }
+                            }
+<span class="nc" id="L533">                        } catch (Return e) {</span>
+<span class="nc" id="L534">                            return e.r;</span>
+<span class="nc" id="L535">                        }</span>
+<span class="pc bpc" id="L536" title="1 of 2 branches missed.">                    } else if (gheader != null) {</span>
+<span class="fc" id="L537">                        gheader.extra = null;</span>
+                    }
+<span class="fc" id="L539">                    this.mode = NAME;</span>
+                case NAME:
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">                    if ((flags &amp; 0x0800) != 0) {</span>
+                        try {
+<span class="fc" id="L543">                            r = readString(r, f);</span>
+<span class="pc bpc" id="L544" title="1 of 2 branches missed.">                            if (gheader != null) {</span>
+<span class="fc" id="L545">                                gheader.name = tmp_string.toByteArray();</span>
+                            }
+<span class="fc" id="L547">                            tmp_string = null;</span>
+<span class="fc" id="L548">                        } catch (Return e) {</span>
+<span class="fc" id="L549">                            return e.r;</span>
+<span class="fc" id="L550">                        }</span>
+<span class="nc bnc" id="L551" title="All 2 branches missed.">                    } else if (gheader != null) {</span>
+<span class="nc" id="L552">                        gheader.name = null;</span>
+                    }
+<span class="fc" id="L554">                    this.mode = COMMENT;</span>
+                case COMMENT:
+<span class="pc bpc" id="L556" title="1 of 2 branches missed.">                    if ((flags &amp; 0x1000) != 0) {</span>
+                        try {
+<span class="fc" id="L558">                            r = readString(r, f);</span>
+<span class="pc bpc" id="L559" title="1 of 2 branches missed.">                            if (gheader != null) {</span>
+<span class="fc" id="L560">                                gheader.comment = tmp_string.toByteArray();</span>
+                            }
+<span class="fc" id="L562">                            tmp_string = null;</span>
+<span class="fc" id="L563">                        } catch (Return e) {</span>
+<span class="fc" id="L564">                            return e.r;</span>
+<span class="fc" id="L565">                        }</span>
+<span class="nc bnc" id="L566" title="All 2 branches missed.">                    } else if (gheader != null) {</span>
+<span class="nc" id="L567">                        gheader.comment = null;</span>
+                    }
+<span class="fc" id="L569">                    this.mode = HCRC;</span>
+                case HCRC:
+<span class="pc bpc" id="L571" title="1 of 2 branches missed.">                    if ((flags &amp; 0x0200) != 0) {</span>
+                        try {
+<span class="nc" id="L573">                            r = readBytes(2, r, f);</span>
+<span class="nc" id="L574">                        } catch (Return e) {</span>
+<span class="nc" id="L575">                            return e.r;</span>
+<span class="nc" id="L576">                        }</span>
+<span class="nc bnc" id="L577" title="All 2 branches missed.">                        if (this.need != (z.adler.getValue() &amp; 0xffffL)) {</span>
+<span class="nc" id="L578">                            this.mode = BAD;</span>
+<span class="nc" id="L579">                            z.msg = &quot;header crc mismatch&quot;;</span>
+<span class="nc" id="L580">                            this.marker = 5;       // can't try inflateSync</span>
+<span class="nc" id="L581">                            break;</span>
+                        }
+                    }
+<span class="fc" id="L584">                    z.adler = new CRC32();</span>
+
+<span class="fc" id="L586">                    this.mode = BLOCKS;</span>
+<span class="fc" id="L587">                    break;</span>
+                default:
+<span class="nc" id="L589">                    return Z_STREAM_ERROR;</span>
+            }
+        }
+    }
+
+    int inflateSetDictionary(byte[] dictionary, int dictLength) {
+<span class="nc bnc" id="L595" title="All 6 branches missed.">        if (z == null || (this.mode != DICT0 &amp;&amp; this.wrap != 0)) {</span>
+<span class="nc" id="L596">            return Z_STREAM_ERROR;</span>
+        }
+
+<span class="nc" id="L599">        int index = 0;</span>
+<span class="nc" id="L600">        int length = dictLength;</span>
+
+<span class="nc bnc" id="L602" title="All 2 branches missed.">        if (this.mode == DICT0) {</span>
+<span class="nc" id="L603">            long adlerNeed = z.adler.getValue();</span>
+<span class="nc" id="L604">            z.adler.reset();</span>
+<span class="nc" id="L605">            z.adler.update(dictionary, 0, dictLength);</span>
+<span class="nc bnc" id="L606" title="All 2 branches missed.">            if (z.adler.getValue() != adlerNeed) {</span>
+<span class="nc" id="L607">                return Z_DATA_ERROR;</span>
+            }
+        }
+
+<span class="nc" id="L611">        z.adler.reset();</span>
+
+<span class="nc bnc" id="L613" title="All 2 branches missed.">        if (length &gt;= (1 &lt;&lt; this.wbits)) {</span>
+<span class="nc" id="L614">            length = (1 &lt;&lt; this.wbits) - 1;</span>
+<span class="nc" id="L615">            index = dictLength - length;</span>
+        }
+<span class="nc bnc" id="L617" title="All 2 branches missed.">        if (this.blocks != null) {</span>
+<span class="nc" id="L618">            this.blocks.setDictionary(dictionary, index, length);</span>
+        }
+<span class="nc" id="L620">        this.mode = BLOCKS;</span>
+<span class="nc" id="L621">        return Z_OK;</span>
+    }
+
+    int inflateSync() {
+        int n;       // number of bytes to look at
+        int p;       // pointer to bytes
+        long r;   // temporaries to save total_in and total_out
+        long w;
+
+        // set up
+<span class="nc bnc" id="L631" title="All 2 branches missed.">        if (z == null) {</span>
+<span class="nc" id="L632">            return Z_STREAM_ERROR;</span>
+        }
+<span class="nc bnc" id="L634" title="All 2 branches missed.">        if (this.mode != BAD) {</span>
+<span class="nc" id="L635">            this.mode = BAD;</span>
+<span class="nc" id="L636">            this.marker = 0;</span>
+        }
+<span class="nc bnc" id="L638" title="All 2 branches missed.">        if ((n = z.availIn) == 0) { //NOPMD AssignmentInOperand</span>
+<span class="nc" id="L639">            return Z_BUF_ERROR;</span>
+        }
+
+<span class="nc" id="L642">        p = z.nextInIndex;</span>
+        // search
+<span class="nc bnc" id="L644" title="All 4 branches missed.">        while (n != 0 &amp;&amp; this.marker &lt; 4) {</span>
+<span class="nc bnc" id="L645" title="All 2 branches missed.">            if (z.nextIn[p] == mark[this.marker]) {</span>
+<span class="nc" id="L646">                this.marker++;</span>
+<span class="nc bnc" id="L647" title="All 2 branches missed.">            } else if (z.nextIn[p] != 0) {</span>
+<span class="nc" id="L648">                this.marker = 0;</span>
+            } else {
+<span class="nc" id="L650">                this.marker = 4 - this.marker;</span>
+            }
+<span class="nc" id="L652">            p++;</span>
+<span class="nc" id="L653">            n--;</span>
+        }
+
+        // restore
+<span class="nc" id="L657">        z.totalIn += p - z.nextInIndex;</span>
+<span class="nc" id="L658">        z.nextInIndex = p;</span>
+<span class="nc" id="L659">        z.availIn = n;</span>
+
+        // return no joy or set up to restart on a new block
+<span class="nc bnc" id="L662" title="All 2 branches missed.">        if (this.marker != 4) {</span>
+<span class="nc" id="L663">            return Z_DATA_ERROR;</span>
+        }
+<span class="nc" id="L665">        r = z.totalIn;</span>
+<span class="nc" id="L666">        w = z.totalOut;</span>
+<span class="nc" id="L667">        inflateReset();</span>
+<span class="nc" id="L668">        z.totalIn = r;</span>
+<span class="nc" id="L669">        z.totalOut = w;</span>
+<span class="nc" id="L670">        this.mode = BLOCKS;</span>
+
+<span class="nc" id="L672">        return Z_OK;</span>
+    }
+
+    // Returns true if inflate is currently at the end of a block generated
+    // by Z_SYNC_FLUSH or Z_FULL_FLUSH. This function is used by one PPP
+    // implementation to provide an additional safety check. PPP uses Z_SYNC_FLUSH
+    // but removes the length bytes of the resulting empty stored block. When
+    // decompressing, PPP checks that at the end of input packet, inflate is
+    // waiting for these length bytes.
+    int inflateSyncPoint() {
+<span class="nc bnc" id="L682" title="All 4 branches missed.">        if (z == null || this.blocks == null) {</span>
+<span class="nc" id="L683">            return Z_STREAM_ERROR;</span>
+        }
+<span class="nc" id="L685">        return this.blocks.syncPoint();</span>
+    }
+
+    private int readBytes(int n, int r, int f) throws Return {
+<span class="pc bpc" id="L689" title="1 of 2 branches missed.">        if (need_bytes == -1) {</span>
+<span class="fc" id="L690">            need_bytes = n;</span>
+<span class="fc" id="L691">            this.need = 0;</span>
+        }
+<span class="fc bfc" id="L693" title="All 2 branches covered.">        while (need_bytes &gt; 0) {</span>
+<span class="pc bpc" id="L694" title="1 of 2 branches missed.">            if (z.availIn == 0) {</span>
+<span class="nc" id="L695">                throw new Return(r);</span>
+            }
+<span class="fc" id="L697">            r = f;</span>
+<span class="fc" id="L698">            z.availIn--;</span>
+<span class="fc" id="L699">            z.totalIn++;</span>
+<span class="fc" id="L700">            this.need = this.need |</span>
+                    ((long) (z.nextIn[z.nextInIndex++] &amp; 0xff) &lt;&lt; ((n - need_bytes) * 8));
+<span class="fc" id="L702">            need_bytes--;</span>
+        }
+<span class="fc bfc" id="L704" title="All 2 branches covered.">        if (n == 2) {</span>
+<span class="fc" id="L705">            this.need &amp;= 0xffffL;</span>
+<span class="pc bpc" id="L706" title="1 of 2 branches missed.">        } else if (n == 4) {</span>
+<span class="fc" id="L707">            this.need &amp;= 0xffffffffL;</span>
+        }
+<span class="fc" id="L709">        need_bytes = -1;</span>
+<span class="fc" id="L710">        return r;</span>
+    }
+
+    private int readString(int r, int f) throws Return {
+<span class="fc bfc" id="L714" title="All 2 branches covered.">        if (tmp_string == null) {</span>
+<span class="fc" id="L715">            tmp_string = new java.io.ByteArrayOutputStream();</span>
+        }
+<span class="fc" id="L717">        int b = 0;</span>
+        do {
+<span class="fc bfc" id="L719" title="All 2 branches covered.">            if (z.availIn == 0) {</span>
+<span class="fc" id="L720">                throw new Return(r);</span>
+            }
+<span class="fc" id="L722">            r = f;</span>
+<span class="fc" id="L723">            z.availIn--;</span>
+<span class="fc" id="L724">            z.totalIn++;</span>
+<span class="fc" id="L725">            b = z.nextIn[z.nextInIndex];</span>
+<span class="fc bfc" id="L726" title="All 2 branches covered.">            if (b != 0) {</span>
+<span class="fc" id="L727">                tmp_string.write(z.nextIn, z.nextInIndex, 1);</span>
+            }
+<span class="fc" id="L729">            z.adler.update(z.nextIn, z.nextInIndex, 1);</span>
+<span class="fc" id="L730">            z.nextInIndex++;</span>
+<span class="fc bfc" id="L731" title="All 2 branches covered.">        } while (b != 0);</span>
+<span class="fc" id="L732">        return r;</span>
+    }
+
+    private int readBytes(int r, int f) throws Return {
+<span class="nc bnc" id="L736" title="All 2 branches missed.">        if (tmp_string == null) {</span>
+<span class="nc" id="L737">            tmp_string = new java.io.ByteArrayOutputStream();</span>
+        }
+<span class="nc bnc" id="L739" title="All 2 branches missed.">        while (this.need &gt; 0) {</span>
+<span class="nc bnc" id="L740" title="All 2 branches missed.">            if (z.availIn == 0) {</span>
+<span class="nc" id="L741">                throw new Return(r);</span>
+            }
+<span class="nc" id="L743">            r = f;</span>
+<span class="nc" id="L744">            z.availIn--;</span>
+<span class="nc" id="L745">            z.totalIn++;</span>
+<span class="nc" id="L746">            tmp_string.write(z.nextIn, z.nextInIndex, 1);</span>
+<span class="nc" id="L747">            z.adler.update(z.nextIn, z.nextInIndex, 1);</span>
+<span class="nc" id="L748">            z.nextInIndex++;</span>
+<span class="nc" id="L749">            this.need--;</span>
+        }
+<span class="nc" id="L751">        return r;</span>
+    }
+
+    private void checksum(int n, long v) {
+<span class="fc bfc" id="L755" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L756">            crcbuf[i] = (byte) (v &amp; 0xff);</span>
+<span class="fc" id="L757">            v &gt;&gt;= 8;</span>
+        }
+<span class="fc" id="L759">        z.adler.update(crcbuf, 0, n);</span>
+<span class="fc" id="L760">    }</span>
+
+    public GZIPHeader getGZIPHeader() {
+<span class="fc" id="L763">        return gheader;</span>
+    }
+
+    boolean inParsingHeader() {
+<span class="fc bfc" id="L767" title="All 2 branches covered.">        switch (mode) {</span>
+            case HEAD:
+            case DICT4:
+            case DICT3:
+            case DICT2:
+            case DICT1:
+            case FLAGS:
+            case TIME:
+            case OS:
+            case EXLEN:
+            case EXTRA:
+            case NAME:
+            case COMMENT:
+            case HCRC:
+<span class="fc" id="L781">                return true;</span>
+            default:
+<span class="fc" id="L783">                return false;</span>
+        }
+    }
+
+    static class Return extends Exception {
+        int r;
+
+<span class="fc" id="L790">        Return(int r) {</span>
+<span class="fc" id="L791">            this.r = r;</span>
+<span class="fc" id="L792">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RGBImage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">RGBImage.java</span></div><h1>RGBImage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+/// An image that stores its data as an integer RGB array internally,
+/// this image cannot be manipulated via Graphics primitives however its
+/// array is accessible and modifiable programmatically. This is very useful
+/// for 2 distinct use cases.
+///
+/// The first use case allows us to manipulate images in
+/// a custom way while still preserving alpha information where applicable.
+///
+/// The second use case allows us to store images in the Java heap which is useful
+/// for some constrained devices. In small devices images are often stored
+/// in a separate &quot;heap&quot; which runs out eventually, this allows us to place
+/// the image in the Java heap which is potentially more wasteful but might
+/// sometimes be more abundant.
+///
+/// Note that unless specified otherwise most methods inherited from Image will
+/// fail when invoked on this subclass often with a NullPointerException. This
+/// image can be drawn on graphics as usual
+///
+/// @author Shai Almog
+public class RGBImage extends Image {
+    private int width;
+    private int height;
+    private int[] rgb;
+    private boolean opaque;
+
+    /// Converts an image to an RGB image after which the original image can be GC'd
+    ///
+    /// #### Parameters
+    ///
+    /// - `img`: the image to convert to an RGB image
+    public RGBImage(Image img) {
+<span class="nc" id="L57">        super(null);</span>
+<span class="nc" id="L58">        width = img.getWidth();</span>
+<span class="nc" id="L59">        height = img.getHeight();</span>
+<span class="nc" id="L60">        rgb = img.getRGBCached();</span>
+<span class="nc" id="L61">    }</span>
+
+    /// Creates an RGB image from scratch the array isn't copied and can be saved
+    /// and manipulated
+    ///
+    /// #### Parameters
+    ///
+    /// - `rgb`: AARRGGBB array
+    ///
+    /// - `width`: width of image
+    ///
+    /// - `height`: height of image
+    public RGBImage(int[] rgb, int width, int height) {
+<span class="fc" id="L74">        super(null);</span>
+<span class="fc" id="L75">        this.width = width;</span>
+<span class="fc" id="L76">        this.height = height;</span>
+<span class="fc" id="L77">        this.rgb = rgb;</span>
+<span class="fc" id="L78">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public Image subImage(int x, int y, int width, int height, boolean processAlpha) {
+<span class="fc" id="L83">        int[] arr = new int[width * height];</span>
+<span class="fc" id="L84">        int alen = arr.length;</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="fc" id="L86">            int destY = iter / width;</span>
+<span class="fc" id="L87">            int destX = iter % width;</span>
+<span class="fc" id="L88">            int offset = x + destX + ((y + destY) * this.width);</span>
+<span class="fc" id="L89">            arr[iter] = rgb[offset];</span>
+        }
+
+<span class="fc" id="L92">        return new RGBImage(arr, width, height);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Image scaled(int width, int height) {
+<span class="fc" id="L98">        int srcWidth = getWidth();</span>
+<span class="fc" id="L99">        int srcHeight = getHeight();</span>
+
+        // no need to scale
+<span class="pc bpc" id="L102" title="3 of 4 branches missed.">        if (srcWidth == width &amp;&amp; srcHeight == height) {</span>
+<span class="nc" id="L103">            return this;</span>
+        }
+<span class="fc" id="L105">        int[] currentArray = new int[srcWidth];</span>
+<span class="fc" id="L106">        int[] destinationArray = new int[width * height];</span>
+<span class="fc" id="L107">        scaleArray(srcWidth, srcHeight, height, width, currentArray, destinationArray);</span>
+
+        // currently we only support byte data...
+<span class="fc" id="L110">        return new RGBImage(destinationArray, width, height);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void scale(int width, int height) {
+<span class="fc" id="L116">        int srcWidth = getWidth();</span>
+<span class="fc" id="L117">        int srcHeight = getHeight();</span>
+
+        // no need to scale
+<span class="pc bpc" id="L120" title="3 of 4 branches missed.">        if (srcWidth == width &amp;&amp; srcHeight == height) {</span>
+<span class="nc" id="L121">            return;</span>
+        }
+<span class="fc" id="L123">        int[] currentArray = new int[srcWidth];</span>
+<span class="fc" id="L124">        int[] destinationArray = new int[width * height];</span>
+<span class="fc" id="L125">        scaleArray(srcWidth, srcHeight, height, width, currentArray, destinationArray);</span>
+
+<span class="fc" id="L127">        this.width = width;</span>
+<span class="fc" id="L128">        this.height = height;</span>
+<span class="fc" id="L129">        this.rgb = destinationArray;</span>
+<span class="fc" id="L130">    }</span>
+
+    /// Unsupported in the current version, this method will be implemented in a future release
+    @Override
+    public Image rotate(int degrees) {
+<span class="nc" id="L135">        throw new RuntimeException(&quot;The rotate method is not supported by RGB images at the moment&quot;);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Image modifyAlpha(byte alpha) {
+<span class="fc" id="L141">        int[] arr = Image.allocateRgbArray(rgb.length);</span>
+<span class="fc" id="L142">        System.arraycopy(rgb, 0, arr, 0, rgb.length);</span>
+<span class="pc bpc" id="L143" title="1 of 4 branches missed.">        if (Image.isSimdOptimizationsEnabled() &amp;&amp; arr.length &gt;= 16) {</span>
+<span class="nc" id="L144">            int alphaInt = (((int) alpha) &lt;&lt; 24) &amp; 0xff000000;</span>
+<span class="nc" id="L145">            Image.replaceAlphaPreserveTransparentSimd(arr, 0, alphaInt, arr.length);</span>
+<span class="nc" id="L146">        } else {</span>
+<span class="fc" id="L147">            int alphaInt = (((int) alpha) &lt;&lt; 24) &amp; 0xff000000;</span>
+<span class="fc" id="L148">            int rlen = rgb.length;</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            for (int iter = 0; iter &lt; rlen; iter++) {</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">                if ((arr[iter] &amp; 0xff000000) != 0) {</span>
+<span class="fc" id="L151">                    arr[iter] = (arr[iter] &amp; 0xffffff) | alphaInt;</span>
+                }
+            }
+        }
+<span class="fc" id="L155">        return new RGBImage(arr, width, height);</span>
+    }
+
+    /// This method is unsupported in this image type
+    @Override
+    public Graphics getGraphics() {
+<span class="nc" id="L161">        throw new RuntimeException(&quot;RGBImage objects can't be modified via graphics&quot;);</span>
+    }
+
+
+    /// Returns a mutable array that can be used to change the appearance of the image
+    /// arranged as AARRGGBB.
+    ///
+    /// #### Returns
+    ///
+    /// ARGB int array
+    @Override
+    public int[] getRGB() {
+<span class="fc" id="L173">        return rgb;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    void getRGB(int[] rgbData,
+                int offset,
+                int x,
+                int y,
+                int width,
+                int height) {
+<span class="fc" id="L184">        int startPoint = y * this.width + x;</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (int rows = 0; rows &lt; height; rows++) {</span>
+<span class="fc" id="L186">            int currentRow = rows * width;</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            if (width &gt;= 0) {</span>
+<span class="fc" id="L188">                System.arraycopy(rgb, startPoint + 0, rgbData, offset + currentRow + 0, width);</span>
+            }
+<span class="fc" id="L190">            startPoint += this.width;</span>
+        }
+<span class="fc" id="L192">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        g.drawRGB(rgb, 0, x, y, width, height, !opaque);</span>
+<span class="fc" id="L198">    }</span>
+
+    /// {@inheritDoc}
+    ///
+    /// `RGBImage` has no native peer, so the inherited scaled-draw path
+    /// (`g.drawImageWH(image, ...)`) renders nothing. Instead, build a
+    /// translate + scale affine transform on top of the graphics context's
+    /// current transform and emit `drawRGB` at the image's native size --
+    /// the platform pipeline (iOS Metal, Android Skia, Graphics2D, ...)
+    /// performs the actual scaling in hardware / native code.
+    ///
+    /// `Graphics.setTransform` is used (rather than `translateMatrix` +
+    /// `scale`) because on ports where `impl.isTranslationSupported()` is
+    /// false (iOS), prior `g.translate(int, int)` calls accumulate into a
+    /// per-Graphics integer translate that is baked into draw coordinates
+    /// **before** the impl matrix is applied. A naked `translateMatrix` /
+    /// `scale` composition would therefore multiply that accumulator by
+    /// the scale factor, shifting the on-screen position. `setTransform`
+    /// conjugates the matrix with `T(xTranslate, yTranslate)`, cancelling
+    /// the accumulator so the result lands at the requested coordinates
+    /// on every port.
+    @Override
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
+<span class="nc bnc" id="L221" title="All 4 branches missed.">        if (w &lt;= 0 || h &lt;= 0) {</span>
+<span class="nc" id="L222">            return;</span>
+        }
+<span class="nc bnc" id="L224" title="All 4 branches missed.">        if (w == width &amp;&amp; h == height) {</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">            g.drawRGB(rgb, 0, x, y, width, height, !opaque);</span>
+<span class="nc" id="L226">            return;</span>
+        }
+<span class="nc" id="L228">        Transform saved = Transform.makeIdentity();</span>
+<span class="nc" id="L229">        g.getTransform(saved);</span>
+        try {
+<span class="nc" id="L231">            Transform scaled = saved.copy();</span>
+<span class="nc" id="L232">            scaled.translate(x, y);</span>
+<span class="nc" id="L233">            scaled.scale(((float) w) / width, ((float) h) / height);</span>
+<span class="nc" id="L234">            g.setTransform(scaled);</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">            g.drawRGB(rgb, 0, 0, 0, width, height, !opaque);</span>
+        } finally {
+<span class="nc" id="L237">            g.setTransform(saved);</span>
+        }
+<span class="nc" id="L239">    }</span>
+
+    /// Indicates if an image should be treated as opaque, this can improve support
+    /// for fast drawing of RGB images without alpha support.
+    @Override
+    public boolean isOpaque() {
+<span class="fc" id="L245">        return opaque;</span>
+    }
+
+    /// Sets whether this image should be treated as fully opaque.
+    ///
+    /// #### Parameters
+    ///
+    /// - `opaque`: `true` to treat this image as opaque.
+    @Override
+    public void setOpaque(boolean opaque) {
+<span class="fc" id="L255">        this.opaque = opaque;</span>
+<span class="fc" id="L256">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public int getWidth() {
+<span class="fc" id="L261">        return width;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public int getHeight() {
+<span class="fc" id="L267">        return height;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean requiresDrawImage() {
+<span class="fc" id="L273">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

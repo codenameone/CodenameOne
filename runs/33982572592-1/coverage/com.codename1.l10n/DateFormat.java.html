@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DateFormat.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.l10n</a> &gt; <span class="el_source">DateFormat.java</span></div><h1>DateFormat.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Eric Coolman, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.l10n;
+
+import java.util.Date;
+
+/// A class for parsing and formatting localisation sensitive dates, compatible
+/// with Jave 6 SDK. This implementation uses the Codename One localization manager for handling formatting dates. Parsing
+/// dates is not implemented in this class since the localization pattern is not
+/// exposed.
+///
+/// @author Eric Coolman
+///
+/// #### See also
+///
+/// - [http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html](http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html)
+public class DateFormat extends Format {
+    /// Constant for full style parsing/formatting pattern.
+    public static final int FULL = 0;
+    /// Constant for long style parsing/formatting pattern.
+    public static final int LONG = 1;
+    /// Constant for medium style parsing/formatting pattern.
+    public static final int MEDIUM = 2;
+    /// Constant for short style parsing/formatting pattern.
+    public static final int SHORT = 3;
+    /// Constant for default style (MEDIUM) parsing/formatting pattern.
+    public static final int DEFAULT = MEDIUM;
+
+    private final int dateStyle;
+    private final int timeStyle;
+
+    /// Construct a date formatter using default patterns for date and time (SHORT/SHORT).
+    DateFormat() {
+<span class="fc" id="L54">        this(SHORT, SHORT);</span>
+<span class="fc" id="L55">    }</span>
+
+    ///
+<span class="fc" id="L58">    DateFormat(int dateStyle, int timeStyle) {</span>
+<span class="fc" id="L59">        this.dateStyle = dateStyle;</span>
+<span class="fc" id="L60">        this.timeStyle = timeStyle;</span>
+<span class="fc" id="L61">    }</span>
+
+    /// Get a DateFormat instance with default style for date/time (SHORT/SHORT).
+    ///
+    /// #### Returns
+    ///
+    /// a DateFormat instance.
+    public static final DateFormat getInstance() {
+<span class="nc" id="L69">        return getDateTimeInstance(SHORT, SHORT);</span>
+    }
+
+    /// Get a DateFormat instance with default style for date (SHORT).
+    ///
+    /// #### Returns
+    ///
+    /// a DateFormat instance.
+    public static final DateFormat getDateInstance() {
+<span class="nc" id="L78">        return getDateInstance(SHORT);</span>
+    }
+
+    /// Get a DateFormat instance with default style for time (SHORT).
+    ///
+    /// #### Returns
+    ///
+    /// a DateFormat instance.
+    public static final DateFormat getTimeInstance() {
+<span class="nc" id="L87">        return getTimeInstance(SHORT);</span>
+    }
+
+    /// Get a DateFormat instance that uses a given style for dates.
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`: style to use for parsing and formatting (SHORT, MEDIUM, LONG, FULL, DEFAULT);
+    ///
+    /// #### Returns
+    ///
+    /// a DateFormat instance.
+    ///
+    /// #### See also
+    ///
+    /// - #SHORT
+    ///
+    /// - #MEDIUM
+    ///
+    /// - #LONG
+    ///
+    /// - #FULL
+    ///
+    /// - #DEFAULT
+    public static final DateFormat getDateInstance(int style) {
+<span class="nc" id="L112">        return getDateTimeInstance(style, DEFAULT);</span>
+    }
+
+    /// Get a DateFormat instance that uses a given style for times.
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`: style to use for parsing and formatting (SHORT, MEDIUM, LONG, FULL, DEFAULT);
+    ///
+    /// #### Returns
+    ///
+    /// a DateFormat instance.
+    ///
+    /// #### See also
+    ///
+    /// - #SHORT
+    ///
+    /// - #MEDIUM
+    ///
+    /// - #LONG
+    ///
+    /// - #FULL
+    ///
+    /// - #DEFAULT
+    public static final DateFormat getTimeInstance(int style) {
+<span class="nc" id="L137">        return getDateTimeInstance(DEFAULT, style);</span>
+    }
+
+    /// Get a DateFormat instance that uses a given style for dates and times.
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`: style to use for parsing and formatting (SHORT, MEDIUM, LONG, FULL, DEFAULT);
+    ///
+    /// #### Returns
+    ///
+    /// a DateFormat instance.
+    ///
+    /// #### See also
+    ///
+    /// - #SHORT
+    ///
+    /// - #MEDIUM
+    ///
+    /// - #LONG
+    ///
+    /// - #FULL
+    ///
+    /// - #DEFAULT
+    public static final DateFormat getDateTimeInstance(int dateStyle, int timeStyle) {
+<span class="nc" id="L162">        return new DateFormat(dateStyle, timeStyle);</span>
+    }
+
+    /// Format a given object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: object to be formatted.
+    ///
+    /// #### Returns
+    ///
+    /// formatted object.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: of the source can not be formatted.
+    @Override
+    public String format(Object obj) throws IllegalArgumentException {
+<span class="nc" id="L180">        return format(obj, new StringBuilder());</span>
+    }
+
+    /// Format a given object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: object to be formatted.
+    ///
+    /// - `toAppendTo`: buffer to which to append output.
+    ///
+    /// #### Returns
+    ///
+    /// formatted date.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: of the source can not be formatted.
+    String format(Object obj, StringBuilder toAppendTo) throws IllegalArgumentException {
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        if (obj instanceof Long) {</span>
+<span class="nc" id="L200">            obj = new Date(((Long) obj).longValue());</span>
+        }
+<span class="nc" id="L202">        Date source = null;</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        if (obj instanceof Date) {</span>
+<span class="nc" id="L204">            source = (Date) obj;</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        } else if (obj instanceof String) {</span>
+            try {
+<span class="nc" id="L207">                source = parse((String) obj);</span>
+<span class="nc" id="L208">            } catch (ParseException pe) {</span>
+<span class="nc" id="L209">                throw new RuntimeException(pe.toString(), pe);</span>
+<span class="nc" id="L210">            }</span>
+        }
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (source == null) {</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">            throw new IllegalArgumentException((obj == null) ? &quot;null&quot; : obj.toString());</span>
+        }
+<span class="nc" id="L215">        return format(source, toAppendTo);</span>
+    }
+
+    /// Format a given object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: object to be formatted.
+    ///
+    /// - `toAppendTo`: buffer to which to append output.
+    ///
+    /// #### Returns
+    ///
+    /// formatted date.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: of the source can not be formatted.
+    String format(Object obj, StringBuffer toAppendTo) throws IllegalArgumentException {
+<span class="nc" id="L234">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L235">        format(obj, sb);</span>
+<span class="nc" id="L236">        toAppendTo.append(sb);</span>
+<span class="nc" id="L237">        return toAppendTo.toString();</span>
+    }
+
+    /// Format a given date.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: date to be formatted.
+    ///
+    /// #### Returns
+    ///
+    /// formatted date.
+    public String format(Date source) {
+<span class="nc" id="L250">        return format(source, new StringBuilder());</span>
+    }
+
+    /// Format a given date.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: date to be formatted.
+    ///
+    /// - `toAppendTo`: buffer to which to append output.
+    ///
+    /// #### Returns
+    ///
+    /// formatted date.
+    String format(Date source, StringBuffer toAppendTo) {
+<span class="nc" id="L265">        return source.toString();</span>
+    }
+
+    /// Format a given date.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: date to be formatted.
+    ///
+    /// - `toAppendTo`: buffer to which to append output.
+    ///
+    /// #### Returns
+    ///
+    /// formatted date.
+    String format(Date source, StringBuilder toAppendTo) {
+<span class="nc" id="L280">        return source.toString();</span>
+    }
+
+    /// NOT IMPLEMENTED - use SimpleDateFormat for parsing instead.
+    @Override
+    public Object parseObject(String source) throws ParseException {
+        // can't parse because we don't know the L10NManagers templates
+<span class="nc" id="L287">        throw new ParseException(&quot;Not implemented&quot;, 0);</span>
+    }
+
+    /// NOT IMPLEMENTED - use SimpleDateFormat for parsing instead.
+    public Date parse(String source) throws ParseException {
+<span class="nc" id="L292">        return (Date) parseObject(source);</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+<span class="nc" id="L302">        final int prime = 31;</span>
+<span class="nc" id="L303">        int result = 1;</span>
+<span class="nc" id="L304">        result = prime * result + dateStyle;</span>
+<span class="nc" id="L305">        result = prime * result + timeStyle;</span>
+<span class="nc" id="L306">        return result;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        if (this == obj) {</span>
+<span class="nc" id="L317">            return true;</span>
+        }
+<span class="nc bnc" id="L319" title="All 2 branches missed.">        if (obj == null) {</span>
+<span class="nc" id="L320">            return false;</span>
+        }
+<span class="nc bnc" id="L322" title="All 2 branches missed.">        if (getClass() != obj.getClass()) {</span>
+<span class="nc" id="L323">            return false;</span>
+        }
+<span class="nc" id="L325">        DateFormat other = (DateFormat) obj;</span>
+<span class="nc bnc" id="L326" title="All 2 branches missed.">        if (dateStyle != other.dateStyle) {</span>
+<span class="nc" id="L327">            return false;</span>
+        }
+<span class="nc bnc" id="L329" title="All 2 branches missed.">        return timeStyle == other.timeStyle;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see java.lang.Object#clone()
+     */
+    @Override
+    public Object clone() {
+<span class="nc" id="L339">        return new DateFormat(dateStyle, timeStyle);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

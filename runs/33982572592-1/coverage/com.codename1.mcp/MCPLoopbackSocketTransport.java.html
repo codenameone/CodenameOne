@@ -1,0 +1,546 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MCPLoopbackSocketTransport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.mcp</a> &gt; <span class="el_source">MCPLoopbackSocketTransport.java</span></div><h1>MCPLoopbackSocketTransport.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.mcp;
+
+import com.codename1.io.Log;
+import com.codename1.io.Socket;
+import com.codename1.io.SocketConnection;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+/// Loopback socket MCP transport built on the portable [com.codename1.io.Socket] API, so
+/// an agent can attach to a running app on ANY port that can bind the loopback interface -
+/// a device or simulator, not only the desktop.
+///
+/// The channel is bound to loopback only. That is the security boundary: an attaching
+/// agent can read the screen and drive the UI, so it must already be on the device (or on
+/// a host forwarding into it), never merely on the same network. There is no wildcard
+/// fallback; if the port cannot bind loopback this transport refuses to open.
+///
+/// The listening socket stays bound across client sessions, so an agent may disconnect and
+/// reconnect - each drive call is typically its own short-lived connection - without the
+/// server thread exiting.
+public final class MCPLoopbackSocketTransport implements MCPTransport {
+    /// Lets [Connection], which the socket API instantiates reflectively via a public
+    /// no-argument constructor, find the transport it belongs to. A single reference
+    /// suffices because MCP runs one server per process.
+    private static MCPLoopbackSocketTransport active;
+
+    /// Ceiling on one incoming frame. What arrives here are requests - tool calls and UI
+    /// actions - while the bulky payloads, screenshots among them, travel the other way,
+    /// so this sits far above any legitimate message. It exists to bound what an ill
+    /// behaved or hostile client can make the server allocate.
+    static final int MAX_FRAME_BYTES = 8 * 1024 * 1024;
+
+    /// Bulk reads land here and are consumed a byte at a time. Whatever follows a
+    /// delimiter stays put for the next message, which is what makes buffering safe: the
+    /// bytes are held rather than swallowed.
+    ///
+    /// Touched only by the reader thread, and reset in readMessage whenever the attached
+    /// stream is not the one that filled it, so a new client never inherits a dead
+    /// client's tail.
+<span class="fc" id="L65">    private final byte[] chunk = new byte[8192];</span>
+    private int chunkPos;
+    private int chunkLen;
+    private InputStream chunkSource; // NOPMD borrowed identity, never read from or closed
+
+    private final int port;
+<span class="fc" id="L71">    private final Object lock = new Object();</span>
+    private Socket.StopListening listening;
+
+    /// True between taking the claim to bind and publishing (or discarding) the listener.
+    ///
+    /// The bind deliberately happens outside the lock, so the field it fills is null for
+    /// the length of a platform call -- and a second open() reading only that field would
+    /// bind a second listener onto the same port. This is the claim itself, taken in the
+    /// same critical section that checks it.
+    private boolean opening;
+    private InputStream in;
+    private OutputStream out;
+    private boolean closed;
+
+<span class="fc" id="L85">    MCPLoopbackSocketTransport(int port) {</span>
+<span class="fc" id="L86">        this.port = port;</span>
+<span class="fc" id="L87">    }</span>
+
+    public int getPort() {
+<span class="nc" id="L90">        return port;</span>
+    }
+
+    /// Registers this transport as the socket factory when the platform has not supplied
+    /// one of its own. The JavaSE port keeps its native implementation (it can use
+    /// java.net directly); every other port with loopback support gets this one.
+    static void registerIfPlatformHasNone() {
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (MCP.hasPlatformSocketTransport()) {</span>
+<span class="fc" id="L98">            return;</span>
+        }
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (!Socket.isLoopbackServerSocketSupported()) {</span>
+            // Registering regardless would be worse than not registering: the caller would
+            // see a transport, believe the server started, and only find out on the
+            // server's own thread that nothing can bind. Leaving the factory unset lets
+            // startSocketServer fail on the calling thread, where it can be handled.
+<span class="fc" id="L105">            return;</span>
+        }
+<span class="fc" id="L107">        MCP.setSocketTransportFactory(new MCP.SocketTransportFactory() {</span>
+            @Override
+            public MCPTransport createSocketTransport(int port) {
+<span class="fc" id="L110">                return new MCPLoopbackSocketTransport(port);</span>
+            }
+        });
+<span class="fc" id="L113">    }</span>
+
+    @Override
+    public void open() throws IOException {
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (!Socket.isLoopbackServerSocketSupported()) {</span>
+<span class="fc" id="L118">            throw new IOException(&quot;This platform cannot bind a loopback server socket, so an &quot;</span>
+                    + &quot;MCP agent cannot attach to it&quot;);
+        }
+<span class="fc" id="L121">        synchronized (MCPLoopbackSocketTransport.class) {</span>
+            // Identity, not equality: is the open transport a DIFFERENT instance?
+<span class="pc bpc" id="L123" title="1 of 4 branches missed.">            if (active != null &amp;&amp; active != this) { // NOPMD identity is the question</span>
+<span class="nc" id="L124">                throw new IOException(&quot;Another MCP socket transport is already open on port &quot;</span>
+                        + active.port);
+            }
+<span class="fc" id="L127">            active = this;</span>
+<span class="fc" id="L128">        }</span>
+        // One listener per instance, decided in ONE critical section.
+        //
+        // This handle is the only reference to the listener, so overwriting it strands the
+        // previous one -- and a stranded listener survives close() and keeps the port
+        // bound, which is the failure this refusal exists to prevent. Asking whether the
+        // field is null and then filling it in a later block does not prevent that: two
+        // callers both see null, both bind, and the second assignment strands the first
+        // listener. The process-wide slot above does not cover it either, because that
+        // only refuses a DIFFERENT instance.
+        //
+        // So the claim is taken here, with the check, and the bind happens outside the
+        // lock afterwards. The alternative -- holding the lock across
+        // Socket.listenLoopback -- would hold it across a platform call whose accepted
+        // connections take the same lock on their way in.
+<span class="fc" id="L143">        synchronized (lock) {</span>
+<span class="pc bpc" id="L144" title="1 of 4 branches missed.">            if (listening != null || opening) {</span>
+<span class="fc" id="L145">                throw new IOException(&quot;This MCP transport is already listening on port &quot;</span>
+                        + port);
+            }
+<span class="fc" id="L148">            opening = true;</span>
+            // Reopening the same instance has to start a session, not resume a closed one.
+            // close() sets this permanently and nothing cleared it, so a stop()/start()
+            // pair over one transport -- which the server explicitly supports, and which
+            // is how a caller that keeps a single transport around restarts -- opened
+            // successfully and then had its first readMessage() return null immediately,
+            // shutting the restarted server straight back down. Cleared here rather than
+            // in close(), because a transport that has been closed and not reopened must
+            // keep refusing reads -- and only once the claim is ours, so an open() that
+            // is refused leaves the transport exactly as it found it.
+<span class="fc" id="L158">            closed = false;</span>
+<span class="fc" id="L159">        }</span>
+        Socket.StopListening bound;
+        try {
+<span class="fc" id="L162">            bound = Socket.listenLoopback(port, Connection.class);</span>
+<span class="fc" id="L163">        } catch (RuntimeException ex) {</span>
+<span class="fc" id="L164">            synchronized (lock) {</span>
+<span class="fc" id="L165">                opening = false;</span>
+<span class="fc" id="L166">            }</span>
+            // Two things go wrong if this escapes. The process-wide registration would stay
+            // pointing at a transport that never started listening, so every later open()
+            // would refuse, believing an agent is already served. And the server's reader
+            // thread only handles IOException around open(), so a runtime exception would
+            // kill that thread before it could clear its running flag, leaving the server
+            // permanently &quot;running&quot; with nothing behind it.
+<span class="fc" id="L173">            clearActiveIfOurs();</span>
+<span class="fc" id="L174">            IOException failure = new IOException(&quot;Failed to listen on loopback port &quot; + port);</span>
+<span class="fc" id="L175">            failure.initCause(ex);</span>
+<span class="fc" id="L176">            throw failure;</span>
+<span class="fc" id="L177">        }</span>
+        boolean stillWanted;
+<span class="fc" id="L179">        synchronized (lock) {</span>
+            // A close() that landed while the bind was in flight has already run: it found
+            // a null handle and had nothing to stop. Publishing the listener now would
+            // strand it on a transport nobody holds -- the same leak, arrived at from the
+            // other side -- so the claim is dropped and the listener is stopped instead.
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            stillWanted = !closed;</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">            if (stillWanted) {</span>
+<span class="fc" id="L186">                listening = bound;</span>
+            }
+<span class="fc" id="L188">            opening = false;</span>
+<span class="fc" id="L189">        }</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (!stillWanted) {</span>
+<span class="nc" id="L191">            bound.stop();</span>
+<span class="nc" id="L192">            clearActiveIfOurs();</span>
+<span class="nc" id="L193">            throw new IOException(&quot;This MCP transport was closed while it was opening&quot;);</span>
+        }
+<span class="fc" id="L195">    }</span>
+
+    /// Test hook: makes this transport the one a freshly constructed [Connection] binds
+    /// to, without binding a real socket.
+    ///
+    /// The binding is what a test needs to reach -- `open()` requires loopback server
+    /// sockets, which not every environment running these tests has -- and the field it
+    /// sets is the same one `open()` sets.
+    static void setActiveForTesting(MCPLoopbackSocketTransport t) {
+<span class="fc" id="L204">        synchronized (MCPLoopbackSocketTransport.class) {</span>
+<span class="fc" id="L205">            active = t;</span>
+<span class="fc" id="L206">        }</span>
+<span class="fc" id="L207">    }</span>
+
+    /// Releases the process-wide registration, but only when it is still this transport's.
+    private void clearActiveIfOurs() {
+<span class="fc" id="L211">        synchronized (MCPLoopbackSocketTransport.class) {</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            if (active == this) { // NOPMD identity: is the slot still ours?</span>
+<span class="fc" id="L213">                active = null;</span>
+            }
+<span class="fc" id="L215">        }</span>
+<span class="fc" id="L216">    }</span>
+
+    /// Called from the connection callback thread when a client attaches. The previous
+    /// client, if any, is dropped: one agent drives at a time.
+    void attach(InputStream is, OutputStream os) {
+        InputStream previousIn; // NOPMD closed below, deliberately outside the lock
+        OutputStream previousOut; // NOPMD closed below, outside the lock
+<span class="fc" id="L223">        synchronized (lock) {</span>
+<span class="fc" id="L224">            previousIn = in;</span>
+<span class="fc" id="L225">            previousOut = out;</span>
+<span class="fc" id="L226">            in = is;</span>
+<span class="fc" id="L227">            out = os;</span>
+<span class="fc" id="L228">            lock.notifyAll();</span>
+<span class="fc" id="L229">        }</span>
+        // Dropping the previous client means closing its streams, not just forgetting
+        // them. A reader parked in read() on the old stream is not watching this field,
+        // so a client that holds its connection open and sends nothing would keep the
+        // server serving a session that has already been replaced.
+        //
+        // Outside the lock, because closing is what wakes that reader and it takes the
+        // lock on its way out.
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">        if (previousIn != is) { // NOPMD identity: the same stream re-attached is not a swap</span>
+<span class="fc" id="L238">            closeQuietly(previousIn);</span>
+        }
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">        if (previousOut != os) { // NOPMD identity: as above</span>
+<span class="fc" id="L241">            closeQuietly(previousOut);</span>
+        }
+<span class="fc" id="L243">    }</span>
+
+    /// Closes a dropped client's stream. Failure is uninteresting: the stream is being
+    /// discarded either way, and closing is best effort by nature.
+    private static void closeQuietly(InputStream stream) {
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (stream != null) {</span>
+            try {
+<span class="fc" id="L250">                stream.close();</span>
+<span class="nc" id="L251">            } catch (IOException ignored) {</span>
+                // discarding this stream regardless
+<span class="fc" id="L253">            }</span>
+        }
+<span class="fc" id="L255">    }</span>
+
+    private static void closeQuietly(OutputStream stream) {
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        if (stream != null) {</span>
+            try {
+<span class="fc" id="L260">                stream.close();</span>
+<span class="nc" id="L261">            } catch (IOException ignored) {</span>
+                // discarding this stream regardless
+<span class="fc" id="L263">            }</span>
+        }
+<span class="fc" id="L265">    }</span>
+
+    /// Called when a client's session ends.
+    void detach(InputStream is) {
+<span class="fc" id="L269">        synchronized (lock) {</span>
+            // Detach only if this is still the very same stream we attached, so a newer
+            // client is not torn down by a stale one finishing late.
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">            if (in == is) { // NOPMD identity: same stream we attached?</span>
+<span class="fc" id="L273">                in = null;</span>
+<span class="fc" id="L274">                out = null;</span>
+<span class="fc" id="L275">                lock.notifyAll();</span>
+            }
+<span class="fc" id="L277">        }</span>
+<span class="fc" id="L278">    }</span>
+
+    @Override
+    public String readMessage() throws IOException {
+        while (true) {
+            // Borrowed reference: read the field under the lock, use it outside. The
+            // stream is owned by the connection callback and closed in close(); closing
+            // it here would end the session after a single message.
+            InputStream stream; // NOPMD borrowed, not owned by this method
+<span class="fc" id="L287">            synchronized (lock) {</span>
+<span class="fc bfc" id="L288" title="All 4 branches covered.">                while (in == null &amp;&amp; !closed) {</span>
+                    try {
+<span class="fc" id="L290">                        lock.wait();</span>
+<span class="nc" id="L291">                    } catch (InterruptedException ex) {</span>
+                        // fall through: re-check the loop conditions
+<span class="pc" id="L293">                    }</span>
+                }
+<span class="fc bfc" id="L295" title="All 2 branches covered.">                if (closed) {</span>
+<span class="fc" id="L296">                    return null;</span>
+                }
+<span class="fc" id="L298">                stream = in;</span>
+<span class="fc" id="L299">            }</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">            if (stream != chunkSource) { // NOPMD identity: is this the stream we buffered?</span>
+                // A different client. Anything left from the previous one belongs to a
+                // session that has ended and must not be read as this client's first
+                // message.
+<span class="fc" id="L304">                chunkSource = stream;</span>
+<span class="fc" id="L305">                chunkPos = 0;</span>
+<span class="fc" id="L306">                chunkLen = 0;</span>
+            }
+<span class="fc" id="L308">            String line = readLine(stream);</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">            if (line != null) {</span>
+<span class="fc" id="L310">                return line;</span>
+            }
+            // client disconnected; wait for the next one rather than ending the server
+<span class="fc" id="L313">            detach(stream);</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">            if (isClosed()) {</span>
+<span class="nc" id="L315">                return null;</span>
+            }
+<span class="fc" id="L317">        }</span>
+    }
+
+    /// Reads one newline-delimited UTF-8 message. Returns null at end of stream, which
+    /// includes a frame cut short by the client going away.
+    ///
+    /// Reads in blocks rather than a byte at a time - a frame near the ceiling would
+    /// otherwise cost millions of single-byte reads. Buffering is safe here because
+    /// whatever follows the delimiter is KEPT in the chunk for the next call, so no bytes
+    /// belonging to the next message are swallowed.
+    private String readLine(InputStream stream) throws IOException {
+<span class="fc" id="L328">        ByteArrayOutputStream buffer = new ByteArrayOutputStream();</span>
+        // A carriage return is only part of the delimiter when a newline follows it, so it
+        // is held back one byte rather than dropped. Dropping every CR would silently edit
+        // a payload that happened to contain one.
+<span class="fc" id="L332">        boolean pendingCarriageReturn = false;</span>
+        while (true) {
+<span class="fc bfc" id="L334" title="All 2 branches covered.">            if (chunkPos &gt;= chunkLen) {</span>
+                int read;
+                try {
+<span class="fc" id="L337">                    read = stream.read(chunk, 0, chunk.length);</span>
+<span class="nc" id="L338">                } catch (IOException ex) {</span>
+<span class="nc" id="L339">                    return null;   // a read error on the client is a disconnect</span>
+<span class="fc" id="L340">                }</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">                if (read &lt; 0) {</span>
+                    // End of stream with no delimiter: the frame is truncated, so this is
+                    // a disconnect and not a message, however many bytes arrived first.
+                    // Handing the partial frame up would have the server fail to parse it,
+                    // then fail to answer it (the peer is already gone), and end the loop -
+                    // when the whole point of this transport is to stay bound and await a
+                    // reconnect.
+<span class="fc" id="L348">                    return null;</span>
+                }
+<span class="fc" id="L350">                chunkPos = 0;</span>
+<span class="fc" id="L351">                chunkLen = read;</span>
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">                if (read == 0) {</span>
+<span class="nc" id="L353">                    continue;      // nothing this time; ask again rather than call it EOF</span>
+                }
+            }
+<span class="fc" id="L356">            int b = chunk[chunkPos++] &amp; 0xff;</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">            if (pendingCarriageReturn) {</span>
+<span class="fc" id="L358">                pendingCarriageReturn = false;</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">                if (b == '\n') {</span>
+<span class="fc" id="L360">                    return toUtf8(buffer);          // the CR belonged to a CRLF delimiter</span>
+                }
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">                if (!append(buffer, '\r')) {        // it belonged to the payload after all</span>
+<span class="nc" id="L363">                    return null;</span>
+                }
+            }
+<span class="fc bfc" id="L366" title="All 2 branches covered.">            if (b == '\r') {</span>
+<span class="fc" id="L367">                pendingCarriageReturn = true;</span>
+<span class="fc" id="L368">                continue;</span>
+            }
+<span class="fc bfc" id="L370" title="All 2 branches covered.">            if (b == '\n') {</span>
+<span class="fc" id="L371">                return toUtf8(buffer);</span>
+            }
+<span class="fc bfc" id="L373" title="All 2 branches covered.">            if (!append(buffer, b)) {</span>
+<span class="fc" id="L374">                return null;</span>
+            }
+<span class="fc" id="L376">        }</span>
+    }
+
+    /// Appends one payload byte, refusing once the frame would pass [#MAX_FRAME_BYTES].
+    /// Enforced here rather than at the top of the read loop so the ceiling is exact: a
+    /// frame of precisely the limit is accepted and its delimiter still read, and one byte
+    /// beyond is refused before it is ever buffered.
+    ///
+    /// A refusal is reported to the caller as end of stream. A client sending no delimiter
+    /// would otherwise grow this buffer until the process ran out of memory, and on a
+    /// device any other app installed alongside can open this connection.
+    private static boolean append(ByteArrayOutputStream buffer, int b) {
+<span class="fc bfc" id="L388" title="All 2 branches covered.">        if (buffer.size() &gt;= MAX_FRAME_BYTES) {</span>
+<span class="fc" id="L389">            return false;</span>
+        }
+<span class="fc" id="L391">        buffer.write(b);</span>
+<span class="fc" id="L392">        return true;</span>
+    }
+
+    /// Note for anyone tempted by ByteArrayOutputStream.toString(String), which would
+    /// decode without toByteArray()'s copy: core is compiled against CLDC11
+    /// (Ports/CLDC11), whose ByteArrayOutputStream declares only the no-argument
+    /// toString(). The overload exists on the JDK and in the ParparVM runtime, so a Maven
+    /// build of core compiles it happily and the Ant build then fails.
+    private static String toUtf8(ByteArrayOutputStream buffer) throws IOException {
+<span class="fc" id="L401">        return new String(buffer.toByteArray(), &quot;UTF-8&quot;);</span>
+    }
+
+    @Override
+    public void writeMessage(String message) throws IOException {
+        // Borrowed reference (see readMessage): this writes one message, it does not own
+        // the session and must not close the stream.
+        OutputStream stream; // NOPMD borrowed, not owned by this method
+<span class="fc" id="L409">        synchronized (lock) {</span>
+<span class="fc" id="L410">            stream = out;</span>
+<span class="fc" id="L411">        }</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">        if (stream == null) {</span>
+<span class="fc" id="L413">            throw new IOException(&quot;No MCP client is attached&quot;);</span>
+        }
+<span class="fc" id="L415">        stream.write(message.getBytes(&quot;UTF-8&quot;));</span>
+<span class="fc" id="L416">        stream.write('\n');</span>
+<span class="fc" id="L417">        stream.flush();</span>
+<span class="fc" id="L418">    }</span>
+
+    private boolean isClosed() {
+<span class="fc" id="L421">        synchronized (lock) {</span>
+<span class="fc" id="L422">            return closed;</span>
+        }
+    }
+
+    /// Test seam: has this transport been closed and not reopened? Package-private
+    /// because the reopen semantics are otherwise only observable through a real socket.
+    boolean isClosedForTest() {
+<span class="nc" id="L429">        synchronized (lock) {</span>
+<span class="nc" id="L430">            return closed;</span>
+        }
+    }
+
+    @Override
+    public void close() {
+        Socket.StopListening l;
+        // Both streams come out of their fields under the lock so they can be closed
+        // below, outside it: closing is what unblocks a reader parked in read(), and it
+        // takes the lock on its way out.
+        InputStream is; // NOPMD closed below, deliberately outside the lock
+        OutputStream os; // NOPMD closed below, outside the lock
+<span class="fc" id="L442">        synchronized (lock) {</span>
+<span class="fc" id="L443">            closed = true;</span>
+<span class="fc" id="L444">            l = listening;</span>
+<span class="fc" id="L445">            listening = null;</span>
+<span class="fc" id="L446">            is = in;</span>
+<span class="fc" id="L447">            os = out;</span>
+<span class="fc" id="L448">            in = null;</span>
+<span class="fc" id="L449">            out = null;</span>
+<span class="fc" id="L450">            lock.notifyAll();</span>
+<span class="fc" id="L451">        }</span>
+        // Only if it is still ours: a transport opened after this one keeps its slot.
+<span class="fc" id="L453">        clearActiveIfOurs();</span>
+<span class="fc bfc" id="L454" title="All 2 branches covered.">        if (l != null) {</span>
+<span class="fc" id="L455">            l.stop();</span>
+        }
+        // Closing the output as well as the input: forgetting the field is not enough,
+        // because a writer that already captured it would go on writing to a session that
+        // has ended, and the socket would stay open until the connection callback unwound.
+<span class="fc" id="L460">        closeQuietly(is);</span>
+<span class="fc" id="L461">        closeQuietly(os);</span>
+<span class="fc" id="L462">    }</span>
+
+    /// The per-connection callback the socket API instantiates. Public with a no-argument
+    /// constructor because [Socket#listenLoopback] creates it reflectively.
+    public static final class Connection extends SocketConnection {
+        /// The last failure reported, so a listener that cannot bind at all says so once
+        /// instead of once per retry. Only ever touched from the listener thread.
+        private static String lastReportedError;
+
+        /// The transport whose listener accepted THIS connection.
+        ///
+        /// Captured when the socket API constructs the callback, which happens on the
+        /// listener thread as the connection is accepted -- not when the callback body
+        /// later runs, which is where it used to be read. Between those two moments a
+        /// transport can close and another can take the process-wide slot, and the
+        /// already-accepted streams were then attached to the new one: a client of the
+        /// listener that has stopped replaces the session of the server that has just
+        /// started. Binding the callback to its own acceptor makes that impossible to
+        /// express.
+        private final MCPLoopbackSocketTransport acceptedBy;
+
+        /// Public and no-argument because [Socket#listenLoopback] constructs this
+        /// reflectively; the binding above is what the constructor exists for.
+<span class="fc" id="L485">        public Connection() {</span>
+<span class="fc" id="L486">            synchronized (MCPLoopbackSocketTransport.class) {</span>
+<span class="fc" id="L487">                acceptedBy = active;</span>
+<span class="fc" id="L488">            }</span>
+<span class="fc" id="L489">        }</span>
+
+        @Override
+        public void connectionError(int errorCode, String message) {
+            // Without this the failure is silent: startSocketServer returns, the server
+            // reports itself running, and nothing can ever attach - a port already in use
+            // being the ordinary way that happens. Logged rather than thrown because this
+            // arrives on the listener thread, long after the caller has gone.
+<span class="nc" id="L497">            String description = &quot;MCP socket listener failed: &quot; + message + &quot; (&quot; + errorCode + &quot;)&quot;;</span>
+<span class="nc bnc" id="L498" title="All 2 branches missed.">            if (description.equals(lastReportedError)) {</span>
+<span class="nc" id="L499">                return;   // the same failure retrying; saying so once is enough</span>
+            }
+<span class="nc" id="L501">            lastReportedError = description;</span>
+            try {
+<span class="nc" id="L503">                Log.p(description, Log.ERROR);</span>
+<span class="nc" id="L504">            } catch (Throwable loggingFailed) {</span>
+                // The log routes through the platform implementation, which may not be
+                // registered yet when a server is started early in initialization.
+<span class="nc" id="L507">                System.err.println(&quot;[cn1.mcp] &quot; + description);</span>
+<span class="nc" id="L508">            }</span>
+<span class="nc" id="L509">        }</span>
+
+        @Override
+        public void connectionEstablished(InputStream is, OutputStream os) {
+<span class="fc" id="L513">            MCPLoopbackSocketTransport transport = acceptedBy;</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">            if (transport == null) {</span>
+<span class="nc" id="L515">                closeQuietly(is);</span>
+<span class="nc" id="L516">                closeQuietly(os);</span>
+<span class="nc" id="L517">                return;</span>
+            }
+            // Closed between accepting this connection and running this callback. The
+            // streams belong to a session nobody is serving, so they are closed rather
+            // than handed to whichever transport is open now -- which would let a client
+            // of the stopped listener take over the new server's session.
+<span class="fc" id="L523">            synchronized (transport.lock) {</span>
+<span class="pc bpc" id="L524" title="1 of 2 branches missed.">                if (transport.closed) {</span>
+<span class="fc" id="L525">                    closeQuietly(is);</span>
+<span class="fc" id="L526">                    closeQuietly(os);</span>
+<span class="fc" id="L527">                    return;</span>
+                }
+<span class="nc" id="L529">            }</span>
+<span class="nc" id="L530">            transport.attach(is, os);</span>
+            // Hold this callback thread for the life of the session: the socket API closes
+            // the streams as soon as it returns, and the server reads them from its own
+            // thread.
+<span class="nc" id="L534">            synchronized (transport.lock) {</span>
+<span class="nc bnc" id="L535" title="All 4 branches missed.">                while (transport.in == is &amp;&amp; !transport.closed) {</span>
+                    try {
+<span class="nc" id="L537">                        transport.lock.wait();</span>
+<span class="nc" id="L538">                    } catch (InterruptedException ex) {</span>
+<span class="nc" id="L539">                        break;</span>
+<span class="nc" id="L540">                    }</span>
+                }
+<span class="nc" id="L542">            }</span>
+<span class="nc" id="L543">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

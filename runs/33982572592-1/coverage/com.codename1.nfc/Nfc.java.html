@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Nfc.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.nfc</a> &gt; <span class="el_source">Nfc.java</span></div><h1>Nfc.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.nfc;
+
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+
+/// Entry point for the Codename One NFC API -- read and write NDEF
+/// messages, exchange APDUs with smart cards, and host-emulate as a
+/// contactless card. Obtain the platform implementation via
+/// [#getInstance()]; the returned subclass is owned by the active port.
+///
+/// #### Quick start: Read an NDEF URI
+///
+/// ```java
+/// Nfc nfc = Nfc.getInstance();
+/// if (!nfc.canRead()) {
+///     // device has no NFC or it is disabled
+///     return;
+/// }
+/// nfc.readTag(new NfcReadOptions()
+///         .setNdefOnly(true)
+///         .setAlertMessage(&quot;Hold near the poster&quot;))
+///    .onResult((tag, err) -&gt; {
+///         if (err != null) {
+///             return;
+///         }
+///         tag.readNdef().onResult((msg, e) -&gt; {
+///             if (e == null) {
+///                 String url = msg.getFirstRecord().getUriPayload();
+///                 // launch / display url
+///             }
+///         });
+///    });
+/// ```
+///
+/// #### Quick start: Send an APDU to a smart card
+///
+/// ```java
+/// nfc.readTag(new NfcReadOptions()
+///         .setTechFilter(TagType.ISO_DEP)
+///         .setIsoSelectAids(myAid))
+///    .onResult((tag, err) -&gt; {
+///         if (err != null) return;
+///         IsoDep iso = tag.getIsoDep();
+///         if (iso == null) return;
+///         iso.transceive(myCommandApdu).onResult((resp, e) -&gt; {
+///             if (ApduResponse.isSuccess(resp)) { ... }
+///         });
+///    });
+/// ```
+///
+/// #### Quick start: Host card emulation
+///
+/// ```java
+/// class MyService extends HostCardEmulationService {
+///     public String[] getAids() { return new String[] { &quot;F0010203040506&quot; }; }
+///     public byte[] processCommand(byte[] apdu) {
+///         return ApduResponse.withStatus(new byte[] { 'O', 'K' },
+///                 ApduResponse.swSuccess());
+///     }
+/// }
+/// Nfc.getInstance().registerHostCardEmulationService(new MyService());
+/// ```
+///
+/// #### Platform support
+///
+/// - **Android** -- `NfcAdapter` foreground dispatch / reader-mode +
+///   `HostApduService` for HCE. Both manifest entries are auto-injected
+///   by the Maven plugin and the build daemon when this class is
+///   referenced.
+/// - **iOS** -- `Core NFC` (`NFCNDEFReaderSession`,
+///   `NFCTagReaderSession`) for reading; `CardSession` (iOS 17.4+, EU
+///   only) for HCE. The `NFCReaderUsageDescription` plist entry and the
+///   relevant entitlements are auto-injected by IPhoneBuilder.
+/// - **JavaSE simulator** -- the Simulate -&gt; NFC menu lets you tap a
+///   virtual tag, edit its NDEF payload, and fire APDUs at any registered
+///   [HostCardEmulationService].
+/// - **All other platforms (desktop deploy, JavaScript, ...)** -- this
+///   base class is returned as-is and reports the device as unsupported;
+///   every operation completes with [NfcError#NOT_AVAILABLE].
+public class Nfc {
+
+    /// Ports construct subclasses. Application code obtains the active
+    /// instance via [#getInstance()].
+<span class="fc" id="L107">    protected Nfc() {</span>
+<span class="fc" id="L108">    }</span>
+
+    /// Returns the platform-specific singleton owned by the current port.
+    /// On ports that do not implement NFC this returns a base [Nfc]
+    /// instance whose methods report the device as unsupported; calling
+    /// code never needs a `null` check or a platform-specific `if`.
+    public static Nfc getInstance() {
+<span class="fc" id="L115">        Nfc n = Display.getInstance().getNfc();</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        return n != null ? n : DEFAULT;</span>
+    }
+
+<span class="fc" id="L119">    private static final Nfc DEFAULT = new Nfc();</span>
+
+    /// `true` when NFC hardware is present, regardless of whether it is
+    /// currently enabled. Combine with [#canRead()] to drive UI
+    /// affordances. Returns `false` on the fallback base class.
+    public boolean isSupported() {
+<span class="fc" id="L125">        return false;</span>
+    }
+
+    /// `true` when NFC is supported AND currently enabled (Android setting
+    /// toggle on, iOS Core NFC available). Defaults to `false`.
+    public boolean canRead() {
+<span class="fc" id="L131">        return false;</span>
+    }
+
+    /// `true` when NFC writing is supported on this device. On Android
+    /// this mirrors [#canRead()]; on iOS, writing requires iOS 13+ and
+    /// the `NFCReaderUsageDescription` plist entry. Defaults to `false`.
+    public boolean canWrite() {
+<span class="fc" id="L138">        return false;</span>
+    }
+
+    /// `true` when this device can act as a host-emulated contactless
+    /// card. Android requires `FEATURE_NFC_HOST_CARD_EMULATION`; iOS 17.4
+    /// + EU only with the HCE entitlement. Defaults to `false`.
+    public boolean canHostEmulate() {
+<span class="fc" id="L145">        return false;</span>
+    }
+
+    /// Performs a single tag-read session. Resolves with the discovered
+    /// [Tag] (call [Tag#readNdef()] or one of the technology accessors)
+    /// or fails with an [NfcException]. The base class fails immediately
+    /// with [NfcError#NOT_AVAILABLE].
+    ///
+    /// Cancel an in-flight read via [#stopRead()].
+    public AsyncResource&lt;Tag&gt; readTag(NfcReadOptions options) {
+<span class="fc" id="L155">        AsyncResource&lt;Tag&gt; r = new AsyncResource&lt;Tag&gt;();</span>
+<span class="fc" id="L156">        r.error(new NfcException(NfcError.NOT_AVAILABLE,</span>
+                &quot;NFC is not available on this platform&quot;));
+<span class="fc" id="L158">        return r;</span>
+    }
+
+    /// Convenience for `readTag(new NfcReadOptions().setNdefOnly(true))`
+    /// followed by [Tag#readNdef()]. Resolves with the parsed NDEF
+    /// message, or fails with an [NfcException].
+    public AsyncResource&lt;NdefMessage&gt; readNdef(NfcReadOptions options) {
+<span class="fc" id="L165">        AsyncResource&lt;NdefMessage&gt; chained = new AsyncResource&lt;NdefMessage&gt;();</span>
+<span class="fc" id="L166">        chainReadNdef(readTag(options), chained);</span>
+<span class="fc" id="L167">        return chained;</span>
+    }
+
+    // The anonymous callbacks live inside a static method so they don't
+    // capture a synthetic outer-Nfc reference (SpotBugs
+    // SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static void chainReadNdef(AsyncResource&lt;Tag&gt; source,
+            final AsyncResource&lt;NdefMessage&gt; chained) {
+<span class="fc" id="L175">        source.ready(new SuccessCallback&lt;Tag&gt;() {</span>
+            @Override
+            public void onSucess(Tag tag) {
+<span class="nc bnc" id="L178" title="All 2 branches missed.">                if (tag == null) {</span>
+<span class="nc" id="L179">                    chained.error(new NfcException(NfcError.TAG_LOST,</span>
+                            &quot;tag-read produced no tag&quot;));
+<span class="nc" id="L181">                    return;</span>
+                }
+<span class="nc" id="L183">                tag.readNdef().ready(new SuccessCallback&lt;NdefMessage&gt;() {</span>
+                    @Override
+                    public void onSucess(NdefMessage msg) {
+<span class="nc" id="L186">                        chained.complete(msg);</span>
+<span class="nc" id="L187">                    }</span>
+<span class="nc" id="L188">                }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                    @Override
+                    public void onSucess(Throwable err) {
+<span class="nc" id="L191">                        chained.error(err);</span>
+<span class="nc" id="L192">                    }</span>
+                });
+<span class="nc" id="L194">            }</span>
+<span class="fc" id="L195">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(Throwable err) {
+<span class="fc" id="L198">                chained.error(err);</span>
+<span class="fc" id="L199">            }</span>
+        });
+<span class="fc" id="L201">    }</span>
+
+    /// Convenience writer -- opens a tag-read session, writes the given
+    /// message and resolves with `true`. Fails with
+    /// [NfcError#READ_ONLY] for locked tags and with
+    /// [NfcError#CAPACITY_EXCEEDED] when the message is too large.
+    public AsyncResource&lt;Boolean&gt; writeNdef(NfcReadOptions options,
+            NdefMessage message) {
+<span class="fc" id="L209">        AsyncResource&lt;Boolean&gt; chained = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc" id="L210">        chainWriteNdef(readTag(options), message, chained);</span>
+<span class="fc" id="L211">        return chained;</span>
+    }
+
+    // Static so the anonymous callbacks don't carry a synthetic outer-Nfc
+    // reference (SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static void chainWriteNdef(AsyncResource&lt;Tag&gt; source,
+            final NdefMessage message,
+            final AsyncResource&lt;Boolean&gt; chained) {
+<span class="fc" id="L219">        source.ready(new SuccessCallback&lt;Tag&gt;() {</span>
+            @Override
+            public void onSucess(Tag tag) {
+<span class="nc bnc" id="L222" title="All 2 branches missed.">                if (tag == null) {</span>
+<span class="nc" id="L223">                    chained.error(new NfcException(NfcError.TAG_LOST,</span>
+                            &quot;tag-read produced no tag&quot;));
+<span class="nc" id="L225">                    return;</span>
+                }
+<span class="nc" id="L227">                tag.writeNdef(message).ready(new SuccessCallback&lt;Boolean&gt;() {</span>
+                    @Override
+                    public void onSucess(Boolean result) {
+<span class="nc" id="L230">                        chained.complete(result);</span>
+<span class="nc" id="L231">                    }</span>
+<span class="nc" id="L232">                }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                    @Override
+                    public void onSucess(Throwable err) {
+<span class="nc" id="L235">                        chained.error(err);</span>
+<span class="nc" id="L236">                    }</span>
+                });
+<span class="nc" id="L238">            }</span>
+<span class="fc" id="L239">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(Throwable err) {
+<span class="fc" id="L242">                chained.error(err);</span>
+<span class="fc" id="L243">            }</span>
+        });
+<span class="fc" id="L245">    }</span>
+
+    /// Cancels any in-flight [#readTag(NfcReadOptions)] /
+    /// [#readNdef(NfcReadOptions)] / [#writeNdef(NfcReadOptions, NdefMessage)]
+    /// call. The pending `AsyncResource` completes with
+    /// [NfcError#USER_CANCELED].
+    ///
+    /// #### Returns
+    ///
+    /// `true` when a call was cancelled; `false` when no session was
+    /// pending. Always `false` on the fallback base class.
+    public boolean stopRead() {
+<span class="fc" id="L257">        return false;</span>
+    }
+
+    /// Registers a long-running tag-discovery listener -- useful on
+    /// Android reader-mode where multiple tags can be tapped in
+    /// succession. Each new tag calls [NfcListener#tagDiscovered(Tag)]
+    /// from the EDT.
+    ///
+    /// Ports that do not support multi-shot reading fall back to a
+    /// single-shot [#readTag(NfcReadOptions)] each time -- iOS for
+    /// example dismisses the system sheet after the first tag and
+    /// re-prompts.
+    ///
+    /// No-op on the fallback base class.
+    public void addTagListener(NfcListener listener) {
+<span class="fc" id="L272">    }</span>
+
+    /// Removes a listener previously added via
+    /// [#addTagListener(NfcListener)]. No-op on the fallback base class.
+    public void removeTagListener(NfcListener listener) {
+<span class="fc" id="L277">    }</span>
+
+    /// Registers a Host Card Emulation service. Only one service may be
+    /// registered per app, and only the AIDs reported by
+    /// [HostCardEmulationService#getAids()] are routed to it.
+    ///
+    /// On Android the platform routing tables are populated from the
+    /// service's manifest entry; the Codename One Maven plugin and
+    /// BuildDaemon auto-generate that entry from the AIDs at build time.
+    /// At runtime this method simply hands the live instance to the port
+    /// so APDUs can be dispatched.
+    ///
+    /// No-op on the fallback base class.
+    public void registerHostCardEmulationService(
+            HostCardEmulationService service) {
+<span class="fc" id="L292">    }</span>
+
+    /// Removes a previously registered HCE service. No-op on the fallback
+    /// base class.
+    public void unregisterHostCardEmulationService() {
+<span class="fc" id="L297">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

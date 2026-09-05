@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DateTimeSpinner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">DateTimeSpinner.java</span></div><h1>DateTimeSpinner.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.spinner;
+
+import java.util.Date;
+
+/// The date and time spinner extends the time spinner by allowing to pick a specific day as well
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// use Picker instead
+public class DateTimeSpinner extends TimeSpinner {
+<span class="fc" id="L35">    private final Date today = new Date();</span>
+    private final int off;
+    private Spinner date;
+<span class="fc" id="L38">    private Date currentDate = today;</span>
+<span class="fc" id="L39">    private Date startDate = new Date(0);</span>
+<span class="fc" id="L40">    private Date endDate = new Date(System.currentTimeMillis() + 10000L * 24L * 60L * 60000L);</span>
+<span class="fc" id="L41">    private boolean markToday = true;</span>
+    private boolean includeYear;
+
+    /// Default constructor
+<span class="fc" id="L45">    public DateTimeSpinner() {</span>
+<span class="fc" id="L46">        off = 0;</span>
+<span class="fc" id="L47">    }</span>
+
+    @Override
+    void initSpinner() {
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if (date == null) {</span>
+<span class="nc" id="L52">            date = Spinner.createDate(startDate.getTime() + off, endDate.getTime() + off, currentDate.getTime(), ' ', Spinner.DATE_FORMAT_DOW_MON_DD);</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">            if (includeYear) {</span>
+<span class="nc" id="L54">                date.setRenderingPrototype(&quot;XXX XXX 99 9999&quot;);</span>
+<span class="nc" id="L55">                ((DateTimeRenderer) date.getRenderer()).setType(Spinner.DATE_FORMAT_DOW_MON_DD_YY);</span>
+            } else {
+<span class="nc" id="L57">                date.setRenderingPrototype(&quot;XXX XXX 99&quot;);</span>
+<span class="nc" id="L58">                ((DateTimeRenderer) date.getRenderer()).setType(Spinner.DATE_FORMAT_DOW_MON_DD);</span>
+            }
+<span class="nc bnc" id="L60" title="All 2 branches missed.">            if (markToday) {</span>
+<span class="nc" id="L61">                ((DateTimeRenderer) date.getRenderer()).setMarkToday(markToday, today.getTime());</span>
+            }
+<span class="nc" id="L63">            this.setCurrentDate(currentDate);</span>
+<span class="nc" id="L64">            this.setStartDate(startDate);</span>
+<span class="nc" id="L65">            this.setEndDate(endDate);</span>
+
+        }
+<span class="nc" id="L68">        super.initSpinner();</span>
+<span class="nc" id="L69">    }</span>
+
+    @Override
+    void addComponents() {
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (date != null) {</span>
+<span class="nc" id="L74">            addComponent(date);</span>
+<span class="nc" id="L75">            addComponent(createSeparator());</span>
+<span class="nc" id="L76">            super.addComponents();</span>
+        }
+<span class="nc" id="L78">    }</span>
+
+    /// #### Returns
+    ///
+    /// the currentDate
+    public Date getCurrentDate() {
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (date != null) {</span>
+<span class="nc" id="L85">            return (Date) date.getValue();</span>
+        }
+<span class="fc" id="L87">        return currentDate;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `currentDate`: the currentDate to set
+    public void setCurrentDate(Date currentDate) {
+<span class="fc" id="L94">        this.currentDate = currentDate;</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (date != null) {</span>
+<span class="nc" id="L96">            date.setValue(currentDate);</span>
+        }
+<span class="fc" id="L98">    }</span>
+
+    /// #### Returns
+    ///
+    /// the startDate
+    public Date getStartDate() {
+<span class="nc" id="L104">        return startDate;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `startDate`: the startDate to set
+    public void setStartDate(Date startDate) {
+<span class="nc" id="L111">        this.startDate = startDate;</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (date != null) {</span>
+<span class="nc" id="L113">            date.setModel(new SpinnerDateModel(startDate.getTime() + off, endDate.getTime() + off, currentDate.getTime() + off));</span>
+        }
+<span class="nc" id="L115">    }</span>
+
+    /// #### Returns
+    ///
+    /// the endDate
+    public Date getEndDate() {
+<span class="nc" id="L121">        return endDate;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `endDate`: the endDate to set
+    public void setEndDate(Date endDate) {
+<span class="nc" id="L128">        this.endDate = endDate;</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (date != null) {</span>
+<span class="nc" id="L130">            date.setModel(new SpinnerDateModel(startDate.getTime() + off, endDate.getTime() + off, currentDate.getTime() + off));</span>
+        }
+<span class="nc" id="L132">    }</span>
+
+    /// #### Returns
+    ///
+    /// the markToday
+    public boolean isMarkToday() {
+<span class="nc" id="L138">        return markToday;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `markToday`: the markToday to set
+    public void setMarkToday(boolean markToday) {
+<span class="nc" id="L145">        this.markToday = markToday;</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (date != null) {</span>
+<span class="nc" id="L147">            ((DateTimeRenderer) date.getRenderer()).setMarkToday(markToday, today.getTime() + off);</span>
+        }
+<span class="nc" id="L149">    }</span>
+
+    /// #### Returns
+    ///
+    /// the includeYear
+    public boolean isIncludeYear() {
+<span class="nc" id="L155">        return includeYear;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `includeYear`: the includeYear to set
+    public void setIncludeYear(boolean includeYear) {
+<span class="nc" id="L162">        this.includeYear = includeYear;</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (date != null) {</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">            if (includeYear) {</span>
+<span class="nc" id="L165">                ((DateTimeRenderer) date.getRenderer()).setType(Spinner.DATE_FORMAT_DOW_MON_DD_YY);</span>
+<span class="nc" id="L166">                date.setRenderingPrototype(&quot;XXX XXX 99 9999&quot;);</span>
+            } else {
+<span class="nc" id="L168">                ((DateTimeRenderer) date.getRenderer()).setType(Spinner.DATE_FORMAT_DOW_MON_DD);</span>
+<span class="nc" id="L169">                date.setRenderingPrototype(&quot;XXX XXX 99&quot;);</span>
+            }
+        }
+<span class="nc" id="L172">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyNames() {
+<span class="nc" id="L177">        return new String[]{&quot;currentHour&quot;, &quot;currentMinute&quot;, &quot;minuteStep&quot;, &quot;currentMeridiem&quot;, &quot;showMeridiem&quot;,</span>
+                &quot;currentDate&quot;, &quot;startDate&quot;, &quot;endDate&quot;, &quot;markToday&quot;, &quot;includeYear&quot;};
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L184">        return new Class[]{Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class,</span>
+                Date.class, Date.class, Date.class, Boolean.class, Boolean.class};
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (&quot;currentDate&quot;.equals(name)) {</span>
+<span class="nc" id="L192">            return currentDate;</span>
+        }
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (&quot;startDate&quot;.equals(name)) {</span>
+<span class="nc" id="L195">            return startDate;</span>
+        }
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        if (&quot;endDate&quot;.equals(name)) {</span>
+<span class="nc" id="L198">            return endDate;</span>
+        }
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (&quot;markToday&quot;.equals(name)) {</span>
+<span class="nc" id="L201">            return Boolean.valueOf(markToday);</span>
+        }
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        if (&quot;includeYear&quot;.equals(name)) {</span>
+<span class="nc" id="L204">            return Boolean.valueOf(includeYear);</span>
+        }
+<span class="nc" id="L206">        return super.getPropertyValue(name);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (&quot;currentDate&quot;.equals(name)) {</span>
+<span class="nc" id="L213">            setCurrentDate((Date) value);</span>
+<span class="nc" id="L214">            return null;</span>
+        }
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (&quot;startDate&quot;.equals(name)) {</span>
+<span class="nc" id="L217">            setStartDate((Date) value);</span>
+<span class="nc" id="L218">            return null;</span>
+        }
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        if (&quot;endDate&quot;.equals(name)) {</span>
+<span class="nc" id="L221">            setEndDate((Date) value);</span>
+<span class="nc" id="L222">            return null;</span>
+        }
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (&quot;markToday&quot;.equals(name)) {</span>
+<span class="nc" id="L225">            setMarkToday(((Boolean) value).booleanValue());</span>
+<span class="nc" id="L226">            return null;</span>
+        }
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        if (&quot;includeYear&quot;.equals(name)) {</span>
+<span class="nc" id="L229">            setIncludeYear(((Boolean) value).booleanValue());</span>
+<span class="nc" id="L230">            return null;</span>
+        }
+
+<span class="nc" id="L233">        return super.setPropertyValue(name, value);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

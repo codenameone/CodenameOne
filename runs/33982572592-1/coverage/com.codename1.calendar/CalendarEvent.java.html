@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CalendarEvent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.calendar</a> &gt; <span class="el_source">CalendarEvent.java</span></div><h1>CalendarEvent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.calendar;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A portable calendar event. Mutable setters make it convenient to create an
+/// event, while sources return detached instances so callers may safely edit.
+<span class="fc" id="L33">public class CalendarEvent {</span>
+
+<span class="fc" id="L35">    public enum Status {</span>
+
+<span class="fc" id="L37">        CONFIRMED, TENTATIVE, CANCELED</span>
+    }
+
+<span class="fc" id="L40">    public enum Availability {</span>
+
+<span class="fc" id="L42">        BUSY, FREE, TENTATIVE, OUT_OF_OFFICE, WORKING_ELSEWHERE</span>
+    }
+
+<span class="fc" id="L45">    public enum Privacy {</span>
+
+<span class="fc" id="L47">        DEFAULT, PUBLIC, PRIVATE, CONFIDENTIAL</span>
+    }
+
+    private String id;
+
+    private String calendarId;
+
+    private String sourceId;
+
+    private String version;
+
+    private String title;
+
+    private String description;
+
+    private String location;
+
+    private String url;
+
+    private String recurringEventId;
+
+    private CalendarDateTime start;
+
+    private CalendarDateTime end;
+
+    private CalendarRecurrenceRule recurrence;
+
+<span class="fc" id="L74">    private Status status = Status.CONFIRMED;</span>
+
+<span class="fc" id="L76">    private Availability availability = Availability.BUSY;</span>
+
+<span class="fc" id="L78">    private Privacy privacy = Privacy.DEFAULT;</span>
+
+    private CalendarConference conference;
+
+<span class="fc" id="L82">    private final List&lt;CalendarAttendee&gt; attendees = new ArrayList&lt;CalendarAttendee&gt;();</span>
+
+<span class="fc" id="L84">    private final List&lt;CalendarAlarm&gt; alarms = new ArrayList&lt;CalendarAlarm&gt;();</span>
+
+<span class="fc" id="L86">    private final List&lt;CalendarAttachment&gt; attachments = new ArrayList&lt;CalendarAttachment&gt;();</span>
+
+<span class="fc" id="L88">    private final Map&lt;String, String&gt; providerData = new HashMap&lt;String, String&gt;();</span>
+
+    public String getId() {
+<span class="fc" id="L91">        return id;</span>
+    }
+
+    public CalendarEvent setId(String v) {
+<span class="fc" id="L95">        id = v;</span>
+<span class="fc" id="L96">        return this;</span>
+    }
+
+    public String getCalendarId() {
+<span class="fc" id="L100">        return calendarId;</span>
+    }
+
+    public CalendarEvent setCalendarId(String v) {
+<span class="fc" id="L104">        calendarId = v;</span>
+<span class="fc" id="L105">        return this;</span>
+    }
+
+    public String getSourceId() {
+<span class="fc" id="L109">        return sourceId;</span>
+    }
+
+    public CalendarEvent setSourceId(String v) {
+<span class="fc" id="L113">        sourceId = v;</span>
+<span class="fc" id="L114">        return this;</span>
+    }
+
+    public String getVersion() {
+<span class="fc" id="L118">        return version;</span>
+    }
+
+    public CalendarEvent setVersion(String v) {
+<span class="fc" id="L122">        version = v;</span>
+<span class="fc" id="L123">        return this;</span>
+    }
+
+    public String getTitle() {
+<span class="fc" id="L127">        return title;</span>
+    }
+
+    public CalendarEvent setTitle(String v) {
+<span class="fc" id="L131">        title = v;</span>
+<span class="fc" id="L132">        return this;</span>
+    }
+
+    public String getDescription() {
+<span class="fc" id="L136">        return description;</span>
+    }
+
+    public CalendarEvent setDescription(String v) {
+<span class="fc" id="L140">        description = v;</span>
+<span class="fc" id="L141">        return this;</span>
+    }
+
+    public String getLocation() {
+<span class="fc" id="L145">        return location;</span>
+    }
+
+    public CalendarEvent setLocation(String v) {
+<span class="fc" id="L149">        location = v;</span>
+<span class="fc" id="L150">        return this;</span>
+    }
+
+    public String getUrl() {
+<span class="fc" id="L154">        return url;</span>
+    }
+
+    public CalendarEvent setUrl(String v) {
+<span class="fc" id="L158">        url = v;</span>
+<span class="fc" id="L159">        return this;</span>
+    }
+
+    public String getRecurringEventId() {
+<span class="fc" id="L163">        return recurringEventId;</span>
+    }
+
+    public CalendarEvent setRecurringEventId(String v) {
+<span class="fc" id="L167">        recurringEventId = v;</span>
+<span class="fc" id="L168">        return this;</span>
+    }
+
+    public CalendarDateTime getStart() {
+<span class="fc" id="L172">        return start;</span>
+    }
+
+    public CalendarEvent setStart(CalendarDateTime v) {
+<span class="fc" id="L176">        start = v;</span>
+<span class="fc" id="L177">        return this;</span>
+    }
+
+    public CalendarDateTime getEnd() {
+<span class="fc" id="L181">        return end;</span>
+    }
+
+    public CalendarEvent setEnd(CalendarDateTime v) {
+<span class="fc" id="L185">        end = v;</span>
+<span class="fc" id="L186">        return this;</span>
+    }
+
+    public CalendarRecurrenceRule getRecurrence() {
+<span class="fc" id="L190">        return recurrence;</span>
+    }
+
+    public CalendarEvent setRecurrence(CalendarRecurrenceRule v) {
+<span class="fc" id="L194">        recurrence = v;</span>
+<span class="fc" id="L195">        return this;</span>
+    }
+
+    public Status getStatus() {
+<span class="fc" id="L199">        return status;</span>
+    }
+
+    public CalendarEvent setStatus(Status v) {
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        status = v == null ? Status.CONFIRMED : v;</span>
+<span class="fc" id="L204">        return this;</span>
+    }
+
+    public Availability getAvailability() {
+<span class="fc" id="L208">        return availability;</span>
+    }
+
+    public CalendarEvent setAvailability(Availability v) {
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        availability = v == null ? Availability.BUSY : v;</span>
+<span class="fc" id="L213">        return this;</span>
+    }
+
+    public Privacy getPrivacy() {
+<span class="fc" id="L217">        return privacy;</span>
+    }
+
+    public CalendarEvent setPrivacy(Privacy v) {
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">        privacy = v == null ? Privacy.DEFAULT : v;</span>
+<span class="fc" id="L222">        return this;</span>
+    }
+
+    public CalendarConference getConference() {
+<span class="fc" id="L226">        return conference;</span>
+    }
+
+    public CalendarEvent setConference(CalendarConference v) {
+<span class="fc" id="L230">        conference = v;</span>
+<span class="fc" id="L231">        return this;</span>
+    }
+
+    public CalendarEvent addAttendee(CalendarAttendee v) {
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (v != null) {</span>
+<span class="fc" id="L236">            attendees.add(v);</span>
+        }
+<span class="fc" id="L238">        return this;</span>
+    }
+
+    public List&lt;CalendarAttendee&gt; getAttendees() {
+<span class="fc" id="L242">        return Collections.unmodifiableList(attendees);</span>
+    }
+
+    public CalendarEvent removeAttendee(CalendarAttendee v) {
+<span class="fc" id="L246">        attendees.remove(v);</span>
+<span class="fc" id="L247">        return this;</span>
+    }
+
+    public CalendarEvent clearAttendees() {
+<span class="nc" id="L251">        attendees.clear();</span>
+<span class="nc" id="L252">        return this;</span>
+    }
+
+    public CalendarEvent addAlarm(CalendarAlarm v) {
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">        if (v != null) {</span>
+<span class="fc" id="L257">            alarms.add(v);</span>
+        }
+<span class="fc" id="L259">        return this;</span>
+    }
+
+    public List&lt;CalendarAlarm&gt; getAlarms() {
+<span class="fc" id="L263">        return Collections.unmodifiableList(alarms);</span>
+    }
+
+    public CalendarEvent removeAlarm(CalendarAlarm v) {
+<span class="fc" id="L267">        alarms.remove(v);</span>
+<span class="fc" id="L268">        return this;</span>
+    }
+
+    public CalendarEvent clearAlarms() {
+<span class="nc" id="L272">        alarms.clear();</span>
+<span class="nc" id="L273">        return this;</span>
+    }
+
+    public CalendarEvent addAttachment(CalendarAttachment v) {
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (v != null) {</span>
+<span class="fc" id="L278">            attachments.add(v);</span>
+        }
+<span class="fc" id="L280">        return this;</span>
+    }
+
+    public List&lt;CalendarAttachment&gt; getAttachments() {
+<span class="fc" id="L284">        return Collections.unmodifiableList(attachments);</span>
+    }
+
+    public CalendarEvent removeAttachment(CalendarAttachment v) {
+<span class="nc" id="L288">        attachments.remove(v);</span>
+<span class="nc" id="L289">        return this;</span>
+    }
+
+    public CalendarEvent clearAttachments() {
+<span class="nc" id="L293">        attachments.clear();</span>
+<span class="nc" id="L294">        return this;</span>
+    }
+
+    public CalendarEvent putProviderData(String k, String v) {
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        if (k != null) {</span>
+<span class="fc" id="L299">            providerData.put(k, v);</span>
+        }
+<span class="fc" id="L301">        return this;</span>
+    }
+
+    public Map&lt;String, String&gt; getProviderData() {
+<span class="fc" id="L305">        return Collections.unmodifiableMap(providerData);</span>
+    }
+
+    public CalendarEvent removeProviderData(String key) {
+<span class="nc" id="L309">        providerData.remove(key);</span>
+<span class="nc" id="L310">        return this;</span>
+    }
+
+    public CalendarEvent clearProviderData() {
+<span class="nc" id="L314">        providerData.clear();</span>
+<span class="nc" id="L315">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

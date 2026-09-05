@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SurfaceNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.surfaces</a> &gt; <span class="el_source">SurfaceNode.java</span></div><h1>SurfaceNode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.surfaces;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/// The base class of all surface layout nodes. A surface descriptor is a small tree of nodes
+/// (columns, rows, boxes, text, images, progress indicators) that every platform can render
+/// natively while the app process is not running -- so a node is pure data: there are no
+/// listeners, no theme lookups and no live `Image` references in the serialized form.
+///
+/// All nodes share the styling in this class: padding, background color, corner radius, alignment
+/// within the parent, flexible weight, an optional fixed size and an optional action. An action is
+/// a plain string id (plus optional parameters) delivered to the handler registered with
+/// `Surfaces.setActionHandler(...)` when the user taps the node -- see `SurfaceActionEvent`.
+///
+/// All dimensions are in display-independent pixels (dips).
+<span class="fc" id="L39">public abstract class SurfaceNode {</span>
+    static final int MAX_DEPTH = 8;
+
+    private int paddingTop;
+    private int paddingRight;
+    private int paddingBottom;
+    private int paddingLeft;
+    private SurfaceColor background;
+    private int cornerRadius;
+    private SurfaceAlignment alignment;
+    private int weight;
+    private int widthDips;
+    private int heightDips;
+    private String actionId;
+    private Map&lt;String, Object&gt; actionParams;
+
+    /// Sets the same padding on all four sides.
+    ///
+    /// #### Parameters
+    ///
+    /// - `all`: padding in dips
+    ///
+    /// #### Returns
+    ///
+    /// this node, for chaining
+    public SurfaceNode setPadding(int all) {
+<span class="fc" id="L65">        return setPadding(all, all, all, all);</span>
+    }
+
+    /// Sets the padding of each side individually.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: top padding in dips
+    /// - `right`: right padding in dips
+    /// - `bottom`: bottom padding in dips
+    /// - `left`: left padding in dips
+    ///
+    /// #### Returns
+    ///
+    /// this node, for chaining
+    public SurfaceNode setPadding(int top, int right, int bottom, int left) {
+<span class="fc" id="L81">        this.paddingTop = top;</span>
+<span class="fc" id="L82">        this.paddingRight = right;</span>
+<span class="fc" id="L83">        this.paddingBottom = bottom;</span>
+<span class="fc" id="L84">        this.paddingLeft = left;</span>
+<span class="fc" id="L85">        return this;</span>
+    }
+
+    /// Sets the background color of this node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `color`: the background color
+    ///
+    /// #### Returns
+    ///
+    /// this node, for chaining
+    public SurfaceNode setBackground(SurfaceColor color) {
+<span class="fc" id="L98">        this.background = color;</span>
+<span class="fc" id="L99">        return this;</span>
+    }
+
+    /// Sets the corner radius applied to the node's background. May render square on Android
+    /// versions below 12.
+    ///
+    /// #### Parameters
+    ///
+    /// - `radius`: the corner radius in dips
+    ///
+    /// #### Returns
+    ///
+    /// this node, for chaining
+    public SurfaceNode setCornerRadius(int radius) {
+<span class="fc" id="L113">        this.cornerRadius = radius;</span>
+<span class="fc" id="L114">        return this;</span>
+    }
+
+    /// Sets this node's alignment within its parent. In a `SurfaceBox` all nine positions apply;
+    /// in rows and columns only the cross-axis component is used.
+    ///
+    /// #### Parameters
+    ///
+    /// - `alignment`: the alignment
+    ///
+    /// #### Returns
+    ///
+    /// this node, for chaining
+    public SurfaceNode setAlignment(SurfaceAlignment alignment) {
+<span class="nc" id="L128">        this.alignment = alignment;</span>
+<span class="nc" id="L129">        return this;</span>
+    }
+
+    /// Sets the flexible-space weight of this node within a row or column. Nodes with a weight
+    /// share the leftover space of the parent proportionally; a weight of 0 (the default) sizes
+    /// the node to its natural size.
+    ///
+    /// #### Parameters
+    ///
+    /// - `weight`: the relative weight, 0 for natural sizing
+    ///
+    /// #### Returns
+    ///
+    /// this node, for chaining
+    public SurfaceNode setWeight(int weight) {
+<span class="fc" id="L144">        this.weight = weight;</span>
+<span class="fc" id="L145">        return this;</span>
+    }
+
+    /// Sets a fixed size for this node. A value of 0 (the default) keeps the natural size of the
+    /// respective axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `widthDips`: fixed width in dips, 0 for natural width
+    /// - `heightDips`: fixed height in dips, 0 for natural height
+    ///
+    /// #### Returns
+    ///
+    /// this node, for chaining
+    public SurfaceNode setSize(int widthDips, int heightDips) {
+<span class="fc" id="L160">        this.widthDips = widthDips;</span>
+<span class="fc" id="L161">        this.heightDips = heightDips;</span>
+<span class="fc" id="L162">        return this;</span>
+    }
+
+    /// Assigns a tap action to this node. Tapping the node opens (or foregrounds) the app and
+    /// delivers the action id to the handler registered with `Surfaces.setActionHandler(...)`.
+    /// Note that small iOS home-screen widgets only honor the action of the root node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `actionId`: the app-defined action identifier
+    ///
+    /// #### Returns
+    ///
+    /// this node, for chaining
+    public SurfaceNode setAction(String actionId) {
+<span class="nc" id="L177">        return setAction(actionId, null);</span>
+    }
+
+    /// Assigns a tap action with parameters to this node. The parameter map may contain `String`,
+    /// `Number` and `Boolean` values and is delivered verbatim with the `SurfaceActionEvent`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `actionId`: the app-defined action identifier
+    /// - `params`: parameters delivered with the action, may be null
+    ///
+    /// #### Returns
+    ///
+    /// this node, for chaining
+    public SurfaceNode setAction(String actionId, Map&lt;String, Object&gt; params) {
+<span class="fc" id="L192">        this.actionId = actionId;</span>
+<span class="fc" id="L193">        this.actionParams = params;</span>
+<span class="fc" id="L194">        return this;</span>
+    }
+
+    /// Returns the top padding in dips.
+    public int getPaddingTop() {
+<span class="nc" id="L199">        return paddingTop;</span>
+    }
+
+    /// Returns the right padding in dips.
+    public int getPaddingRight() {
+<span class="nc" id="L204">        return paddingRight;</span>
+    }
+
+    /// Returns the bottom padding in dips.
+    public int getPaddingBottom() {
+<span class="nc" id="L209">        return paddingBottom;</span>
+    }
+
+    /// Returns the left padding in dips.
+    public int getPaddingLeft() {
+<span class="nc" id="L214">        return paddingLeft;</span>
+    }
+
+    /// Returns the background color, or null.
+    public SurfaceColor getBackground() {
+<span class="nc" id="L219">        return background;</span>
+    }
+
+    /// Returns the corner radius in dips.
+    public int getCornerRadius() {
+<span class="nc" id="L224">        return cornerRadius;</span>
+    }
+
+    /// Returns the alignment within the parent, or null for the platform default.
+    public SurfaceAlignment getAlignment() {
+<span class="nc" id="L229">        return alignment;</span>
+    }
+
+    /// Returns the flexible-space weight, 0 when naturally sized.
+    public int getWeight() {
+<span class="nc" id="L234">        return weight;</span>
+    }
+
+    /// Returns the fixed width in dips, 0 when naturally sized.
+    public int getWidthDips() {
+<span class="nc" id="L239">        return widthDips;</span>
+    }
+
+    /// Returns the fixed height in dips, 0 when naturally sized.
+    public int getHeightDips() {
+<span class="nc" id="L244">        return heightDips;</span>
+    }
+
+    /// Returns the tap action id, or null.
+    public String getActionId() {
+<span class="nc" id="L249">        return actionId;</span>
+    }
+
+    /// Returns the tap action parameters, or null.
+    public Map&lt;String, Object&gt; getActionParams() {
+<span class="nc" id="L254">        return actionParams;</span>
+    }
+
+    /// Returns the wire-format type tag of this node (`col`, `row`, `box`, `text`, `dyn`, `img`,
+    /// `prog`, `vec`, `spacer`).
+    abstract String getType();
+
+    /// Adds the node-specific keys to the serialized form. Image nodes register their PNG bytes
+    /// in `images`; containers serialize their children at `depth + 1`.
+    abstract void serializeContent(Map&lt;String, Object&gt; out, Map&lt;String, byte[]&gt; images, int depth);
+
+    /// Serializes this node (and its subtree) to the map structure emitted as JSON.
+    final Map&lt;String, Object&gt; toMap(Map&lt;String, byte[]&gt; images, int depth) {
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        if (depth &gt; MAX_DEPTH) {</span>
+<span class="fc" id="L268">            throw new IllegalArgumentException(&quot;Surface descriptors are limited to &quot; + MAX_DEPTH</span>
+                    + &quot; nesting levels so they stay within platform widget budgets&quot;);
+        }
+<span class="fc" id="L271">        Map&lt;String, Object&gt; out = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L272">        out.put(&quot;t&quot;, getType());</span>
+<span class="pc bpc" id="L273" title="3 of 8 branches missed.">        if (paddingTop != 0 || paddingRight != 0 || paddingBottom != 0 || paddingLeft != 0) {</span>
+<span class="fc" id="L274">            java.util.List&lt;Object&gt; pad = new java.util.ArrayList&lt;Object&gt;(4);</span>
+<span class="fc" id="L275">            pad.add(Integer.valueOf(paddingTop));</span>
+<span class="fc" id="L276">            pad.add(Integer.valueOf(paddingRight));</span>
+<span class="fc" id="L277">            pad.add(Integer.valueOf(paddingBottom));</span>
+<span class="fc" id="L278">            pad.add(Integer.valueOf(paddingLeft));</span>
+<span class="fc" id="L279">            out.put(&quot;pad&quot;, pad);</span>
+        }
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (background != null) {</span>
+<span class="fc" id="L282">            out.put(&quot;bg&quot;, SurfaceSerializer.colorMap(background));</span>
+        }
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        if (cornerRadius != 0) {</span>
+<span class="fc" id="L285">            out.put(&quot;corner&quot;, Integer.valueOf(cornerRadius));</span>
+        }
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        if (alignment != null) {</span>
+<span class="nc" id="L288">            out.put(&quot;align&quot;, alignment.getJsonName());</span>
+        }
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        if (weight != 0) {</span>
+<span class="fc" id="L291">            out.put(&quot;weight&quot;, Integer.valueOf(weight));</span>
+        }
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (widthDips != 0) {</span>
+<span class="fc" id="L294">            out.put(&quot;w&quot;, Integer.valueOf(widthDips));</span>
+        }
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        if (heightDips != 0) {</span>
+<span class="fc" id="L297">            out.put(&quot;h&quot;, Integer.valueOf(heightDips));</span>
+        }
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (actionId != null) {</span>
+<span class="fc" id="L300">            Map&lt;String, Object&gt; action = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L301">            action.put(&quot;id&quot;, actionId);</span>
+<span class="pc bpc" id="L302" title="2 of 4 branches missed.">            if (actionParams != null &amp;&amp; !actionParams.isEmpty()) {</span>
+<span class="fc" id="L303">                action.put(&quot;p&quot;, SurfaceSerializer.sortedCopy(actionParams));</span>
+            }
+<span class="fc" id="L305">            out.put(&quot;action&quot;, action);</span>
+        }
+<span class="fc" id="L307">        serializeContent(out, images, depth);</span>
+<span class="fc" id="L308">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

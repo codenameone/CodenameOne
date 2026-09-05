@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ChatRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">ChatRequest.java</span></div><h1>ChatRequest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// The full request to [LlmClient#chat(ChatRequest)] /
+/// [LlmClient#chatStream(ChatRequest, StreamingListener)]. Built via
+/// [#builder()]; immutable once constructed so the same request can be
+/// re-used across retries.
+///
+/// Numeric tuning fields are boxed so a `null` means &quot;don't send&quot; --
+/// the provider's own default is used instead of one we picked.
+public final class ChatRequest {
+    private final String model;
+    private final List&lt;ChatMessage&gt; messages;
+    private final Float temperature;
+    private final Integer maxTokens;
+    private final Float topP;
+    private final List&lt;String&gt; stopSequences;
+    private final Long seed;
+    private final ResponseFormat responseFormat;
+    private final List&lt;Tool&gt; tools;
+    private final ToolChoice toolChoice;
+    private final Map&lt;String, String&gt; metadata;
+    private final SafetyFilter safetyFilter;
+
+<span class="fc" id="L52">    private ChatRequest(Builder b) {</span>
+<span class="fc" id="L53">        this.model = b.model;</span>
+<span class="fc" id="L54">        this.messages = Collections.unmodifiableList(new ArrayList&lt;ChatMessage&gt;(b.messages));</span>
+<span class="fc" id="L55">        this.temperature = b.temperature;</span>
+<span class="fc" id="L56">        this.maxTokens = b.maxTokens;</span>
+<span class="fc" id="L57">        this.topP = b.topP;</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        this.stopSequences = b.stopSequences == null ? Collections.&lt;String&gt;emptyList()</span>
+<span class="fc" id="L59">                : Collections.unmodifiableList(new ArrayList&lt;String&gt;(b.stopSequences));</span>
+<span class="fc" id="L60">        this.seed = b.seed;</span>
+<span class="fc" id="L61">        this.responseFormat = b.responseFormat;</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        this.tools = b.tools == null ? Collections.&lt;Tool&gt;emptyList()</span>
+<span class="fc" id="L63">                : Collections.unmodifiableList(new ArrayList&lt;Tool&gt;(b.tools));</span>
+<span class="fc" id="L64">        this.toolChoice = b.toolChoice;</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        this.metadata = b.metadata == null ? Collections.&lt;String, String&gt;emptyMap()</span>
+<span class="fc" id="L66">                : Collections.unmodifiableMap(new HashMap&lt;String, String&gt;(b.metadata));</span>
+<span class="fc" id="L67">        this.safetyFilter = b.safetyFilter;</span>
+<span class="fc" id="L68">    }</span>
+
+    /// Starts an empty request builder. At least one message is required.
+    /// @return a new builder
+    public static Builder builder() {
+<span class="fc" id="L73">        return new Builder();</span>
+    }
+
+    /// @return requested provider model, or {@code null} for the client default
+    public String getModel() {
+<span class="fc" id="L78">        return model;</span>
+    }
+
+    /// @return immutable conversation messages in provider order
+    public List&lt;ChatMessage&gt; getMessages() {
+<span class="fc" id="L83">        return messages;</span>
+    }
+
+    /// @return sampling temperature, or {@code null} for the provider default
+    public Float getTemperature() {
+<span class="fc" id="L88">        return temperature;</span>
+    }
+
+    /// @return maximum generated tokens, or {@code null} for the provider default
+    public Integer getMaxTokens() {
+<span class="fc" id="L93">        return maxTokens;</span>
+    }
+
+    /// @return nucleus-sampling probability, or {@code null} when unspecified
+    public Float getTopP() {
+<span class="fc" id="L98">        return topP;</span>
+    }
+
+    /// @return immutable stop sequences; empty when none were requested
+    public List&lt;String&gt; getStopSequences() {
+<span class="fc" id="L103">        return stopSequences;</span>
+    }
+
+    /// @return deterministic sampling seed, or {@code null} when unspecified
+    public Long getSeed() {
+<span class="fc" id="L108">        return seed;</span>
+    }
+
+    /// @return requested text/JSON response format, or {@code null}
+    public ResponseFormat getResponseFormat() {
+<span class="fc" id="L113">        return responseFormat;</span>
+    }
+
+    /// @return immutable tools offered to the model
+    public List&lt;Tool&gt; getTools() {
+<span class="fc" id="L118">        return tools;</span>
+    }
+
+    /// @return tool-selection policy, or {@code null} for provider behavior
+    public ToolChoice getToolChoice() {
+<span class="nc" id="L123">        return toolChoice;</span>
+    }
+
+    /// @return immutable provider metadata attached to this request
+    public Map&lt;String, String&gt; getMetadata() {
+<span class="fc" id="L128">        return metadata;</span>
+    }
+
+    /// @return client-side preflight filter, or {@code null} when disabled
+    public SafetyFilter getSafetyFilter() {
+<span class="fc" id="L133">        return safetyFilter;</span>
+    }
+
+    /// Returns a builder pre-populated with the values of this request.
+    /// Useful for replaying a request with one field changed.
+    public Builder toBuilder() {
+<span class="fc" id="L139">        Builder b = new Builder();</span>
+<span class="fc" id="L140">        b.model = model;</span>
+<span class="fc" id="L141">        b.messages = new ArrayList&lt;ChatMessage&gt;(messages);</span>
+<span class="fc" id="L142">        b.temperature = temperature;</span>
+<span class="fc" id="L143">        b.maxTokens = maxTokens;</span>
+<span class="fc" id="L144">        b.topP = topP;</span>
+<span class="fc" id="L145">        b.stopSequences = new ArrayList&lt;String&gt;(stopSequences);</span>
+<span class="fc" id="L146">        b.seed = seed;</span>
+<span class="fc" id="L147">        b.responseFormat = responseFormat;</span>
+<span class="fc" id="L148">        b.tools = new ArrayList&lt;Tool&gt;(tools);</span>
+<span class="fc" id="L149">        b.toolChoice = toolChoice;</span>
+<span class="fc" id="L150">        b.metadata = new HashMap&lt;String, String&gt;(metadata);</span>
+<span class="fc" id="L151">        b.safetyFilter = safetyFilter;</span>
+<span class="fc" id="L152">        return b;</span>
+    }
+
+    /// Mutable fluent builder for {@link ChatRequest}. Collection arguments
+    /// are copied when the immutable request is built.
+    public static final class Builder {
+        private String model;
+<span class="fc" id="L159">        private List&lt;ChatMessage&gt; messages = new ArrayList&lt;ChatMessage&gt;();</span>
+        private Float temperature;
+        private Integer maxTokens;
+        private Float topP;
+        private List&lt;String&gt; stopSequences;
+        private Long seed;
+        private ResponseFormat responseFormat;
+        private List&lt;Tool&gt; tools;
+        private ToolChoice toolChoice;
+        private Map&lt;String, String&gt; metadata;
+        private SafetyFilter safetyFilter;
+
+<span class="fc" id="L171">        Builder() {</span>
+<span class="fc" id="L172">        }</span>
+
+        /// Selects a provider model.
+        /// @param model provider model id; {@code null} uses the client default
+        /// @return this builder
+        public Builder model(String model) {
+<span class="fc" id="L178">            this.model = model;</span>
+<span class="fc" id="L179">            return this;</span>
+        }
+
+        /// Replaces the conversation history.
+        /// @param messages messages in chronological order; {@code null} clears them
+        /// @return this builder
+        public Builder messages(List&lt;ChatMessage&gt; messages) {
+<span class="nc bnc" id="L186" title="All 2 branches missed.">            this.messages = messages == null ? new ArrayList&lt;ChatMessage&gt;()</span>
+                    : new ArrayList&lt;ChatMessage&gt;(messages);
+<span class="nc" id="L188">            return this;</span>
+        }
+
+        /// Appends one conversation message.
+        /// @param m message to append
+        /// @return this builder
+        public Builder addMessage(ChatMessage m) {
+<span class="fc" id="L195">            this.messages.add(m);</span>
+<span class="fc" id="L196">            return this;</span>
+        }
+
+        /// Sets sampling temperature.
+        /// @param t provider-supported temperature, or {@code null} to omit
+        /// @return this builder
+        public Builder temperature(Float t) {
+<span class="fc" id="L203">            this.temperature = t;</span>
+<span class="fc" id="L204">            return this;</span>
+        }
+
+        /// Limits response length.
+        /// @param n maximum generated token count, or {@code null} to omit
+        /// @return this builder
+        public Builder maxTokens(Integer n) {
+<span class="fc" id="L211">            this.maxTokens = n;</span>
+<span class="fc" id="L212">            return this;</span>
+        }
+
+        /// Sets nucleus sampling probability.
+        /// @param p provider-supported probability, or {@code null} to omit
+        /// @return this builder
+        public Builder topP(Float p) {
+<span class="fc" id="L219">            this.topP = p;</span>
+<span class="fc" id="L220">            return this;</span>
+        }
+
+        /// Sets sequences that terminate generation.
+        /// @param stops stop strings, or {@code null} for none
+        /// @return this builder
+        public Builder stopSequences(List&lt;String&gt; stops) {
+<span class="fc" id="L227">            this.stopSequences = stops;</span>
+<span class="fc" id="L228">            return this;</span>
+        }
+
+        /// Requests deterministic sampling where supported.
+        /// @param seed provider sampling seed, or {@code null} to omit
+        /// @return this builder
+        public Builder seed(Long seed) {
+<span class="fc" id="L235">            this.seed = seed;</span>
+<span class="fc" id="L236">            return this;</span>
+        }
+
+        /// Requests text or structured JSON output.
+        /// @param f desired format, or {@code null} for provider default
+        /// @return this builder
+        public Builder responseFormat(ResponseFormat f) {
+<span class="fc" id="L243">            this.responseFormat = f;</span>
+<span class="fc" id="L244">            return this;</span>
+        }
+
+        /// Replaces the callable tools advertised to the model.
+        /// @param tools tool definitions, or {@code null} for none
+        /// @return this builder
+        public Builder tools(List&lt;Tool&gt; tools) {
+<span class="nc" id="L251">            this.tools = tools;</span>
+<span class="nc" id="L252">            return this;</span>
+        }
+
+        /// Controls whether and which tool the model may call.
+        /// @param choice selection policy, or {@code null} for provider default
+        /// @return this builder
+        public Builder toolChoice(ToolChoice choice) {
+<span class="nc" id="L259">            this.toolChoice = choice;</span>
+<span class="nc" id="L260">            return this;</span>
+        }
+
+        /// Attaches provider-specific request metadata.
+        /// @param meta metadata copied into the request, or {@code null}
+        /// @return this builder
+        public Builder metadata(Map&lt;String, String&gt; meta) {
+<span class="nc" id="L267">            this.metadata = meta;</span>
+<span class="nc" id="L268">            return this;</span>
+        }
+
+        /// Installs a client-side filter evaluated before network submission.
+        /// @param f safety policy, or {@code null} to disable it
+        /// @return this builder
+        public Builder safetyFilter(SafetyFilter f) {
+<span class="fc" id="L275">            this.safetyFilter = f;</span>
+<span class="fc" id="L276">            return this;</span>
+        }
+
+        /// Validates and creates an immutable request.
+        /// @return completed request
+        /// @throws IllegalStateException when no messages were supplied
+        public ChatRequest build() {
+<span class="fc bfc" id="L283" title="All 2 branches covered.">            if (messages.isEmpty()) {</span>
+<span class="fc" id="L284">                throw new IllegalStateException(&quot;at least one message is required&quot;);</span>
+            }
+<span class="fc" id="L286">            return new ChatRequest(this);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

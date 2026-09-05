@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WeightMeasurement.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health.sensors</a> &gt; <span class="el_source">WeightMeasurement.java</span></div><h1>WeightMeasurement.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.sensors;
+
+/// A decoded Weight Measurement, characteristic `0x2A9D`.
+///
+/// #### Wire format
+///
+/// Byte 0 is a flags field:
+///
+/// | Bit | Meaning |
+/// |-----|---------|
+/// | 0 | units: 0 = SI (kg), 1 = Imperial (lb) |
+/// | 1 | timestamp present |
+/// | 2 | user id present |
+/// | 3 | BMI and height present |
+///
+/// followed by a `uint16` weight and the optional fields.
+///
+/// #### The resolution depends on the unit
+///
+/// The raw `uint16` is scaled by **0.005 kg** in SI mode and **0.01 lb**
+/// in Imperial mode -- not the same multiplier, and not a simple unit
+/// conversion applied afterwards. Getting this wrong yields a weight that
+/// is wrong by a factor of about two, which is exactly close enough to
+/// look plausible. Height carries the same split: 0.001 m against 0.1 in.
+///
+/// Like all characteristics here this one is **indicated, not notified**.
+public final class WeightMeasurement {
+
+    private static final int FLAG_IMPERIAL = 0x01;
+    private static final int FLAG_TIMESTAMP = 0x02;
+    private static final int FLAG_USER_ID = 0x04;
+    private static final int FLAG_BMI_HEIGHT = 0x08;
+
+    /// The value the profile reserves, in every one of these fields, for
+    /// &quot;the scale could not measure this&quot;.
+    private static final int UNAVAILABLE = 0xFFFF;
+
+    private static final double WEIGHT_RESOLUTION_KG = 0.005;
+    private static final double WEIGHT_RESOLUTION_LB = 0.01;
+    private static final double HEIGHT_RESOLUTION_M = 0.001;
+    private static final double HEIGHT_RESOLUTION_IN = 0.1;
+
+    private static final double LB_TO_KG = 0.45359237;
+    private static final double IN_TO_M = 0.0254;
+
+    private final double weightKg;
+    private final double heightMeters;
+    private final double bmi;
+    private final int userId;
+    private final long timestampMillis;
+    private final boolean imperial;
+
+    private WeightMeasurement(double weightKg, double heightMeters, double bmi,
+<span class="fc" id="L76">            int userId, long timestampMillis, boolean imperial) {</span>
+<span class="fc" id="L77">        this.weightKg = weightKg;</span>
+<span class="fc" id="L78">        this.heightMeters = heightMeters;</span>
+<span class="fc" id="L79">        this.bmi = bmi;</span>
+<span class="fc" id="L80">        this.userId = userId;</span>
+<span class="fc" id="L81">        this.timestampMillis = timestampMillis;</span>
+<span class="fc" id="L82">        this.imperial = imperial;</span>
+<span class="fc" id="L83">    }</span>
+
+    /// Decodes a `0x2A9D` value. Returns `null` for a malformed or
+    /// truncated payload; never throws.
+    public static WeightMeasurement parse(byte[] value) {
+<span class="fc bfc" id="L88" title="All 4 branches covered.">        if (value == null || value.length &lt; 3) {</span>
+<span class="fc" id="L89">            return null;</span>
+        }
+<span class="fc" id="L91">        GattReader r = new GattReader(value);</span>
+<span class="fc" id="L92">        int flags = r.uint8();</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        boolean imperial = (flags &amp; FLAG_IMPERIAL) != 0;</span>
+
+<span class="fc" id="L95">        int rawWeight = r.uint16();</span>
+        // 0xFFFF is the Weight Scale Service's &quot;measurement unsuccessful&quot;
+        // sentinel, not a weight. Scaling it produced 327.675 kg in SI
+        // mode and about 297 kg imperial, which the session then published
+        // and could write to the store as a real body mass -- the other
+        // medical parsers here already reject their failure values.
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (rawWeight == UNAVAILABLE) {</span>
+<span class="nc" id="L102">            return null;</span>
+        }
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        double weightKg = imperial</span>
+                ? rawWeight * WEIGHT_RESOLUTION_LB * LB_TO_KG
+                : rawWeight * WEIGHT_RESOLUTION_KG;
+
+<span class="fc" id="L108">        long timestamp = -1;</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if ((flags &amp; FLAG_TIMESTAMP) != 0) {</span>
+<span class="fc" id="L110">            timestamp = GattDateTime.read(r);</span>
+        }
+<span class="fc" id="L112">        int user = -1;</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if ((flags &amp; FLAG_USER_ID) != 0) {</span>
+<span class="nc" id="L114">            user = r.uint8();</span>
+        }
+<span class="fc" id="L116">        double bmi = Double.NaN;</span>
+<span class="fc" id="L117">        double heightM = Double.NaN;</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if ((flags &amp; FLAG_BMI_HEIGHT) != 0) {</span>
+            // Each field carries its own 0xFFFF &quot;unavailable&quot; value, and a
+            // scale that measured one but not the other still sends both.
+            // Scaled rather than checked, they surfaced as a BMI of 6553.5
+            // and a height of about 6.5 kilometres -- numbers an app has no
+            // reason to distrust, next to a weight that is perfectly real.
+            // NaN is what the getters already document for absent.
+<span class="fc" id="L125">            int rawBmi = r.uint16();</span>
+            // BMI is always transmitted with a resolution of 0.1,
+            // regardless of the unit flag.
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (rawBmi != UNAVAILABLE) {</span>
+<span class="fc" id="L129">                bmi = rawBmi * 0.1;</span>
+            }
+<span class="fc" id="L131">            int rawHeight = r.uint16();</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (rawHeight != UNAVAILABLE) {</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">                heightM = imperial</span>
+                        ? rawHeight * HEIGHT_RESOLUTION_IN * IN_TO_M
+                        : rawHeight * HEIGHT_RESOLUTION_M;
+            }
+        }
+
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (!r.isValid()) {</span>
+<span class="fc" id="L140">            return null;</span>
+        }
+<span class="fc" id="L142">        return new WeightMeasurement(weightKg, heightM, bmi, user, timestamp,</span>
+                imperial);
+    }
+
+    /// The weight in kilograms, converted from pounds when the scale
+    /// reported Imperial units.
+    public double getWeightKg() {
+<span class="fc" id="L149">        return weightKg;</span>
+    }
+
+    /// `true` when the scale transmitted Imperial units. Useful for
+    /// matching the user's own display preference; the value returned by
+    /// [#getWeightKg()] is already normalized either way.
+    public boolean isImperial() {
+<span class="fc" id="L156">        return imperial;</span>
+    }
+
+    /// The height in metres, or `Double.NaN` when absent.
+    public double getHeightMeters() {
+<span class="fc" id="L161">        return heightMeters;</span>
+    }
+
+    /// The body mass index the scale computed, or `Double.NaN` when
+    /// absent.
+    public double getBmi() {
+<span class="fc" id="L167">        return bmi;</span>
+    }
+
+    /// `true` when this reading carried BMI **and** height.
+    ///
+    /// Both, as the name says. The two fields are optional
+    /// independently -- each carries its own `0xFFFF` unavailable value
+    /// and a scale that measured one but not the other sends both -- so
+    /// testing only the BMI let a caller that gated on this go on to use
+    /// a height of `NaN`.
+    public boolean hasBmiAndHeight() {
+<span class="pc bpc" id="L178" title="1 of 4 branches missed.">        return !Double.isNaN(bmi) &amp;&amp; !Double.isNaN(heightMeters);</span>
+    }
+
+    /// The scale's user-profile index, or `-1` when absent. Family scales
+    /// use it to attribute a reading.
+    public int getUserId() {
+<span class="nc" id="L184">        return userId;</span>
+    }
+
+    /// The scale's own timestamp in epoch millis, or `-1` when absent.
+    public long getTimestampMillis() {
+<span class="fc" id="L189">        return timestampMillis;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L194">        return &quot;WeightMeasurement[&quot; + weightKg + &quot; kg]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,747 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Distance.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.collision</a> &gt; <span class="el_source">Distance.java</span></div><h1>Distance.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.collision;
+
+import com.codename1.gaming.physics.box2d.collision.shapes.ChainShape;
+import com.codename1.gaming.physics.box2d.collision.shapes.CircleShape;
+import com.codename1.gaming.physics.box2d.collision.shapes.EdgeShape;
+import com.codename1.gaming.physics.box2d.collision.shapes.PolygonShape;
+import com.codename1.gaming.physics.box2d.collision.shapes.Shape;
+import com.codename1.gaming.physics.box2d.common.MathUtils;
+import com.codename1.gaming.physics.box2d.common.Rot;
+import com.codename1.gaming.physics.box2d.common.Settings;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.gaming.physics.box2d.common.Transform;
+
+// updated to rev 100
+/// This is non-static for faster pooling. To get an instance, use the {@link SingletonPool}, don't
+/// construct a distance object.
+///
+/// @author Daniel Murphy
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">public class Distance {</span>
+
+<span class="fc" id="L44">  public static int GJK_CALLS = 0;</span>
+<span class="fc" id="L45">  public static int GJK_ITERS = 0;</span>
+<span class="fc" id="L46">  public static int GJK_MAX_ITERS = 20;</span>
+
+  /// GJK using Voronoi regions (Christer Ericson) and Barycentric coordinates.
+<span class="fc" id="L49">  private class SimplexVertex {</span>
+<span class="fc" id="L50">    public final Vec2 wA = new Vec2(); // support point in shapeA</span>
+<span class="fc" id="L51">    public final Vec2 wB = new Vec2(); // support point in shapeB</span>
+<span class="fc" id="L52">    public final Vec2 w = new Vec2(); // wB - wA</span>
+    public float a; // barycentric coordinate for closest point
+    public int indexA; // wA index
+    public int indexB; // wB index
+
+    public void set(SimplexVertex sv) {
+<span class="fc" id="L58">      wA.set(sv.wA);</span>
+<span class="fc" id="L59">      wB.set(sv.wB);</span>
+<span class="fc" id="L60">      w.set(sv.w);</span>
+<span class="fc" id="L61">      a = sv.a;</span>
+<span class="fc" id="L62">      indexA = sv.indexA;</span>
+<span class="fc" id="L63">      indexB = sv.indexB;</span>
+<span class="fc" id="L64">    }</span>
+  }
+
+  /// Used to warm start Distance. Set count to zero on first call.
+  ///
+  /// @author daniel
+  public static class SimplexCache {
+    /// length or area
+    public float metric;
+    public int count;
+    /// vertices on shape A
+<span class="fc" id="L75">    public final int indexA[] = new int[3];</span>
+    /// vertices on shape B
+<span class="fc" id="L77">    public final int indexB[] = new int[3];</span>
+
+<span class="fc" id="L79">    public SimplexCache() {</span>
+<span class="fc" id="L80">      metric = 0;</span>
+<span class="fc" id="L81">      count = 0;</span>
+<span class="fc" id="L82">      indexA[0] = Integer.MAX_VALUE;</span>
+<span class="fc" id="L83">      indexA[1] = Integer.MAX_VALUE;</span>
+<span class="fc" id="L84">      indexA[2] = Integer.MAX_VALUE;</span>
+<span class="fc" id="L85">      indexB[0] = Integer.MAX_VALUE;</span>
+<span class="fc" id="L86">      indexB[1] = Integer.MAX_VALUE;</span>
+<span class="fc" id="L87">      indexB[2] = Integer.MAX_VALUE;</span>
+<span class="fc" id="L88">    }</span>
+
+    public void set(SimplexCache sc) {
+<span class="nc" id="L91">      System.arraycopy(sc.indexA, 0, indexA, 0, indexA.length);</span>
+<span class="nc" id="L92">      System.arraycopy(sc.indexB, 0, indexB, 0, indexB.length);</span>
+<span class="nc" id="L93">      metric = sc.metric;</span>
+<span class="nc" id="L94">      count = sc.count;</span>
+<span class="nc" id="L95">    }</span>
+  }
+
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">  private class Simplex {</span>
+<span class="fc" id="L99">    public final SimplexVertex m_v1 = new SimplexVertex();</span>
+<span class="fc" id="L100">    public final SimplexVertex m_v2 = new SimplexVertex();</span>
+<span class="fc" id="L101">    public final SimplexVertex m_v3 = new SimplexVertex();</span>
+<span class="fc" id="L102">    public final SimplexVertex vertices[] = {m_v1, m_v2, m_v3};</span>
+    public int m_count;
+
+    public void readCache(SimplexCache cache, DistanceProxy proxyA, Transform transformA,
+        DistanceProxy proxyB, Transform transformB) {
+<span class="pc bpc" id="L107" title="2 of 4 branches missed.">      assert (cache.count &lt;= 3);</span>
+
+      // Copy data from cache.
+<span class="fc" id="L110">      m_count = cache.count;</span>
+
+<span class="fc bfc" id="L112" title="All 2 branches covered.">      for (int i = 0; i &lt; m_count; ++i) {</span>
+<span class="fc" id="L113">        SimplexVertex v = vertices[i];</span>
+<span class="fc" id="L114">        v.indexA = cache.indexA[i];</span>
+<span class="fc" id="L115">        v.indexB = cache.indexB[i];</span>
+<span class="fc" id="L116">        Vec2 wALocal = proxyA.getVertex(v.indexA);</span>
+<span class="fc" id="L117">        Vec2 wBLocal = proxyB.getVertex(v.indexB);</span>
+<span class="fc" id="L118">        Transform.mulToOutUnsafe(transformA, wALocal, v.wA);</span>
+<span class="fc" id="L119">        Transform.mulToOutUnsafe(transformB, wBLocal, v.wB);</span>
+<span class="fc" id="L120">        v.w.set(v.wB).subLocal(v.wA);</span>
+<span class="fc" id="L121">        v.a = 0.0f;</span>
+      }
+
+      // Compute the new simplex metric, if it is substantially different than
+      // old metric then flush the simplex.
+<span class="fc bfc" id="L126" title="All 2 branches covered.">      if (m_count &gt; 1) {</span>
+<span class="fc" id="L127">        float metric1 = cache.metric;</span>
+<span class="fc" id="L128">        float metric2 = getMetric();</span>
+<span class="pc bpc" id="L129" title="3 of 6 branches missed.">        if (metric2 &lt; 0.5f * metric1 || 2.0f * metric1 &lt; metric2 || metric2 &lt; Settings.EPSILON) {</span>
+          // Reset the simplex.
+<span class="nc" id="L131">          m_count = 0;</span>
+        }
+      }
+
+      // If the cache is empty or invalid ...
+<span class="fc bfc" id="L136" title="All 2 branches covered.">      if (m_count == 0) {</span>
+<span class="fc" id="L137">        SimplexVertex v = vertices[0];</span>
+<span class="fc" id="L138">        v.indexA = 0;</span>
+<span class="fc" id="L139">        v.indexB = 0;</span>
+<span class="fc" id="L140">        Vec2 wALocal = proxyA.getVertex(0);</span>
+<span class="fc" id="L141">        Vec2 wBLocal = proxyB.getVertex(0);</span>
+<span class="fc" id="L142">        Transform.mulToOutUnsafe(transformA, wALocal, v.wA);</span>
+<span class="fc" id="L143">        Transform.mulToOutUnsafe(transformB, wBLocal, v.wB);</span>
+<span class="fc" id="L144">        v.w.set(v.wB).subLocal(v.wA);</span>
+<span class="fc" id="L145">        m_count = 1;</span>
+      }
+<span class="fc" id="L147">    }</span>
+
+    public void writeCache(SimplexCache cache) {
+<span class="fc" id="L150">      cache.metric = getMetric();</span>
+<span class="fc" id="L151">      cache.count = m_count;</span>
+
+<span class="fc bfc" id="L153" title="All 2 branches covered.">      for (int i = 0; i &lt; m_count; ++i) {</span>
+<span class="fc" id="L154">        cache.indexA[i] = (vertices[i].indexA);</span>
+<span class="fc" id="L155">        cache.indexB[i] = (vertices[i].indexB);</span>
+      }
+<span class="fc" id="L157">    }</span>
+
+<span class="fc" id="L159">    private final Vec2 e12 = new Vec2();</span>
+
+    public final void getSearchDirection(final Vec2 out) {
+<span class="pc bpc" id="L162" title="1 of 3 branches missed.">      switch (m_count) {</span>
+        case 1:
+<span class="fc" id="L164">          out.set(m_v1.w).negateLocal();</span>
+<span class="fc" id="L165">          return;</span>
+        case 2:
+<span class="fc" id="L167">          e12.set(m_v2.w).subLocal(m_v1.w);</span>
+          // use out for a temp variable real quick
+<span class="fc" id="L169">          out.set(m_v1.w).negateLocal();</span>
+<span class="fc" id="L170">          float sgn = Vec2.cross(e12, out);</span>
+
+<span class="fc bfc" id="L172" title="All 2 branches covered.">          if (sgn &gt; 0f) {</span>
+            // Origin is left of e12.
+<span class="fc" id="L174">            Vec2.crossToOutUnsafe(1f, e12, out);</span>
+<span class="fc" id="L175">            return;</span>
+          } else {
+            // Origin is right of e12.
+<span class="fc" id="L178">            Vec2.crossToOutUnsafe(e12, 1f, out);</span>
+<span class="fc" id="L179">            return;</span>
+          }
+        default:
+<span class="nc bnc" id="L182" title="All 2 branches missed.">          assert (false);</span>
+<span class="nc" id="L183">          out.setZero();</span>
+<span class="nc" id="L184">          return;</span>
+      }
+    }
+
+    // djm pooled
+<span class="fc" id="L189">    private final Vec2 case2 = new Vec2();</span>
+<span class="fc" id="L190">    private final Vec2 case22 = new Vec2();</span>
+
+    /// this returns pooled objects. don't keep or modify them
+    ///
+    /// @return
+    public void getClosestPoint(final Vec2 out) {
+<span class="pc bpc" id="L196" title="3 of 5 branches missed.">      switch (m_count) {</span>
+        case 0:
+<span class="nc bnc" id="L198" title="All 2 branches missed.">          assert (false);</span>
+<span class="nc" id="L199">          out.setZero();</span>
+<span class="nc" id="L200">          return;</span>
+        case 1:
+<span class="fc" id="L202">          out.set(m_v1.w);</span>
+<span class="fc" id="L203">          return;</span>
+        case 2:
+<span class="fc" id="L205">          case22.set(m_v2.w).mulLocal(m_v2.a);</span>
+<span class="fc" id="L206">          case2.set(m_v1.w).mulLocal(m_v1.a).addLocal(case22);</span>
+<span class="fc" id="L207">          out.set(case2);</span>
+<span class="fc" id="L208">          return;</span>
+        case 3:
+<span class="nc" id="L210">          out.setZero();</span>
+<span class="nc" id="L211">          return;</span>
+        default:
+<span class="nc bnc" id="L213" title="All 2 branches missed.">          assert (false);</span>
+<span class="nc" id="L214">          out.setZero();</span>
+<span class="nc" id="L215">          return;</span>
+      }
+    }
+
+    // djm pooled, and from above
+<span class="fc" id="L220">    private final Vec2 case3 = new Vec2();</span>
+<span class="fc" id="L221">    private final Vec2 case33 = new Vec2();</span>
+
+    public void getWitnessPoints(Vec2 pA, Vec2 pB) {
+<span class="pc bpc" id="L224" title="3 of 5 branches missed.">      switch (m_count) {</span>
+        case 0:
+<span class="nc bnc" id="L226" title="All 2 branches missed.">          assert (false);</span>
+          break;
+
+        case 1:
+<span class="fc" id="L230">          pA.set(m_v1.wA);</span>
+<span class="fc" id="L231">          pB.set(m_v1.wB);</span>
+<span class="fc" id="L232">          break;</span>
+
+        case 2:
+<span class="fc" id="L235">          case2.set(m_v1.wA).mulLocal(m_v1.a);</span>
+<span class="fc" id="L236">          pA.set(m_v2.wA).mulLocal(m_v2.a).addLocal(case2);</span>
+          // m_v1.a * m_v1.wA + m_v2.a * m_v2.wA;
+          // *pB = m_v1.a * m_v1.wB + m_v2.a * m_v2.wB;
+<span class="fc" id="L239">          case2.set(m_v1.wB).mulLocal(m_v1.a);</span>
+<span class="fc" id="L240">          pB.set(m_v2.wB).mulLocal(m_v2.a).addLocal(case2);</span>
+
+<span class="fc" id="L242">          break;</span>
+
+        case 3:
+<span class="nc" id="L245">          pA.set(m_v1.wA).mulLocal(m_v1.a);</span>
+<span class="nc" id="L246">          case3.set(m_v2.wA).mulLocal(m_v2.a);</span>
+<span class="nc" id="L247">          case33.set(m_v3.wA).mulLocal(m_v3.a);</span>
+<span class="nc" id="L248">          pA.addLocal(case3).addLocal(case33);</span>
+<span class="nc" id="L249">          pB.set(pA);</span>
+          // *pA = m_v1.a * m_v1.wA + m_v2.a * m_v2.wA + m_v3.a * m_v3.wA;
+          // *pB = *pA;
+<span class="nc" id="L252">          break;</span>
+
+        default:
+<span class="nc bnc" id="L255" title="All 2 branches missed.">          assert (false);</span>
+          break;
+      }
+<span class="fc" id="L258">    }</span>
+
+    // djm pooled, from above
+    public float getMetric() {
+<span class="pc bpc" id="L262" title="3 of 5 branches missed.">      switch (m_count) {</span>
+        case 0:
+<span class="nc bnc" id="L264" title="All 2 branches missed.">          assert (false);</span>
+<span class="nc" id="L265">          return 0.0f;</span>
+
+        case 1:
+<span class="fc" id="L268">          return 0.0f;</span>
+
+        case 2:
+<span class="fc" id="L271">          return MathUtils.distance(m_v1.w, m_v2.w);</span>
+
+        case 3:
+<span class="nc" id="L274">          case3.set(m_v2.w).subLocal(m_v1.w);</span>
+<span class="nc" id="L275">          case33.set(m_v3.w).subLocal(m_v1.w);</span>
+          // return Vec2.cross(m_v2.w - m_v1.w, m_v3.w - m_v1.w);
+<span class="nc" id="L277">          return Vec2.cross(case3, case33);</span>
+
+        default:
+<span class="nc bnc" id="L280" title="All 2 branches missed.">          assert (false);</span>
+<span class="nc" id="L281">          return 0.0f;</span>
+      }
+    }
+
+    // djm pooled from above
+    /// Solve a line segment using barycentric coordinates.
+    public void solve2() {
+      // Solve a line segment using barycentric coordinates.
+      //
+      // p = a1 * w1 + a2 * w2
+      // a1 + a2 = 1
+      //
+      // The vector from the origin to the closest point on the line is
+      // perpendicular to the line.
+      // e12 = w2 - w1
+      // dot(p, e) = 0
+      // a1 * dot(w1, e) + a2 * dot(w2, e) = 0
+      //
+      // 2-by-2 linear system
+      // [1 1 ][a1] = [1]
+      // [w1.e12 w2.e12][a2] = [0]
+      //
+      // Define
+      // d12_1 = dot(w2, e12)
+      // d12_2 = -dot(w1, e12)
+      // d12 = d12_1 + d12_2
+      //
+      // Solution
+      // a1 = d12_1 / d12
+      // a2 = d12_2 / d12
+<span class="fc" id="L311">      final Vec2 w1 = m_v1.w;</span>
+<span class="fc" id="L312">      final Vec2 w2 = m_v2.w;</span>
+<span class="fc" id="L313">      e12.set(w2).subLocal(w1);</span>
+
+      // w1 region
+<span class="fc" id="L316">      float d12_2 = -Vec2.dot(w1, e12);</span>
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">      if (d12_2 &lt;= 0.0f) {</span>
+        // a2 &lt;= 0, so we clamp it to 0
+<span class="nc" id="L319">        m_v1.a = 1.0f;</span>
+<span class="nc" id="L320">        m_count = 1;</span>
+<span class="nc" id="L321">        return;</span>
+      }
+
+      // w2 region
+<span class="fc" id="L325">      float d12_1 = Vec2.dot(w2, e12);</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">      if (d12_1 &lt;= 0.0f) {</span>
+        // a1 &lt;= 0, so we clamp it to 0
+<span class="fc" id="L328">        m_v2.a = 1.0f;</span>
+<span class="fc" id="L329">        m_count = 1;</span>
+<span class="fc" id="L330">        m_v1.set(m_v2);</span>
+<span class="fc" id="L331">        return;</span>
+      }
+
+      // Must be in e12 region.
+<span class="fc" id="L335">      float inv_d12 = 1.0f / (d12_1 + d12_2);</span>
+<span class="fc" id="L336">      m_v1.a = d12_1 * inv_d12;</span>
+<span class="fc" id="L337">      m_v2.a = d12_2 * inv_d12;</span>
+<span class="fc" id="L338">      m_count = 2;</span>
+<span class="fc" id="L339">    }</span>
+
+    // djm pooled, and from above
+<span class="fc" id="L342">    private final Vec2 e13 = new Vec2();</span>
+<span class="fc" id="L343">    private final Vec2 e23 = new Vec2();</span>
+<span class="fc" id="L344">    private final Vec2 w1 = new Vec2();</span>
+<span class="fc" id="L345">    private final Vec2 w2 = new Vec2();</span>
+<span class="fc" id="L346">    private final Vec2 w3 = new Vec2();</span>
+
+    /// Solve a line segment using barycentric coordinates.&lt;br/&gt;
+    /// Possible regions:&lt;br/&gt;
+    /// - points[2]&lt;br/&gt;
+    /// - edge points[0]-points[2]&lt;br/&gt;
+    /// - edge points[1]-points[2]&lt;br/&gt;
+    /// - inside the triangle
+    public void solve3() {
+<span class="fc" id="L355">      w1.set(m_v1.w);</span>
+<span class="fc" id="L356">      w2.set(m_v2.w);</span>
+<span class="fc" id="L357">      w3.set(m_v3.w);</span>
+
+      // Edge12
+      // [1 1 ][a1] = [1]
+      // [w1.e12 w2.e12][a2] = [0]
+      // a3 = 0
+<span class="fc" id="L363">      e12.set(w2).subLocal(w1);</span>
+<span class="fc" id="L364">      float w1e12 = Vec2.dot(w1, e12);</span>
+<span class="fc" id="L365">      float w2e12 = Vec2.dot(w2, e12);</span>
+<span class="fc" id="L366">      float d12_1 = w2e12;</span>
+<span class="fc" id="L367">      float d12_2 = -w1e12;</span>
+
+      // Edge13
+      // [1 1 ][a1] = [1]
+      // [w1.e13 w3.e13][a3] = [0]
+      // a2 = 0
+<span class="fc" id="L373">      e13.set(w3).subLocal(w1);</span>
+<span class="fc" id="L374">      float w1e13 = Vec2.dot(w1, e13);</span>
+<span class="fc" id="L375">      float w3e13 = Vec2.dot(w3, e13);</span>
+<span class="fc" id="L376">      float d13_1 = w3e13;</span>
+<span class="fc" id="L377">      float d13_2 = -w1e13;</span>
+
+      // Edge23
+      // [1 1 ][a2] = [1]
+      // [w2.e23 w3.e23][a3] = [0]
+      // a1 = 0
+<span class="fc" id="L383">      e23.set(w3).subLocal(w2);</span>
+<span class="fc" id="L384">      float w2e23 = Vec2.dot(w2, e23);</span>
+<span class="fc" id="L385">      float w3e23 = Vec2.dot(w3, e23);</span>
+<span class="fc" id="L386">      float d23_1 = w3e23;</span>
+<span class="fc" id="L387">      float d23_2 = -w2e23;</span>
+
+      // Triangle123
+<span class="fc" id="L390">      float n123 = Vec2.cross(e12, e13);</span>
+
+<span class="fc" id="L392">      float d123_1 = n123 * Vec2.cross(w2, w3);</span>
+<span class="fc" id="L393">      float d123_2 = n123 * Vec2.cross(w3, w1);</span>
+<span class="fc" id="L394">      float d123_3 = n123 * Vec2.cross(w1, w2);</span>
+
+      // w1 region
+<span class="pc bpc" id="L397" title="3 of 4 branches missed.">      if (d12_2 &lt;= 0.0f &amp;&amp; d13_2 &lt;= 0.0f) {</span>
+<span class="nc" id="L398">        m_v1.a = 1.0f;</span>
+<span class="nc" id="L399">        m_count = 1;</span>
+<span class="nc" id="L400">        return;</span>
+      }
+
+      // e12
+<span class="pc bpc" id="L404" title="2 of 6 branches missed.">      if (d12_1 &gt; 0.0f &amp;&amp; d12_2 &gt; 0.0f &amp;&amp; d123_3 &lt;= 0.0f) {</span>
+<span class="fc" id="L405">        float inv_d12 = 1.0f / (d12_1 + d12_2);</span>
+<span class="fc" id="L406">        m_v1.a = d12_1 * inv_d12;</span>
+<span class="fc" id="L407">        m_v2.a = d12_2 * inv_d12;</span>
+<span class="fc" id="L408">        m_count = 2;</span>
+<span class="fc" id="L409">        return;</span>
+      }
+
+      // e13
+<span class="fc bfc" id="L413" title="All 6 branches covered.">      if (d13_1 &gt; 0.0f &amp;&amp; d13_2 &gt; 0.0f &amp;&amp; d123_2 &lt;= 0.0f) {</span>
+<span class="fc" id="L414">        float inv_d13 = 1.0f / (d13_1 + d13_2);</span>
+<span class="fc" id="L415">        m_v1.a = d13_1 * inv_d13;</span>
+<span class="fc" id="L416">        m_v3.a = d13_2 * inv_d13;</span>
+<span class="fc" id="L417">        m_count = 2;</span>
+<span class="fc" id="L418">        m_v2.set(m_v3);</span>
+<span class="fc" id="L419">        return;</span>
+      }
+
+      // w2 region
+<span class="pc bpc" id="L423" title="3 of 4 branches missed.">      if (d12_1 &lt;= 0.0f &amp;&amp; d23_2 &lt;= 0.0f) {</span>
+<span class="nc" id="L424">        m_v2.a = 1.0f;</span>
+<span class="nc" id="L425">        m_count = 1;</span>
+<span class="nc" id="L426">        m_v1.set(m_v2);</span>
+<span class="nc" id="L427">        return;</span>
+      }
+
+      // w3 region
+<span class="pc bpc" id="L431" title="1 of 4 branches missed.">      if (d13_1 &lt;= 0.0f &amp;&amp; d23_1 &lt;= 0.0f) {</span>
+<span class="nc" id="L432">        m_v3.a = 1.0f;</span>
+<span class="nc" id="L433">        m_count = 1;</span>
+<span class="nc" id="L434">        m_v1.set(m_v3);</span>
+<span class="nc" id="L435">        return;</span>
+      }
+
+      // e23
+<span class="pc bpc" id="L439" title="3 of 6 branches missed.">      if (d23_1 &gt; 0.0f &amp;&amp; d23_2 &gt; 0.0f &amp;&amp; d123_1 &lt;= 0.0f) {</span>
+<span class="fc" id="L440">        float inv_d23 = 1.0f / (d23_1 + d23_2);</span>
+<span class="fc" id="L441">        m_v2.a = d23_1 * inv_d23;</span>
+<span class="fc" id="L442">        m_v3.a = d23_2 * inv_d23;</span>
+<span class="fc" id="L443">        m_count = 2;</span>
+<span class="fc" id="L444">        m_v1.set(m_v3);</span>
+<span class="fc" id="L445">        return;</span>
+      }
+
+      // Must be in triangle123
+<span class="nc" id="L449">      float inv_d123 = 1.0f / (d123_1 + d123_2 + d123_3);</span>
+<span class="nc" id="L450">      m_v1.a = d123_1 * inv_d123;</span>
+<span class="nc" id="L451">      m_v2.a = d123_2 * inv_d123;</span>
+<span class="nc" id="L452">      m_v3.a = d123_3 * inv_d123;</span>
+<span class="nc" id="L453">      m_count = 3;</span>
+<span class="nc" id="L454">    }</span>
+  }
+
+  /// A distance proxy is used by the GJK algorithm. It encapsulates any shape. TODO: see if we can
+  /// just do assignments with m_vertices, instead of copying stuff over
+  ///
+  /// @author daniel
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">  public static class DistanceProxy {</span>
+    public final Vec2[] m_vertices;
+    public int m_count;
+    public float m_radius;
+    public final Vec2[] m_buffer;
+
+<span class="fc" id="L467">    public DistanceProxy() {</span>
+<span class="fc" id="L468">      m_vertices = new Vec2[Settings.maxPolygonVertices];</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">      for (int i = 0; i &lt; m_vertices.length; i++) {</span>
+<span class="fc" id="L470">        m_vertices[i] = new Vec2();</span>
+      }
+<span class="fc" id="L472">      m_buffer = new Vec2[2];</span>
+<span class="fc" id="L473">      m_count = 0;</span>
+<span class="fc" id="L474">      m_radius = 0f;</span>
+<span class="fc" id="L475">    }</span>
+
+    /// Initialize the proxy using the given shape. The shape must remain in scope while the proxy is
+    /// in use.
+    public final void set(final Shape shape, int index) {
+<span class="pc bpc" id="L480" title="2 of 5 branches missed.">      switch (shape.getType()) {</span>
+        case CIRCLE:
+<span class="fc" id="L482">          final CircleShape circle = (CircleShape) shape;</span>
+<span class="fc" id="L483">          m_vertices[0].set(circle.m_p);</span>
+<span class="fc" id="L484">          m_count = 1;</span>
+<span class="fc" id="L485">          m_radius = circle.m_radius;</span>
+
+<span class="fc" id="L487">          break;</span>
+        case POLYGON:
+<span class="fc" id="L489">          final PolygonShape poly = (PolygonShape) shape;</span>
+<span class="fc" id="L490">          m_count = poly.m_count;</span>
+<span class="fc" id="L491">          m_radius = poly.m_radius;</span>
+<span class="fc bfc" id="L492" title="All 2 branches covered.">          for (int i = 0; i &lt; m_count; i++) {</span>
+<span class="fc" id="L493">            m_vertices[i].set(poly.m_vertices[i]);</span>
+          }
+<span class="fc" id="L495">          break;</span>
+        case CHAIN:
+<span class="nc" id="L497">          final ChainShape chain = (ChainShape) shape;</span>
+<span class="nc bnc" id="L498" title="All 6 branches missed.">          assert (0 &lt;= index &amp;&amp; index &lt; chain.m_count);</span>
+
+<span class="nc" id="L500">          m_buffer[0] = chain.m_vertices[index];</span>
+<span class="nc bnc" id="L501" title="All 2 branches missed.">          if (index + 1 &lt; chain.m_count) {</span>
+<span class="nc" id="L502">            m_buffer[1] = chain.m_vertices[index + 1];</span>
+          } else {
+<span class="nc" id="L504">            m_buffer[1] = chain.m_vertices[0];</span>
+          }
+
+<span class="nc" id="L507">          m_vertices[0].set(m_buffer[0]);</span>
+<span class="nc" id="L508">          m_vertices[1].set(m_buffer[1]);</span>
+<span class="nc" id="L509">          m_count = 2;</span>
+<span class="nc" id="L510">          m_radius = chain.m_radius;</span>
+<span class="nc" id="L511">          break;</span>
+        case EDGE:
+<span class="fc" id="L513">          EdgeShape edge = (EdgeShape) shape;</span>
+<span class="fc" id="L514">          m_vertices[0].set(edge.m_vertex1);</span>
+<span class="fc" id="L515">          m_vertices[1].set(edge.m_vertex2);</span>
+<span class="fc" id="L516">          m_count = 2;</span>
+<span class="fc" id="L517">          m_radius = edge.m_radius;</span>
+<span class="fc" id="L518">          break;</span>
+        default:
+<span class="nc bnc" id="L520" title="All 2 branches missed.">          assert (false);</span>
+      }
+<span class="fc" id="L522">    }</span>
+
+    /// Get the supporting vertex index in the given direction.
+    ///
+    /// @param d
+    /// @return
+    public final int getSupport(final Vec2 d) {
+<span class="fc" id="L529">      int bestIndex = 0;</span>
+<span class="fc" id="L530">      float bestValue = Vec2.dot(m_vertices[0], d);</span>
+<span class="fc bfc" id="L531" title="All 2 branches covered.">      for (int i = 1; i &lt; m_count; i++) {</span>
+<span class="fc" id="L532">        float value = Vec2.dot(m_vertices[i], d);</span>
+<span class="fc bfc" id="L533" title="All 2 branches covered.">        if (value &gt; bestValue) {</span>
+<span class="fc" id="L534">          bestIndex = i;</span>
+<span class="fc" id="L535">          bestValue = value;</span>
+        }
+      }
+
+<span class="fc" id="L539">      return bestIndex;</span>
+    }
+
+    /// Get the supporting vertex in the given direction.
+    ///
+    /// @param d
+    /// @return
+    public final Vec2 getSupportVertex(final Vec2 d) {
+<span class="nc" id="L547">      int bestIndex = 0;</span>
+<span class="nc" id="L548">      float bestValue = Vec2.dot(m_vertices[0], d);</span>
+<span class="nc bnc" id="L549" title="All 2 branches missed.">      for (int i = 1; i &lt; m_count; i++) {</span>
+<span class="nc" id="L550">        float value = Vec2.dot(m_vertices[i], d);</span>
+<span class="nc bnc" id="L551" title="All 2 branches missed.">        if (value &gt; bestValue) {</span>
+<span class="nc" id="L552">          bestIndex = i;</span>
+<span class="nc" id="L553">          bestValue = value;</span>
+        }
+      }
+
+<span class="nc" id="L557">      return m_vertices[bestIndex];</span>
+    }
+
+    /// Get the vertex count.
+    ///
+    /// @return
+    public final int getVertexCount() {
+<span class="nc" id="L564">      return m_count;</span>
+    }
+
+    /// Get a vertex by index. Used by Distance.
+    ///
+    /// @param index
+    /// @return
+    public final Vec2 getVertex(int index) {
+<span class="pc bpc" id="L572" title="3 of 6 branches missed.">      assert (0 &lt;= index &amp;&amp; index &lt; m_count);</span>
+<span class="fc" id="L573">      return m_vertices[index];</span>
+    }
+  }
+
+<span class="fc" id="L577">  private Simplex simplex = new Simplex();</span>
+<span class="fc" id="L578">  private int[] saveA = new int[3];</span>
+<span class="fc" id="L579">  private int[] saveB = new int[3];</span>
+<span class="fc" id="L580">  private Vec2 closestPoint = new Vec2();</span>
+<span class="fc" id="L581">  private Vec2 d = new Vec2();</span>
+<span class="fc" id="L582">  private Vec2 temp = new Vec2();</span>
+<span class="fc" id="L583">  private Vec2 normal = new Vec2();</span>
+
+  /// Compute the closest points between two shapes. Supports any combination of: CircleShape and
+  /// PolygonShape. The simplex cache is input/output. On the first call set SimplexCache.count to
+  /// zero.
+  ///
+  /// @param output
+  /// @param cache
+  /// @param input
+  public final void distance(final DistanceOutput output, final SimplexCache cache,
+      final DistanceInput input) {
+<span class="fc" id="L594">    GJK_CALLS++;</span>
+
+<span class="fc" id="L596">    final DistanceProxy proxyA = input.proxyA;</span>
+<span class="fc" id="L597">    final DistanceProxy proxyB = input.proxyB;</span>
+
+<span class="fc" id="L599">    Transform transformA = input.transformA;</span>
+<span class="fc" id="L600">    Transform transformB = input.transformB;</span>
+
+    // Initialize the simplex.
+<span class="fc" id="L603">    simplex.readCache(cache, proxyA, transformA, proxyB, transformB);</span>
+
+    // Get simplex vertices as an array.
+<span class="fc" id="L606">    SimplexVertex[] vertices = simplex.vertices;</span>
+
+    // These store the vertices of the last simplex so that we
+    // can check for duplicates and prevent cycling.
+    // (pooled above)
+<span class="fc" id="L611">    int saveCount = 0;</span>
+
+<span class="fc" id="L613">    simplex.getClosestPoint(closestPoint);</span>
+<span class="fc" id="L614">    float distanceSqr1 = closestPoint.lengthSquared();</span>
+<span class="fc" id="L615">    float distanceSqr2 = distanceSqr1;</span>
+
+    // Main iteration loop
+<span class="fc" id="L618">    int iter = 0;</span>
+<span class="pc bpc" id="L619" title="1 of 2 branches missed.">    while (iter &lt; GJK_MAX_ITERS) {</span>
+
+      // Copy simplex so we can identify duplicates.
+<span class="fc" id="L622">      saveCount = simplex.m_count;</span>
+<span class="fc bfc" id="L623" title="All 2 branches covered.">      for (int i = 0; i &lt; saveCount; i++) {</span>
+<span class="fc" id="L624">        saveA[i] = vertices[i].indexA;</span>
+<span class="fc" id="L625">        saveB[i] = vertices[i].indexB;</span>
+      }
+
+<span class="pc bpc" id="L628" title="1 of 4 branches missed.">      switch (simplex.m_count) {</span>
+        case 1:
+<span class="fc" id="L630">          break;</span>
+        case 2:
+<span class="fc" id="L632">          simplex.solve2();</span>
+<span class="fc" id="L633">          break;</span>
+        case 3:
+<span class="fc" id="L635">          simplex.solve3();</span>
+<span class="fc" id="L636">          break;</span>
+        default:
+<span class="nc bnc" id="L638" title="All 2 branches missed.">          assert (false);</span>
+      }
+
+      // If we have 3 points, then the origin is in the corresponding triangle.
+<span class="pc bpc" id="L642" title="1 of 2 branches missed.">      if (simplex.m_count == 3) {</span>
+<span class="nc" id="L643">        break;</span>
+      }
+
+      // Compute closest point.
+<span class="fc" id="L647">      simplex.getClosestPoint(closestPoint);</span>
+<span class="fc" id="L648">      distanceSqr2 = closestPoint.lengthSquared();</span>
+
+      // ensure progress
+<span class="fc bfc" id="L651" title="All 2 branches covered.">      if (distanceSqr2 &gt;= distanceSqr1) {</span>
+        // break;
+      }
+<span class="fc" id="L654">      distanceSqr1 = distanceSqr2;</span>
+
+      // get search direction;
+<span class="fc" id="L657">      simplex.getSearchDirection(d);</span>
+
+      // Ensure the search direction is numerically fit.
+<span class="fc bfc" id="L660" title="All 2 branches covered.">      if (d.lengthSquared() &lt; Settings.EPSILON * Settings.EPSILON) {</span>
+        // The origin is probably contained by a line segment
+        // or triangle. Thus the shapes are overlapped.
+
+        // We can't return zero here even though there may be overlap.
+        // In case the simplex is a point, segment, or triangle it is difficult
+        // to determine if the origin is contained in the CSO or very close to it.
+<span class="fc" id="L667">        break;</span>
+      }
+      /*
+       * SimplexVertex* vertex = vertices + simplex.m_count; vertex.indexA =
+       * proxyA.GetSupport(MulT(transformA.R, -d)); vertex.wA = Mul(transformA,
+       * proxyA.GetVertex(vertex.indexA)); Vec2 wBLocal; vertex.indexB =
+       * proxyB.GetSupport(MulT(transformB.R, d)); vertex.wB = Mul(transformB,
+       * proxyB.GetVertex(vertex.indexB)); vertex.w = vertex.wB - vertex.wA;
+       */
+
+      // Compute a tentative new simplex vertex using support points.
+<span class="fc" id="L678">      SimplexVertex vertex = vertices[simplex.m_count];</span>
+
+<span class="fc" id="L680">      Rot.mulTransUnsafe(transformA.q, d.negateLocal(), temp);</span>
+<span class="fc" id="L681">      vertex.indexA = proxyA.getSupport(temp);</span>
+<span class="fc" id="L682">      Transform.mulToOutUnsafe(transformA, proxyA.getVertex(vertex.indexA), vertex.wA);</span>
+      // Vec2 wBLocal;
+<span class="fc" id="L684">      Rot.mulTransUnsafe(transformB.q, d.negateLocal(), temp);</span>
+<span class="fc" id="L685">      vertex.indexB = proxyB.getSupport(temp);</span>
+<span class="fc" id="L686">      Transform.mulToOutUnsafe(transformB, proxyB.getVertex(vertex.indexB), vertex.wB);</span>
+<span class="fc" id="L687">      vertex.w.set(vertex.wB).subLocal(vertex.wA);</span>
+
+      // Iteration count is equated to the number of support point calls.
+<span class="fc" id="L690">      ++iter;</span>
+<span class="fc" id="L691">      ++GJK_ITERS;</span>
+
+      // Check for duplicate support points. This is the main termination criteria.
+<span class="fc" id="L694">      boolean duplicate = false;</span>
+<span class="fc bfc" id="L695" title="All 2 branches covered.">      for (int i = 0; i &lt; saveCount; ++i) {</span>
+<span class="fc bfc" id="L696" title="All 4 branches covered.">        if (vertex.indexA == saveA[i] &amp;&amp; vertex.indexB == saveB[i]) {</span>
+<span class="fc" id="L697">          duplicate = true;</span>
+<span class="fc" id="L698">          break;</span>
+        }
+      }
+
+      // If we found a duplicate support point we must exit to avoid cycling.
+<span class="fc bfc" id="L703" title="All 2 branches covered.">      if (duplicate) {</span>
+<span class="fc" id="L704">        break;</span>
+      }
+
+      // New vertex is ok and needed.
+<span class="fc" id="L708">      ++simplex.m_count;</span>
+<span class="fc" id="L709">    }</span>
+
+<span class="fc" id="L711">    GJK_MAX_ITERS = MathUtils.max(GJK_MAX_ITERS, iter);</span>
+
+    // Prepare output.
+<span class="fc" id="L714">    simplex.getWitnessPoints(output.pointA, output.pointB);</span>
+<span class="fc" id="L715">    output.distance = MathUtils.distance(output.pointA, output.pointB);</span>
+<span class="fc" id="L716">    output.iterations = iter;</span>
+
+    // Cache the simplex.
+<span class="fc" id="L719">    simplex.writeCache(cache);</span>
+
+    // Apply radii if requested.
+<span class="pc bpc" id="L722" title="1 of 2 branches missed.">    if (input.useRadii) {</span>
+<span class="nc" id="L723">      float rA = proxyA.m_radius;</span>
+<span class="nc" id="L724">      float rB = proxyB.m_radius;</span>
+
+<span class="nc bnc" id="L726" title="All 4 branches missed.">      if (output.distance &gt; rA + rB &amp;&amp; output.distance &gt; Settings.EPSILON) {</span>
+        // Shapes are still no overlapped.
+        // Move the witness points to the outer surface.
+<span class="nc" id="L729">        output.distance -= rA + rB;</span>
+<span class="nc" id="L730">        normal.set(output.pointB).subLocal(output.pointA);</span>
+<span class="nc" id="L731">        normal.normalize();</span>
+<span class="nc" id="L732">        temp.set(normal).mulLocal(rA);</span>
+<span class="nc" id="L733">        output.pointA.addLocal(temp);</span>
+<span class="nc" id="L734">        temp.set(normal).mulLocal(rB);</span>
+<span class="nc" id="L735">        output.pointB.subLocal(temp);</span>
+      } else {
+        // Shapes are overlapped when radii are considered.
+        // Move the witness points to the middle.
+        // Vec2 p = 0.5f * (output.pointA + output.pointB);
+<span class="nc" id="L740">        output.pointA.addLocal(output.pointB).mulLocal(.5f);</span>
+<span class="nc" id="L741">        output.pointB.set(output.pointA);</span>
+<span class="nc" id="L742">        output.distance = 0.0f;</span>
+      }
+    }
+<span class="fc" id="L745">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

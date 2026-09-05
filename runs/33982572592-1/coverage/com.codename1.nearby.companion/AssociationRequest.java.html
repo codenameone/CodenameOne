@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssociationRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.nearby.companion</a> &gt; <span class="el_source">AssociationRequest.java</span></div><h1>AssociationRequest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.nearby.companion;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// What to show the user in the system device chooser, built with
+/// [AssociationRequest.Builder].
+public final class AssociationRequest {
+
+    private final CompanionProfile profile;
+    private final boolean singleDevice;
+    private final List&lt;DeviceFilter&gt; filters;
+
+    private AssociationRequest(CompanionProfile profile, boolean singleDevice,
+<span class="fc" id="L38">            List&lt;DeviceFilter&gt; filters) {</span>
+<span class="fc" id="L39">        this.profile = profile;</span>
+<span class="fc" id="L40">        this.singleDevice = singleDevice;</span>
+<span class="fc" id="L41">        this.filters = Collections.unmodifiableList(filters);</span>
+<span class="fc" id="L42">    }</span>
+
+    /// The profile requested. Never null.
+    public CompanionProfile getProfile() {
+<span class="fc" id="L46">        return profile;</span>
+    }
+
+    /// Whether to associate immediately when exactly one device matches,
+    /// rather than showing a one-item list.
+    public boolean isSingleDevice() {
+<span class="fc" id="L52">        return singleDevice;</span>
+    }
+
+    /// The filters, OR-combined. Never null and possibly empty, in which
+    /// case every visible device is offered.
+    public List&lt;DeviceFilter&gt; getFilters() {
+<span class="fc" id="L58">        return filters;</span>
+    }
+
+    /// Assembles an [AssociationRequest].
+<span class="fc" id="L62">    public static final class Builder {</span>
+
+<span class="fc" id="L64">        private CompanionProfile profile = CompanionProfile.GENERIC;</span>
+        private boolean singleDevice;
+<span class="fc" id="L66">        private final List&lt;DeviceFilter&gt; filters = new ArrayList&lt;DeviceFilter&gt;();</span>
+
+        /// Sets the profile. Defaults to [CompanionProfile#GENERIC], which
+        /// is what most accessories should ask for.
+        ///
+        /// #### Parameters
+        ///
+        /// - `profile`: the profile to request
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder profile(CompanionProfile profile) {
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            this.profile = profile == null ? CompanionProfile.GENERIC : profile;</span>
+<span class="fc" id="L80">            return this;</span>
+        }
+
+        /// Asks the platform to skip the chooser when exactly one device
+        /// matches the filters. The user still consents -- they are shown
+        /// one device and confirm it -- so this is a shortcut, not a way to
+        /// associate silently.
+        ///
+        /// #### Parameters
+        ///
+        /// - `singleDevice`: whether to take the shortcut
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder singleDevice(boolean singleDevice) {
+<span class="nc" id="L96">            this.singleDevice = singleDevice;</span>
+<span class="nc" id="L97">            return this;</span>
+        }
+
+        /// Adds a filter. Filters are OR-combined.
+        ///
+        /// #### Parameters
+        ///
+        /// - `filter`: the filter to add
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder addFilter(DeviceFilter filter) {
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            if (filter != null) {</span>
+<span class="fc" id="L111">                filters.add(filter);</span>
+            }
+<span class="fc" id="L113">            return this;</span>
+        }
+
+        /// Builds the request.
+        ///
+        /// #### Returns
+        ///
+        /// the immutable request
+        public AssociationRequest build() {
+<span class="fc" id="L122">            return new AssociationRequest(profile, singleDevice,</span>
+                    new ArrayList&lt;DeviceFilter&gt;(filters));
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

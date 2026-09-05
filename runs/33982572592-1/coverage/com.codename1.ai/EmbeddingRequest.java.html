@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EmbeddingRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">EmbeddingRequest.java</span></div><h1>EmbeddingRequest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+/// Request payload for [LlmClient#embed(EmbeddingRequest)]. Carries
+/// one or more input strings plus optional `dimensions` (OpenAI's
+/// `dimensions`, Gemini's `outputDimensionality`). A `null` value means
+/// &quot;use the model's default dimensionality&quot;.
+public final class EmbeddingRequest {
+    private final String model;
+    private final List&lt;String&gt; inputs;
+    private final Integer dimensions;
+
+<span class="fc" id="L39">    private EmbeddingRequest(Builder b) {</span>
+<span class="fc" id="L40">        this.model = b.model;</span>
+<span class="fc" id="L41">        this.inputs = Collections.unmodifiableList(new ArrayList&lt;String&gt;(b.inputs));</span>
+<span class="fc" id="L42">        this.dimensions = b.dimensions;</span>
+<span class="fc" id="L43">    }</span>
+
+    /// @return a new empty embedding request builder
+    public static Builder builder() {
+<span class="fc" id="L47">        return new Builder();</span>
+    }
+
+    /// Creates a single-input request.
+    /// @param model provider model id, or {@code null} for the client default
+    /// @param text text to embed
+    /// @return immutable embedding request
+    public static EmbeddingRequest of(String model, String text) {
+<span class="fc" id="L55">        return builder().model(model).inputs(Arrays.asList(text)).build();</span>
+    }
+
+    /// @return requested model id, or {@code null} for the client default
+    public String getModel() {
+<span class="fc" id="L60">        return model;</span>
+    }
+
+    /// @return immutable input strings in request order
+    public List&lt;String&gt; getInputs() {
+<span class="fc" id="L65">        return inputs;</span>
+    }
+
+    /// @return requested output dimensions, or {@code null} for model default
+    public Integer getDimensions() {
+<span class="fc" id="L70">        return dimensions;</span>
+    }
+
+    /// Mutable builder for an immutable {@link EmbeddingRequest}.
+    public static final class Builder {
+        private String model;
+<span class="fc" id="L76">        private List&lt;String&gt; inputs = new ArrayList&lt;String&gt;();</span>
+        private Integer dimensions;
+
+<span class="fc" id="L79">        Builder() {</span>
+<span class="fc" id="L80">        }</span>
+
+        /// @param m provider model id, or {@code null} for client default
+        /// @return this builder
+        public Builder model(String m) {
+<span class="fc" id="L85">            this.model = m;</span>
+<span class="fc" id="L86">            return this;</span>
+        }
+
+        /// Replaces all input strings.
+        /// @param in strings to embed; {@code null} clears the list
+        /// @return this builder
+        public Builder inputs(List&lt;String&gt; in) {
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            this.inputs = in == null ? new ArrayList&lt;String&gt;()</span>
+                    : new ArrayList&lt;String&gt;(in);
+<span class="fc" id="L95">            return this;</span>
+        }
+
+        /// @param s input string to append
+        /// @return this builder
+        public Builder addInput(String s) {
+<span class="fc" id="L101">            this.inputs.add(s);</span>
+<span class="fc" id="L102">            return this;</span>
+        }
+
+        /// @param d requested vector dimensions, or {@code null} for model default
+        /// @return this builder
+        public Builder dimensions(Integer d) {
+<span class="fc" id="L108">            this.dimensions = d;</span>
+<span class="fc" id="L109">            return this;</span>
+        }
+
+        /// @return validated immutable request
+        /// @throws IllegalStateException when no input strings were supplied
+        public EmbeddingRequest build() {
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">            if (inputs.isEmpty()) {</span>
+<span class="nc" id="L116">                throw new IllegalStateException(&quot;at least one input is required&quot;);</span>
+            }
+<span class="fc" id="L118">            return new EmbeddingRequest(this);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

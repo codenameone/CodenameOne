@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Accessory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.home</a> &gt; <span class="el_source">Accessory.java</span></div><h1>Accessory.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.home;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// One physical device in the home: HomeKit's `HMAccessory`, a Google Home
+/// device, one Matter node.
+///
+/// #### An immutable snapshot, not a live handle
+///
+/// Every getter here reads a field. Nothing calls into the platform, so
+/// nothing here can block, fail, or care which thread you are on.
+///
+/// The alternative -- a proxy over the platform's own live object -- was
+/// rejected: `HMAccessory` is a mutable Objective-C object whose properties
+/// are only safe to touch on the main queue, so every getter would have been a
+/// cross-boundary call with a threading rule attached, and under ParparVM an
+/// expensive one. Reading six properties to lay out a row would be six hops.
+///
+/// The cost is that a snapshot goes stale. When the topology moves -- an
+/// accessory added, removed, renamed, moved between rooms, or its reachability
+/// flipping -- a [HomeStructureListener] fires and you fetch again. Trait
+/// *values* are not part of the snapshot at all; read them with
+/// [SmartHome#read(TraitReadRequest)] or watch them with a
+/// [TraitSubscription].
+public final class Accessory {
+
+    private final String id;
+    private final String name;
+    private final String roomId;
+    private final AccessoryCategory category;
+    private final String manufacturer;
+    private final String model;
+    private final String firmwareVersion;
+    private final boolean reachable;
+    private final String bridgeAccessoryId;
+    private final List&lt;AccessoryService&gt; services;
+
+    /// Creates an accessory snapshot. Called by the ports and by the local
+    /// home; application code receives these rather than building them.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the accessory identifier, unique within the backend
+    ///
+    /// - `name`: the user-visible name, or `null` for none
+    ///
+    /// - `roomId`: the room it is in, or `null` when it is in none
+    ///
+    /// - `category`: roughly what it is; `null` becomes
+    ///   [AccessoryCategory#OTHER]
+    ///
+    /// - `manufacturer`: the maker, or `null`
+    ///
+    /// - `model`: the model name, or `null`
+    ///
+    /// - `firmwareVersion`: the firmware version, or `null`
+    ///
+    /// - `reachable`: whether the platform could talk to it when the snapshot
+    ///   was taken
+    ///
+    /// - `bridgeAccessoryId`: the bridge it sits behind, or `null` when it
+    ///   talks to the platform directly
+    ///
+    /// - `services`: its functional endpoints; `null` becomes empty
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `id` is `null` or empty
+    public Accessory(String id, String name, String roomId,
+            AccessoryCategory category, String manufacturer, String model,
+            String firmwareVersion, boolean reachable,
+<span class="fc" id="L96">            String bridgeAccessoryId, List&lt;AccessoryService&gt; services) {</span>
+<span class="pc bpc" id="L97" title="2 of 4 branches missed.">        if (id == null || id.length() == 0) {</span>
+<span class="nc" id="L98">            throw new IllegalArgumentException(&quot;accessory id is required&quot;);</span>
+        }
+<span class="fc" id="L100">        this.id = id;</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        this.name = name == null ? &quot;&quot; : name;</span>
+<span class="fc" id="L102">        this.roomId = roomId;</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        this.category = category == null ? AccessoryCategory.OTHER : category;</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        this.manufacturer = manufacturer == null ? &quot;&quot; : manufacturer;</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        this.model = model == null ? &quot;&quot; : model;</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        this.firmwareVersion = firmwareVersion == null ? &quot;&quot; : firmwareVersion;</span>
+<span class="fc" id="L107">        this.reachable = reachable;</span>
+<span class="fc" id="L108">        this.bridgeAccessoryId = bridgeAccessoryId;</span>
+<span class="pc bpc" id="L109" title="1 of 4 branches missed.">        if (services == null || services.isEmpty()) {</span>
+<span class="fc" id="L110">            this.services = Collections.&lt;AccessoryService&gt;emptyList();</span>
+        } else {
+<span class="fc" id="L112">            this.services = Collections.unmodifiableList(</span>
+                    new ArrayList&lt;AccessoryService&gt;(services));
+        }
+<span class="fc" id="L115">    }</span>
+
+    /// The identifier this accessory is addressed by.
+    ///
+    /// Unique across the whole backend, not merely within its structure, so a
+    /// read or a write needs only this and a service id.
+    ///
+    /// Stable for the life of the process on every backend, and stable across
+    /// launches wherever the platform provides a stable identifier -- which
+    /// both do today. [SmartHome#areIdsPersistent()] is the honest answer for
+    /// a given backend, and is what to check before persisting one as a user's
+    /// favourite.
+    ///
+    /// #### Returns
+    ///
+    /// the identifier, never `null`
+    public String getId() {
+<span class="fc" id="L132">        return id;</span>
+    }
+
+    /// The user-visible name, empty when the accessory has none.
+    ///
+    /// This is the user's own text, from their ecosystem app. Treat it as
+    /// untrusted for anything beyond display.
+    ///
+    /// #### Returns
+    ///
+    /// the name, never `null`
+    public String getName() {
+<span class="nc" id="L144">        return name;</span>
+    }
+
+    /// The room this accessory is in.
+    ///
+    /// #### Returns
+    ///
+    /// the room identifier, or `null` when it is not assigned to one
+    public String getRoomId() {
+<span class="fc" id="L153">        return roomId;</span>
+    }
+
+    /// Roughly what this accessory is, for icons and grouping. Read the
+    /// services to decide what it can do.
+    ///
+    /// #### Returns
+    ///
+    /// the category, never `null`
+    public AccessoryCategory getCategory() {
+<span class="nc" id="L163">        return category;</span>
+    }
+
+    /// The manufacturer, empty when unknown.
+    ///
+    /// #### Returns
+    ///
+    /// the manufacturer, never `null`
+    public String getManufacturer() {
+<span class="fc" id="L172">        return manufacturer;</span>
+    }
+
+    /// The model name, empty when unknown.
+    ///
+    /// #### Returns
+    ///
+    /// the model, never `null`
+    public String getModel() {
+<span class="nc" id="L181">        return model;</span>
+    }
+
+    /// The firmware version, empty when unknown.
+    ///
+    /// #### Returns
+    ///
+    /// the firmware version, never `null`
+    public String getFirmwareVersion() {
+<span class="nc" id="L190">        return firmwareVersion;</span>
+    }
+
+    /// Whether the platform could talk to this accessory when the snapshot
+    /// was taken.
+    ///
+    /// A snapshot's answer, so it can be out of date; the current answer
+    /// arrives through [StructureChangeKind#REACHABILITY_CHANGED]. An
+    /// operation on an unreachable accessory fails with
+    /// [HomeError#ACCESSORY_UNREACHABLE], which is worth handling even when
+    /// this said `true`.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when the accessory was reachable
+    public boolean isReachable() {
+<span class="fc" id="L206">        return reachable;</span>
+    }
+
+    /// Whether this accessory sits behind a bridge rather than talking to the
+    /// platform directly.
+    ///
+    /// Worth surfacing because a bridge going offline takes every accessory
+    /// behind it with it, and &quot;twelve lights stopped responding&quot; is much
+    /// easier to explain when you can name the one device that actually
+    /// failed.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when [#getBridgeAccessoryId()] names a bridge
+    public boolean isBridged() {
+<span class="pc bpc" id="L221" title="1 of 4 branches missed.">        return bridgeAccessoryId != null &amp;&amp; bridgeAccessoryId.length() &gt; 0;</span>
+    }
+
+    /// The bridge this accessory sits behind.
+    ///
+    /// #### Returns
+    ///
+    /// the bridge's accessory id, or `null` when it is not bridged
+    public String getBridgeAccessoryId() {
+<span class="fc" id="L230">        return bridgeAccessoryId;</span>
+    }
+
+    /// Every functional endpoint of this accessory.
+    ///
+    /// #### Returns
+    ///
+    /// an immutable list, possibly empty
+    public List&lt;AccessoryService&gt; getServices() {
+<span class="fc" id="L239">        return services;</span>
+    }
+
+    /// One service by identifier.
+    ///
+    /// #### Parameters
+    ///
+    /// - `serviceId`: the identifier to look up, or `null`
+    ///
+    /// #### Returns
+    ///
+    /// the service, or `null` when this accessory has no such service
+    public AccessoryService getService(String serviceId) {
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        if (serviceId == null) {</span>
+<span class="nc" id="L253">            return null;</span>
+        }
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        for (AccessoryService s : services) {</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">            if (serviceId.equals(s.getId())) {</span>
+<span class="fc" id="L257">                return s;</span>
+            }
+<span class="fc" id="L259">        }</span>
+<span class="nc" id="L260">        return null;</span>
+    }
+
+    /// The accessory's main service -- what a UI showing one control for the
+    /// whole device should drive.
+    ///
+    /// Falls back to the first service when none is flagged primary, and to
+    /// `null` only when there are no services at all.
+    ///
+    /// #### Returns
+    ///
+    /// the primary service, or `null`
+    public AccessoryService getPrimaryService() {
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">        for (AccessoryService s : services) {</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">            if (s.isPrimary()) {</span>
+<span class="fc" id="L275">                return s;</span>
+            }
+<span class="nc" id="L277">        }</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">        return services.isEmpty() ? null : services.get(0);</span>
+    }
+
+    /// Every service on this accessory that exposes a trait.
+    ///
+    /// More than one for a device with repeated endpoints -- the two halves of
+    /// a two-gang switch both expose [Trait#ON_OFF] -- which is exactly why a
+    /// write names a service rather than an accessory.
+    ///
+    /// #### Parameters
+    ///
+    /// - `trait`: the trait to look for, or `null`
+    ///
+    /// #### Returns
+    ///
+    /// an immutable list, possibly empty
+    public List&lt;AccessoryService&gt; getServicesSupporting(Trait trait) {
+<span class="pc bpc" id="L295" title="2 of 4 branches missed.">        if (trait == null || services.isEmpty()) {</span>
+<span class="nc" id="L296">            return Collections.&lt;AccessoryService&gt;emptyList();</span>
+        }
+<span class="fc" id="L298">        List&lt;AccessoryService&gt; out = new ArrayList&lt;AccessoryService&gt;();</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        for (AccessoryService s : services) {</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">            if (s.supports(trait)) {</span>
+<span class="fc" id="L301">                out.add(s);</span>
+            }
+<span class="fc" id="L303">        }</span>
+<span class="fc" id="L304">        return Collections.unmodifiableList(out);</span>
+    }
+
+    /// Whether any service on this accessory exposes a trait.
+    ///
+    /// #### Parameters
+    ///
+    /// - `trait`: the trait to test, or `null`
+    ///
+    /// #### Returns
+    ///
+    /// `true` when at least one service has it
+    public boolean supports(Trait trait) {
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">        if (trait == null) {</span>
+<span class="nc" id="L318">            return false;</span>
+        }
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">        for (AccessoryService s : services) {</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">            if (s.supports(trait)) {</span>
+<span class="fc" id="L322">                return true;</span>
+            }
+<span class="nc" id="L324">        }</span>
+<span class="nc" id="L325">        return false;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L330">        return category.name() + &quot;[&quot; + id</span>
+<span class="nc bnc" id="L331" title="All 4 branches missed.">                + (name.length() &gt; 0 ? &quot; &quot; + name : &quot;&quot;)</span>
+                + (reachable ? &quot;&quot; : &quot; unreachable&quot;) + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

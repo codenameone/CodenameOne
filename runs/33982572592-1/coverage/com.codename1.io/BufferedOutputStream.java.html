@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BufferedOutputStream.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">BufferedOutputStream.java</span></div><h1>BufferedOutputStream.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.io;
+
+import java.io.IOException;
+import java.io.OutputStream;
+
+/// Based on the buffered output stream from the JDK with some minor tweaks to allow
+/// external classes to monitor stream status and progress.
+public class BufferedOutputStream extends OutputStream {
+<span class="fc" id="L32">    private static int streamCount = 0;</span>
+<span class="fc" id="L33">    private static int defaultBufferSize = 8192;</span>
+    private final OutputStream out;
+    private final String name;
+    /// The internal buffer where data is stored.
+    protected byte[] buf;
+    /// The number of valid bytes in the buffer. This value is always
+    /// in the range 0 through buf.length; elements
+    /// buf[0] through buf[count-1] contain valid
+    /// byte data.
+    protected int count;
+    private Object connection;
+    private boolean closed;
+    private long lastActivityTime;
+    private int totalBytesWritten;
+    private IOProgressListener progressListener;
+
+    /// Creates a new buffered output stream to write data to the
+    /// specified underlying output stream.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the underlying output stream.
+    public BufferedOutputStream(OutputStream out) {
+<span class="fc" id="L56">        this(out, defaultBufferSize);</span>
+<span class="fc" id="L57">    }</span>
+
+    /// Creates a new buffered output stream to write data to the
+    /// specified underlying output stream.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the underlying output stream.
+    ///
+    /// - `name`: the name of the stream used for debugging/logging purposes
+    public BufferedOutputStream(OutputStream out, String name) {
+<span class="fc" id="L68">        this(out, defaultBufferSize, name);</span>
+<span class="fc" id="L69">    }</span>
+
+    /// Creates a new buffered output stream to write data to the
+    /// specified underlying output stream with the specified buffer
+    /// size.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the underlying output stream.
+    ///
+    /// - `size`: the buffer size.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if size &lt;= 0.
+    public BufferedOutputStream(OutputStream out, int size) {
+<span class="fc" id="L85">        this(out, size, &quot;unnamed&quot;);</span>
+<span class="fc" id="L86">    }</span>
+
+    /// Creates a new buffered output stream to write data to the
+    /// specified underlying output stream with the specified buffer
+    /// size.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the underlying output stream.
+    ///
+    /// - `size`: the buffer size.
+    ///
+    /// - `name`: the name of the stream used for debugging/logging purposes
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if size &lt;= 0.
+<span class="fc" id="L103">    public BufferedOutputStream(OutputStream out, int size, String name) {</span>
+<span class="fc" id="L104">        this.out = out;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (size &lt;= 0) {</span>
+<span class="fc" id="L106">            throw new IllegalArgumentException(&quot;Buffer size &lt;= 0&quot;);</span>
+        }
+<span class="fc" id="L108">        buf = new byte[size];</span>
+<span class="fc" id="L109">        streamCount++;</span>
+<span class="fc" id="L110">        this.name = name;</span>
+<span class="fc" id="L111">        Util.getImplementation().logStreamCreate(name, false, streamCount);</span>
+<span class="fc" id="L112">    }</span>
+
+    /// The default size for a stream buffer
+    ///
+    /// #### Returns
+    ///
+    /// the defaultBufferSize
+    public static int getDefaultBufferSize() {
+<span class="fc" id="L120">        return defaultBufferSize;</span>
+    }
+
+    /// The default size for a stream buffer
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultBufferSize`: the defaultBufferSize to set
+    public static void setDefaultBufferSize(int aDefaultBufferSize) {
+<span class="fc" id="L129">        defaultBufferSize = aDefaultBufferSize;</span>
+<span class="fc" id="L130">    }</span>
+
+    /// Indicates the name of the stream for debugging purposes
+    ///
+    /// #### Returns
+    ///
+    /// the name of the stream
+    public String getName() {
+<span class="fc" id="L138">        return name;</span>
+    }
+
+    /// Flush the internal buffer
+    public synchronized void flushBuffer() throws IOException {
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (closed) {</span>
+<span class="fc" id="L144">            return;</span>
+        }
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (count &gt; 0) {</span>
+<span class="fc" id="L147">            out.write(buf, 0, count);</span>
+<span class="fc" id="L148">            count = 0;</span>
+        }
+<span class="fc" id="L150">    }</span>
+
+    /// Writes the specified byte to this buffered output stream.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the byte to be written.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error occurs.
+    @Override
+    public synchronized void write(int b) throws IOException {
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (count &gt;= buf.length) {</span>
+<span class="fc" id="L164">            flushBuffer();</span>
+        }
+<span class="fc" id="L166">        totalBytesWritten++;</span>
+<span class="fc" id="L167">        fireProgress();</span>
+<span class="fc" id="L168">        lastActivityTime = System.currentTimeMillis();</span>
+<span class="fc" id="L169">        buf[count++] = (byte) b;</span>
+<span class="fc" id="L170">    }</span>
+
+    /// Writes `len` bytes from the specified byte array
+    /// starting at offset `off` to this buffered output stream.
+    ///
+    ///  Ordinarily this method stores bytes from the given array into this
+    /// stream's buffer, flushing the buffer to the underlying output stream as
+    /// needed.  If the requested length is at least as large as this stream's
+    /// buffer, however, then this method will flush the buffer and write the
+    /// bytes directly to the underlying output stream.  Thus redundant
+    /// `BufferedOutputStream`s will not copy data unnecessarily.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the data.
+    ///
+    /// - `off`: the start offset in the data.
+    ///
+    /// - `len`: the number of bytes to write.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error occurs.
+    @Override
+    public synchronized void write(byte[] b, int off, int len) throws IOException {
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (len &gt;= buf.length) {</span>
+            /* If the request length exceeds the size of the output buffer,
+            flush the output buffer and then write the data directly.
+            In this way buffered streams will cascade harmlessly. */
+<span class="fc" id="L199">            flushBuffer();</span>
+<span class="fc" id="L200">            out.write(b, off, len);</span>
+        } else {
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            if (len &gt; buf.length - count) {</span>
+<span class="fc" id="L203">                flushBuffer();</span>
+            }
+<span class="fc" id="L205">            System.arraycopy(b, off, buf, count, len);</span>
+<span class="fc" id="L206">            count += len;</span>
+        }
+<span class="fc" id="L208">        totalBytesWritten += len;</span>
+<span class="fc" id="L209">        fireProgress();</span>
+<span class="fc" id="L210">        lastActivityTime = System.currentTimeMillis();</span>
+<span class="fc" id="L211">    }</span>
+
+    /// Flushes this buffered output stream. This forces any buffered
+    /// output bytes to be written out to the underlying output stream.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error occurs.
+    @Override
+    public synchronized void flush() throws IOException {
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (closed) {</span>
+<span class="fc" id="L222">            return;</span>
+        }
+<span class="fc" id="L224">        flushBuffer();</span>
+<span class="fc" id="L225">        out.flush();</span>
+<span class="fc" id="L226">        lastActivityTime = System.currentTimeMillis();</span>
+<span class="fc" id="L227">    }</span>
+
+    /// Returns the time of the last activity
+    ///
+    /// #### Returns
+    ///
+    /// time of the last activity on this stream
+    public synchronized long getLastActivityTime() {
+<span class="fc" id="L235">        return lastActivityTime;</span>
+    }
+
+    /// Returns the total amount of bytes written to this stream so far
+    ///
+    /// #### Returns
+    ///
+    /// the total amount of bytes written to this stream so far
+    public synchronized int getTotalBytesWritten() {
+<span class="fc" id="L244">        return totalBytesWritten;</span>
+    }
+
+    /// Sets the callback for IO updates from a buffered stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `progressListener`: the progressListener to set
+    public void setProgressListener(IOProgressListener progressListener) {
+<span class="fc" id="L253">        this.progressListener = progressListener;</span>
+<span class="fc" id="L254">    }</span>
+
+    private void fireProgress() {
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        if (progressListener != null) {</span>
+<span class="fc" id="L258">            progressListener.ioStreamUpdate(this, totalBytesWritten);</span>
+        }
+<span class="fc" id="L260">    }</span>
+
+    /// Writes `b.length` bytes to this output stream.
+    ///
+    /// The `write` method of `FilterOutputStream`
+    /// calls its `write` method of three arguments with the
+    /// arguments `b`, `0`, and
+    /// `b.length`.
+    ///
+    /// Note that this method does not call the one-argument
+    /// `write` method of its underlying stream with the single
+    /// argument `b`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the data to be written.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error occurs.
+    @Override
+    public void write(byte[] b) throws IOException {
+<span class="fc" id="L282">        write(b, 0, b.length);</span>
+<span class="fc" id="L283">    }</span>
+
+    /// Closes this output stream and releases any system resources
+    /// associated with the stream.
+    ///
+    /// The `close` method of `FilterOutputStream`
+    /// calls its `flush` method, and then calls the
+    /// `close` method of its underlying output stream.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error occurs.
+    @Override
+    public void close() throws IOException {
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (!closed) {</span>
+<span class="fc" id="L298">            streamCount--;</span>
+<span class="fc" id="L299">            Util.getImplementation().closingOutput(out);</span>
+<span class="fc" id="L300">            Util.getImplementation().logStreamClose(name, false, streamCount);</span>
+            try {
+<span class="fc" id="L302">                flush();</span>
+<span class="nc" id="L303">            } catch (Exception ignored) {</span>
+            } finally {
+<span class="fc" id="L305">                Util.cleanup(out);</span>
+            }
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">            if (connection != null) {</span>
+<span class="nc" id="L308">                Util.getImplementation().cleanup(connection);</span>
+            }
+<span class="fc" id="L310">            closed = true;</span>
+        } else {
+<span class="fc" id="L312">            Util.getImplementation().logStreamDoubleClose(name, false);</span>
+        }
+<span class="fc" id="L314">    }</span>
+
+    /// If applicable this member represents the connection object for the stream
+    ///
+    /// #### Returns
+    ///
+    /// the connection
+    public Object getConnection() {
+<span class="fc" id="L322">        return connection;</span>
+    }
+
+    /// If applicable this member represents the connection object for the stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection to set
+    public void setConnection(Object connection) {
+<span class="fc" id="L331">        this.connection = connection;</span>
+<span class="fc" id="L332">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

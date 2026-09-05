@@ -1,0 +1,344 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PiiScrubber.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crash</a> &gt; <span class="el_source">PiiScrubber.java</span></div><h1>PiiScrubber.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crash;
+
+/// Default PII scrubber for {@link CrashProtection} uploads. Designed to
+/// be subclassed: override {@link #scrubMessage(String)} or
+/// {@link #scrubFrame(String, String)} to extend the behaviour, then
+/// register the subclass with {@link CrashProtection#setScrubber(PiiScrubber)}.
+///
+/// Default behaviour applied to exception message strings only:
+///
+/// 1. Emails partially redacted: the local part is truncated to its first
+///    three characters followed by `***`, the domain is preserved.
+///    Example: `johndoe@example.com` becomes `joh***@example.com`.
+/// 2. Runs of six or more consecutive digits are replaced with `[num]`,
+///    catching phone numbers, long IDs, etc.
+/// 3. URLs are NOT scrubbed (they routinely carry useful debugging
+///    context; if a particular app embeds tokens in URLs it can opt-in
+///    to URL scrubbing by overriding this class).
+///
+/// Stack frames are not scrubbed by default. Class and method names do
+/// not carry PII; subclasses that emit synthetic frames containing user
+/// data may override {@link #scrubFrame(String, String)}.
+<span class="fc" id="L44">public class PiiScrubber {</span>
+
+    /// Scrubs PII from a free-form message, typically an exception message.
+    /// The default implementation applies email partial redaction and
+    /// long-digit-run masking.
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: original message; may be `null`.
+    ///
+    /// #### Returns
+    ///
+    /// scrubbed message, or `null` if `message` is `null`.
+    public String scrubMessage(String message) {
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (message == null) {</span>
+<span class="nc" id="L59">            return null;</span>
+        }
+<span class="fc" id="L61">        String result = scrubEmails(message);</span>
+<span class="fc" id="L62">        result = scrubDigitRuns(result);</span>
+<span class="fc" id="L63">        return result;</span>
+    }
+
+    /// Scrubs PII from a single stack frame. Default implementation
+    /// returns the original method name unchanged.
+    ///
+    /// #### Parameters
+    ///
+    /// - `className`: fully-qualified class name of the frame.
+    /// - `methodName`: method name of the frame.
+    ///
+    /// #### Returns
+    ///
+    /// the (possibly modified) method name to upload.
+    public String scrubFrame(String className, String methodName) {
+<span class="fc" id="L78">        return methodName;</span>
+    }
+
+    /// Scrubs a pre-rendered stack string. On the ParparVM ports the whole
+    /// Java trace arrives as one string rather than structured frames, and on
+    /// the JavaScript port it is the engine's `Error().stack`. A stricter
+    /// application can override this to redact aggressively.
+    ///
+    /// The default scrubs emails everywhere and applies long-digit-run masking
+    /// UNIFORMLY to every line, frame-shaped or not. It does not try to preserve
+    /// a frame's line/column: `printStackTrace` writes the exception message
+    /// verbatim, and a message can embed an indented, frame-shaped line that is
+    /// indistinguishable from a real frame -- preserving a &quot;coordinate&quot; from such
+    /// a line would let a crafted `:line:column` tail smuggle a long id past the
+    /// digit masking. `scrubMessage` masks only 6-or-more-digit runs, so ordinary
+    /// short line numbers survive, but a large minified-JavaScript column such as
+    /// `app.js:1:123456` is masked to `app.js:1:[num]`. That loses the column for
+    /// this text form; precise coordinates for symbolication come from the
+    /// structured frames (real `StackTraceElement`s), not this scrubbed string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rawStack`: the pre-rendered stack string; may be `null`.
+    ///
+    /// #### Returns
+    ///
+    /// the scrubbed stack string, or `null` if `rawStack` is `null`.
+    ///
+    /// EVERY line is routed through {@link #scrubMessage(String)} -- the overridable method -- so an app
+    /// that redacts app-specific tokens there redacts them in `rawStack` too. No line is treated as a
+    /// &quot;frame&quot; whose coordinate is preserved: `printStackTrace` writes the exception MESSAGE verbatim, and
+    /// a message can contain an embedded, indented, frame-shaped line (e.g. code that folds another stack
+    /// trace into a message), which is indistinguishable from a real frame by any shape or indentation
+    /// check. Preserving a &quot;coordinate&quot; from such a line would let a crafted `:line:column` tail bypass
+    /// digit masking. So the raw stack is scrubbed uniformly; `scrubMessage` masks only 6+ digit runs, so
+    /// ordinary short line numbers survive and stay readable, while a large minified-bundle column (or a
+    /// long id planted as a fake column) is masked. Precise coordinates for symbolication come from the
+    /// structured frames, which are real `StackTraceElement`s, not parsed text. The app's
+    /// {@link #scrubFrame(String, String)} override is still applied to a `at &lt;class&gt;.&lt;method&gt;` line so a
+    /// synthetic method name redacted from the structured frames does not resurface here.
+    public String scrubRawStack(String rawStack) {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (rawStack == null) {</span>
+<span class="fc" id="L120">            return null;</span>
+        }
+<span class="fc" id="L122">        int len = rawStack.length();</span>
+<span class="fc" id="L123">        StringBuilder out = new StringBuilder(len);</span>
+<span class="fc" id="L124">        int i = 0;</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        while (i &lt; len) {</span>
+<span class="fc" id="L126">            int nl = rawStack.indexOf('\n', i);</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            int lineEnd = nl &lt; 0 ? len : nl;</span>
+<span class="fc" id="L128">            String line = rawStack.substring(i, lineEnd);</span>
+<span class="fc" id="L129">            out.append(scrubMessage(applyFrameOverride(line)));</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">            if (nl &lt; 0) {</span>
+<span class="nc" id="L131">                break;</span>
+            }
+<span class="fc" id="L133">            out.append('\n');</span>
+<span class="fc" id="L134">            i = nl + 1;</span>
+<span class="fc" id="L135">        }</span>
+<span class="fc" id="L136">        return out.toString();</span>
+    }
+
+    /// Applies {@link #scrubFrame(String, String)} to the method name of a JVM/ParparVM
+    /// `at &lt;class&gt;.&lt;method&gt;(&lt;loc&gt;)` / `at &lt;class&gt;.&lt;method&gt;:&lt;line&gt;` frame, so an app that redacts a
+    /// synthetic method name in its structured frames redacts it in the raw stack too. Only these
+    /// dotted-identity forms carry a {@code class.method} the override addresses; other forms (a bare
+    /// V8 function, a URL frame) are returned unchanged. The default {@code scrubFrame} returns the
+    /// method unchanged, so a build that does not override it sees no difference.
+    private String applyFrameOverride(String line) {
+<span class="fc" id="L146">        int at = line.indexOf(&quot;at &quot;);</span>
+<span class="pc bpc" id="L147" title="1 of 4 branches missed.">        if (at &lt; 0 || line.substring(0, at).trim().length() != 0) {</span>
+<span class="fc" id="L148">            return line;</span>
+        }
+<span class="fc" id="L150">        String rest = line.substring(at + 3).trim();</span>
+<span class="fc" id="L151">        int paren = rest.indexOf('(');</span>
+        int idEnd;
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (paren &gt;= 0) {</span>
+<span class="fc" id="L154">            idEnd = paren;</span>
+        } else {
+<span class="fc" id="L156">            int locStart = trailingLocationStart(rest);</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            idEnd = locStart &gt; 0 ? locStart : rest.length();</span>
+        }
+<span class="fc" id="L159">        String identity = rest.substring(0, idEnd).trim();</span>
+<span class="fc" id="L160">        int lastDot = identity.lastIndexOf('.');</span>
+<span class="pc bpc" id="L161" title="2 of 6 branches missed.">        if (lastDot &lt;= 0 || lastDot == identity.length() - 1 || !isFrameIdentity(identity)) {</span>
+<span class="fc" id="L162">            return line;</span>
+        }
+<span class="fc" id="L164">        String cls = identity.substring(0, lastDot);</span>
+<span class="fc" id="L165">        String method = identity.substring(lastDot + 1);</span>
+<span class="fc" id="L166">        String scrubbed = scrubFrame(cls, method);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (scrubbed == null) {</span>
+            // The app removed the method name (its structured frame renders an empty method,
+            // CrashReportPayload.Frame); render it empty here too rather than restoring the original.
+<span class="fc" id="L170">            scrubbed = &quot;&quot;;</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        } else if (scrubbed.equals(method)) {</span>
+<span class="fc" id="L172">            return line;</span>
+        }
+<span class="fc" id="L174">        return line.substring(0, at + 3) + cls + &quot;.&quot; + scrubbed + rest.substring(idEnd);</span>
+    }
+
+    /// A frame's identity is a single token: non-empty and free of whitespace. A free-form message
+    /// continuation (`account 123456 failed`) has spaces, so it is rejected.
+    private static boolean isFrameIdentity(String id) {
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (id.length() == 0) {</span>
+<span class="nc" id="L181">            return false;</span>
+        }
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        for (int i = 0; i &lt; id.length(); i++) {</span>
+<span class="fc" id="L184">            char c = id.charAt(i);</span>
+<span class="pc bpc" id="L185" title="2 of 4 branches missed.">            if (c == ' ' || c == '\t') {</span>
+<span class="nc" id="L186">                return false;</span>
+            }
+        }
+<span class="fc" id="L189">        return true;</span>
+    }
+
+    /// Index at which a trailing `:&lt;line&gt;` (optionally `:&lt;line&gt;:&lt;column&gt;`) location begins, or -1
+    /// when the string does not end in one. A single trailing `)` is allowed. Consumes AT MOST two
+    /// numeric groups -- a real location is `:line` or `:line:column` -- so colon-delimited data before
+    /// the coordinate (a URL like `host/account:123456:1:42`) stays in the scrubbable head rather than
+    /// being preserved as if it were part of the coordinate.
+    private static int trailingLocationStart(String t) {
+<span class="fc" id="L198">        int i = t.length() - 1;</span>
+<span class="pc bpc" id="L199" title="2 of 4 branches missed.">        if (i &gt;= 0 &amp;&amp; t.charAt(i) == ')') {</span>
+<span class="nc" id="L200">            i--;</span>
+        }
+<span class="fc" id="L202">        int start = -1;</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        for (int groups = 0; groups &lt; 2; groups++) {</span>
+<span class="fc" id="L204">            int j = i;</span>
+<span class="fc" id="L205">            int digits = 0;</span>
+<span class="pc bpc" id="L206" title="2 of 6 branches missed.">            while (j &gt;= 0 &amp;&amp; t.charAt(j) &gt;= '0' &amp;&amp; t.charAt(j) &lt;= '9') {</span>
+<span class="fc" id="L207">                j--;</span>
+<span class="fc" id="L208">                digits++;</span>
+            }
+<span class="pc bpc" id="L210" title="2 of 6 branches missed.">            if (digits &gt; 0 &amp;&amp; j &gt;= 0 &amp;&amp; t.charAt(j) == ':') {</span>
+<span class="fc" id="L211">                start = j;</span>
+<span class="fc" id="L212">                i = j - 1;</span>
+            } else {
+                break;
+            }
+        }
+<span class="fc" id="L217">        return start;</span>
+    }
+
+    /// Replaces all occurrences of an email-like substring with the form
+    /// `&lt;first-three&gt;***@&lt;domain&gt;`. Local parts shorter than three
+    /// characters are not padded; the original prefix is preserved and
+    /// followed by `***`. The domain (including TLD) is preserved verbatim.
+    ///
+    /// This implementation is character-driven rather than regex-based
+    /// to stay compatible with the Java 5 source level enforced by the
+    /// core framework module.
+    protected static String scrubEmails(String s) {
+<span class="pc bpc" id="L229" title="1 of 4 branches missed.">        if (s == null || s.indexOf('@') &lt; 0) {</span>
+<span class="fc" id="L230">            return s;</span>
+        }
+<span class="fc" id="L232">        int len = s.length();</span>
+<span class="fc" id="L233">        StringBuilder out = new StringBuilder(len);</span>
+<span class="fc" id="L234">        int i = 0;</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        while (i &lt; len) {</span>
+<span class="fc" id="L236">            char c = s.charAt(i);</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">            if (c == '@') {</span>
+<span class="fc" id="L238">                int localStart = i;</span>
+<span class="fc bfc" id="L239" title="All 4 branches covered.">                while (localStart &gt; 0 &amp;&amp; isEmailLocalChar(s.charAt(localStart - 1))) {</span>
+<span class="fc" id="L240">                    localStart--;</span>
+                }
+<span class="fc" id="L242">                int domainEnd = i + 1;</span>
+<span class="fc bfc" id="L243" title="All 4 branches covered.">                while (domainEnd &lt; len &amp;&amp; isEmailDomainChar(s.charAt(domainEnd))) {</span>
+<span class="fc" id="L244">                    domainEnd++;</span>
+                }
+<span class="fc" id="L246">                String local = s.substring(localStart, i);</span>
+<span class="fc" id="L247">                String domain = s.substring(i + 1, domainEnd);</span>
+<span class="pc bpc" id="L248" title="1 of 4 branches missed.">                if (local.length() &gt; 0 &amp;&amp; isValidDomain(domain)) {</span>
+<span class="fc" id="L249">                    int alreadyWritten = i - localStart;</span>
+<span class="fc" id="L250">                    int outBaseLen = out.length() - alreadyWritten;</span>
+<span class="fc" id="L251">                    out.setLength(outBaseLen);</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">                    int keep = local.length() &lt; 3 ? local.length() : 3;</span>
+<span class="fc" id="L253">                    out.append(local, 0, keep);</span>
+<span class="fc" id="L254">                    out.append(&quot;***@&quot;);</span>
+<span class="fc" id="L255">                    out.append(domain);</span>
+<span class="fc" id="L256">                    i = domainEnd;</span>
+<span class="fc" id="L257">                    continue;</span>
+                }
+            }
+<span class="fc" id="L260">            out.append(c);</span>
+<span class="fc" id="L261">            i++;</span>
+<span class="fc" id="L262">        }</span>
+<span class="fc" id="L263">        return out.toString();</span>
+    }
+
+    private static boolean isEmailLocalChar(char c) {
+<span class="pc bpc" id="L267" title="1 of 4 branches missed.">        if (c &gt;= 'a' &amp;&amp; c &lt;= 'z') {</span>
+<span class="fc" id="L268">            return true;</span>
+        }
+<span class="pc bpc" id="L270" title="1 of 4 branches missed.">        if (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') {</span>
+<span class="fc" id="L271">            return true;</span>
+        }
+<span class="pc bpc" id="L273" title="3 of 4 branches missed.">        if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="nc" id="L274">            return true;</span>
+        }
+<span class="pc bpc" id="L276" title="4 of 8 branches missed.">        return c == '.' || c == '_' || c == '+' || c == '-';</span>
+    }
+
+    private static boolean isEmailDomainChar(char c) {
+<span class="pc bpc" id="L280" title="1 of 4 branches missed.">        if (c &gt;= 'a' &amp;&amp; c &lt;= 'z') {</span>
+<span class="fc" id="L281">            return true;</span>
+        }
+<span class="pc bpc" id="L283" title="3 of 4 branches missed.">        if (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') {</span>
+<span class="nc" id="L284">            return true;</span>
+        }
+<span class="pc bpc" id="L286" title="1 of 4 branches missed.">        if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="nc" id="L287">            return true;</span>
+        }
+<span class="pc bpc" id="L289" title="1 of 4 branches missed.">        return c == '.' || c == '-';</span>
+    }
+
+    private static boolean isValidDomain(String domain) {
+<span class="fc" id="L293">        int dot = domain.indexOf('.');</span>
+<span class="pc bpc" id="L294" title="1 of 4 branches missed.">        if (dot &lt; 1 || dot == domain.length() - 1) {</span>
+<span class="fc" id="L295">            return false;</span>
+        }
+<span class="fc" id="L297">        int afterDot = domain.length() - dot - 1;</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        return afterDot &gt;= 2;</span>
+    }
+
+    /// Replaces every run of six or more consecutive ASCII digits with
+    /// the literal token `[num]`.
+    protected static String scrubDigitRuns(String s) {
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L305">            return null;</span>
+        }
+<span class="fc" id="L307">        int len = s.length();</span>
+<span class="fc" id="L308">        StringBuilder out = null;</span>
+<span class="fc" id="L309">        int i = 0;</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        while (i &lt; len) {</span>
+<span class="fc" id="L311">            char c = s.charAt(i);</span>
+<span class="fc bfc" id="L312" title="All 4 branches covered.">            if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="fc" id="L313">                int j = i + 1;</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">                while (j &lt; len) {</span>
+<span class="fc" id="L315">                    char d = s.charAt(j);</span>
+<span class="fc bfc" id="L316" title="All 4 branches covered.">                    if (d &lt; '0' || d &gt; '9') {</span>
+<span class="fc" id="L317">                        break;</span>
+                    }
+<span class="fc" id="L319">                    j++;</span>
+<span class="fc" id="L320">                }</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">                if (j - i &gt;= 6) {</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">                    if (out == null) {</span>
+<span class="fc" id="L323">                        out = new StringBuilder(len);</span>
+<span class="fc" id="L324">                        out.append(s, 0, i);</span>
+                    }
+<span class="fc" id="L326">                    out.append(&quot;[num]&quot;);</span>
+<span class="fc" id="L327">                    i = j;</span>
+<span class="fc" id="L328">                    continue;</span>
+                }
+<span class="fc bfc" id="L330" title="All 2 branches covered.">                if (out != null) {</span>
+<span class="fc" id="L331">                    out.append(s, i, j);</span>
+                }
+<span class="fc" id="L333">                i = j;</span>
+<span class="fc" id="L334">                continue;</span>
+            }
+<span class="fc bfc" id="L336" title="All 2 branches covered.">            if (out != null) {</span>
+<span class="fc" id="L337">                out.append(c);</span>
+            }
+<span class="fc" id="L339">            i++;</span>
+<span class="fc" id="L340">        }</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">        return out == null ? s : out.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

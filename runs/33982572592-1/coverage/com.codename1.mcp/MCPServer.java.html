@@ -1,0 +1,737 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MCPServer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.mcp</a> &gt; <span class="el_source">MCPServer.java</span></div><h1>MCPServer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.mcp;
+
+import com.codename1.ai.Tool;
+import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
+import com.codename1.util.Base64;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A Model Context Protocol server. Speaks JSON-RPC 2.0 over a pluggable
+/// {@link MCPTransport}, dispatching the MCP methods `initialize`, `tools/list`,
+/// `tools/call`, `resources/list`, `resources/read`, `ping` and the
+/// `notifications/*` family.
+///
+/// Tools are {@link com.codename1.ai.Tool} instances. The built in tools from
+/// {@link McpUiTools} expose the accessibility semantics tree so any application is
+/// drivable without code; applications add domain tools with {@link #addTool(Tool)}.
+///
+/// The message dispatch is thread free and reentrant: {@link #handleMessage(String)}
+/// takes one request line and returns one response line (or null for a notification),
+/// which makes it directly unit testable. {@link #start(MCPTransport)} wraps that in a
+/// reader thread over the transport.
+public class MCPServer {
+    /// Standard JSON-RPC and MCP error codes.
+    public static final int PARSE_ERROR = -32700;
+    public static final int INVALID_REQUEST = -32600;
+    public static final int METHOD_NOT_FOUND = -32601;
+    public static final int INVALID_PARAMS = -32602;
+    public static final int INTERNAL_ERROR = -32603;
+    public static final int RESOURCE_NOT_FOUND = -32002;
+
+    /// MCP protocol revision advertised when the client does not request one, or requests
+    /// one this server does not implement.
+    public static final String DEFAULT_PROTOCOL_VERSION = &quot;2024-11-05&quot;;
+
+    /// The MCP protocol revisions this server actually implements.
+<span class="fc" id="L62">    private static final String[] SUPPORTED_PROTOCOL_VERSIONS = {&quot;2024-11-05&quot;};</span>
+
+    private static boolean isSupportedProtocol(String version) {
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (version == null) {</span>
+<span class="fc" id="L66">            return false;</span>
+        }
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (String v : SUPPORTED_PROTOCOL_VERSIONS) {</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (v.equals(version)) {</span>
+<span class="fc" id="L70">                return true;</span>
+            }
+        }
+<span class="fc" id="L73">        return false;</span>
+    }
+
+    private static final String SCREEN_RESOURCE_URI = &quot;cn1://screen.png&quot;;
+
+<span class="fc" id="L78">    private final Map&lt;String, Tool&gt; tools = new LinkedHashMap&lt;String, Tool&gt;();</span>
+<span class="fc" id="L79">    private String serverName = &quot;Codename One MCP&quot;;</span>
+<span class="fc" id="L80">    private String serverVersion = &quot;1.0&quot;;</span>
+<span class="fc" id="L81">    private boolean screenshotEnabled = true;</span>
+    private boolean running;
+    /// Bumped by every start(), so a reader thread can tell its own run from a later one that
+    /// happens to have been handed the same transport instance.
+    private int startGeneration;
+    private MCPTransport transport;
+<span class="fc" id="L87">    private MCPVerbosity verbosity = MCPVerbosity.OFF;</span>
+
+    /// Sets how much of the MCP conversation is echoed to the Codename One log for
+    /// debugging. Defaults to {@link MCPVerbosity#OFF}.
+    public void setVerbosity(MCPVerbosity verbosity) {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        this.verbosity = verbosity == null ? MCPVerbosity.OFF : verbosity;</span>
+<span class="nc" id="L93">    }</span>
+
+    public MCPVerbosity getVerbosity() {
+<span class="nc" id="L96">        return verbosity;</span>
+    }
+
+<span class="fc" id="L99">    public MCPServer() {</span>
+<span class="fc" id="L100">        List&lt;Tool&gt; builtIn = McpUiTools.builtInTools();</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (Tool t : builtIn) {</span>
+<span class="fc" id="L102">            tools.put(t.getName(), t);</span>
+<span class="fc" id="L103">        }</span>
+<span class="fc" id="L104">    }</span>
+
+    /// Registers a developer defined tool, replacing any existing tool with the same
+    /// name. This is how an application publishes domain specific data and actions.
+    public synchronized void addTool(Tool tool) {
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (tool != null) {</span>
+<span class="fc" id="L110">            tools.put(tool.getName(), tool);</span>
+        }
+<span class="fc" id="L112">    }</span>
+
+    /// Removes a previously registered tool by name.
+    public synchronized void removeTool(String name) {
+<span class="nc" id="L116">        tools.remove(name);</span>
+<span class="nc" id="L117">    }</span>
+
+    /// Sets the server identity reported to the host during `initialize`.
+    public void setServerInfo(String name, String version) {
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (name != null) {</span>
+<span class="nc" id="L122">            this.serverName = name;</span>
+        }
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (version != null) {</span>
+<span class="nc" id="L125">            this.serverVersion = version;</span>
+        }
+<span class="nc" id="L127">    }</span>
+
+    /// Enables or disables the built in screenshot resource. Enabled by default.
+    public void setScreenshotEnabled(boolean screenshotEnabled) {
+<span class="nc" id="L131">        this.screenshotEnabled = screenshotEnabled;</span>
+<span class="nc" id="L132">    }</span>
+
+    public synchronized boolean isRunning() {
+<span class="fc" id="L135">        return running;</span>
+    }
+
+    /// Starts serving over the given transport on a dedicated reader thread.
+    public synchronized void start(MCPTransport transport) {
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (running) {</span>
+<span class="nc" id="L141">            return;</span>
+        }
+<span class="fc" id="L143">        this.transport = transport;</span>
+<span class="fc" id="L144">        running = true;</span>
+<span class="fc" id="L145">        startGeneration++;</span>
+<span class="fc" id="L146">        final int generation = startGeneration;</span>
+        // Captured for the thread rather than read back off the field. A later start()
+        // replaces the field, and a reader thread that followed it would end up serving a
+        // transport the server no longer considers its own -- while the transport it was
+        // actually given was never closed.
+<span class="fc" id="L151">        final MCPTransport mine = transport;</span>
+<span class="fc" id="L152">        Thread readerThread = new Thread(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L155">                runLoop(mine, generation);</span>
+<span class="fc" id="L156">            }</span>
+        }, &quot;cn1-mcp-server&quot;);
+<span class="fc" id="L158">        readerThread.start();</span>
+<span class="fc" id="L159">    }</span>
+
+    /// Stops serving and closes the transport.
+    public synchronized void stop() {
+<span class="fc" id="L163">        running = false;</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (transport != null) {</span>
+<span class="fc" id="L165">            transport.close();</span>
+        }
+<span class="fc" id="L167">    }</span>
+
+    /// True while `t` is still the transport this server is serving over. False once stop()
+    /// has run, or once a restart handed the server a different transport -- in both cases
+    /// the thread holding `t` owns it alone and has to close it itself.
+    private synchronized boolean isCurrent(MCPTransport t, int generation) {
+        // The generation as well as the identity. A caller that stops and restarts with
+        // the SAME transport instance would otherwise leave the old reader thread looking
+        // current, so it could run on beside the replacement and eventually stop the
+        // server and close the transport underneath it.
+<span class="pc bpc" id="L177" title="1 of 6 branches missed.">        return running &amp;&amp; startGeneration == generation</span>
+                &amp;&amp; transport == t; // NOPMD identity is the question, not equality
+    }
+
+    /// Clears the running flag when this thread is still the current run, and answers the
+    /// only other question a thread unwinding from `t` has: does it close `t`?
+    ///
+    /// Both halves have to be decided together under this lock. Deciding &quot;am I current&quot; and
+    /// then closing outside it leaves a window where a `stop()`/`start(sameTransport)` pair
+    /// hands `t` to a fresh generation -- and the old thread, correctly declining to stop
+    /// the *server*, would still close the transport the replacement is now serving over,
+    /// killing a server that had just been restarted.
+    ///
+    /// Three cases, only one of which closes nothing:
+    ///
+    /// - still current: this run is over, so clear `running` and close.
+    /// - superseded, and the replacement holds a different transport: nobody else can close
+    ///   `t`, so this thread must. Leaking it is not benign -- an open transport stays
+    ///   registered process-wide and every later `open()` is refused.
+    /// - superseded, and the replacement holds this same transport: leave it alone. It is
+    ///   the live server's transport now, and the replacement thread will close it.
+    ///
+    /// The close happens here, under the monitor, rather than being reported back to a
+    /// caller that closes afterwards. Deciding and then closing outside the lock leaves
+    /// the very gap this method exists to remove: a reader reaching EOF clears `running`,
+    /// a restart over the same transport lands in the gap, and the close then lands on
+    /// the replacement's transport.
+    private synchronized void releaseAndCloseIfCurrent(MCPTransport t, int generation) {
+        boolean mine;
+<span class="pc bpc" id="L206" title="1 of 4 branches missed.">        if (startGeneration == generation</span>
+                &amp;&amp; transport == t) { // NOPMD identity: is this still our transport?
+<span class="fc" id="L208">            running = false;</span>
+<span class="fc" id="L209">            mine = true;</span>
+        } else {
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">            mine = transport != t; // NOPMD identity: reused by the replacement, or orphaned?</span>
+        }
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (mine) {</span>
+            // Closing under the monitor matches stop(), which is synchronized and closes
+            // the same way. A transport's close() releases a socket; it does not call
+            // back into the server, so there is nothing here to deadlock against.
+<span class="fc" id="L217">            t.close();</span>
+        }
+<span class="fc" id="L219">    }</span>
+
+    /// Unwinds an open this thread performed and must not keep: clears `running` when the
+    /// server is still on this run, and closes `t` either way.
+    ///
+    /// Unconditionally, which is the one thing it does differently from
+    /// `releaseAndCloseIfCurrent`, and the difference is the whole reason it exists. That
+    /// method's same-transport rule -- leave `t` alone, the replacement owns it -- is
+    /// right for a thread unwinding from the read loop, where the replacement has already
+    /// opened the transport and closing it would kill a live server. It is wrong here:
+    /// this runs inside the transport's monitor, so the replacement is still blocked and
+    /// has opened nothing, and the listener registered on `t` is this thread's alone.
+    /// Declining to close it left the replacement's own `open()` refused with &quot;already
+    /// listening&quot; -- and that IOException stopped the server the restart had just brought
+    /// up.
+    ///
+    /// Only ever called while holding `t`'s open lock, which is what makes &quot;the
+    /// replacement cannot have opened yet&quot; true rather than merely likely.
+    private synchronized void discardOwnOpen(MCPTransport t, int generation) {
+<span class="pc bpc" id="L238" title="1 of 4 branches missed.">        if (startGeneration == generation</span>
+                &amp;&amp; transport == t) { // NOPMD identity: is this still our transport?
+<span class="fc" id="L240">            running = false;</span>
+        }
+<span class="fc" id="L242">        t.close();</span>
+<span class="fc" id="L243">    }</span>
+
+    /// Opens `t` for this generation, serialized against any other generation opening the
+    /// same transport. Returns false when this thread is done and must not read.
+    ///
+    /// Serialized per TRANSPORT, and the WHOLE open -- the attempt, its failure path, and
+    /// the teardown of a superseded one -- happens inside. A stop()/start() over the SAME
+    /// transport while the old reader is still parked in open() would otherwise have both
+    /// generations open one instance: the same-transport rule then correctly declines to
+    /// close it on the way out, and the transport is left holding two listeners with one
+    /// handle for them, so the first is leaked and outlives stop().
+    ///
+    /// The teardown has to be in here too, not after. Releasing the lock first let the
+    /// replacement acquire it and call open() while this thread's now-stale listener was
+    /// still registered -- and a transport refuses a second listener, so the replacement
+    /// took an IOException and stopped the server it had just started.
+    ///
+    /// Per transport and not per server, which is what a server-wide lock got wrong: a
+    /// restart over a DIFFERENT transport has nothing to serialize against, and making it
+    /// wait behind a superseded open that may never return deadlocks the restart. Not the
+    /// server monitor either: open() blocks, and holding that across it would make stop()
+    /// wait on what it is stopping.
+    ///
+    /// And deliberately NOT the transport's own monitor, which is what this used to be.
+    /// [MCPTransport] is a public interface: an implementation is entitled to write
+    /// `synchronized void close()`, and with such a transport the two locks were taken in
+    /// opposite orders -- this thread held the transport and waited for the server monitor
+    /// inside `isCurrent`, while `stop()` held the server monitor and waited for the
+    /// transport inside `close()`. Both threads park forever. The same ownership also
+    /// blocked the one call that can end a legitimately blocking `open()`: `close()` could
+    /// not run until `open()` returned, and `open()` was waiting for `close()`. A lock the
+    /// server owns and no transport can name has neither problem, and the ordering below
+    /// has one direction only -- open lock, then server monitor, then whatever the
+    /// transport locks internally.
+    private boolean openSerialized(MCPTransport t, int generation) {
+<span class="fc" id="L278">        Object openLock = acquireOpenLock(t);</span>
+        try {
+<span class="fc" id="L280">            synchronized (openLock) {</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">                if (!isCurrent(t, generation)) {</span>
+<span class="nc" id="L282">                    releaseAndCloseIfCurrent(t, generation);</span>
+<span class="nc" id="L283">                    return false;</span>
+                }
+                try {
+<span class="fc" id="L286">                    t.open();</span>
+<span class="nc" id="L287">                } catch (IOException ex) {</span>
+                    // The transport failed to start listening. Log defensively: the CN1
+                    // Log routes through the platform implementation, which may not be
+                    // registered yet when the server is auto-started early in
+                    // Display.init(), and a raw NullPointerException here would silently
+                    // kill the reader thread.
+                    try {
+<span class="nc" id="L294">                        Log.e(ex);</span>
+<span class="nc" id="L295">                    } catch (Throwable logErr) {</span>
+<span class="nc" id="L296">                        System.err.println(&quot;[cn1.mcp] transport open failed: &quot; + ex);</span>
+<span class="nc" id="L297">                    }</span>
+                    // A failed open can still have registered something -- the loopback
+                    // transport claims the process-wide slot before it binds -- so this
+                    // unwinds the same way a successful one does.
+<span class="nc" id="L301">                    discardOwnOpen(t, generation);</span>
+<span class="nc" id="L302">                    return false;</span>
+<span class="fc" id="L303">                }</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">                if (!isCurrent(t, generation)) {</span>
+                    // Same window, the far side of it: the server moved on while open()
+                    // was in flight. The listener now on `t` is this thread's and has to
+                    // go.
+<span class="fc" id="L308">                    discardOwnOpen(t, generation);</span>
+<span class="fc" id="L309">                    return false;</span>
+                }
+<span class="fc" id="L311">                return true;</span>
+            }
+        } finally {
+<span class="fc" id="L314">            releaseOpenLock(t);</span>
+        }
+    }
+
+    /// The per-transport open locks, and how many threads are currently holding a
+    /// reference to each.
+    ///
+    /// A plain map would grow one entry per transport instance the process ever serves.
+    /// The count is what makes removal safe: dropping an entry while a thread is parked on
+    /// that monitor would let the next generation mint a second lock for the same
+    /// transport, and two generations serializing on different objects are not serialized
+    /// at all.
+<span class="fc" id="L326">    private final List&lt;Object[]&gt; openLocks = new ArrayList&lt;Object[]&gt;();</span>
+
+    /// Transports with a reader still inside their loop, and which generation it belongs
+    /// to.
+    ///
+    /// A restart over the SAME transport instance is the case this exists for. Both
+    /// production transports clear their closed flag in open(), so a reader still parked
+    /// in readMessage() from the previous generation is looking at a live stream again the
+    /// moment the replacement opens -- and it can take a frame the new client sent. The
+    /// frame is then handled by a loop that belongs to a stopped server, or dropped
+    /// entirely; the new session simply never sees it, which reads as a client that hangs.
+    ///
+    /// stop() closes the transport before any of this, so the stale read unwinds
+    /// immediately and the wait below is measured in the time that takes rather than in
+    /// anything the client controls.
+<span class="fc" id="L341">    private final List&lt;Object[]&gt; activeReaders = new ArrayList&lt;Object[]&gt;();</span>
+
+    /// How long a replacement waits for the previous reader of the same transport before
+    /// opening anyway.
+    ///
+    /// Bounded rather than indefinite, and the bound is the whole design. `stop()` closes
+    /// the transport first, so a reader blocked on a real socket unwinds in microseconds
+    /// and this wait is never observed. [MCPTransport] is a public interface, though, and
+    /// an implementation is entitled to a `readMessage()` that parks until something other
+    /// than `close()` releases it -- the loopback test transport is exactly that. Waiting
+    /// forever for such a reader deadlocks the restart against a thread only the caller
+    /// can end, which is worse than the overlap this is guarding against: the loop already
+    /// re-checks `isCurrent` after every read, so a stale reader cannot HANDLE anything,
+    /// and what is left is a frame it might swallow.
+    private static final long READER_HANDOVER_WAIT_MS = 2000L;
+
+    /// Registers this generation as the reader of {@code t}, waiting out any older one.
+    private void awaitSoleReader(MCPTransport t, int generation) {
+<span class="fc" id="L359">        synchronized (activeReaders) {</span>
+<span class="fc" id="L360">            long deadline = System.currentTimeMillis() + READER_HANDOVER_WAIT_MS;</span>
+            for (;;) {
+<span class="fc" id="L362">                Object[] found = null;</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">                for (Object[] entry : activeReaders) {</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">                    if (entry[0] == t) { // NOPMD identity: one reader per INSTANCE</span>
+<span class="fc" id="L365">                        found = entry;</span>
+<span class="fc" id="L366">                        break;</span>
+                    }
+<span class="fc" id="L368">                }</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">                if (found == null) {</span>
+<span class="fc" id="L370">                    activeReaders.add(new Object[] {t, Integer.valueOf(generation)});</span>
+<span class="fc" id="L371">                    return;</span>
+                }
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">                if (((Integer) found[1]).intValue() == generation) {</span>
+<span class="nc" id="L374">                    return;</span>
+                }
+<span class="fc" id="L376">                long remaining = deadline - System.currentTimeMillis();</span>
+<span class="fc bfc" id="L377" title="All 2 branches covered.">                if (remaining &lt;= 0L) {</span>
+                    // The previous reader is not coming back on its own. Taking the
+                    // registration over rather than leaving it to the departed generation
+                    // keeps a third restart waiting for THIS thread, which is the one
+                    // actually on the transport.
+<span class="fc" id="L382">                    found[1] = Integer.valueOf(generation);</span>
+<span class="fc" id="L383">                    return;</span>
+                }
+                try {
+<span class="fc" id="L386">                    activeReaders.wait(remaining);</span>
+<span class="nc" id="L387">                } catch (InterruptedException ex) {</span>
+<span class="nc" id="L388">                    Thread.currentThread().interrupt();</span>
+<span class="nc" id="L389">                    return;</span>
+<span class="fc" id="L390">                }</span>
+<span class="fc" id="L391">            }</span>
+        }
+    }
+
+    private void releaseReader(MCPTransport t, int generation) {
+<span class="fc" id="L396">        synchronized (activeReaders) {</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">            for (java.util.Iterator&lt;Object[]&gt; it = activeReaders.iterator(); it.hasNext();) {</span>
+<span class="fc" id="L398">                Object[] entry = it.next();</span>
+<span class="pc bpc" id="L399" title="1 of 2 branches missed.">                if (entry[0] == t // NOPMD identity: one reader per INSTANCE</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">                        &amp;&amp; ((Integer) entry[1]).intValue() == generation) {</span>
+<span class="fc" id="L401">                    it.remove();</span>
+<span class="fc" id="L402">                    break;</span>
+                }
+<span class="fc" id="L404">            }</span>
+<span class="fc" id="L405">            activeReaders.notifyAll();</span>
+<span class="fc" id="L406">        }</span>
+<span class="fc" id="L407">    }</span>
+
+    private Object acquireOpenLock(MCPTransport t) {
+<span class="fc" id="L410">        synchronized (openLocks) {</span>
+<span class="fc bfc" id="L411" title="All 2 branches covered.">            for (Object[] entry : openLocks) {</span>
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">                if (entry[0] == t) { // NOPMD identity: one lock per transport INSTANCE</span>
+<span class="nc" id="L413">                    ((int[]) entry[2])[0]++;</span>
+<span class="nc" id="L414">                    return entry[1];</span>
+                }
+<span class="fc" id="L416">            }</span>
+<span class="fc" id="L417">            Object lock = new Object();</span>
+<span class="fc" id="L418">            openLocks.add(new Object[] {t, lock, new int[] {1}});</span>
+<span class="fc" id="L419">            return lock;</span>
+        }
+    }
+
+    private void releaseOpenLock(MCPTransport t) {
+<span class="fc" id="L424">        synchronized (openLocks) {</span>
+            // Iterator.remove rather than List.remove during a foreach. The foreach
+            // version could not actually throw -- it returned before the iterator was
+            // touched again -- but that made its safety depend on a `return` three lines
+            // away, which is the kind of coupling a later edit breaks without anything
+            // saying so. This shape is safe on its own terms.
+<span class="pc bpc" id="L430" title="1 of 2 branches missed.">            for (java.util.Iterator&lt;Object[]&gt; it = openLocks.iterator(); it.hasNext();) {</span>
+<span class="fc" id="L431">                Object[] entry = it.next();</span>
+<span class="fc bfc" id="L432" title="All 2 branches covered.">                if (entry[0] == t) { // NOPMD identity: one lock per transport INSTANCE</span>
+<span class="fc" id="L433">                    int[] users = (int[]) entry[2];</span>
+<span class="fc" id="L434">                    users[0]--;</span>
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">                    if (users[0] &lt;= 0) {</span>
+<span class="fc" id="L436">                        it.remove();</span>
+                    }
+<span class="fc" id="L438">                    return;</span>
+                }
+<span class="fc" id="L440">            }</span>
+<span class="nc" id="L441">        }</span>
+<span class="nc" id="L442">    }</span>
+
+    private void runLoop(MCPTransport t, int generation) {
+        // Opening is deferred to this thread, so by the time it happens the server may
+        // already have been stopped or restarted. Either way stop()'s close() ran against a
+        // transport that had not opened yet and therefore released nothing, so opening now
+        // would leave a transport registered with nobody left to close it. That registration
+        // is process-wide: every later open() is refused on the grounds that an agent is
+        // already being served.
+<span class="fc bfc" id="L451" title="All 2 branches covered.">        if (!isCurrent(t, generation)) {</span>
+<span class="fc" id="L452">            return;</span>
+        }
+        // Before opening, not after: a reader from the previous generation of this same
+        // transport instance may still be parked in readMessage(), and open() clears the
+        // flag that would have ended it. Opening first would put two readers on one
+        // stream, and the frame the new client sends can go to the one that no longer
+        // belongs to anybody.
+<span class="fc" id="L459">        awaitSoleReader(t, generation);</span>
+        try {
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">            if (!isCurrent(t, generation)) {</span>
+<span class="nc" id="L462">                return;</span>
+            }
+<span class="fc bfc" id="L464" title="All 2 branches covered.">            if (!openSerialized(t, generation)) {</span>
+<span class="fc" id="L465">                return;</span>
+            }
+<span class="fc" id="L467">            readUntilClosed(t, generation);</span>
+        } finally {
+<span class="fc" id="L469">            releaseReader(t, generation);</span>
+        }
+<span class="fc" id="L471">        releaseAndCloseIfCurrent(t, generation);</span>
+<span class="fc" id="L472">    }</span>
+
+    private void readUntilClosed(MCPTransport t, int generation) {
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">        while (isCurrent(t, generation)) {</span>
+            String line;
+            try {
+<span class="fc" id="L478">                line = t.readMessage();</span>
+<span class="nc" id="L479">            } catch (IOException ex) {</span>
+<span class="nc" id="L480">                break;</span>
+<span class="fc" id="L481">            }</span>
+            // Re-checked on the far side of the read as well as the near side. A read
+            // blocks for as long as the client is quiet, which is most of the time, so
+            // &quot;was this server current when the read started&quot; says nothing about whether
+            // it still is when the read returns -- and handling a request for a server
+            // that has been stopped answers on a transport somebody else may now own.
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">            if (!isCurrent(t, generation)) {</span>
+<span class="fc" id="L488">                break;</span>
+            }
+<span class="nc bnc" id="L490" title="All 2 branches missed.">            if (line == null) {</span>
+<span class="nc" id="L491">                break;</span>
+            }
+<span class="nc bnc" id="L493" title="All 2 branches missed.">            if (line.trim().length() == 0) {</span>
+<span class="nc" id="L494">                continue;</span>
+            }
+<span class="nc" id="L496">            String response = handleMessage(line);</span>
+<span class="nc bnc" id="L497" title="All 2 branches missed.">            if (response != null) {</span>
+                try {
+<span class="nc" id="L499">                    t.writeMessage(response);</span>
+<span class="nc" id="L500">                } catch (IOException ex) {</span>
+<span class="nc" id="L501">                    break;</span>
+<span class="nc" id="L502">                }</span>
+            }
+<span class="nc" id="L504">        }</span>
+<span class="fc" id="L505">    }</span>
+
+    /// Handles one inbound JSON-RPC message and returns the response line, or null
+    /// when the message is a notification that warrants no reply. Never throws; every
+    /// failure is turned into a JSON-RPC error response.
+    public String handleMessage(String line) {
+<span class="fc" id="L511">        String response = handleMessageInternal(line);</span>
+<span class="fc" id="L512">        logConversation(line, response);</span>
+<span class="fc" id="L513">        return response;</span>
+    }
+
+    private String handleMessageInternal(String line) {
+        Map&lt;String, Object&gt; request;
+        try {
+<span class="fc" id="L519">            request = MCPJson.parse(line);</span>
+<span class="nc" id="L520">        } catch (Exception ex) {</span>
+<span class="nc" id="L521">            return errorEnvelope(null, PARSE_ERROR, &quot;Parse error&quot;);</span>
+<span class="fc" id="L522">        }</span>
+<span class="pc bpc" id="L523" title="1 of 2 branches missed.">        if (request == null) {</span>
+<span class="nc" id="L524">            return errorEnvelope(null, PARSE_ERROR, &quot;Parse error&quot;);</span>
+        }
+<span class="fc" id="L526">        boolean hasId = request.containsKey(&quot;id&quot;);</span>
+<span class="fc" id="L527">        Object id = request.get(&quot;id&quot;);</span>
+        try {
+<span class="fc" id="L529">            String method = JSONParser.getString(request, &quot;method&quot;);</span>
+<span class="fc" id="L530">            Map&lt;String, Object&gt; params = JSONParser.asMap(request.get(&quot;params&quot;));</span>
+<span class="fc bfc" id="L531" title="All 2 branches covered.">            if (method == null) {</span>
+<span class="pc bpc" id="L532" title="1 of 2 branches missed.">                return hasId ? errorEnvelope(id, INVALID_REQUEST, &quot;Invalid Request&quot;) : null;</span>
+            }
+<span class="fc bfc" id="L534" title="All 2 branches covered.">            if (!hasId) {</span>
+                // A notification (no id) such as notifications/initialized needs no reply.
+<span class="fc" id="L536">                return null;</span>
+            }
+<span class="fc" id="L538">            return dispatch(id, method, params);</span>
+<span class="nc" id="L539">        } catch (Exception ex) {</span>
+<span class="nc bnc" id="L540" title="All 2 branches missed.">            return errorEnvelope(hasId ? id : null, INTERNAL_ERROR,</span>
+<span class="nc" id="L541">                    &quot;Internal error: &quot; + messageOf(ex));</span>
+        }
+    }
+
+    /// Echoes the exchange to the log according to the configured verbosity. Never throws.
+    private void logConversation(String request, String response) {
+<span class="pc bpc" id="L547" title="1 of 2 branches missed.">        if (verbosity == MCPVerbosity.OFF) {</span>
+<span class="fc" id="L548">            return;</span>
+        }
+        try {
+<span class="nc bnc" id="L551" title="All 4 branches missed.">            boolean isError = response != null &amp;&amp; (response.indexOf(&quot;\&quot;error\&quot;&quot;) &gt;= 0</span>
+<span class="nc bnc" id="L552" title="All 2 branches missed.">                    || response.indexOf(&quot;\&quot;isError\&quot;:true&quot;) &gt;= 0);</span>
+<span class="nc bnc" id="L553" title="All 4 branches missed.">            if (verbosity == MCPVerbosity.ERRORS &amp;&amp; !isError) {</span>
+<span class="nc" id="L554">                return;</span>
+            }
+<span class="nc bnc" id="L556" title="All 2 branches missed.">            if (verbosity.includes(MCPVerbosity.FULL)) {</span>
+<span class="nc" id="L557">                Log.p(&quot;MCP &gt;&gt; &quot; + request);</span>
+<span class="nc bnc" id="L558" title="All 2 branches missed.">                if (response != null) {</span>
+<span class="nc" id="L559">                    Log.p(&quot;MCP &lt;&lt; &quot; + response);</span>
+                }
+<span class="nc" id="L561">                return;</span>
+            }
+            // SUMMARY / ERRORS: one concise line
+<span class="nc" id="L564">            Map&lt;String, Object&gt; req = MCPJson.parse(request);</span>
+<span class="nc bnc" id="L565" title="All 2 branches missed.">            String method = req == null ? &quot;?&quot; : JSONParser.getString(req, &quot;method&quot;);</span>
+<span class="nc" id="L566">            String detail = &quot;&quot;;</span>
+<span class="nc bnc" id="L567" title="All 2 branches missed.">            Map&lt;String, Object&gt; params = req == null ? null : JSONParser.asMap(req.get(&quot;params&quot;));</span>
+<span class="nc bnc" id="L568" title="All 4 branches missed.">            if (params != null &amp;&amp; &quot;tools/call&quot;.equals(method)) {</span>
+<span class="nc" id="L569">                detail = &quot; &quot; + JSONParser.getString(params, &quot;name&quot;);</span>
+            }
+<span class="nc bnc" id="L571" title="All 2 branches missed.">            Log.p(&quot;MCP &quot; + method + detail + (isError ? &quot; -&gt; error&quot; : &quot; -&gt; ok&quot;));</span>
+<span class="nc" id="L572">        } catch (Throwable ignored) {</span>
+            // logging must never disrupt the protocol
+<span class="nc" id="L574">        }</span>
+<span class="nc" id="L575">    }</span>
+
+    private String dispatch(Object id, String method, Map&lt;String, Object&gt; params) throws Exception {
+<span class="fc bfc" id="L578" title="All 2 branches covered.">        if (&quot;initialize&quot;.equals(method)) {</span>
+<span class="fc" id="L579">            return resultEnvelope(id, initializeResult(params));</span>
+        }
+<span class="pc bpc" id="L581" title="1 of 2 branches missed.">        if (&quot;ping&quot;.equals(method)) {</span>
+<span class="nc" id="L582">            return resultEnvelope(id, new LinkedHashMap&lt;String, Object&gt;());</span>
+        }
+<span class="fc bfc" id="L584" title="All 2 branches covered.">        if (&quot;tools/list&quot;.equals(method)) {</span>
+<span class="fc" id="L585">            return resultEnvelope(id, toolsList());</span>
+        }
+<span class="fc bfc" id="L587" title="All 2 branches covered.">        if (&quot;tools/call&quot;.equals(method)) {</span>
+<span class="fc" id="L588">            return toolsCall(id, params);</span>
+        }
+<span class="pc bpc" id="L590" title="1 of 2 branches missed.">        if (&quot;resources/list&quot;.equals(method)) {</span>
+<span class="nc" id="L591">            return resultEnvelope(id, resourcesList());</span>
+        }
+<span class="pc bpc" id="L593" title="1 of 2 branches missed.">        if (&quot;resources/read&quot;.equals(method)) {</span>
+<span class="nc" id="L594">            return resourcesRead(id, params);</span>
+        }
+<span class="fc" id="L596">        return errorEnvelope(id, METHOD_NOT_FOUND, &quot;Method not found: &quot; + method);</span>
+    }
+
+    private Map&lt;String, Object&gt; initializeResult(Map&lt;String, Object&gt; params) {
+        // Only echo a protocol version we actually implement. MCP requires an unsupported
+        // request to be answered with a version the server supports, not the client's.
+<span class="pc bpc" id="L602" title="1 of 2 branches missed.">        String requested = params == null ? null : JSONParser.getString(params, &quot;protocolVersion&quot;);</span>
+<span class="fc bfc" id="L603" title="All 2 branches covered.">        String protocol = isSupportedProtocol(requested) ? requested : DEFAULT_PROTOCOL_VERSION;</span>
+<span class="fc" id="L604">        Map&lt;String, Object&gt; capabilities = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L605">        capabilities.put(&quot;tools&quot;, new LinkedHashMap&lt;String, Object&gt;());</span>
+<span class="fc" id="L606">        capabilities.put(&quot;resources&quot;, new LinkedHashMap&lt;String, Object&gt;());</span>
+<span class="fc" id="L607">        Map&lt;String, Object&gt; serverInfo = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L608">        serverInfo.put(&quot;name&quot;, serverName);</span>
+<span class="fc" id="L609">        serverInfo.put(&quot;version&quot;, serverVersion);</span>
+<span class="fc" id="L610">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L611">        result.put(&quot;protocolVersion&quot;, protocol);</span>
+<span class="fc" id="L612">        result.put(&quot;capabilities&quot;, capabilities);</span>
+<span class="fc" id="L613">        result.put(&quot;serverInfo&quot;, serverInfo);</span>
+<span class="fc" id="L614">        return result;</span>
+    }
+
+    private synchronized Map&lt;String, Object&gt; toolsList() {
+<span class="fc" id="L618">        List&lt;Object&gt; list = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L619" title="All 2 branches covered.">        for (Tool tool : tools.values()) {</span>
+<span class="fc" id="L620">            Map&lt;String, Object&gt; entry = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L621">            entry.put(&quot;name&quot;, tool.getName());</span>
+<span class="fc" id="L622">            entry.put(&quot;description&quot;, tool.getDescription());</span>
+<span class="fc" id="L623">            entry.put(&quot;inputSchema&quot;, JSONParser.rawJson(tool.getParametersJsonSchema()));</span>
+<span class="fc" id="L624">            list.add(entry);</span>
+<span class="fc" id="L625">        }</span>
+<span class="fc" id="L626">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L627">        result.put(&quot;tools&quot;, list);</span>
+<span class="fc" id="L628">        return result;</span>
+    }
+
+    private String toolsCall(Object id, Map&lt;String, Object&gt; params) {
+<span class="pc bpc" id="L632" title="1 of 2 branches missed.">        String name = params == null ? null : JSONParser.getString(params, &quot;name&quot;);</span>
+<span class="pc bpc" id="L633" title="2 of 4 branches missed.">        if (name == null || name.length() == 0) {</span>
+<span class="nc" id="L634">            return errorEnvelope(id, INVALID_PARAMS, &quot;Missing tool name&quot;);</span>
+        }
+        Tool tool;
+<span class="fc" id="L637">        synchronized (this) {</span>
+<span class="fc" id="L638">            tool = tools.get(name);</span>
+<span class="fc" id="L639">        }</span>
+<span class="fc bfc" id="L640" title="All 2 branches covered.">        if (tool == null) {</span>
+<span class="fc" id="L641">            return errorEnvelope(id, METHOD_NOT_FOUND, &quot;Unknown tool: &quot; + name);</span>
+        }
+<span class="fc" id="L643">        Object argObj = params.get(&quot;arguments&quot;);</span>
+<span class="pc bpc" id="L644" title="1 of 2 branches missed.">        String argumentsJson = argObj == null ? &quot;{}&quot; : MCPJson.toJson(argObj);</span>
+        String text;
+        boolean isError;
+        try {
+<span class="fc" id="L648">            text = tool.invoke(argumentsJson);</span>
+<span class="fc" id="L649">            isError = false;</span>
+<span class="fc" id="L650">        } catch (Exception ex) {</span>
+<span class="fc" id="L651">            text = messageOf(ex);</span>
+<span class="fc" id="L652">            isError = true;</span>
+<span class="fc" id="L653">        }</span>
+<span class="pc bpc" id="L654" title="1 of 2 branches missed.">        if (text == null) {</span>
+<span class="nc" id="L655">            text = &quot;&quot;;</span>
+        }
+<span class="fc" id="L657">        Map&lt;String, Object&gt; content = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L658">        content.put(&quot;type&quot;, &quot;text&quot;);</span>
+<span class="fc" id="L659">        content.put(&quot;text&quot;, text);</span>
+<span class="fc" id="L660">        List&lt;Object&gt; contentList = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L661">        contentList.add(content);</span>
+<span class="fc" id="L662">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L663">        result.put(&quot;content&quot;, contentList);</span>
+<span class="fc" id="L664">        result.put(&quot;isError&quot;, Boolean.valueOf(isError));</span>
+<span class="fc" id="L665">        return resultEnvelope(id, result);</span>
+    }
+
+    private Map&lt;String, Object&gt; resourcesList() {
+<span class="nc" id="L669">        List&lt;Object&gt; list = new ArrayList&lt;Object&gt;();</span>
+<span class="nc bnc" id="L670" title="All 2 branches missed.">        if (screenshotEnabled) {</span>
+<span class="nc" id="L671">            Map&lt;String, Object&gt; screen = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L672">            screen.put(&quot;uri&quot;, SCREEN_RESOURCE_URI);</span>
+<span class="nc" id="L673">            screen.put(&quot;name&quot;, &quot;Current screen&quot;);</span>
+<span class="nc" id="L674">            screen.put(&quot;description&quot;, &quot;A PNG screenshot of the current Codename One form.&quot;);</span>
+<span class="nc" id="L675">            screen.put(&quot;mimeType&quot;, &quot;image/png&quot;);</span>
+<span class="nc" id="L676">            list.add(screen);</span>
+        }
+<span class="nc" id="L678">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L679">        result.put(&quot;resources&quot;, list);</span>
+<span class="nc" id="L680">        return result;</span>
+    }
+
+    private String resourcesRead(Object id, Map&lt;String, Object&gt; params) {
+<span class="nc bnc" id="L684" title="All 2 branches missed.">        String uri = params == null ? null : JSONParser.getString(params, &quot;uri&quot;);</span>
+<span class="nc bnc" id="L685" title="All 4 branches missed.">        if (uri == null || uri.length() == 0) {</span>
+<span class="nc" id="L686">            return errorEnvelope(id, INVALID_PARAMS, &quot;Missing resource uri&quot;);</span>
+        }
+<span class="nc bnc" id="L688" title="All 4 branches missed.">        if (screenshotEnabled &amp;&amp; SCREEN_RESOURCE_URI.equals(uri)) {</span>
+<span class="nc" id="L689">            byte[] png = McpUiTools.screenshotPng();</span>
+<span class="nc bnc" id="L690" title="All 2 branches missed.">            if (png == null) {</span>
+<span class="nc" id="L691">                return errorEnvelope(id, INTERNAL_ERROR, &quot;No screen available to capture&quot;);</span>
+            }
+<span class="nc" id="L693">            Map&lt;String, Object&gt; content = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L694">            content.put(&quot;uri&quot;, uri);</span>
+<span class="nc" id="L695">            content.put(&quot;mimeType&quot;, &quot;image/png&quot;);</span>
+<span class="nc" id="L696">            content.put(&quot;blob&quot;, Base64.encodeNoNewline(png));</span>
+<span class="nc" id="L697">            List&lt;Object&gt; contents = new ArrayList&lt;Object&gt;();</span>
+<span class="nc" id="L698">            contents.add(content);</span>
+<span class="nc" id="L699">            Map&lt;String, Object&gt; result = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L700">            result.put(&quot;contents&quot;, contents);</span>
+<span class="nc" id="L701">            return resultEnvelope(id, result);</span>
+        }
+<span class="nc" id="L703">        return errorEnvelope(id, RESOURCE_NOT_FOUND, &quot;Unknown resource: &quot; + uri);</span>
+    }
+
+    private String resultEnvelope(Object id, Map&lt;String, Object&gt; result) {
+<span class="fc" id="L707">        return &quot;{\&quot;jsonrpc\&quot;:\&quot;2.0\&quot;,\&quot;id\&quot;:&quot; + idJson(id)</span>
+<span class="fc" id="L708">                + &quot;,\&quot;result\&quot;:&quot; + JSONParser.toJson(result) + &quot;}&quot;;</span>
+    }
+
+    private String errorEnvelope(Object id, int code, String message) {
+<span class="fc" id="L712">        Map&lt;String, Object&gt; error = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L713">        error.put(&quot;code&quot;, Integer.valueOf(code));</span>
+<span class="fc" id="L714">        error.put(&quot;message&quot;, message);</span>
+<span class="fc" id="L715">        return &quot;{\&quot;jsonrpc\&quot;:\&quot;2.0\&quot;,\&quot;id\&quot;:&quot; + idJson(id)</span>
+<span class="fc" id="L716">                + &quot;,\&quot;error\&quot;:&quot; + JSONParser.toJson(error) + &quot;}&quot;;</span>
+    }
+
+    /// Serializes the JSON-RPC id, preserving integer form. The lenient CN1 parser reads
+    /// `1` as a double, but the id must be echoed exactly so strict hosts can correlate
+    /// the response, so an integral double is emitted without a fractional part.
+    private static String idJson(Object id) {
+<span class="pc bpc" id="L723" title="2 of 4 branches missed.">        if (id instanceof Double || id instanceof Float) {</span>
+<span class="nc" id="L724">            double d = ((Number) id).doubleValue();</span>
+<span class="nc bnc" id="L725" title="All 6 branches missed.">            if (!Double.isInfinite(d) &amp;&amp; !Double.isNaN(d) &amp;&amp; d == Math.floor(d)) {</span>
+<span class="nc" id="L726">                return Long.toString((long) d);</span>
+            }
+        }
+<span class="fc" id="L729">        return JSONParser.toJson(id);</span>
+    }
+
+    private static String messageOf(Throwable ex) {
+<span class="fc" id="L733">        String m = ex.getMessage();</span>
+<span class="pc bpc" id="L734" title="1 of 2 branches missed.">        return m == null ? ex.getClass().getName() : m;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

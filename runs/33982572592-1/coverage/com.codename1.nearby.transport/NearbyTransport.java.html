@@ -1,0 +1,780 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NearbyTransport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.nearby.transport</a> &gt; <span class="el_source">NearbyTransport.java</span></div><h1>NearbyTransport.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.nearby.transport;
+
+import com.codename1.impl.async.EdtResult;
+import com.codename1.impl.async.PendingMap;
+import com.codename1.impl.nearby.NearbyRequests;
+import com.codename1.impl.nearby.NearbyWire;
+import com.codename1.nearby.NearbyAvailability;
+import com.codename1.nearby.NearbyError;
+import com.codename1.nearby.NearbyException;
+import com.codename1.nearby.NearbyPermission;
+import com.codename1.nearby.spi.NearbyBridge;
+import com.codename1.util.AsyncResource;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Moving bytes and files to a device that is physically nearby, with no
+/// access point, no pairing and no internet.
+///
+/// The platform picks and combines the radios itself -- Bluetooth to find
+/// each other, then Wi-Fi to move the data -- so an app advertises a service
+/// id, discovers peers using the same id, connects, and sends payloads.
+///
+/// #### This transport does not cross ecosystems
+///
+/// **Android talks to Android and Apple talks to Apple, and the two do not
+/// meet.** Underneath are Google's Nearby Connections and Apple's
+/// MultipeerConnectivity, which share no wire protocol; nothing in this API
+/// papers over that, because a portable-looking API that silently never
+/// finds the peer is worse than an honest limitation.
+///
+/// For an iPhone that must talk to an Android phone, the framework already
+/// has two things that do work across the divide:
+///
+/// - `com.codename1.bluetooth.le.L2capChannel` -- a raw bidirectional byte
+///   stream over BLE, on every platform that has BLE.
+/// - `com.codename1.io.bonjour` plus ordinary sockets, when both devices are
+///   on the same Wi-Fi network.
+///
+/// #### Quick start
+///
+/// ```java
+/// NearbyTransport.addTransportListener(new TransportAdapter() {
+///     public void endpointFound(Endpoint e) {
+///         NearbyTransport.requestConnection(e, &quot;Shai's phone&quot;);
+///     }
+///     public void connectionRequested(IncomingConnection r) {
+///         // show r.getAuthenticationToken() on both screens before this
+///         r.accept();
+///     }
+///     public void connected(Endpoint e) {
+///         NearbyTransport.send(e, Payload.fromBytes(data));
+///     }
+///     public void payloadReceived(Endpoint e, Payload p) {
+///         process(p.getBytes());
+///     }
+/// });
+/// NearbyTransport.startAdvertising(&quot;com.example.chat&quot;, &quot;Shai's phone&quot;,
+///         TransportStrategy.CLUSTER);
+/// NearbyTransport.startDiscovery(&quot;com.example.chat&quot;, TransportStrategy.CLUSTER);
+/// ```
+///
+/// #### Threading
+///
+/// Every callback here is delivered on the EDT.
+public final class NearbyTransport {
+
+    /// Request id to the endpoint whose incoming connection is being
+    /// accepted.
+    ///
+    /// accept() answers the platform rather than the caller -- it returns
+    /// void, and the outcome is documented to arrive as connected or
+    /// connectionFailed -- so there is no AsyncResource for a port to fail.
+    /// Without this the port's failure was dropped on the floor: the id it
+    /// reported had no entry in PENDING, and an acceptance the platform
+    /// refused (the endpoint went away first, most often) produced no
+    /// callback of any kind and left the app waiting.
+<span class="fc" id="L102">    private static final Map&lt;Integer, Endpoint&gt; ACCEPTING =</span>
+            new LinkedHashMap&lt;Integer, Endpoint&gt;();
+    /// Bounds ACCEPTING. Every entry is normally removed by the port's
+    /// answer, but a port that answers neither way would otherwise leave one
+    /// behind per acceptance for the life of the process. The oldest goes
+    /// first: an acceptance old enough to be evicted has already lost its
+    /// race with the platform's own timeout.
+    private static final int MAX_ACCEPTING = 64;
+
+<span class="fc" id="L111">    private static final PendingMap&lt;Boolean&gt; PENDING =</span>
+            new PendingMap&lt;Boolean&gt;();
+<span class="fc" id="L113">    private static final List&lt;TransportListener&gt; LISTENERS =</span>
+            new ArrayList&lt;TransportListener&gt;();
+
+    private NearbyTransport() {
+    }
+
+    /// `true` when this port implements the nearby transport.
+    public static boolean isSupported() {
+<span class="fc" id="L121">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L122" title="1 of 4 branches missed.">        return b != null &amp;&amp; b.isTransportSupported();</span>
+    }
+
+    /// How usable the transport is right now.
+    ///
+    /// #### Returns
+    ///
+    /// the current availability, never null
+    public static NearbyAvailability getAvailability() {
+<span class="fc" id="L131">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L132" title="1 of 4 branches missed.">        if (b == null || !b.isTransportSupported()) {</span>
+<span class="fc" id="L133">            return NearbyAvailability.NOT_SUPPORTED;</span>
+        }
+<span class="fc" id="L135">        NearbyAvailability[] all = NearbyAvailability.values();</span>
+<span class="fc" id="L136">        int o = b.getTransportAvailability();</span>
+<span class="pc bpc" id="L137" title="2 of 4 branches missed.">        return o &gt;= 0 &amp;&amp; o &lt; all.length ? all[o]</span>
+                : NearbyAvailability.NOT_SUPPORTED;
+    }
+
+    /// The largest byte payload [#send] accepts in one call. Anything bigger
+    /// has to go as a file payload.
+    ///
+    /// #### Returns
+    ///
+    /// the limit in bytes, or zero when the transport is unsupported
+    public static int getMaxPayloadSize() {
+<span class="fc" id="L148">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L149" title="1 of 4 branches missed.">        return b == null || !b.isTransportSupported()</span>
+<span class="fc" id="L150">                ? 0 : b.getMaxPayloadSize();</span>
+    }
+
+    /// Asks for the runtime permissions the transport needs -- on Android
+    /// that is the Bluetooth trio plus nearby Wi-Fi, which is a lot to ask
+    /// for at once, so ask when the user reaches the feature rather than at
+    /// startup.
+    ///
+    /// #### Parameters
+    ///
+    /// - `permissions`: what the app intends to do
+    ///
+    /// #### Returns
+    ///
+    /// resolves `true` when every requested permission is granted
+    public static AsyncResource&lt;Boolean&gt; requestPermissions(
+            NearbyPermission... permissions) {
+<span class="fc" id="L167">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L168" title="2 of 4 branches missed.">        if (b == null || !b.isTransportSupported()) {</span>
+<span class="nc" id="L169">            return unsupported();</span>
+        }
+<span class="fc" id="L171">        int bits = 0;</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (permissions != null) {</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            for (NearbyPermission permission : permissions) {</span>
+<span class="fc" id="L174">                bits |= bitFor(permission);</span>
+            }
+        }
+<span class="fc" id="L177">        int id = NearbyRequests.nextId();</span>
+        // The SHARED permission map, not this class's own: a port answers
+        // every permission request through Ranging.deliverPermissionResult
+        // whichever entry point asked, so a request parked here would never
+        // be found and the caller would wait forever.
+<span class="fc" id="L182">        EdtResult&lt;Boolean&gt; out = NearbyRequests.openPermissionRequest(id);</span>
+<span class="fc" id="L183">        b.requestPermissions(id, bits);</span>
+<span class="fc" id="L184">        return out;</span>
+    }
+
+    /// Starts advertising this device so peers running the same service id
+    /// can find it.
+    ///
+    /// The service id must match exactly on both sides. On iOS it also
+    /// becomes the Bonjour service type, which the platform restricts to
+    /// fifteen characters of lowercase letters, digits and hyphens -- so a
+    /// reverse-DNS string works on Android and is rejected on iOS. Pick a
+    /// short one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `serviceId`: the service both ends agreed on
+    /// - `localName`: the name to show peers
+    /// - `strategy`: the topology to use; must match on both sides
+    ///
+    /// #### Returns
+    ///
+    /// resolves `true` once the platform is advertising
+    public static AsyncResource&lt;Boolean&gt; startAdvertising(String serviceId,
+            String localName, TransportStrategy strategy) {
+<span class="fc" id="L207">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L208" title="1 of 4 branches missed.">        if (b == null || !b.isTransportSupported()) {</span>
+<span class="fc" id="L209">            return unsupported();</span>
+        }
+<span class="fc" id="L211">        int id = NearbyRequests.nextId();</span>
+<span class="fc" id="L212">        EdtResult&lt;Boolean&gt; out = PENDING.open(id);</span>
+<span class="fc" id="L213">        b.startAdvertising(id, serviceId, localName, ordinalOf(strategy));</span>
+<span class="fc" id="L214">        return out;</span>
+    }
+
+    /// Stops advertising. Idempotent; existing connections stay open.
+    public static void stopAdvertising() {
+<span class="fc" id="L219">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (b != null) {</span>
+<span class="fc" id="L221">            b.stopAdvertising();</span>
+        }
+<span class="fc" id="L223">    }</span>
+
+    /// Starts looking for peers advertising the same service id. Sightings
+    /// arrive as [TransportListener#endpointFound].
+    ///
+    /// #### Parameters
+    ///
+    /// - `serviceId`: the service both ends agreed on
+    /// - `strategy`: the topology to use; must match on both sides
+    ///
+    /// #### Returns
+    ///
+    /// resolves `true` once the platform is discovering
+    public static AsyncResource&lt;Boolean&gt; startDiscovery(String serviceId,
+            TransportStrategy strategy) {
+<span class="fc" id="L238">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L239" title="1 of 4 branches missed.">        if (b == null || !b.isTransportSupported()) {</span>
+<span class="fc" id="L240">            return unsupported();</span>
+        }
+<span class="fc" id="L242">        int id = NearbyRequests.nextId();</span>
+<span class="fc" id="L243">        EdtResult&lt;Boolean&gt; out = PENDING.open(id);</span>
+<span class="fc" id="L244">        b.startDiscovery(id, serviceId, ordinalOf(strategy));</span>
+<span class="fc" id="L245">        return out;</span>
+    }
+
+    /// Stops discovery. Idempotent; existing connections stay open.
+    public static void stopDiscovery() {
+<span class="fc" id="L250">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (b != null) {</span>
+<span class="nc" id="L252">            b.stopDiscovery();</span>
+        }
+<span class="fc" id="L254">    }</span>
+
+    /// Asks a discovered endpoint to connect.
+    ///
+    /// The resource here resolves once the request has been sent, which is
+    /// not the same as being connected: the far side still has to accept,
+    /// and that answer arrives as [TransportListener#connected] or
+    /// [TransportListener#connectionFailed].
+    ///
+    /// #### Parameters
+    ///
+    /// - `endpoint`: the peer to ask
+    /// - `localName`: the name to show them
+    ///
+    /// #### Returns
+    ///
+    /// resolves `true` once the request has been sent
+    public static AsyncResource&lt;Boolean&gt; requestConnection(Endpoint endpoint,
+            String localName) {
+<span class="fc" id="L273">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L274" title="1 of 4 branches missed.">        if (b == null || !b.isTransportSupported()) {</span>
+<span class="fc" id="L275">            return unsupported();</span>
+        }
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (endpoint == null) {</span>
+<span class="nc" id="L278">            return failed(NearbyError.PEER_UNAVAILABLE,</span>
+                    &quot;an endpoint is required&quot;);
+        }
+<span class="fc" id="L281">        int id = NearbyRequests.nextId();</span>
+<span class="fc" id="L282">        EdtResult&lt;Boolean&gt; out = PENDING.open(id);</span>
+<span class="fc" id="L283">        b.requestConnection(id, endpoint.getId(), localName);</span>
+<span class="fc" id="L284">        return out;</span>
+    }
+
+    /// Sends a payload to one connected endpoint.
+    ///
+    /// #### Parameters
+    ///
+    /// - `endpoint`: the recipient
+    /// - `payload`: what to send
+    ///
+    /// #### Returns
+    ///
+    /// resolves `true` once the payload is handed to the platform. Delivery
+    /// is reported by [TransportListener#payloadProgress].
+    public static AsyncResource&lt;Boolean&gt; send(Endpoint endpoint,
+            Payload payload) {
+<span class="fc" id="L300">        return send(new Endpoint[] {endpoint}, payload);</span>
+    }
+
+    /// Sends a payload to several connected endpoints at once, which both
+    /// platforms do more efficiently than one call each.
+    ///
+    /// #### Parameters
+    ///
+    /// - `endpoints`: the recipients
+    /// - `payload`: what to send
+    ///
+    /// #### Returns
+    ///
+    /// resolves `true` once the payload is handed to the platform
+    public static AsyncResource&lt;Boolean&gt; send(Endpoint[] endpoints,
+            Payload payload) {
+<span class="fc" id="L316">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L317" title="1 of 4 branches missed.">        if (b == null || !b.isTransportSupported()) {</span>
+<span class="fc" id="L318">            return unsupported();</span>
+        }
+<span class="pc bpc" id="L320" title="1 of 4 branches missed.">        if (endpoints == null || endpoints.length == 0) {</span>
+<span class="fc" id="L321">            return failed(NearbyError.PEER_UNAVAILABLE,</span>
+                    &quot;at least one endpoint is required&quot;);
+        }
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">        if (payload == null) {</span>
+<span class="nc" id="L325">            return failed(NearbyError.IO_ERROR, &quot;a payload is required&quot;);</span>
+        }
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">        if (payload.getType() == Payload.TYPE_BYTES) {</span>
+<span class="fc" id="L328">            int max = b.getMaxPayloadSize();</span>
+<span class="pc bpc" id="L329" title="1 of 4 branches missed.">            if (max &gt; 0 &amp;&amp; payload.getBytes().length &gt; max) {</span>
+<span class="fc" id="L330">                return failed(NearbyError.IO_ERROR,</span>
+                        &quot;a byte payload is limited to &quot; + max
+                                + &quot; bytes on this platform; send a file&quot;
+                                + &quot; payload instead&quot;);
+            }
+        }
+<span class="fc" id="L336">        String[] ids = new String[endpoints.length];</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        for (int i = 0; i &lt; endpoints.length; i++) {</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">            if (endpoints[i] == null) {</span>
+<span class="fc" id="L339">                return failed(NearbyError.PEER_UNAVAILABLE,</span>
+                        &quot;a null endpoint was passed to send&quot;);
+            }
+<span class="fc" id="L342">            ids[i] = endpoints[i].getId();</span>
+        }
+<span class="fc" id="L344">        int id = NearbyRequests.nextId();</span>
+<span class="fc" id="L345">        EdtResult&lt;Boolean&gt; out = PENDING.open(id);</span>
+<span class="fc" id="L346">        b.sendPayload(id, ids, payload.getId(),</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">                payload.getType() == Payload.TYPE_FILE</span>
+                        ? NearbyBridge.PAYLOAD_FILE
+                        : NearbyBridge.PAYLOAD_BYTES,
+<span class="fc" id="L350">                payload.getBytes(), payload.getPath());</span>
+<span class="fc" id="L351">        return out;</span>
+    }
+
+    /// Cancels an in-flight payload. Idempotent.
+    ///
+    /// The send reaches
+    /// [PayloadStatus#CANCELED] on this side, and a transfer
+    /// the platform can still recall is recalled -- which for a file is
+    /// every byte not yet sent, on all three implementations.
+    ///
+    /// A BYTE payload is a different matter, and the same on every one of
+    /// them: it is handed to the platform whole, and no platform offers a
+    /// handle to take it back. Cancelling one that has already been accepted
+    /// stops this side reporting it as delivered, but the peer may receive
+    /// it anyway. Cancel a byte payload to stop waiting on it, not to
+    /// prevent its arrival.
+    ///
+    /// #### Parameters
+    ///
+    /// - `payloadId`: the id from [Payload#getId()]
+    public static void cancel(int payloadId) {
+<span class="fc" id="L372">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        if (b != null) {</span>
+<span class="fc" id="L374">            b.cancelPayload(payloadId);</span>
+        }
+<span class="fc" id="L376">    }</span>
+
+    /// Disconnects one endpoint. Idempotent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `endpoint`: the peer to drop
+    public static void disconnect(Endpoint endpoint) {
+<span class="fc" id="L384">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L385" title="1 of 4 branches missed.">        if (b != null &amp;&amp; endpoint != null) {</span>
+<span class="fc" id="L386">            b.disconnect(endpoint.getId());</span>
+        }
+<span class="fc" id="L388">    }</span>
+
+    /// Stops advertising and discovery and drops every connection. Call it
+    /// when the feature's UI closes: both platforms keep the radios busy
+    /// until something says stop.
+    public static void stop() {
+<span class="fc" id="L394">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        if (b != null) {</span>
+<span class="fc" id="L396">            b.stopAllTransport();</span>
+        }
+<span class="fc" id="L398">    }</span>
+
+    /// Registers a listener. Callbacks arrive on the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to add
+    public static void addTransportListener(TransportListener l) {
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">        if (l == null) {</span>
+<span class="nc" id="L407">            return;</span>
+        }
+<span class="fc" id="L409">        synchronized (LISTENERS) {</span>
+<span class="fc" id="L410">            LISTENERS.add(l);</span>
+<span class="fc" id="L411">        }</span>
+<span class="fc" id="L412">    }</span>
+
+    /// Removes a listener added by [#addTransportListener].
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to remove
+    public static void removeTransportListener(TransportListener l) {
+<span class="fc" id="L420">        synchronized (LISTENERS) {</span>
+<span class="fc" id="L421">            LISTENERS.remove(l);</span>
+<span class="fc" id="L422">        }</span>
+<span class="fc" id="L423">    }</span>
+
+
+    /// Clears every in-flight request, so one test cannot see the requests of
+    /// the test that ran before it. Reached through
+    /// `com.codename1.impl.nearby.NearbyRequests#resetForTest`.
+    ///
+    /// In-flight requests are failed rather than dropped: a resource that
+    /// never settles is worse than one that fails, and a test holding one
+    /// would hang rather than report.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public static void resetForTest() {
+<span class="fc" id="L436">        synchronized (ACCEPTING) {</span>
+<span class="fc" id="L437">            ACCEPTING.clear();</span>
+<span class="fc" id="L438">        }</span>
+<span class="fc" id="L439">        NearbyException reset = new NearbyException(NearbyError.UNKNOWN,</span>
+                &quot;the nearby framework was reset&quot;);
+<span class="fc" id="L441">        PENDING.failAll(reset);</span>
+<span class="fc" id="L442">        synchronized (LISTENERS) {</span>
+<span class="fc" id="L443">            LISTENERS.clear();</span>
+<span class="fc" id="L444">        }</span>
+<span class="fc" id="L445">    }</span>
+
+    // ------------------------------------------------------------------
+    // Port entry points
+    // ------------------------------------------------------------------
+
+    /// Answers any request that resolves with a simple acknowledgement --
+    /// advertising, discovery, a connection request, a payload handoff.
+    ///
+    /// @hidden not part of the public API; called by ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the id the request was made with
+    public static void deliverRequestOk(int requestId) {
+        // An accepted connection is not an outcome, only the platform taking
+        // the answer; the outcome still arrives through the lifecycle
+        // callback. Dropped here so the entry cannot outlive the request.
+<span class="fc" id="L463">        takeAcceptance(requestId);</span>
+<span class="fc" id="L464">        EdtResult&lt;Boolean&gt; r = PENDING.take(requestId);</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">        if (r != null) {</span>
+<span class="fc" id="L466">            r.complete(Boolean.TRUE);</span>
+        }
+<span class="fc" id="L468">    }</span>
+
+    /// Records that `requestId` belongs to an acceptance of `endpoint`.
+    ///
+    /// @hidden not part of the public API.
+    static void trackAcceptance(int requestId, Endpoint endpoint) {
+<span class="pc bpc" id="L474" title="1 of 2 branches missed.">        if (endpoint == null) {</span>
+<span class="nc" id="L475">            return;</span>
+        }
+<span class="fc" id="L477">        synchronized (ACCEPTING) {</span>
+<span class="pc bpc" id="L478" title="1 of 2 branches missed.">            while (ACCEPTING.size() &gt;= MAX_ACCEPTING) {</span>
+<span class="nc" id="L479">                ACCEPTING.remove(ACCEPTING.keySet().iterator().next());</span>
+            }
+<span class="fc" id="L481">            ACCEPTING.put(Integer.valueOf(requestId), endpoint);</span>
+<span class="fc" id="L482">        }</span>
+<span class="fc" id="L483">    }</span>
+
+    /// The endpoint an acceptance request belongs to, removing it.
+    private static Endpoint takeAcceptance(int requestId) {
+<span class="fc" id="L487">        synchronized (ACCEPTING) {</span>
+<span class="fc" id="L488">            return ACCEPTING.remove(Integer.valueOf(requestId));</span>
+        }
+    }
+
+    /// Fails whichever transport request carries this id.
+    ///
+    /// @hidden not part of the public API; called by ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the id the request was made with
+    /// - `errorOrdinal`: the ordinal of a `com.codename1.nearby.NearbyError`
+    ///   constant
+    /// - `message`: a human-readable detail, may be null
+    public static void deliverRequestFailed(int requestId, int errorOrdinal,
+            String message) {
+<span class="fc" id="L504">        final NearbyException ex =</span>
+<span class="fc" id="L505">                NearbyWire.decodeError(errorOrdinal, message);</span>
+<span class="fc" id="L506">        final Endpoint accepting = takeAcceptance(requestId);</span>
+<span class="fc bfc" id="L507" title="All 2 branches covered.">        if (accepting != null) {</span>
+            // Reported the way the accept() javadoc promises the outcome
+            // arrives, because there is no resource to fail.
+<span class="fc" id="L510">            NearbyRequests.onEdt(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L513">                    TransportListener[] ls = snapshot();</span>
+<span class="fc bfc" id="L514" title="All 2 branches covered.">                    for (TransportListener l : ls) {</span>
+<span class="fc" id="L515">                        l.connectionFailed(accepting, ex);</span>
+                    }
+<span class="fc" id="L517">                }</span>
+            });
+<span class="fc" id="L519">            return;</span>
+        }
+<span class="fc" id="L521">        EdtResult&lt;Boolean&gt; r = PENDING.take(requestId);</span>
+<span class="fc bfc" id="L522" title="All 2 branches covered.">        if (r != null) {</span>
+<span class="fc" id="L523">            r.error(ex);</span>
+<span class="fc" id="L524">            return;</span>
+        }
+        // A permission request lives in the shared map, so a port that fails
+        // one through this entry point still finds its caller.
+<span class="fc" id="L528">        EdtResult&lt;Boolean&gt; p = NearbyRequests.takePermissionRequest(requestId);</span>
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">        if (p != null) {</span>
+<span class="nc" id="L530">            p.error(ex);</span>
+        }
+<span class="fc" id="L532">    }</span>
+
+    /// Reports a discovered or lost endpoint.
+    ///
+    /// @hidden not part of the public API; called by ports from any thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `encodedEndpoint`: the endpoint, encoded by
+    ///   `com.codename1.impl.nearby.NearbyWire`
+    /// - `found`: true for a sighting, false when it went away
+    public static void deliverEndpointFound(String encodedEndpoint,
+            final boolean found) {
+<span class="fc" id="L545">        final Endpoint e = NearbyWire.decodeEndpoint(encodedEndpoint);</span>
+<span class="fc bfc" id="L546" title="All 2 branches covered.">        if (e == null) {</span>
+<span class="fc" id="L547">            return;</span>
+        }
+<span class="fc" id="L549">        NearbyRequests.onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L552">                TransportListener[] ls = snapshot();</span>
+<span class="fc bfc" id="L553" title="All 2 branches covered.">                for (TransportListener l : ls) {</span>
+<span class="pc bpc" id="L554" title="1 of 2 branches missed.">                    if (found) {</span>
+<span class="fc" id="L555">                        l.endpointFound(e);</span>
+                    } else {
+<span class="nc" id="L557">                        l.endpointLost(e);</span>
+                    }
+                }
+<span class="fc" id="L560">            }</span>
+        });
+<span class="fc" id="L562">    }</span>
+
+    /// Reports an incoming connection request.
+    ///
+    /// @hidden not part of the public API; called by ports from any thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `encodedEndpoint`: the endpoint, encoded by
+    ///   `com.codename1.impl.nearby.NearbyWire`
+    /// - `authenticationToken`: the short comparison string
+    public static void deliverConnectionRequested(String encodedEndpoint,
+            final String authenticationToken) {
+<span class="fc" id="L575">        final Endpoint e = NearbyWire.decodeEndpoint(encodedEndpoint);</span>
+<span class="fc bfc" id="L576" title="All 2 branches covered.">        if (e == null) {</span>
+<span class="fc" id="L577">            return;</span>
+        }
+<span class="fc" id="L579">        NearbyRequests.onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L582">                IncomingConnection r =</span>
+                        new IncomingConnection(e, authenticationToken);
+<span class="fc" id="L584">                TransportListener[] ls = snapshot();</span>
+<span class="fc bfc" id="L585" title="All 2 branches covered.">                for (TransportListener l : ls) {</span>
+<span class="fc" id="L586">                    l.connectionRequested(r);</span>
+                }
+<span class="fc bfc" id="L588" title="All 2 branches covered.">                if (ls.length == 0) {</span>
+                    // Nobody was listening, so nobody will ever answer. The
+                    // far side would sit in its connecting state until it
+                    // timed out; reject instead so it learns immediately.
+                    //
+                    // Only when there were NO listeners. A listener that
+                    // returns without answering is the documented flow, not a
+                    // mistake: showing the authentication token and asking the
+                    // user whether it matches cannot finish inside this
+                    // callback. Rejecting on &quot;not answered yet&quot; made the
+                    // later accept() a no-op and left the verified handshake
+                    // -- the one thing that makes the pairing trustworthy --
+                    // unable to connect at all.
+<span class="fc" id="L601">                    r.reject();</span>
+                }
+<span class="fc" id="L603">            }</span>
+        });
+<span class="fc" id="L605">    }</span>
+
+    /// Reports the outcome of a connection attempt.
+    ///
+    /// @hidden not part of the public API; called by ports from any thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `encodedEndpoint`: the endpoint, encoded by
+    ///   `com.codename1.impl.nearby.NearbyWire`
+    /// - `connected`: whether the connection is now open
+    /// - `errorOrdinal`: when not connected, the ordinal of a
+    ///   `com.codename1.nearby.NearbyError` constant
+    /// - `message`: when not connected, a human-readable detail
+    public static void deliverConnectionResult(String encodedEndpoint,
+            final boolean connected, final int errorOrdinal,
+            final String message) {
+<span class="fc" id="L622">        final Endpoint e = NearbyWire.decodeEndpoint(encodedEndpoint);</span>
+<span class="pc bpc" id="L623" title="1 of 2 branches missed.">        if (e == null) {</span>
+<span class="nc" id="L624">            return;</span>
+        }
+<span class="fc" id="L626">        NearbyRequests.onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L629">                TransportListener[] ls = snapshot();</span>
+<span class="fc bfc" id="L630" title="All 2 branches covered.">                for (TransportListener l : ls) {</span>
+<span class="fc bfc" id="L631" title="All 2 branches covered.">                    if (connected) {</span>
+<span class="fc" id="L632">                        l.connected(e);</span>
+                    } else {
+<span class="fc" id="L634">                        l.connectionFailed(e,</span>
+<span class="fc" id="L635">                                NearbyWire.decodeError(errorOrdinal, message));</span>
+                    }
+                }
+<span class="fc" id="L638">            }</span>
+        });
+<span class="fc" id="L640">    }</span>
+
+    /// Reports that an open connection closed.
+    ///
+    /// @hidden not part of the public API; called by ports from any thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `encodedEndpoint`: the endpoint, encoded by
+    ///   `com.codename1.impl.nearby.NearbyWire`
+    public static void deliverDisconnected(String encodedEndpoint) {
+<span class="fc" id="L651">        final Endpoint e = NearbyWire.decodeEndpoint(encodedEndpoint);</span>
+<span class="fc bfc" id="L652" title="All 2 branches covered.">        if (e == null) {</span>
+<span class="fc" id="L653">            return;</span>
+        }
+<span class="fc" id="L655">        NearbyRequests.onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L658">                TransportListener[] ls = snapshot();</span>
+<span class="fc bfc" id="L659" title="All 2 branches covered.">                for (TransportListener l : ls) {</span>
+<span class="fc" id="L660">                    l.disconnected(e);</span>
+                }
+<span class="fc" id="L662">            }</span>
+        });
+<span class="fc" id="L664">    }</span>
+
+    /// Reports a complete incoming payload.
+    ///
+    /// @hidden not part of the public API; called by ports from any thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `encodedEndpoint`: who sent it, encoded by
+    ///   `com.codename1.impl.nearby.NearbyWire`
+    /// - `payloadId`: the sender's payload id
+    /// - `payloadType`: `NearbyBridge.PAYLOAD_BYTES` or
+    ///   `NearbyBridge.PAYLOAD_FILE`
+    /// - `bytes`: the payload for a byte payload, otherwise null
+    /// - `path`: the file the port wrote, for a file payload
+    public static void deliverPayloadReceived(String encodedEndpoint,
+            final int payloadId, final int payloadType, final byte[] bytes,
+            final String path) {
+<span class="fc" id="L682">        final Endpoint e = NearbyWire.decodeEndpoint(encodedEndpoint);</span>
+<span class="fc bfc" id="L683" title="All 2 branches covered.">        if (e == null) {</span>
+<span class="fc" id="L684">            return;</span>
+        }
+<span class="fc" id="L686">        NearbyRequests.onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="pc bpc" id="L689" title="1 of 2 branches missed.">                Payload p = Payload.received(payloadId,</span>
+                        payloadType == NearbyBridge.PAYLOAD_FILE
+                                ? Payload.TYPE_FILE : Payload.TYPE_BYTES,
+                        bytes, path);
+<span class="fc" id="L693">                TransportListener[] ls = snapshot();</span>
+<span class="fc bfc" id="L694" title="All 2 branches covered.">                for (TransportListener l : ls) {</span>
+<span class="fc" id="L695">                    l.payloadReceived(e, p);</span>
+                }
+<span class="fc" id="L697">            }</span>
+        });
+<span class="fc" id="L699">    }</span>
+
+    /// Reports progress on a payload.
+    ///
+    /// @hidden not part of the public API; called by ports from any thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `encodedEndpoint`: the other end, encoded by
+    ///   `com.codename1.impl.nearby.NearbyWire`
+    /// - `payloadId`: the payload
+    /// - `bytesTransferred`: bytes moved so far
+    /// - `totalBytes`: the payload size, or -1 when unknown
+    /// - `statusOrdinal`: the ordinal of a [PayloadStatus] constant
+    public static void deliverPayloadProgress(String encodedEndpoint,
+            final int payloadId, final long bytesTransferred,
+            final long totalBytes, final int statusOrdinal) {
+<span class="fc" id="L716">        final Endpoint e = NearbyWire.decodeEndpoint(encodedEndpoint);</span>
+<span class="pc bpc" id="L717" title="1 of 2 branches missed.">        if (e == null) {</span>
+<span class="nc" id="L718">            return;</span>
+        }
+<span class="fc" id="L720">        NearbyRequests.onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L723">                PayloadStatus[] all = PayloadStatus.values();</span>
+<span class="pc bpc" id="L724" title="2 of 4 branches missed.">                PayloadStatus s = statusOrdinal &gt;= 0</span>
+                        &amp;&amp; statusOrdinal &lt; all.length
+                        ? all[statusOrdinal] : PayloadStatus.IN_PROGRESS;
+<span class="fc" id="L727">                PayloadTransferUpdate u = new PayloadTransferUpdate(payloadId,</span>
+                        bytesTransferred, totalBytes, s);
+<span class="fc" id="L729">                TransportListener[] ls = snapshot();</span>
+<span class="fc bfc" id="L730" title="All 2 branches covered.">                for (TransportListener l : ls) {</span>
+<span class="fc" id="L731">                    l.payloadProgress(e, u);</span>
+                }
+<span class="fc" id="L733">            }</span>
+        });
+<span class="fc" id="L735">    }</span>
+
+    // ------------------------------------------------------------------
+    // Internals
+    // ------------------------------------------------------------------
+
+    private static TransportListener[] snapshot() {
+<span class="fc" id="L742">        synchronized (LISTENERS) {</span>
+<span class="fc" id="L743">            return LISTENERS.toArray(</span>
+<span class="fc" id="L744">                    new TransportListener[LISTENERS.size()]);</span>
+        }
+    }
+
+    private static int ordinalOf(TransportStrategy s) {
+<span class="pc bpc" id="L749" title="1 of 2 branches missed.">        return s == null ? TransportStrategy.CLUSTER.ordinal() : s.ordinal();</span>
+    }
+
+    private static int bitFor(NearbyPermission p) {
+<span class="pc bpc" id="L753" title="1 of 2 branches missed.">        if (p == NearbyPermission.RANGING) {</span>
+<span class="nc" id="L754">            return NearbyBridge.PERMISSION_RANGING;</span>
+        }
+<span class="fc bfc" id="L756" title="All 2 branches covered.">        if (p == NearbyPermission.DISCOVERY) {</span>
+<span class="fc" id="L757">            return NearbyBridge.PERMISSION_DISCOVERY;</span>
+        }
+<span class="pc bpc" id="L759" title="1 of 2 branches missed.">        if (p == NearbyPermission.ADVERTISE) {</span>
+<span class="nc" id="L760">            return NearbyBridge.PERMISSION_ADVERTISE;</span>
+        }
+<span class="pc bpc" id="L762" title="1 of 2 branches missed.">        if (p == NearbyPermission.CONNECT) {</span>
+<span class="fc" id="L763">            return NearbyBridge.PERMISSION_CONNECT;</span>
+        }
+<span class="nc" id="L765">        return 0;</span>
+    }
+
+    private static AsyncResource&lt;Boolean&gt; unsupported() {
+<span class="fc" id="L769">        return failed(NearbyError.NOT_SUPPORTED,</span>
+                &quot;this platform does not support the nearby transport&quot;);
+    }
+
+    private static AsyncResource&lt;Boolean&gt; failed(NearbyError error,
+            String message) {
+<span class="fc" id="L775">        EdtResult&lt;Boolean&gt; out = new EdtResult&lt;Boolean&gt;();</span>
+<span class="fc" id="L776">        out.error(new NearbyException(error, message));</span>
+<span class="fc" id="L777">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JSONWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">JSONWriter.java</span></div><h1>JSONWriter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details.
+ */
+package com.codename1.io;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Convenience JSON writer to complement [JSONParser]. Two access modes:
+///
+/// 1. **One-shot**: `JSONWriter.toJson(map)` /
+///    `JSONWriter.toJson(map, writer)` -- accepts a `Map`, `List`, `String`,
+///    `Number`, `Boolean`, `null`, and arbitrarily nested combinations.
+///
+/// 2. **Fluent builder**: `JSONWriter.object().put(&quot;name&quot;, x).put(&quot;values&quot;,
+///    JSONWriter.array().add(&quot;a&quot;).add(&quot;b&quot;)).toJson()` -- for ad-hoc request
+///    bodies where a `Map` literal would be noisier than the chain.
+///
+/// Encoded output is strict JSON: no trailing commas, all strings
+/// double-quoted with the standard backslash escapes for `&quot;`, `\`, `\n`,
+/// `\r`, `\t`, and control chars `&lt; 0x20` emitted as `\` + `u00xx`. No
+/// pretty-printing layer is included; if you need indented output, run
+/// the result through an external formatter at debug time.
+///
+/// For typed mapper-based serialization (DTOs annotated with `@Mapped`
+/// from the binding framework), use `com.codename1.mapping.Mappers#toJson`
+/// instead. `JSONWriter` is for ad-hoc and untyped payloads.
+public final class JSONWriter {
+
+    private JSONWriter() { }
+
+    // ---- one-shot ----
+
+    /// Encodes `value` as JSON and returns the resulting string. Accepts
+    /// `Map`, `List`, `String`, `Number`, `Boolean`, `null`. Maps with
+    /// non-String keys are encoded using `String.valueOf(key)`.
+    public static String toJson(Object value) {
+<span class="fc" id="L56">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L57">        writeJson(value, sb);</span>
+<span class="fc" id="L58">        return sb.toString();</span>
+    }
+
+    /// Streams `value` as JSON into `writer`. The writer is **not** closed
+    /// or flushed by this method -- the caller owns the writer.
+    public static void toJson(Object value, Writer writer) throws IOException {
+<span class="fc" id="L64">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L65">        writeJson(value, sb);</span>
+<span class="fc" id="L66">        writer.write(sb.toString());</span>
+<span class="fc" id="L67">    }</span>
+
+    /// Streams `value` as JSON into `out` using UTF-8 encoding. The stream
+    /// is flushed but **not** closed.
+    public static void toJson(Object value, OutputStream out) throws IOException {
+<span class="fc" id="L72">        OutputStreamWriter w = new OutputStreamWriter(out, &quot;UTF-8&quot;);</span>
+<span class="fc" id="L73">        toJson(value, w);</span>
+<span class="fc" id="L74">        w.flush();</span>
+<span class="fc" id="L75">    }</span>
+
+    // ---- fluent builder ----
+
+    /// Starts a JSON-object builder. Insertion order is preserved.
+    public static ObjectBuilder object() {
+<span class="fc" id="L81">        return new ObjectBuilder();</span>
+    }
+
+    /// Starts a JSON-array builder.
+    public static ArrayBuilder array() {
+<span class="fc" id="L86">        return new ArrayBuilder();</span>
+    }
+
+    /// Fluent builder for `{ &quot;k&quot;: v, ... }`. Implements `toJson()` to emit
+    /// the encoded string and exposes the backing `Map` via `toMap()` for
+    /// callers that need to embed the builder into a larger structure.
+    public static final class ObjectBuilder {
+<span class="fc" id="L93">        private final Map&lt;String, Object&gt; map = new LinkedHashMap&lt;String, Object&gt;();</span>
+
+<span class="fc" id="L95">        ObjectBuilder() { }</span>
+
+        public ObjectBuilder put(String key, Object value) {
+<span class="fc" id="L98">            map.put(key, unwrap(value));</span>
+<span class="fc" id="L99">            return this;</span>
+        }
+
+        public Map&lt;String, Object&gt; toMap() {
+<span class="fc" id="L103">            return map;</span>
+        }
+
+        public String toJson() {
+<span class="fc" id="L107">            return JSONWriter.toJson(map);</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="fc" id="L112">            return toJson();</span>
+        }
+    }
+
+    /// Fluent builder for `[ ..., ..., ... ]`.
+    public static final class ArrayBuilder {
+<span class="fc" id="L118">        private final List&lt;Object&gt; list = new ArrayList&lt;Object&gt;();</span>
+
+<span class="fc" id="L120">        ArrayBuilder() { }</span>
+
+        public ArrayBuilder add(Object value) {
+<span class="fc" id="L123">            list.add(unwrap(value));</span>
+<span class="fc" id="L124">            return this;</span>
+        }
+
+        public List&lt;Object&gt; toList() {
+<span class="fc" id="L128">            return list;</span>
+        }
+
+        public String toJson() {
+<span class="fc" id="L132">            return JSONWriter.toJson(list);</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="fc" id="L137">            return toJson();</span>
+        }
+    }
+
+    // ---- internal encoding ----
+
+    /// Lets builders embed each other transparently: `object().put(&quot;xs&quot;,
+    /// array().add(1).add(2))` stores the *list*, not the builder wrapper.
+    private static Object unwrap(Object value) {
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (value instanceof ObjectBuilder) {</span>
+<span class="fc" id="L147">            return ((ObjectBuilder) value).map;</span>
+        }
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (value instanceof ArrayBuilder) {</span>
+<span class="fc" id="L150">            return ((ArrayBuilder) value).list;</span>
+        }
+<span class="fc" id="L152">        return value;</span>
+    }
+
+    private static void writeJson(Object o, StringBuilder sb) {
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (o == null) {</span>
+<span class="fc" id="L157">            sb.append(&quot;null&quot;);</span>
+<span class="fc" id="L158">            return;</span>
+        }
+<span class="fc bfc" id="L160" title="All 4 branches covered.">        if (o instanceof Boolean || o instanceof Number) {</span>
+<span class="fc" id="L161">            sb.append(o);</span>
+<span class="fc" id="L162">            return;</span>
+        }
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (o instanceof Map) {</span>
+<span class="fc" id="L165">            Map&lt;?, ?&gt; m = (Map&lt;?, ?&gt;) o;</span>
+<span class="fc" id="L166">            sb.append('{');</span>
+<span class="fc" id="L167">            boolean first = true;</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            for (Map.Entry&lt;?, ?&gt; e : m.entrySet()) {</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                if (!first) {</span>
+<span class="fc" id="L170">                    sb.append(',');</span>
+                }
+<span class="fc" id="L172">                first = false;</span>
+<span class="fc" id="L173">                writeString(String.valueOf(e.getKey()), sb);</span>
+<span class="fc" id="L174">                sb.append(':');</span>
+<span class="fc" id="L175">                writeJson(e.getValue(), sb);</span>
+<span class="fc" id="L176">            }</span>
+<span class="fc" id="L177">            sb.append('}');</span>
+<span class="fc" id="L178">            return;</span>
+        }
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (o instanceof List) {</span>
+<span class="fc" id="L181">            sb.append('[');</span>
+<span class="fc" id="L182">            boolean first = true;</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            for (Object e : (List&lt;?&gt;) o) {</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                if (!first) {</span>
+<span class="fc" id="L185">                    sb.append(',');</span>
+                }
+<span class="fc" id="L187">                first = false;</span>
+<span class="fc" id="L188">                writeJson(e, sb);</span>
+<span class="fc" id="L189">            }</span>
+<span class="fc" id="L190">            sb.append(']');</span>
+<span class="fc" id="L191">            return;</span>
+        }
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (o instanceof ObjectBuilder) {</span>
+<span class="fc" id="L194">            writeJson(((ObjectBuilder) o).map, sb);</span>
+<span class="fc" id="L195">            return;</span>
+        }
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (o instanceof ArrayBuilder) {</span>
+<span class="fc" id="L198">            writeJson(((ArrayBuilder) o).list, sb);</span>
+<span class="fc" id="L199">            return;</span>
+        }
+<span class="fc" id="L201">        writeString(String.valueOf(o), sb);</span>
+<span class="fc" id="L202">    }</span>
+
+    private static void writeString(String s, StringBuilder sb) {
+<span class="fc" id="L205">        sb.append('&quot;');</span>
+<span class="fc" id="L206">        int n = s.length();</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L208">            char c = s.charAt(i);</span>
+<span class="fc bfc" id="L209" title="All 8 branches covered.">            switch (c) {</span>
+<span class="fc" id="L210">                case '&quot;':  sb.append(&quot;\\\&quot;&quot;); break;</span>
+<span class="fc" id="L211">                case '\\': sb.append(&quot;\\\\&quot;); break;</span>
+<span class="fc" id="L212">                case '\n': sb.append(&quot;\\n&quot;); break;</span>
+<span class="fc" id="L213">                case '\r': sb.append(&quot;\\r&quot;); break;</span>
+<span class="fc" id="L214">                case '\t': sb.append(&quot;\\t&quot;); break;</span>
+<span class="fc" id="L215">                case '\b': sb.append(&quot;\\b&quot;); break;</span>
+<span class="fc" id="L216">                case '\f': sb.append(&quot;\\f&quot;); break;</span>
+                default:
+<span class="fc bfc" id="L218" title="All 2 branches covered.">                    if (c &lt; 0x20) {</span>
+<span class="fc" id="L219">                        sb.append(&quot;\\u&quot;);</span>
+<span class="fc" id="L220">                        String hex = Integer.toHexString(c);</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">                        for (int p = hex.length(); p &lt; 4; p++) {</span>
+<span class="fc" id="L222">                            sb.append('0');</span>
+                        }
+<span class="fc" id="L224">                        sb.append(hex);</span>
+<span class="fc" id="L225">                    } else {</span>
+<span class="fc" id="L226">                        sb.append(c);</span>
+                    }
+            }
+        }
+<span class="fc" id="L230">        sb.append('&quot;');</span>
+<span class="fc" id="L231">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

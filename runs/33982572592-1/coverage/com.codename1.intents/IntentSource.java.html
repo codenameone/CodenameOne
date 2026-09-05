@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IntentSource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.intents</a> &gt; <span class="el_source">IntentSource.java</span></div><h1>IntentSource.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.intents;
+
+/// Where an intent invocation came from.
+///
+/// Handlers should rarely branch on this -- an intent that behaves differently
+/// depending on who asked is a bug waiting to happen -- but it is useful for
+/// analytics, for tailoring the spoken line, and for deciding how much detail a
+/// snippet should carry.
+<span class="fc" id="L31">public enum IntentSource {</span>
+    /// A voice assistant, where the platform says so.
+    ///
+    /// iOS does not: an App Intent's `perform()` is not told whether Siri, the Shortcuts app or
+    /// a home-screen App Shortcut ran it, so all three arrive as [#UNKNOWN] rather than one of
+    /// them claiming to be Siri. Do not write a branch that expects this on a device; the
+    /// simulator can still produce it, which is how the path is exercised.
+<span class="fc" id="L38">    VOICE,</span>
+
+    /// The user tapped an item this app published through [Intents#index].
+<span class="fc" id="L41">    SPOTLIGHT,</span>
+
+    /// A shortcut the user placed or the system suggested: the Shortcuts app,
+    /// an iOS App Shortcut, or an Android launcher shortcut.
+<span class="fc" id="L45">    SHORTCUT,</span>
+
+    /// A button on a home-screen widget or live activity bound to this intent.
+<span class="fc" id="L48">    WIDGET,</span>
+
+    /// An in-app call to [Intents#invoke], including the simulator's Intents
+    /// window.
+<span class="fc" id="L52">    IN_APP,</span>
+
+    /// A language model calling the intent as a tool, through the projection
+    /// [Intents#asTools()] exposes.
+<span class="fc" id="L56">    MODEL,</span>
+
+    /// The platform did not say, or the source is one this version does not model.
+    ///
+    /// This is the ordinary case for an iOS App Intent, which is invoked by Siri, the Shortcuts
+    /// app or an App Shortcut without disclosing which -- so it is not a rare fallback and
+    /// carries no implication that the app is on screen. Take it as exactly what it says: the
+    /// source is unknown. Anything that needs to be certain should be true for every source.
+<span class="fc" id="L64">    UNKNOWN</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IntentContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.intents</a> &gt; <span class="el_source">IntentContext.java</span></div><h1>IntentContext.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.intents;
+
+/// The circumstances one invocation runs under. Declare it as the first
+/// parameter of a handler to receive it; handlers that do not care about any of
+/// this simply leave it out.
+///
+/// ```java
+/// @AppIntent(value = &quot;sync_now&quot;, title = &quot;Sync now&quot;, headless = true)
+/// public static IntentResult sync(IntentContext ctx) {
+///     while (Backend.hasMore()) {
+///         if (ctx.isCancelled()) {
+///             return IntentResult.failed(&quot;Sync did not finish in time&quot;);
+///         }
+///         Backend.syncNextPage();
+///     }
+///     return IntentResult.spoken(&quot;Everything is up to date&quot;);
+/// }
+/// ```
+public final class IntentContext {
+
+    private final IntentSource source;
+    private final boolean headless;
+    private final long deadline;
+    // Guarded by its own monitor rather than declared volatile: the framework
+    // cancels from the timeout thread while the handler polls from its own, so
+    // the write has to be visible across threads, and the repo's static-analysis
+    // gate does not permit volatile. Contention is nil -- one write, occasional
+    // reads.
+<span class="fc" id="L51">    private final boolean[] cancelled = new boolean[1];</span>
+
+    /// Framework entry point. Applications receive these, they do not build them.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: where the invocation came from
+    /// - `headless`: whether the app is running without a visible UI
+    /// - `deadline`: absolute epoch millis after which the result is discarded
+<span class="fc" id="L60">    public IntentContext(IntentSource source, boolean headless, long deadline) {</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        this.source = source == null ? IntentSource.UNKNOWN : source;</span>
+<span class="fc" id="L62">        this.headless = headless;</span>
+<span class="fc" id="L63">        this.deadline = deadline;</span>
+<span class="fc" id="L64">    }</span>
+
+    /// Where this invocation came from.
+    public IntentSource getSource() {
+<span class="fc" id="L68">        return source;</span>
+    }
+
+    /// True when the handler is running with no UI on screen.
+    ///
+    /// This is the flag that decides what the handler is allowed to touch: no
+    /// `Form`, no `Dialog`, nothing that needs a window. See the package
+    /// documentation for the full contract.
+    public boolean isHeadless() {
+<span class="fc" id="L77">        return headless;</span>
+    }
+
+    /// The absolute epoch-millis instant after which this invocation's result is
+    /// no longer wanted.
+    ///
+    /// Matches the shape of
+    /// `com.codename1.background.BackgroundFetch#performBackgroundFetch(long, com.codename1.util.Callback)`
+    /// so the two kinds of background work read the same way.
+    public long getDeadline() {
+<span class="fc" id="L87">        return deadline;</span>
+    }
+
+    /// Milliseconds left before the deadline, or 0 once it has passed.
+    public long getRemainingTime() {
+<span class="fc" id="L92">        long remaining = deadline - System.currentTimeMillis();</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        return remaining &gt; 0 ? remaining : 0;</span>
+    }
+
+    /// True once the framework has stopped waiting for this invocation.
+    ///
+    /// Cancellation is cooperative: nothing interrupts a running handler, so a
+    /// handler doing extended work should check this between steps. Anything it
+    /// returns after cancellation is discarded, which is why durable work should
+    /// be committed to storage as it completes rather than only at the end.
+    public boolean isCancelled() {
+<span class="fc" id="L103">        synchronized (cancelled) {</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            if (cancelled[0]) {</span>
+<span class="fc" id="L105">                return true;</span>
+            }
+<span class="fc" id="L107">        }</span>
+<span class="pc bpc" id="L108" title="1 of 4 branches missed.">        return deadline &gt; 0 &amp;&amp; System.currentTimeMillis() &gt; deadline;</span>
+    }
+
+    /// Framework entry point: marks this invocation abandoned.
+    public void cancel() {
+<span class="fc" id="L113">        synchronized (cancelled) {</span>
+<span class="fc" id="L114">            cancelled[0] = true;</span>
+<span class="fc" id="L115">        }</span>
+<span class="fc" id="L116">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        return &quot;IntentContext[&quot; + source + (headless ? &quot;, headless&quot; : &quot;&quot;) + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

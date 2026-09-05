@@ -1,0 +1,444 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IntentSerializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.intents</a> &gt; <span class="el_source">IntentSerializer.java</span></div><h1>IntentSerializer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.intents;
+
+import com.codename1.io.JSONParser;
+import com.codename1.io.JSONWriter;
+import com.codename1.io.Log;
+import com.codename1.surfaces.SurfaceSerializer;
+import com.codename1.ui.EncodedImage;
+import com.codename1.util.Base64;
+
+import java.io.IOException;
+import java.io.StringReader;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Serializes intent declarations, entities and results to the wire format the
+/// platform bridges consume: a compact JSON document plus PNG blobs named by
+/// content hash. This class is an internal seam between the core API and the
+/// platform bridges -- it is public only because ports live in separate
+/// artifacts; applications never call it.
+///
+/// The format is versioned (`&quot;v&quot;: 1`). Everything crosses as data because an
+/// invocation can be answered while the app has no UI, and because the peer is
+/// Swift or Kotlin rather than Java.
+public final class IntentSerializer {
+
+    private static final int VERSION = 1;
+
+    private IntentSerializer() {
+    }
+
+    /// Serializes the application's intent catalogue.
+    ///
+    /// #### Parameters
+    ///
+    /// - `declarations`: the declarations to serialize; null becomes empty
+    public static String serializeDeclarations(List&lt;IntentDeclaration&gt; declarations) {
+<span class="fc" id="L63">        Map&lt;String, Object&gt; doc = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L64">        doc.put(&quot;v&quot;, Integer.valueOf(VERSION));</span>
+<span class="fc" id="L65">        List&lt;Object&gt; out = new ArrayList&lt;Object&gt;();</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (declarations != null) {</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            for (IntentDeclaration d : declarations) {</span>
+<span class="fc" id="L68">                out.add(declarationToMap(d));</span>
+<span class="fc" id="L69">            }</span>
+        }
+<span class="fc" id="L71">        doc.put(&quot;intents&quot;, out);</span>
+<span class="fc" id="L72">        return JSONWriter.toJson(doc);</span>
+    }
+
+    private static Map&lt;String, Object&gt; declarationToMap(IntentDeclaration d) {
+<span class="fc" id="L76">        Map&lt;String, Object&gt; m = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L77">        m.put(&quot;id&quot;, d.getId());</span>
+<span class="fc" id="L78">        m.put(&quot;title&quot;, d.getTitle());</span>
+<span class="fc" id="L79">        m.put(&quot;description&quot;, d.getDescription());</span>
+<span class="fc" id="L80">        m.put(&quot;headless&quot;, Boolean.valueOf(d.isHeadless()));</span>
+<span class="fc" id="L81">        m.put(&quot;discoverable&quot;, Boolean.valueOf(d.isDiscoverable()));</span>
+<span class="fc" id="L82">        m.put(&quot;destructive&quot;, Boolean.valueOf(d.isDestructive()));</span>
+<span class="fc" id="L83">        m.put(&quot;opensRoute&quot;, d.getOpensRoute());</span>
+<span class="fc" id="L84">        m.put(&quot;timeoutSeconds&quot;, Integer.valueOf(d.getTimeoutSeconds()));</span>
+<span class="fc" id="L85">        m.put(&quot;phrases&quot;, new ArrayList&lt;Object&gt;(d.getPhrases()));</span>
+
+<span class="fc" id="L87">        List&lt;Object&gt; params = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (IntentParameterInfo p : d.getParameters()) {</span>
+<span class="fc" id="L89">            Map&lt;String, Object&gt; pm = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L90">            pm.put(&quot;name&quot;, p.getName());</span>
+<span class="fc" id="L91">            pm.put(&quot;title&quot;, p.getTitle());</span>
+<span class="fc" id="L92">            pm.put(&quot;type&quot;, p.getType().name().toLowerCase());</span>
+<span class="fc" id="L93">            pm.put(&quot;required&quot;, Boolean.valueOf(p.isRequired()));</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            if (p.getEntityType() != null) {</span>
+<span class="fc" id="L95">                pm.put(&quot;entityType&quot;, p.getEntityType());</span>
+            }
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            if (p.getDefaultValue() != null) {</span>
+<span class="fc" id="L98">                pm.put(&quot;default&quot;, p.getDefaultValue());</span>
+            }
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            if (!p.getOptions().isEmpty()) {</span>
+<span class="fc" id="L101">                pm.put(&quot;options&quot;, new ArrayList&lt;Object&gt;(p.getOptions()));</span>
+            }
+<span class="fc" id="L103">            params.add(pm);</span>
+<span class="fc" id="L104">        }</span>
+<span class="fc" id="L105">        m.put(&quot;params&quot;, params);</span>
+<span class="fc" id="L106">        return m;</span>
+    }
+
+    /// Serializes a parameter map for donation or invocation.
+    ///
+    /// Values are reduced to the wire types -- text, numbers, booleans and epoch
+    /// millis for dates -- because the receiving side is not Java. An [AppEntity]
+    /// value reduces to its id, which is the only part of it the platform needs
+    /// in order to hand the same entity back later.
+    ///
+    /// #### Parameters
+    ///
+    /// - `params`: the values; null becomes an empty document
+    public static String serializeParams(Map&lt;String, Object&gt; params) {
+<span class="fc" id="L120">        Map&lt;String, Object&gt; out = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (params != null) {</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            for (Map.Entry&lt;String, Object&gt; e : params.entrySet()) {</span>
+<span class="fc" id="L123">                Object wire = toWire(e.getValue());</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">                if (wire != null) {</span>
+<span class="fc" id="L125">                    out.put(e.getKey(), wire);</span>
+                }
+<span class="fc" id="L127">            }</span>
+        }
+<span class="fc" id="L129">        return JSONWriter.toJson(out);</span>
+    }
+
+    /// Merges bound values under a serialized parameter document, returning a fresh document.
+    ///
+    /// Used when a parameterization is donated: the shortcut has to carry the values the
+    /// parameterization bound, with anything supplied at donation time still winning, because a
+    /// binding is a default rather than a lock.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bound`: the parameterization's values
+    /// - `paramsJson`: values supplied at donation time, may be null
+    public static String mergeParams(Map&lt;String, Object&gt; bound, String paramsJson) {
+<span class="nc" id="L143">        Map&lt;String, Object&gt; out = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (bound != null) {</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            for (Map.Entry&lt;String, Object&gt; e : bound.entrySet()) {</span>
+<span class="nc" id="L146">                Object wire = toWire(e.getValue());</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">                if (wire != null) {</span>
+<span class="nc" id="L148">                    out.put(e.getKey(), wire);</span>
+                }
+<span class="nc" id="L150">            }</span>
+        }
+<span class="nc bnc" id="L152" title="All 4 branches missed.">        if (paramsJson != null &amp;&amp; paramsJson.length() &gt; 0) {</span>
+            try {
+<span class="nc" id="L154">                Map&lt;String, Object&gt; supplied = parsePayload(paramsJson);</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                if (supplied != null) {</span>
+<span class="nc" id="L156">                    out.putAll(supplied);</span>
+                }
+<span class="nc" id="L158">            } catch (Throwable t) {</span>
+<span class="nc" id="L159">                Log.e(t);</span>
+<span class="nc" id="L160">            }</span>
+        }
+<span class="nc" id="L162">        return JSONWriter.toJson(out);</span>
+    }
+
+    /// Serializes entities for the search index, collecting their thumbnails.
+    ///
+    /// #### Parameters
+    ///
+    /// - `entities`: the entities to serialize
+    /// - `images`: receives PNG blobs keyed by the name used in the JSON
+    public static String serializeEntities(List&lt;AppEntity&gt; entities, Map&lt;String, byte[]&gt; images) {
+<span class="fc" id="L172">        return serializeEntities(entities, images, false);</span>
+    }
+
+    /// Serializes entities, optionally carrying their thumbnails inside the document.
+    ///
+    /// Indexing wants the second form: the blobs go out separately, keyed by the name embedded
+    /// in the JSON, because a search index takes them one at a time and a base64 copy of every
+    /// thumbnail in one string would be wasteful.
+    ///
+    /// A query answering a platform picker wants the first. The reply is synchronous and the
+    /// caller is a native picker being built right now, so there is nowhere to put a side
+    /// channel of bytes that the reply is guaranteed to be matched with. Inlining a handful of
+    /// small thumbnails is the whole transaction.
+    ///
+    /// #### Parameters
+    ///
+    /// - `entities`: the entities to serialize
+    /// - `images`: receives PNG blobs keyed by the name used in the JSON; may be null when
+    ///   inlining
+    /// - `inlineImages`: true to also write each thumbnail as base64 under `imageData`
+    public static String serializeEntities(List&lt;AppEntity&gt; entities, Map&lt;String, byte[]&gt; images,
+                                           boolean inlineImages) {
+<span class="fc" id="L194">        Map&lt;String, Object&gt; doc = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L195">        doc.put(&quot;v&quot;, Integer.valueOf(VERSION));</span>
+<span class="fc" id="L196">        List&lt;Object&gt; out = new ArrayList&lt;Object&gt;();</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (entities != null) {</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            for (AppEntity e : entities) {</span>
+<span class="fc" id="L199">                out.add(entityToMap(e, images, inlineImages));</span>
+<span class="fc" id="L200">            }</span>
+        }
+<span class="fc" id="L202">        doc.put(&quot;entities&quot;, out);</span>
+<span class="fc" id="L203">        return JSONWriter.toJson(doc);</span>
+    }
+
+    /// Serializes a single `{type, id}` reference for index removal.
+    ///
+    /// #### Parameters
+    ///
+    /// - `entityType`: the entity type id
+    /// - `id`: the entity id
+    public static String serializeEntityRef(String entityType, String id) {
+<span class="fc" id="L213">        Map&lt;String, Object&gt; doc = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L214">        doc.put(&quot;v&quot;, Integer.valueOf(VERSION));</span>
+<span class="fc" id="L215">        List&lt;Object&gt; refs = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L216">        Map&lt;String, Object&gt; ref = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L217">        ref.put(&quot;type&quot;, entityType);</span>
+<span class="fc" id="L218">        ref.put(&quot;id&quot;, id);</span>
+<span class="fc" id="L219">        ref.put(&quot;uid&quot;, entityType + &quot;:&quot; + id);</span>
+<span class="fc" id="L220">        refs.add(ref);</span>
+<span class="fc" id="L221">        doc.put(&quot;refs&quot;, refs);</span>
+<span class="fc" id="L222">        return JSONWriter.toJson(doc);</span>
+    }
+
+    /// Serializes an intent result for the platform, collecting any snippet
+    /// imagery.
+    ///
+    /// #### Parameters
+    ///
+    /// - `result`: the result to serialize
+    /// - `images`: receives PNG blobs referenced by the snippet
+    public static String serializeResult(IntentResult result, Map&lt;String, byte[]&gt; images) {
+<span class="fc" id="L233">        Map&lt;String, Object&gt; doc = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L234">        doc.put(&quot;v&quot;, Integer.valueOf(VERSION));</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (result == null) {</span>
+<span class="nc" id="L236">            doc.put(&quot;ok&quot;, Boolean.TRUE);</span>
+<span class="nc" id="L237">            return JSONWriter.toJson(doc);</span>
+        }
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        doc.put(&quot;ok&quot;, Boolean.valueOf(!result.isFailed()));</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        if (result.isFailed()) {</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">            doc.put(&quot;error&quot;, result.getErrorMessage() == null ? &quot;&quot; : result.getErrorMessage());</span>
+<span class="fc" id="L242">            return JSONWriter.toJson(doc);</span>
+        }
+<span class="fc" id="L244">        Object value = toWire(result.getValue());</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (value != null) {</span>
+<span class="fc" id="L246">            doc.put(&quot;value&quot;, value);</span>
+        }
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        if (result.getDialog() != null) {</span>
+<span class="fc" id="L249">            doc.put(&quot;dialog&quot;, result.getDialog());</span>
+        }
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (result.getOpenUrl() != null) {</span>
+<span class="fc" id="L252">            doc.put(&quot;openUrl&quot;, result.getOpenUrl());</span>
+        }
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">        if (result.getEntity() != null) {</span>
+<span class="nc" id="L255">            doc.put(&quot;entity&quot;, entityToMap(result.getEntity(), images));</span>
+        }
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        if (result.getSnippet() != null) {</span>
+            // Reuse the surfaces wire format verbatim. A snippet is rendered by
+            // the platform while this app may be off screen, which is the same
+            // problem a widget solves, so it gets the same descriptor and the
+            // same native renderer rather than a parallel one.
+<span class="nc" id="L262">            doc.put(&quot;snippet&quot;, SurfaceSerializer.serializeNodeToMap(</span>
+<span class="nc" id="L263">                    result.getSnippet(), images));</span>
+        }
+<span class="fc" id="L265">        return JSONWriter.toJson(doc);</span>
+    }
+
+    private static Map&lt;String, Object&gt; entityToMap(AppEntity e, Map&lt;String, byte[]&gt; images) {
+<span class="nc" id="L269">        return entityToMap(e, images, false);</span>
+    }
+
+    /// A thumbnail large enough to matter here is a mistake rather than a picture: a picker row
+    /// renders it at a few dozen points. Inlining is capped so one oversized image cannot turn
+    /// a synchronous query reply into a payload the picker waits on.
+    private static final int MAX_INLINE_IMAGE_BYTES = 128 * 1024;
+
+    private static Map&lt;String, Object&gt; entityToMap(AppEntity e, Map&lt;String, byte[]&gt; images,
+                                                   boolean inlineImages) {
+<span class="fc" id="L279">        Map&lt;String, Object&gt; m = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L280">        m.put(&quot;type&quot;, e.getType());</span>
+<span class="fc" id="L281">        m.put(&quot;id&quot;, e.getId());</span>
+        // The platform search index stores one opaque identifier per entry and
+        // hands that same string back on a tap, so the type has to travel inside
+        // it. Composing it here keeps the native side from having to know the
+        // convention.
+<span class="fc" id="L286">        m.put(&quot;uid&quot;, e.getType() + &quot;:&quot; + e.getId());</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        if (e.getTitle() != null) {</span>
+<span class="fc" id="L288">            m.put(&quot;title&quot;, e.getTitle());</span>
+        }
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        if (e.getSubtitle() != null) {</span>
+<span class="fc" id="L291">            m.put(&quot;subtitle&quot;, e.getSubtitle());</span>
+        }
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (!e.getKeywords().isEmpty()) {</span>
+<span class="fc" id="L294">            m.put(&quot;keywords&quot;, new ArrayList&lt;Object&gt;(e.getKeywords()));</span>
+        }
+<span class="fc" id="L296">        EncodedImage img = e.getImage();</span>
+<span class="pc bpc" id="L297" title="1 of 6 branches missed.">        if (img != null &amp;&amp; (images != null || inlineImages)) {</span>
+<span class="fc" id="L298">            byte[] bytes = img.getImageData();</span>
+<span class="pc bpc" id="L299" title="2 of 4 branches missed.">            if (bytes != null &amp;&amp; bytes.length &gt; 0) {</span>
+<span class="fc" id="L300">                String name = imageName(bytes, images);</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">                if (images != null) {</span>
+<span class="fc" id="L302">                    images.put(name, bytes);</span>
+                }
+<span class="fc" id="L304">                m.put(&quot;image&quot;, name);</span>
+<span class="fc bfc" id="L305" title="All 4 branches covered.">                if (inlineImages &amp;&amp; bytes.length &lt;= MAX_INLINE_IMAGE_BYTES) {</span>
+<span class="fc" id="L306">                    m.put(&quot;imageData&quot;, Base64.encodeNoNewline(bytes));</span>
+                }
+            }
+        }
+<span class="fc" id="L310">        return m;</span>
+    }
+
+    /// Reduces a Java value to something the wire format can carry. Returns null
+    /// for anything unsupported, which the callers drop rather than guess at.
+    ///
+    /// Note the deliberate absence of a cast-and-catch: every branch is an
+    /// `instanceof` test. On iOS a failed cast does not throw, so a
+    /// `catch (ClassCastException)` here would be dead code guarding a native
+    /// crash.
+    /// Parses an intent payload, keeping whole numbers as `Long`.
+    ///
+    /// The convenience `JSONParser.parseJSON` defaults to materialising every number as a
+    /// `Double`, which silently rounds anything past 2^53: an id of 9007199254740993 arrives as
+    /// ...992, still integral, so every downstream check accepts it and the handler acts on a
+    /// number the caller never sent. Ids of that size are ordinary -- snowflake ids, database
+    /// keys -- and the corruption is invisible at every layer.
+    ///
+    /// Every path that reads an intent payload goes through this, in core and in the ports, so
+    /// the guarantee does not depend on remembering it at six call sites.
+    ///
+    /// #### Parameters
+    ///
+    /// - `json`: the document; null or empty yields null
+    public static Map&lt;String, Object&gt; parsePayload(String json) throws IOException {
+<span class="pc bpc" id="L335" title="2 of 4 branches missed.">        if (json == null || json.length() == 0) {</span>
+<span class="nc" id="L336">            return null;</span>
+        }
+<span class="fc" id="L338">        JSONParser parser = new JSONParser();</span>
+<span class="fc" id="L339">        parser.setUseLongsInstance(true);</span>
+<span class="fc" id="L340">        return parser.parseJSON(new StringReader(json));</span>
+    }
+
+    /// Reduces a value to what the wire format carries. Package-visible because in-process
+    /// dispatch has to apply the same reduction: a handler must not be able to tell whether its
+    /// arguments crossed a platform boundary.
+    static Object toWire(Object value) {
+<span class="fc bfc" id="L347" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L348">            return null;</span>
+        }
+<span class="fc bfc" id="L350" title="All 4 branches covered.">        if (value instanceof String || value instanceof Boolean) {</span>
+<span class="fc" id="L351">            return value;</span>
+        }
+<span class="fc bfc" id="L353" title="All 2 branches covered.">        if (value instanceof Number) {</span>
+<span class="fc" id="L354">            double d = ((Number) value).doubleValue();</span>
+<span class="fc bfc" id="L355" title="All 4 branches covered.">            if (Double.isNaN(d) || Double.isInfinite(d)) {</span>
+                // JSONWriter would emit a bare NaN or Infinity token, which is not JSON. The
+                // iOS decoder rejects the whole document and reports an empty success, so the
+                // dialog and the snippet go with it -- one unrepresentable number costing the
+                // entire result. Dropped instead: everything else in the document survives.
+<span class="fc" id="L360">                return null;</span>
+            }
+<span class="fc" id="L362">            return value;</span>
+        }
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        if (value instanceof Date) {</span>
+<span class="fc" id="L365">            return Long.valueOf(((Date) value).getTime());</span>
+        }
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (value instanceof AppEntity) {</span>
+<span class="fc" id="L368">            return ((AppEntity) value).getId();</span>
+        }
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">        if (value instanceof Character) {</span>
+<span class="nc" id="L371">            return value.toString();</span>
+        }
+<span class="fc" id="L373">        return null;</span>
+    }
+
+    /// The first parameter whose value the wire format cannot carry, or null when every
+    /// value can cross.
+    ///
+    /// Dropping such a value is right in a *result* -- the rest of the document survives, and
+    /// the alternative is losing the dialog and the snippet to one unrepresentable number. It
+    /// is wrong in *parameters*, because a parameter that goes missing is not reported as
+    /// invalid: the far side simply sees it as absent and runs the declared default instead.
+    /// The caller asked for one thing and got another, with nothing anywhere saying so. So the
+    /// parameter doors ask this first and refuse, rather than serializing and hoping.
+    ///
+    /// #### Parameters
+    ///
+    /// - `params`: the values to check; null and empty carry fine
+    static String unrepresentable(Map&lt;String, Object&gt; params) {
+<span class="pc bpc" id="L390" title="1 of 2 branches missed.">        if (params == null) {</span>
+<span class="nc" id="L391">            return null;</span>
+        }
+<span class="fc bfc" id="L393" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; e : params.entrySet()) {</span>
+<span class="pc bpc" id="L394" title="1 of 4 branches missed.">            if (e.getValue() != null &amp;&amp; toWire(e.getValue()) == null) {</span>
+<span class="fc" id="L395">                return e.getKey();</span>
+            }
+<span class="fc" id="L397">        }</span>
+<span class="fc" id="L398">        return null;</span>
+    }
+
+    /// A name for this blob that no other blob in the same request will take.
+    ///
+    /// The name was a 32-bit content hash, which is fine as a cache key and wrong as an
+    /// identity: two different thumbnails that collide got the same name and the second
+    /// overwrote the first, so one entity displayed another entity's picture on every platform.
+    /// The length narrows it further, and an actual collision is then resolved by comparing the
+    /// bytes -- exact, and cheaper than pulling in a digest the ParparVM runtime would have to
+    /// carry.
+    private static String imageName(byte[] bytes, Map&lt;String, byte[]&gt; images) {
+<span class="fc" id="L410">        String base = &quot;e&quot; + Integer.toHexString(contentHash(bytes)) + &quot;_&quot; + bytes.length;</span>
+<span class="fc bfc" id="L411" title="All 2 branches covered.">        if (images == null) {</span>
+<span class="fc" id="L412">            return base;</span>
+        }
+<span class="fc" id="L414">        String name = base;</span>
+<span class="pc" id="L415">        for (int i = 1; ; i++) {</span>
+<span class="fc" id="L416">            byte[] existing = images.get(name);</span>
+<span class="pc bpc" id="L417" title="1 of 4 branches missed.">            if (existing == null || sameBytes(existing, bytes)) {</span>
+<span class="fc" id="L418">                return name;</span>
+            }
+<span class="nc" id="L420">            name = base + &quot;_&quot; + i;</span>
+        }
+    }
+
+    private static boolean sameBytes(byte[] a, byte[] b) {
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">        if (a.length != b.length) {</span>
+<span class="nc" id="L426">            return false;</span>
+        }
+<span class="fc bfc" id="L428" title="All 2 branches covered.">        for (int i = 0; i &lt; a.length; i++) {</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">            if (a[i] != b[i]) {</span>
+<span class="nc" id="L430">                return false;</span>
+            }
+        }
+<span class="fc" id="L433">        return true;</span>
+    }
+
+    private static int contentHash(byte[] data) {
+<span class="fc" id="L437">        int h = 17;</span>
+<span class="fc bfc" id="L438" title="All 2 branches covered.">        for (byte b : data) {</span>
+<span class="fc" id="L439">            h = h * 31 + b;</span>
+        }
+<span class="fc" id="L441">        return h;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

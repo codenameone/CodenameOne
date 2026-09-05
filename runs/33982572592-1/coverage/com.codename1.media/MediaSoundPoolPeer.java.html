@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MediaSoundPoolPeer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media</a> &gt; <span class="el_source">MediaSoundPoolPeer.java</span></div><h1>MediaSoundPoolPeer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media;
+
+import com.codename1.io.Util;
+import com.codename1.io.Log;
+import com.codename1.ui.Display;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Pure cross platform fallback implementation of `SoundPoolPeer`, built entirely
+/// on top of `MediaManager`.
+///
+/// Each loaded sound keeps a small ring of `Media` instances that are
+/// `Media#prepare()`d up front, so the decode/buffer cost is paid at load time. A
+/// play looks for an idle instance in the ring, rewinds it with `Media#setTime(int)`
+/// and starts it. This works on every platform with no native code, but inherits
+/// the latency of the platform's general purpose media player and cannot change
+/// pitch or pan -- `rate` and `pan` are ignored. Ports that provide a real low
+/// latency `SoundPoolPeer` are used in preference to this (see
+/// `com.codename1.gaming.SoundPool#isNativeAccelerated()`).
+class MediaSoundPoolPeer implements CompletionAwareSoundPoolPeer {
+    private static final int RING_DEFAULT = 4;
+
+    private final int maxStreams;
+<span class="fc" id="L51">    private final List sounds = new ArrayList();</span>
+<span class="fc" id="L52">    private final Map voices = new HashMap();</span>
+    private int activeVoices;
+<span class="fc" id="L54">    private int nextVoiceId = 1;</span>
+    private VoiceCompletionListener completionListener;
+
+    @Override
+    public synchronized void setVoiceCompletionListener(VoiceCompletionListener listener) {
+<span class="fc" id="L59">        this.completionListener = listener;</span>
+<span class="fc" id="L60">    }</span>
+
+<span class="fc" id="L62">    MediaSoundPoolPeer(int maxStreams) {</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        this.maxStreams = maxStreams &lt; 1 ? 1 : maxStreams;</span>
+<span class="fc" id="L64">    }</span>
+
+    private static final class Slot {
+        Media media;
+        boolean busy;
+        int voiceId;
+        int loopsRemaining;
+    }
+
+    private static final class Sound {
+        String uri;
+        byte[] data;
+        String mime;
+        Slot[] ring;
+    }
+
+    /// Restarts a looping voice from the EDT (scheduled from the off-EDT media
+    /// completion callback).
+    private static final class RestartVoice implements Runnable {
+        private final Slot slot;
+
+<span class="nc" id="L85">        RestartVoice(Slot slot) {</span>
+<span class="nc" id="L86">            this.slot = slot;</span>
+<span class="nc" id="L87">        }</span>
+
+        @Override
+        public void run() {
+            try {
+<span class="nc" id="L92">                slot.media.setTime(0);</span>
+<span class="nc" id="L93">            } catch (Throwable t) {</span>
+<span class="nc" id="L94">                Log.e(t);</span>
+<span class="nc" id="L95">            }</span>
+<span class="nc" id="L96">            slot.media.play();</span>
+<span class="nc" id="L97">        }</span>
+    }
+
+    private Media newMedia(Sound s, final Slot slot) throws IOException {
+<span class="nc" id="L101">        Runnable onComplete = new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L104">                onVoiceComplete(slot);</span>
+<span class="nc" id="L105">            }</span>
+        };
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (s.uri != null) {</span>
+<span class="nc" id="L108">            return MediaManager.createMedia(s.uri, false, onComplete);</span>
+        }
+<span class="nc" id="L110">        return MediaManager.createMedia(new ByteArrayInputStream(s.data), s.mime, onComplete);</span>
+    }
+
+    private Sound buildSound(Sound s) throws IOException {
+<span class="nc" id="L114">        int ringSize = Math.min(maxStreams, RING_DEFAULT);</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (ringSize &lt; 1) {</span>
+<span class="nc" id="L116">            ringSize = 1;</span>
+        }
+<span class="nc" id="L118">        s.ring = new Slot[ringSize];</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        for (int i = 0; i &lt; ringSize; i++) {</span>
+<span class="nc" id="L120">            Slot slot = new Slot();</span>
+<span class="nc" id="L121">            slot.media = newMedia(s, slot);</span>
+            try {
+<span class="nc" id="L123">                slot.media.prepare();</span>
+<span class="nc" id="L124">            } catch (Throwable t) {</span>
+<span class="nc" id="L125">                Log.e(t);</span>
+<span class="nc" id="L126">            }</span>
+<span class="nc" id="L127">            s.ring[i] = slot;</span>
+        }
+<span class="nc" id="L129">        synchronized (this) {</span>
+<span class="nc" id="L130">            sounds.add(s);</span>
+<span class="nc" id="L131">        }</span>
+<span class="nc" id="L132">        return s;</span>
+    }
+
+    @Override
+    public Object loadSound(InputStream data, String mimeType) throws IOException {
+<span class="nc" id="L137">        byte[] bytes = Util.readInputStream(data);</span>
+<span class="nc" id="L138">        Util.cleanup(data);</span>
+<span class="nc" id="L139">        Sound s = new Sound();</span>
+<span class="nc" id="L140">        s.data = bytes;</span>
+<span class="nc" id="L141">        s.mime = mimeType;</span>
+<span class="nc" id="L142">        return buildSound(s);</span>
+    }
+
+    @Override
+    public Object loadSound(String uri) throws IOException {
+<span class="nc" id="L147">        Sound s = new Sound();</span>
+<span class="nc" id="L148">        s.uri = uri;</span>
+<span class="nc" id="L149">        return buildSound(s);</span>
+    }
+
+    @Override
+    public synchronized int play(Object soundHandle, float volume, float pan, float rate, int loop) {
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        if (activeVoices &gt;= maxStreams) {</span>
+<span class="nc" id="L155">            return -1;</span>
+        }
+<span class="nc" id="L157">        Sound s = (Sound) soundHandle;</span>
+<span class="nc" id="L158">        Slot free = null;</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        for (int i = 0; i &lt; s.ring.length; i++) {</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">            if (!s.ring[i].busy) {</span>
+<span class="nc" id="L161">                free = s.ring[i];</span>
+<span class="nc" id="L162">                break;</span>
+            }
+        }
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (free == null) {</span>
+<span class="nc" id="L166">            return -1;</span>
+        }
+<span class="nc" id="L168">        int vid = nextVoiceId++;</span>
+<span class="nc" id="L169">        free.busy = true;</span>
+<span class="nc" id="L170">        free.voiceId = vid;</span>
+<span class="nc" id="L171">        free.loopsRemaining = loop;</span>
+<span class="nc" id="L172">        voices.put(Integer.valueOf(vid), free);</span>
+<span class="nc" id="L173">        activeVoices++;</span>
+<span class="nc" id="L174">        applyVolume(free.media, volume);</span>
+        try {
+<span class="nc" id="L176">            free.media.setTime(0);</span>
+<span class="nc" id="L177">        } catch (Throwable t) {</span>
+<span class="nc" id="L178">            Log.e(t);</span>
+<span class="nc" id="L179">        }</span>
+<span class="nc" id="L180">        free.media.play();</span>
+<span class="nc" id="L181">        return vid;</span>
+    }
+
+    private void onVoiceComplete(final Slot slot) {
+        // Media completion callbacks arrive off the EDT; restart looping playback
+        // on the EDT and keep bookkeeping synchronized.
+        VoiceCompletionListener notify;
+<span class="nc" id="L188">        synchronized (this) {</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            if (!slot.busy) {</span>
+<span class="nc" id="L190">                return;</span>
+            }
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            if (slot.loopsRemaining != 0) {</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">                if (slot.loopsRemaining &gt; 0) {</span>
+<span class="nc" id="L194">                    slot.loopsRemaining--;</span>
+                }
+<span class="nc" id="L196">                Display.getInstance().callSerially(new RestartVoice(slot));</span>
+<span class="nc" id="L197">                return;</span>
+            }
+<span class="nc" id="L199">            voices.remove(Integer.valueOf(slot.voiceId));</span>
+<span class="nc" id="L200">            slot.busy = false;</span>
+<span class="nc" id="L201">            activeVoices--;</span>
+<span class="nc" id="L202">            notify = completionListener;</span>
+<span class="nc" id="L203">        }</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">        if (notify != null) {</span>
+<span class="nc" id="L205">            notify.onVoiceComplete(slot.voiceId);</span>
+        }
+<span class="nc" id="L207">    }</span>
+
+    private static void applyVolume(Media m, float volume) {
+<span class="nc" id="L210">        int pct = Math.round(volume * 100);</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if (pct &lt; 0) {</span>
+<span class="nc" id="L212">            pct = 0;</span>
+        }
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (pct &gt; 100) {</span>
+<span class="nc" id="L215">            pct = 100;</span>
+        }
+        try {
+<span class="nc" id="L218">            m.setVolume(pct);</span>
+<span class="nc" id="L219">        } catch (Throwable t) {</span>
+<span class="nc" id="L220">            Log.e(t);</span>
+<span class="nc" id="L221">        }</span>
+<span class="nc" id="L222">    }</span>
+
+    @Override
+    public synchronized void setVolume(int voiceId, float volume) {
+<span class="fc" id="L226">        Slot slot = (Slot) voices.get(Integer.valueOf(voiceId));</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (slot != null) {</span>
+<span class="nc" id="L228">            applyVolume(slot.media, volume);</span>
+        }
+<span class="fc" id="L230">    }</span>
+
+    @Override
+    public void setRate(int voiceId, float rate) {
+        // not supported by the generic Media player
+<span class="fc" id="L235">    }</span>
+
+    @Override
+    public void setPan(int voiceId, float pan) {
+        // not supported by the generic Media player
+<span class="fc" id="L240">    }</span>
+
+    @Override
+    public synchronized void pauseVoice(int voiceId) {
+<span class="fc" id="L244">        Slot slot = (Slot) voices.get(Integer.valueOf(voiceId));</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        if (slot != null) {</span>
+<span class="nc" id="L246">            slot.media.pause();</span>
+        }
+<span class="fc" id="L248">    }</span>
+
+    @Override
+    public synchronized void resumeVoice(int voiceId) {
+<span class="fc" id="L252">        Slot slot = (Slot) voices.get(Integer.valueOf(voiceId));</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">        if (slot != null) {</span>
+<span class="nc" id="L254">            slot.media.play();</span>
+        }
+<span class="fc" id="L256">    }</span>
+
+    @Override
+    public synchronized void stopVoice(int voiceId) {
+<span class="fc" id="L260">        Slot slot = (Slot) voices.remove(Integer.valueOf(voiceId));</span>
+<span class="pc bpc" id="L261" title="3 of 4 branches missed.">        if (slot != null &amp;&amp; slot.busy) {</span>
+<span class="nc" id="L262">            stopSlot(slot);</span>
+<span class="nc" id="L263">            activeVoices--;</span>
+        }
+<span class="fc" id="L265">    }</span>
+
+    private static void stopSlot(Slot slot) {
+<span class="nc" id="L268">        slot.loopsRemaining = 0;</span>
+        try {
+<span class="nc" id="L270">            slot.media.pause();</span>
+<span class="nc" id="L271">            slot.media.setTime(0);</span>
+<span class="nc" id="L272">        } catch (Throwable t) {</span>
+<span class="nc" id="L273">            Log.e(t);</span>
+<span class="nc" id="L274">        }</span>
+<span class="nc" id="L275">        slot.busy = false;</span>
+<span class="nc" id="L276">    }</span>
+
+    @Override
+    public synchronized void stopAll() {
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        for (Object o : sounds) {</span>
+<span class="nc" id="L281">            Sound s = (Sound) o;</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">            for (Slot slot : s.ring) {</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">                if (slot.busy) {</span>
+<span class="nc" id="L284">                    stopSlot(slot);</span>
+                }
+            }
+<span class="nc" id="L287">        }</span>
+<span class="fc" id="L288">        voices.clear();</span>
+<span class="fc" id="L289">        activeVoices = 0;</span>
+<span class="fc" id="L290">    }</span>
+
+    @Override
+    public synchronized void autoPause() {
+<span class="nc bnc" id="L294" title="All 2 branches missed.">        for (Object o : sounds) {</span>
+<span class="nc" id="L295">            Sound s = (Sound) o;</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">            for (Slot slot : s.ring) {</span>
+<span class="nc bnc" id="L297" title="All 2 branches missed.">                if (slot.busy) {</span>
+<span class="nc" id="L298">                    slot.media.pause();</span>
+                }
+            }
+<span class="nc" id="L301">        }</span>
+<span class="nc" id="L302">    }</span>
+
+    @Override
+    public synchronized void autoResume() {
+<span class="nc bnc" id="L306" title="All 2 branches missed.">        for (Object o : sounds) {</span>
+<span class="nc" id="L307">            Sound s = (Sound) o;</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">            for (Slot slot : s.ring) {</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">                if (slot.busy) {</span>
+<span class="nc" id="L310">                    slot.media.play();</span>
+                }
+            }
+<span class="nc" id="L313">        }</span>
+<span class="nc" id="L314">    }</span>
+
+    @Override
+    public synchronized void unloadSound(Object soundHandle) {
+<span class="nc" id="L318">        Sound s = (Sound) soundHandle;</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">        for (Slot slot : s.ring) {</span>
+<span class="nc bnc" id="L320" title="All 2 branches missed.">            if (slot.busy) {</span>
+<span class="nc" id="L321">                voices.remove(Integer.valueOf(slot.voiceId));</span>
+<span class="nc" id="L322">                activeVoices--;</span>
+<span class="nc" id="L323">                slot.busy = false;</span>
+            }
+            try {
+<span class="nc" id="L326">                slot.media.cleanup();</span>
+<span class="nc" id="L327">            } catch (Throwable t) {</span>
+<span class="nc" id="L328">                Log.e(t);</span>
+<span class="nc" id="L329">            }</span>
+        }
+<span class="nc" id="L331">        sounds.remove(s);</span>
+<span class="nc" id="L332">    }</span>
+
+    @Override
+    public synchronized void release() {
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">        for (Object o : sounds) {</span>
+<span class="nc" id="L337">            Sound s = (Sound) o;</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">            for (Slot slot : s.ring) {</span>
+                try {
+<span class="nc" id="L340">                    slot.media.cleanup();</span>
+<span class="nc" id="L341">                } catch (Throwable t) {</span>
+<span class="nc" id="L342">                    Log.e(t);</span>
+<span class="nc" id="L343">                }</span>
+            }
+<span class="nc" id="L345">        }</span>
+<span class="fc" id="L346">        sounds.clear();</span>
+<span class="fc" id="L347">        voices.clear();</span>
+<span class="fc" id="L348">        activeVoices = 0;</span>
+<span class="fc" id="L349">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

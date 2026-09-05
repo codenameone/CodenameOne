@@ -1,0 +1,1185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MorphTransition.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.animations</a> &gt; <span class="el_source">MorphTransition.java</span></div><h1>MorphTransition.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.animations;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.geom.Dimension;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+
+/// A transition inspired by the Android L release morph activity effect allowing
+/// a set of components in one form/container to morph into another in a different
+/// container/form.
+///
+/// Beyond the original position / size morph, this transition can also tween the
+/// **opacity**, **rotation** and **scale** of each morphed target and can morph
+/// **arbitrary rendered elements** (an `Image`, a rendered SVG, a snapshot of any
+/// `Component`, ...) that don't have to be named components living in a `Form` --
+/// see `#morph(MorphElement)`.
+///
+/// The transition is also **scrubbable**: instead of letting the framework drive
+/// it from the animation clock you can step it to an arbitrary normalized
+/// position `t` in `[0, 1]` with `#setProgress(double)`. Scrubbing is
+/// deterministic (it never reads the wall clock), is repeatable, and can move
+/// backwards, which makes it compose cleanly with a frame-export loop that renders
+/// the same animation at a set of progress fractions.
+///
+/// @author Shai Almog
+public final class MorphTransition extends Transition {
+<span class="fc" id="L57">    private final HashMap&lt;String, String&gt; fromTo = new HashMap&lt;String, String&gt;();</span>
+
+    /// Optional per-named-target opacity tween, keyed by the source component
+    /// name. The value is `{fromOpacity, toOpacity}` in the `[0, 1]` range.
+    /// Applied when drawing the captured snapshots (see `#snapshotMode(boolean)`).
+<span class="fc" id="L62">    private final HashMap&lt;String, float[]&gt; opacityByName = new HashMap&lt;String, float[]&gt;();</span>
+    /// Optional per-named-target rotation tween, keyed by source name. Value is
+    /// `{fromDegrees, toDegrees}`.
+<span class="fc" id="L65">    private final HashMap&lt;String, float[]&gt; rotationByName = new HashMap&lt;String, float[]&gt;();</span>
+    /// Optional per-named-target scale tween, keyed by source name. Value is
+    /// `{fromScale, toScale}` (a multiplier about the target center, `1` = no
+    /// scaling beyond the interpolated bounds).
+<span class="fc" id="L69">    private final HashMap&lt;String, float[]&gt; scaleByName = new HashMap&lt;String, float[]&gt;();</span>
+
+    /// Arbitrary rendered elements morphed independently of the named-component
+    /// pairs. See `#morph(MorphElement)`.
+<span class="fc" id="L73">    private final ArrayList&lt;MorphElement&gt; elements = new ArrayList&lt;MorphElement&gt;();</span>
+
+    private int duration;
+    private CC[] fromToComponents;
+    private Motion animationMotion;
+    private boolean finished;
+    /// Set once the layered-pane surgery from `#initTransition()` has been undone
+    /// (either by the `animate()` terminal frame or by `#cleanup()` in scrub
+    /// mode). Guards against a double restore.
+    private boolean restored;
+
+    /// Opt-in snapshot mode -- when on, source / destination components are
+    /// captured as clipped `Image`s at `initTransition()` time and the tween
+    /// draws those images rather than re-painting the live components every
+    /// frame. See `#snapshotMode(boolean)`.
+    private boolean snapshotMode;
+
+    /// True once `#setProgress(double)` has been used to drive the transition.
+    /// In scrub mode the cross-fade alpha and tweened values come from the
+    /// normalized progress rather than the animation clock, and the terminal
+    /// teardown in `animate()` is suppressed so the transition can be stepped
+    /// repeatedly (and backwards).
+    private boolean scrubbing;
+    /// Last normalized progress (`0..1`) requested through `#setProgress(double)`.
+    private double progress;
+    /// Cross-fade alpha (`0..255`) when scrubbing; `-1` means &quot;derive from the
+    /// animation clock&quot; (the legacy time-driven behaviour).
+<span class="fc" id="L100">    private int currentAlpha = -1;</span>
+
+<span class="fc" id="L102">    private MorphTransition() {</span>
+<span class="fc" id="L103">    }</span>
+
+    /// Enables the image-snapshot path. Each `(source, dest)` pair is rendered
+    /// once into an `Image` at `initTransition()` (clipped to the component's
+    /// own bounds; off-viewport children do not contribute pixels), then the
+    /// tween draws those images at the interpolated `(x, y, w, h)`.
+    ///
+    /// Use this when:
+    ///
+    /// - The source lives inside a scrolling container whose
+    ///   `scrollX`/`scrollY` would otherwise leak off-viewport child pixels
+    ///   into the morph (the cross-form morph clipping artifact).
+    /// - The source has children with dynamic content (a `BrowserComponent`,
+    ///   a video frame, a custom-painted background) that should be frozen
+    ///   visually for the duration of the animation.
+    /// - The source's parent applies a clip that the layered pane wouldn't
+    ///   replicate.
+    ///
+    /// Snapshot mode is also required for the per-named-target `#rotation`,
+    /// `#scale` and `#opacity` tweens to have a visible effect, since those
+    /// transforms are applied while drawing the captured image.
+    ///
+    /// Default is **off** to preserve back-compat with the legacy live-paint
+    /// path. Always pair with a screenshot regression test (see
+    /// `scripts/hellocodenameone/.../MorphTransitionTest`).
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`: `true` to snapshot, `false` for the legacy live-paint mode
+    ///
+    /// #### Returns
+    ///
+    /// this transition (for chaining with `#morph(String)` etc.)
+    public MorphTransition snapshotMode(boolean enabled) {
+<span class="fc" id="L137">        this.snapshotMode = enabled;</span>
+<span class="fc" id="L138">        return this;</span>
+    }
+
+    /// Returns the current snapshot-mode setting. See `#snapshotMode(boolean)`.
+    public boolean isSnapshotMode() {
+<span class="nc" id="L143">        return snapshotMode;</span>
+    }
+
+    /// Creates a transition with the given duration, this transition should be modified with the
+    /// builder methods such as morph
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration of the transition
+    ///
+    /// #### Returns
+    ///
+    /// a new Morph transition instance
+    public static MorphTransition create(int duration) {
+<span class="fc" id="L157">        MorphTransition mt = new MorphTransition();</span>
+<span class="fc" id="L158">        mt.duration = duration;</span>
+<span class="fc" id="L159">        return mt;</span>
+    }
+
+    private static Component findByName(Container root, String componentName) {
+<span class="fc" id="L163">        int count = root.getComponentCount();</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="fc" id="L165">            Component c = root.getComponentAt(iter);</span>
+<span class="fc" id="L166">            String n = c.getName();</span>
+<span class="pc bpc" id="L167" title="1 of 4 branches missed.">            if (n != null &amp;&amp; n.equals(componentName)) {</span>
+<span class="fc" id="L168">                return c;</span>
+            }
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (c instanceof Container) {</span>
+<span class="fc" id="L171">                c = findByName((Container) c, componentName);</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">                if (c != null) {</span>
+<span class="fc" id="L173">                    return c;</span>
+                }
+            }
+        }
+<span class="fc" id="L177">        return null;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Transition copy(boolean reverse) {
+<span class="fc" id="L183">        MorphTransition m = create(duration);</span>
+<span class="fc" id="L184">        m.snapshotMode = snapshotMode;</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (reverse) {</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            for (Map.Entry&lt;String, String&gt; entry : fromTo.entrySet()) {</span>
+<span class="fc" id="L187">                String k = entry.getKey();</span>
+<span class="fc" id="L188">                String v = entry.getValue();</span>
+<span class="fc" id="L189">                m.fromTo.put(v, k);</span>
+                // A per-name tween was registered against the source name `k`;
+                // after reversing, the new source name is `v` (what used to be
+                // the destination) and the from/to endpoints swap.
+<span class="fc" id="L193">                reverseAttrInto(opacityByName.get(k), v, m.opacityByName);</span>
+<span class="fc" id="L194">                reverseAttrInto(rotationByName.get(k), v, m.rotationByName);</span>
+<span class="fc" id="L195">                reverseAttrInto(scaleByName.get(k), v, m.scaleByName);</span>
+<span class="fc" id="L196">            }</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            for (MorphElement e : elements) {</span>
+<span class="nc" id="L198">                m.elements.add(e.copy(true));</span>
+<span class="pc" id="L199">            }</span>
+        } else {
+<span class="nc" id="L201">            m.fromTo.putAll(fromTo);</span>
+<span class="nc" id="L202">            copyAttr(opacityByName, m.opacityByName);</span>
+<span class="nc" id="L203">            copyAttr(rotationByName, m.rotationByName);</span>
+<span class="nc" id="L204">            copyAttr(scaleByName, m.scaleByName);</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            for (MorphElement e : elements) {</span>
+<span class="nc" id="L206">                m.elements.add(e.copy(false));</span>
+<span class="nc" id="L207">            }</span>
+        }
+<span class="fc" id="L209">        return m;</span>
+    }
+
+    private static void copyAttr(HashMap&lt;String, float[]&gt; src, HashMap&lt;String, float[]&gt; dest) {
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        for (Map.Entry&lt;String, float[]&gt; e : src.entrySet()) {</span>
+<span class="nc" id="L214">            dest.put(e.getKey(), new float[]{e.getValue()[0], e.getValue()[1]});</span>
+<span class="nc" id="L215">        }</span>
+<span class="nc" id="L216">    }</span>
+
+    private static void reverseAttrInto(float[] attr, String newKey, HashMap&lt;String, float[]&gt; dest) {
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (attr != null) {</span>
+<span class="nc" id="L220">            dest.put(newKey, new float[]{attr[1], attr[0]});</span>
+        }
+<span class="fc" id="L222">    }</span>
+
+    /// Morphs the component with the given source name in the source container hierarchy
+    /// to the component with the same name in the destination hierarchy
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the compoennt name
+    ///
+    /// #### Returns
+    ///
+    /// this so morph operations can be chained as MorphTransition t = MorphTransition.create(300).morph(&quot;a&quot;).(&quot;c&quot;);
+    public MorphTransition morph(String cmp) {
+<span class="fc" id="L235">        fromTo.put(cmp, cmp);</span>
+<span class="fc" id="L236">        return this;</span>
+    }
+
+    /// Morphs the component with the given source name in the source container hierarchy
+    /// to the component with the given name in the destination hierarchy
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`
+    ///
+    /// - `to`
+    ///
+    /// #### Returns
+    ///
+    /// this so morph operations can be chained as MorphTransition t = MorphTransition.create(300).morph(&quot;a&quot;, &quot;b&quot;).(&quot;c&quot;, &quot;d&quot;);
+    public MorphTransition morph(String source, String to) {
+<span class="fc" id="L252">        fromTo.put(source, to);</span>
+<span class="fc" id="L253">        return this;</span>
+    }
+
+    /// Tweens the opacity of a named morph target from `fromOpacity` to
+    /// `toOpacity` (both in the `[0, 1]` range) over the course of the
+    /// transition. The named target must also be registered with `#morph(String)`
+    /// / `#morph(String, String)`. The opacity is applied while drawing the
+    /// captured snapshot, so this requires `#snapshotMode(boolean)` to be on to
+    /// have a visible effect.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceName`: the source-side name passed to `#morph(String)`
+    /// - `fromOpacity`: the opacity at `t = 0`, `0` (transparent) to `1` (opaque)
+    /// - `toOpacity`: the opacity at `t = 1`
+    ///
+    /// #### Returns
+    ///
+    /// this transition for chaining
+    public MorphTransition opacity(String sourceName, float fromOpacity, float toOpacity) {
+<span class="fc" id="L273">        opacityByName.put(sourceName, new float[]{fromOpacity, toOpacity});</span>
+<span class="fc" id="L274">        return this;</span>
+    }
+
+    /// Tweens the rotation of a named morph target from `fromDegrees` to
+    /// `toDegrees` about its center. Requires `#snapshotMode(boolean)` to have a
+    /// visible effect and an affine-capable `Graphics` (every modern port);
+    /// where affine isn't supported the rotation is silently skipped.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceName`: the source-side name passed to `#morph(String)`
+    /// - `fromDegrees`: rotation in degrees at `t = 0`
+    /// - `toDegrees`: rotation in degrees at `t = 1`
+    ///
+    /// #### Returns
+    ///
+    /// this transition for chaining
+    public MorphTransition rotation(String sourceName, float fromDegrees, float toDegrees) {
+<span class="fc" id="L292">        rotationByName.put(sourceName, new float[]{fromDegrees, toDegrees});</span>
+<span class="fc" id="L293">        return this;</span>
+    }
+
+    /// Tweens an extra scale multiplier (about the target center, on top of the
+    /// interpolated bounds) of a named morph target from `fromScale` to
+    /// `toScale`. A value of `1` leaves the interpolated size unchanged; use this
+    /// for a &quot;pop&quot; that overshoots the target box. Requires
+    /// `#snapshotMode(boolean)` to have a visible effect.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceName`: the source-side name passed to `#morph(String)`
+    /// - `fromScale`: scale multiplier at `t = 0`
+    /// - `toScale`: scale multiplier at `t = 1`
+    ///
+    /// #### Returns
+    ///
+    /// this transition for chaining
+    public MorphTransition scale(String sourceName, float fromScale, float toScale) {
+<span class="fc" id="L312">        scaleByName.put(sourceName, new float[]{fromScale, toScale});</span>
+<span class="fc" id="L313">        return this;</span>
+    }
+
+    /// Morphs an arbitrary rendered element (an `Image`, a rendered SVG, a
+    /// snapshot of any `Component`) between two states. Unlike the named-component
+    /// morph this does not require the element to be a child of the source /
+    /// destination form -- the element is drawn as an overlay at the interpolated
+    /// position, size, opacity, rotation and scale. Multiple elements can be
+    /// registered and they compose with the named-component morphs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: the element description built via `MorphElement#create`
+    ///
+    /// #### Returns
+    ///
+    /// this transition for chaining
+    public MorphTransition morph(MorphElement element) {
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">        if (element != null) {</span>
+<span class="fc" id="L332">            element.applyFraction(0f);</span>
+<span class="fc" id="L333">            elements.add(element);</span>
+        }
+<span class="fc" id="L335">        return this;</span>
+    }
+
+    /// Steps the transition to a normalized progress `t` in `[0, 1]` without
+    /// reading the animation clock. `0` is the source state, `1` the destination
+    /// state; intermediate values are eased with the same ease-in-out curve the
+    /// clock-driven path uses. The call is deterministic, repeatable and may move
+    /// backwards, so it composes with a frame-export loop that renders the
+    /// animation at a set of progress fractions:
+    ///
+    /// ```java
+    /// MorphTransition t = MorphTransition.create(600).morph(element);
+    /// t.init(source, dest);
+    /// t.initTransition();
+    /// for (double f = 0; f &lt;= 1.0; f += 1.0 / frames) {
+    ///     t.setProgress(f);
+    ///     t.paint(frameGraphics);
+    /// }
+    /// t.cleanup();
+    /// ```
+    ///
+    /// `#initTransition()` must have been invoked first (the
+    /// `AbstractTransitionScreenshotTest` harness does this for you). Scrubbing
+    /// and the clock-driven `animate()` lifecycle are not meant to be mixed on
+    /// the same instance.
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the normalized progress, clamped to `[0, 1]`
+    ///
+    /// #### Returns
+    ///
+    /// this transition for chaining
+    public MorphTransition setProgress(double t) {
+<span class="fc" id="L369">        scrubbing = true;</span>
+<span class="fc" id="L370">        progress = clamp01(t);</span>
+<span class="fc" id="L371">        float f = easeInOut(progress);</span>
+<span class="fc" id="L372">        currentAlpha = Math.round(f * 255f);</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        if (fromToComponents != null) {</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">            for (CC c : fromToComponents) {</span>
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">                if (c == null) {</span>
+<span class="nc" id="L376">                    continue;</span>
+                }
+<span class="fc" id="L378">                int x = Math.round(lerp(c.xMotion.getSourceValue(), c.xMotion.getDestinationValue(), f));</span>
+<span class="fc" id="L379">                int y = Math.round(lerp(c.yMotion.getSourceValue(), c.yMotion.getDestinationValue(), f));</span>
+<span class="fc" id="L380">                int w = Math.round(lerp(c.wMotion.getSourceValue(), c.wMotion.getDestinationValue(), f));</span>
+<span class="fc" id="L381">                int h = Math.round(lerp(c.hMotion.getSourceValue(), c.hMotion.getDestinationValue(), f));</span>
+<span class="fc" id="L382">                applyBounds(c, x, y, w, h);</span>
+<span class="fc" id="L383">                c.applyFraction(f);</span>
+            }
+        }
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        for (MorphElement e : elements) {</span>
+<span class="fc" id="L387">            e.applyFraction(f);</span>
+<span class="fc" id="L388">        }</span>
+<span class="fc" id="L389">        return this;</span>
+    }
+
+    /// Returns the last normalized progress requested through
+    /// `#setProgress(double)` (`0` until the first call).
+    public double getProgress() {
+<span class="fc" id="L395">        return progress;</span>
+    }
+
+    /// Returns true once `#setProgress(double)` has been used to drive this
+    /// transition manually.
+    public boolean isScrubbing() {
+<span class="fc" id="L401">        return scrubbing;</span>
+    }
+
+    /// The interpolated opacity (`0..1`) of a named morph target at the current
+    /// progress, or `1` when no opacity tween is registered for that name.
+    /// Primarily useful for tests / custom rendering.
+    public float getCurrentOpacity(String sourceName) {
+<span class="fc" id="L408">        CC c = findCC(sourceName);</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">        return c == null ? attrCurrent(opacityByName.get(sourceName), 1f) : c.curOpacity;</span>
+    }
+
+    /// The interpolated rotation (degrees) of a named morph target at the current
+    /// progress, or `0` when no rotation tween is registered for that name.
+    public float getCurrentRotation(String sourceName) {
+<span class="fc" id="L415">        CC c = findCC(sourceName);</span>
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">        return c == null ? attrCurrent(rotationByName.get(sourceName), 0f) : c.curRotation;</span>
+    }
+
+    /// The interpolated scale multiplier of a named morph target at the current
+    /// progress, or `1` when no scale tween is registered for that name.
+    public float getCurrentScale(String sourceName) {
+<span class="fc" id="L422">        CC c = findCC(sourceName);</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">        return c == null ? attrCurrent(scaleByName.get(sourceName), 1f) : c.curScale;</span>
+    }
+
+    private float attrCurrent(float[] attr, float def) {
+<span class="nc bnc" id="L427" title="All 2 branches missed.">        if (attr == null) {</span>
+<span class="nc" id="L428">            return def;</span>
+        }
+<span class="nc" id="L430">        return lerp(attr[0], attr[1], easeInOut(progress));</span>
+    }
+
+    private CC findCC(String sourceName) {
+<span class="pc bpc" id="L434" title="2 of 4 branches missed.">        if (fromToComponents == null || sourceName == null) {</span>
+<span class="nc" id="L435">            return null;</span>
+        }
+<span class="pc bpc" id="L437" title="1 of 2 branches missed.">        for (CC c : fromToComponents) {</span>
+<span class="pc bpc" id="L438" title="2 of 4 branches missed.">            if (c != null &amp;&amp; sourceName.equals(c.sourceName)) {</span>
+<span class="fc" id="L439">                return c;</span>
+            }
+        }
+<span class="nc" id="L442">        return null;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void initTransition() {
+<span class="fc" id="L448">        finished = false;</span>
+<span class="fc" id="L449">        restored = false;</span>
+<span class="fc" id="L450">        animationMotion = Motion.createEaseInOutMotion(0, 255, duration);</span>
+<span class="fc" id="L451">        animationMotion.start();</span>
+<span class="fc" id="L452">        Container s = (Container) getSource();</span>
+<span class="fc" id="L453">        Container d = (Container) getDestination();</span>
+
+<span class="fc" id="L455">        int size = fromTo.size();</span>
+<span class="fc" id="L456">        fromToComponents = new CC[size];</span>
+<span class="fc" id="L457">        Form destForm = d.getComponentForm();</span>
+<span class="fc" id="L458">        destForm.forceRevalidate();</span>
+<span class="fc" id="L459">        Form sourceForm = s.getComponentForm();</span>
+<span class="fc" id="L460">        int index = 0;</span>
+<span class="fc bfc" id="L461" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : fromTo.entrySet()) {</span>
+<span class="fc" id="L462">            String k = entry.getKey();</span>
+<span class="fc" id="L463">            String v = entry.getValue();</span>
+<span class="fc" id="L464">            Component sourceCmp = findByName(s, k);</span>
+<span class="fc" id="L465">            Component destCmp = findByName(d, v);</span>
+<span class="pc bpc" id="L466" title="2 of 4 branches missed.">            if (sourceCmp == null || destCmp == null) {</span>
+<span class="nc" id="L467">                continue;</span>
+            }
+<span class="fc" id="L469">            CC cc = new CC(k, sourceCmp, destCmp, duration);</span>
+<span class="fc" id="L470">            cc.applyAttributes(opacityByName.get(k), rotationByName.get(k), scaleByName.get(k));</span>
+            // Snapshot capture happens BEFORE the layered-pane swap, so
+            // the source still sits inside its original (possibly
+            // scrolling, possibly clipped) parent and renders the pixels
+            // the user actually sees at the moment they tap. Capturing
+            // after the swap would render the layered-pane copy, which
+            // has no clipping context.
+<span class="fc bfc" id="L477" title="All 2 branches covered.">            if (snapshotMode) {</span>
+<span class="fc" id="L478">                cc.sourceImage = captureSnapshot(sourceCmp);</span>
+<span class="fc" id="L479">                cc.destImage = captureSnapshot(destCmp);</span>
+            }
+<span class="fc" id="L481">            fromToComponents[index] = cc;</span>
+<span class="fc" id="L482">            index++;</span>
+<span class="fc" id="L483">            cc.placeholderDest = new Label();</span>
+<span class="fc" id="L484">            cc.placeholderDest.setVisible(false);</span>
+<span class="fc" id="L485">            Container destParent = cc.dest.getParent();</span>
+<span class="fc" id="L486">            cc.placeholderDest.setX(cc.dest.getX());</span>
+<span class="fc" id="L487">            cc.placeholderDest.setY(cc.dest.getY() - destForm.getContentPane().getY());</span>
+<span class="fc" id="L488">            cc.placeholderDest.setWidth(cc.dest.getWidth());</span>
+<span class="fc" id="L489">            cc.placeholderDest.setHeight(cc.dest.getHeight());</span>
+<span class="fc" id="L490">            cc.placeholderDest.setPreferredSize(new Dimension(cc.dest.getWidth(), cc.dest.getHeight()));</span>
+<span class="fc" id="L491">            destParent.replace(cc.dest, cc.placeholderDest, null);</span>
+<span class="fc" id="L492">            destForm.getLayeredPane().addComponent(cc.dest);</span>
+
+<span class="fc" id="L494">            cc.placeholderSrc = new Label();</span>
+<span class="fc" id="L495">            cc.placeholderSrc.setVisible(false);</span>
+<span class="fc" id="L496">            cc.placeholderSrc.setX(cc.source.getX());</span>
+<span class="fc" id="L497">            cc.placeholderSrc.setY(cc.source.getY() - sourceForm.getContentPane().getY());</span>
+<span class="fc" id="L498">            cc.placeholderSrc.setWidth(cc.source.getWidth());</span>
+<span class="fc" id="L499">            cc.placeholderSrc.setHeight(cc.source.getHeight());</span>
+<span class="fc" id="L500">            cc.placeholderSrc.setPreferredSize(new Dimension(cc.source.getWidth(), cc.source.getHeight()));</span>
+
+<span class="fc" id="L502">            Container originalContainer = cc.source.getParent();</span>
+<span class="fc" id="L503">            originalContainer.replace(cc.source, cc.placeholderSrc, null);</span>
+<span class="fc" id="L504">            originalContainer.getComponentForm().getLayeredPane().addComponent(cc.source);</span>
+<span class="fc" id="L505">        }</span>
+
+        // Resolve element images (snapshot any component-backed elements now
+        // that layout is settled) and seed their initial interpolated state.
+<span class="fc bfc" id="L509" title="All 2 branches covered.">        for (MorphElement e : elements) {</span>
+<span class="fc" id="L510">            e.resolve();</span>
+<span class="fc" id="L511">            e.applyFraction(0f);</span>
+<span class="fc" id="L512">        }</span>
+<span class="fc" id="L513">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public boolean animate() {
+<span class="fc bfc" id="L518" title="All 2 branches covered.">        if (!finished) {</span>
+            // animate one last time
+<span class="pc bpc" id="L520" title="2 of 6 branches missed.">            if (!scrubbing &amp;&amp; animationMotion != null &amp;&amp; animationMotion.isFinished()) {</span>
+<span class="fc" id="L521">                finished = true;</span>
+<span class="fc" id="L522">                restoreComponents();</span>
+                // remove potential memory leak
+<span class="fc" id="L524">                fromToComponents = null;</span>
+<span class="fc" id="L525">                return true;</span>
+            }
+<span class="pc bpc" id="L527" title="1 of 2 branches missed.">            float f = animationMotion != null ? animationMotion.getValue() / 255f : 0f;</span>
+<span class="pc bpc" id="L528" title="1 of 2 branches missed.">            if (fromToComponents != null) {</span>
+<span class="fc bfc" id="L529" title="All 2 branches covered.">                for (CC c : fromToComponents) {</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">                    if (c == null) {</span>
+<span class="nc" id="L531">                        continue;</span>
+                    }
+<span class="fc" id="L533">                    int x = c.xMotion.getValue();</span>
+<span class="fc" id="L534">                    int y = c.yMotion.getValue();</span>
+<span class="fc" id="L535">                    int w = c.wMotion.getValue();</span>
+<span class="fc" id="L536">                    int h = c.hMotion.getValue();</span>
+<span class="fc" id="L537">                    applyBounds(c, x, y, w, h);</span>
+<span class="fc" id="L538">                    c.applyFraction(f);</span>
+                }
+            }
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">            for (MorphElement e : elements) {</span>
+<span class="nc" id="L542">                e.applyFraction(f);</span>
+<span class="nc" id="L543">            }</span>
+
+<span class="fc" id="L545">            return true;</span>
+        }
+
+<span class="fc" id="L548">        return false;</span>
+    }
+
+    private static void applyBounds(CC c, int x, int y, int w, int h) {
+<span class="fc" id="L552">        c.source.setX(x);</span>
+<span class="fc" id="L553">        c.source.setY(y);</span>
+<span class="fc" id="L554">        c.source.setWidth(w);</span>
+<span class="fc" id="L555">        c.source.setHeight(h);</span>
+<span class="fc" id="L556">        c.dest.setX(x);</span>
+<span class="fc" id="L557">        c.dest.setY(y);</span>
+<span class="fc" id="L558">        c.dest.setWidth(w);</span>
+<span class="fc" id="L559">        c.dest.setHeight(h);</span>
+<span class="fc" id="L560">    }</span>
+
+    /// Undoes the layered-pane surgery from `#initTransition()`, restoring the
+    /// morphed components back into their original parents. Safe to call more
+    /// than once. Invoked from the terminal `animate()` frame on the clock-driven
+    /// path and from `#cleanup()` on the scrub path.
+    private void restoreComponents() {
+<span class="pc bpc" id="L567" title="2 of 4 branches missed.">        if (restored || fromToComponents == null) {</span>
+<span class="nc" id="L568">            return;</span>
+        }
+<span class="fc" id="L570">        restored = true;</span>
+<span class="fc bfc" id="L571" title="All 2 branches covered.">        for (CC c : fromToComponents) {</span>
+<span class="pc bpc" id="L572" title="3 of 6 branches missed.">            if (c == null || c.placeholderDest == null || c.placeholderSrc == null) {</span>
+<span class="nc" id="L573">                continue;</span>
+            }
+<span class="fc" id="L575">            Container p = c.placeholderDest.getParent();</span>
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">            if (p != null) {</span>
+<span class="fc" id="L577">                c.dest.getParent().removeComponent(c.dest);</span>
+<span class="fc" id="L578">                p.replace(c.placeholderDest, c.dest, null);</span>
+            }
+<span class="fc" id="L580">            p = c.placeholderSrc.getParent();</span>
+<span class="pc bpc" id="L581" title="1 of 2 branches missed.">            if (p != null) {</span>
+<span class="fc" id="L582">                c.source.getParent().removeComponent(c.source);</span>
+<span class="fc" id="L583">                p.replace(c.placeholderSrc, c.source, null);</span>
+            }
+        }
+<span class="fc" id="L586">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void cleanup() {
+        // On the scrub path animate() never reaches its terminal frame, so the
+        // layered-pane swap has to be undone here.
+<span class="fc" id="L593">        restoreComponents();</span>
+<span class="fc" id="L594">        fromToComponents = null;</span>
+<span class="fc" id="L595">        super.cleanup();</span>
+<span class="fc" id="L596">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void paint(Graphics g) {
+<span class="fc" id="L601">        int oldAlpha = g.getAlpha();</span>
+<span class="pc bpc" id="L602" title="3 of 4 branches missed.">        int alpha = currentAlpha &gt;= 0 ? currentAlpha : (animationMotion != null ? animationMotion.getValue() : 0);</span>
+        // In snapshot mode we hide the live morphed components on the
+        // layered pane (they'd otherwise paint themselves on top of the
+        // captured images), paint the source / dest forms normally, then
+        // overlay the alpha-blended snapshots at the tweened bounds.
+<span class="fc" id="L607">        boolean hidSnapshots = false;</span>
+<span class="pc bpc" id="L608" title="1 of 4 branches missed.">        if (snapshotMode &amp;&amp; fromToComponents != null) {</span>
+<span class="fc bfc" id="L609" title="All 2 branches covered.">            for (CC c : fromToComponents) {</span>
+<span class="pc bpc" id="L610" title="1 of 2 branches missed.">                if (c != null) {</span>
+<span class="fc" id="L611">                    c.source.setVisible(false);</span>
+<span class="fc" id="L612">                    c.dest.setVisible(false);</span>
+                }
+            }
+<span class="fc" id="L615">            hidSnapshots = true;</span>
+        }
+        try {
+<span class="fc bfc" id="L618" title="All 2 branches covered.">            if (alpha &lt; 255) {</span>
+<span class="fc" id="L619">                g.setAlpha(255 - alpha);</span>
+<span class="fc" id="L620">                getSource().paintComponent(g);</span>
+
+<span class="fc" id="L622">                g.setAlpha(alpha);</span>
+<span class="fc" id="L623">                byte bgT = getDestination().getUnselectedStyle().getBgTransparency();</span>
+<span class="fc" id="L624">                getDestination().getUnselectedStyle().setBgTransparency(0);</span>
+<span class="fc" id="L625">                getDestination().paintComponent(g, false);</span>
+<span class="fc" id="L626">                getDestination().getUnselectedStyle().setBgTransparency(bgT);</span>
+<span class="fc" id="L627">                g.setAlpha(oldAlpha);</span>
+<span class="fc" id="L628">            } else {</span>
+<span class="fc" id="L629">                getDestination().paintComponent(g);</span>
+            }
+<span class="pc bpc" id="L631" title="1 of 4 branches missed.">            if (snapshotMode &amp;&amp; fromToComponents != null) {</span>
+<span class="fc" id="L632">                paintSnapshots(g, alpha);</span>
+            }
+<span class="fc" id="L634">            paintElements(g);</span>
+        } finally {
+<span class="fc bfc" id="L636" title="All 2 branches covered.">            if (hidSnapshots) {</span>
+<span class="fc bfc" id="L637" title="All 2 branches covered.">                for (CC c : fromToComponents) {</span>
+<span class="pc bpc" id="L638" title="1 of 2 branches missed.">                    if (c != null) {</span>
+<span class="fc" id="L639">                        c.source.setVisible(true);</span>
+<span class="fc" id="L640">                        c.dest.setVisible(true);</span>
+                    }
+                }
+            }
+<span class="fc" id="L644">            g.setAlpha(oldAlpha);</span>
+        }
+<span class="fc" id="L646">    }</span>
+
+    /// Snapshot-mode draw of each morphed pair: alpha-blend the source
+    /// snapshot (decreasing) on top of the destination snapshot
+    /// (increasing) at the current tweened bounds. The snapshots are
+    /// scaled to fit those bounds; on hi-DPI this is a nearest-neighbour
+    /// stretch via `drawImage(scaled)`. Both images already represent the
+    /// component clipped to its own bounds at the moment of capture, so
+    /// nothing off-viewport leaks into the morph. When a per-target
+    /// `#rotation` / `#scale` / `#opacity` tween was registered the captured
+    /// image is additionally transformed about its center.
+    ///
+    /// Callers must have already invoked `#initTransition()` -- the guard
+    /// at the top of the method protects against late-call paths
+    /// (`finished` flush, animation cancel) where the field has been
+    /// nulled out.
+    private void paintSnapshots(Graphics g, int alpha) {
+<span class="fc" id="L663">        CC[] pairs = fromToComponents;</span>
+<span class="pc bpc" id="L664" title="1 of 2 branches missed.">        if (pairs == null) {</span>
+<span class="nc" id="L665">            return;</span>
+        }
+<span class="fc" id="L667">        int oldAlpha = g.getAlpha();</span>
+        try {
+<span class="fc bfc" id="L669" title="All 2 branches covered.">            for (CC c : pairs) {</span>
+<span class="pc bpc" id="L670" title="3 of 6 branches missed.">                if (c == null || c.sourceImage == null || c.destImage == null) {</span>
+<span class="nc" id="L671">                    continue;</span>
+                }
+<span class="fc" id="L673">                int x = c.source.getX();</span>
+<span class="fc" id="L674">                int y = c.source.getY();</span>
+<span class="fc" id="L675">                int w = c.source.getWidth();</span>
+<span class="fc" id="L676">                int h = c.source.getHeight();</span>
+<span class="pc bpc" id="L677" title="2 of 4 branches missed.">                if (w &lt;= 0 || h &lt;= 0) {</span>
+<span class="nc" id="L678">                    continue;</span>
+                }
+                // Source fades out
+<span class="fc" id="L681">                drawTransformed(g, c.sourceImage, x, y, w, h, c.curScale, c.curRotation,</span>
+<span class="fc" id="L682">                        Math.round((255 - alpha) * c.curOpacity));</span>
+                // Dest fades in
+<span class="fc" id="L684">                drawTransformed(g, c.destImage, x, y, w, h, c.curScale, c.curRotation,</span>
+<span class="fc" id="L685">                        Math.round(alpha * c.curOpacity));</span>
+            }
+        } finally {
+<span class="fc" id="L688">            g.setAlpha(oldAlpha);</span>
+        }
+<span class="fc" id="L690">    }</span>
+
+    /// Draws every registered `MorphElement` at its current interpolated state.
+    private void paintElements(Graphics g) {
+<span class="fc bfc" id="L694" title="All 2 branches covered.">        if (elements.isEmpty()) {</span>
+<span class="fc" id="L695">            return;</span>
+        }
+<span class="fc" id="L697">        int oldAlpha = g.getAlpha();</span>
+        try {
+<span class="fc bfc" id="L699" title="All 2 branches covered.">            for (MorphElement e : elements) {</span>
+<span class="fc" id="L700">                Image img = e.image;</span>
+<span class="pc bpc" id="L701" title="1 of 2 branches missed.">                if (img == null) {</span>
+<span class="nc" id="L702">                    continue;</span>
+                }
+<span class="fc" id="L704">                int a = Math.round(clamp01(e.curOpacity) * 255f);</span>
+<span class="pc bpc" id="L705" title="1 of 2 branches missed.">                if (a &lt;= 0) {</span>
+<span class="nc" id="L706">                    continue;</span>
+                }
+<span class="fc" id="L708">                drawTransformed(g, img, Math.round(e.curX), Math.round(e.curY),</span>
+<span class="fc" id="L709">                        Math.round(e.curW), Math.round(e.curH), e.curScale, e.curRotation, a);</span>
+<span class="fc" id="L710">            }</span>
+        } finally {
+<span class="fc" id="L712">            g.setAlpha(oldAlpha);</span>
+        }
+<span class="fc" id="L714">    }</span>
+
+    /// Draws `img` into the base `(x, y, w, h)` rectangle, additionally scaled by
+    /// `scaleMul` about the rectangle center, rotated `rotationDeg` about the
+    /// same center, at the given `alpha`. Rotation needs an affine-capable
+    /// `Graphics`; where it isn't supported the rotation is skipped (the scale /
+    /// opacity still apply).
+    private static void drawTransformed(Graphics g, Image img, int x, int y, int w, int h,
+                                        float scaleMul, float rotationDeg, int alpha) {
+<span class="pc bpc" id="L723" title="2 of 6 branches missed.">        if (w &lt;= 0 || h &lt;= 0 || alpha &lt;= 0) {</span>
+<span class="fc" id="L724">            return;</span>
+        }
+        // Apply the extra scale multiplier about the center via the draw rect so
+        // it works on every port (no affine required for scaling).
+<span class="fc" id="L728">        int sw = Math.max(1, Math.round(w * scaleMul));</span>
+<span class="fc" id="L729">        int sh = Math.max(1, Math.round(h * scaleMul));</span>
+<span class="fc" id="L730">        int sx = x + (w - sw) / 2;</span>
+<span class="fc" id="L731">        int sy = y + (h - sh) / 2;</span>
+
+<span class="fc" id="L733">        g.setAlpha(Math.max(0, Math.min(255, alpha)));</span>
+<span class="pc bpc" id="L734" title="1 of 4 branches missed.">        boolean rotate = rotationDeg != 0f &amp;&amp; g.isAffineSupported();</span>
+<span class="pc bpc" id="L735" title="1 of 2 branches missed.">        if (rotate) {</span>
+<span class="nc" id="L736">            int tX = g.getTranslateX();</span>
+<span class="nc" id="L737">            int tY = g.getTranslateY();</span>
+<span class="nc" id="L738">            int pivotX = tX + sx + sw / 2;</span>
+<span class="nc" id="L739">            int pivotY = tY + sy + sh / 2;</span>
+<span class="nc" id="L740">            g.translate(-tX, -tY);</span>
+<span class="nc" id="L741">            g.rotate((float) Math.toRadians(rotationDeg), pivotX, pivotY);</span>
+<span class="nc" id="L742">            drawImageScaled(g, img, tX + sx, tY + sy, sw, sh);</span>
+<span class="nc" id="L743">            g.resetAffine();</span>
+<span class="nc" id="L744">            g.translate(tX, tY);</span>
+<span class="nc" id="L745">        } else {</span>
+<span class="fc" id="L746">            drawImageScaled(g, img, sx, sy, sw, sh);</span>
+        }
+<span class="fc" id="L748">    }</span>
+
+    /// Draws `img` into the `(x, y, w, h)` rectangle. Skips a scaled copy
+    /// when the image already happens to be at the target size (cheap
+    /// fast-path for the first and last frames of the animation).
+    private static void drawImageScaled(Graphics g, Image img, int x, int y, int w, int h) {
+<span class="pc bpc" id="L754" title="1 of 4 branches missed.">        if (img.getWidth() == w &amp;&amp; img.getHeight() == h) {</span>
+<span class="fc" id="L755">            g.drawImage(img, x, y);</span>
+        } else {
+<span class="fc" id="L757">            g.drawImage(img, x, y, w, h);</span>
+        }
+<span class="fc" id="L759">    }</span>
+
+    private static double clamp01(double v) {
+<span class="fc bfc" id="L762" title="All 2 branches covered.">        if (v &lt; 0) {</span>
+<span class="fc" id="L763">            return 0;</span>
+        }
+<span class="fc bfc" id="L765" title="All 2 branches covered.">        if (v &gt; 1) {</span>
+<span class="fc" id="L766">            return 1;</span>
+        }
+<span class="fc" id="L768">        return v;</span>
+    }
+
+    private static float clamp01(float v) {
+<span class="pc bpc" id="L772" title="1 of 2 branches missed.">        if (v &lt; 0f) {</span>
+<span class="nc" id="L773">            return 0f;</span>
+        }
+<span class="pc bpc" id="L775" title="1 of 2 branches missed.">        if (v &gt; 1f) {</span>
+<span class="nc" id="L776">            return 1f;</span>
+        }
+<span class="fc" id="L778">        return v;</span>
+    }
+
+    private static float lerp(float from, float to, float f) {
+<span class="fc" id="L782">        return from + (to - from) * f;</span>
+    }
+
+    // --- ease-in-out cubic-bezier(0, 0.42, 0.58, 1) -------------------------
+    // Mirrors Motion.createEaseInOutMotion so a scrubbed frame lands on the same
+    // value the clock-driven path would produce at the same normalized time.
+
+    private static float easeInOut(double t) {
+<span class="fc" id="L790">        float x = (float) clamp01(t);</span>
+<span class="fc bfc" id="L791" title="All 2 branches covered.">        if (x &lt;= 0f) {</span>
+<span class="fc" id="L792">            return 0f;</span>
+        }
+<span class="fc bfc" id="L794" title="All 2 branches covered.">        if (x &gt;= 1f) {</span>
+<span class="fc" id="L795">            return 1f;</span>
+        }
+        // control points: P1=(0, 0.42), P2=(0.58, 1)
+<span class="fc" id="L798">        float u = solveBezierForT(x, 0f, 0.58f);</span>
+<span class="fc" id="L799">        return bezierAxis(u, 0.42f, 1f);</span>
+    }
+
+    private static float bezierAxis(float u, float c1, float c2) {
+<span class="fc" id="L803">        float omu = 1f - u;</span>
+<span class="fc" id="L804">        return 3f * omu * omu * u * c1</span>
+                + 3f * omu * u * u * c2
+                + u * u * u;
+    }
+
+    private static float bezierAxisDerivative(float u, float c1, float c2) {
+<span class="fc" id="L810">        float omu = 1f - u;</span>
+<span class="fc" id="L811">        return 3f * omu * omu * c1</span>
+                + 6f * omu * u * (c2 - c1)
+                + 3f * u * u * (1f - c2);
+    }
+
+    private static float solveBezierForT(float t, float x1, float x2) {
+<span class="pc bpc" id="L817" title="1 of 2 branches missed.">        if (t &lt;= 0f) {</span>
+<span class="nc" id="L818">            return 0f;</span>
+        }
+<span class="pc bpc" id="L820" title="1 of 2 branches missed.">        if (t &gt;= 1f) {</span>
+<span class="nc" id="L821">            return 1f;</span>
+        }
+<span class="fc" id="L823">        float cx1 = Math.max(0f, Math.min(1f, x1));</span>
+<span class="fc" id="L824">        float cx2 = Math.max(0f, Math.min(1f, x2));</span>
+<span class="fc" id="L825">        float u = t;</span>
+<span class="pc bpc" id="L826" title="1 of 2 branches missed.">        for (int i = 0; i &lt; 8; i++) {</span>
+<span class="fc" id="L827">            float bxAtU = bezierAxis(u, cx1, cx2);</span>
+<span class="fc" id="L828">            float diff = bxAtU - t;</span>
+<span class="fc bfc" id="L829" title="All 2 branches covered.">            if (Math.abs(diff) &lt; 1e-6f) {</span>
+<span class="fc" id="L830">                return u;</span>
+            }
+<span class="fc" id="L832">            float deriv = bezierAxisDerivative(u, cx1, cx2);</span>
+<span class="pc bpc" id="L833" title="1 of 2 branches missed.">            if (deriv == 0f) {</span>
+<span class="nc" id="L834">                break;</span>
+            }
+<span class="fc" id="L836">            u -= diff / deriv;</span>
+<span class="pc bpc" id="L837" title="1 of 2 branches missed.">            if (u &lt; 0f) {</span>
+<span class="nc" id="L838">                u = 0f;</span>
+<span class="pc bpc" id="L839" title="1 of 2 branches missed.">            } else if (u &gt; 1f) {</span>
+<span class="nc" id="L840">                u = 1f;</span>
+            }
+        }
+<span class="nc" id="L843">        float lo = 0f;</span>
+<span class="nc" id="L844">        float hi = 1f;</span>
+<span class="nc" id="L845">        u = t;</span>
+<span class="nc bnc" id="L846" title="All 2 branches missed.">        for (int i = 0; i &lt; 16; i++) {</span>
+<span class="nc" id="L847">            float bxAtU = bezierAxis(u, cx1, cx2);</span>
+<span class="nc bnc" id="L848" title="All 2 branches missed.">            if (Math.abs(bxAtU - t) &lt; 1e-5f) {</span>
+<span class="nc" id="L849">                return u;</span>
+            }
+<span class="nc bnc" id="L851" title="All 2 branches missed.">            if (bxAtU &lt; t) {</span>
+<span class="nc" id="L852">                lo = u;</span>
+            } else {
+<span class="nc" id="L854">                hi = u;</span>
+            }
+<span class="nc" id="L856">            u = 0.5f * (lo + hi);</span>
+        }
+<span class="nc" id="L858">        return u;</span>
+    }
+
+    static class CC {
+        final String sourceName;
+        Component source;
+        Component dest;
+        Label placeholderSrc;
+        Label placeholderDest;
+        Motion xMotion;
+        Motion yMotion;
+        Motion wMotion;
+        Motion hMotion;
+
+        // Optional opacity / rotation / scale tweens (identity by default).
+<span class="fc" id="L873">        float fromOpacity = 1f;</span>
+<span class="fc" id="L874">        float toOpacity = 1f;</span>
+<span class="fc" id="L875">        float fromRotation = 0f;</span>
+<span class="fc" id="L876">        float toRotation = 0f;</span>
+<span class="fc" id="L877">        float fromScale = 1f;</span>
+<span class="fc" id="L878">        float toScale = 1f;</span>
+<span class="fc" id="L879">        float curOpacity = 1f;</span>
+<span class="fc" id="L880">        float curRotation = 0f;</span>
+<span class="fc" id="L881">        float curScale = 1f;</span>
+
+        /// Snapshot-mode capture of `source` at its original bounds, clipped
+        /// to its own size. Populated in `MorphTransition#captureSnapshot`
+        /// when `snapshotMode == true`; null on the legacy path.
+        Image sourceImage;
+        /// Snapshot-mode capture of `dest` at its destination-form bounds.
+        Image destImage;
+
+<span class="fc" id="L890">        public CC(String sourceName, Component source, Component dest, int duration) {</span>
+<span class="fc" id="L891">            this.sourceName = sourceName;</span>
+<span class="fc" id="L892">            this.source = source;</span>
+<span class="fc" id="L893">            this.dest = dest;</span>
+<span class="fc" id="L894">            xMotion = Motion.createEaseInOutMotion(positionRelativeToScreen(source, false), positionRelativeToScreen(dest, false), duration);</span>
+<span class="fc" id="L895">            xMotion.start();</span>
+<span class="fc" id="L896">            yMotion = Motion.createEaseInOutMotion(positionRelativeToScreen(source, true), positionRelativeToScreen(dest, true), duration);</span>
+<span class="fc" id="L897">            yMotion.start();</span>
+<span class="fc" id="L898">            hMotion = Motion.createEaseInOutMotion(source.getHeight(), dest.getHeight(), duration);</span>
+<span class="fc" id="L899">            hMotion.start();</span>
+<span class="fc" id="L900">            wMotion = Motion.createEaseInOutMotion(source.getWidth(), dest.getWidth(), duration);</span>
+<span class="fc" id="L901">            wMotion.start();</span>
+<span class="fc" id="L902">        }</span>
+
+        void applyAttributes(float[] opacity, float[] rotation, float[] scale) {
+<span class="fc bfc" id="L905" title="All 2 branches covered.">            if (opacity != null) {</span>
+<span class="fc" id="L906">                fromOpacity = opacity[0];</span>
+<span class="fc" id="L907">                toOpacity = opacity[1];</span>
+            }
+<span class="fc bfc" id="L909" title="All 2 branches covered.">            if (rotation != null) {</span>
+<span class="fc" id="L910">                fromRotation = rotation[0];</span>
+<span class="fc" id="L911">                toRotation = rotation[1];</span>
+            }
+<span class="fc bfc" id="L913" title="All 2 branches covered.">            if (scale != null) {</span>
+<span class="fc" id="L914">                fromScale = scale[0];</span>
+<span class="fc" id="L915">                toScale = scale[1];</span>
+            }
+<span class="fc" id="L917">            curOpacity = fromOpacity;</span>
+<span class="fc" id="L918">            curRotation = fromRotation;</span>
+<span class="fc" id="L919">            curScale = fromScale;</span>
+<span class="fc" id="L920">        }</span>
+
+        void applyFraction(float f) {
+<span class="fc" id="L923">            curOpacity = lerp(fromOpacity, toOpacity, f);</span>
+<span class="fc" id="L924">            curRotation = lerp(fromRotation, toRotation, f);</span>
+<span class="fc" id="L925">            curScale = lerp(fromScale, toScale, f);</span>
+<span class="fc" id="L926">        }</span>
+
+        private int positionRelativeToScreen(Component cmp, boolean yAxis) {
+<span class="fc" id="L929">            int retVal = 0;</span>
+<span class="fc bfc" id="L930" title="All 2 branches covered.">            if (yAxis) {</span>
+<span class="fc" id="L931">                int titleHeight = cmp.getComponentForm().getContentPane().getAbsoluteY();</span>
+<span class="fc" id="L932">                retVal = cmp.getAbsoluteY() - titleHeight;</span>
+<span class="fc" id="L933">            } else {</span>
+<span class="fc" id="L934">                retVal = cmp.getAbsoluteX();</span>
+            }
+
+<span class="fc" id="L937">            return retVal;</span>
+        }
+    }
+
+    /// Renders `cmp` into a fresh `Image` sized to its current bounds. Used
+    /// by snapshot mode in `initTransition()` to freeze each endpoint
+    /// visually before the tween starts; the resulting image is what the
+    /// `paint()` cycle draws at the interpolated bounds.
+    ///
+    /// The component is painted with `paintComponent` (not `paint`) so its
+    /// background + border + children are all included. The graphics is
+    /// translated so the component's `(getX(), getY())` becomes `(0, 0)` in
+    /// the snapshot. The image's own bounds clip everything that paints
+    /// outside `(0, 0, width, height)` -- which is exactly the
+    /// &quot;off-viewport children don't leak&quot; property the legacy live-paint
+    /// path lacked.
+    private static Image captureSnapshot(Component cmp) {
+<span class="fc" id="L954">        int w = Math.max(1, cmp.getWidth());</span>
+<span class="fc" id="L955">        int h = Math.max(1, cmp.getHeight());</span>
+<span class="fc" id="L956">        Image img = Image.createImage(w, h, 0);</span>
+<span class="fc" id="L957">        Graphics g = img.getGraphics();</span>
+        // paintComponent renders the component at its current screen position
+        // by default; offset so the top-left of `cmp` lands at (0, 0) of the
+        // image buffer. The image's bounds clip outside-of-buffer paints.
+<span class="fc" id="L961">        g.translate(-cmp.getX(), -cmp.getY());</span>
+<span class="fc" id="L962">        cmp.paintComponent(g);</span>
+<span class="fc" id="L963">        return img;</span>
+    }
+
+    /// Describes an arbitrary rendered element that the morph tweens between two
+    /// states: position, size, opacity, rotation and scale. Build one with
+    /// `#create(Image)` (e.g. a rendered SVG, an icon, an `EncodedImage`) or
+    /// `#create(Component)` (the component is snapshotted to an image when the
+    /// transition initializes), then hand it to
+    /// `MorphTransition#morph(MorphElement)`.
+    ///
+    /// All builder setters return `this` for chaining; every state has an
+    /// identity default (opacity `1`, rotation `0`, scale `1`, and the element's
+    /// own bounds for position / size) so only the properties you actually want
+    /// to tween need to be set.
+    public static final class MorphElement {
+        Image image;
+        private Component component;
+        private float fromX;
+        private float fromY;
+        private float fromW;
+        private float fromH;
+        private float toX;
+        private float toY;
+        private float toW;
+        private float toH;
+        private boolean fromSet;
+        private boolean toSet;
+<span class="fc" id="L990">        private float fromOpacity = 1f;</span>
+<span class="fc" id="L991">        private float toOpacity = 1f;</span>
+<span class="fc" id="L992">        private float fromRotation = 0f;</span>
+<span class="fc" id="L993">        private float toRotation = 0f;</span>
+<span class="fc" id="L994">        private float fromScale = 1f;</span>
+<span class="fc" id="L995">        private float toScale = 1f;</span>
+
+        // Current interpolated state, updated by the owning transition.
+        float curX;
+        float curY;
+        float curW;
+        float curH;
+<span class="fc" id="L1002">        float curOpacity = 1f;</span>
+<span class="fc" id="L1003">        float curRotation = 0f;</span>
+<span class="fc" id="L1004">        float curScale = 1f;</span>
+
+<span class="fc" id="L1006">        private MorphElement() {</span>
+<span class="fc" id="L1007">        }</span>
+
+        /// Creates an element backed by a pre-rendered `Image` (a rasterized SVG,
+        /// an icon, a snapshot, ...).
+        public static MorphElement create(Image image) {
+<span class="fc" id="L1012">            MorphElement e = new MorphElement();</span>
+<span class="fc" id="L1013">            e.image = image;</span>
+<span class="fc" id="L1014">            return e;</span>
+        }
+
+        /// Creates an element backed by a `Component`; the component is
+        /// snapshotted to an image when the transition initializes. The
+        /// component's laid-out bounds seed the source rectangle unless
+        /// `#from(int, int, int, int)` is given.
+        public static MorphElement create(Component cmp) {
+<span class="nc" id="L1022">            MorphElement e = new MorphElement();</span>
+<span class="nc" id="L1023">            e.component = cmp;</span>
+<span class="nc" id="L1024">            return e;</span>
+        }
+
+        /// Sets the source rectangle (state at `t = 0`).
+        public MorphElement from(int x, int y, int w, int h) {
+<span class="fc" id="L1029">            fromX = x;</span>
+<span class="fc" id="L1030">            fromY = y;</span>
+<span class="fc" id="L1031">            fromW = w;</span>
+<span class="fc" id="L1032">            fromH = h;</span>
+<span class="fc" id="L1033">            fromSet = true;</span>
+<span class="fc" id="L1034">            return this;</span>
+        }
+
+        /// Sets the destination rectangle (state at `t = 1`).
+        public MorphElement to(int x, int y, int w, int h) {
+<span class="fc" id="L1039">            toX = x;</span>
+<span class="fc" id="L1040">            toY = y;</span>
+<span class="fc" id="L1041">            toW = w;</span>
+<span class="fc" id="L1042">            toH = h;</span>
+<span class="fc" id="L1043">            toSet = true;</span>
+<span class="fc" id="L1044">            return this;</span>
+        }
+
+        /// Tweens the element opacity from `from` to `to` (both `[0, 1]`).
+        public MorphElement opacity(float from, float to) {
+<span class="fc" id="L1049">            fromOpacity = from;</span>
+<span class="fc" id="L1050">            toOpacity = to;</span>
+<span class="fc" id="L1051">            return this;</span>
+        }
+
+        /// Tweens the element rotation in degrees about its center.
+        public MorphElement rotation(float fromDegrees, float toDegrees) {
+<span class="fc" id="L1056">            fromRotation = fromDegrees;</span>
+<span class="fc" id="L1057">            toRotation = toDegrees;</span>
+<span class="fc" id="L1058">            return this;</span>
+        }
+
+        /// Tweens an extra scale multiplier about the element center (on top of
+        /// the interpolated size).
+        public MorphElement scale(float from, float to) {
+<span class="fc" id="L1064">            fromScale = from;</span>
+<span class="fc" id="L1065">            toScale = to;</span>
+<span class="fc" id="L1066">            return this;</span>
+        }
+
+        /// The interpolated x of the element at the current progress.
+        public float getCurrentX() {
+<span class="fc" id="L1071">            return curX;</span>
+        }
+
+        /// The interpolated y of the element at the current progress.
+        public float getCurrentY() {
+<span class="fc" id="L1076">            return curY;</span>
+        }
+
+        /// The interpolated width of the element at the current progress.
+        public float getCurrentWidth() {
+<span class="fc" id="L1081">            return curW;</span>
+        }
+
+        /// The interpolated height of the element at the current progress.
+        public float getCurrentHeight() {
+<span class="fc" id="L1086">            return curH;</span>
+        }
+
+        /// The interpolated opacity (`0..1`) at the current progress.
+        public float getCurrentOpacity() {
+<span class="fc" id="L1091">            return curOpacity;</span>
+        }
+
+        /// The interpolated rotation (degrees) at the current progress.
+        public float getCurrentRotation() {
+<span class="fc" id="L1096">            return curRotation;</span>
+        }
+
+        /// The interpolated scale multiplier at the current progress.
+        public float getCurrentScale() {
+<span class="fc" id="L1101">            return curScale;</span>
+        }
+
+        /// Snapshots the component (if any) and fills in default rectangles.
+        /// Called by the transition during `initTransition()`.
+        void resolve() {
+<span class="pc bpc" id="L1107" title="3 of 4 branches missed.">            if (image == null &amp;&amp; component != null) {</span>
+<span class="nc" id="L1108">                image = captureSnapshot(component);</span>
+            }
+<span class="fc bfc" id="L1110" title="All 2 branches covered.">            if (!fromSet) {</span>
+<span class="pc bpc" id="L1111" title="1 of 2 branches missed.">                if (component != null) {</span>
+<span class="nc" id="L1112">                    fromX = component.getX();</span>
+<span class="nc" id="L1113">                    fromY = component.getY();</span>
+<span class="nc" id="L1114">                    fromW = component.getWidth();</span>
+<span class="nc" id="L1115">                    fromH = component.getHeight();</span>
+<span class="pc bpc" id="L1116" title="1 of 2 branches missed.">                } else if (image != null) {</span>
+<span class="fc" id="L1117">                    fromW = image.getWidth();</span>
+<span class="fc" id="L1118">                    fromH = image.getHeight();</span>
+                }
+<span class="fc" id="L1120">                fromSet = true;</span>
+            }
+<span class="fc bfc" id="L1122" title="All 2 branches covered.">            if (!toSet) {</span>
+                // Default the destination to the source rectangle so an element
+                // that only tweens opacity / rotation / scale stays in place.
+<span class="fc" id="L1125">                toX = fromX;</span>
+<span class="fc" id="L1126">                toY = fromY;</span>
+<span class="fc" id="L1127">                toW = fromW;</span>
+<span class="fc" id="L1128">                toH = fromH;</span>
+<span class="fc" id="L1129">                toSet = true;</span>
+            }
+<span class="fc" id="L1131">        }</span>
+
+        void applyFraction(float f) {
+<span class="fc" id="L1134">            curX = lerp(fromX, toX, f);</span>
+<span class="fc" id="L1135">            curY = lerp(fromY, toY, f);</span>
+<span class="fc" id="L1136">            curW = lerp(fromW, toW, f);</span>
+<span class="fc" id="L1137">            curH = lerp(fromH, toH, f);</span>
+<span class="fc" id="L1138">            curOpacity = lerp(fromOpacity, toOpacity, f);</span>
+<span class="fc" id="L1139">            curRotation = lerp(fromRotation, toRotation, f);</span>
+<span class="fc" id="L1140">            curScale = lerp(fromScale, toScale, f);</span>
+<span class="fc" id="L1141">        }</span>
+
+        MorphElement copy(boolean reverse) {
+<span class="fc" id="L1144">            MorphElement e = new MorphElement();</span>
+<span class="fc" id="L1145">            e.image = image;</span>
+<span class="fc" id="L1146">            e.component = component;</span>
+<span class="fc" id="L1147">            e.fromSet = fromSet;</span>
+<span class="fc" id="L1148">            e.toSet = toSet;</span>
+<span class="fc bfc" id="L1149" title="All 2 branches covered.">            if (reverse) {</span>
+<span class="fc" id="L1150">                e.fromX = toX;</span>
+<span class="fc" id="L1151">                e.fromY = toY;</span>
+<span class="fc" id="L1152">                e.fromW = toW;</span>
+<span class="fc" id="L1153">                e.fromH = toH;</span>
+<span class="fc" id="L1154">                e.toX = fromX;</span>
+<span class="fc" id="L1155">                e.toY = fromY;</span>
+<span class="fc" id="L1156">                e.toW = fromW;</span>
+<span class="fc" id="L1157">                e.toH = fromH;</span>
+<span class="fc" id="L1158">                e.fromOpacity = toOpacity;</span>
+<span class="fc" id="L1159">                e.toOpacity = fromOpacity;</span>
+<span class="fc" id="L1160">                e.fromRotation = toRotation;</span>
+<span class="fc" id="L1161">                e.toRotation = fromRotation;</span>
+<span class="fc" id="L1162">                e.fromScale = toScale;</span>
+<span class="fc" id="L1163">                e.toScale = fromScale;</span>
+            } else {
+<span class="fc" id="L1165">                e.fromX = fromX;</span>
+<span class="fc" id="L1166">                e.fromY = fromY;</span>
+<span class="fc" id="L1167">                e.fromW = fromW;</span>
+<span class="fc" id="L1168">                e.fromH = fromH;</span>
+<span class="fc" id="L1169">                e.toX = toX;</span>
+<span class="fc" id="L1170">                e.toY = toY;</span>
+<span class="fc" id="L1171">                e.toW = toW;</span>
+<span class="fc" id="L1172">                e.toH = toH;</span>
+<span class="fc" id="L1173">                e.fromOpacity = fromOpacity;</span>
+<span class="fc" id="L1174">                e.toOpacity = toOpacity;</span>
+<span class="fc" id="L1175">                e.fromRotation = fromRotation;</span>
+<span class="fc" id="L1176">                e.toRotation = toRotation;</span>
+<span class="fc" id="L1177">                e.fromScale = fromScale;</span>
+<span class="fc" id="L1178">                e.toScale = toScale;</span>
+            }
+<span class="fc" id="L1180">            e.applyFraction(0f);</span>
+<span class="fc" id="L1181">            return e;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

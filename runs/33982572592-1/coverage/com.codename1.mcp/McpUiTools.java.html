@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>McpUiTools.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.mcp</a> &gt; <span class="el_source">McpUiTools.java</span></div><h1>McpUiTools.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.mcp;
+
+import com.codename1.ai.Tool;
+import com.codename1.ai.ToolHandler;
+import com.codename1.io.JSONParser;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.accessibility.AccessibilityAction;
+import com.codename1.ui.accessibility.AccessibilityManager;
+import com.codename1.ui.accessibility.AccessibilityNodeSnapshot;
+import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.util.ImageIO;
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Built in MCP tools that turn any Codename One application into an agent drivable
+/// surface with no application code. They wrap the portable accessibility semantics
+/// tree: {@link AccessibilityTreeSnapshot#toJson()} reads the current screen and
+/// {@link AccessibilityAction} entries drive it. All tree access is marshalled onto
+/// the Codename One EDT because the live component hierarchy must never be walked off
+/// thread.
+final class McpUiTools {
+    private McpUiTools() {
+    }
+
+    static List&lt;Tool&gt; builtInTools() {
+<span class="fc" id="L55">        List&lt;Tool&gt; tools = new ArrayList&lt;Tool&gt;();</span>
+
+<span class="fc" id="L57">        tools.add(new Tool(&quot;ui_snapshot&quot;,</span>
+                &quot;Returns the accessibility semantics tree of the current screen as JSON: every &quot;
+                        + &quot;visible node with its id, role, label, value, state and the ids of the &quot;
+                        + &quot;actions that can be performed on it.&quot;,
+                &quot;{\&quot;type\&quot;:\&quot;object\&quot;,\&quot;properties\&quot;:{}}&quot;,
+<span class="fc" id="L62">                new ToolHandler() {</span>
+                    @Override
+                    public String invoke(String argumentsJson) {
+<span class="fc" id="L65">                        return snapshotJson();</span>
+                    }
+                }));
+
+<span class="fc" id="L69">        tools.add(new Tool(&quot;ui_perform_action&quot;,</span>
+                &quot;Performs an accessibility action on a node from ui_snapshot. actionId is one of the &quot;
+                        + &quot;action ids listed on the node (for example activate, setText, increment, focus). &quot;
+                        + &quot;Returns whether it succeeded and a fresh snapshot.&quot;,
+                &quot;{\&quot;type\&quot;:\&quot;object\&quot;,\&quot;properties\&quot;:{&quot;
+                        + &quot;\&quot;nodeId\&quot;:{\&quot;type\&quot;:\&quot;integer\&quot;,\&quot;description\&quot;:\&quot;id of the target node\&quot;},&quot;
+                        + &quot;\&quot;actionId\&quot;:{\&quot;type\&quot;:\&quot;string\&quot;,\&quot;description\&quot;:\&quot;id of the action to perform\&quot;},&quot;
+                        + &quot;\&quot;argument\&quot;:{\&quot;type\&quot;:\&quot;string\&quot;,\&quot;description\&quot;:\&quot;optional argument, e.g. text for setText\&quot;}&quot;
+                        + &quot;},\&quot;required\&quot;:[\&quot;nodeId\&quot;,\&quot;actionId\&quot;]}&quot;,
+<span class="fc" id="L78">                new ToolHandler() {</span>
+                    @Override
+                    public String invoke(String argumentsJson) throws Exception {
+<span class="nc" id="L81">                        Map&lt;String, Object&gt; args = parse(argumentsJson);</span>
+<span class="nc" id="L82">                        long nodeId = longArg(args, &quot;nodeId&quot;, -1);</span>
+<span class="nc" id="L83">                        String actionId = JSONParser.getString(args, &quot;actionId&quot;);</span>
+<span class="nc" id="L84">                        Object argument = args.get(&quot;argument&quot;);</span>
+<span class="nc" id="L85">                        return JSONParser.toJson(performAction(nodeId, actionId, argument));</span>
+                    }
+                }));
+
+<span class="fc" id="L89">        tools.add(new Tool(&quot;ui_activate&quot;,</span>
+                &quot;Convenience wrapper that performs the activate action on a node (equivalent to a tap &quot;
+                        + &quot;or click). Returns whether it succeeded and a fresh snapshot.&quot;,
+                &quot;{\&quot;type\&quot;:\&quot;object\&quot;,\&quot;properties\&quot;:{&quot;
+                        + &quot;\&quot;nodeId\&quot;:{\&quot;type\&quot;:\&quot;integer\&quot;,\&quot;description\&quot;:\&quot;id of the node to activate\&quot;}&quot;
+                        + &quot;},\&quot;required\&quot;:[\&quot;nodeId\&quot;]}&quot;,
+<span class="fc" id="L95">                new ToolHandler() {</span>
+                    @Override
+                    public String invoke(String argumentsJson) throws Exception {
+<span class="fc" id="L98">                        Map&lt;String, Object&gt; args = parse(argumentsJson);</span>
+<span class="fc" id="L99">                        return JSONParser.toJson(performAction(longArg(args, &quot;nodeId&quot;, -1),</span>
+                                AccessibilityAction.ACTIVATE, null));
+                    }
+                }));
+
+<span class="fc" id="L104">        tools.add(new Tool(&quot;ui_set_text&quot;,</span>
+                &quot;Convenience wrapper that sets the text of an editable node (performs the setText &quot;
+                        + &quot;action with the given text). Returns whether it succeeded and a fresh snapshot.&quot;,
+                &quot;{\&quot;type\&quot;:\&quot;object\&quot;,\&quot;properties\&quot;:{&quot;
+                        + &quot;\&quot;nodeId\&quot;:{\&quot;type\&quot;:\&quot;integer\&quot;,\&quot;description\&quot;:\&quot;id of the editable node\&quot;},&quot;
+                        + &quot;\&quot;text\&quot;:{\&quot;type\&quot;:\&quot;string\&quot;,\&quot;description\&quot;:\&quot;the text to set\&quot;}&quot;
+                        + &quot;},\&quot;required\&quot;:[\&quot;nodeId\&quot;,\&quot;text\&quot;]}&quot;,
+<span class="fc" id="L111">                new ToolHandler() {</span>
+                    @Override
+                    public String invoke(String argumentsJson) throws Exception {
+<span class="fc" id="L114">                        Map&lt;String, Object&gt; args = parse(argumentsJson);</span>
+<span class="fc" id="L115">                        return JSONParser.toJson(performAction(longArg(args, &quot;nodeId&quot;, -1),</span>
+<span class="fc" id="L116">                                AccessibilityAction.SET_TEXT, JSONParser.getString(args, &quot;text&quot;)));</span>
+                    }
+                }));
+
+<span class="fc" id="L120">        tools.add(new Tool(&quot;ui_find&quot;,</span>
+                &quot;Finds nodes on the current screen by application identifier, by a case insensitive &quot;
+                        + &quot;substring of their label, or by a screen coordinate. Returns a compact JSON array &quot;
+                        + &quot;of matches with their id, role, label and available action ids.&quot;,
+                &quot;{\&quot;type\&quot;:\&quot;object\&quot;,\&quot;properties\&quot;:{&quot;
+                        + &quot;\&quot;identifier\&quot;:{\&quot;type\&quot;:\&quot;string\&quot;,\&quot;description\&quot;:\&quot;exact application identifier\&quot;},&quot;
+                        + &quot;\&quot;label\&quot;:{\&quot;type\&quot;:\&quot;string\&quot;,\&quot;description\&quot;:\&quot;label substring to search for\&quot;},&quot;
+                        + &quot;\&quot;x\&quot;:{\&quot;type\&quot;:\&quot;integer\&quot;,\&quot;description\&quot;:\&quot;screen x coordinate\&quot;},&quot;
+                        + &quot;\&quot;y\&quot;:{\&quot;type\&quot;:\&quot;integer\&quot;,\&quot;description\&quot;:\&quot;screen y coordinate\&quot;}&quot;
+                        + &quot;}}&quot;,
+<span class="fc" id="L130">                new ToolHandler() {</span>
+                    @Override
+                    public String invoke(String argumentsJson) throws Exception {
+<span class="fc" id="L133">                        Map&lt;String, Object&gt; args = parse(argumentsJson);</span>
+<span class="fc" id="L134">                        return findNodes(JSONParser.getString(args, &quot;identifier&quot;),</span>
+<span class="fc" id="L135">                                JSONParser.getString(args, &quot;label&quot;),</span>
+<span class="fc" id="L136">                                (int) longArg(args, &quot;x&quot;, Integer.MIN_VALUE),</span>
+<span class="fc" id="L137">                                (int) longArg(args, &quot;y&quot;, Integer.MIN_VALUE));</span>
+                    }
+                }));
+
+<span class="fc" id="L141">        return tools;</span>
+    }
+
+    static String snapshotJson() {
+<span class="fc" id="L145">        final String[] holder = new String[1];</span>
+<span class="fc" id="L146">        runOnEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L149">                holder[0] = currentSnapshot().toJson();</span>
+<span class="fc" id="L150">            }</span>
+        });
+<span class="fc" id="L152">        return holder[0];</span>
+    }
+
+    static Map&lt;String, Object&gt; performAction(final long nodeId, final String actionId, final Object argument) {
+<span class="fc" id="L156">        final Map&lt;String, Object&gt; out = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L157">        runOnEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L160">                AccessibilityManager mgr = AccessibilityManager.getInstance();</span>
+<span class="fc" id="L161">                AccessibilityTreeSnapshot snap = currentSnapshot();</span>
+<span class="fc" id="L162">                AccessibilityNodeSnapshot node = snap.getNode(nodeId);</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">                AccessibilityAction action = node == null ? null : node.getAction(actionId);</span>
+<span class="fc" id="L164">                boolean ok = false;</span>
+<span class="pc bpc" id="L165" title="3 of 6 branches missed.">                if (node != null &amp;&amp; action != null &amp;&amp; action.isEnabled()) {</span>
+<span class="fc" id="L166">                    ok = action.perform(node.getComponent(), argument);</span>
+<span class="fc" id="L167">                    mgr.invalidate(node.getComponent(), AccessibilityManager.CHANGE_STATE</span>
+                            | AccessibilityManager.CHANGE_VALUE | AccessibilityManager.CHANGE_CONTENT
+                            | AccessibilityManager.CHANGE_STRUCTURE);
+                }
+<span class="fc" id="L171">                out.put(&quot;success&quot;, Boolean.valueOf(ok));</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">                if (node == null) {</span>
+<span class="nc" id="L173">                    out.put(&quot;error&quot;, &quot;no node with id &quot; + nodeId);</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">                } else if (action == null) {</span>
+<span class="nc" id="L175">                    out.put(&quot;error&quot;, &quot;node &quot; + nodeId + &quot; has no action &quot; + actionId);</span>
+                }
+<span class="fc" id="L177">                out.put(&quot;snapshot&quot;, JSONParser.rawJson(currentSnapshot().toJson()));</span>
+<span class="fc" id="L178">            }</span>
+        });
+<span class="fc" id="L180">        return out;</span>
+    }
+
+    static String findNodes(final String identifier, final String label, final int x, final int y) {
+<span class="fc" id="L184">        final List&lt;Object&gt; matches = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L185">        runOnEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L188">                AccessibilityTreeSnapshot snap = currentSnapshot();</span>
+<span class="pc bpc" id="L189" title="3 of 4 branches missed.">                if (identifier != null &amp;&amp; identifier.length() &gt; 0) {</span>
+<span class="nc" id="L190">                    addNode(matches, snap.getNodeByIdentifier(identifier));</span>
+<span class="pc bpc" id="L191" title="3 of 4 branches missed.">                } else if (x != Integer.MIN_VALUE &amp;&amp; y != Integer.MIN_VALUE) {</span>
+<span class="nc" id="L192">                    addNode(matches, snap.getNodeAt(x, y));</span>
+<span class="pc bpc" id="L193" title="2 of 4 branches missed.">                } else if (label != null &amp;&amp; label.length() &gt; 0) {</span>
+<span class="fc" id="L194">                    String needle = label.toLowerCase();</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                    for (AccessibilityNodeSnapshot node : snap.getNodes().values()) {</span>
+<span class="fc" id="L196">                        String candidate = node.getLabel();</span>
+<span class="fc bfc" id="L197" title="All 4 branches covered.">                        if (candidate != null &amp;&amp; candidate.toLowerCase().indexOf(needle) &gt;= 0) {</span>
+<span class="fc" id="L198">                            addNode(matches, node);</span>
+                        }
+<span class="fc" id="L200">                    }</span>
+                }
+<span class="fc" id="L202">            }</span>
+        });
+<span class="fc" id="L204">        return JSONParser.toJson(matches);</span>
+    }
+
+    /// Renders the current form to a PNG. Returns null when no form is showing or the
+    /// platform cannot encode PNG images. Runs on the EDT.
+    static byte[] screenshotPng() {
+<span class="nc" id="L210">        final byte[][] holder = new byte[1][];</span>
+<span class="nc" id="L211">        runOnEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L214">                holder[0] = renderCurrentFormPng();</span>
+<span class="nc" id="L215">            }</span>
+        });
+<span class="nc" id="L217">        return holder[0];</span>
+    }
+
+    private static byte[] renderCurrentFormPng() {
+<span class="nc" id="L221">        Form form = Display.getInstance().getCurrent();</span>
+<span class="nc" id="L222">        ImageIO io = ImageIO.getImageIO();</span>
+<span class="nc bnc" id="L223" title="All 4 branches missed.">        if (form == null || io == null) {</span>
+<span class="nc" id="L224">            return null;</span>
+        }
+<span class="nc" id="L226">        int w = form.getWidth();</span>
+<span class="nc" id="L227">        int h = form.getHeight();</span>
+<span class="nc bnc" id="L228" title="All 4 branches missed.">        if (w &lt;= 0 || h &lt;= 0) {</span>
+<span class="nc" id="L229">            return null;</span>
+        }
+<span class="nc" id="L231">        Image image = Image.createImage(w, h, 0xffffffff);</span>
+<span class="nc" id="L232">        Graphics g = image.getGraphics();</span>
+<span class="nc" id="L233">        form.paintComponent(g, true);</span>
+        try {
+<span class="nc" id="L235">            ByteArrayOutputStream bo = new ByteArrayOutputStream();</span>
+<span class="nc" id="L236">            io.save(image, bo, ImageIO.FORMAT_PNG, 1);</span>
+<span class="nc" id="L237">            return bo.toByteArray();</span>
+<span class="nc" id="L238">        } catch (Exception ex) {</span>
+<span class="nc" id="L239">            return null;</span>
+        }
+    }
+
+    private static void addNode(List&lt;Object&gt; matches, AccessibilityNodeSnapshot node) {
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (node == null) {</span>
+<span class="nc" id="L245">            return;</span>
+        }
+<span class="fc" id="L247">        Map&lt;String, Object&gt; out = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L248">        out.put(&quot;id&quot;, Long.valueOf(node.getId()));</span>
+<span class="fc" id="L249">        out.put(&quot;role&quot;, node.getRole().name());</span>
+<span class="fc" id="L250">        out.put(&quot;label&quot;, node.getLabel());</span>
+<span class="fc" id="L251">        out.put(&quot;value&quot;, node.getValue());</span>
+<span class="fc" id="L252">        out.put(&quot;identifier&quot;, node.getIdentifier());</span>
+<span class="fc" id="L253">        Rectangle b = node.getBounds();</span>
+<span class="fc" id="L254">        List&lt;Object&gt; bounds = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L255">        bounds.add(Integer.valueOf(b.getX()));</span>
+<span class="fc" id="L256">        bounds.add(Integer.valueOf(b.getY()));</span>
+<span class="fc" id="L257">        bounds.add(Integer.valueOf(b.getWidth()));</span>
+<span class="fc" id="L258">        bounds.add(Integer.valueOf(b.getHeight()));</span>
+<span class="fc" id="L259">        out.put(&quot;bounds&quot;, bounds);</span>
+<span class="fc" id="L260">        List&lt;Object&gt; actions = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        for (AccessibilityAction action : node.getActions()) {</span>
+<span class="fc" id="L262">            actions.add(action.getId());</span>
+<span class="fc" id="L263">        }</span>
+<span class="fc" id="L264">        out.put(&quot;actions&quot;, actions);</span>
+<span class="fc" id="L265">        matches.add(out);</span>
+<span class="fc" id="L266">    }</span>
+
+    private static AccessibilityTreeSnapshot currentSnapshot() {
+<span class="fc" id="L269">        return AccessibilityManager.getInstance().getSnapshot(Display.getInstance().getCurrent());</span>
+    }
+
+    private static void runOnEdt(Runnable r) {
+<span class="fc" id="L273">        Display display = Display.getInstance();</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        if (display.isEdt()) {</span>
+<span class="fc" id="L275">            r.run();</span>
+        } else {
+<span class="nc" id="L277">            display.callSeriallyAndWait(r);</span>
+        }
+<span class="fc" id="L279">    }</span>
+
+    private static Map&lt;String, Object&gt; parse(String json) throws Exception {
+<span class="pc bpc" id="L282" title="2 of 4 branches missed.">        if (json == null || json.length() == 0) {</span>
+<span class="nc" id="L283">            return new LinkedHashMap&lt;String, Object&gt;();</span>
+        }
+<span class="fc" id="L285">        Map&lt;String, Object&gt; parsed = JSONParser.parseJSON(json);</span>
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">        return parsed == null ? new LinkedHashMap&lt;String, Object&gt;() : parsed;</span>
+    }
+
+    private static long longArg(Map&lt;String, Object&gt; args, String key, long defaultValue) {
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        if (args == null) {</span>
+<span class="nc" id="L291">            return defaultValue;</span>
+        }
+<span class="fc" id="L293">        Object v = args.get(key);</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        if (v instanceof Number) {</span>
+<span class="fc" id="L295">            return ((Number) v).longValue();</span>
+        }
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">        if (v instanceof String) {</span>
+            try {
+<span class="nc" id="L299">                return Long.parseLong(((String) v).trim());</span>
+<span class="nc" id="L300">            } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L301">                return defaultValue;</span>
+            }
+        }
+<span class="fc" id="L304">        return defaultValue;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,552 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TopLevelSupport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">TopLevelSupport.java</span></div><h1>TopLevelSupport.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.animations.Animation;
+
+/// Package private helpers shared by `Form` and `Window`.
+///
+/// Java 5 has no default methods, so behaviour common to the two top levels lives
+/// here as statics rather than on `TopLevelContainer`.
+///
+/// @author Shai Almog
+final class TopLevelSupport {
+
+    /// Client property recording a layer's depth within a layered pane.
+    static final String Z_INDEX_PROP = &quot;cn1$_zIndex&quot;;
+
+    /// Client property recording the class a layer belongs to.
+    static final String CLASS_PROP = &quot;cn1$_cls&quot;;
+
+    private TopLevelSupport() {
+    }
+
+    /// Returns the layer belonging to the given class, creating it at the top or the
+    /// bottom of the stack if it does not exist yet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layeredPaneImpl`: the container holding the layers
+    ///
+    /// - `c`: the class owning the layer, or null for the global layer
+    ///
+    /// - `top`: true to create the layer above the existing ones
+    ///
+    /// #### Returns
+    ///
+    /// the layer for the given class
+    static Container layeredPane(Container layeredPaneImpl, Class c, boolean top) {
+<span class="fc" id="L60">        Container existing = findLayer(layeredPaneImpl, c);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (existing != null) {</span>
+<span class="fc" id="L62">            return existing;</span>
+        }
+        // getChildrenAsList(true) rather than iterating the container directly: the
+        // latter will not find components while an animation is in progress, and we
+        // would then add a duplicate layer.
+<span class="fc" id="L67">        java.util.List&lt;Component&gt; children = layeredPaneImpl.getChildrenAsList(true);</span>
+<span class="fc" id="L68">        Container cnt = new Container();</span>
+<span class="fc" id="L69">        int zIndex = 0;</span>
+<span class="fc" id="L70">        int componentCount = children.size();</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (top) {</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if (componentCount &gt; 0) {</span>
+<span class="fc" id="L73">                Integer z = (Integer) children.get(componentCount - 1).getClientProperty(Z_INDEX_PROP);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">                if (z != null) {</span>
+<span class="nc" id="L75">                    zIndex = z.intValue();</span>
+                }
+            }
+<span class="fc" id="L78">            layeredPaneImpl.add(cnt);</span>
+        } else {
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            if (componentCount &gt; 0) {</span>
+<span class="nc" id="L81">                Integer z = (Integer) children.get(0).getClientProperty(Z_INDEX_PROP);</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                if (z != null) {</span>
+<span class="nc" id="L83">                    zIndex = z.intValue();</span>
+                }
+            }
+<span class="nc" id="L86">            layeredPaneImpl.addComponent(0, cnt);</span>
+        }
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        cnt.putClientProperty(CLASS_PROP, c != null ? c.getName() : null);</span>
+<span class="fc" id="L89">        cnt.putClientProperty(Z_INDEX_PROP, zIndex);</span>
+<span class="fc" id="L90">        return cnt;</span>
+    }
+
+    /// Returns the layer belonging to the given class, creating it at an explicit
+    /// depth if it does not exist yet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layeredPaneImpl`: the container holding the layers
+    ///
+    /// - `c`: the class owning the layer, or null for the global layer
+    ///
+    /// - `zIndex`: the depth at which to create the layer, higher sits in front
+    ///
+    /// #### Returns
+    ///
+    /// the layer for the given class
+    static Container layeredPane(Container layeredPaneImpl, Class c, int zIndex) {
+<span class="fc" id="L108">        Container existing = findLayer(layeredPaneImpl, c);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (existing != null) {</span>
+<span class="nc" id="L110">            return existing;</span>
+        }
+<span class="fc" id="L112">        java.util.List&lt;Component&gt; children = layeredPaneImpl.getChildrenAsList(true);</span>
+<span class="fc" id="L113">        Container cnt = new Container();</span>
+<span class="fc" id="L114">        cnt.putClientProperty(Z_INDEX_PROP, zIndex);</span>
+<span class="fc" id="L115">        int len = children.size();</span>
+<span class="fc" id="L116">        int insertIndex = -1;</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L118">            Component cmp = children.get(i);</span>
+<span class="fc" id="L119">            Integer cmpZIndex = (Integer) cmp.getClientProperty(Z_INDEX_PROP);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            int cmpZ = cmpZIndex == null ? 0 : cmpZIndex.intValue();</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            if (cmpZ &gt;= zIndex) {</span>
+<span class="nc" id="L122">                insertIndex = i;</span>
+<span class="nc" id="L123">                break;</span>
+            }
+        }
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (insertIndex == -1) {</span>
+<span class="fc" id="L127">            layeredPaneImpl.add(cnt);</span>
+        } else {
+<span class="nc" id="L129">            layeredPaneImpl.addComponent(insertIndex, cnt);</span>
+        }
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        cnt.putClientProperty(CLASS_PROP, c != null ? c.getName() : null);</span>
+<span class="fc" id="L132">        return cnt;</span>
+    }
+
+    private static Container findLayer(Container layeredPaneImpl, Class c) {
+<span class="fc" id="L136">        java.util.List&lt;Component&gt; children = layeredPaneImpl.getChildrenAsList(true);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (c == null) {</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">            for (Component cmp : children) {</span>
+<span class="pc bpc" id="L139" title="2 of 4 branches missed.">                if (cmp != null &amp;&amp; cmp.getClientProperty(CLASS_PROP) == null) {</span>
+<span class="fc" id="L140">                    return (Container) cmp;</span>
+                }
+<span class="nc" id="L142">            }</span>
+<span class="nc" id="L143">            return null;</span>
+        }
+<span class="fc" id="L145">        String n = c.getName();</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        for (Component cmp : children) {</span>
+<span class="pc bpc" id="L147" title="1 of 4 branches missed.">            if (cmp != null &amp;&amp; n.equals(cmp.getClientProperty(CLASS_PROP))) {</span>
+<span class="fc" id="L148">                return (Container) cmp;</span>
+            }
+<span class="fc" id="L150">        }</span>
+<span class="fc" id="L151">        return null;</span>
+    }
+
+    /// Resolves the top level containing the given component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to resolve from, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the enclosing top level, or null when the component is detached
+    static TopLevelContainer of(Component cmp) {
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (cmp == null) {</span>
+<span class="nc" id="L165">            return null;</span>
+        }
+<span class="fc" id="L167">        return cmp.getTopLevelContainer();</span>
+    }
+
+    /// Resolves the top level containing the given component and returns it as a
+    /// `Container`, which is the form the package private top level hooks are
+    /// declared in.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to resolve from, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the enclosing top level as a container, or null when the component is detached
+    static Container rootOf(Component cmp) {
+<span class="fc" id="L182">        TopLevelContainer top = of(cmp);</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (top == null) {</span>
+<span class="fc" id="L184">            return null;</span>
+        }
+<span class="fc" id="L186">        return top.asContainer();</span>
+    }
+
+    /// Resolves the container that a command activated inside the given component
+    /// should be reported to.
+    ///
+    /// Not the same as `#rootOf(Component)`. A `Dialog` shown inside a window's
+    /// layered pane is a parented `Form`, so the top level walk goes past it to the
+    /// `Window` -- whose command listeners are somebody else's. The dialog never
+    /// heard that its own button had been pressed, which left `lastCommandPressed`
+    /// null and the modal wait running forever.
+    ///
+    /// For every hierarchy that has no hosted dialog in it this returns the very
+    /// container `rootOf` would, because `Form` and `Window` both answer
+    /// `Container#isCommandHost()` with the unparented test that `getTopLevelContainer`
+    /// already uses.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component the command was activated from, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the container to notify, or null when the component is detached
+    static Container commandHostOf(Component cmp) {
+<span class="fc" id="L211">        Component c = cmp;</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        while (c != null) {</span>
+<span class="fc bfc" id="L213" title="All 4 branches covered.">            if (c instanceof Container &amp;&amp; ((Container) c).isCommandHost()) {</span>
+<span class="fc" id="L214">                return (Container) c;</span>
+            }
+<span class="fc" id="L216">            c = c.getParent();</span>
+        }
+<span class="fc" id="L218">        return null;</span>
+    }
+
+    /// Registers a component for animation with the top level it lives in, using the
+    /// internal registration that skips the public bookkeeping.
+    ///
+    /// `registerAnimatedInternal` is package private on both `Form` and `Window` and so
+    /// cannot sit on the public `TopLevelContainer` interface -- an interface member
+    /// would force it public. It is declared on `Container`, the nearest common
+    /// supertype, so the call below dispatches virtually. Callers inside this package
+    /// go through here instead of `getComponentForm()`, which is null by design inside
+    /// a `Window`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component whose top level is registered against
+    ///
+    /// - `a`: the animation to register
+    static void registerAnimatedInternal(Component c, Animation a) {
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">        registerAnimatedInternal(c == null ? null : c.getTopLevelContainer(), a);</span>
+<span class="fc" id="L238">    }</span>
+
+    /// The counterpart to `#registerAnimatedInternal(Component, Animation)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component whose top level is deregistered from
+    ///
+    /// - `a`: the animation to deregister
+    static void deregisterAnimatedInternal(Component c, Animation a) {
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        deregisterAnimatedInternal(c == null ? null : c.getTopLevelContainer(), a);</span>
+<span class="fc" id="L249">    }</span>
+
+    /// Registers an animation with an already resolved top level.
+    ///
+    /// The `Component` overload covers the common case; this one is for callers that
+    /// hold the top level in a local, or that register something other than themselves.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to register with, may be null
+    ///
+    /// - `a`: the animation to register
+    static void registerAnimatedInternal(TopLevelContainer top, Animation a) {
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (top != null) {</span>
+<span class="fc" id="L263">            top.asContainer().registerAnimatedInternal(a);</span>
+        }
+<span class="fc" id="L265">    }</span>
+
+    /// The counterpart to `#registerAnimatedInternal(TopLevelContainer, Animation)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to deregister from, may be null
+    ///
+    /// - `a`: the animation to deregister
+    static void deregisterAnimatedInternal(TopLevelContainer top, Animation a) {
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">        if (top != null) {</span>
+<span class="fc" id="L276">            top.asContainer().deregisterAnimatedInternal(a);</span>
+        }
+<span class="fc" id="L278">    }</span>
+
+    /// The form wide layered pane of the given top level if one exists, without
+    /// creating one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to ask, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the layered pane, or null when there is none or no top level
+    static Container formLayeredPaneIfExists(TopLevelContainer top) {
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">        return top == null ? null : top.asContainer().getFormLayeredPaneIfExists();</span>
+    }
+
+    /// The content area layered pane of the given top level if one exists, without
+    /// creating one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to ask, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the layered pane, or null when there is none or no top level
+    static Container layeredPaneIfExists(TopLevelContainer top) {
+<span class="nc bnc" id="L305" title="All 2 branches missed.">        return top == null ? null : top.asContainer().getLayeredPaneIfExists();</span>
+    }
+
+    /// The height the top level's soft button bar costs, zero for a window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to measure, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the soft button area height
+    static int softButtonAreaHeight(TopLevelContainer top) {
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">        return top == null ? 0 : top.asContainer().softButtonAreaHeight();</span>
+    }
+
+    /// The width to measure against for something that will be shown on the given top
+    /// level.
+    ///
+    /// A window is measured by its own size. A form is measured by the display, not by
+    /// its own width, because that is the expression every caller evaluated before
+    /// windows existed and a form is not always laid out when it is asked.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the width to size against
+    static int hostWidth(TopLevelContainer top) {
+<span class="fc bfc" id="L336" title="All 4 branches covered.">        if (top != null &amp;&amp; top.asContainer().isNativeWindow()) {</span>
+<span class="fc" id="L337">            return top.asContainer().getWidth();</span>
+        }
+<span class="fc" id="L339">        return Display.getInstance().getDisplayWidth();</span>
+    }
+
+    /// The counterpart to `#hostWidth(TopLevelContainer)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the height to size against
+    static int hostHeight(TopLevelContainer top) {
+<span class="pc bpc" id="L352" title="1 of 4 branches missed.">        if (top != null &amp;&amp; top.asContainer().isNativeWindow()) {</span>
+<span class="fc" id="L353">            return top.asContainer().getHeight();</span>
+        }
+<span class="fc" id="L355">        return Display.getInstance().getDisplayHeight();</span>
+    }
+
+    /// The top level the user is currently working in: the focused window when one has
+    /// focus, otherwise the current form.
+    ///
+    /// This is what a caller with no component to resolve from should use --
+    /// `ToastBar.showMessage`, `InfiniteProgress.showInfiniteBlocking`, the static
+    /// `Dialog.show` helpers. Those used to name the current form unconditionally, so
+    /// in a multi window application they put their overlay on the main window while
+    /// the user was looking at another one.
+    ///
+    /// #### Returns
+    ///
+    /// the top level to act on, or null when the application has neither
+    static TopLevelContainer current() {
+        // Every port that has windows reports focus for them, Mac Catalyst included:
+        // its scene delegate calls CN1MacWindowDeliverFocus from sceneDidBecomeActive
+        // and sceneWillResignActive, which reaches windowFocusCallback and so
+        // Desktop.getFocusedWindow(). Checked because a review read the callback as
+        // declared but never invoked, which would have left every overlay routed
+        // through here on the main form; the call sites are in
+        // CodenameOne_GLSceneDelegate.m, not in the two files that only declare it.
+<span class="pc bpc" id="L378" title="1 of 4 branches missed.">        if (Display.impl != null &amp;&amp; Display.impl.getWindowManager() != null) {</span>
+<span class="fc" id="L379">            Window focused = Desktop.getInstance().getFocusedWindow();</span>
+<span class="fc bfc" id="L380" title="All 4 branches covered.">            if (focused != null &amp;&amp; focused.isWindowShowing()) {</span>
+<span class="fc" id="L381">                return focused;</span>
+            }
+        }
+<span class="fc" id="L384">        return Display.getInstance().getCurrent();</span>
+    }
+
+    /// Throws when the running platform has no windowing system, so that misuse
+    /// fails at the point of construction rather than at the first paint.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: if this platform cannot open native windows
+    static void requireMultiWindow() {
+<span class="pc bpc" id="L394" title="1 of 4 branches missed.">        if (Display.impl == null || Display.impl.getWindowManager() == null) {</span>
+<span class="fc" id="L395">            throw new UnsupportedOperationException(</span>
+                    &quot;Multiple native windows are not supported on this platform. &quot;
+                    + &quot;Guard with Desktop.isSupported() or CN.isMultiWindowSupported().&quot;);
+        }
+<span class="fc" id="L399">    }</span>
+
+    /// Adds a component to the top level's own layout, outside the content pane. Both
+    /// `Form` and `Window` keep that structural add package private rather than on
+    /// `TopLevelContainer`, since widening it would hand every caller a way to place
+    /// components beside the content pane; `Container` declares the hook they override.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to add to
+    ///
+    /// - `constraints`: the layout constraint
+    ///
+    /// - `cmp`: the component to add
+    static void addComponentToTopLevel(TopLevelContainer top, Object constraints, Component cmp) {
+<span class="nc bnc" id="L414" title="All 2 branches missed.">        if (top != null) {</span>
+<span class="nc" id="L415">            top.asContainer().addComponentToTopLevel(constraints, cmp);</span>
+        }
+<span class="nc" id="L417">    }</span>
+
+    /// The counterpart to
+    /// `#addComponentToTopLevel(TopLevelContainer, Object, Component)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to remove from
+    ///
+    /// - `cmp`: the component to remove
+    static void removeComponentFromTopLevel(TopLevelContainer top, Component cmp) {
+<span class="nc bnc" id="L428" title="All 2 branches missed.">        if (top != null) {</span>
+<span class="nc" id="L429">            top.asContainer().removeComponentFromTopLevel(cmp);</span>
+        }
+<span class="nc" id="L431">    }</span>
+
+    // ---------------------------------------------------------------------------
+    // Directional focus traversal, shared by Form and Window.
+    //
+    // The scan is generic: it walks a root container by absolute coordinates and
+    // knows nothing about which kind of top level it came from. It lived on Form,
+    // where Window could not reach it -- so every arrow key in a window resolved
+    // through Container's inert stubs and moved focus nowhere at all. Moved here
+    // rather than copied, so the two cannot drift.
+    // ---------------------------------------------------------------------------
+
+    /// Returns true if the given dest component is in the column of the source component
+    static boolean isInSameColumn(Component source, Component dest) {
+        // workaround for NPE
+<span class="pc bpc" id="L446" title="2 of 4 branches missed.">        if (source == null || dest == null) {</span>
+<span class="nc" id="L447">            return false;</span>
+        }
+<span class="fc" id="L449">        return Rectangle.intersects(source.getAbsoluteX(), 0,</span>
+<span class="fc" id="L450">                source.getWidth(), Integer.MAX_VALUE, dest.getAbsoluteX(), dest.getAbsoluteY(),</span>
+<span class="fc" id="L451">                dest.getWidth(), dest.getHeight());</span>
+    }
+
+    /// Returns true if the given dest component is in the row of the source component
+    static boolean isInSameRow(Component source, Component dest) {
+<span class="fc" id="L456">        return Rectangle.intersects(0, source.getAbsoluteY(),</span>
+<span class="fc" id="L457">                Integer.MAX_VALUE, source.getHeight(), dest.getAbsoluteX(), dest.getAbsoluteY(),</span>
+<span class="fc" id="L458">                dest.getWidth(), dest.getHeight());</span>
+    }
+
+    static Component findNextFocusHorizontal(Component focused, Component bestCandidate, Container root, boolean right) {
+<span class="nc" id="L462">        int count = root.getComponentCount();</span>
+<span class="nc bnc" id="L463" title="All 2 branches missed.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="nc" id="L464">            Component current = root.getComponentAt(iter);</span>
+<span class="nc bnc" id="L465" title="All 2 branches missed.">            if (current.isFocusable()) {</span>
+<span class="nc bnc" id="L466" title="All 2 branches missed.">                if (isInSameRow(focused, current)) {</span>
+<span class="nc" id="L467">                    int currentX = current.getAbsoluteX();</span>
+<span class="nc" id="L468">                    int focusedX = focused.getAbsoluteX();</span>
+<span class="nc bnc" id="L469" title="All 2 branches missed.">                    if (right) {</span>
+<span class="nc bnc" id="L470" title="All 2 branches missed.">                        if (focusedX &lt; currentX) {</span>
+<span class="nc bnc" id="L471" title="All 2 branches missed.">                            if (bestCandidate != null) {</span>
+<span class="nc bnc" id="L472" title="All 2 branches missed.">                                if (bestCandidate.getAbsoluteX() &lt; currentX) {</span>
+<span class="nc" id="L473">                                    continue;</span>
+                                }
+                            }
+<span class="nc" id="L476">                            bestCandidate = current;</span>
+                        }
+                    } else {
+<span class="nc bnc" id="L479" title="All 2 branches missed.">                        if (focusedX &gt; currentX) {</span>
+<span class="nc bnc" id="L480" title="All 2 branches missed.">                            if (bestCandidate != null) {</span>
+<span class="nc bnc" id="L481" title="All 2 branches missed.">                                if (bestCandidate.getAbsoluteX() &gt; currentX) {</span>
+<span class="nc" id="L482">                                    continue;</span>
+                                }
+                            }
+<span class="nc" id="L485">                            bestCandidate = current;</span>
+                        }
+                    }
+                }
+            }
+<span class="nc bnc" id="L490" title="All 4 branches missed.">            if (current instanceof Container &amp;&amp; !(((Container) current).isBlockFocus())) {</span>
+<span class="nc" id="L491">                bestCandidate = findNextFocusHorizontal(focused, bestCandidate, (Container) current, right);</span>
+            }
+        }
+<span class="nc" id="L494">        return bestCandidate;</span>
+    }
+
+    static Component findNextFocusVertical(Component focused, Component bestCandidate, Container root, boolean down) {
+<span class="fc" id="L498">        int count = root.getComponentCount();</span>
+<span class="fc bfc" id="L499" title="All 2 branches covered.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="fc" id="L500">            Component current = root.getComponentAt(iter);</span>
+<span class="fc bfc" id="L501" title="All 2 branches covered.">            if (current.isFocusable()) {</span>
+<span class="fc" id="L502">                int currentY = current.getAbsoluteY();</span>
+<span class="fc" id="L503">                int focusedY = 0;</span>
+<span class="pc bpc" id="L504" title="1 of 2 branches missed.">                if (focused != null) {</span>
+<span class="fc" id="L505">                    focusedY = focused.getAbsoluteY();</span>
+                }
+<span class="fc bfc" id="L507" title="All 2 branches covered.">                if (down) {</span>
+<span class="fc bfc" id="L508" title="All 2 branches covered.">                    if (focusedY &lt; currentY) {</span>
+<span class="fc bfc" id="L509" title="All 2 branches covered.">                        if (bestCandidate != null) {</span>
+<span class="fc" id="L510">                            boolean exitingInSame = isInSameColumn(focused, bestCandidate);</span>
+<span class="pc bpc" id="L511" title="1 of 2 branches missed.">                            if (bestCandidate.getAbsoluteY() &lt; currentY) {</span>
+<span class="pc bpc" id="L512" title="1 of 2 branches missed.">                                if (exitingInSame) {</span>
+<span class="fc" id="L513">                                    continue;</span>
+                                }
+<span class="nc bnc" id="L515" title="All 4 branches missed.">                                if (isInSameRow(current, bestCandidate) &amp;&amp; !isInSameColumn(focused, current)) {</span>
+<span class="nc" id="L516">                                    continue;</span>
+                                }
+                            }
+<span class="nc bnc" id="L519" title="All 4 branches missed.">                            if (exitingInSame &amp;&amp; isInSameRow(current, bestCandidate)) {</span>
+<span class="nc" id="L520">                                continue;</span>
+                            }
+                        }
+<span class="fc" id="L523">                        bestCandidate = current;</span>
+                    }
+                } else {
+<span class="fc bfc" id="L526" title="All 2 branches covered.">                    if (focusedY &gt; currentY) {</span>
+<span class="fc bfc" id="L527" title="All 2 branches covered.">                        if (bestCandidate != null) {</span>
+<span class="fc" id="L528">                            boolean exitingInSame = isInSameColumn(focused, bestCandidate);</span>
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">                            if (bestCandidate.getAbsoluteY() &gt; currentY) {</span>
+<span class="nc bnc" id="L530" title="All 2 branches missed.">                                if (exitingInSame) {</span>
+<span class="nc" id="L531">                                    continue;</span>
+                                }
+<span class="nc bnc" id="L533" title="All 4 branches missed.">                                if (isInSameRow(current, bestCandidate) &amp;&amp; !isInSameColumn(focused, current)) {</span>
+<span class="nc" id="L534">                                    continue;</span>
+                                }
+                            }
+<span class="pc bpc" id="L537" title="2 of 4 branches missed.">                            if (exitingInSame &amp;&amp; isInSameRow(current, bestCandidate)) {</span>
+<span class="nc" id="L538">                                continue;</span>
+                            }
+                        }
+<span class="fc" id="L541">                        bestCandidate = current;</span>
+                    }
+                }
+            }
+<span class="pc bpc" id="L545" title="1 of 4 branches missed.">            if (current instanceof Container &amp;&amp; !(((Container) current).isBlockFocus())) {</span>
+<span class="fc" id="L546">                bestCandidate = findNextFocusVertical(focused, bestCandidate, (Container) current, down);</span>
+            }
+        }
+<span class="fc" id="L549">        return bestCandidate;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
