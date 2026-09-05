@@ -194,8 +194,33 @@ public class LocationButton extends Container {
     /// as each request finishes; a button already waiting is not added twice.
     ///
     /// No lock. Every touch of this list is on the EDT, inside a callSerially.
-    private static final List<LocationButton> WAITING =
-            new ArrayList<LocationButton>();
+    private static final List<Pending> WAITING = new ArrayList<Pending>();
+
+    /// One grant waiting its turn: which button earned it, and from which
+    /// system button.
+    ///
+    /// A record per GRANT rather than a slot per button, because a button can
+    /// hold two. A tap on the old peer waiting while a setter replaces the
+    /// control and the replacement is tapped; or the same fallback control
+    /// tapped twice before the queue moves. Keeping the stamp in a field on
+    /// the button and one entry in the list made those collide -- the second
+    /// tap overwrote the first's stamp and was refused a slot, so two taps
+    /// produced one answer -- and each way of colliding had to be patched
+    /// separately. A grant is the thing that waits, so a grant is what the
+    /// queue holds.
+    private static final class Pending {
+
+        /// The button that earned this grant.
+        private final LocationButton button;
+
+        /// Which system button it came from, or [#NO_SESSION].
+        private final int generation;
+
+        private Pending(LocationButton button, int generation) {
+            this.button = button;
+            this.generation = generation;
+        }
+    }
 
     /// Set once the platform's button has failed, which stops [#rebuild()] from
     /// asking for another one and makes [#isUnavailable()] answer true.
@@ -260,26 +285,6 @@ public class LocationButton extends Container {
         return generation == NO_SESSION
                 || generation == systemButtonGeneration;
     }
-
-    /// Which system button the grant sitting in [#WAITING] came from.
-    ///
-    /// A queued grant is a tap the user already made and the platform already
-    /// answered, so it waits its turn rather than being dropped. But a setter
-    /// can replace the control while it waits, and then the grant belongs to a
-    /// peer that is gone: serving it would start a lookup against a session
-    /// nobody granted and report the result as the untapped replacement's.
-    ///
-    /// So the stamp is kept with the entry and rechecked on the way out. A
-    /// grant that lost its button is ANSWERED rather than discarded -- see
-    /// [#serveNextWaiting()] -- because a tap that is never reported at all is
-    /// the failure this queue exists to prevent.
-    ///
-    /// One field, because a button occupies one slot in the queue. When a
-    /// SECOND grant arrives for the same button under a newer stamp -- a tap
-    /// on the replacement while a tap on the old peer is still waiting -- the
-    /// superseded one is answered on the spot rather than given a slot of its
-    /// own, so no grant is lost to the overwrite.
-    private int waitingGeneration;
 
     /// Creates a button labelled "Precise location".
     public LocationButton() {
@@ -625,8 +630,12 @@ public class LocationButton extends Container {
                 // been served, and the user's tap was answered by the null of
                 // a session it never used. Same question serveGrant asks of a
                 // running request: whose failure was this?
-                if (waitingGeneration != NO_SESSION) {
-                    WAITING.remove(LocationButton.this);
+                for (int at = WAITING.size() - 1; at >= 0; at--) {
+                    Pending waiting = WAITING.get(at);
+                    if (waiting.button == LocationButton.this //NOPMD CompareObjectsWithEquals
+                            && waiting.generation != NO_SESSION) {
+                        WAITING.remove(at);
+                    }
                 }
                 setBody(createUnavailablePlaceholder());
                 // And tell the listeners. A session that failed IS this button
@@ -788,28 +797,14 @@ public class LocationButton extends Container {
                     // is what an earlier revision did, and it turned "two
                     // buttons corrupt each other's request" into "the second
                     // button never reports anything".
-                    boolean queued = WAITING.contains(LocationButton.this);
-                    if (queued && waitingGeneration != generation) {
-                        // Two grants, one slot. A tap on the old peer is
-                        // already waiting, a setter has since replaced the
-                        // control, and this is a tap on its replacement.
-                        // Overwriting the stamp and stopping at contains()
-                        // left the FIRST tap with nothing at all -- neither
-                        // its stale null nor a lookup of its own -- so two
-                        // taps produced one answer, which is the same silence
-                        // the queue exists to prevent, arrived at from the
-                        // other direction.
-                        //
-                        // Answered here rather than queued twice: the drain
-                        // would give it the same null a moment later, and one
-                        // entry per button is what makes contains() a
-                        // meaningful test.
-                        fire(null);
-                    }
-                    waitingGeneration = generation;
-                    if (!queued) {
-                        WAITING.add(LocationButton.this);
-                    }
+                    // One entry per GRANT, not per button. Two taps that
+                    // land here are two grants and get two entries: the drain
+                    // answers a superseded one with null and serves a current
+                    // one, and neither has to know about the other. Keeping a
+                    // stamp on the button and one slot in the list collided
+                    // instead -- the second tap overwrote the first's stamp
+                    // and was refused a slot, so two taps produced one answer.
+                    WAITING.add(new Pending(LocationButton.this, generation));
                     scheduleStaleWake();
                     return;
                 }
@@ -909,20 +904,20 @@ public class LocationButton extends Container {
         // principle already applied to a fallback tap that survives an upgrade
         // rather than a new rule: what has no session cannot be superseded by
         // one, and cannot be killed by one failing either.
-        LocationButton found = null;
+        Pending found = null;
         while (found == null && !WAITING.isEmpty()) {
-            LocationButton candidate = WAITING.remove(0);
-            if (candidate.unavailable
-                    && candidate.waitingGeneration != NO_SESSION) {
+            Pending candidate = WAITING.remove(0);
+            if (candidate.button.unavailable
+                    && candidate.generation != NO_SESSION) {
                 continue;
             }
-            if (!candidate.stillCurrent(candidate.waitingGeneration)) {
+            if (!candidate.button.stillCurrent(candidate.generation)) {
                 // The control that earned this grant was replaced while the
                 // grant waited. Answering it is the honest outcome: the tap
                 // happened and produced no location. Serving it instead would
                 // run a lookup against a session nobody granted and hand the
                 // result to listeners as the untapped replacement's.
-                candidate.fire(null);
+                candidate.button.fire(null);
                 continue;
             }
             found = candidate;
@@ -930,21 +925,21 @@ public class LocationButton extends Container {
         if (found == null) {
             return;
         }
-        final LocationButton next = found;
+        final Pending next = found;
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                if (next.unavailable
-                        && next.waitingGeneration != NO_SESSION) {
+                if (next.button.unavailable
+                        && next.generation != NO_SESSION) {
                     // Failed between being dequeued and running.
                     serveNextWaiting();
                     return;
                 }
-                if (!next.stillCurrent(next.waitingGeneration)) {
+                if (!next.button.stillCurrent(next.generation)) {
                     // Replaced between being dequeued and running, which the
                     // drain above cannot see because it already let this one
                     // through. Same answer as there.
-                    next.fire(null);
+                    next.button.fire(null);
                     serveNextWaiting();
                     return;
                 }
@@ -954,13 +949,11 @@ public class LocationButton extends Container {
                     // wake again: serveNextWaiting cancelled the pending one on
                     // the way in, so without this the requeued button waits on
                     // a tap that may never come.
-                    if (!WAITING.contains(next)) {
-                        WAITING.add(next);
-                    }
+                    WAITING.add(next);
                     scheduleStaleWake();
                     return;
                 }
-                next.serveGrant(next.waitingGeneration);
+                next.button.serveGrant(next.generation);
             }
         });
     }

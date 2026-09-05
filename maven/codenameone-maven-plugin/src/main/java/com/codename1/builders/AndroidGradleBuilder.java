@@ -3050,6 +3050,18 @@ public class AndroidGradleBuilder extends Executor {
             LocationButtonManifestFragments.LocationUsage appLocation =
                     LocationButtonManifestFragments.scanForLocationUsage(
                             dummyClassesDir);
+            // The same fold-in the library path does below, for the same
+            // reason: without it the uses-feature declarations at the
+            // manifest stage are absent, and Play can infer GPS hardware as
+            // REQUIRED and filter the app off devices that lack it. The
+            // bytecode scan sets this from an ordinary reference; an
+            // annotation-only one never reached it.
+            //
+            // Honours android.blockLocationPermission, because the rest of
+            // this feature does.
+            gpsPermission |= appLocation.usesButton()
+                    && !request.getArg("android.blockLocationPermission",
+                            "false").equals("true");
             if (appLocation.usesButton() && !usesLocationButton) {
                 debug("Location button found in the application by the "
                         + "byte-level scan, which reads annotation class "

@@ -448,6 +448,52 @@ class LocationButtonRebuildTest extends UITestBase {
                 "and reports the location it obtained: " + heard);
     }
 
+    @Test
+    void twoTapsOnOneFallbackAreTwoRequests() throws Exception {
+        RecordingBridge bridge = install();
+        ParkingManager granted = parkingManager();
+        bridge.granted = granted;
+        ParkingManager ordinary = parkingManager();
+        ordinary.answer = new Location();
+        ordinary.openGate();
+        implementation.setLocationManager(ordinary);
+
+        LocationButton holder = new LocationButton();
+        bridge.building = false;
+        LocationButton fallbackButton = new LocationButton();
+        Button tapTarget = (Button) fallbackButton.getComponentAt(0);
+        final List<Location> heard = new ArrayList<Location>();
+        fallbackButton.addLocationSharedListener(new LocationSharedListener() {
+            public void locationShared(Location location) {
+                heard.add(location);
+            }
+        });
+
+        // The holder parks, so everything else queues.
+        bridge.sessions.get(0).onResult.onSucess(Boolean.TRUE);
+        drain();
+
+        // The user taps the fallback TWICE before the queue moves. Both taps
+        // carry NO_SESSION and the same button, which a stamp-on-the-button
+        // queue could not tell apart: the second overwrote the first and was
+        // refused a slot, so two taps produced one answer.
+        tapTarget.pressed();
+        tapTarget.released();
+        drain();
+        tapTarget.pressed();
+        tapTarget.released();
+        drain();
+        assertEquals(0, heard.size(), "both queued, neither answered yet");
+
+        granted.release();
+        drain();
+        drain();
+        drain();
+
+        assertEquals(2, ordinary.lookups, "each tap runs its own lookup");
+        assertEquals(2, heard.size(), "and each is answered: " + heard);
+    }
+
     private static boolean wakePending() throws Exception {
         return field("staleWake").get(null) != null;
     }
