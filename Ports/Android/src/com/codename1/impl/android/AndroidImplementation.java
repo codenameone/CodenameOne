@@ -1985,6 +1985,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return Thread.NORM_PRIORITY;
     }
 
+    /// Android reports this directly as DisplayMetrics.density, so there is no
+    /// need to make callers derive it from the density bucket -- the bucket is a
+    /// coarse DPI band and rounds to a different number than the scale the
+    /// platform itself lays out with.
+    ///
+    /// Read the same way getDeviceDensity does, preferring the activity's own
+    /// display, because a multi-display device can have a different scale per
+    /// display and the resources copy is the default one.
+    @Override
+    public float getDevicePixelRatio() {
+        DisplayMetrics metrics = new DisplayMetrics();
+        if (getActivity() != null) {
+            getActivity().getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        } else if (getContext() != null) {
+            metrics = getContext().getResources().getDisplayMetrics();
+        } else {
+            return super.getDevicePixelRatio();
+        }
+        // 0 means "not reported", which is what the portable contract expects.
+        return metrics.density > 0 ? metrics.density : super.getDevicePixelRatio();
+    }
+
     @Override
     public int getDeviceDensity() {
         DisplayMetrics metrics = new DisplayMetrics();

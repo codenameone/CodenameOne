@@ -5139,14 +5139,9 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
-    /// Returns one of the density variables appropriate for this device, notice that
-    /// density doesn't always correspond to resolution and an implementation might
-    /// decide to change the density based on DPI constraints.
-    ///
-    /// #### Returns
-    ///
-    /// The platform's own logical-pixel scale factor: device pixels per logical pixel,
-    /// the number iOS calls `UIScreen.scale` and Android calls `density`.
+    /// Returns the platform's own logical-pixel scale factor: device pixels per
+    /// logical pixel, the number iOS calls `UIScreen.scale` and Android calls
+    /// `density`.
     ///
     /// This is NOT the same question as [#getDeviceDensity], even though the two are
     /// easily confused. Density is a coarse DPI bucket used to pick artwork and to size
