@@ -57,7 +57,6 @@ Monetization.asciidoc	The `createRESTClient()` method shown there creates a `RES
 Monetization.asciidoc	The general usage is as follows:
 Monetization.asciidoc	The source for your ReceiptStore is as follows:
 Monetization.asciidoc	You are now ready to see the full magic of the `validateAndSaveReceipt()` method in all its glory:
-Monetization.asciidoc	You'll set these in your constants:
 Motion-Sensors.asciidoc	Callbacks arrive on the EDT, so the listener can update the UI directly. Sampling is reference counted: the hardware sensor draws power only while at least one listener is registered. Remove the listener once the screen is no longer visible, typically from the form's `removeNotify`, so the sensor powers down:
 Motion-Sensors.asciidoc	Register a `GestureListener` for one of the `GestureEvent.TYPE_*` gestures. The accelerometer powers on for the duration that a gesture listener stays registered:
 Motion-Sensors.asciidoc	The detection thresholds suit most apps as shipped, and you can tune them when a gesture needs to be more or less sensitive:
