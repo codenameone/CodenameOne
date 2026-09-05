@@ -28,6 +28,17 @@
 #import "CN1MacTextInput.h"
 #import "CN1Metalcompat.h"
 #include <stdatomic.h>
+#import <IOSurface/IOSurface.h>
+
+/// Three, not two. The window server is not asked when it has finished reading a
+/// surface -- there is no such callback -- so the only safe surface to draw into
+/// is one it does not currently hold. IOSurfaceIsInUse() reports exactly that,
+/// and a third slot means the renderer still has somewhere to go on the frame
+/// where one surface is on screen and another is still being picked up. Two
+/// slots have to reuse the older one as soon as the compositor is more than a
+/// frame behind, which is the tearing this whole path exists to avoid.
+#define CN1_PRESENT_SURFACE_COUNT 3
+
 #include "cn1_globals.h"
 
 /// Orthographic projection with the origin at the top left.
@@ -124,15 +135,20 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     /// The surfaces the window server composites, and the Metal textures that
     /// write into them.
     ///
-    /// TWO, alternating -- not the one this started with, and not CAMetalLayer's
-    /// pool either (see makeBackingLayer). Handing the layer a surface does not
-    /// wait for the window server to finish reading it, so writing the NEXT
-    /// frame into the same surface can land while the previous composite is
-    /// still in progress and put half of each frame on screen. Alternating gives
-    /// the compositor one surface to read while the renderer fills the other,
-    /// which is the least a single-writer/single-reader handoff needs.
-    IOSurfaceRef cn1PresentSurfaces[2];
-    id<MTLTexture> cn1PresentTextures[2];
+    /// A small ring, not the single surface this started with and not
+    /// CAMetalLayer's pool either (see makeBackingLayer). Handing the layer a
+    /// surface does not wait for the window server to finish reading it, so
+    /// writing the NEXT frame into the same surface can land while the previous
+    /// composite is still in progress and put half of each frame on screen.
+    ///
+    /// Which slot a frame goes to is decided by asking IOSurfaceIsInUse() rather
+    /// than by taking turns -- see presentFramebuffer. A turn order alone still
+    /// wraps onto a surface the compositor is holding as soon as it falls far
+    /// enough behind, because nothing in this path ever waits for it.
+    IOSurfaceRef cn1PresentSurfaces[CN1_PRESENT_SURFACE_COUNT];
+    id<MTLTexture> cn1PresentTextures[CN1_PRESENT_SURFACE_COUNT];
+    /// Where to START looking, not the slot in use: presentFramebuffer skips any
+    /// surface the window server still holds, so this only sets the search order.
     int cn1PresentIndex;
 
     /// Bumped whenever the surfaces are rebuilt, so a frame that was already in
@@ -198,14 +214,23 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 /// buffers to present a single image, measured at 21.5MB of IOSurface against
 /// the 11.6MB a single-surface compositor uses for the same window.
 ///
-/// Presenting through IOSurfaces instead keeps that down to two. The window
-/// server composites a surface directly out of shared memory, and the renderer
-/// alternates between the pair so the one being composited is never the one
-/// being written -- a single surface would have let the next frame land on top
-/// of a composite still in progress. Two plus the persistent screenTexture is
-/// still one buffer fewer than the pool, and the surfaces are the only part the
-/// window server ever sees. Layer-hosted still: AppKit adopts this as the view's
-/// own layer and never draws into it.
+/// Presenting through IOSurfaces instead lets the window server composite
+/// directly out of shared memory, and the renderer picks a surface the server is
+/// not holding (presentFramebuffer) so the one being composited is never the one
+/// being written -- a single surface let the next frame land on top of a
+/// composite still in progress.
+///
+/// The honest cost: CN1_PRESENT_SURFACE_COUNT surfaces plus the persistent
+/// screenTexture is one buffer MORE than CAMetalLayer's pool, so this no longer
+/// wins on memory the way the two-surface version did. It is bought
+/// deliberately. During a handoff the server can hold both the surface still on
+/// screen and the one just attached, so with only two the renderer has nowhere
+/// untouched to draw and has to overwrite a held surface -- which is the tearing
+/// this whole path exists to prevent. The third slot is what keeps a free
+/// surface available across that handoff.
+///
+/// Layer-hosted still: AppKit adopts this as the view's own layer and never
+/// draws into it.
 - (CALayer *)makeBackingLayer {
     CALayer *l = [CALayer layer];
     l.opaque = YES;
@@ -457,7 +482,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 
     // The surface the window server reads. Replaced rather than resized: an
     // IOSurface is fixed at its creation size.
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
         if (cn1PresentTextures[i] != nil) {
             [cn1PresentTextures[i] release];
             cn1PresentTextures[i] = nil;
@@ -475,7 +500,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         (id)kIOSurfaceBytesPerElement: @4,
         (id)kIOSurfacePixelFormat:     @((unsigned int)'BGRA'),
     };
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
         cn1PresentSurfaces[i] = IOSurfaceCreate((CFDictionaryRef)surfaceProps);
         if (cn1PresentSurfaces[i] == NULL) {
             continue;
@@ -676,11 +701,36 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     self.renderCommandEncoder = nil;
     self.renderPassDescriptor = nil;
 
-    // Alternate: the compositor may still be reading the surface handed over by
-    // the previous frame, and overwriting that one is what puts half of each
-    // frame on screen.
-    int presentIdx = cn1PresentIndex;
-    cn1PresentIndex = presentIdx ^ 1;
+    // Draw into a surface the window server is NOT holding, rather than trusting
+    // a turn order. Alternation alone only moves the problem: nothing here waits
+    // for the compositor, so if it falls more than one frame behind, the turn
+    // comes back round to a surface it is still reading and half of each frame
+    // lands on screen -- the exact artefact this path exists to prevent.
+    //
+    // IOSurfaceIsInUse() is that missing acknowledgement. Verified rather than
+    // assumed: binding an MTLTexture to a surface does NOT mark it in use, a
+    // surface the window server is displaying DOES report in use, and it stops
+    // reporting so once the layer has moved on -- so this genuinely distinguishes
+    // "still being read" from "safe to overwrite".
+    //
+    // The search starts at the slot after the one used last, so a surface is not
+    // immediately reused while its own completion handler is still pending.
+    int presentIdx = -1;
+    for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
+        int candidate = (cn1PresentIndex + i) % CN1_PRESENT_SURFACE_COUNT;
+        if (cn1PresentSurfaces[candidate] != NULL
+                && !IOSurfaceIsInUse(cn1PresentSurfaces[candidate])) {
+            presentIdx = candidate;
+            break;
+        }
+    }
+    if (presentIdx < 0) {
+        // Everything is held. Blocking the paint thread is not an option -- that
+        // is the 16ms of start-up this path removed -- so take the turn anyway;
+        // that is no worse than the pure round robin this replaced.
+        presentIdx = cn1PresentIndex;
+    }
+    cn1PresentIndex = (presentIdx + 1) % CN1_PRESENT_SURFACE_COUNT;
     id<MTLTexture> presentTexture = cn1PresentTextures[presentIdx];
     if (presentTexture == nil) {
         [self.commandBuffer commit];
@@ -777,7 +827,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 - (void)deleteFramebuffer {
     self.screenTexture = nil;
     self.stencilTexture = nil;
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
         if (cn1PresentTextures[i] != nil) {
             [cn1PresentTextures[i] release];
             cn1PresentTextures[i] = nil;
