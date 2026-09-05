@@ -1005,19 +1005,29 @@ public final class Graphics {
             drawImage(img, x, y, w, h);
             return;
         }
-        Object peer = img.roundedDrawPeer();
-        if (peer == null) {
-            // Not drawable from a peer alone -- a procedural subclass or a
-            // rotated image. Rounding it here would drop the subclass's own
-            // drawing or the rotation, so it goes through the normal path and
-            // comes out square. Ask isRoundedImageSupported(Image) rather than
-            // the no-argument form to find this out BEFORE skipping a
-            // rounded-copy fallback; the platform answering yes does not mean
-            // every picture can be rounded.
+        if (!isRoundedImageSupported(img)) {
+            // Either the platform cannot round at all, or this picture cannot be
+            // handed over as a peer -- a procedural subclass or a rotated image,
+            // where rounding here would drop the subclass's own drawing or the
+            // rotation. Both go through the normal path and come out square.
+            //
+            // The platform half of that test is not optional. Without it this
+            // called impl.drawImageRounded for any image with a peer, and the
+            // inherited implementation forwards to the six-argument drawImage,
+            // whose body in CodenameOneImplementation is EMPTY -- so on a port
+            // that does not override it (J2ME, Windows, Linux, BlackBerry) the
+            // image was not drawn square, it was not drawn at all. drawImage
+            // below is what knows to pre-scale when the port cannot draw a
+            // scaled image itself.
+            //
+            // Asking isRoundedImageSupported(Image) rather than repeating its
+            // two conditions keeps the public query and this behaviour in step:
+            // whatever it answers is exactly what happens here.
             drawImage(img, x, y, w, h);
             return;
         }
-        impl.drawImageRounded(nativeGraphics, peer, x + xTranslate, y + yTranslate, w, h, cornerRadius);
+        impl.drawImageRounded(nativeGraphics, img.roundedDrawPeer(),
+                x + xTranslate, y + yTranslate, w, h, cornerRadius);
     }
 
     public void drawImage(Image img, int x, int y, int w, int h) {
