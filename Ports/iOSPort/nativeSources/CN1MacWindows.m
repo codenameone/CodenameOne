@@ -53,6 +53,7 @@ extern void cn1CapturePointerMetadata(UITouch* touch);
 
 /* The main view controller's UIKey mapping, shared so the two cannot drift. */
 extern int cn1MapUIKeyToKeyCode(UIKey* key) API_AVAILABLE(ios(13.4));
+extern CN1View *editingComponent;
 
 #define CN1_MAC_MAX_WINDOWS 32
 
@@ -265,6 +266,19 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
  */
 - (void)deliverPresses:(NSSet<UIPress*>*)presses pressed:(BOOL)pressed
                  event:(UIPressesEvent*)event {
+    /* A native text editor owns the keyboard while it is up. UIKit inserts typed
+     * text only after every responder has declined the press, so claiming one
+     * here would swallow it before the focused CN1UITextField could ever see it
+     * -- the defect issue #5709 reports against the main controller, which this
+     * method was copied from. */
+    if (editingComponent != nil) {
+        if (pressed) {
+            [super pressesBegan:presses withEvent:event];
+        } else {
+            [super pressesEnded:presses withEvent:event];
+        }
+        return;
+    }
     if (@available(iOS 13.4, *)) {
         BOOL handled = NO;
         for (UIPress* press in presses) {

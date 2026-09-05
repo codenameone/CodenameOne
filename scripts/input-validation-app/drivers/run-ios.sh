@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Drive the CN1 input-validation app through tap / drag / long-press on an
+# Drive the CN1 input-validation app through tap / drag / long-press / typing on an
 # iOS simulator and assert the expected CN1IV:EVENT log lines appear.
 #
 # Usage:
@@ -152,7 +152,8 @@ fi
 XCRESULT_BUNDLE="$ARTIFACTS_DIR/test.xcresult"
 rm -rf "$XCRESULT_BUNDLE"
 mkdir -p "$SYNC_DIR"
-rm -f "$SYNC_DIR/tap.go" "$SYNC_DIR/drag.go" "$SYNC_DIR/longpress.go"
+rm -f "$SYNC_DIR/tap.go" "$SYNC_DIR/drag.go" "$SYNC_DIR/longpress.go" "$SYNC_DIR/keytype.go"
+rm -f "$SYNC_DIR/keytype.stop"
 XCB_RC_FILE="$ARTIFACTS_DIR/xcodebuild.rc"
 rm -f "$XCB_RC_FILE"
 
@@ -177,7 +178,7 @@ wait_for_log_marker() {
   local deadline=$((SECONDS + timeout_seconds))
   local spin=0
   while [ "$SECONDS" -lt "$deadline" ]; do
-    if grep -q "$needle" "$LOG_FILE"; then
+    if grep -qE "$needle" "$LOG_FILE"; then
       return 0
     fi
     # The live stream is not a channel this handshake can depend on. It attaches its
@@ -188,7 +189,7 @@ wait_for_log_marker() {
     # attempt spawns simctl until the file exists.
     spin=$((spin + 1))
     if [ "$((spin % 5))" -eq 0 ] && resolve_app_events_file \
-        && grep -q "$needle" "$CN1IV_EVENTS_FILE"; then
+        && grep -qE "$needle" "$CN1IV_EVENTS_FILE"; then
       return 0
     fi
     if [ -f "$XCB_RC_FILE" ]; then
@@ -239,6 +240,14 @@ fi
 release_xcui_step tap || SYNC_FAILED=1
 release_xcui_step drag || SYNC_FAILED=1
 release_xcui_step longpress || SYNC_FAILED=1
+release_xcui_step keytype || SYNC_FAILED=1
+# The keytype driver types in a retry loop, because CN1 needs a moment to bring
+# the native editor up after the tap and keys typed before then are dropped.
+# Stop it the moment the step resolves: the app exits a second and a half after
+# the suite finishes and typing into a process that has left fails the XCUITest
+# run even when every event landed.
+wait_for_log_marker 'CN1IV:(EVENT|TIMEOUT):keytype' 120 || true
+: > "$SYNC_DIR/keytype.stop"
 wait "$XCB_PIPE_PID" >/dev/null 2>&1 || true
 if [ -f "$XCB_RC_FILE" ]; then
   XCB_RC="$(cat "$XCB_RC_FILE")"
@@ -300,6 +309,8 @@ REQUIRED_EVENTS=(
   "CN1IV:EVENT:drag"
   "CN1IV:READY:longpress"
   "CN1IV:EVENT:longpress"
+  "CN1IV:READY:keytype"
+  "CN1IV:EVENT:keytype"
   "CN1IV:SUITE:FINISHED"
 )
 FAILED=0

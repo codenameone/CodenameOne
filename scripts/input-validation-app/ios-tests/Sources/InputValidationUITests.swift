@@ -1,13 +1,34 @@
-// Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
-// DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 //
 // XCUITest target that drives the CN1 input-validation app through tap,
-// drag, and long-press gestures on the iOS simulator. We rely on coordinate
-// taps rather than accessibility queries because the CN1 iOS port does not
-// surface child Components as XCUIElements -- the whole CN1 form renders into
-// one GL/Metal-backed view from XCUITest's perspective. The driver shell
-// script asserts the CN1IV:EVENT:* lines appear in the os_log stream; this
-// file only sequences the physical inputs.
+// drag, long-press and keyboard-typing gestures on the iOS simulator. We
+// rely on coordinate taps rather than accessibility queries because the CN1
+// iOS port does not surface child Components as XCUIElements -- the whole
+// CN1 form renders into one GL/Metal-backed view from XCUITest's
+// perspective. The driver shell script asserts the CN1IV:EVENT:* lines
+// appear in the os_log stream; this file only sequences the physical
+// inputs.
 
 import XCTest
 
@@ -67,6 +88,11 @@ final class InputValidationUITests: XCTestCase {
         }
 
         try driveLongPress(app: app, syncDir: syncDir)
+        if syncDir == nil {
+            Thread.sleep(forTimeInterval: stepDelaySeconds)
+        }
+
+        try driveKeyType(app: app, syncDir: syncDir)
         Thread.sleep(forTimeInterval: max(stepDelaySeconds, 10.0))
     }
 
@@ -89,6 +115,61 @@ final class InputValidationUITests: XCTestCase {
         try waitForGate("longpress", syncDir: syncDir)
         let target = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.56))
         target.press(forDuration: 2.25)
+    }
+
+    private func driveKeyType(app: XCUIApplication, syncDir: URL?) throws {
+        try waitForGate("keytype", syncDir: syncDir)
+        // KeyTypeStep places its TextField in BorderLayout.CENTER with
+        // generous padding/margin, matching the layout TapStep and
+        // LongPressStep use so a single screen-center tap focuses it on
+        // every iPhone size class on the CI runner.
+        let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        center.tap()
+        // typeKey, not typeText. typeText refuses to synthesise anything
+        // unless some accessibility element reports hasKeyboardFocus, and CN1
+        // publishes its own accessibility tree (updateAccessibilityTree assigns
+        // container.accessibilityElements), which replaces the real subviews --
+        // so the native CN1UITextField never appears in the tree no matter how
+        // long we wait for it. typeKey posts the key events directly, which is
+        // the hardware-keyboard path this step is about: they arrive as UIPress
+        // on the responder chain through GLViewController, where issue #5709
+        // was swallowing them. The on-screen keyboard raises no UIPress, which
+        // is why tapping its keys kept working.
+        //
+        // Retried rather than typed once after a fixed sleep: CN1's
+        // editStringAtImpl needs a moment to install the native editor and make
+        // it first responder, and it took three and a half seconds on a
+        // simulator busy serving XCUITest accessibility snapshots. Keys typed
+        // before then are simply dropped, so the loop costs nothing and removes
+        // the guess. KeyTypeStep asserts the field CONTAINS "cn1", so the
+        // repeats a slow start can leave in front of it are harmless.
+        //
+        // Stopped by the driver's keytype.stop gate, written as soon as the step
+        // resolves either way. The app exits a second and a half after the suite
+        // finishes, and typing into a process that has left fails the XCUITest
+        // run even though every event landed; app.state is re-checked before
+        // each key so the loop cannot outlive the app in the gap between the
+        // gate being written and this loop waking up.
+        for _ in 0..<15 {
+            if stopRequested("keytype", syncDir: syncDir) {
+                return
+            }
+            for key in ["c", "n", "1"] {
+                guard app.state == .runningForeground else {
+                    return
+                }
+                app.typeKey(key, modifierFlags: [])
+            }
+            Thread.sleep(forTimeInterval: 1.0)
+        }
+    }
+
+    private func stopRequested(_ name: String, syncDir: URL?) -> Bool {
+        guard let syncDir = syncDir else {
+            return false
+        }
+        return FileManager.default.fileExists(
+            atPath: syncDir.appendingPathComponent("\(name).stop").path)
     }
 
     private func waitForGate(_ name: String, syncDir: URL?) throws {

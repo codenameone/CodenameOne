@@ -172,3 +172,8 @@ cn1-build-hints.json
 
 # Local wrangler state from running the website worker tests.
 .wrangler/
+
+# Generated on demand by scripts/input-validation-app/drivers/run-ios.sh, which
+# runs `xcodegen generate` from the checked-in project.yml. A committed pbxproj
+# would be a second source of truth for the same target.
+/scripts/input-validation-app/ios-tests/*.xcodeproj/

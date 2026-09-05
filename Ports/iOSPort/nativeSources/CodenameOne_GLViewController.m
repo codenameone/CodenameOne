@@ -3581,6 +3581,23 @@ bool lockDrawing;
 // Mac Catalyst host keyboard, hardware keyboard in the iOS simulator via
 // Cmd-Shift-K). UIKey arrived in iOS 13.4 -- on older versions the
 // responder chain falls back to the existing UITextField editing path.
+//
+// While a native text editor is up (editingComponent != nil) every press is
+// forwarded untouched. UIKit inserts typed text at the END of the responder
+// chain, after every responder has declined the press, so consuming one here
+// is what stops it reaching the focused CN1UITextField / CN1UITextView --
+// and cn1MapUIKeyToKeyCode maps a printable character to its unicode
+// codepoint, which is never zero, so "handled" swallowed every key. A
+// hardware keyboard then typed nothing at all while the on-screen keyboard,
+// which raises no UIPress, kept working: issue #5709.
+//
+// Forwarding rather than returning early is deliberate. [super pressesBegan:]
+// is exactly what an app that does not override this method does, and it is
+// the only way the press reaches UIKit's text-input pipeline; returning here
+// swallows it just as effectively as claiming it did.
+//
+// CN1 key listeners not firing during text editing is the intended outcome:
+// arrow keys and backspace belong to the caret while a field is focused.
 // UIKit-only declaration: the type in its signature does not exist on macOS,
 // so the whole declaration is dropped rather than just its body. Guarding
 // only the body would leave a signature naming an unknown type.
@@ -3590,6 +3607,10 @@ bool lockDrawing;
 // renamed one, so this is inert on the native macOS port until it is ported.
 #if TARGET_OS_OSX
 #else
+    if (editingComponent != nil) {
+        [super pressesBegan:presses withEvent:event];
+        return;
+    }
     if (@available(iOS 13.4, *)) {
         BOOL handled = NO;
         NSMutableSet *passthrough = nil;
@@ -3635,6 +3656,10 @@ bool lockDrawing;
 // renamed one, so this is inert on the native macOS port until it is ported.
 #if TARGET_OS_OSX
 #else
+    if (editingComponent != nil) {
+        [super pressesEnded:presses withEvent:event];
+        return;
+    }
     if (@available(iOS 13.4, *)) {
         BOOL handled = NO;
         NSMutableSet *passthrough = nil;
@@ -3680,6 +3705,10 @@ bool lockDrawing;
 // renamed one, so this is inert on the native macOS port until it is ported.
 #if TARGET_OS_OSX
 #else
+    if (editingComponent != nil) {
+        [super pressesCancelled:presses withEvent:event];
+        return;
+    }
     if (@available(iOS 13.4, *)) {
         for (UIPress *press in presses) {
             UIKey *key = press.key;
