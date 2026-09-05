@@ -559,6 +559,44 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void anIncompleteSpkiValueIsRejected() {
+        // Peeking at the BIT STRING tag was not enough: a lone 0x03 byte and an
+        // empty "03 00" both passed as SubjectPublicKeyInfo, and SPKI has
+        // exactly two fields so nothing may follow the value either.
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY",
+                Base64.encodeNoNewline(hex("3010 300d 0609 2a864886f70d010101 0500 03")))));
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY",
+                Base64.encodeNoNewline(hex("3011 300d 0609 2a864886f70d010101 0500 0300")))));
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY",
+                Base64.encodeNoNewline(hex("3014 300d 0609 2a864886f70d010101 0500 030100 0500")))));
+    }
+
+    @Test
+    void sec1RejectsFieldsItHasNoRoomFor() {
+        // ECPrivateKey ends with at most one [0] and one [1]. Accepting anything
+        // else let a malformed key carry thousands of junk children, each one
+        // appended to a growing array that was copied whole every time.
+        StringBuilder content = new StringBuilder("020101").append("0420")
+                .append("00000000000000000000000000000000000000000000000000000000000000")
+                .append("00")
+                .append("A00A06082a8648ce3d030107");
+        for (int i = 0; i < 2000; i++) {
+            content.append("0500");
+        }
+        byte[] body = hex(content.toString());
+        byte[] blob = new byte[body.length + 4];
+        blob[0] = 0x30;
+        blob[1] = (byte) 0x82;
+        blob[2] = (byte) (body.length >> 8);
+        blob[3] = (byte) body.length;
+        System.arraycopy(body, 0, blob, 4, body.length);
+
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem("EC PRIVATE KEY", Base64.encodeNoNewline(blob))));
+        assertTrue(e.getMessage().contains("unexpected field"), e.getMessage());
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));

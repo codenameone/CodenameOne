@@ -153,8 +153,14 @@ final class Pem {
         }
         if (c.peek() == 0x30) {
             // SubjectPublicKeyInfo ::= SEQUENCE { AlgorithmIdentifier, BIT STRING }
+            // -- exactly two fields, so the BIT STRING is consumed (which
+            // bounds-checks its length) and nothing may follow it. Peeking at
+            // the tag alone accepted a lone 0x03 byte and an empty 03 00.
             c.skip();
-            return c.hasMore() && c.peek() == 0x03 ? SHAPE_SPKI : SHAPE_UNKNOWN;
+            if (!c.hasMore() || c.peek() != 0x03) {
+                return SHAPE_UNKNOWN;
+            }
+            return c.consume(0x03) > 0 && !c.hasMore() ? SHAPE_SPKI : SHAPE_UNKNOWN;
         }
         if (c.peek() != 0x02) {
             return SHAPE_UNKNOWN;
@@ -165,12 +171,17 @@ final class Pem {
         }
         if (c.peek() == 0x30) {
             // PrivateKeyInfo ::= SEQUENCE { INTEGER, AlgorithmIdentifier, OCTET STRING }
+            // RFC 5958 allows optional [0] attributes and [1] publicKey after
+            // the privateKey, so trailing fields are not an error here.
             c.skip();
-            return c.hasMore() && c.peek() == 0x04 ? SHAPE_PKCS8 : SHAPE_UNKNOWN;
+            if (!c.hasMore() || c.peek() != 0x04) {
+                return SHAPE_UNKNOWN;
+            }
+            return c.consume(0x04) > 0 ? SHAPE_PKCS8 : SHAPE_UNKNOWN;
         }
         if (c.peek() == 0x04) {
             // ECPrivateKey ::= SEQUENCE { INTEGER, OCTET STRING, [0], [1] }
-            return SHAPE_SEC1;
+            return c.consume(0x04) > 0 ? SHAPE_SEC1 : SHAPE_UNKNOWN;
         }
         if (c.peek() != 0x02) {
             return SHAPE_UNKNOWN;
@@ -364,28 +375,34 @@ final class Pem {
         byte[] version = c.element();
         byte[] privateKey = c.element();
         byte[] ecParameters = null;
-        byte[] tail = new byte[0];
-        while (c.hasMore()) {
-            int tag = c.peek();
-            byte[] element = c.element();
-            if (tag == 0xA0) {
-                // [0] wraps ECParameters, which is a CHOICE -- a named-curve
-                // OID or, for a key written with explicit parameters, a whole
-                // SEQUENCE describing the curve. Take it verbatim: reading an
-                // OID out of it would reject the explicit form, which is a
-                // valid SEC1 key.
-                Cursor parameters = new Cursor(element);
-                parameters.enter(0xA0);
-                ecParameters = parameters.element();
-            } else {
-                tail = concat(tail, element);
-            }
+        byte[] publicKey = new byte[0];
+        // ECPrivateKey ends with at most one [0] parameters and one [1]
+        // publicKey, in that order. Accepting anything else here meant a
+        // malformed key could carry thousands of junk children, and appending
+        // each one to a growing array copied the whole accumulation every time.
+        if (c.hasMore() && c.peek() == 0xA0) {
+            // [0] wraps ECParameters, which is a CHOICE -- a named-curve OID
+            // or, for a key written with explicit parameters, a whole SEQUENCE
+            // describing the curve. Take it verbatim: reading an OID out of it
+            // would reject the explicit form, which is a valid SEC1 key.
+            Cursor parameters = new Cursor(c.element());
+            parameters.enter(0xA0);
+            ecParameters = parameters.element();
+        }
+        if (c.hasMore() && c.peek() == 0xA1) {
+            publicKey = c.element();
+        }
+        if (c.hasMore()) {
+            throw new CryptoException("malformed SEC1 EC private key: unexpected field 0x"
+                    + Integer.toHexString(c.peek()));
         }
         if (ecParameters == null) {
             throw new CryptoException("SEC1 EC private key names no curve; re-export it as PKCS#8 with: "
                     + "openssl pkcs8 -topk8 -nocrypt -in key.pem -out key_pkcs8.pem");
         }
-        byte[] inner = tlv(0x30, concat(concat(version, privateKey), tail));
+        // RFC 5915: the parameters field is not repeated inside PKCS#8, the
+        // AlgorithmIdentifier carries the curve instead.
+        byte[] inner = tlv(0x30, concat(concat(version, privateKey), publicKey));
         return wrapPkcs8(ecAlgorithmIdentifier(ecParameters), inner);
     }
 
@@ -522,6 +539,17 @@ final class Pem {
             byte[] out = new byte[pos - start];
             System.arraycopy(der, start, out, 0, out.length);
             return out;
+        }
+
+        /// Consumes a primitive element and returns the length of its
+        /// contents, without copying them -- for validating a field is present
+        /// and well formed when its value is not otherwise needed.
+        int consume(int expectedTag) {
+            expect(expectedTag);
+            int length = length();
+            requireRoom(length);
+            pos += length;
+            return length;
         }
 
         /// Consumes a primitive element and returns its contents.
