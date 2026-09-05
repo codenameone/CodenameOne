@@ -313,21 +313,37 @@ public final class Continuity {
         }
         enabled = true;
         applicationHasChosen = true;
-        installCallback();
+        // Asking for what the port held: a continuation declined before this call is exactly what
+        // enabling is meant to pick up.
+        installCallback(true);
     }
 
-    /// Hands the port a callback, once. Installing it is what makes a port offer an arrival it
-    /// has been holding, so both enable() and disable() do it -- the two answers differ in what
-    /// the callback then says, not in whether it exists.
+    /// Hands the port a callback.
     ///
-    /// Only from those two, so a build that merely LINKS this class -- because something else in
-    /// the framework mentions it -- never installs a callback or touches storage.
-    private static void installCallback() {
+    /// Installing one is ALSO how a port is asked to re-offer a continuation it declined earlier
+    /// and is holding -- our iOS port does exactly that, and it is what recovers a Handoff that
+    /// cold-launched the app before anything was listening. So the two things cannot be fully
+    /// separated, and pretending otherwise stranded that arrival: with a strict install-once
+    /// guard, a sync-only listener installed the seam, the arrival was declined and held, and the
+    /// enable() that followed skipped the install and never asked for it again.
+    ///
+    /// `askForHeld` is the distinction that matters. False is "make sure a seam exists", which is
+    /// what every SyncedStore listener wants and what must not grow with their number. True is
+    /// "and hand me anything you kept", which is worth a re-install and happens at four bounded
+    /// moments: enable(), disable(), clear(), and a bridge the port has swapped.
+    ///
+    /// Only from those callers, so a build that merely LINKS this class -- because something else
+    /// in the framework mentions it -- never installs a callback or touches storage.
+    private static void installCallback(boolean askForHeld) {
         ContinuityBridge b = bridgeInternal();
         if (b == null) {
             return;
         }
-        if (b == callbackInstalledOn) { //NOPMD CompareObjectsWithEquals
+        if (!askForHeld && b == callbackInstalledOn) { //NOPMD CompareObjectsWithEquals
+            // Already installed on this bridge and nothing has changed the answer, so this is a
+            // repeat that buys nothing -- the per-LISTENER case, which is the one that grew
+            // without bound and which a port registering a native observer pays for on every
+            // store change.
             return;
         }
         try {
@@ -362,7 +378,7 @@ public final class Continuity {
             // is recorded -- so the callback claims and drops it, which is what disable() says
             // happens to arriving states. Same route as the one already taken by a state that
             // arrives after this returns, rather than a second mechanism doing the same job.
-            installCallback();
+            installCallback(true);
             return;
         }
         // Sampled with the bump, not read later: see formAtSessionEnd.
@@ -1425,7 +1441,7 @@ public final class Continuity {
         // before it.
         discardHeldArrival = true;
         try {
-            installCallback();
+            installCallback(true);
         } finally {
             discardHeldArrival = false;
         }
@@ -3064,12 +3080,15 @@ public final class Continuity {
     /// which is what lets the listener work with continuity still off.
     public static void installSyncedStoreCallback() {
         storeCallbackInstalled = true;
+        // Through the one installer, and NOT asking for held arrivals: a store listener is not
+        // consent to restore a route stack, so it installs the seam and leaves anything the port
+        // is holding for the enable() that may never come.
         // Through the one installer, which is what stops this being called once per LISTENER.
         // Every SyncedStore.addChangeListener() reached here, so a second listener gave the same
         // bridge a second callback -- and ContinuityBridge documents that setCallback is called
         // once, so a port that registers a native observer there keeps both and delivers every
         // store change twice.
-        installCallback();
+        installCallback(false);
     }
 
     /// Internal. Re-installs the framework's inbound seam on whatever bridge the port now
@@ -3090,7 +3109,12 @@ public final class Continuity {
         // object, which is what this method is for and is a sharper test than the unconditional
         // call it replaces: a port that calls this without having swapped anything no longer
         // stacks a second callback on the bridge it already gave one to.
-        installCallback();
+        //
+        // ENSURE, not ask-for-held. This method exists for a bridge the port has SWAPPED, and the
+        // instance guard is exactly that test -- a different object gets a seam, the same object
+        // does not get a second one. Asking for held arrivals here instead made two calls to this
+        // method install twice on one bridge, which is the accumulation the guard is for.
+        installCallback(false);
     }
 
     static ContinuityBridge bridgeInternal() {

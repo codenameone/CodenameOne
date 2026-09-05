@@ -99,8 +99,19 @@ public interface ContinuityBridge {
     /// Every key currently in the synced store, in no particular order. Never null.
     String[] syncedStoreKeys();
 
-    /// Installs the framework's inbound seam. Called once during initialization, before any other
-    /// method on this bridge; ports must retain it and may call it from any thread.
+    /// Installs the framework's inbound seam. Ports must retain it and may call it from any
+    /// thread.
+    ///
+    /// It REPLACES the seam and may be called more than once, so a port that registers a native
+    /// observer here must register that observer once and only replace the reference. It is not
+    /// called once per listener -- the framework collapses those -- but it is called again at the
+    /// few moments its answer to a held continuation changes: enable(), disable(), clear(), and a
+    /// bridge the port has swapped.
+    ///
+    /// Re-installing is also how the framework asks for a continuation the port DECLINED earlier
+    /// and is holding. A port that offers a held activity when a callback is installed -- which
+    /// is what recovers a Handoff that cold-launched the app before anything was listening -- is
+    /// relying on exactly that, so a framework that installed strictly once would strand it.
     ///
     /// #### Parameters
     ///

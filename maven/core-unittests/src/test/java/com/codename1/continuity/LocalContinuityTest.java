@@ -3822,18 +3822,62 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
-     * A bridge is given the framework's callback once, however many listeners register.
+     * A continuation declined before enable() is delivered by the enable().
      *
-     * <p>ContinuityBridge documents that setCallback is called once, and every
-     * SyncedStore.addChangeListener() reached the install path -- so a second listener gave the
-     * same bridge a second callback, and a port that registers a native observer there keeps both
-     * and delivers every store change twice.</p>
-     *
-     * <p>A bridge the port has SWAPPED must still be given one, which is what refreshBridge()
-     * exists for, so the guard is the bridge INSTANCE rather than a flag.</p>
+     * <p>The interaction between two earlier fixes. A sync-only application installs the seam
+     * through SyncedStore.addChangeListener and leaves continuity off, so an arrival is declined
+     * and the port holds it -- that is the retention contract working. Making installation
+     * strictly once then removed the only event that asks the port to offer it again, so the
+     * enable() that came with the login never saw it and the cold-launch Handoff was lost.</p>
      */
     @EdtTest
-    public void aBridgeIsGivenTheCallbackOnceHoweverManyListenersRegister() {
+    public void aContinuationDeclinedBeforeEnableIsDeliveredByTheEnable() {
+        HoldingBridge holding = new HoldingBridge();
+        Continuity.setBridge(holding);
+        SyncedStoreListener listener = new SyncedStoreListener() {
+            public void storeChanged() {
+            }
+        };
+        try {
+            // The sync-only path: a seam exists, continuity does not.
+            SyncedStore.addChangeListener(listener);
+            holding.pending = StateCodec.toMap(fromElsewhere("cold-launch handoff", 330L));
+            ContinuityCallback c = Continuity.callbackForTest();
+            assertFalse(c.continuationReceived(Continuity.getActivityType(), holding.pending),
+                    "the arrival was claimed before the application had chosen, so the port let "
+                            + "go of it and there is nothing left to deliver");
+
+            RecordingProvider provider = new RecordingProvider();
+            Continuity.setStateProvider(provider);
+            flushSerialCalls();
+            flushSerialCalls();
+
+            assertNull(holding.pending,
+                    "the port is still holding the arrival, so enabling never asked for it");
+            assertNotNull(provider.restored,
+                    "the continuation declined before enable() was never delivered by it, so a "
+                            + "Handoff that cold-launched the app is lost for good");
+        } finally {
+            SyncedStore.removeChangeListener(listener);
+        }
+    }
+
+    /**
+     * Installing the seam does not grow with the number of listeners.
+     *
+     * <p>This asserted "exactly one" and that was the wrong invariant, which only showed once the
+     * retention path needed a re-offer. Installing a callback is ALSO how a port is asked to hand
+     * over a continuation it declined earlier and is holding, so a framework that installed
+     * strictly once stranded that arrival -- see the sibling test below.</p>
+     *
+     * <p>What must not happen is the reported harm: every SyncedStore.addChangeListener()
+     * reaching the install path, so a port that registers a native observer there keeps one per
+     * listener and delivers every store change that many times. That is unbounded in application
+     * code. The re-offers are bounded and deliberate -- enable(), disable(), clear(), and a
+     * swapped bridge -- and a port is told so.</p>
+     */
+    @EdtTest
+    public void installingTheSeamDoesNotGrowWithTheNumberOfListeners() {
         CountingBridge counting = new CountingBridge();
         Continuity.setBridge(counting);
         SyncedStoreListener first = new SyncedStoreListener() {
@@ -3846,14 +3890,23 @@ public class LocalContinuityTest extends UITestBase {
         };
         try {
             SyncedStore.addChangeListener(first);
+            assertEquals(1, counting.callbacks, "the first listener installed no seam");
             SyncedStore.addChangeListener(second);
-            Continuity.enable();
-            Continuity.refreshBridge();
-
+            SyncedStore.addChangeListener(new SyncedStoreListener() {
+                public void storeChanged() {
+                }
+            });
             assertEquals(1, counting.callbacks,
-                    "the bridge was given " + counting.callbacks + " callbacks, so a port that "
-                            + "registers a native observer in setCallback keeps every one of them "
-                            + "and delivers each store change that many times");
+                    "the bridge was given " + counting.callbacks + " callbacks for 3 listeners, "
+                            + "so a port that registers a native observer in setCallback keeps "
+                            + "one per listener and delivers each store change that many times");
+
+            // enable() DOES re-install, on purpose: that is how the port is asked for a
+            // continuation it declined while continuity was off.
+            Continuity.enable();
+            assertEquals(2, counting.callbacks,
+                    "enabling did not ask the port for anything it had held, so a Handoff that "
+                            + "cold-launched the app before anything was listening is stranded");
 
             // And a bridge the port SWAPS in still gets one, or refreshBridge() would be inert.
             CountingBridge replacement = new CountingBridge();
