@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-04T08:07:28Z",
-  "commit": "a782da1c2741b2db531706d47be47388b6cfb7e0",
+  "generated_at": "2026-09-05T07:39:50Z",
+  "commit": "30ffac801ba0caf2af1410755560be8f2de85c36",
   "browsers": [
     {
       "id": "chromium",
       "name": "Chromium",
-      "engine_version": "151.0.7922.34",
+      "engine_version": "153.0.8010.12",
       "status": "pass",
       "coverage": "Full compliance suite plus nightly lifecycle validation"
     },
     {
       "id": "firefox",
       "name": "Firefox",
-      "engine_version": "153.0",
+      "engine_version": "155.0",
       "status": "pass",
       "coverage": "Nightly lifecycle validation"
     },
     {
       "id": "webkit",
       "name": "WebKit",
-      "engine_version": "26.5",
+      "engine_version": "26.6",
       "status": "pass",
       "coverage": "Nightly lifecycle validation"
     }
