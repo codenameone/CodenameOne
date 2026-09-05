@@ -46,46 +46,8 @@ class EncodedImageTest extends UITestBase {
                 "a picture nobody invalidated must not be decoded twice");
     }
 
-    @FormTest
-    void testInvalidateDecodedImagesForcesRedecode() {
-        EncodedImage encoded = EncodedImage.create(new byte[]{1, 2, 3, 4});
-        Object first = encoded.getImage();
 
-        EncodedImage.invalidateDecodedImages();
 
-        assertNotSame(first, encoded.getImage(),
-                "after the platform may have thrown the decode away, the picture has to be decoded again");
-    }
-
-    @FormTest
-    void testInvalidateDecodedImagesReachesLockedImages() {
-        EncodedImage encoded = EncodedImage.create(new byte[]{5, 6, 7, 8});
-        encoded.lock();
-        Object first = encoded.getImage();
-        assertSame(first, encoded.getImage(), "a locked picture is held hard, so it decodes once");
-
-        EncodedImage.invalidateDecodedImages();
-
-        // The point of the generation: a locked image keeps its stale decode
-        // until it is next used, and then discards it unused. Locking must not
-        // be able to pin a decode the platform has invalidated.
-        assertNotSame(first, encoded.getImage(),
-                "a lock must not keep a decode alive that the platform has invalidated");
-        assertTrue(encoded.isLocked(), "invalidation must not disturb the lock protocol");
-    }
-
-    @FormTest
-    void testInvalidateDecodedImagesKeepsDimensions() {
-        EncodedImage encoded = EncodedImage.create(new byte[]{9, 8, 7}, 21, 13, true);
-
-        EncodedImage.invalidateDecodedImages();
-
-        // Width and height are a property of the ENCODED bytes, which have not
-        // changed; only the decoded form is suspect. Resetting them would make
-        // every layout that measured this image wrong until it re-decoded.
-        assertEquals(21, encoded.getWidth());
-        assertEquals(13, encoded.getHeight());
-    }
 
     @FormTest
     void testCreateFromByteArrayReturnsSameData() {

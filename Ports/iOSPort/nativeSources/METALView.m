@@ -667,12 +667,6 @@ int cn1DirectToDrawableEnabled(void) {
 - (void)memoryWarning {
     extern void CN1MetalReleaseCaches(void);
     CN1MetalReleaseCaches();
-    // The JAVA decode generation too, not just the native texture one. Dropping
-    // a texture is recoverable for an image that still holds its decoded copy;
-    // a no-backing-copy image has none, so it has to be told to rebuild from the
-    // encoded bytes. Same call applicationWillResignActive makes, for the same
-    // reason -- this path just was not covered.
-    com_codename1_impl_ios_IOSImplementation_applicationDidReceiveMemoryWarning__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 - (void)dealloc

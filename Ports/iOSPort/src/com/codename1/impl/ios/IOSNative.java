@@ -339,8 +339,6 @@ public final class IOSNative {
     /// Tells the peer it does not have to keep the decoded UIImage alive once it
     /// has uploaded its texture: the caller holds the encoded bytes and will
     /// recreate the image if the platform loses it. See
-    /// EncodedImage#invalidateDecodedImages().
-    native void markImageNoBackingCopy(long peer);
 
     native void releasePeer(long peer);
     native void retainPeer(long peer);

@@ -423,38 +423,6 @@ public class Image implements ActionSource {
         }
     }
 
-    /// Creates an image from encoded bytes whose platform peer does NOT have to
-    /// keep a decoded copy alive for its own recovery.
-    ///
-    /// The normal contract is that a platform image can rebuild itself -- some
-    /// ports hold the decoded bitmap so they can re-upload it after the OS
-    /// discards a GPU texture. That costs the picture being resident twice, once
-    /// on the CPU and once on the GPU, for as long as it is on screen. A caller
-    /// that keeps the ENCODED bytes and will recreate the image itself does not
-    /// need the platform to do it too; [EncodedImage] is that caller.
-    ///
-    /// Ports that have no such copy to begin with implement this as the plain
-    /// [#createImage(byte[], int, int)], which is the default.
-    ///
-    /// #### Returns
-    ///
-    /// the newly created image
-    @SuppressWarnings("PMD.DoNotCallGarbageCollectionExplicitly")
-    static Image createImageNoBackingCopy(byte[] bytes, int offset, int len) {
-        try {
-            Object o = Display.impl.createImageNoBackingCopy(bytes, offset, len);
-            if (o == null) {
-                throw new IllegalArgumentException("create image failed for the given image data of length: " + len);
-            }
-            return new Image(o);
-        } catch (OutOfMemoryError err) {
-            // Same reason as createImage: some devices throw a spurious OOM that
-            // a collection and a retry clears.
-            System.gc();
-            System.gc();
-            return new Image(Display.impl.createImageNoBackingCopy(bytes, offset, len));
-        }
-    }
 
     /// The main use case of this method is the automatic rotation and flipping
     /// of an image returned from the camera or from the gallery, preserving the

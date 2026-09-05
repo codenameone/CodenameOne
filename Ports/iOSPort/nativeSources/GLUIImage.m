@@ -229,10 +229,6 @@ extern int nextPowerOf2(int val);
     return mtlTexture;
 }
 
--(void)setNoBackingCopy:(BOOL)v {
-    noBackingCopy = v;
-}
-
 -(void)dropReadOnlyCachedTexture {
     // issue #5349: release the cached read-only texture; getMTLTexture rebuilds
     // it from the retained CN1Image on next use. Bumping the generation match is

@@ -87,15 +87,6 @@ public class EncodedImage extends Image {
     private Image hardCache;
     private int locked;
     private boolean disposed;
-    /// Bumped when every decoded image in the process becomes suspect. iOS may
-    /// discard the GPU contents of any texture we uploaded while the application
-    /// is suspended, so on resume nothing decoded before the suspend can be
-    /// trusted. See [#invalidateDecodedImages()].
-    private static int decodeGeneration;
-    /// The generation this instance's cached decode belongs to. When it falls
-    /// behind the static counter the cache is dropped and the picture is decoded
-    /// again from [#imageData], which this class keeps for exactly that purpose.
-    private int decodedAtGeneration;
 
     private EncodedImage(byte[][] imageData) {
         super(null);
@@ -351,20 +342,6 @@ public class EncodedImage extends Image {
         return create(Display.getInstance().getResourceAsStream(EncodedImage.class, i));
     }
 
-    /// Marks every decoded image in the process stale, so the next use of each
-    /// one decodes it again from the encoded bytes it still holds.
-    ///
-    /// This is a counter bump, not a sweep: there is no registry of live images
-    /// to walk and nothing is touched here. Each instance compares its own
-    /// generation the next time it is asked for pixels, and an instance that is
-    /// never used again is never looked at. Images that are locked keep their
-    /// stale decode until then, and it is discarded unused.
-    ///
-    /// Called by a port when the platform may have thrown the decoded form away
-    /// behind our back -- on iOS, when the application is suspended.
-    public static void invalidateDecodedImages() {
-        decodeGeneration++;
-    }
 
     /// A subclass might choose to load asynchroniously and reset the cache when the image is ready.
     protected void resetCache() {
@@ -457,14 +434,6 @@ public class EncodedImage extends Image {
             width = -1;
             height = -1;
         }
-        if (decodedAtGeneration != decodeGeneration) {
-            // Deliberately NOT resetting width/height: those are a property of
-            // the encoded bytes, which have not changed. Only the decoded form
-            // is suspect.
-            decodedAtGeneration = decodeGeneration;
-            hardCache = null;
-            cache = null;
-        }
         if (hardCache != null) {
             return hardCache;
         }
@@ -498,7 +467,7 @@ public class EncodedImage extends Image {
             // generation bump above, so a port that would otherwise keep a
             // CPU-side bitmap alive next to its GPU texture -- the same picture
             // in memory twice -- does not have to.
-            i = Image.createImageNoBackingCopy(b, 0, b.length);
+            i = Image.createImage(b, 0, b.length);
             if (opaqueChecked) {
                 i.setOpaque(opaque);
             }

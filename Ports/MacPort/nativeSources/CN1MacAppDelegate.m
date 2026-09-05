@@ -1043,6 +1043,32 @@ void CN1MacInstallAppDelegate(void) {
         // padding and margin on every component.
         extern void CN1MacPublishMainWindowScreen(void);
         CN1MacPublishMainWindowScreen();
+
+        // ...and keep it fresh when the window itself moves.
+        //
+        // The republish in CN1AppKitWindows lives on the window DELEGATE, and
+        // the main window has none -- CN1MacHost never sets one, so that path
+        // only ever fires for secondary windows. Without these the published
+        // index and scale stay whatever the window opened with, and dragging
+        // the main window between a 1x and a Retina display left
+        // convertToPixels and getDeviceDensity using the old scale for good.
+        //
+        // Both notifications: DidChangeScreen is the move, and
+        // DidChangeBackingProperties is the same window's scale changing under
+        // it, which a move between displays of different scale also produces.
+        NSWindow *mainWindow = [CN1MacHost sharedHost].builtWindow;
+        if (mainWindow != nil) {
+            for (NSNotificationName n in @[NSWindowDidChangeScreenNotification,
+                                           NSWindowDidChangeBackingPropertiesNotification]) {
+                [[NSNotificationCenter defaultCenter]
+                    addObserverForName:n
+                                object:mainWindow
+                                 queue:[NSOperationQueue mainQueue]
+                            usingBlock:^(NSNotification *note) {
+                    CN1MacPublishMainWindowScreen();
+                }];
+            }
+        }
     });
     [[NSNotificationCenter defaultCenter]
         addObserverForName:NSApplicationDidChangeScreenParametersNotification

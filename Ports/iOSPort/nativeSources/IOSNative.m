@@ -5302,10 +5302,6 @@ void com_codename1_impl_ios_IOSNative_clearRadialGradientPaintMutable__(CN1_THRE
     [PaintOp setCurrentMutable:NULL];
 }
 
-void com_codename1_impl_ios_IOSNative_markImageNoBackingCopy___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    GLUIImage* i = (BRIDGE_CAST GLUIImage*)((void *)peer);
-    [i setNoBackingCopy:YES];
-}
 
 void com_codename1_impl_ios_IOSNative_releasePeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
 #ifndef CN1_USE_ARC
