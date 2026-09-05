@@ -494,6 +494,49 @@ class LocationButtonRebuildTest extends UITestBase {
         assertEquals(2, heard.size(), "and each is answered: " + heard);
     }
 
+    @Test
+    void aFailedSessionRetiresOnlyItsOwnQueuedGrant() throws Exception {
+        RecordingBridge bridge = install();
+        ParkingManager manager = parkingManager();
+        bridge.granted = manager;
+
+        LocationButton holder = new LocationButton();
+        LocationButton second = new LocationButton();
+        final List<Location> heard = new ArrayList<Location>();
+        second.addLocationSharedListener(new LocationSharedListener() {
+            public void locationShared(Location location) {
+                heard.add(location);
+            }
+        });
+
+        bridge.sessions.get(0).onResult.onSucess(Boolean.TRUE);
+        drain();
+
+        // A tap on the second button queues, its control is replaced, and the
+        // replacement is tapped too: two grants from two different sessions,
+        // both waiting.
+        bridge.sessions.get(1).onResult.onSucess(Boolean.TRUE);
+        drain();
+        second.setTextType(LocationButton.TEXT_USE_PRECISE_LOCATION);
+        assertEquals(3, bridge.sessions.size());
+        bridge.sessions.get(2).onResult.onSucess(Boolean.TRUE);
+        drain();
+
+        // The CURRENT session dies. Retiring every queued grant of this button
+        // took the earlier tap's with it, and systemButtonFailed fires one
+        // null -- so two taps got one answer.
+        bridge.sessions.get(2).onUnavailable.run();
+        drain();
+
+        manager.release();
+        drain();
+        drain();
+
+        assertEquals(2, heard.size(),
+                "the failed session retires its own grant; the earlier one is "
+                + "still answered by the drain: " + heard);
+    }
+
     private static boolean wakePending() throws Exception {
         return field("staleWake").get(null) != null;
     }

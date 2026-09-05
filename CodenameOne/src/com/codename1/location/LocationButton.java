@@ -630,10 +630,15 @@ public class LocationButton extends Container {
                 // been served, and the user's tap was answered by the null of
                 // a session it never used. Same question serveGrant asks of a
                 // running request: whose failure was this?
+                // THIS session's grants, not every session's. A grant from a
+                // peer that was already replaced is stale, not dead: the drain
+                // answers it with its own null, and removing it here meant one
+                // null for two taps. And a fallback grant is neither -- it
+                // never had a session to lose.
                 for (int at = WAITING.size() - 1; at >= 0; at--) {
                     Pending waiting = WAITING.get(at);
                     if (waiting.button == LocationButton.this //NOPMD CompareObjectsWithEquals
-                            && waiting.generation != NO_SESSION) {
+                            && waiting.generation == generation) {
                         WAITING.remove(at);
                     }
                 }
@@ -907,10 +912,13 @@ public class LocationButton extends Container {
         Pending found = null;
         while (found == null && !WAITING.isEmpty()) {
             Pending candidate = WAITING.remove(0);
-            if (candidate.button.unavailable
-                    && candidate.generation != NO_SESSION) {
-                continue;
-            }
+            // Staleness FIRST. A button that has gone unavailable installed a
+            // placeholder, which advanced its stamp, so every grant it still
+            // has queued is stale -- and skipping on unavailable before asking
+            // dropped them without a word. systemButtonFailed fires one null,
+            // which answers the grant of the session that failed; a grant from
+            // a session that was already replaced is a different tap and needs
+            // its own.
             if (!candidate.button.stillCurrent(candidate.generation)) {
                 // The control that earned this grant was replaced while the
                 // grant waited. Answering it is the honest outcome: the tap
@@ -918,6 +926,10 @@ public class LocationButton extends Container {
                 // run a lookup against a session nobody granted and hand the
                 // result to listeners as the untapped replacement's.
                 candidate.button.fire(null);
+                continue;
+            }
+            if (candidate.button.unavailable
+                    && candidate.generation != NO_SESSION) {
                 continue;
             }
             found = candidate;
@@ -929,17 +941,17 @@ public class LocationButton extends Container {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                if (next.button.unavailable
-                        && next.generation != NO_SESSION) {
-                    // Failed between being dequeued and running.
-                    serveNextWaiting();
-                    return;
-                }
                 if (!next.button.stillCurrent(next.generation)) {
                     // Replaced between being dequeued and running, which the
                     // drain above cannot see because it already let this one
                     // through. Same answer as there.
                     next.button.fire(null);
+                    serveNextWaiting();
+                    return;
+                }
+                if (next.button.unavailable
+                        && next.generation != NO_SESSION) {
+                    // Failed between being dequeued and running.
                     serveNextWaiting();
                     return;
                 }

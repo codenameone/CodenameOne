@@ -140,21 +140,34 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         return null;
     }
 
-    /// Counts bindings, so a cleanup can tell whether it has been overtaken.
+    /// Counts every change of intent, so each half can tell whether it has
+    /// been overtaken.
+    ///
+    /// Incremented by BOTH bind and clear, and checked by both. Guarding only
+    /// the removal was half a fix: a bind whose thread was still waiting for
+    /// the API client could post its requestLocationUpdates after the request
+    /// that wanted it had gone, leaving a continuous high-accuracy
+    /// subscription registered with nothing consuming it until some later
+    /// clear happened to remove it -- and the clear that would have removed it
+    /// was itself suppressed as overtaken.
+    ///
+    /// Symmetric, so the last call made is the one that takes effect: whoever
+    /// finds the count still equal to the one it took is the current intent,
+    /// and everybody else does nothing.
     ///
     /// Atomic because the two sides genuinely are on different threads: bind
-    /// and clear are called from the Codename One EDT, and the check runs on
+    /// and clear are called from the Codename One EDT, and the checks run on
     /// the Android main looper. This is the native boundary, which is where
     /// that marshalling belongs.
-    private final java.util.concurrent.atomic.AtomicInteger bindGeneration =
+    private final java.util.concurrent.atomic.AtomicInteger intent =
             new java.util.concurrent.atomic.AtomicInteger();
 
     @Override
     protected void bindListener() {
         final Class bgListenerClass = getBackgroundLocationListener();
-        // Counted before the thread is spawned, so a cleanup already on its
-        // way sees that it has been overtaken. See clearListener.
-        bindGeneration.incrementAndGet();
+        // Counted before the thread is spawned, so anything already on its way
+        // sees that it has been overtaken. See intent.
+        final int mine = intent.incrementAndGet();
         Thread t = new Thread(new Runnable() {
 
             @Override
@@ -168,6 +181,12 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                 mHandler.post(new Runnable() {
 
                     public void run() {
+                        if (intent.get() != mine) {
+                            // Overtaken while this thread waited for the API
+                            // client. Registering now would leave a
+                            // subscription nobody asked for any more.
+                            return;
+                        }
                         LocationRequest r = locationRequest;
 
                         com.codename1.location.LocationRequest request = getRequest();
@@ -292,7 +311,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         // ends in setLocationListener(null) and the next one can start
         // straight away -- but the button's queue starts the next request the
         // moment the previous one finishes, which is precisely the window.
-        final int retiring = bindGeneration.get();
+        final int mine = intent.incrementAndGet();
         Thread t = new Thread(new Runnable() {
 
             @Override
@@ -305,11 +324,9 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                 mHandler.post(new Runnable() {
 
                     public void run() {
-                        if (bindGeneration.get() != retiring) {
-                            // Overtaken by a bind. The subscription in place is
-                            // not the one this call set out to remove, and the
-                            // clear that retires THAT one will do its own
-                            // removal, so nothing is left running.
+                        if (intent.get() != mine) {
+                            // Overtaken. Whatever is in place belongs to a
+                            // later call, which will retire it itself.
                             return;
                         }
                         if (inMemoryBackgroundLocationListener != null) {

@@ -409,7 +409,14 @@ public abstract class LocationManager {
         public void locationUpdated(Location location) {
             result = location;
             finished = true;
-            setLocationListener(null);
+            // Only while this LL is STILL the installed listener, for the same
+            // reason the timeout path above says so. The platform can deliver
+            // to a listener it captured before the wait gave up: the slot has
+            // been released by then and the next request has installed its
+            // own, and an unconditional clear here removed THAT one -- so a
+            // fix arriving late for a request nobody is waiting on any more
+            // made the request that is waiting time out instead.
+            clearListenerIfStill(this);
         }
 
         @Override
@@ -425,7 +432,10 @@ public abstract class LocationManager {
                 result = null;
             }
             finished = true;
-            setLocationListener(null);
+            // Conditional for the reason locationUpdated above is: a late
+            // state change belongs to the request that installed this LL, not
+            // to whoever holds the slot now.
+            clearListenerIfStill(this);
         }
 
         @Override
