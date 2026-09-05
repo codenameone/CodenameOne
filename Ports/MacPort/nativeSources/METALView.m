@@ -184,6 +184,21 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     /// screen keeps showing the previous frame indefinitely. This says a frame
     /// is owed, and the completion that frees a surface pays it.
     _Atomic int cn1PresentDeferred;
+
+    /// The slot most recently handed to layer.contents, or -1 before the first.
+    ///
+    /// Neither of the other two tests covers it. IOSurfaceIsInUse() answers for
+    /// the window server, which does not own the surface until Core Animation
+    /// has handed the transaction over -- and between the assignment and that
+    /// handoff it reads false. The in-flight flag is already clear by then, since
+    /// the GPU finished before the handler ran. So for that window a surface the
+    /// layer is about to display looks free to both tests, and a renderer fast
+    /// enough to wrap the pool would draw over the frame being shown.
+    ///
+    /// Excluding it outright is simpler than trying to observe the handoff: the
+    /// surface under the layer is never a legal target no matter who owns it,
+    /// and it stops being current the moment a later frame replaces it.
+    _Atomic int cn1PresentCurrent;
 }
 
 @synthesize commandQueue;
@@ -526,6 +541,8 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     // The rebuild path asks for a repaint of its own, so an owed frame is
     // already covered and the flag would otherwise ask for a second one.
     atomic_store_explicit(&cn1PresentDeferred, 0, memory_order_release);
+    // Nothing is under the layer any more either; the surface it named is gone.
+    atomic_store_explicit(&cn1PresentCurrent, -1, memory_order_release);
     atomic_fetch_add_explicit(&cn1PresentGeneration, 1, memory_order_release);
     NSDictionary *surfaceProps = @{
         (id)kIOSurfaceWidth:           @(pw),
@@ -559,6 +576,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         [CATransaction setDisableActions:YES];
         self.layer.contents = (id)cn1PresentSurfaces[0];
         [CATransaction commit];
+        atomic_store_explicit(&cn1PresentCurrent, 0, memory_order_release);
     }
 
     // The persistent target. Codename One only queues the operations that
@@ -784,6 +802,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
         int candidate = (cn1PresentIndex + i) % CN1_PRESENT_SURFACE_COUNT;
         if (cn1PresentSurfaces[candidate] != NULL
+                && candidate != atomic_load_explicit(&cn1PresentCurrent, memory_order_acquire)
                 && !atomic_load_explicit(&cn1PresentInFlight[candidate], memory_order_acquire)
                 && !IOSurfaceIsInUse(cn1PresentSurfaces[candidate])) {
             presentIdx = candidate;
@@ -888,6 +907,10 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
             // dirty for the next composite.
             presentLayer.contents = (id)presented;
             [CATransaction commit];
+            // Reserved from here until a later frame takes its place, which is
+            // what covers the window where the server does not own it yet.
+            atomic_store_explicit(&presentView->cn1PresentCurrent, completedIdx,
+                                  memory_order_release);
         }
         // Only while this is still the generation that set it. A resize
         // rebuilds the surfaces and zeroes every flag, so by the time an older
@@ -974,6 +997,8 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     // The rebuild path asks for a repaint of its own, so an owed frame is
     // already covered and the flag would otherwise ask for a second one.
     atomic_store_explicit(&cn1PresentDeferred, 0, memory_order_release);
+    // Nothing is under the layer any more either; the surface it named is gone.
+    atomic_store_explicit(&cn1PresentCurrent, -1, memory_order_release);
     framebufferWidth = 0;
     framebufferHeight = 0;
 }
