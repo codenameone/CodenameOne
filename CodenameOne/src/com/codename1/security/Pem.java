@@ -36,6 +36,13 @@ import com.codename1.util.StringUtil;
 /// Nothing here is exposed publicly; the entry points are the `fromPem`
 /// factories on [PublicKey] and [PrivateKey].
 final class Pem {
+    private static final int SHAPE_SPKI = 0;
+    private static final int SHAPE_PKCS8 = 1;
+    private static final int SHAPE_PKCS1_PUBLIC = 2;
+    private static final int SHAPE_PKCS1_PRIVATE = 3;
+    private static final int SHAPE_SEC1 = 4;
+    private static final int SHAPE_UNKNOWN = 5;
+
     private static final String BEGIN = "-----BEGIN ";
     private static final String END = "-----END ";
     private static final String DASHES = "-----";
@@ -62,27 +69,30 @@ final class Pem {
     static byte[] toSpki(String pem) {
         String label = label(pem);
         byte[] der = body(pem, label);
-        if (label == null) {
-            if (looksLikePrivateKey(der)) {
-                throw new CryptoException("this is a private key, not a public key");
+        if (label != null && !"PUBLIC KEY".equals(label) && !"RSA PUBLIC KEY".equals(label)) {
+            if ("CERTIFICATE".equals(label)) {
+                throw new CryptoException("this is a certificate, not a public key; "
+                        + "extract the key with: openssl x509 -in cert.pem -pubkey -noout");
             }
+            throw new CryptoException("not a public key PEM block: -----BEGIN " + label + "-----");
+        }
+        // The container is settled by the DER's own shape rather than by the
+        // label, so unarmored input accepts exactly what armored input does.
+        int shape = shapeOf(der);
+        if (shape == SHAPE_SPKI) {
             return der;
         }
-        if ("PUBLIC KEY".equals(label)) {
-            return der;
-        }
-        if ("RSA PUBLIC KEY".equals(label)) {
+        if (shape == SHAPE_PKCS1_PUBLIC) {
             // PKCS#1 RSAPublicKey -> SubjectPublicKeyInfo. The BIT STRING needs
             // a leading zero byte for "no unused bits in the final octet".
             byte[] bitString = new byte[der.length + 1];
             System.arraycopy(der, 0, bitString, 1, der.length);
             return tlv(0x30, concat(rsaAlgorithmIdentifier(), tlv(0x03, bitString)));
         }
-        if ("CERTIFICATE".equals(label)) {
-            throw new CryptoException("this is a certificate, not a public key; "
-                    + "extract the key with: openssl x509 -in cert.pem -pubkey -noout");
+        if (shape == SHAPE_UNKNOWN) {
+            throw new CryptoException("unrecognized public key container");
         }
-        throw new CryptoException("not a public key PEM block: -----BEGIN " + label + "-----");
+        throw new CryptoException("this is a private key, not a public key");
     }
 
     /// Decodes `pem` to PKCS#8 PrivateKeyInfo DER.
@@ -93,27 +103,28 @@ final class Pem {
     static byte[] toPkcs8(String pem) {
         String label = label(pem);
         byte[] der = body(pem, label);
-        if (label == null) {
-            if (!looksLikePrivateKey(der)) {
-                throw new CryptoException("this is a public key, not a private key");
+        if (label != null && !"PRIVATE KEY".equals(label)
+                && !"RSA PRIVATE KEY".equals(label) && !"EC PRIVATE KEY".equals(label)) {
+            if ("ENCRYPTED PRIVATE KEY".equals(label)) {
+                throw new CryptoException("this private key is passphrase-encrypted; decrypt it first with: "
+                        + "openssl pkcs8 -topk8 -nocrypt -in key.pem -out key_pkcs8.pem");
             }
+            throw new CryptoException("not a private key PEM block: -----BEGIN " + label + "-----");
+        }
+        int shape = shapeOf(der);
+        if (shape == SHAPE_PKCS8) {
             return der;
         }
-        if ("PRIVATE KEY".equals(label)) {
-            return der;
-        }
-        if ("RSA PRIVATE KEY".equals(label)) {
-            // PKCS#1 RSAPrivateKey -> PrivateKeyInfo.
+        if (shape == SHAPE_PKCS1_PRIVATE) {
             return wrapPkcs8(rsaAlgorithmIdentifier(), der);
         }
-        if ("EC PRIVATE KEY".equals(label)) {
+        if (shape == SHAPE_SEC1) {
             return sec1ToPkcs8(der);
         }
-        if ("ENCRYPTED PRIVATE KEY".equals(label)) {
-            throw new CryptoException("this private key is passphrase-encrypted; decrypt it first with: "
-                    + "openssl pkcs8 -topk8 -nocrypt -in key.pem -out key_pkcs8.pem");
+        if (shape == SHAPE_UNKNOWN) {
+            throw new CryptoException("unrecognized private key container");
         }
-        throw new CryptoException("not a private key PEM block: -----BEGIN " + label + "-----");
+        throw new CryptoException("this is a public key, not a private key");
     }
 
     /// Reads the algorithm OID out of an SPKI or PKCS#8 blob and maps it to the
@@ -139,14 +150,44 @@ final class Pem {
                 + "; only RSA and EC keys are supported");
     }
 
-    /// Tells a PKCS#8 blob from an SPKI one by shape alone, for input that
-    /// arrived as bare base64 and so carries no label to go on: PKCS#8 opens
-    /// with a version INTEGER, SPKI opens straight into the AlgorithmIdentifier
-    /// SEQUENCE.
-    private static boolean looksLikePrivateKey(byte[] der) {
+    /// Classifies a key blob by the tags of the outer SEQUENCE's children,
+    /// which is the only thing available for input that arrived as bare base64
+    /// and so carries no label:
+    ///
+    /// - `SEQUENCE` first -> SubjectPublicKeyInfo
+    /// - `INTEGER, SEQUENCE` -> PKCS#8 PrivateKeyInfo
+    /// - `INTEGER, OCTET STRING` -> SEC1 ECPrivateKey
+    /// - `INTEGER, INTEGER` -> PKCS#1, and RSAPublicKey is exactly the two
+    ///   fields `{ n, e }` where RSAPrivateKey carries nine
+    private static int shapeOf(byte[] der) {
         Cursor c = new Cursor(der);
         c.enter(0x30);
-        return c.peek() == 0x02;
+        if (!c.hasMore()) {
+            return SHAPE_UNKNOWN;
+        }
+        int first = c.peek();
+        if (first == 0x30) {
+            return SHAPE_SPKI;
+        }
+        if (first != 0x02) {
+            return SHAPE_UNKNOWN;
+        }
+        c.skip();
+        if (!c.hasMore()) {
+            return SHAPE_UNKNOWN;
+        }
+        int second = c.peek();
+        if (second == 0x30) {
+            return SHAPE_PKCS8;
+        }
+        if (second == 0x04) {
+            return SHAPE_SEC1;
+        }
+        if (second != 0x02) {
+            return SHAPE_UNKNOWN;
+        }
+        c.skip();
+        return c.hasMore() ? SHAPE_PKCS1_PRIVATE : SHAPE_PKCS1_PUBLIC;
     }
 
     /// Returns the label of the first armored block, or `null` when the input
@@ -188,6 +229,7 @@ final class Pem {
             }
             base64 = pem.substring(bodyStart, bodyEnd);
         }
+        requireStrictBase64(base64);
         // Base64.decode tolerates the line breaks but nothing else, and answers
         // null rather than throwing when it meets a character it cannot map.
         byte[] der = Base64.decode(StringUtil.getBytes(base64));
@@ -196,6 +238,46 @@ final class Pem {
         }
         requireWholeElement(der);
         return der;
+    }
+
+    /// Checks the body is well-formed base64 before it is decoded.
+    ///
+    /// [Base64#decode] stops at the first `=` and never looks at what follows,
+    /// so a body of `<valid base64>=<anything>` decodes to the intact prefix and
+    /// is accepted. A spliced or corrupted file would load silently on the
+    /// strength of its first half, so padding is required to be the last thing
+    /// in the body.
+    private static void requireStrictBase64(String base64) {
+        int symbols = 0;
+        int padding = 0;
+        for (int i = 0; i < base64.length(); i++) {
+            char c = base64.charAt(i);
+            if (c == '\n' || c == '\r' || c == ' ' || c == '\t') {
+                continue;
+            }
+            if (c == '=') {
+                padding++;
+                continue;
+            }
+            if (padding > 0) {
+                throw new CryptoException("malformed PEM: content follows the base64 padding");
+            }
+            if (!isBase64(c)) {
+                throw new CryptoException("malformed PEM: '" + c + "' is not a base64 character");
+            }
+            symbols++;
+        }
+        if (padding > 2) {
+            throw new CryptoException("malformed PEM: too much base64 padding");
+        }
+        if (symbols == 0 || ((symbols + padding) & 3) != 0) {
+            throw new CryptoException("malformed PEM: the base64 body is truncated");
+        }
+    }
+
+    private static boolean isBase64(char c) {
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+                || (c >= '0' && c <= '9') || c == '+' || c == '/';
     }
 
     /// Checks that the decoded body is exactly one complete DER element.
@@ -362,10 +444,13 @@ final class Pem {
             // be read into a local first -- "pos += length()" would capture the
             // old pos and throw that advance away.
             int length = length();
-            pos += length;
-            if (pos > der.length) {
+            // Compare against the space that is left, never "pos + length":
+            // a declared length near Integer.MAX_VALUE makes that sum overflow
+            // to a negative number, which slips past the check.
+            if (length > der.length - pos) {
                 throw new CryptoException("malformed key: truncated DER");
             }
+            pos += length;
         }
 
         /// Offset of the cursor within the blob.
@@ -392,7 +477,7 @@ final class Pem {
         byte[] read(int expectedTag) {
             expect(expectedTag);
             int length = length();
-            if (pos + length > der.length) {
+            if (length > der.length - pos) {
                 throw new CryptoException("malformed key: truncated DER");
             }
             byte[] out = new byte[length];
@@ -419,7 +504,7 @@ final class Pem {
                 return first;
             }
             int count = first & 0x7F;
-            if (count == 0 || count > 4 || pos + count > der.length) {
+            if (count == 0 || count > 4 || count > der.length - pos) {
                 throw new CryptoException("malformed key: bad DER length");
             }
             int value = 0;

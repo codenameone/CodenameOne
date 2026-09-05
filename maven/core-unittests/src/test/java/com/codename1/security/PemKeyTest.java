@@ -372,6 +372,55 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void unarmoredInputAcceptsTheSameContainersAsArmored() {
+        // stripping the armor must not change which formats load, and must not
+        // change the bytes they produce
+        assertArrayEquals(der(RSA_SPKI), PublicKey.fromPem(RSA_PKCS1_PUB).getEncoded());
+        assertArrayEquals(der(RSA_PKCS8), PrivateKey.fromPem(RSA_PKCS1).getEncoded());
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(EC_SEC1).getEncoded());
+    }
+
+    @Test
+    void unarmoredInputStillTellsPublicFromPrivate() {
+        assertTrue(assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(RSA_PKCS1_PUB)).getMessage().contains("public key"));
+        assertTrue(assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(EC_SEC1)).getMessage().contains("private key"));
+    }
+
+    @Test
+    void oversizedDerLengthDoesNotAllocate() {
+        // A four-byte length near Integer.MAX_VALUE used to make the bounds
+        // check "pos + length > der.length" overflow to a negative number and
+        // pass, so a ten-byte PEM reached new byte[length] and died with
+        // OutOfMemoryError. Every declared length must come back as a
+        // CryptoException instead.
+        for (int shift = 0; shift < 32; shift++) {
+            int length = 1 << shift;
+            byte[] oversized = {0x30, 0x08, 0x30, 0x06, 0x06, (byte) 0x84,
+                    (byte) (length >>> 24), (byte) (length >>> 16),
+                    (byte) (length >>> 8), (byte) length};
+            String armored = pem("PUBLIC KEY", Base64.encodeNoNewline(oversized));
+            assertThrows(CryptoException.class, () -> PublicKey.fromPem(armored),
+                    "declared length 2^" + shift + " must not escape as a runtime error");
+        }
+    }
+
+    @Test
+    void contentAfterTheBase64PaddingIsRejected() {
+        // Base64.decode stops at the first '=' and ignores the rest, so without
+        // an explicit check a spliced body loads on its first half alone.
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(RSA_SPKI_LABEL, RSA_SPKI + "=garbage")));
+        assertTrue(e.getMessage().contains("padding"), e.getMessage());
+
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(RSA_SPKI_LABEL, RSA_SPKI + "!!")));
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(RSA_SPKI_LABEL, RSA_SPKI.substring(0, RSA_SPKI.length() - 1))));
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));
