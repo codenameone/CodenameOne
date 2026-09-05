@@ -1252,13 +1252,14 @@ final class LocationButtonManifestFragments {
             throws java.io.IOException {
         LocationUsage found = new LocationUsage();
         if (root != null && root.isDirectory()) {
-            scanTree(root, found, new Executor.PermScanBudget());
+            scanTree(root, root, found, new Executor.PermScanBudget());
         }
         return found;
     }
 
-    private static void scanTree(java.io.File dir, LocationUsage found,
-            Executor.PermScanBudget budget) throws java.io.IOException {
+    private static void scanTree(java.io.File root, java.io.File dir,
+            LocationUsage found, Executor.PermScanBudget budget)
+            throws java.io.IOException {
         java.io.File[] children = dir.listFiles();
         if (children == null) {
             return;
@@ -1268,12 +1269,12 @@ final class LocationButtonManifestFragments {
             String childPath = child.getPath();
             String name = child.getName().toLowerCase(java.util.Locale.ROOT);
             if (child.isDirectory()) {
-                scanTree(child, found, budget);
+                scanTree(root, child, found, budget);
             } else if (name.endsWith(".jar") || name.endsWith(".aar")
                     || name.endsWith(".zip")) {
                 scanArchive(child, found, budget);
             } else if (name.endsWith(".class")
-                    && !isFrameworkClass(pathOf(child))) {
+                    && !isFrameworkClass(relativePath(root, child))) {
                 // Through the budget, like every archive entry. A loose file
                 // cannot lie about its size the way a compressed entry can, but
                 // it can still be enormous, and the budget's AGGREGATE cap is
@@ -1292,13 +1293,32 @@ final class LocationButtonManifestFragments {
     }
 
     /**
-     * The class's own binary name as far as it can be read off the file, which
-     * is all {@link #isFrameworkClass} needs: the check is a package prefix.
+     * The class's binary name, taken from where the file sits UNDER THE ROOT.
+     *
+     * <p>Anchored, like an archive entry is. The previous form searched the
+     * whole filesystem path for {@code com/codename1/} and truncated there,
+     * which reads an application's own relocated
+     * {@code org/acme/com/codename1/location/LocationButton.class} as the
+     * framework's and skips it -- and that class can hold the application's
+     * only reference to the real button, so the bridge is deleted under an app
+     * that uses it. A build directory that merely happened to contain those
+     * segments did the same to everything below it.</p>
+     *
+     * @param root the tree being scanned
+     * @param file a file inside it
+     * @return the path relative to the root, with forward slashes
      */
-    private static String pathOf(java.io.File file) {
+    private static String relativePath(java.io.File root, java.io.File file) {
+        String rootPath = root.getPath().replace('\\', '/');
         String path = file.getPath().replace('\\', '/');
-        int at = path.indexOf("com/codename1/");
-        return at < 0 ? path : path.substring(at);
+        if (path.length() > rootPath.length() && path.startsWith(rootPath)) {
+            path = path.substring(rootPath.length());
+        }
+        int cut = 0;
+        while (cut < path.length() && path.charAt(cut) == '/') {
+            cut++;
+        }
+        return path.substring(cut);
     }
 
     private static void scanArchive(java.io.File archive, LocationUsage found,

@@ -537,6 +537,40 @@ class LocationButtonRebuildTest extends UITestBase {
                 + "still answered by the drain: " + heard);
     }
 
+    @Test
+    void anEnormousTimeoutDoesNotMakeEveryRequestStale() throws Exception {
+        RecordingBridge bridge = install();
+        ParkingManager manager = parkingManager();
+        bridge.granted = manager;
+
+        LocationButton holder = new LocationButton();
+        // Long.MAX_VALUE is how a caller says "wait as long as it takes".
+        // Adding the stale margin to it wrapped negative, so the deadline was
+        // already behind us and the request counted as stale the moment it
+        // began -- which let the next grant start beside it and share
+        // LocationManager's single listener slot.
+        holder.setTimeout(Long.MAX_VALUE);
+        LocationButton second = new LocationButton();
+        assertEquals(2, bridge.sessions.size());
+
+        bridge.sessions.get(0).onResult.onSucess(Boolean.TRUE);
+        drain();
+        assertEquals(1, manager.lookups, "the holder's lookup is running");
+
+        // The second is granted while that one is genuinely still in flight.
+        // It must QUEUE, not start a concurrent lookup.
+        bridge.sessions.get(1).onResult.onSucess(Boolean.TRUE);
+        drain();
+        assertEquals(1, manager.lookups,
+                "a request with an enormous timeout is not stale, so the next "
+                + "grant waits instead of running beside it");
+
+        manager.release();
+        drain();
+        drain();
+        assertEquals(2, manager.lookups, "and is served once the first ends");
+    }
+
     private static boolean wakePending() throws Exception {
         return field("staleWake").get(null) != null;
     }

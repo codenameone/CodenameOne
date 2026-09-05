@@ -137,6 +137,27 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aRelocatedClassIsNotMistakenForTheFrameworks() throws Exception {
+        // The loose-file path used to be normalised by searching the whole
+        // filesystem path for com/codename1/ and truncating there, so an
+        // application's own relocated class read as the framework's and was
+        // skipped -- and it can hold the only reference to the real button,
+        // which then leaves the bridge deleted under an app that uses it. A
+        // build directory that merely contained those segments did the same to
+        // everything beneath it.
+        File root = tempDir("cn1-lb-relocated");
+        // The path has to truncate onto a listed name for the old form to
+        // skip it, which is exactly the shape a relocation produces: the
+        // package is rewritten in front and the class keeps its name.
+        writeClass(new File(root,
+                        "org/acme/com/codename1/location/LocationButton.class"),
+                "com/codename1/location/LocationButton");
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "a class under a relocated package is the application's");
+    }
+
+    @Test
     void aPrefixTheElementReboundIsNotOurs() {
         // The element takes the conventional prefix for a namespace of its own
         // and carries the real Android one under an alias. Offering "android"

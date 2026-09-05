@@ -833,7 +833,7 @@ public class LocationButton extends Container {
         // The deadline this request is entitled to, plus room for the platform
         // to answer late. Generous on purpose: taking the slot from a request
         // that was about to succeed is worse than waiting a little longer.
-        inFlightDeadline = timeout + STALE_MARGIN;
+        inFlightDeadline = saturatedSum(timeout, STALE_MARGIN);
         // A wake for whoever is BEHIND this request, because the queue may not
         // be empty and this request is not guaranteed to end.
         //
@@ -1015,8 +1015,25 @@ public class LocationButton extends Container {
         if (staleWake != null) {
             return;
         }
-        long delay = inFlightSince + inFlightDeadline
-                - System.currentTimeMillis();
+        long now = System.currentTimeMillis();
+        long deadlineAt = saturatedSum(inFlightSince, inFlightDeadline);
+        if (deadlineAt > Long.MAX_VALUE - WAKE_SLACK - now) {
+            // No wake at all, rather than one as far away as we can express.
+            //
+            // Timer adds the delay to the clock and REFUSES the result if it
+            // overflows -- "Illegal execution time" -- so saturating the delay
+            // to Long.MAX_VALUE moved the overflow one frame along instead of
+            // removing it, and the throw came back out through the callSerially
+            // that was queueing a grant.
+            //
+            // Nothing is lost by not scheduling: this wake exists to re-drive
+            // the queue once the request in flight has outstayed its deadline,
+            // and a deadline that cannot be reached is one the request will
+            // never outstay. Whoever is waiting is served when it finishes,
+            // which is the only way it can end.
+            return;
+        }
+        long delay = deadlineAt + WAKE_SLACK - now;
         if (delay < 0) {
             delay = 0;
         }
@@ -1042,7 +1059,7 @@ public class LocationButton extends Container {
                         }
                     });
                 }
-            }, delay + WAKE_SLACK);
+            }, delay);
         } catch (IllegalStateException cancelledAlready) {
             staleWake = null;
         }
@@ -1066,6 +1083,24 @@ public class LocationButton extends Container {
     /// The blocked call is not cancelled -- there is no API for that, and it
     /// may still return later. This releases the QUEUE, so a stuck request
     /// costs its own tap and not every tap after it.
+    /// Adds two non-negative values without wrapping past the end of time.
+    ///
+    /// setTimeout takes any positive long, and Long.MAX_VALUE is how a caller
+    /// says "wait as long as it takes". Adding STALE_MARGIN to that wrapped
+    /// NEGATIVE, so the deadline was already behind us: every request looked
+    /// stale the moment it started, the next grant was free to begin beside
+    /// it, and two of them shared LocationManager's single listener slot --
+    /// which is the exact collision inFlight exists to prevent, reached by
+    /// asking for a longer wait.
+    ///
+    /// Both callers pass values that cannot be negative -- a timeout, a margin,
+    /// an epoch in milliseconds -- so the one-sided test is the whole test.
+    private static long saturatedSum(long first, long second) {
+        return first > Long.MAX_VALUE - second
+                ? Long.MAX_VALUE
+                : first + second;
+    }
+
     private static boolean inFlightIsStale() {
         return inFlight
                 && System.currentTimeMillis() - inFlightSince
