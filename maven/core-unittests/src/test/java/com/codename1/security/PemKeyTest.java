@@ -673,6 +673,58 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void onlyKnownPkcs8VersionsAreAccepted() {
+        // Normalizing anything that merely was not version 0 laundered a corrupt
+        // header into a well-formed key: version 2, and an empty INTEGER, both
+        // came back as the canonical version-0 encoding and were accepted.
+        byte[] canonical = der(RSA_PKCS8);
+        int off = (canonical[1] & 0xFF) < 0x80 ? 2 : 2 + (canonical[1] & 0x7F);
+
+        for (int version : new int[] {2, 5, 127}) {
+            byte[] bad = canonical.clone();
+            bad[off + 2] = (byte) version;
+            CryptoException e = assertThrows(CryptoException.class,
+                    () -> PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(bad))),
+                    "version " + version + " must not be normalized");
+            assertTrue(e.getMessage().contains("version"), e.getMessage());
+        }
+
+        // and version 0 and 1 are still the two that work
+        assertArrayEquals(canonical, PrivateKey.fromPem(pem(RSA_PKCS8_LABEL, RSA_PKCS8)).getEncoded());
+    }
+
+    @Test
+    void pkcs1PrivateKeyRejectsAnythingAfterItsNineFields() {
+        // Only a single otherPrimeInfos SEQUENCE may follow, for a multi-prime
+        // key; anything else was wrapped into the PKCS#8 output as-is.
+        byte[] pkcs1 = der(RSA_PKCS1);
+        int off = (pkcs1[1] & 0xFF) < 0x80 ? 2 : 2 + (pkcs1[1] & 0x7F);
+        byte[] body = new byte[pkcs1.length - off];
+        System.arraycopy(pkcs1, off, body, 0, body.length);
+
+        for (String junk : new String[] {"0500", "020105", "0400"}) {
+            byte[] extra = hex(junk);
+            byte[] content = new byte[body.length + extra.length];
+            System.arraycopy(body, 0, content, 0, body.length);
+            System.arraycopy(extra, 0, content, body.length, extra.length);
+
+            byte[] blob = new byte[content.length + 4];
+            blob[0] = 0x30;
+            blob[1] = (byte) 0x82;
+            blob[2] = (byte) (content.length >> 8);
+            blob[3] = (byte) content.length;
+            System.arraycopy(content, 0, blob, 4, content.length);
+
+            assertThrows(CryptoException.class,
+                    () -> PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(blob))),
+                    "trailing " + junk + " must not be accepted");
+        }
+
+        // the untouched key still converts
+        assertArrayEquals(der(RSA_PKCS8), PrivateKey.fromPem(pem(RSA_PKCS1_LABEL, RSA_PKCS1)).getEncoded());
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));

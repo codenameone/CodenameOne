@@ -219,7 +219,22 @@ final class Pem {
         if (integers == 2 && !c.hasMore()) {
             return SHAPE_PKCS1_PUBLIC;
         }
-        return integers >= 9 ? SHAPE_PKCS1_PRIVATE : SHAPE_UNKNOWN;
+        if (integers != 9) {
+            return SHAPE_UNKNOWN;
+        }
+        if (c.hasMore()) {
+            // The only thing that may follow the nine fields is a single
+            // otherPrimeInfos SEQUENCE, for a multi-prime key. Accepting
+            // whatever was there wrapped the junk into the PKCS#8 output.
+            if (c.peek() != 0x30) {
+                return SHAPE_UNKNOWN;
+            }
+            c.skip();
+            if (c.hasMore()) {
+                return SHAPE_UNKNOWN;
+            }
+        }
+        return SHAPE_PKCS1_PRIVATE;
     }
 
     /// Decodes the first armored block whose label is one of `wanted`.
@@ -396,8 +411,16 @@ final class Pem {
         Cursor c = new Cursor(der);
         c.enter(0x30);
         byte[] version = c.element();
-        if (version.length == 3 && version[0] == 0x02 && version[1] == 0x01 && version[2] == 0) {
+        if (isVersion(version, 0)) {
             return der;
+        }
+        if (!isVersion(version, 1)) {
+            // Rewriting anything that merely is not version 0 would launder a
+            // corrupt header into a well-formed key: a version of 2, or an
+            // empty INTEGER, came back as the canonical version-0 encoding and
+            // was accepted.
+            throw new CryptoException("unsupported PKCS#8 version; only 0 (RFC 5208) and "
+                    + "1 (RFC 5958) are defined");
         }
         byte[] algorithm = c.element();
         byte[] privateKey = c.element();
@@ -408,6 +431,12 @@ final class Pem {
         }
         return tlv(0x30, concat(concat(tlv(0x02, new byte[] {0}), algorithm),
                 concat(privateKey, attributes)));
+    }
+
+    /// True when `element` is the DER for `INTEGER value` as a version field.
+    private static boolean isVersion(byte[] element, int value) {
+        return element.length == 3 && element[0] == 0x02 && element[1] == 0x01
+                && element[2] == (byte) value;
     }
 
     /// Converts a SEC1 `ECPrivateKey` --
