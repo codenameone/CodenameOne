@@ -970,6 +970,33 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void theBitStringUnusedBitsOctetIsChecked() {
+        // That octet is a count of 0..7, and the bits it declares unused must be
+        // zero. Checking only the length accepted both of these, which the JDK
+        // and OpenSSL each refuse.
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY",
+                Base64.encodeNoNewline(hex("3013 300d 0609 2a864886f70d010101 0500 03020800")))));
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY",
+                Base64.encodeNoNewline(hex("3013 300d 0609 2a864886f70d010101 0500 030207ff")))));
+        // a zero count with real payload is still fine
+        assertNotNull(PublicKey.fromPem(pem(RSA_SPKI_LABEL, RSA_SPKI)));
+    }
+
+    @Test
+    void aMalformedAlgorithmOidIsRejectedByBothOverloads() {
+        // read() checks the tag and the bounds and nothing else, so an empty or
+        // unterminated OID reached the explicit overload intact -- the
+        // auto-detecting path only caught it by accident, because such an OID
+        // matches neither algorithm it knows.
+        String empty = pem("PUBLIC KEY", Base64.encodeNoNewline(hex("3008 3002 0600 03020001")));
+        String unterminated = pem("PUBLIC KEY", Base64.encodeNoNewline(hex("300a 3004 06022a86 03020001")));
+        for (String bad : new String[] {empty, unterminated}) {
+            assertThrows(CryptoException.class, () -> PublicKey.fromPem(bad));
+            assertThrows(CryptoException.class, () -> PublicKey.fromPem(PublicKey.RSA, bad));
+        }
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));

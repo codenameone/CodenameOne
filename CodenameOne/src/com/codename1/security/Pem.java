@@ -163,6 +163,7 @@ final class Pem {
         }
         c.enter(0x30);
         byte[] oid = c.read(0x06);
+        requireOid(oid);
         // AlgorithmIdentifier ::= SEQUENCE { algorithm OID, parameters ANY
         // DEFINED BY algorithm OPTIONAL } -- at most one parameters element,
         // and nothing after it. Stopping at the OID accepted { OID, NULL, NULL }.
@@ -211,7 +212,21 @@ final class Pem {
             }
             // A BIT STRING's first content octet counts unused bits, so a
             // length of one is metadata and no key material at all.
-            return c.consume(0x03) > 1 && !c.hasMore() ? SHAPE_SPKI : SHAPE_UNKNOWN;
+            byte[] bits = c.read(0x03);
+            if (bits.length < 2 || c.hasMore()) {
+                return SHAPE_UNKNOWN;
+            }
+            // That octet is a count of 0..7, and the bits it declares unused
+            // must be zero. Checking only the length accepted "03 02 08 00"
+            // and "03 02 07 FF", which both decoders refuse.
+            int unused = bits[0] & 0xFF;
+            if (unused > 7) {
+                return SHAPE_UNKNOWN;
+            }
+            if (unused != 0 && (bits[bits.length - 1] & ((1 << unused) - 1)) != 0) {
+                return SHAPE_UNKNOWN;
+            }
+            return SHAPE_SPKI;
         }
         if (c.peek() != 0x02) {
             return SHAPE_UNKNOWN;
@@ -532,6 +547,30 @@ final class Pem {
         }
         return tlv(0x30, concat(concat(tlv(0x02, new byte[] {0}), algorithm),
                 concat(privateKey, attributes)));
+    }
+
+    /// Checks an OBJECT IDENTIFIER's contents.
+    ///
+    /// [Cursor#read] verifies the tag and the bounds, nothing more, so an empty
+    /// or unterminated OID reached the explicit-algorithm overloads intact --
+    /// the auto-detecting path only caught them by accident, because such an
+    /// OID matches neither of the two it knows.
+    private static void requireOid(byte[] oid) {
+        if (oid.length == 0) {
+            throw new CryptoException("malformed key: the algorithm OID is empty");
+        }
+        if ((oid[oid.length - 1] & 0x80) != 0) {
+            throw new CryptoException("malformed key: the algorithm OID ends mid-value");
+        }
+        // Each sub-identifier is base-128, most significant group first, and a
+        // leading 0x80 group would be a redundant zero.
+        boolean startOfValue = true;
+        for (int i = 0; i < oid.length; i++) {
+            if (startOfValue && oid[i] == (byte) 0x80) {
+                throw new CryptoException("malformed key: the algorithm OID is not minimally encoded");
+            }
+            startOfValue = (oid[i] & 0x80) == 0;
+        }
     }
 
     /// Checks a PKCS#8 `[0] attributes` wrapper.
