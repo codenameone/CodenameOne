@@ -1,0 +1,205 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.backend;
+
+import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * One HTTP/2 connection, on nghttp2.
+ *
+ * The framing is not implemented here and should not be: HPACK alone is a static
+ * table, a dynamic table with eviction and Huffman coding, and flow control,
+ * stream state, CONTINUATION reassembly and GOAWAY are all their own problems.
+ * nghttp2 owns those. This class owns the shape of the boundary.
+ *
+ * Java PULLS from the session rather than being called back into. nghttp2 is
+ * callback-driven, but a C callback that reaches into the VM has to survive
+ * dead-code elimination and must not run while the collector is moving; the
+ * callbacks instead accumulate completed requests and this class takes them.
+ */
+public final class Http2 {
+    /** The ALPN identifier. There is no upgrade handshake for h2 over TLS. */
+    public static final String ALPN = "h2";
+
+    private long session;
+
+    private Http2(long session) {
+        this.session = session;
+    }
+
+    /** A new server session, with the SETTINGS preface already queued. */
+    public static Http2 create() throws IOException {
+        long s = createImpl();
+        if(s == 0) {
+            throw new IOException("Could not create an HTTP/2 session");
+        }
+        return new Http2(s);
+    }
+
+    /** One request, once the client has finished sending it. */
+    public static final class Stream {
+        final int id;
+        final String method;
+        final String path;
+        final String authority;
+        final Map headers;
+        final byte[] body;
+
+        Stream(int id, String method, String path, String authority, Map headers, byte[] body) {
+            this.id = id;
+            this.method = method;
+            this.path = path;
+            this.authority = authority;
+            this.headers = headers;
+            this.body = body;
+        }
+
+        public int getId() {
+            return id;
+        }
+
+        public String getMethod() {
+            return method;
+        }
+
+        /** Path and query, from the :path pseudo-header. */
+        public String getPath() {
+            return path;
+        }
+
+        /** From :authority, which is what Host is in HTTP/1.1. */
+        public String getAuthority() {
+            return authority;
+        }
+
+        /** Lower-cased names, as HTTP/2 requires them on the wire. */
+        public Map getHeaders() {
+            return headers;
+        }
+
+        public String getBodyAsString() {
+            if(body == null || body.length == 0) {
+                return null;
+            }
+            try {
+                return new String(body, "UTF-8");
+            } catch (IOException err) {
+                return new String(body);
+            }
+        }
+    }
+
+    /** Feeds received bytes to the session. */
+    public void receive(byte[] buffer, int offset, int length) throws IOException {
+        if(receiveImpl(session, buffer, offset, length) < 0) {
+            throw new IOException("HTTP/2 framing error");
+        }
+    }
+
+    /**
+     * The next completed request, or null. A stream is complete only when
+     * END_STREAM arrives -- on the HEADERS frame for a request with no body, on
+     * the last DATA frame otherwise.
+     */
+    public Stream nextRequest() {
+        int id = nextRequestImpl(session);
+        if(id < 0) {
+            return null;
+        }
+        Map headers = new LinkedHashMap();
+        int count = headerCountImpl(session);
+        for(int iter = 0 ; iter < count ; iter++) {
+            String name = headerNameImpl(session, iter);
+            if(name != null) {
+                headers.put(name, headerValueImpl(session, iter));
+            }
+        }
+        return new Stream(id, methodImpl(session), pathImpl(session),
+                authorityImpl(session), headers, bodyImpl(session));
+    }
+
+    /**
+     * - `extraHeaders`: "name: value" strings. Connection-specific headers are
+     *   dropped, because HTTP/2 forbids them, and names are lower-cased, because a
+     *   capital letter is a protocol error the peer resets the stream over.
+     */
+    public void respond(int streamId, int status, String contentType, List extraHeaders, byte[] body)
+            throws IOException {
+        StringBuilder joined = new StringBuilder();
+        joined.append("content-type: ").append(contentType == null
+                ? "application/octet-stream" : contentType);
+        if(extraHeaders != null) {
+            for(int iter = 0 ; iter < extraHeaders.size() ; iter++) {
+                joined.append('\n').append(String.valueOf(extraHeaders.get(iter)));
+            }
+        }
+        if(respondImpl(session, streamId, String.valueOf(status), joined.toString(), body) != 0) {
+            throw new IOException("Could not submit an HTTP/2 response on stream " + streamId);
+        }
+    }
+
+    /**
+     * Runs the session's output side and returns the bytes to put on the wire.
+     * Empty when there is nothing pending.
+     */
+    public byte[] drain() throws IOException {
+        if(pumpImpl(session) != 0) {
+            throw new IOException("HTTP/2 session failed");
+        }
+        return drainImpl(session);
+    }
+
+    /** False once the session is finished and the connection can be closed. */
+    public boolean isAlive() {
+        return wantsMoreImpl(session);
+    }
+
+    public void close() {
+        if(session != 0) {
+            long s = session;
+            session = 0;
+            destroyImpl(s);
+        }
+    }
+
+    private static native long createImpl();
+    private static native int receiveImpl(long session, byte[] buffer, int offset, int length);
+    private static native int pumpImpl(long session);
+    private static native int pendingOutputImpl(long session);
+    private static native byte[] drainImpl(long session);
+    private static native int nextRequestImpl(long session);
+    private static native String methodImpl(long session);
+    private static native String pathImpl(long session);
+    private static native String authorityImpl(long session);
+    private static native int headerCountImpl(long session);
+    private static native String headerNameImpl(long session, int index);
+    private static native String headerValueImpl(long session, int index);
+    private static native byte[] bodyImpl(long session);
+    private static native int respondImpl(long session, int streamId, String status,
+                                          String headerLines, byte[] body);
+    private static native boolean wantsMoreImpl(long session);
+    private static native void destroyImpl(long session);
+}

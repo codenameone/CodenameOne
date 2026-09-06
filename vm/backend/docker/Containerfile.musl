@@ -1,0 +1,42 @@
+# Builder image for fully static (musl) Linux backend binaries.
+#
+# The counterpart to Containerfile.glibc. The output depends on no libc at all, so
+# it runs in a scratch or distroless image and the container's size is the
+# binary's size.
+#
+# Alpine's prebuilt libcurl.a is compiled with brotli, libpsl, nghttp2 and c-ares,
+# whose static archives are LTO objects lld cannot resolve. Rather than chase
+# those, curl is built here with only what a server-side HTTP client needs:
+# OpenSSL for TLS, zlib for content encoding, nothing else. Verification stays
+# curl's, which is the reason for using curl instead of hand-rolled TLS.
+#
+# Only lib/ and include/ are built: the curl COMMAND needs perl to generate its
+# man page (even with --disable-manual) and nothing here uses the command.
+#
+# Built once; every subsequent binary is just the clang invocation.
+FROM alpine:3.20
+
+ARG CURL_VER=8.7.1
+
+RUN apk add --no-cache clang lld musl-dev openssl-dev openssl-libs-static \
+        zlib-dev zlib-static nghttp2-dev nghttp2-static curl tar make
+
+RUN cd /tmp \
+ && curl -fsSL "https://curl.se/download/curl-${CURL_VER}.tar.gz" -o curl.tar.gz \
+ && tar xzf curl.tar.gz \
+ && cd "curl-${CURL_VER}" \
+ && ./configure --disable-shared --enable-static --with-openssl \
+        --without-brotli --without-libpsl --without-nghttp2 --without-libidn2 \
+        --without-zstd --disable-ares --disable-ldap --disable-ldaps \
+        --disable-rtsp --disable-dict --disable-telnet --disable-tftp \
+        --disable-pop3 --disable-imap --disable-smtp --disable-gopher \
+        --disable-mqtt --disable-manual --prefix=/opt/curlstatic \
+ && make -j"$(nproc)" -C lib \
+ && make -C lib install \
+ && make -C include install \
+ && cd / && rm -rf /tmp/curl*
+
+COPY link.sh /usr/local/bin/link.sh
+RUN chmod +x /usr/local/bin/link.sh
+ENV CN1_LINK_MODE=static
+ENTRYPOINT ["/usr/local/bin/link.sh"]

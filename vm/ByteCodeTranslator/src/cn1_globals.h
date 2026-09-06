@@ -858,13 +858,32 @@ else if (IS_DOUBLE_WORD(-1)) SP=BC_DUP2_X2_DSS(SP);\
 #define BC_ISHL() SP--; SP[-1].data.i = (SP[-1].data.i << (0x1f & (*SP).data.i))
 #define BC_ISHL_EXPR(val1, val2) (val1 << (0x1f & val2))
 #define BC_LSHL() SP--; SP[-1].data.l = (SP[-1].data.l << (0x3f & (*SP).data.l))
-#define BC_LSHL_EXPR(val1, val2) (val1 << (0x3f & val2))
+/* val1 is CAST, and that cast is the whole point.
+ *
+ * The translator emits a long constant as a bare C literal, so LCONST_1 reaches
+ * here as `BC_LSHL_EXPR(1, n)` -- and in C `1` is an int, which makes this an
+ * int shift no matter what the 0x3f mask says. The result was silently wrong for
+ * every shift of a long CONSTANT by 31 or more:
+ *
+ *     1L << 31  gave -2147483648   (int overflow, then sign-extended)
+ *     1L << 32  gave 1             (int shift counts are masked to 5 bits)
+ *     1L << 33  gave 2
+ *
+ * `x << n` for a long VARIABLE was always right, which is why this survived: the
+ * variable carries JAVA_LONG into the macro and the constant does not. Found by a
+ * histogram whose bucket labels came out negative.
+ *
+ * BC_LUSHR_EXPR below already casts, so this class of bug was fixed once for the
+ * unsigned shift and not carried across to its two siblings. */
+#define BC_LSHL_EXPR(val1, val2) (((JAVA_LONG)(val1)) << (0x3f & (val2)))
 
 #define BC_ISHR() SP--; SP[-1].data.i = (SP[-1].data.i >> (0x1f & (*SP).data.i))
 #define BC_ISHR_EXPR(val1, val2) (val1 >> (0x1f & val2))
 
 #define BC_LSHR() SP--; SP[-1].data.l = (SP[-1].data.l >> (0x3f & (*SP).data.l))
-#define BC_LSHR_EXPR(val1, val2) (val1 >> (0x3f & val2))
+/* Cast for the same reason as BC_LSHL_EXPR above: a long constant arrives as an
+ * int literal and would otherwise be shifted 32 bits wide. */
+#define BC_LSHR_EXPR(val1, val2) (((JAVA_LONG)(val1)) >> (0x3f & (val2)))
 
 #define BC_IUSHL() SP--; SP[-1].data.i = (((unsigned int)SP[-1].data.i) << (0x1f & ((unsigned int)(*SP).data.i)))
 #define BC_IUSHL_EXPR(val1, val2) (((unsigned int)val1) << (0x1f & ((unsigned int)val2)))
@@ -1883,7 +1902,17 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 // memset" note in cn1BibopFastAlloc and OVERFLOW RESCAN in cn1_globals.m). The
 // header (parentCls / mark / heapPosition) is still initialized here; ONLY the
 // body zero is elided.
+#ifdef CN1_GC_CONFORM
+// Defined in cn1_globals.m. Declared here because the BiBOP fast path is inline
+// in this header and is the route MOST small objects take -- profiling only
+// codenameOneGcMalloc would miss them and blame whatever little reaches it.
+void cn1RecordAllocation(struct clazz* parent, int size);
+#endif
+
 static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
+#ifdef CN1_GC_CONFORM
+    cn1RecordAllocation(parent, size);
+#endif
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
     if(__builtin_expect(threadStateData->bibopBypassRemaining[ci] > 0, 0)) {
         return (JAVA_OBJECT)0; // cn1BibopAlloc consumes the legacy-bypass budget

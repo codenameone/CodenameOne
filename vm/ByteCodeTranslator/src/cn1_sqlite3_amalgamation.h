@@ -362324,7 +362324,18 @@ int sqlite3_zipfile_init(
 /*
 ** VLE - Value Level Encryption
 */
+/* CN1 EDIT (re-apply on the next SQLite3MC sync): upstream enables VLE
+** unconditionally, but its implementation below is additionally guarded by
+** "#if HAVE_CIPHER_CHACHA20 || HAVE_CIPHER_ASCON128" while its CALL in
+** sqlite3mc_builtin_extensions is guarded only by SQLITE3MC_ENABLE_VLE. Build
+** SQLite with no cipher at all -- which is what an application that only stores
+** plaintext gets, and what cn1_sqlite3.c configures when no cn1_sqlite3_cipher.h
+** is present -- and the call is compiled while the definition is not, so the link
+** fails on _sqlite3_vle_init. Value Level Encryption needs a cipher by
+** definition, so gate its enablement on the same condition as its body. */
+#if HAVE_CIPHER_CHACHA20 || HAVE_CIPHER_ASCON128
 #define SQLITE3MC_ENABLE_VLE 1
+#endif
 #ifdef SQLITE3MC_ENABLE_VLE
 SQLITE_API
 int sqlite3_vle_init(sqlite3* db, char** pzErrMsg, const sqlite3_api_routines* pApi);
