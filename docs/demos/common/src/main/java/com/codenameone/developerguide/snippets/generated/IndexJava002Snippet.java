@@ -55,7 +55,8 @@ import com.codename1.system.Lifecycle;
 import java.util.*;
 
 
-class IndexJava001Snippet {
+class IndexJava002Snippet {
+
 
     Object context;
     Object url;
@@ -79,23 +80,34 @@ class IndexJava001Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::index-java-001[]
-    public class HelloWorld extends Lifecycle {                             // <1>
+    // tag::index-java-002[]
+    public class HelloWorld extends Lifecycle {
+        private TextArea editor;
 
         @Override
-        public void runApp() {                                              // <2>
-            Form hi = new Form("Hi World", BoxLayout.y());                  // <3>
-            Button helloButton = new Button("Hello World");
-            hi.add(helloButton);
-            helloButton.addActionListener(e -> hello());
-            hi.getToolbar().addMaterialCommandToSideMenu("Hello Command",
-                    FontImage.MATERIAL_CHECK, 4, e -> hello());             // <4>
+        public void init(Object context) {
+            super.init(context);                                            // <1>
+            Log.p("app starting");
+        }
+
+        @Override
+        public void stop() {
+            saveDraft();                                                    // <2>
+            super.stop();
+        }
+
+        @Override
+        public void runApp() {
+            editor = new TextArea(Preferences.get("draft", ""));            // <3>
+            Form hi = new Form("Hi World", BoxLayout.y());
+            hi.add(editor);
             hi.show();
         }
 
-        private void hello() {
-            Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null);
+        private void saveDraft() {
+            Preferences.set("draft", editor.getText());
         }
     }
-    // end::index-java-001[]
+    // end::index-java-002[]
+
 }
