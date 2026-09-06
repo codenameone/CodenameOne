@@ -614,6 +614,33 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aSubclassInOurNamespaceInsideAJarIsStillTheLibrarys()
+            throws Exception {
+        // And in the shape a consumed library actually arrives in. The scan
+        // walks archives and loose trees through the same inspect(), so this
+        // guards the pairing rather than the filter -- an archive entry that
+        // stopped contributing to the hierarchy would leave the loose test
+        // green and ship the same silent downgrade.
+        File root = tempDir("cn1-lb-subclass-ns-jar");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "mylib.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry(
+                    "com/codename1/impl/mylib/MyManager.class"));
+            zip.write(subclassCallClass("com/codename1/impl/mylib/MyManager",
+                    "com/codename1/location/LocationManager",
+                    "setLocationListener"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesPersistentLocation(),
+                "a library jar's class in our namespace is still the "
+                + "library's");
+    }
+
+    @Test
     void aLibrarysOwnPreciseRequestConflictsWithExclusivity() throws Exception {
         // A native SDK inside an aar calls android.location.LocationManager
         // directly, so no marker of ours ever names it -- its manifest asking
@@ -1210,6 +1237,17 @@ class LocationButtonManifestFragmentsTest {
     private static void writeSubclassCall(File at, String name,
             String superName, String method) throws Exception {
         at.getParentFile().mkdirs();
+        OutputStream out = new FileOutputStream(at);
+        try {
+            out.write(subclassCallClass(name, superName, method));
+        } finally {
+            out.close();
+        }
+    }
+
+    /** The same class as bytes, for writing straight into an archive. */
+    private static byte[] subclassCallClass(String name, String superName,
+            String method) throws Exception {
         ByteArrayOutputStream body = new ByteArrayOutputStream();
         body.write(new byte[] {(byte) 0xca, (byte) 0xfe, (byte) 0xba,
                 (byte) 0xbe, 0, 0, 0, 52});
@@ -1229,12 +1267,7 @@ class LocationButtonManifestFragmentsTest {
         }
         // access_flags, this_class=2, super_class=4, and no members.
         body.write(new byte[] {0, 33, 0, 2, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0});
-        OutputStream out = new FileOutputStream(at);
-        try {
-            out.write(body.toByteArray());
-        } finally {
-            out.close();
-        }
+        return body.toByteArray();
     }
 
     /** A class whose pool holds a Methodref for {@code owner.method}. */
