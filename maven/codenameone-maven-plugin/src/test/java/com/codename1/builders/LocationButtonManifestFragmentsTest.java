@@ -125,6 +125,40 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void exclusiveFlagsBothElementShapesOfTheSamePermission() {
+        // One permission, declared twice under two different ELEMENTS. Both
+        // uses-permission and uses-permission-sdk-23 are live requests on the
+        // API this flag is about, so flagging only the first left the other
+        // asking for ordinary precise location while the build reported itself
+        // exclusive -- exactly what the hint promises not to do.
+        String both = "    <uses-permission android:name=\""
+                + "android.permission.ACCESS_FINE_LOCATION\" />\n"
+                + "    <uses-permission-sdk-23 android:name=\""
+                + "android.permission.ACCESS_FINE_LOCATION\" />\n";
+        String out = LocationButtonManifestFragments.inject(both, true);
+        int flagged = 0;
+        int at = out.indexOf("android.permission.ACCESS_FINE_LOCATION");
+        while (at >= 0) {
+            int open = out.lastIndexOf('<', at);
+            int close = out.indexOf('>', at);
+            if (open >= 0 && close >= 0 && out.substring(open, close)
+                    .contains("onlyForLocationButton")) {
+                flagged++;
+            }
+            at = out.indexOf("android.permission.ACCESS_FINE_LOCATION",
+                    at + 1);
+        }
+        int declarations = count(out,
+                "android.permission.ACCESS_FINE_LOCATION");
+        assertEquals(declarations, flagged,
+                "every live fine-location declaration carries the flag, "
+                + "declarations=" + declarations + " flagged=" + flagged
+                + " in:\n" + out);
+        assertTrue(declarations >= 2,
+                "sanity: both element shapes survived, in:\n" + out);
+    }
+
+    @Test
     void exclusiveFlagsFineLocationOnly() {
         String out = LocationButtonManifestFragments.inject("", true);
         int at = out.indexOf("android.permission.ACCESS_FINE_LOCATION");
@@ -2978,6 +3012,25 @@ class LocationButtonManifestFragmentsTest {
                 true, false, true, false));
         assertTrue(LocationButtonManifestFragments.exclusiveConflict(
                 true, true, true, false).contains("android.locationButton.exclusive"));
+    }
+
+    @Test
+    void theBridgePackageSurvivesR8() {
+        // The bridge is reached by NAME, because the package is deleted for
+        // every app that does not use the button and so cannot be referenced
+        // from code that always compiles. To R8 that makes it unreachable, and
+        // minifyEnabled is on for a signed release by default -- so without a
+        // keep the class is renamed or shrunk away, Class.forName throws, and
+        // the component silently installs its fallback. On a release built
+        // with exclusivity the manifest has by then restricted fine location
+        // to a control that is not in the apk.
+        String keep = AndroidGradleBuilder.locationButtonProguardRules(true);
+        assertTrue(keep.contains(
+                "-keep class com.codename1.impl.android.locationbutton."), keep);
+        // And nothing for an app that never carried the package, so no
+        // existing build's configuration changes.
+        assertEquals("",
+                AndroidGradleBuilder.locationButtonProguardRules(false));
     }
 
     @Test

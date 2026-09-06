@@ -523,6 +523,43 @@ final class LocationButtonManifestFragments {
     }
 
     /** Where {@code name} is asked for by a live element, or -1. */
+    /**
+     * Every ACTIVE declaration of {@code name}, in document order.
+     *
+     * <p>The singular form above answers the first, which is what a question
+     * like "is this declared at all" wants. Editing wants all of them: the same
+     * permission can be declared under {@code uses-permission} and under
+     * {@code uses-permission-sdk-23} in one manifest, both are live on the API
+     * the exclusivity flag is about, and changing one of the two leaves the
+     * other saying the opposite.</p>
+     *
+     * @param text the permission block
+     * @param name the permission
+     * @return the index of each live declaration's name value, possibly empty
+     */
+    private static int[] activePermissionIndexes(String text, String name) {
+        if (text == null) {
+            return new int[0];
+        }
+        int[] found = new int[4];
+        int count = 0;
+        int at = text.indexOf(name);
+        while (at >= 0) {
+            if (declaresPermissionAt(text, at, name)) {
+                if (count == found.length) {
+                    int[] grown = new int[found.length * 2];
+                    System.arraycopy(found, 0, grown, 0, found.length);
+                    found = grown;
+                }
+                found[count++] = at;
+            }
+            at = text.indexOf(name, at + name.length());
+        }
+        int[] out = new int[count];
+        System.arraycopy(found, 0, out, 0, count);
+        return out;
+    }
+
     private static int activePermissionIndex(String text, String name) {
         if (text == null) {
             return -1;
@@ -1082,16 +1119,30 @@ final class LocationButtonManifestFragments {
      */
     static String addPermissionFlag(String xPermissions, String name,
             String flag) {
-        // The ACTIVE element, like every other lookup here. A commented-out
-        // declaration sitting before the live one used to win, and the flag was
-        // written INSIDE the comment: the real element kept ordinary precise
-        // access and the build claimed to be exclusive.
-        int at = activePermissionIndex(xPermissions, name);
-        if (at < 0) {
+        // EVERY active element, not the first one. A permission can be declared
+        // twice in one manifest under two different ELEMENTS -- uses-permission
+        // and uses-permission-sdk-23 -- and both are live requests on the API
+        // this flag is about. Flagging only the first left the other asking for
+        // ordinary precise location while the build reported itself exclusive,
+        // which is the whole of what the hint promises not to do.
+        //
+        // Back to front, so an edit cannot move an index not yet used.
+        int[] spots = activePermissionIndexes(xPermissions, name);
+        if (spots.length == 0) {
             return "    <uses-permission android:name=\"" + name
                     + "\" android:usesPermissionFlags=\"" + flag + "\" />\n"
                     + xPermissions;
         }
+        String out = xPermissions;
+        for (int spot = spots.length - 1; spot >= 0; spot--) {
+            out = flagDeclarationAt(out, spots[spot], name, flag);
+        }
+        return out;
+    }
+
+    /// Adds `flag` to the single declaration whose name attribute sits at `at`.
+    private static String flagDeclarationAt(String xPermissions, int at,
+            String name, String flag) {
         int start = xPermissions.lastIndexOf('<', at);
         int end = xPermissions.indexOf('>', at);
         if (start < 0 || end < 0) {

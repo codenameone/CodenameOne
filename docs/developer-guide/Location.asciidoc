@@ -80,12 +80,13 @@ and its metadata requires Android Gradle plugin 9.1.0, Gradle 9 and compile SDK
 8, and the hosted build images carry platforms through android-36, so that
 library can't be resolved yet.
 
-Nothing about that is your problem. An Android build on the current toolchain
+None of that reaches your app. An Android build on the current toolchain
 simply uses the standard location API: `LocationButton` becomes an ordinary
 Codename One button that requests location permission the usual way -- the same
 fallback it already uses on every platform without the system control -- and the
-app builds and ships normally. The library is not added, `minSdkVersion` is not
-raised, and the ordinary location permissions are declared so the button works.
+app builds and ships normally. Codename One skips the library, leaves
+`minSdkVersion` alone, and declares the ordinary location permissions so the
+button works.
 
 When Codename One moves to Android Gradle plugin 9 and compile SDK 37, the same
 code picks the system control up on its own. Write against `LocationButton`

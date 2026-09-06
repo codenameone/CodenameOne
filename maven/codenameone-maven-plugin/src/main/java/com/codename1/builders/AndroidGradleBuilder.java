@@ -7779,6 +7779,8 @@ public class AndroidGradleBuilder extends Executor {
         String keepAi = visionSupport || languageSupport || inferenceSupport
                 ? "-keep class com.codename1.impl.android.ai.** { *; }\n\n"
                 : "";
+        String keepLocationButton =
+                locationButtonProguardRules(usesLocationButton);
         String keepInferenceRuntime =
                 androidInferenceProguardRules(inferenceSupport);
         // workaround broken optimizer in proguard
@@ -7792,6 +7794,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "-dontwarn com.google.android.gms.**\n"
                 + keepFirebase
                 + keepAi
+                + keepLocationButton
                 + keepInferenceRuntime
                 + "-keep class com.codename1.impl.android.AndroidBrowserComponentCallback {\n"
                 + "*;\n"
@@ -8724,6 +8727,41 @@ public class AndroidGradleBuilder extends Executor {
             return "AndroidTextRecognitionKoreanAdapter.java";
         }
         return null;
+    }
+
+    /**
+     * The R8 keep for the location button's bridge, which R8 would otherwise
+     * take away.
+     *
+     * <p>{@code AndroidImplementation.getLocationButtonBridge} reaches
+     * {@code com.codename1.impl.android.locationbutton.AndroidLocationButtonBridge}
+     * by NAME. It has to: the package is deleted for every app that does not
+     * use the button, so nothing that always compiles can reference it. That
+     * leaves the class unreachable as far as R8 is concerned, and
+     * {@code minifyEnabled} is on for a signed release by default --
+     * {@code android.enableProguard} defaults to {@code true} -- so the class
+     * is renamed or shrunk away.</p>
+     *
+     * <p>{@code Class.forName} then throws, the lookup answers null, and
+     * {@code LocationButton} installs its fallback. That is silent, and it is
+     * the worst shape this feature can fail in: the app builds, the button
+     * draws, and on a release built with
+     * {@code android.locationButton.exclusive} the manifest has restricted
+     * fine location to a system control that is no longer in the apk -- so
+     * every location request is refused, in the one build the developer ships
+     * and can least easily debug.</p>
+     *
+     * <p>Conditional, like the AI keep beside it: an app that never carried
+     * the package gets nothing, so no existing build changes.</p>
+     *
+     * @param locationButtonIncluded whether this build kept the bridge package
+     * @return the keep, or an empty string
+     */
+    static String locationButtonProguardRules(boolean locationButtonIncluded) {
+        return locationButtonIncluded
+                ? "-keep class com.codename1.impl.android.locationbutton.**"
+                    + " { *; }\n\n"
+                : "";
     }
 
     static String androidInferenceProguardRules(boolean inferenceIncluded) {

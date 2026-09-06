@@ -95,11 +95,14 @@ class LocationButtonRebuildTest extends UITestBase {
         /** When true isStale throws, as a port querying native state can. */
         boolean staleThrows;
 
+        /** When true every peer is reported stale, as a broken port would. */
+        boolean staleAlways;
+
         public boolean isStale(PeerComponent button) {
             if (staleThrows) {
                 throw new RuntimeException("native state is being rebuilt");
             }
-            return stale.contains(button);
+            return staleAlways || stale.contains(button);
         }
 
         public boolean isSupported() {
@@ -1010,8 +1013,9 @@ class LocationButtonRebuildTest extends UITestBase {
         // A platform can retire the context a control was built against while
         // the control survives: Android recreates its activity and the port
         // re-attaches the SAME view, so the system session a tap needs belongs
-        // to the destroyed one. The control still draws, so initComponent is
-        // the only place that can notice.
+        // to the destroyed one. The control still draws, so nothing else can
+        // notice. This covers the ATTACH path; the layout path an activity
+        // recreation actually takes is the test below.
         //
         // Patching the activity afterwards does not work -- the AndroidX
         // control opens its session from onAttachedToWindow, which has already
@@ -1147,5 +1151,78 @@ class LocationButtonRebuildTest extends UITestBase {
                 "the fallback tap is answered exactly once: no failure "
                 + "callback ever spoke for it, so suppressing it leaves the "
                 + "listener waiting forever");
+    }
+    @Test
+    void aStalePeerIsRebuiltOnLayoutWhenNothingReinitialisesTheComponent() {
+        // The path an Android activity recreation really takes, and the one
+        // the attach check above never sees. initComponent runs only for a
+        // component that is not already initialised, and a recreation leaves
+        // the Form and this component initialised -- AndroidImplementation.init
+        // walks its native peers and calls init() on each directly. So the
+        // stale view is re-wrapped against the new activity and re-attached
+        // with a session belonging to the destroyed one: a control that draws
+        // and does nothing, forever, because no attach is coming.
+        //
+        // A recreation does force a layout, which is the hook this uses.
+        RecordingBridge bridge = install();
+        LocationButton button = new LocationButton();
+        Form form = new Form();
+        form.add(button);
+        form.show();
+        drain();
+        int built = bridge.sessions.size();
+        assertTrue(built > 0, "sanity: a control was built");
+        assertTrue(button.getComponentAt(0) instanceof PeerComponent,
+                "sanity: the control is a peer");
+
+        // The port retires the peer, and NOTHING re-initialises the component:
+        // no setter, no re-attach. Only a layout, as a recreation produces.
+        bridge.stale.add((PeerComponent) button.getComponentAt(0));
+        button.revalidate();
+        drain();
+        drain();
+
+        waitUntil("the stale peer was replaced on layout", new Settled() {
+            public boolean isSo() {
+                return bridge.sessions.size() > built;
+            }
+        });
+        assertTrue(bridge.sessions.size() > built,
+                "a layout must replace a peer the port reports retired, "
+                + "because no attach will ever come to notice it");
+    }
+
+    @Test
+    void aPortThatCannotRebuildDoesNotQueueRebuildsForever() {
+        // The guard on the deferred rebuild. Layouts arrive in bursts and the
+        // bridge goes on reporting stale until the peer is actually replaced,
+        // so without a pending flag every layout in the burst queues another
+        // rebuild -- and a port whose replacement is stale too queues them
+        // without end.
+        RecordingBridge bridge = install();
+        LocationButton button = new LocationButton();
+        Form form = new Form();
+        form.add(button);
+        form.show();
+        drain();
+
+        // Every peer this bridge builds is born stale, which is the pathological
+        // port. Marking them as they appear is what a real one would do.
+        bridge.staleAlways = true;
+        int before = bridge.sessions.size();
+        for (int i = 0; i < 5; i++) {
+            button.revalidate();
+            drain();
+        }
+        drain();
+        drain();
+        int built = bridge.sessions.size() - before;
+        // ONE attempt. The port gets a chance to replace the peer; when the
+        // replacement is stale too the component stops asking, because
+        // rebuild() revalidates and a revalidate lays out, so asking again is
+        // a loop that runs for as long as the button is on screen.
+        assertEquals(1, built,
+                "a port that cannot rebuild is asked once, not once per "
+                + "layout: built=" + built);
     }
 }

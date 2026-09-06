@@ -125,9 +125,13 @@ public interface LocationButtonBridge {
     /// system session a tap needs belongs to the retired one. The control
     /// still draws, so nothing else can tell.
     ///
-    /// Asked before a peer that is already in place is left alone, so the
-    /// answer has to be cheap and must not build anything. A bridge with no
-    /// such notion returns false.
+    /// Asked before a peer that is already in place is left alone, and again
+    /// on every LAYOUT of the component -- which is the only hook an Android
+    /// activity recreation reaches, since it leaves the component initialised
+    /// and re-initialises the native peers directly. So the answer has to be
+    /// cheap and must not build anything: a field comparison is the intended
+    /// shape, not a call into the platform. A bridge with no such notion
+    /// returns false.
     ///
     /// @param button a peer this bridge returned from
     ///               [#createButton(int,int,int,SuccessCallback,Runnable)]
