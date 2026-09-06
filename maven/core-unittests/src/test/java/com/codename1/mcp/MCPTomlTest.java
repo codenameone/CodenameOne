@@ -252,12 +252,13 @@ class MCPTomlTest {
 
     @Test
     void refusesShapesItWouldHaveToGuessAt() {
-        // A dotted key at the root defines mcp_servers itself, and TOML then forbids a
-        // later [mcp_servers.x] header, so appending one would break the file.
-        assertTrue(refuse("mcp_servers.docs.command = \"d\"\n", descriptor())
-                .indexOf("dotted keys") >= 0);
+        // Assigning mcp_servers itself is fatal: TOML forbids a [mcp_servers.x] header
+        // after it, so appending one would produce a file Codex cannot read.
         assertTrue(refuse("mcp_servers = { docs = { command = \"d\" } }\n", descriptor())
-                .indexOf("dotted keys") >= 0);
+                .indexOf("declared as a value") >= 0);
+        // A root dotted key that names THIS server would be a second declaration of it.
+        assertTrue(refuse("mcp_servers.cn1-my-app.command = \"d\"\n", descriptor())
+                .indexOf("dotted key") >= 0);
         // The server itself declared in a shape the editor does not rewrite.
         assertTrue(refuse("[mcp_servers]\n\"cn1-my-app\" = { command = \"x\" }\n", descriptor())
                 .indexOf("inline table") >= 0);
@@ -265,6 +266,19 @@ class MCPTomlTest {
                 .indexOf("array of tables") >= 0);
         assertTrue(refuse("[mcp_servers.cn1-my-app]\na = 1\n[mcp_servers.cn1-my-app]\nb = 2\n",
                 descriptor()).indexOf("more than once") >= 0);
+    }
+
+    @Test
+    void anotherServersRootDottedKeyDoesNotBlockThisOne() {
+        // `mcp_servers.docs.command = "d"` leaves mcp_servers defined by dotted keys, and
+        // TOML explicitly allows a [table] header to add a sub-table to one of those. This
+        // used to refuse every registration, and every removal, because of a neighbour.
+        String doc = "mcp_servers.docs.command = \"d\"\n";
+        String updated = apply(doc, descriptor());
+        assertTrue(updated.startsWith(doc), updated);
+        assertTrue(updated.indexOf("[mcp_servers.cn1-my-app]") > 0);
+        // ...and the entry can be taken out again.
+        assertEquals(doc, apply(updated, null));
     }
 
     @Test

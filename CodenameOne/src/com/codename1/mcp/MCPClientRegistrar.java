@@ -274,9 +274,12 @@ public final class MCPClientRegistrar {
                 return false;
             }
             if (result.getText().equals(existing)) {
-                // Removing an entry the config never had. Report nothing was updated
-                // rather than rewriting the file to itself.
-                return false;
+                // Nothing to write either way, but the two cases mean opposite things.
+                // Registering: the entry is already exactly what would be written, so the
+                // host IS registered and reporting a failure would list it as "not
+                // updated" with nothing in the log to explain why. Removing: there was no
+                // entry to take out, so nothing was updated.
+                return descriptor != null;
             }
             return writeConfigAtomic(fs, path, storagePath, result.getText());
         } catch (Throwable ex) {

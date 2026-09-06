@@ -113,13 +113,19 @@ final class MCPToml {
         int exactHeaders = 0;
         for (Item item : items) {
             if (item.kind == KIND_ASSIGNMENT) {
-                if (item.table.isEmpty() && !item.fullKey.isEmpty()
+                if (item.table.isEmpty() && item.fullKey.size() == 1
                         && TABLE_NAME.equals(item.fullKey.get(0))) {
-                    // The root table assigns mcp_servers itself, either as a value or
-                    // through a dotted key. TOML then forbids a later [mcp_servers.x]
-                    // header, so appending one would produce a file Codex cannot read.
-                    return Result.refused("'" + TABLE_NAME + "' is declared as a value or with "
-                            + "dotted keys, which this editor does not rewrite");
+                    // The root table assigns mcp_servers ITSELF a value. TOML then forbids
+                    // a later [mcp_servers.x] header, so appending one would produce a file
+                    // Codex cannot read.
+                    //
+                    // Only the whole-table assignment is fatal. A root dotted key that
+                    // reaches THROUGH the table, `mcp_servers.docs.command = "d"`, leaves
+                    // mcp_servers defined by dotted keys, and TOML explicitly allows a
+                    // [table] header to add a sub-table to one of those - so another
+                    // server declared that way must not block this one.
+                    return Result.refused("'" + TABLE_NAME + "' is declared as a value, which "
+                            + "this editor does not rewrite");
                 }
                 // An assignment INSIDE the server's own table is replaced wholesale with
                 // the rest of it. One that reaches into it from anywhere else declares the
