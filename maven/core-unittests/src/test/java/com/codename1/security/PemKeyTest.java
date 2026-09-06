@@ -1208,7 +1208,21 @@ class PemKeyTest extends UITestBase {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem(PublicKey.EC, pem(EC_SPKI_LABEL, Base64.encodeNoNewline(nulled))));
 
-        // a named curve and explicit parameters both still load
+        // an empty SEQUENCE is not explicit parameters either: SpecifiedECDomain
+        // has five mandatory fields and that carries none of them
+        byte[] emptySeq = new byte[key.length - curve.length + 2];
+        System.arraycopy(key, 0, emptySeq, 0, at);
+        emptySeq[at] = 0x30;
+        emptySeq[at + 1] = 0x00;
+        System.arraycopy(key, at + curve.length, emptySeq, at + 2, key.length - at - curve.length);
+        emptySeq[1] -= (curve.length - 2);
+        emptySeq[3] -= (curve.length - 2);
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(EC_SPKI_LABEL, Base64.encodeNoNewline(emptySeq))));
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(PublicKey.EC, pem(EC_SPKI_LABEL, Base64.encodeNoNewline(emptySeq))));
+
+        // a named curve and real explicit parameters both still load
         assertEquals(PublicKey.EC, PublicKey.fromPem(pem(EC_SPKI_LABEL, EC_SPKI)).getAlgorithm());
         assertArrayEquals(der(EC_PKCS8_EXPLICIT),
                 PrivateKey.fromPem(pem(EC_SEC1_EXPLICIT_LABEL, EC_SEC1_EXPLICIT)).getEncoded());

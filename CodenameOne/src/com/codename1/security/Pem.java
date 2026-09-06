@@ -198,9 +198,9 @@ final class Pem {
             int parametersTag = parameters[0] & 0xFF;
             if (parametersTag == 0x06) {
                 requireOid(new Cursor(parameters).read(0x06));
-            } else if (parametersTag != 0x30) {
+            } else if (parametersTag != 0x30 || !isSpecifiedEcDomain(parameters)) {
                 throw new CryptoException("EC key names no curve: ECParameters must be a "
-                        + "named-curve OID or explicit parameters");
+                        + "named-curve OID or a complete explicit curve");
             }
         }
         return oid;
@@ -555,6 +555,32 @@ final class Pem {
         }
         return tlv(0x30, concat(concat(tlv(0x02, new byte[] {0}), algorithm),
                 concat(privateKey, attributes)));
+    }
+
+    /// True when `element` is a `SpecifiedECDomain` -- the arm of ECParameters
+    /// that spells a curve out instead of naming it.
+    ///
+    /// `SEQUENCE { version INTEGER, fieldID SEQUENCE, curve SEQUENCE,
+    /// base OCTET STRING, order INTEGER, cofactor INTEGER OPTIONAL,
+    /// hash SEQUENCE OPTIONAL }`. Taking any SEQUENCE for this accepted an
+    /// empty "30 00", which carries none of the five fields a curve needs and
+    /// which both the JDK and OpenSSL refuse.
+    private static boolean isSpecifiedEcDomain(byte[] element) {
+        Cursor c = new Cursor(element);
+        c.enter(0x30);
+        int[] mandatory = {0x02, 0x30, 0x30, 0x04, 0x02};
+        for (int tag : mandatory) {
+            if (!c.hasMore() || c.peek() != tag || c.consume(tag) == 0) {
+                return false;
+            }
+        }
+        if (c.hasMore() && c.peek() == 0x02) {
+            c.skip();
+        }
+        if (c.hasMore() && c.peek() == 0x30) {
+            c.skip();
+        }
+        return !c.hasMore();
     }
 
     /// True when `contents` is a well-formed BIT STRING value.
