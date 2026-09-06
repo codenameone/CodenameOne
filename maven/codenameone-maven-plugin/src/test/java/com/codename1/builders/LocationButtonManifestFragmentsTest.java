@@ -501,6 +501,64 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aLibrarysOwnPreciseRequestConflictsWithExclusivity() throws Exception {
+        // A native SDK inside an aar calls android.location.LocationManager
+        // directly, so no marker of ours ever names it -- its manifest asking
+        // for ACCESS_FINE_LOCATION is the only evidence there is. Accepting
+        // exclusivity over that adds onlyForLocationButton and the library's
+        // own precise-location flow is answered with an approximation.
+        File root = tempDir("cn1-lb-native");
+        writeAar(new File(root, "native.aar"),
+                "<manifest xmlns:android=\"http://schemas.android.com/apk/res/"
+                + "android\"><uses-permission android:name=\"android."
+                + "permission.ACCESS_FINE_LOCATION\"/></manifest>");
+        LocationButtonManifestFragments.LocationUsage usage =
+                LocationButtonManifestFragments.scanForLocationUsage(root);
+        assertTrue(usage.declaresPreciseLocation(),
+                "the library's own request is seen");
+        assertFalse(usage.declaresBackgroundLocation(),
+                "and it is not background location");
+
+        String conflict = LocationButtonManifestFragments.exclusiveConflict(
+                true, false, false, true);
+        assertNotNull(conflict, "which conflicts with exclusivity");
+        assertTrue(conflict.contains("submitted library"),
+                "and the message says which of the three it was: " + conflict);
+    }
+
+    @Test
+    void anArchiveTheBuildWouldNotAddIsNotScanned() throws Exception {
+        // The aar loop asks getName().endsWith(".aar") and the gradle include
+        // is '*.jar', both case-sensitive, and neither consumes a .zip.
+        File root = tempDir("cn1-lb-ext");
+        for (String named : new String[] {"sample.JAR", "sample.AAR",
+                "sample.zip"}) {
+            ByteArrayOutputStream inner = new ByteArrayOutputStream();
+            ZipOutputStream innerZip = new ZipOutputStream(inner);
+            try {
+                innerZip.putNextEntry(new ZipEntry("com/example/Form.class"));
+                innerZip.write(constantPoolEntry(
+                        "com/codename1/location/LocationButton"));
+                innerZip.closeEntry();
+            } finally {
+                innerZip.close();
+            }
+            ZipOutputStream zip = new ZipOutputStream(
+                    new FileOutputStream(new File(root, named)));
+            try {
+                zip.putNextEntry(new ZipEntry("classes.jar"));
+                zip.write(inner.toByteArray());
+                zip.closeEntry();
+            } finally {
+                zip.close();
+            }
+        }
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "none of these spellings is added to the build");
+    }
+
+    @Test
     void anArchiveBelowTheTopLevelIsNotADependency() throws Exception {
         // The dependency loop reads libsDir.listFiles() and the generated
         // gradle includes fileTree(dir: 'libs', include: ['*.jar']) -- neither
@@ -907,15 +965,15 @@ class LocationButtonManifestFragmentsTest {
     @Test
     void exclusiveIsRefusedAlongsidePersistentLocation() {
         assertNull(LocationButtonManifestFragments.exclusiveConflict(
-                true, false, false));
+                true, false, false, false));
         assertNull(LocationButtonManifestFragments.exclusiveConflict(
-                false, true, true));
+                false, true, true, false));
         assertNotNull(LocationButtonManifestFragments.exclusiveConflict(
-                true, true, false));
+                true, true, false, false));
         assertNotNull(LocationButtonManifestFragments.exclusiveConflict(
-                true, false, true));
+                true, false, true, false));
         assertTrue(LocationButtonManifestFragments.exclusiveConflict(
-                true, true, true).contains("android.locationButton.exclusive"));
+                true, true, true, false).contains("android.locationButton.exclusive"));
     }
 
     @Test
@@ -1550,7 +1608,7 @@ class LocationButtonManifestFragmentsTest {
                 .scanForLocationUsage(root).usesPersistentLocation(),
                 "continuous updates need the grant the hint gives away");
         assertNotNull(LocationButtonManifestFragments.exclusiveConflict(
-                true, false, true),
+                true, false, true, false),
                 "and the build must refuse the combination");
     }
 
@@ -1580,7 +1638,7 @@ class LocationButtonManifestFragmentsTest {
     @Test
     void theConflictMessageNamesForegroundTrackingToo() {
         String message = LocationButtonManifestFragments.exclusiveConflict(
-                true, false, true);
+                true, false, true, false);
         assertNotNull(message);
         assertTrue(message.indexOf("setLocationListener") > -1,
                 "a navigating app must be told what clashes: " + message);

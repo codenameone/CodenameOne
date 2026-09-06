@@ -719,21 +719,41 @@ final class LocationButtonManifestFragments {
      * @return the message, or null when there is no conflict
      */
     static String exclusiveConflict(boolean exclusive,
-            boolean backgroundLocation, boolean persistentApi) {
-        if (!exclusive || (!backgroundLocation && !persistentApi)) {
+            boolean backgroundLocation, boolean persistentApi,
+            boolean libraryPreciseLocation) {
+        if (!exclusive || (!backgroundLocation && !persistentApi
+                && !libraryPreciseLocation)) {
             return null;
+        }
+        java.util.List<String> uses = new java.util.ArrayList<String>();
+        if (backgroundLocation) {
+            uses.add("background location");
+        }
+        if (persistentApi) {
+            uses.add("a location API of its own -- geofencing, a background"
+                    + " location listener, or continuous updates through"
+                    + " setLocationListener");
+        }
+        if (libraryPreciseLocation) {
+            // A submitted library asking for ACCESS_FINE_LOCATION in its own
+            // manifest is asking for precise location for its own purposes, and
+            // it need not go anywhere near Codename One to use it: a native SDK
+            // calls android.location.LocationManager directly, so no bytecode
+            // marker of ours ever names it. The permission it declares is the
+            // only thing that says so, and under this hint it cannot have it.
+            uses.add("a submitted library that asks for precise location of its"
+                    + " own");
+        }
+        StringBuilder listed = new StringBuilder();
+        for (int iter = 0; iter < uses.size(); iter++) {
+            if (iter > 0) {
+                listed.append(iter + 1 == uses.size() ? ", and " : ", ");
+            }
+            listed.append(uses.get(iter));
         }
         return "android.locationButton.exclusive=true restricts"
                 + " ACCESS_FINE_LOCATION to the location button, but this build"
-                + " also uses "
-                + (backgroundLocation && persistentApi
-                        ? "background location, and a location API of its own"
-                        : backgroundLocation
-                                ? "background location"
-                                : "a location API of its own -- geofencing, a"
-                                        + " background location listener, or"
-                                        + " continuous updates through"
-                                        + " setLocationListener")
+                + " also uses " + listed
                 + ". Precise location reaches those through the ordinary"
                 + " permission, which this hint gives away: every request that"
                 + " is not the button is answered with an approximate location"
@@ -1422,6 +1442,14 @@ final class LocationButtonManifestFragments {
         private final java.util.Set<String> backgroundTags =
                 new java.util.TreeSet<String>();
 
+        /// A submitted archive's manifest asks for ACCESS_FINE_LOCATION.
+        private boolean libraryPrecise;
+
+        /** Whether a submitted archive asks for precise location itself. */
+        public boolean declaresPreciseLocation() {
+            return libraryPrecise;
+        }
+
         /** The element types that asked for background location. */
         public java.util.Set<String> backgroundElements() {
             return backgroundTags;
@@ -1708,28 +1736,29 @@ final class LocationButtonManifestFragments {
         for (int iter = 0; iter < children.length && !found.settled(); iter++) {
             java.io.File child = children[iter];
             String childPath = child.getPath();
-            String name = child.getName().toLowerCase(java.util.Locale.ROOT);
+            String name = child.getName();
             if (child.isDirectory()) {
                 scanTree(root, child, found, budget);
-            } else if ((name.endsWith(".jar") || name.endsWith(".aar")
-                    || name.endsWith(".zip"))
+            } else if ((name.endsWith(".jar") || name.endsWith(".aar"))
                     && dir.getPath().equals(root.getPath())) {
-                // TOP LEVEL only, because that is what the build consumes. The
-                // dependency loop reads libsDir.listFiles() and the generated
-                // gradle includes fileTree(dir: 'libs', include: ['*.jar']) --
-                // neither descends, so an archive submitted at vendor/lib.aar
-                // is staged, never added, and never runs. Reading a button
-                // reference out of one refused a build over code that is not
-                // in it, which is the same rule already applied to
-                // assets/sample.jar inside an archive, applied to the tree
-                // around them.
+                // Exactly what the build consumes, in name and in place.
                 //
-                // Loose .class files stay recursive: those are read for the
-                // application tree, where the package directories ARE the
-                // layout.
+                // The dependency loop reads libsDir.listFiles() and asks
+                // getName().endsWith(".aar"); the generated gradle includes
+                // fileTree(dir: 'libs', include: ['*.jar']). Neither descends
+                // and both are case-sensitive, and neither consumes a .zip at
+                // all -- so vendor/lib.aar, sample.JAR and anything.zip are
+                // staged and never added. Reading a marker out of one refused a
+                // build over code that never runs, which is the rule this file
+                // already applies to assets/sample.jar INSIDE an archive,
+                // applied to the tree around them.
                 scanArchive(child, found, budget);
             } else if (name.endsWith(".class")
                     && !isFrameworkClass(relativePath(root, child))) {
+                // Loose class files stay RECURSIVE, because for the application
+                // tree the package directories are the layout -- and exact in
+                // suffix, because a class loader asks for Sample.class by that
+                // name and no compiler writes it any other way.
                 // Through the budget, like every archive entry. A loose file
                 // cannot lie about its size the way a compressed entry can, but
                 // it can still be enormous, and the budget's AGGREGATE cap is
@@ -1932,6 +1961,11 @@ final class LocationButtonManifestFragments {
         if (declaresBackgroundLocation(text)) {
             found.background = true;
             found.backgroundTags.addAll(backgroundElements(text));
+        }
+        // And precise location, which a native SDK asks for without touching
+        // anything of ours. See exclusiveConflict.
+        if (declaresPermission(text, FINE_LOCATION)) {
+            found.libraryPrecise = true;
         }
     }
 

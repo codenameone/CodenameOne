@@ -1107,6 +1107,14 @@ public class AndroidGradleBuilder extends Executor {
 
     /// Owners of a non-button location call that were not LocationManager
     /// itself, waiting to be tested against the hierarchy.
+    /// A submitted archive asks for precise location in its own manifest.
+    ///
+    /// Kept separate from usesPersistentLocation because it is a different
+    /// fact with a different message: nothing of ours is called, so no bytecode
+    /// marker exists, and the permission the library declares is the whole
+    /// evidence.
+    private boolean libraryPreciseLocation;
+
     private final java.util.Set<String> deferredLocationOwners =
             new java.util.HashSet<String>();
 
@@ -3192,6 +3200,7 @@ public class AndroidGradleBuilder extends Executor {
             // also geofences would have passed the conflict check and then had
             // its background behaviour refused the grant on Android 17.
             usesPersistentLocation |= libraryLocation.usesPersistentLocation();
+            libraryPreciseLocation |= libraryLocation.declaresPreciseLocation();
             // A submitted aar's own manifest asking for background location.
             // It calls nothing of ours -- a native location SDK does its own --
             // so no bytecode scan sees it, and its permission still merges into
@@ -3732,7 +3741,14 @@ public class AndroidGradleBuilder extends Executor {
                                     || LocationButtonManifestFragments
                                             .declaresBackgroundLocation(
                                                     xPermissions),
-                            usesPersistentLocation);
+                            usesPersistentLocation,
+                            // A submitted library's OWN precise-location
+                            // request. A native SDK inside an aar calls
+                            // android.location.LocationManager directly, so no
+                            // marker of ours names it -- its manifest asking
+                            // for ACCESS_FINE_LOCATION is the only evidence
+                            // there is, and under this hint it cannot have it.
+                            libraryPreciseLocation);
             if (conflict != null) {
                 error("Error: " + conflict, new RuntimeException());
                 return false;
