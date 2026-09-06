@@ -85,8 +85,20 @@ class NotificationsAndBackgroundExecutionJava004Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     
-    void snippet() throws Exception {
-        // tag::notifications-and-background-execution-java-004[]
+    // tag::notifications-and-background-execution-java-004[]
+    /// The platform may rebuild this after the app process was killed, so it
+    /// needs a public no-argument constructor and can rely on nothing from the
+    /// foreground app -- state arrives through the input data.
+    public static class SyncWorker implements BackgroundWorker {
+        public void performWork(String id, java.util.Map<String, String> inputData,
+                long deadline, com.codename1.util.Callback<Boolean> onComplete) {
+            boolean ok = sync(inputData.get("account"));
+            // TRUE for done, FALSE to ask the platform to retry later
+            onComplete.onSucess(Boolean.valueOf(ok));
+        }
+    }
+
+    void scheduleSync() {
         WorkRequest req = WorkRequest.builder("sync", SyncWorker.class)
                 .setRequiresNetwork(true)
                 .setRequiresCharging(true)
@@ -94,12 +106,11 @@ class NotificationsAndBackgroundExecutionJava004Snippet {
                 .putInputData("account", "primary")
                 .build();
         BackgroundWork.schedule(req);
-        // end::notifications-and-background-execution-java-004[]
     }
+    // end::notifications-and-background-execution-java-004[]
 
-    static class SyncWorker implements com.codename1.background.BackgroundWorker {
-        public void performWork(String id, java.util.Map<String, String> inputData,
-                long deadline, com.codename1.util.Callback<Boolean> done) { }
-    }
+
+
+    static boolean sync(String account) { return true; }
 
 }

@@ -86,17 +86,16 @@ class AnnotationComponentBindingJava003Snippet {
     
     void snippet() throws Exception {
         // tag::annotation-component-binding-java-003[]
+        // set this first: bind() attaches the constraints, and each one picks a
+        // data-change or an action listener from this flag as it attaches
+        Validator.setValidateOnEveryKey(true);
+
         LoginModel model = new LoginModel();
         Binding b = Binders.bind(model, form);
 
         // Auto-disable a submit button until everything is valid. Pass the
         // button you built the form with: Container has no lookup by name.
         b.getValidator().addSubmitButtons(submitButton);
-
-        // Live feedback as the user types (static toggle on the Validator
-        // class -- one switch flips the behaviour for every validator in the
-        // app):
-        Validator.setValidateOnEveryKey(true);
 
         // Programmatic gate before saving:
         if (b.getValidator().isValid()) {
