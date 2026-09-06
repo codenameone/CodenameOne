@@ -12395,8 +12395,19 @@ void cn1RecordAllocation(struct clazz* parent, int size) {
         atomic_fetch_add_explicit(&cn1AllocProfOutOfRangeBytes, (long long)size,
                                   memory_order_relaxed);
         atomic_fetch_add_explicit(&cn1AllocProfOutOfRangeCount, 1, memory_order_relaxed);
-        if(id > atomic_load_explicit(&cn1AllocProfMaxSeenId, memory_order_relaxed)) {
-            atomic_store_explicit(&cn1AllocProfMaxSeenId, id, memory_order_relaxed);
+        // Compare-exchange rather than load-then-store: that pair is a
+        // read-modify-write, so two threads reporting out-of-range classes can
+        // both pass the comparison and the smaller id can land last. This number
+        // exists to tell a reader how far the table has to grow, and understating
+        // it sends the next run back with a bound that is still too small.
+        {
+            int seen = atomic_load_explicit(&cn1AllocProfMaxSeenId, memory_order_relaxed);
+            while(id > seen &&
+                  !atomic_compare_exchange_weak_explicit(&cn1AllocProfMaxSeenId, &seen, id,
+                                                         memory_order_relaxed,
+                                                         memory_order_relaxed)) {
+                /* seen was reloaded by the failed exchange; retry while we are still larger */
+            }
         }
         return;
     }
