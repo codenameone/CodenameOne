@@ -88,7 +88,11 @@ class MiscellaneousFeaturesJava042Snippet {
         Display display = Display.getInstance();
         if (display.isLargerTextEnabled()) {
             float scale = display.getLargerTextScale();
-            Font base = UIManager.getInstance().getComponentStyle("Label").getFont();
+            // take the base from the component's own style: derive() keeps the
+            // typeface of its receiver, so deriving Label's font would replace
+            // whatever face this component was given
+            Style style = someComponent.getUnselectedStyle();
+            Font base = style.getFont();
             // derive() only works on TrueType/native fonts and throws on a
             // legacy bitmap font, and it takes a requested pixel size rather
             // than getHeight(), which is the rendered line height. Both checks
@@ -100,7 +104,7 @@ class MiscellaneousFeaturesJava042Snippet {
                 }
                 if (baseSize > 0) {
                     Font scaled = base.derive(baseSize * scale, base.getStyle());
-                    someComponent.getUnselectedStyle().setFont(scaled);
+                    style.setFont(scaled);
                 }
             }
         }
