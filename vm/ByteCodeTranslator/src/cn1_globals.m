@@ -12282,12 +12282,29 @@ static void cn1RecordAllocationSize(struct clazz* parent, int size) {
     }
     for(i = 0 ; i < CN1_ALLOC_SIZE_BUCKETS ; i++) {
         int k = atomic_load_explicit(&cn1AllocSizeKey[i], memory_order_relaxed);
-        if(k == size) {
-            atomic_fetch_add_explicit(&cn1AllocSizeCount[i], 1, memory_order_relaxed);
-            return;
-        }
         if(k == 0) {
-            atomic_store_explicit(&cn1AllocSizeKey[i], size, memory_order_relaxed);
+            // Claim the empty bucket with a compare-exchange rather than a store.
+            // The allocation path is genuinely concurrent -- that is why the counts
+            // beside this are atomics -- so two threads allocating the profiled
+            // class at DIFFERENT sizes could both read this zero, both store, and
+            // then both add into whichever size was written last: one size's row
+            // vanishes and the other's count is overstated by exactly the same
+            // amount. The value of this table is that a reading like "7073173 of
+            // 7073834 allocations were exactly 97 bytes" can be trusted to mean one
+            // site, so a silent merge would attack the one thing it is for. On
+            // losing the race the winner's key is adopted and compared, which lands
+            // the allocation in that bucket if the sizes agree and moves to the next
+            // bucket if they do not.
+            int expected = 0;
+            if(atomic_compare_exchange_strong_explicit(&cn1AllocSizeKey[i], &expected,
+                                                       size, memory_order_relaxed,
+                                                       memory_order_relaxed)) {
+                k = size;
+            } else {
+                k = expected;
+            }
+        }
+        if(k == size) {
             atomic_fetch_add_explicit(&cn1AllocSizeCount[i], 1, memory_order_relaxed);
             return;
         }
