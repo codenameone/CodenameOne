@@ -164,6 +164,88 @@ public abstract class LocationManager {
     /// #### Returns
     ///
     /// the current location or null in case of an error
+    /// A fix taken after this call, for a caller whose permission is new.
+    ///
+    /// [#getCurrentLocationSync(long)] hands back the CACHED fix whenever a
+    /// listener is installed, and that is right for an ordinary caller: the
+    /// listener is keeping the cache current, and starting a second
+    /// acquisition would replace the application's own listener -- `LL.bind`
+    /// calls [#setLocationListener(LocationListener)] -- and silently end its
+    /// tracking.
+    ///
+    /// It is wrong for the location button. The whole of that gesture is that
+    /// the tap earns precise location for this session, and the cached fix was
+    /// taken BEFORE it: on an application that until now held only the
+    /// approximate grant, the cache holds an approximate fix and the tap
+    /// reports it. The control appears to work and quietly answers with the
+    /// accuracy the user just agreed to improve.
+    ///
+    /// So this waits for the next fix the installed listener delivers, which is
+    /// the first one taken under the new grant, and recognises it by its
+    /// timestamp. Nothing is registered or cleared, so the application's
+    /// listener is untouched -- the constraint that makes the obvious fix
+    /// (bind a fresh LL) unsafe.
+    ///
+    /// Falls back to the cached fix rather than to null when none arrives in
+    /// time. A listener registered at a slow interval may have nothing newer
+    /// for minutes, and a slightly imprecise answer beats the empty one the
+    /// caller would otherwise report -- so this is never worse than the
+    /// method it wraps.
+    ///
+    /// Package private on purpose. It exists for `LocationButton`, which is in
+    /// this package, and a public "give me a fix ignoring the cache" is a
+    /// wider promise than this keeps.
+    ///
+    /// @param timeout how long to wait, in milliseconds, or -1 for the default
+    /// @return a fix taken under the caller's new grant where one arrives, the
+    ///         cached fix otherwise, or null if there is none at all
+    Location freshLocationSync(long timeout) {
+        try {
+            // No listener of the application's to protect, so the ordinary
+            // path already starts a fresh acquisition and this adds nothing.
+            if (listener == null || listener == timedOut) { //NOPMD CompareObjectsWithEquals
+                return getCurrentLocationSync(timeout);
+            }
+            final Location cached = getCurrentLocation();
+            final long was = cached == null ? 0 : cached.getTimeStamp();
+            final long wait = timeout > -1 ? timeout : FRESH_FIX_DEFAULT_MS;
+            final Location[] fresh = new Location[1];
+            // Off the EDT, like every other wait here: the caller is on it and
+            // the listener's callback has to be able to run.
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    long start = System.currentTimeMillis();
+                    while (System.currentTimeMillis() - start < wait) {
+                        try {
+                            Thread.sleep(20);
+                        } catch (InterruptedException interrupted) {
+                        }
+                        Location now;
+                        try {
+                            now = getCurrentLocation();
+                        } catch (IOException err) {
+                            // The cache is all there is, then.
+                            return;
+                        }
+                        if (now != null && now.getTimeStamp() > was) {
+                            fresh[0] = now;
+                            return;
+                        }
+                    }
+                }
+            });
+            return fresh[0] != null ? fresh[0] : cached;
+        } catch (IOException err) {
+            Log.e(err);
+            return null;
+        }
+    }
+
+    /// How long [#freshLocationSync(long)] waits when the caller names no
+    /// deadline of its own.
+    private static final long FRESH_FIX_DEFAULT_MS = 10000;
+
     public Location getCurrentLocationSync(long timeout) {
         try {
             // A timed-out listener routes as absent, and is deliberately

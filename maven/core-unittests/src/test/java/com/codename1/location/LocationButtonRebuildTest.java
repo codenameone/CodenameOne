@@ -1328,4 +1328,108 @@ class LocationButtonRebuildTest extends UITestBase {
                 "a rebuild deferred for want of an activity must be retried "
                 + "once one is available, because no attach is coming");
     }
+    /**
+     * A manager with a CACHED fix, the way one with an installed listener has.
+     *
+     * <p>Its cache turns over after a couple of reads, which is what the
+     * application's own listener does when it delivers the first fix taken
+     * under a grant that has just been made.</p>
+     */
+    private static final class CachingManager extends LocationManager {
+        private Location cached;
+        private Location arriving;
+        private int reads;
+
+        @Override
+        public Location getCurrentLocation() {
+            reads++;
+            return reads > 2 && arriving != null ? arriving : cached;
+        }
+
+        @Override
+        public Location getLastKnownLocation() {
+            return cached;
+        }
+
+        @Override
+        protected void bindListener() {
+        }
+
+        @Override
+        protected void clearListener() {
+        }
+
+        @Override
+        protected void bindBackgroundListener() {
+        }
+
+        @Override
+        protected void clearBackgroundListener() {
+        }
+    }
+
+    @Test
+    void aGrantedTapReportsTheFixTakenAfterTheGrant() throws Exception {
+        // The point of the whole gesture. The tap earns precise location for
+        // this session, and the CACHED fix was taken before it -- on an app
+        // that until now held only the approximate grant, that cache holds an
+        // approximate fix. Reporting it makes the control appear to work while
+        // quietly answering with the accuracy the user just agreed to improve.
+        //
+        // getCurrentLocationSync hands back exactly that cache whenever a
+        // listener is installed, and it is right to: binding a fresh one would
+        // replace the application's listener and end its tracking. So the
+        // button waits for the next fix that listener delivers instead.
+        RecordingBridge bridge = install();
+        CachingManager manager = new CachingManager();
+        bridge.granted = manager;
+
+        Location coarse = new Location();
+        coarse.setAccuracy(2000f);
+        coarse.setTimeStamp(1000L);
+        Location precise = new Location();
+        precise.setAccuracy(5f);
+        precise.setTimeStamp(2000L);
+        manager.cached = coarse;
+        manager.arriving = precise;
+
+        // An application listener installed, which is what sends the request
+        // down the cached path in the first place.
+        LocationListener appListener = new LocationListener() {
+            public void locationUpdated(Location location) {
+            }
+
+            public void providerStateChanged(int newState) {
+            }
+        };
+        manager.setLocationListener(appListener);
+        try {
+            LocationButton button = new LocationButton();
+            final Location[] seen = new Location[1];
+            final int[] answers = new int[1];
+            button.addLocationSharedListener(new LocationSharedListener() {
+                public void locationShared(Location location) {
+                    answers[0]++;
+                    seen[0] = location;
+                }
+            });
+            assertEquals(1, bridge.sessions.size(), "sanity: a control");
+
+            bridge.sessions.get(0).onResult.onSucess(Boolean.TRUE);
+            drain();
+            waitUntil("the tap was answered", new Settled() {
+                public boolean isSo() {
+                    return answers[0] > 0;
+                }
+            });
+
+            assertEquals(1, answers[0], "the tap is answered once");
+            assertNotNull(seen[0], "and with a location");
+            assertEquals(2000L, seen[0].getTimeStamp(),
+                    "the fix reported is the one taken AFTER the grant, not "
+                    + "the cache the tap was meant to improve on");
+        } finally {
+            manager.setLocationListener(null);
+        }
+    }
 }

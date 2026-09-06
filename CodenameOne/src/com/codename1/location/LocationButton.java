@@ -1017,7 +1017,20 @@ public class LocationButton extends Container {
         try {
             LocationManager manager = grantedManager(generation);
             if (manager != null) {
-                result = manager.getCurrentLocationSync(timeout);
+                // Fresh, not cached. getCurrentLocationSync hands back the
+                // cached fix whenever a listener is installed -- right for an
+                // ordinary caller, wrong for this one: the cached fix was
+                // taken BEFORE the tap, so an application that until now held
+                // only the approximate grant reports an approximate location
+                // for the gesture whose entire purpose was to improve it.
+                //
+                // freshLocationSync waits for the next fix the application's
+                // own listener delivers rather than registering one of its
+                // own, because binding here would replace that listener and
+                // silently end the application's tracking. It falls back to
+                // the cached fix, so this is never worse than the call it
+                // replaces.
+                result = manager.freshLocationSync(timeout);
             }
         } catch (Throwable err) {
             Log.e(err);
