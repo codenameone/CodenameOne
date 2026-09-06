@@ -45,7 +45,12 @@ public final class GestureSuite {
     /// tap before it can type anything, which took three and a half seconds
     /// on a simulator busy serving XCUITest accessibility snapshots.
     private static final long DEFAULT_STEP_TIMEOUT_MS = 30000L;
-    private static final long SUITE_EXIT_DELAY_MS = 1500L;
+    /// Grace period between the last event and exitApplication(). It has to
+    /// outlast the platform driver noticing that the final step resolved and
+    /// telling its input loop to stop: the keytype driver types in a retry loop,
+    /// and a key synthesised into a process that has already left fails the
+    /// XCUITest run even though every event landed.
+    private static final long SUITE_EXIT_DELAY_MS = 8000L;
 
     private final GestureStep[] steps;
     private final Form form;

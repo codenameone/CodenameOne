@@ -3577,17 +3577,60 @@ bool lockDrawing;
 }
 #endif
 
+// Key codes this controller handed to the framework from pressesBegan:. A press
+// the framework owns has to be completed with the framework whatever the editor
+// does in between -- Display.keyPressedImpl arms the key-repeat and long-press
+// timers and only keyReleased cancels them, so a release diverted to UIKit
+// instead would leave CN1 repeating a key the user has already let go of. The
+// converse pairs up too: a press that went to UIKit while an editor was open
+// has its release forwarded there even if the editor closed meanwhile.
+//
+// Keyed by code rather than by UIPress, which is how the framework itself
+// identifies a key and cannot be ambiguous -- the same key cannot be down
+// twice. Main thread only, like every other UIKit callback in this file, so it
+// needs no synchronization.
+//
+// A press whose terminal phase never arrives (the app suspended mid-key) leaves
+// its code behind. The cost is one later release of that same key routed to the
+// framework instead of UIKit; the repeat-timer wedge this prevents is the
+// larger failure, and before this the release was misrouted unconditionally.
+#if !TARGET_OS_OSX
+static NSMutableSet *cn1FrameworkOwnedKeys = nil;
+
+static void cn1NoteFrameworkOwnsKey(int code) {
+    if (cn1FrameworkOwnedKeys == nil) {
+        cn1FrameworkOwnedKeys = [[NSMutableSet alloc] init];
+    }
+    [cn1FrameworkOwnedKeys addObject:[NSNumber numberWithInt:code]];
+}
+
+/* YES exactly once per recorded press, so the release reaches the framework and
+ * nothing is left armed for the next press of the same key. */
+static BOOL cn1TakeFrameworkOwnedKey(int code) {
+    NSNumber *boxed = [NSNumber numberWithInt:code];
+    if (![cn1FrameworkOwnedKeys containsObject:boxed]) {
+        return NO;
+    }
+    [cn1FrameworkOwnedKeys removeObject:boxed];
+    return YES;
+}
+#endif
+
 // Hardware keyboard support (BT keyboard on iPad/iPhone, Magic Keyboard,
 // Mac Catalyst host keyboard, hardware keyboard in the iOS simulator via
 // Cmd-Shift-K). UIKey arrived in iOS 13.4 -- on older versions the
 // responder chain falls back to the existing UITextField editing path.
 //
-// While a native text editor is up (editingComponent != nil) every press is
-// forwarded untouched. UIKit inserts typed text at the END of the responder
-// chain, after every responder has declined the press, so consuming one here
-// is what stops it reaching the focused CN1UITextField / CN1UITextView --
-// and cn1MapUIKeyToKeyCode maps a printable character to its unicode
-// codepoint, which is never zero, so "handled" swallowed every key. A
+// Whether a press belongs to the framework is decided ONCE, in pressesBegan:,
+// and the end and cancellation follow that decision through
+// cn1TakeFrameworkOwnedKey above rather than re-reading the editor's state.
+//
+// While a native text editor is up (editingComponent != nil) the press is
+// forwarded untouched and never recorded. UIKit inserts typed text at the END
+// of the responder chain, after every responder has declined the press, so
+// consuming one here is what stops it reaching the focused CN1UITextField /
+// CN1UITextView -- and cn1MapUIKeyToKeyCode maps a printable character to its
+// unicode codepoint, which is never zero, so "handled" swallowed every key. A
 // hardware keyboard then typed nothing at all while the on-screen keyboard,
 // which raises no UIPress, kept working: issue #5709.
 //
@@ -3633,6 +3676,7 @@ bool lockDrawing;
             }
             if (code != 0) {
                 keyPressedNative(code);
+                cn1NoteFrameworkOwnsKey(code);
                 handled = YES;
             } else {
                 if (passthrough == nil) {
@@ -3662,10 +3706,6 @@ bool lockDrawing;
 // renamed one, so this is inert on the native macOS port until it is ported.
 #if TARGET_OS_OSX
 #else
-    if (editingComponent != nil) {
-        [super pressesEnded:presses withEvent:event];
-        return;
-    }
     if (@available(iOS 13.4, *)) {
         BOOL handled = NO;
         NSMutableSet *passthrough = nil;
@@ -3680,7 +3720,7 @@ bool lockDrawing;
             if (code == 0 && key == nil) {
                 continue;
             }
-            if (code != 0) {
+            if (code != 0 && cn1TakeFrameworkOwnedKey(code)) {
                 keyReleasedNative(code);
                 handled = YES;
             } else {
@@ -3711,10 +3751,6 @@ bool lockDrawing;
 // renamed one, so this is inert on the native macOS port until it is ported.
 #if TARGET_OS_OSX
 #else
-    if (editingComponent != nil) {
-        [super pressesCancelled:presses withEvent:event];
-        return;
-    }
     if (@available(iOS 13.4, *)) {
         for (UIPress *press in presses) {
             UIKey *key = press.key;
@@ -3727,7 +3763,7 @@ bool lockDrawing;
             if (code == 0 && key == nil) {
                 continue;
             }
-            if (code != 0) {
+            if (code != 0 && cn1TakeFrameworkOwnedKey(code)) {
                 keyReleasedNative(code);
             }
         }

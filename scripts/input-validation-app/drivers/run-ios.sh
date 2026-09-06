@@ -32,7 +32,23 @@ ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$APP_DIR}/artifacts/input-va
 mkdir -p "$ARTIFACTS_DIR"
 LOG_FILE="$ARTIFACTS_DIR/device.log"
 XCODEBUILD_LOG="$ARTIFACTS_DIR/xcodebuild-test.log"
-SYNC_DIR="${CN1IV_SYNC_DIR:-/tmp/cn1-input-validation-sync}"
+# Must stay in step with the fallback path in InputValidationUITests.swift.
+# The test process cannot be told this path: neither an env var on the
+# xcodebuild command line nor TEST_RUNNER_CN1IV_SYNC_DIR reaches it (measured --
+# ProcessInfo saw nothing), so the Swift side finds the directory by that
+# hard-coded path alone. Pointing this script somewhere else does not move the
+# handshake, it removes it: waitForGate returns immediately when it has no
+# directory, so every gesture fires on a fixed delay and the run still reports
+# a full set of gate releases. Checked below rather than left as a trap.
+CN1IV_SYNC_DIR_DEFAULT=/tmp/cn1-input-validation-sync
+SYNC_DIR="${CN1IV_SYNC_DIR:-$CN1IV_SYNC_DIR_DEFAULT}"
+
+if [ "$SYNC_DIR" != "$CN1IV_SYNC_DIR_DEFAULT" ]; then
+  iv_log "CN1IV_SYNC_DIR is $SYNC_DIR but the XCUITest process can only look in" >&2
+  iv_log "$CN1IV_SYNC_DIR_DEFAULT, so the gesture handshake would be silently skipped." >&2
+  iv_log "Change the fallback in ios-tests/Sources/InputValidationUITests.swift too." >&2
+  exit 3
+fi
 
 if ! command -v xcrun >/dev/null 2>&1; then iv_log "xcrun not on PATH" >&2; exit 3; fi
 if ! command -v xcodebuild >/dev/null 2>&1; then iv_log "xcodebuild not on PATH" >&2; exit 3; fi
@@ -185,10 +201,12 @@ wait_for_log_marker() {
     # predicate a few seconds late -- which the archive pass further down already
     # compensates for -- and a CI run saw it deliver nothing whatsoever, so every
     # gesture stalled behind a marker the app had in fact printed a second after
-    # startup. Ask the app directly instead. Throttled to once a second because each
-    # attempt spawns simctl until the file exists.
+    # startup. Ask the app directly instead. Throttled to once a second only while
+    # the path is still unknown, because each of those attempts spawns simctl;
+    # once resolved the check is a local grep, and the extra second of latency
+    # was enough for the keytype stop signal to lose its race with app exit.
     spin=$((spin + 1))
-    if [ "$((spin % 5))" -eq 0 ] && resolve_app_events_file \
+    if { [ -n "$CN1IV_EVENTS_FILE" ] || [ "$((spin % 5))" -eq 0 ]; } && resolve_app_events_file \
         && grep -qE "$needle" "$CN1IV_EVENTS_FILE"; then
       return 0
     fi

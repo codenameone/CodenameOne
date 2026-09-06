@@ -70,6 +70,10 @@ final class InputValidationUITests: XCTestCase {
     func testGestureSuite() throws {
         let app = XCUIApplication(bundleIdentifier: bundleIdentifier)
         let syncDir = syncDirectory
+        // Say which mode this run is in. Without a directory every waitForGate
+        // returns immediately, so an ungated run looks exactly like a perfectly
+        // synchronised one right up until a step races -- worth one log line.
+        NSLog("CN1IV: gate directory %@", syncDir?.path ?? "<none: running ungated on fixed delays>")
         app.launch()
         if syncDir == nil {
             // Local fallback when the shell harness is not coordinating from

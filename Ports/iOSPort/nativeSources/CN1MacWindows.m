@@ -131,6 +131,10 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
 @interface CN1MacWindowController : UIViewController
 @property (nonatomic, assign) int windowId;
 @property (nonatomic, assign) CN1MacWindowView* content;
+/* Key codes this window handed to the framework from pressesBegan:, so the end
+ * and the cancellation of a press follow the decision made when it started
+ * rather than whatever the editor is doing by then. See the presses overrides. */
+@property (nonatomic, retain) NSMutableSet* cn1FrameworkOwnedKeys;
 @end
 
 @implementation CN1MacWindowController
@@ -288,21 +292,31 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
 }
 
 /*
- * A native text editor owns the keyboard while it is up, so every press is
- * forwarded untouched. UIKit inserts typed text only after every responder has
- * declined the press, so claiming one here would swallow it before the focused
- * CN1UITextField could ever see it -- the defect issue #5709 reports against
- * the main controller, which deliverPresses: was copied from.
+ * A native text editor owns the keyboard while it is up, so a press that starts
+ * while one is open is forwarded untouched. UIKit inserts typed text only after
+ * every responder has declined the press, so claiming one here would swallow it
+ * before the focused CN1UITextField could ever see it -- the defect issue #5709
+ * reports against the main controller, which deliverPresses: was copied from.
+ *
+ * Ownership is decided ONCE, when the press begins, and recorded per key code.
+ * The end and the cancellation follow that record rather than re-reading the
+ * editor's state, because the two can disagree: Display.keyPressedImpl arms the
+ * key-repeat and long-press timers and only keyReleased cancels them, so a
+ * release diverted to UIKit because an editor opened mid-press would leave the
+ * framework repeating a key the user has let go of. A code cannot be ambiguous
+ * -- the same key cannot be down twice -- and everything here is on the main
+ * thread, so the set needs no synchronization.
  *
  * The guard sits in each override rather than in deliverPresses: because that
  * helper flattens the three phases into a BOOL, which is right for the
- * framework delivery below and wrong for UIKit: a cancellation forwarded as
- * pressesEnded: tells the text-input chain a key completed when it was aborted.
- * Keep each phase forwarded as itself.
+ * framework delivery -- CN1MacWindowDeliverKey deliberately treats a
+ * cancellation as a release so a key cannot stay latched down -- and wrong for
+ * UIKit, where a cancellation forwarded as pressesEnded: tells the text-input
+ * chain a key completed when it was aborted. Each phase is forwarded as itself.
  *
  * editingComponent is global rather than per-window, so an editor open in a
- * sibling Codename One window makes this controller transparent too. That is
- * deliberate: scoping it with [editingComponent isDescendantOfView:self.view]
+ * sibling Codename One window also stops this window claiming a NEW press. That
+ * is deliberate: scoping it with [editingComponent isDescendantOfView:self.view]
  * reads as more precise and is worse, because the editor host is re-parented
  * across scene grants -- editStringAtImpl puts the field on the MAIN view when
  * CN1MacWindowEditingHostView() has no content view yet and
@@ -310,16 +324,58 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
  * the keys of the very editor it is meant to protect. A key lost to a window
  * whose sibling has an editor open is the smaller failure.
  */
+- (BOOL)cn1TakeOwnedKeysFrom:(NSSet<UIPress*>*)presses {
+    BOOL owned = NO;
+    if (@available(iOS 13.4, *)) {
+        for (UIPress* press in presses) {
+            UIKey* key = press.key;
+            int code = key != nil ? cn1MapUIKeyToKeyCode(key) : 0;
+            if (code == 0) {
+                continue;
+            }
+            NSNumber* boxed = [NSNumber numberWithInt:code];
+            if ([self.cn1FrameworkOwnedKeys containsObject:boxed]) {
+                [self.cn1FrameworkOwnedKeys removeObject:boxed];
+                owned = YES;
+            }
+        }
+    }
+    return owned;
+}
+
+- (void)cn1NoteOwnedKeysFrom:(NSSet<UIPress*>*)presses {
+    if (@available(iOS 13.4, *)) {
+        for (UIPress* press in presses) {
+            UIKey* key = press.key;
+            int code = key != nil ? cn1MapUIKeyToKeyCode(key) : 0;
+            if (code == 0) {
+                continue;
+            }
+            if (self.cn1FrameworkOwnedKeys == nil) {
+                self.cn1FrameworkOwnedKeys = [NSMutableSet set];
+            }
+            [self.cn1FrameworkOwnedKeys addObject:[NSNumber numberWithInt:code]];
+        }
+    }
+}
+
+/* The port builds without ARC, so the retained set is ours to give back. */
+- (void)dealloc {
+    [_cn1FrameworkOwnedKeys release];
+    [super dealloc];
+}
+
 - (void)pressesBegan:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
     if (editingComponent != nil) {
         [super pressesBegan:presses withEvent:event];
         return;
     }
+    [self cn1NoteOwnedKeysFrom:presses];
     [self deliverPresses:presses pressed:YES event:event];
 }
 
 - (void)pressesEnded:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
-    if (editingComponent != nil) {
+    if (![self cn1TakeOwnedKeysFrom:presses]) {
         [super pressesEnded:presses withEvent:event];
         return;
     }
@@ -327,7 +383,7 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
 }
 
 - (void)pressesCancelled:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
-    if (editingComponent != nil) {
+    if (![self cn1TakeOwnedKeysFrom:presses]) {
         [super pressesCancelled:presses withEvent:event];
         return;
     }
