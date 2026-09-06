@@ -81,8 +81,11 @@ class MiscellaneousFeaturesJava001Snippet {
     void snippet() throws Exception {
         // tag::miscellaneous-features-java-001[]
         try {
-            Display.getInstance().sendSMS("+999999999", "My SMS Message");
-            // Or: CN.sendSMS("+999999999", "My SMS Message");
+            // true opens the platform composer, which is what both Android and
+            // iOS offer; the two-argument overload asks for a background send
+            // that neither implements
+            Display.getInstance().sendSMS("+999999999", "My SMS Message", true);
+            // Or: CN.sendSMS("+999999999", "My SMS Message", true);
         } catch(IOException err) {
             Log.e(err);
             Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);

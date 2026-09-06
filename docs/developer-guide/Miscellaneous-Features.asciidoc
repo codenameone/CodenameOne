@@ -13,10 +13,14 @@ Codename One supports sending SMS messages but not receiving them as this functi
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava001Snippet.java[tag=miscellaneous-features-java-001,indent=0]
 ----
 
-Android supports sending SMS messages in the background without any UI. iOS doesn't provide that ability, so the best it can offer is to launch the native SMS app with your message composed for the user to send. Android supports that interactive flow as well (launching the OS native SMS app).
+Both Android and iOS launch the native SMS application with your message
+composed, for the user to send. Neither sends in the background: the API keeps a
+seamless mode for platforms that allow it, and no port in the tree implements
+one today.
 
-The default `sendSMS` API ignores that difference and works interactively on iOS while sending
-in the background for Android when the platform allows it.
+That's why the samples pass `true` for the interactive argument. The
+two-argument overload asks for the seamless send, so on these platforms it does
+nothing at all.
 
 The `getSMSSupport` API returns one of the following options:
 
