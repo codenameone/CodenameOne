@@ -316,8 +316,9 @@ The four platform callbacks the <<ApplicationLifecycle,Application Lifecycle
 Sidebar>> describes are already implemented for you by `Lifecycle`, which is why
 the generated class carries none of them:
 
-* `init(Object)` installs the theme, turns on the global `Toolbar`, sets the
-  network thread count and registers a network error listener.
+* `init(Object)` sets the network thread count, installs the theme, turns on the
+  global `Toolbar`, binds crash protection through `Log.bindCrashProtection` and
+  registers a network error listener, in that order.
 * `start()` calls `runApp()` on a cold start. On a warm start it re-shows the
   `Form` the user was looking at when the app was suspended, so returning to an app
   lands the user back where they were.
@@ -375,8 +376,8 @@ optional:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IndexJava002Snippet.java[tag=index-java-002,indent=0]
 ----
 
-<1> Without this the theme, the `Toolbar` and the network listener are never
-installed, and the app comes up unstyled.
+<1> Without this none of the five things `init` does happen, most visibly the
+theme, so the app comes up unstyled.
 
 <2> Called as the app is suspended, which is the moment to persist anything the
 user would hate to lose.
