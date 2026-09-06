@@ -2755,14 +2755,9 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         err = pthread_mutex_lock(&data->__codenameOneMutex);
         data->counter++;
         data->ownerThread = own;
-        CN1_STALL_T0(__stallMon);
         while (threadStateData->threadBlockedByGC) {
             usleep(100);
         }
-        // Instrumented so the [GCSTALL] report stops under-reporting: this
-        // handshake loop was invisible to it, which is why a run that really
-        // did lose time here reported stallMs=0.
-        CN1_STALL_ADD(__stallMon, CN1_STALL_HANDSHAKE, threadStateData);
         threadStateData->threadActive = JAVA_TRUE;
 
 

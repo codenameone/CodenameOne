@@ -170,7 +170,6 @@ void CN1MacRefreshScaleValue(void) {
         return;
     }
 
-    cn1StartupPhase("buildWindow.enter");
     NSRect frame = NSMakeRect(0, 0, CN1_MAC_DEFAULT_WIDTH, CN1_MAC_DEFAULT_HEIGHT);
     NSWindowStyleMask style = NSWindowStyleMaskTitled
             | NSWindowStyleMaskClosable
@@ -261,7 +260,6 @@ void CN1MacRefreshScaleValue(void) {
     // this process in front. Without this the app launches, runs and draws --
     // behind whatever the user was already looking at.
     [NSApp activateIgnoringOtherApps:YES];
-    cn1StartupPhase("buildWindow.exit");
 }
 
 /// Answering a size query must not WAIT for the window either.

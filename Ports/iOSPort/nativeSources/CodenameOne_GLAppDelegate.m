@@ -567,7 +567,6 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
-    { extern void cn1StartupPhase(const char*); cn1StartupPhase("didFinishLaunching"); }
 #ifdef CN1_DETECT_JAILBREAK
     cn1DetectJailbreakBypassesAndExit();
 #endif

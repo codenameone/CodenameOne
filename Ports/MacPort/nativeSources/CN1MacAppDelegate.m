@@ -499,7 +499,6 @@ JAVA_VOID com_codename1_impl_mac_MacNative_replyToTermination__(CODENAME_ONE_THR
 }
 
 void cn1_mac_runtime_markJavaReady(void) {
-    cn1StartupPhase("javaReady");
     dispatch_async(dispatch_get_main_queue(), ^{
         cn1MacJavaReady = YES;
         struct ThreadLocalData* threadStateData = getThreadLocalData();
@@ -661,7 +660,6 @@ void CN1MacDeliverWindowMiniaturized(BOOL miniaturized) {
 // paint path reads, and it has to be right from the first frame.
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
-    cn1StartupPhase("appDidFinishLaunching");
     // Installed unconditionally, and this early. A scheduled notification is
     // delivered through this delegate whether it fires while the application is
     // frontmost or the user opens it from Notification Center, so without it a
@@ -986,7 +984,6 @@ void CN1MacInstallAppDelegate(void) {
     //
     // See CN1MacPublishPrimaryScale. Reading it is what lets the event dispatch
     // thread skip a dispatch_sync onto a main queue that is still busy.
-    cn1StartupPhase("installDelegate.enter");
     extern void CN1MacPublishPrimaryScale(void);
     CN1MacPublishPrimaryScale();
     // Build the window HERE, once, on this thread.
@@ -1036,7 +1033,6 @@ void CN1MacInstallAppDelegate(void) {
     // size, before anything paints.
     dispatch_async(dispatch_get_main_queue(), ^{
         (void)[CN1MacHost sharedHost].renderingView;
-        cn1StartupPhase("installDelegate.windowBuilt");
         // The window exists now, so the screen it opened on can be published.
         // Until this runs macMonitorForMainWindow has to marshal to find out,
         // and Style.convertUnit asks it through convertToPixels for every

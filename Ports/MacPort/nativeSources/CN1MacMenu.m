@@ -35,7 +35,6 @@ static NSString *CN1MacAppName(void) {
 }
 
 void CN1MacInstallMainMenu(void) {
-    cn1StartupPhase("installMainMenu.enter");
     NSString *appName = CN1MacAppName();
     NSMenu *mainMenu = [[NSMenu alloc] initWithTitle:@""];
 

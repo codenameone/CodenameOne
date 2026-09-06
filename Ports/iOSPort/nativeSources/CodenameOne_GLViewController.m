@@ -1570,56 +1570,6 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
         pixels[i] = (a << 24) | (r << 16) | (g << 8) | b;
     }
 
-    // CN1_VERIFY_ARGB reproduces the old CoreGraphics conversion and reports any
-    // pixel that differs. Channel order and premultiply rounding are exactly the
-    // kind of thing that is invisible in a stack trace and shows up as an image
-    // that is slightly dark, or blue. Set it once after touching this.
-    static int verifyArgb = -1;
-    if(verifyArgb < 0) {
-        verifyArgb = getenv("CN1_VERIFY_ARGB") ? 1 : 0;
-    }
-    if(verifyArgb) {
-        uint32_t *reference = (uint32_t *)calloc(1, bufferLength);
-        if(reference != NULL) {
-            CGDataProviderRef srcProvider =
-                CGDataProviderCreateWithData(NULL, buffer, bufferLength, NULL);
-            CGImageRef srcImage = srcProvider ? CGImageCreate(width, height, 8, 32, bytesPerRow,
-                    colorSpaceRef, kCGBitmapByteOrder32Little | kCGImageAlphaFirst,
-                    srcProvider, NULL, NO, kCGRenderingIntentDefault) : NULL;
-            CGContextRef refCtx = CGBitmapContextCreate(reference, width, height, 8, bytesPerRow,
-                    colorSpaceRef, kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
-            if(srcImage != NULL && refCtx != NULL) {
-                CGContextDrawImage(refCtx, CGRectMake(0.0f, 0.0f, width, height), srcImage);
-                CGContextFlush(refCtx);
-                size_t bad = 0, worst = 0;
-                long firstIdx = -1;
-                for(size_t i = 0 ; i < count ; i++) {
-                    if(pixels[i] == reference[i]) continue;
-                    if(firstIdx < 0) firstIdx = (long)i;
-                    bad++;
-                    for(int ch = 0 ; ch < 4 ; ch++) {
-                        long d = (long)((pixels[i] >> (ch * 8)) & 0xff)
-                               - (long)((reference[i] >> (ch * 8)) & 0xff);
-                        if(d < 0) d = -d;
-                        if((size_t)d > worst) worst = (size_t)d;
-                    }
-                }
-                if(bad != 0) {
-                    CN1Log(@"CN1_VERIFY_ARGB: %zu/%zu differ, worst channel delta %zu "
-                            "(first at %ld: fast=%08x cg=%08x) for %ix%i",
-                           bad, count, worst, firstIdx,
-                           (unsigned)pixels[firstIdx], (unsigned)reference[firstIdx], width, height);
-                } else {
-                    CN1Log(@"CN1_VERIFY_ARGB: %ix%i matches", width, height);
-                }
-            }
-            if(refCtx != NULL) CGContextRelease(refCtx);
-            if(srcImage != NULL) CGImageRelease(srcImage);
-            if(srcProvider != NULL) CGDataProviderRelease(srcProvider);
-            free(reference);
-        }
-    }
-
     CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, pixels, bufferLength,
                                                               cn1ArgbImageFreeData);
     if(provider == NULL) {
@@ -5166,37 +5116,6 @@ BOOL prefersStatusBarHidden = NO;
         [renderingView prepareRetainedFramebufferForDrawRect:rect displayWidth:displayWidth displayHeight:displayHeight];
     }
 #endif
-    // How much of the screen does a frame actually repaint? The offscreen
-    // screenTexture exists so a frame can repaint only its dirty region and keep
-    // the rest; it costs a full-screen texture to do that. If frames repaint
-    // most of the screen anyway, that texture is buying very little.
-    // CN1_REPAINT_RATIO reports it; costs one cached getenv otherwise.
-    {
-        static int repaintRatioOn = -1;
-        if(repaintRatioOn < 0) {
-            repaintRatioOn = getenv("CN1_REPAINT_RATIO") ? 1 : 0;
-        }
-        if(repaintRatioOn) {
-            static long frames = 0;
-            static double areaSum = 0;
-            static long fullFrames = 0;
-            double full = (double)displayWidth * (double)displayHeight;
-            double area = (double)rect.size.width * (double)rect.size.height;
-            if(full > 0) {
-                double frac = area / full;
-                if(frac > 1.0) frac = 1.0;
-                frames++;
-                areaSum += frac;
-                if(frac > 0.95) fullFrames++;
-                if((frames % 5) == 0) {
-                    fprintf(stderr, "BENCH:REPAINT frames=%ld mean=%.1f%% full(>95%%)=%ld (%.0f%%)\n",
-                            frames, 100.0 * areaSum / (double)frames, fullFrames,
-                            100.0 * (double)fullFrames / (double)frames);
-                    fflush(stderr);
-                }
-            }
-        }
-    }
     [renderingView setFramebuffer];
     GLErrorLog;
     BOOL drewContentOps = NO;
