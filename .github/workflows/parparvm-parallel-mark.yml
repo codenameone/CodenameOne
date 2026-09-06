@@ -98,17 +98,22 @@ jobs:
       - name: Install clang and cmake
         run: bash scripts/ci/apt-get-install.sh clang cmake
 
-      - name: Build the translator
-        run: mvn -q -B -pl ByteCodeTranslator package -DskipTests
+      # Package first, then test with -am: the integration tests reload the
+      # translator from its PACKAGED jar, and the reactor is what resolves the
+      # dependency. Packaging alone without -am (and without install) leaves
+      # nothing for the tests module to resolve against, which is how the first
+      # revision of this workflow failed on all three arms including the control.
+      # This mirrors parparvm-tests.yml.
+      - name: Build JavaAPI and the translator
+        run: mvn -B clean package -pl JavaAPI -am -DskipTests
         working-directory: vm
 
-      # The integration tests reload the translator from its packaged jar, so -am
-      # here would run them against classes that are not in it.
       - name: GC suite
         env:
           CN1_TEST_EXTRA_CFLAGS: ${{ matrix.cflags }}
         run: |
-          mvn -B -pl tests test \
+          mvn -B test -pl tests -am \
+            -Dsurefire.failIfNoSpecifiedTests=false \
             -Dtest='GcHeapIntegrityIntegrationTest,GcOverflowSpiralIntegrationTest,GcUncooperativeThreadIntegrationTest,LargeArrayGcIntegrationTest,LowMemoryThrottleIntegrationTest,BibopPageFloorIntegrationTest'
         working-directory: vm
 

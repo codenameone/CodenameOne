@@ -152,8 +152,8 @@ class GcHeapIntegrityIntegrationTest {
                 "-DCMAKE_BUILD_TYPE=Release",
                 "-DCMAKE_C_COMPILER=clang",
                 "-DCMAKE_OBJC_COMPILER=clang",
-                "-DCMAKE_C_FLAGS=-DCN1_GC_VERIFY" + extraCFlags(),
-                "-DCMAKE_OBJC_FLAGS=-DCN1_GC_VERIFY" + extraCFlags()
+                CompilerHelper.cFlagsArg("-DCN1_GC_VERIFY"),
+                CompilerHelper.objcFlagsArg("-DCN1_GC_VERIFY")
         ), distDir);
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
@@ -347,20 +347,5 @@ class GcHeapIntegrityIntegrationTest {
         }
     }
 
-    /**
-     * Extra compile flags for the C build, from the {@code CN1_TEST_EXTRA_CFLAGS}
-     * environment variable, appended to whatever this test already passes.
-     *
-     * The parallel mark pool is compiled out by default (see
-     * gcMarkResolveThreadCount) because arm64 Linux corrupted the heap with it on
-     * and the second ordering hole was never located. Reproducing that needs the
-     * existing GC tests run against a parallel marker on real arm64 hardware,
-     * which this hook allows without changing any default: unset, every test
-     * compiles exactly as before.
-     */
-    static String extraCFlags() {
-        String v = System.getenv("CN1_TEST_EXTRA_CFLAGS");
-        return v == null ? "" : (" " + v);
-    }
 
 }

@@ -5451,6 +5451,21 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             if(!cn1VirtualThreadYieldIfVirtual()) {
                 usleep(50);
             }
+            // Do NOT go active again while the collector has this thread blocked.
+            //
+            // threadActive is what tells the collector it may scan this thread's
+            // roots without stopping it. If threadBlockedByGC went up during the
+            // sleep, the collector saw threadActive == false and may already be
+            // walking this stack conservatively; raising the flag here would let
+            // the mutator run -- moving that stack, and the assist above running
+            // mark functions on it -- underneath a scan in progress, which loses
+            // reachable objects. Wait the block out first, exactly as the tail of
+            // this function does.
+            while(threadStateData->threadBlockedByGC) {
+                if(!cn1VirtualThreadYieldIfVirtual()) {
+                    usleep((JAVA_INT)(500));
+                }
+            }
             threadStateData->threadActive = JAVA_TRUE;
         }
         threadStateData->threadActive = JAVA_FALSE;
@@ -6283,11 +6298,37 @@ void cn1BibopNoteNativePeer(JAVA_OBJECT obj) { (void)obj; }
  * The smallest trigger this live set justifies: live + growth%, clamped to the
  * absolute minimum. Answers in bytes.
  */
+// Recent live-set high-water, in bytes, decayed once per adapt.
+//
+// liveBytes as handed to cn1BibopAdaptAfterSweep is NOT the whole live set: the
+// sweep walks the retired-page list, and a page the major sweep splices out of a
+// partial pool is deliberately withheld from policy statistics (see
+// statsExcluded). Sizing the floor from one such sample lets it collapse toward
+// the minimum while a large live heap sits on pages this cycle never looked at,
+// and the collector would then retrace that heap every few megabytes.
+//
+// A decaying high-water is the cheap defence: any recent cycle that DID see a
+// large live set holds the floor up, and a genuinely small live set walks it
+// down within a few cycles. It costs one long and no extra walking, where an
+// exact answer needs a live count over every registered page and there is no
+// such figure today.
+static long bibopLiveHighWater = 0;
+
+// 1/8 per adapt: a real drop in the live set reaches the floor in a handful of
+// cycles, while a single unrepresentative sample cannot move it far.
+#ifndef CN1_BIBOP_LIVE_DECAY_SHIFT
+#define CN1_BIBOP_LIVE_DECAY_SHIFT 3
+#endif
+
 static long cn1BibopTriggerFloor(long liveBytes) {
     long floor;
     if(liveBytes < 0) {
         liveBytes = 0;
     }
+    if(liveBytes > bibopLiveHighWater) {
+        bibopLiveHighWater = liveBytes;
+    }
+    liveBytes = bibopLiveHighWater;
     // The multiply is done in long long so a large live set cannot wrap the
     // percentage before the clamp sees it.
     {
@@ -6310,6 +6351,11 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
     bibopLastCycleOccupiedBytes = occupiedBytes;
     bibopLastCycleLiveBytes = liveBytes;
     bibopLastCycleReclaimedBytes = reclaimedBytes;
+
+    // Decay before this cycle's sample is folded in by cn1BibopTriggerFloor, so a
+    // live set that really has shrunk walks the floor down instead of pinning it
+    // at the largest value ever seen.
+    bibopLiveHighWater -= bibopLiveHighWater >> CN1_BIBOP_LIVE_DECAY_SHIFT;
 
     if(lowMemoryMode) {
         long oldTrigger = atomic_load_explicit(&bibopGcTriggerBytes,

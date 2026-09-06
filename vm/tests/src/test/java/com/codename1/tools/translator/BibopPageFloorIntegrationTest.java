@@ -221,6 +221,9 @@ class BibopPageFloorIntegrationTest {
             // arm64 269552KB -> 90656KB, x86_64 263813KB -> 263821KB.
             cmakeArgs.add("-DCMAKE_OSX_ARCHITECTURES=arm64");
         }
+        // Injected flags (CN1_TEST_EXTRA_CFLAGS) appended last, so they survive the
+        // hardcoded compiler settings above; empty unless the variable is set.
+        cmakeArgs.addAll(CompilerHelper.extraCFlagArgs());
         CleanTargetIntegrationTest.runCommand(cmakeArgs, distDir);
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 

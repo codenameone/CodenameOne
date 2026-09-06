@@ -163,14 +163,18 @@ class LowMemoryThrottleIntegrationTest {
 
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
-        CleanTargetIntegrationTest.runCommand(Arrays.asList(
+        List<String> cmakeArgs = new ArrayList<>(Arrays.asList(
                 "cmake",
                 "-S", distDir.toString(),
                 "-B", buildDir.toString(),
                 "-DCMAKE_BUILD_TYPE=Release",
                 "-DCMAKE_C_COMPILER=clang",
                 "-DCMAKE_OBJC_COMPILER=clang"
-        ), distDir);
+        ));
+        // Injected flags (CN1_TEST_EXTRA_CFLAGS) appended last, so they survive the
+        // hardcoded compiler settings above; empty unless the variable is set.
+        cmakeArgs.addAll(CompilerHelper.extraCFlagArgs());
+        CleanTargetIntegrationTest.runCommand(cmakeArgs, distDir);
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
         Path executable = buildDir.resolve("LowMemoryThrottleApp");
