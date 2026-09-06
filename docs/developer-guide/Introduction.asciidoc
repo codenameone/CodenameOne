@@ -326,11 +326,13 @@ the generated class carries none of them:
 * `destroy()` does nothing by default.
 
 
-[[TitleAndLabelImage]]
-.Title and Label in the UI
-image::img/codenameone-hello-world-title-label.png[Title and Label in the UI,scaledwidth=50%]
-
-Some complex ideas appear within this short snippet that this chapter addresses later when talking about layout. The gist of it's that you create and show a `Form`. `Form` is the top level UI element, it takes over the whole screen. You can add UI elements to that `Form` object, in this case the `Label`. You use the `BoxLayout` to arrange the elements within the `Form` from top to the bottom vertically.
+Some complex ideas appear within this short snippet that this chapter addresses
+later when talking about layout. The gist of it's that you create and show a
+`Form`, the top level UI element that takes over the whole screen. You add UI
+elements to it, here a `Button` that opens a `Dialog` when tapped, and the
+`BoxLayout` arranges them from top to bottom. The same action is attached to the
+side menu through the `Toolbar`, so the starter shows both ways of triggering
+one piece of code.
 
 [[ApplicationLifecycle]]
 .Application Lifecycle
