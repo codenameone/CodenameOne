@@ -364,8 +364,11 @@ Codename One has four standard callback methods in the lifecycle API:
 IMPORTANT: `destroy()` is optional there is no guarantee that it will be invoked. It should be used only as a last resort
 ****
 
-You only override one of them when you need to run code at that point, and each
-override has to call its `super`, or the setup above stops happening:
+Override one when you need to run code at that point. What the `super` call
+protects differs by callback: in `init` it's the whole list above, in `start`
+it's the only thing that puts a `Form` on screen, and in `stop` it's the record
+of which `Form` to come back to. `destroy` is empty, so `super` there is
+optional:
 
 [source,java,title='Overriding a lifecycle callback']
 ----
