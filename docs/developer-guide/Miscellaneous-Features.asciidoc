@@ -475,11 +475,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 On Android 11 (API level 30) and higher, requesting background location permission requires a two-step process. First, foreground location permissions must be granted. Then, the app must request background location access, which will direct the user to the system settings to select `Allow all the time`. Codename One handles this flow automatically when you use `LocationManager`.
 
-For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize the prompt through localization keys. The bare
-`android.permission.ACCESS_BACKGROUND_LOCATION` key is the body of the first
-prompt, and the port looks up `.title`, `.explanation_title`,
-`.explanation_body`, `.settings`, `.ok` and `.cancel` beneath it for the
-follow-up dialog that sends the user to the settings screen:
+For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize both dialogs through localization keys under
+`android.permission.ACCESS_BACKGROUND_LOCATION`. The first one, offering to open
+the settings screen, takes its body from the bare key and its title and buttons
+from `.title`, `.settings` and `.cancel`. The second, shown after the user comes
+back, uses `.explanation_title`, `.explanation_body` and `.ok`:
 
 [source,java]
 ----

@@ -82,8 +82,8 @@ class MiscellaneousFeaturesJava001Snippet {
         // tag::miscellaneous-features-java-001[]
         try {
             // true opens the platform composer, which is what both Android and
-            // iOS offer; the two-argument overload asks for a background send
-            // that neither implements
+            // iOS offer. iOS opens it either way, but Android takes the flag
+            // literally and its background path is not implemented
             Display.getInstance().sendSMS("+999999999", "My SMS Message", true);
             // Or: CN.sendSMS("+999999999", "My SMS Message", true);
         } catch(IOException err) {
