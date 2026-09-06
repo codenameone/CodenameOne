@@ -5,6 +5,7 @@ import com.codename1.junit.UITestBase;
 import com.codename1.ui.Display;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -119,6 +120,39 @@ class LocationManagerTest extends UITestBase {
         Field field = Display.class.getDeclaredField(name);
         field.setAccessible(true);
         return field.get(Display.getInstance());
+    }
+
+    @Test
+    void aTimedOutRequestReleasesTheSlotWithoutClearingThePlatform() {
+        // A timed-out request used to stay installed forever, so the NEXT
+        // getCurrentLocationSync saw a non-null listener and took the
+        // getCurrentLocation() path instead of starting a fresh timed request.
+        //
+        // Releasing the field fixes that. Calling the port's clear would fix
+        // it too and cost more: on Android with Play Services clearListener()
+        // is ASYNCHRONOUS, and a retry arriving as connectivity returns can
+        // bind first, after which the late clear removes the retry's own
+        // subscription. Nothing in core can serialize against that, so core
+        // does not start it -- the next bind replaces the listener inside one
+        // port call instead.
+        TestLocationManager manager = new TestLocationManager();
+        manager.notifyOnBind = false;
+        manager.setCurrentLocation(null);
+
+        Location timedOut = manager.getCurrentLocationSync(50);
+        assertNull(timedOut, "sanity: the request must time out");
+        assertEquals(1, manager.bindCount, "sanity: it bound once");
+        assertEquals(0, manager.clearCount,
+                "the timeout must not start a platform clear");
+        assertNull(manager.getLocationListener(),
+                "but the slot is free, which is what the routing reads");
+
+        // And the retry starts a fresh timed request rather than falling
+        // through to getCurrentLocation().
+        manager.getCurrentLocationSync(50);
+        assertEquals(2, manager.bindCount, "the retry binds again");
+        assertEquals(0, manager.getCurrentLocationCalls,
+                "and does not take the already-listening path");
     }
 
     private static class DummyLocationListener implements LocationListener {

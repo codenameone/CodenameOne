@@ -134,6 +134,11 @@ final class LocationButtonManifestFragments {
             "registerGnssNavigationMessageCallback",
             "registerGnssStatusCallback",
             "registerAntennaInfoListener",
+            // The deprecated spellings too. They still compile, still run and
+            // still need fine location, and a library old enough to use them
+            // is exactly the kind that ships as a plain jar with no manifest
+            // to declare it.
+            "addGpsStatusListener",
             "addNmeaListener",
         },
         {
@@ -157,6 +162,10 @@ final class LocationButtonManifestFragments {
             "androidx/core/location/LocationManagerCompat",
             "requestLocationUpdates",
             "getCurrentLocation",
+            // The wrapper carries the GNSS registrations as well, and they
+            // need the same permission through it as they do direct.
+            "registerGnssStatusCallback",
+            "registerGnssMeasurementsCallback",
         },
     };
 

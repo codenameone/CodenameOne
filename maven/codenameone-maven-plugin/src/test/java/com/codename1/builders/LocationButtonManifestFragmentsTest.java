@@ -2158,6 +2158,48 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aLegacyGpsStatusListenerIsPreciseUse() throws Exception {
+        // addGpsStatusListener is deprecated and still compiles, still runs
+        // and still needs fine location -- and a library old enough to use it
+        // is exactly the kind that ships as a plain jar with no manifest.
+        File root = tempDir("cn1-lb-gps-status");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "legacy.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/Sat.class"));
+            zip.write(methodCallClass("android/location/LocationManager",
+                    "addGpsStatusListener"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .callsPreciseLocation(),
+                "the legacy satellite listener needs fine location too");
+    }
+
+    @Test
+    void aCompatGnssRegistrationIsPreciseUse() throws Exception {
+        // The AndroidX wrapper carries the GNSS registrations as well, and
+        // they need the same permission through it as they do direct.
+        File root = tempDir("cn1-lb-compat-gnss");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "compat.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/CompatSat.class"));
+            zip.write(methodCallClass(
+                    "androidx/core/location/LocationManagerCompat",
+                    "registerGnssStatusCallback"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .callsPreciseLocation(),
+                "the wrapper's GNSS registration is precise use");
+    }
+
+    @Test
     void aGnssNavigationCallbackIsPreciseUse() throws Exception {
         File root = tempDir("cn1-lb-gnss-nav");
         ZipOutputStream zip = new ZipOutputStream(

@@ -304,6 +304,21 @@ public abstract class LocationManager {
     /// #### Parameters
     ///
     /// - `l`: the listener to remove if it is still current
+    /// Forgets `l` as the installed listener WITHOUT touching the platform.
+    ///
+    /// For the timed-out request, whose only real damage is to this class's
+    /// own routing: `getCurrentLocationSync` branches on the field. A port
+    /// clear is asynchronous on Android and can overtake the next bind, so
+    /// starting one here would trade a routing bug for a lost subscription.
+    private void releaseIfStill(LocationListener l) {
+        synchronized (LISTENER_LOCK) {
+            // Reference identity, for the reason clearListenerIfStill says.
+            if (listener == l) { //NOPMD CompareObjectsWithEquals
+                listener = null;
+            }
+        }
+    }
+
     private void clearListenerIfStill(LocationListener l) {
         synchronized (LISTENER_LOCK) {
             // Reference identity is the question, not equality: "is the
@@ -395,13 +410,36 @@ public abstract class LocationManager {
                 // forever -- and LocationButton defaults to 30 seconds, which
                 // is what makes this reachable in ordinary use.
                 //
+                // The CORE field only, and deliberately not the platform
+                // subscription.
+                //
+                // What the leak actually broke is right here: getCurrentLocation
+                // Sync branches on this field, so a timed-out LL left in it sent
+                // the next request down getCurrentLocation() instead of starting
+                // a fresh timed one. Releasing the field fixes that entirely.
+                //
+                // Calling setLocationListener(null) would fix it too and cost
+                // more than it is worth. On Android with Play Services that
+                // starts an ASYNCHRONOUS clearListener(), and a retry arriving
+                // as connectivity returns can bind first -- the late clear then
+                // removes the retry's subscription and the retry times out as
+                // well. AndroidLocationPlayServiceManager.clearListener()
+                // documents that ordering hazard; nothing in core can serialize
+                // against it, and before this cleanup existed there was no
+                // clear here to race at all.
+                //
+                // The platform subscription is not orphaned for long: the next
+                // request's bind() calls setLocationListener(this), and a port
+                // replaces a listener inside that ONE call rather than through
+                // a separate clear that can overtake it.
+                //
                 // Only when this LL is STILL the manager's listener. The wait
                 // runs through invokeAndBlock, so the EDT keeps pumping and the
                 // application can call setLocationListener(other) while we are
                 // parked here -- `finished` is false either way, so an
-                // unconditional clear tore down a listener the application had
-                // just installed and stopped its platform subscription.
-                clearListenerIfStill(this);
+                // unconditional release would forget a listener the application
+                // had just installed.
+                releaseIfStill(this);
             }
         }
 
