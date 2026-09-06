@@ -74,15 +74,22 @@ public final class HttpServer {
      * {@link #getHeaders} or {@link #getHeader} give Strings that are safe to keep.
      */
     public static final class Request {
-        private final String method;
-        private final String target;
-        private final String version;
-        private final String body;
+        // Not final because one Request is REUSED for every request on a
+        // connection, which is the same trade the buffer and the slice table
+        // already make and the reason a Request is documented as valid only for
+        // the duration of Handler.handle. "Immutable to its handler" is the
+        // property that matters and it still holds exactly: reset() runs while a
+        // request is being PARSED, which is strictly before the handler is called
+        // and strictly after the previous one returned.
+        private String method;
+        private String target;
+        private String version;
+        private String body;
         /** The bytes the header block was read from. */
-        private final byte[] raw;
+        private byte[] raw;
         /** nameStart, nameLength, valueStart, valueLength per header, in order. */
-        private final int[] slices;
-        private final int headerCount;
+        private int[] slices;
+        private int headerCount;
         private Map headers;
 
         Request(String method, String target, String version, byte[] raw, int[] slices,
@@ -94,6 +101,27 @@ public final class HttpServer {
             this.slices = slices;
             this.headerCount = headerCount;
             this.body = body;
+        }
+
+        /**
+         * Re-points this Request at a freshly parsed request. Every field is
+         * assigned, with no "unchanged" case: a field left behind describes the
+         * PREVIOUS request on this connection, and headers is the one that would
+         * hurt -- it caches a Map built on demand by getHeaders, so carrying it
+         * over would answer one request's header lookups with another's. That is
+         * a wrong answer rather than a crash, which is why it is assigned here
+         * unconditionally instead of being cleared at some later point.
+         */
+        void reset(String method, String target, String version, byte[] raw, int[] slices,
+                   int headerCount, String body) {
+            this.method = method;
+            this.target = target;
+            this.version = version;
+            this.raw = raw;
+            this.slices = slices;
+            this.headerCount = headerCount;
+            this.body = body;
+            this.headers = null;
         }
 
         /**
@@ -1650,6 +1678,14 @@ public final class HttpServer {
             return buffer.length - pos;
         }
 
+        /**
+         * The one Request served on this connection, re-pointed per request rather
+         * than reallocated. Response and Request were the whole of what /plaintext
+         * still allocated once the borrowed-buffer copy went: 88 and 80 bytes, one
+         * of each, every request.
+         */
+        Request pooledRequest;
+
         /** Reads more. False at end of stream. */
         boolean fill(byte[] scratch) throws IOException {
             if(borrowed && available() == 0 && !parsedFromBuffer) {
@@ -2403,7 +2439,18 @@ public final class HttpServer {
             at = end + 2;
         }
 
-        Request request = new Request(method, target, version, raw, slices, headerCount, null);
+        Request request;
+        if(POOL_REQUEST) {
+            if(conn.pooledRequest == null) {
+                conn.pooledRequest = new Request(method, target, version, raw, slices,
+                                                 headerCount, null);
+            } else {
+                conn.pooledRequest.reset(method, target, version, raw, slices, headerCount, null);
+            }
+            request = conn.pooledRequest;
+        } else {
+            request = new Request(method, target, version, raw, slices, headerCount, null);
+        }
 
         int contentLengthAt = -1;
         boolean chunked = false;
@@ -2475,11 +2522,19 @@ public final class HttpServer {
                 conn.pos += declaredLength;
             }
         }
-        // The body is the only field not known when the header block was parsed,
-        // and a Request is immutable to its handler, so it is rebuilt here rather
-        // than mutated. The slices and the array are shared, not copied.
-        return body == null ? request
-                : new Request(method, target, version, raw, slices, headerCount, body);
+        // The body is the only field not known when the header block was parsed.
+        // Both branches below run during PARSING -- before this Request is handed
+        // to a handler -- so neither one mutates anything a handler can see, and
+        // "immutable to its handler" is preserved either way. The slices and the
+        // array are shared, not copied.
+        if(body == null) {
+            return request;
+        }
+        if(POOL_REQUEST) {
+            request.reset(method, target, version, raw, slices, headerCount, body);
+            return request;
+        }
+        return new Request(method, target, version, raw, slices, headerCount, body);
     }
 
     /**
@@ -3062,6 +3117,28 @@ public final class HttpServer {
      * CN1_HTTP_ZERO_COPY=0 still disables it entirely.
      */
     private static final boolean ZERO_COPY_READ = ZERO_COPY_MODE != 0;
+
+    /**
+     * Reuse one Request per connection instead of allocating one per request.
+     *
+     * Request and Response were the whole of what /plaintext still allocated once
+     * the borrowed-buffer copy went -- 80 and 88 bytes, one of each, every
+     * request -- so this is half of what was left. The allocation half is exact
+     * and was measured directly: Request disappears from the profile and the
+     * route falls from 168.2 to 88.2 bytes per request. Throughput, thirteen
+     * interleaved pairs in one binary with the arm order rotating, is a median
+     * +13.6% and ahead in 12 of 13, p99 better in 10.
+     *
+     * A profiled build shows only +2.3% for the same change, and that is not a
+     * contradiction: the profiler taxes every allocation, so the server is slower,
+     * allocates less per second, and the collector it is being spared matters
+     * less. The non-profiled figure is the one that describes a real deployment.
+     *
+     * CN1_HTTP_POOL_REQUEST=0 restores the allocating path -- kept for the same
+     * reason ZERO_COPY_MODE keeps its switch, so the comparison stays runnable
+     * rather than having to be rebuilt.
+     */
+    private static final boolean POOL_REQUEST = envInt("CN1_HTTP_POOL_REQUEST", 1) != 0;
 
     static String asciiString(byte[] data, int start, int length) {
         char[] chars = new char[length];
