@@ -51,6 +51,7 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.annotations.Required;
 import java.util.*;
 import com.codename1.annotations.*;
 import com.codename1.binding.BindAttr;
@@ -85,6 +86,7 @@ class AnnotationComponentBindingJava001Snippet {
     public class LoginModel {
 
         @Bind(name = "userField", attr = BindAttr.TEXT)
+        @Required
         private String user;
         public String getUser()              { return user; }
         public void   setUser(String u)      { this.user = u; }                  // <1>

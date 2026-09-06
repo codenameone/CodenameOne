@@ -90,7 +90,8 @@ class NotificationsAndBackgroundExecutionJava006Snippet {
         public void onReceivedSharedContent(SharedContent content) {
             for (SharedContent.Item item : content.getItems()) {
                 if (item.getType() == SharedContent.TYPE_IMAGE) {
-                    importImage(item.getFilePath()); // a FileSystemStorage path
+                    // your own import; the path is a FileSystemStorage path
+                    importImage(item.getFilePath());
                 }
             }
         }

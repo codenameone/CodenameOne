@@ -83,7 +83,7 @@ class PrintingJava001Snippet {
     
     void snippet() throws Exception {
         // tag::printing-java-001[]
-        Image chart = renderChart();
+        Image chart = renderChart();   // your own drawing code
         Printer.printImage(chart, result -> {
             if (result.isFailed()) {
                 ToastBar.showErrorMessage("Print failed: " + result.getError());

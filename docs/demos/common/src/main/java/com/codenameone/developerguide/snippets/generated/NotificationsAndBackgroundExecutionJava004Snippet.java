@@ -92,7 +92,10 @@ class NotificationsAndBackgroundExecutionJava004Snippet {
     public static class SyncWorker implements BackgroundWorker {
         public void performWork(String id, java.util.Map<String, String> inputData,
                 long deadline, com.codename1.util.Callback<Boolean> onComplete) {
-            boolean ok = sync(inputData.get("account"));
+            // the real work goes here; inputData carries whatever the request
+            // was scheduled with, because no foreground state survives
+            String account = inputData.get("account");
+            boolean ok = account != null;
             // TRUE for done, FALSE to ask the platform to retry later
             onComplete.onSucess(Boolean.valueOf(ok));
         }
@@ -110,7 +113,5 @@ class NotificationsAndBackgroundExecutionJava004Snippet {
     // end::notifications-and-background-execution-java-004[]
 
 
-
-    static boolean sync(String account) { return true; }
 
 }
