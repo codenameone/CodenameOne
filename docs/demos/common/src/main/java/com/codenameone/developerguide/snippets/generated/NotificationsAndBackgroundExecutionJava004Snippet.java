@@ -102,7 +102,10 @@ class NotificationsAndBackgroundExecutionJava004Snippet {
     }
 
     void scheduleSync() {
-        WorkRequest req = WorkRequest.builder("sync", SyncWorker.class)
+        // on iOS the id has to be one of the permitted identifiers, so either
+        // use the default the build injects or declare your own with the
+        // ios.backgroundProcessingIds build hint
+        WorkRequest req = WorkRequest.builder("com.example.myapp.processing", SyncWorker.class)
                 .setRequiresNetwork(true)
                 .setRequiresCharging(true)
                 .setPeriodic(6 * 60 * 60 * 1000L)

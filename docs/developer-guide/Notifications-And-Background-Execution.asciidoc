@@ -124,6 +124,14 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 | periodic | Approximated (resubmit) | Yes (>= 15 min) | Yes
 |===
 
+WARNING: The iOS approximation of a periodic request doesn't carry the request
+forward. After a run completes, the port resubmits the task with an earliest
+date one minute out and with both the network and power requirements cleared, so
+the work can recur far more often than the period you asked for and outside the
+constraints you set. Treat a periodic request on iOS as "sometime after the app
+is next backgrounded," and re-check the conditions you care about at the top of
+the worker.
+
 `BackgroundTask.scheduleProcessing(id, earliestBeginDate, requiresNetwork, requiresPower,
 runnable)` is a one-shot variant for occasional maintenance work. On iOS the identifiers
 must be declared via the `ios.backgroundProcessingIds` build hint (comma separated,
