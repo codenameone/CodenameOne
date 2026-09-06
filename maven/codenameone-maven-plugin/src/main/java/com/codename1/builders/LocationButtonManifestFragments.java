@@ -607,7 +607,13 @@ final class LocationButtonManifestFragments {
         out = stripRemovals(out, USE_LOCATION_BUTTON);
         out = stripRemovals(out, FINE_LOCATION);
         out = stripRemovals(out, COARSE_LOCATION);
-        out = addPermission(out, USE_LOCATION_BUTTON);
+        // Through the same path as the two below, not a plain add. A plain
+        // add suppresses a duplicate and keeps whatever cap the existing
+        // declaration carries -- and a capped USE_LOCATION_BUTTON is the one
+        // permission whose absence makes the control itself unavailable, on
+        // the very platform that introduced it.
+        out = declareUncapped(out, USE_LOCATION_BUTTON);
+        out = removeCapAcrossMerge(out, USE_LOCATION_BUTTON);
 
         // Both standard permissions, declared and uncapped.
         //
@@ -792,15 +798,7 @@ final class LocationButtonManifestFragments {
         // the flag in the rebound namespace, where the merger never looks, and
         // the permission it was meant to restrict keeps ordinary precise
         // access while the build reports itself exclusive.
-        String prefix = flagPrefixes.length > 0 ? flagPrefixes[0] : "android";
-        for (int iter = 0; iter < flagPrefixes.length; iter++) {
-            int[] named = findAttribute(element, flagPrefixes[iter] + ":name");
-            if (named != null && name.equals(element
-                    .substring(named[2], named[3]).trim())) {
-                prefix = flagPrefixes[iter];
-                break;
-            }
-        }
+        String prefix = androidPrefixNaming(element, flagPrefixes, name);
         // Before the element's own close, whatever shape it has: the
         // declaration may end in "/>", in "  />" or in ">".
         int insert = element.length() - 1;
@@ -854,7 +852,13 @@ final class LocationButtonManifestFragments {
         String element = xPermissions.substring(start, end + 1);
         String[] prefixes = candidatePrefixes(element, xPermissions, TOOLS_NS,
                 "tools");
-        String cap = "android:maxSdkVersion";
+        // The VALUE is a QName, so it needs the Android prefix that is in
+        // scope HERE. A literal "android:maxSdkVersion" on an element that
+        // rebound that prefix names an attribute in somebody else's namespace,
+        // and the real cap merges in untouched.
+        String cap = androidPrefixNaming(element,
+                candidatePrefixes(element, xPermissions, ANDROID_NS, "android"),
+                name) + ":maxSdkVersion";
         for (int iter = 0; iter < prefixes.length; iter++) {
             int[] existing = findAttribute(element,
                     prefixes[iter] + ":remove");
@@ -885,6 +889,33 @@ final class LocationButtonManifestFragments {
                 + element.substring(insert);
         return xPermissions.substring(0, start) + replacement
                 + xPermissions.substring(end + 1);
+    }
+
+    /**
+     * The prefix this element used to NAME the permission.
+     *
+     * <p>Which is the one bound to the Android namespace here, whatever the
+     * document calls it elsewhere: an element may rebind the conventional
+     * prefix and carry the real namespace under an alias. Anything written
+     * with the wrong prefix lands in the wrong namespace, where the merger
+     * never looks -- and that is as true of a {@code tools:remove} VALUE, which
+     * is a QName naming an attribute, as it is of an attribute itself.</p>
+     *
+     * @param element    the element
+     * @param candidates the prefixes that may be the Android namespace here
+     * @param name       the permission the element declares
+     * @return the prefix that named it, or the likeliest candidate
+     */
+    private static String androidPrefixNaming(String element,
+            String[] candidates, String name) {
+        for (int iter = 0; iter < candidates.length; iter++) {
+            int[] named = findAttribute(element, candidates[iter] + ":name");
+            if (named != null && name.equals(element
+                    .substring(named[2], named[3]).trim())) {
+                return candidates[iter];
+            }
+        }
+        return candidates.length > 0 ? candidates[0] : "android";
     }
 
     /** Whether a comma-separated list already names {@code wanted}. */

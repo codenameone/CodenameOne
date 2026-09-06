@@ -420,6 +420,46 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void theRemoveMarkerNamesTheAttributeInTheRightNamespace() {
+        // The value of tools:remove is a QName. On an element that rebound the
+        // conventional prefix and carries the real Android namespace under an
+        // alias, a literal "android:maxSdkVersion" names an attribute in
+        // somebody else's namespace -- so a library's real cap merges in
+        // untouched and the button loses fine location above it.
+        String rebound = "    <uses-permission xmlns:android=\"urn:fake\""
+                + " xmlns:a=\"http://schemas.android.com/apk/res/android\""
+                + " a:name=\"android.permission.ACCESS_FINE_LOCATION\" />\n";
+        String out = LocationButtonManifestFragments.inject(rebound, false);
+        int fine = out.indexOf("android.permission.ACCESS_FINE_LOCATION");
+        String element = out.substring(out.lastIndexOf('<', fine),
+                out.indexOf('>', fine));
+        assertTrue(element.contains("tools:remove=\"a:maxSdkVersion\""),
+                "the marker names the attribute under the prefix that named "
+                + "the permission: " + element);
+    }
+
+    @Test
+    void theButtonsOwnPermissionIsUncappedToo() {
+        // A capped USE_LOCATION_BUTTON is the one permission whose absence
+        // makes the control itself unavailable, on the very platform that
+        // introduced it -- and a plain add suppresses the duplicate and keeps
+        // the cap.
+        String capped = "    <uses-permission android:name=\"android."
+                + "permission.USE_LOCATION_BUTTON\" android:maxSdkVersion=\""
+                + "36\" />\n";
+        String out = LocationButtonManifestFragments.inject(capped, false);
+        int at = out.indexOf("android.permission.USE_LOCATION_BUTTON");
+        String element = out.substring(out.lastIndexOf('<', at),
+                out.indexOf('>', at));
+        assertFalse(element.contains("maxSdkVersion=\""),
+                "the cap is gone: " + element);
+        assertTrue(element.contains("tools:remove=\"android:maxSdkVersion\""),
+                "and a library's cap cannot merge in either: " + element);
+        assertEquals(1, count(out, "android.permission.USE_LOCATION_BUTTON"),
+                "declared once: " + out);
+    }
+
+    @Test
     void theCapIsRemovedAcrossTheMergeToo() {
         // declareUncapped settles what is in THIS block. The merger takes the
         // union of an element's attributes, so a library that declares the
