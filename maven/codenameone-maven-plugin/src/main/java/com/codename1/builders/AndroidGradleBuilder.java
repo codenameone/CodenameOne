@@ -3125,10 +3125,28 @@ public class AndroidGradleBuilder extends Executor {
         // This one fails the other way -- it keeps an implementation package
         // that would otherwise be deleted -- so a false positive costs an
         // unused class and a false negative costs the feature.
+        //
+        // Declared out here because BOTH scans below need it and they sit in
+        // separate try blocks.
+        boolean locationBlocked = request.getArg(
+                "android.blockLocationPermission", "false").equals("true");
         try {
+            // Not read at all when the feature is switched off, so not paid
+            // for either. android.blockLocationPermission clears
+            // usesLocationButton below, and every other consumer of these two
+            // scans is either inside "if (usesLocationButton)" -- the
+            // exclusivity check and everything it feeds -- or already tests
+            // the hint itself, as the gpsPermission fold-in does. Running them
+            // anyway walked every application class and every submitted
+            // archive through the scan budget, which REFUSES a tree over its
+            // cap, so a large project that had deliberately turned location
+            // off could be failed by a question nobody asked.
             LocationButtonManifestFragments.LocationUsage appLocation =
-                    LocationButtonManifestFragments.scanForLocationUsage(
-                            dummyClassesDir);
+                    locationBlocked
+                            ? new LocationButtonManifestFragments
+                                    .LocationUsage()
+                            : LocationButtonManifestFragments
+                                    .scanForLocationUsage(dummyClassesDir);
             // The same fold-in the library path does below, for the same
             // reason: without it the uses-feature declarations at the
             // manifest stage are absent, and Play can infer GPS hardware as
@@ -3196,7 +3214,11 @@ public class AndroidGradleBuilder extends Executor {
 
         try {
             LocationButtonManifestFragments.LocationUsage libraryLocation =
-                    LocationButtonManifestFragments.scanForLocationUsage(libsDir);
+                    locationBlocked
+                            ? new LocationButtonManifestFragments
+                                    .LocationUsage()
+                            : LocationButtonManifestFragments
+                                    .scanForLocationUsage(libsDir);
             if (!libraryLocation.isEmpty()) {
                 debug("Location usage found inside a submitted library"
                         + (libraryLocation.usesButton() ? " button" : "")

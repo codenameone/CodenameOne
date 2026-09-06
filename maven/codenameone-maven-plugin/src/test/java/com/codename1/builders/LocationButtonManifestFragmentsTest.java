@@ -981,6 +981,65 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void anUnkeyedRemoveAllCoversALibrarysDeclaration() {
+        // <uses-permission tools:node="removeAll" /> carries no permission
+        // name, so the keyed walk never reaches it -- and it takes every
+        // lower-priority uses-permission with it, so the library's
+        // declaration does not survive the merge at all.
+        String block = "    <uses-permission tools:node=\"removeAll\" />\n";
+        assertTrue(LocationButtonManifestFragments
+                        .removesPermission(block,
+                                LocationButtonManifestFragments.FINE_LOCATION)
+                        .contains("uses-permission"),
+                "an unkeyed removeAll clears the element type");
+    }
+
+    @Test
+    void anUnkeyedRemoveAllDoesNotReachTheOtherElementType() {
+        // uses-permission and uses-permission-sdk-23 are different elements to
+        // the merger, so clearing one leaves the other's declarations in
+        // place. Reading it as covering both would accept exclusivity over a
+        // request that really does survive.
+        String block = "    <uses-permission tools:node=\"removeAll\" />\n";
+        assertFalse(LocationButtonManifestFragments
+                        .removesPermission(block,
+                                LocationButtonManifestFragments.FINE_LOCATION)
+                        .contains("uses-permission-sdk-23"),
+                "removeAll on one element type is not removeAll on the other");
+    }
+
+    @Test
+    void aRemoveAllOfAnotherPermissionRemovesNothingOfOurs() {
+        // The guard that keeps the unkeyed walk honest, and the one direction
+        // here that fails dangerously. A removeAll KEYED to another permission
+        // clears that permission and nothing else -- reading it as a blanket
+        // removal would report a library's fine-location request as gone,
+        // accept exclusivity over it, and downgrade a request that really does
+        // survive the merge.
+        String block = "    <uses-permission android:name=\"android.permission"
+                + ".CAMERA\" tools:node=\"removeAll\" />\n";
+        assertTrue(LocationButtonManifestFragments
+                        .removesPermission(block,
+                                LocationButtonManifestFragments.FINE_LOCATION)
+                        .isEmpty(),
+                "removing another permission removes nothing of ours");
+    }
+
+    @Test
+    void aSelectorScopedRemoveAllIsNotABlanketRemoval() {
+        // tools:selector scopes the marker to ONE library, so the rest of them
+        // keep their declarations. Counting it as a blanket removal would
+        // accept the hint over a request nothing took out of the manifest.
+        String block = "    <uses-permission tools:node=\"removeAll\""
+                + " tools:selector=\"com.example.other\" />\n";
+        assertTrue(LocationButtonManifestFragments
+                        .removesPermission(block,
+                                LocationButtonManifestFragments.FINE_LOCATION)
+                        .isEmpty(),
+                "a scoped removeAll removes nothing globally");
+    }
+
+    @Test
     void aLibrarysOwnPreciseRequestConflictsWithExclusivity() throws Exception {
         // A native SDK inside an aar calls android.location.LocationManager
         // directly, so no marker of ours ever names it -- its manifest asking

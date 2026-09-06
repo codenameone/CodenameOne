@@ -92,6 +92,9 @@ final class LocationButtonManifestFragments {
      */
     private static final int LOCATION_BUTTON_API = 37;
 
+    /** The merger marker that clears an element type outright. */
+    private static final String REMOVE_ALL = "removeAll";
+
     /** The permission that lets an app render the system button. */
     static final String USE_LOCATION_BUTTON =
             "android.permission.USE_LOCATION_BUTTON";
@@ -205,7 +208,62 @@ final class LocationButtonManifestFragments {
             }
             at = xPermissions.indexOf(name, at + name.length());
         }
+        // And the UNKEYED marker, which this loop can never reach because it
+        // walks occurrences of the permission's name and that element carries
+        // none. <uses-permission tools:node="removeAll" /> is valid and takes
+        // every lower-priority uses-permission with it, so a library's
+        // declaration does not survive the merge and refusing the hint over it
+        // refuses a build that has no conflict left in it.
+        removed.addAll(unkeyedRemoveAll(xPermissions));
         return removed;
+    }
+
+    /**
+     * The element types an unkeyed {@code tools:node="removeAll"} clears.
+     *
+     * <p>Only {@code removeAll}: an unkeyed {@code remove} selects nothing,
+     * because the merger matches a {@code uses-permission} by its
+     * {@code android:name} and there is none to match.</p>
+     *
+     * <p>Only its OWN element type, too. {@code uses-permission} and
+     * {@code uses-permission-sdk-23} are different elements to the merger, and
+     * a removeAll on one leaves the other's declarations in place.</p>
+     *
+     * <p>A {@code tools:selector} scopes the marker to one library, so it is
+     * not the blanket removal this reports -- the same reason the keyed loop
+     * above skips those.</p>
+     *
+     * @param text the permission block
+     * @return the element types cleared outright, which may be empty
+     */
+    private static java.util.Set<String> unkeyedRemoveAll(String text) {
+        java.util.Set<String> tags = new java.util.TreeSet<String>();
+        int at = text.indexOf(REMOVE_ALL);
+        while (at >= 0) {
+            int open = text.lastIndexOf('<', at);
+            int close = text.indexOf('>', at);
+            if (open >= 0 && close > open && !isInsideComment(text, at)
+                    && !isSelectorScoped(text, at)
+                    && isRemovalDirective(text, at)
+                    && !namesAPermission(text, text.substring(open,
+                            close + 1))) {
+                tags.add(elementName(text, open));
+            }
+            at = text.indexOf(REMOVE_ALL, at + REMOVE_ALL.length());
+        }
+        return tags;
+    }
+
+    /** Whether an element carries an {@code android:name} in some scope. */
+    private static boolean namesAPermission(String document, String element) {
+        String[] prefixes = candidatePrefixes(element, document, ANDROID_NS,
+                "android");
+        for (int iter = 0; iter < prefixes.length; iter++) {
+            if (findAttribute(element, prefixes[iter] + ":name") != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
