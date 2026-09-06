@@ -90,6 +90,9 @@ class MiscellaneousFeaturesJava054Snippet {
             System.out.println("This is a thread");
             return 3;
         });
+        // the worker stays alive waiting for more work, so release it when the
+        // thread has nothing left to do
+        e.killWhenIdle();
         // end::miscellaneous-features-java-054[]
     }
 }

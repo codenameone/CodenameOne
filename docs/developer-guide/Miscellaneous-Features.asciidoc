@@ -23,13 +23,15 @@ The `getSMSSupport` API returns one of the following options:
 - SMS_NOT_SUPPORTED - for desktop, tablet etc.
 - SMS_SEAMLESS - `sendSMS` won't show a UI and will send in the background
 - SMS_INTERACTIVE - `sendSMS` will show an SMS sending UI
-- SMS_BOTH - `sendSMS` can support both seamless and interactive mode, this works on Android
+- SMS_BOTH - `sendSMS` can support both seamless and interactive mode
 
 The `sendSMS` can accept an interactive argument: `sendSMS(String phoneNumber, String message, boolean interactive)`
 
-The last argument will be ignored unless `SMS_BOTH` is returned from `getSMSSupport` at which point you
-would be able to choose one way or the other. The default behavior (when not using that flag) is the background
-sending which is the current behavior on Android.
+Pass `true` for it whenever `getSMSSupport` reports `SMS_INTERACTIVE`. The
+two-argument overload asks for a seamless send, and a port that only offers the
+system composer does nothing with that request -- on Android nothing happens at
+all, because the background-send path isn't implemented there. Both the Android and
+the iOS port report `SMS_INTERACTIVE`; no port in the tree returns `SMS_BOTH`.
 
 A typical use of this API would be something like this:
 
