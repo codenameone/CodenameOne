@@ -602,6 +602,29 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void theAndroidXCompatWrapperIsAPreciseRequestToo() throws Exception {
+        // androidx.core.location.LocationManagerCompat reaches the same
+        // provider and needs the same permission, and a plain jar using it has
+        // no manifest to declare one -- so its bytecode is the only evidence,
+        // exactly as for the platform manager and the fused client.
+        File root = tempDir("cn1-lb-compat");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "compat.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/Compat.class"));
+            zip.write(methodCallClass(
+                    "androidx/core/location/LocationManagerCompat",
+                    "getCurrentLocation"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .callsPreciseLocation(),
+                "the AndroidX wrapper is a precise request too");
+    }
+
+    @Test
     void aLibrarysOwnMethodOfThatNameIsNotAFusedCall() throws Exception {
         // Attributed by OWNER, like every other marker here. A library with a
         // method of its own called getLastLocation is not calling Play

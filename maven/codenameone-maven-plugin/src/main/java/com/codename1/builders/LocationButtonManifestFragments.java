@@ -142,6 +142,14 @@ final class LocationButtonManifestFragments {
             "getCurrentLocation",
             "getLastLocation",
         },
+        {
+            // AndroidX's wrapper over the platform manager. Its calls reach
+            // the same provider and need the same permission, and a plain jar
+            // using it has no manifest to say so either.
+            "androidx/core/location/LocationManagerCompat",
+            "requestLocationUpdates",
+            "getCurrentLocation",
+        },
     };
 
     static final String FINE_LOCATION =

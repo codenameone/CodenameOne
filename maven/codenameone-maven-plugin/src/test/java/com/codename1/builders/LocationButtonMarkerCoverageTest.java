@@ -67,6 +67,8 @@ public class LocationButtonMarkerCoverageTest {
         // Play services' client, which most Android apps that ask for
         // location ask instead of the platform's own manager.
         "com/google/android/gms/location/FusedLocationProviderClient",
+        // AndroidX's wrapper over the platform manager.
+        "androidx/core/location/LocationManagerCompat",
         "getLastLocation",
         "com/codename1/location/GeofenceManager",
         "com/codename1/maps/MapComponent",
