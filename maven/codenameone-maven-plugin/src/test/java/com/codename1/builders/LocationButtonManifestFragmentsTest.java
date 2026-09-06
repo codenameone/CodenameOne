@@ -524,6 +524,28 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aCachedPlatformLookupCountsAsPreciseUseToo() throws Exception {
+        // getLastKnownLocation returns what the permission allows, so under the
+        // hint it comes back approximate and the library's answer quietly loses
+        // its accuracy. Our own marker list has said so about the Codename One
+        // equivalent from the start; the platform list disagreed with it.
+        File root = tempDir("cn1-lb-lastknown");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "cache.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/Cache.class"));
+            zip.write(methodCallClass("android/location/LocationManager",
+                    "getLastKnownLocation"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresPreciseLocation(),
+                "a cached platform lookup is precise use as well");
+    }
+
+    @Test
     void anAppRemovalOfTheLibrarysFineLocationIsHonoured() throws Exception {
         // The developer took the library's request out of the merged manifest,
         // and inject() then declares fine location itself with

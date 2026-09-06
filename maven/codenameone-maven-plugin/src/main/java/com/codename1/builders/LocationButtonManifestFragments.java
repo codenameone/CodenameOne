@@ -102,6 +102,13 @@ final class LocationButtonManifestFragments {
         "requestLocationUpdates",
         "requestSingleUpdate",
         "getCurrentLocation",
+        // The CACHED lookup too, for the reason PERSISTENT_MARKERS lists the
+        // Codename One equivalent: what getLastKnownLocation returns is as
+        // precise as the permission allows, so under the hint it comes back
+        // approximate and the library's answer quietly loses its accuracy.
+        // Leaving it out made the platform list disagree with ours about the
+        // same call.
+        "getLastKnownLocation",
     };
 
     static final String FINE_LOCATION =

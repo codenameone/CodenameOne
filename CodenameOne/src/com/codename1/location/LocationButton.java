@@ -567,12 +567,19 @@ public class LocationButton extends Container {
         try {
             // ASKING can fail, and a port that cannot answer has, in effect,
             // no system control -- which is what the fallback is for.
+            //
+            // isSupported IS the asking, so it belongs inside this try and not
+            // after it: a port answers that question by consulting native
+            // state, and a throw there escaped into rebuild() and aborted the
+            // CONSTRUCTOR. A component that cannot be built at all is worse
+            // than one that falls back, which is what this catch was written
+            // to say and did not cover.
             bridge = Display.getInstance().getLocationButtonBridge();
+            if (bridge == null || !bridge.isSupported()) {
+                return null;
+            }
         } catch (Throwable cannotAnswer) {
             Log.e(cannotAnswer);
-            return null;
-        }
-        if (bridge == null || !bridge.isSupported()) {
             return null;
         }
         try {

@@ -71,7 +71,13 @@ class LocationButtonRebuildTest extends UITestBase {
     private static final class RecordingBridge implements LocationButtonBridge {
         private final List<Session> sessions = new ArrayList<Session>();
 
+        /** When true isSupported throws, as a port consulting native state can. */
+        private boolean probeThrows;
+
         public boolean isSupported() {
+            if (probeThrows) {
+                throw new IllegalStateException("no platform state");
+            }
             return true;
         }
 
@@ -712,6 +718,22 @@ class LocationButtonRebuildTest extends UITestBase {
         button.initComponent();
         assertEquals(2, bridge.sessions.size(),
                 "the pending rebuild is retried on attach");
+    }
+
+    @Test
+    void aSupportProbeThatThrowsFallsBackRatherThanAborting() {
+        RecordingBridge bridge = install();
+        bridge.probeThrows = true;
+
+        // Asking whether the platform HAS the control is the port touching
+        // native state, and a throw there used to escape into rebuild() and
+        // abort construction. A component that cannot be built at all is worse
+        // than one that falls back.
+        LocationButton button = new LocationButton();
+        assertFalse(button.isUnavailable(),
+                "a failed probe is not a failed session");
+        assertTrue(button.getComponentAt(0).isEnabled(),
+                "and the ordinary fallback is up");
     }
 
     @Test
