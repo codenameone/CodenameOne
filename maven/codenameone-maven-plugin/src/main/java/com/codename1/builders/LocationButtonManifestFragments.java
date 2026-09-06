@@ -2382,8 +2382,26 @@ final class LocationButtonManifestFragments {
                 continue;
             }
             String owner = nameOfClassEntry(pool, pool.first[index]);
+            // isFrameworkOwner, NOT a com/codename1/ prefix. A library is
+            // allowed to put its classes in our namespace -- a relocated or
+            // shaded copy lands there, and so does a cn1lib that simply chose
+            // com.codename1.impl.<name> -- which is why every other filter here
+            // matches EXACT framework names. A prefix test threw away
+            // com/codename1/impl/mylib/MyManager, so a library subclassing
+            // LocationManager and calling an inherited setLocationListener
+            // through its own type left persistent false, the hint was
+            // accepted, and that library's tracking silently went approximate.
+            //
+            // The framework half is defence in depth and nothing can observe
+            // it: a framework class is skipped BEFORE inspection, so it never
+            // enters supers, and an owner of ours therefore dies at the first
+            // step of resolveDeferredOwners whether it is filtered here or not.
+            // Removing it passes every test. It stays because it states the
+            // rule the rest of this class follows -- exact names, never a
+            // package prefix -- and because it is the only thing that would
+            // hold if a later change let our own classes into supers.
             if (owner == null || LOCATION_MANAGER.equals(owner)
-                    || owner.startsWith("com/codename1/")) {
+                    || isFrameworkOwner(owner)) {
                 continue;
             }
             int natIndex = pool.second[index];

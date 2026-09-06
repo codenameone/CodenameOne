@@ -594,6 +594,26 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aSubclassInOurNamespaceIsStillTheLibrarys() throws Exception {
+        // The same library, having put its implementation in com.codename1.*,
+        // which it is allowed to do -- a relocated copy lands there, and so
+        // does a cn1lib that simply chose the package. A prefix test dropped
+        // the owner before the hierarchy was consulted, so persistent stayed
+        // false, android.locationButton.exclusive was accepted, and that
+        // library's own tracking silently went approximate. Every other filter
+        // here matches exact framework names for this reason.
+        File root = tempDir("cn1-lb-subclass-ns");
+        writeSubclassCall(new File(root,
+                        "com/codename1/impl/mylib/MyManager.class"),
+                "com/codename1/impl/mylib/MyManager",
+                "com/codename1/location/LocationManager",
+                "setLocationListener");
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesPersistentLocation(),
+                "a library class in our namespace is still the library's");
+    }
+
+    @Test
     void aLibrarysOwnPreciseRequestConflictsWithExclusivity() throws Exception {
         // A native SDK inside an aar calls android.location.LocationManager
         // directly, so no marker of ours ever names it -- its manifest asking
