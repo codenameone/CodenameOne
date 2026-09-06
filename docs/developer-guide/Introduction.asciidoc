@@ -309,6 +309,9 @@ from `start()`, so this is the one method a new project overrides.
 a time and everything on the screen is a child of it. `BoxLayout.y()` stacks the
 children from the top down, and a theme decides how they look.
 
+<4> The `Toolbar` carries the title bar and the side menu. The generated project
+puts the same action in both places so there is an example of each.
+
 The four platform callbacks the <<ApplicationLifecycle,Application Lifecycle
 Sidebar>> describes are already implemented for you by `Lifecycle`, which is why
 the generated class carries none of them:
@@ -533,6 +536,9 @@ This is essential as the build server will fail with weird errors related to ins
 
 NOTE: This applies to the main class of the project, other classes in Codename One can remain `final`
 
-The second problem is that arguments are non-null by default. The `init` method might have a null argument. This fails with an exception. The solution is to add a question mark to the end of the call: `fun init(context: Any?)`.
+The second problem only bites if you override `init(Object)`, which the
+generated class doesn't. Kotlin treats arguments as non-null by default, and the
+context passed to `init` can be null, so an override has to accept it as
+`fun init(context: Any?)` or it fails with an exception.
 
 Once all that's in place Kotlin should work. This should be possible for more JVM languages in the future.

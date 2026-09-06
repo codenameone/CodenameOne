@@ -85,8 +85,16 @@ class IndexJava001Snippet {
         @Override
         public void runApp() {                                              // <2>
             Form hi = new Form("Hi World", BoxLayout.y());                  // <3>
-            hi.add(new Label("Hi World"));
+            Button helloButton = new Button("Hello World");
+            hi.add(helloButton);
+            helloButton.addActionListener(e -> hello());
+            hi.getToolbar().addMaterialCommandToSideMenu("Hello Command",
+                    FontImage.MATERIAL_CHECK, 4, e -> hello());             // <4>
             hi.show();
+        }
+
+        private void hello() {
+            Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null);
         }
     }
     // end::index-java-001[]
