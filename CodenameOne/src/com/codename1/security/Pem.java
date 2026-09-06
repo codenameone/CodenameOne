@@ -422,6 +422,15 @@ final class Pem {
             }
             base64 = pem.substring(bodyStart, bodyEnd);
         }
+        if (label != null && (base64.indexOf("Proc-Type:") >= 0 || base64.indexOf("DEK-Info:") >= 0)) {
+            // A traditional encrypted key keeps its ordinary label and puts the
+            // encryption in RFC 1421 headers above the ciphertext. Without this
+            // the headers reach the base64 decoder and the answer is that "-"
+            // is not a base64 character, which says nothing about the key being
+            // encrypted or what to do about it.
+            throw new CryptoException("this private key is passphrase-encrypted; decrypt it first with: "
+                    + "openssl pkcs8 -topk8 -nocrypt -in key.pem -out key_pkcs8.pem");
+        }
         requireStrictBase64(base64);
         // Base64.decode tolerates the line breaks but nothing else, and answers
         // null rather than throwing when it meets a character it cannot map.
@@ -568,11 +577,17 @@ final class Pem {
     private static boolean isSpecifiedEcDomain(byte[] element) {
         Cursor c = new Cursor(element);
         c.enter(0x30);
-        int[] mandatory = {0x02, 0x30, 0x30, 0x04, 0x02};
-        for (int tag : mandatory) {
-            if (!c.hasMore() || c.peek() != tag || c.consume(tag) == 0) {
-                return false;
-            }
+        if (!isPrimitive(c, 0x02)) {
+            return false;
+        }
+        if (!c.hasMore() || c.peek() != 0x30 || !isFieldId(c.element())) {
+            return false;
+        }
+        if (!c.hasMore() || c.peek() != 0x30 || !isCurve(c.element())) {
+            return false;
+        }
+        if (!isPrimitive(c, 0x04) || !isPrimitive(c, 0x02)) {
+            return false;
         }
         if (c.hasMore() && c.peek() == 0x02) {
             c.skip();
@@ -581,6 +596,43 @@ final class Pem {
             c.skip();
         }
         return !c.hasMore();
+    }
+
+    /// `FieldID ::= SEQUENCE { fieldType OBJECT IDENTIFIER, parameters ANY
+    /// DEFINED BY fieldType }` -- both mandatory, nothing after them. Taking any
+    /// non-empty SEQUENCE for this accepted "30 02 05 00" as the field a curve
+    /// is defined over.
+    private static boolean isFieldId(byte[] element) {
+        Cursor c = new Cursor(element);
+        c.enter(0x30);
+        if (!c.hasMore() || c.peek() != 0x06) {
+            return false;
+        }
+        requireOid(c.read(0x06));
+        if (!c.hasMore()) {
+            return false;
+        }
+        c.skip();
+        return !c.hasMore();
+    }
+
+    /// `Curve ::= SEQUENCE { a OCTET STRING, b OCTET STRING,
+    /// seed BIT STRING OPTIONAL }`.
+    private static boolean isCurve(byte[] element) {
+        Cursor c = new Cursor(element);
+        c.enter(0x30);
+        if (!isPrimitive(c, 0x04) || !isPrimitive(c, 0x04)) {
+            return false;
+        }
+        if (c.hasMore() && c.peek() == 0x03) {
+            c.skip();
+        }
+        return !c.hasMore();
+    }
+
+    /// Consumes the next element when it carries `tag` and is not empty.
+    private static boolean isPrimitive(Cursor c, int tag) {
+        return c.hasMore() && c.peek() == tag && c.consume(tag) > 0;
     }
 
     /// True when `contents` is a well-formed BIT STRING value.

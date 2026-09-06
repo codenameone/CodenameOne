@@ -194,6 +194,16 @@ class PemKeyTest extends UITestBase {
             + "/+kk1lZcl5DdXBwSi5mcV2dUxnlnnl6hRANCAAQuvJBWnyj34TNN2JkU/cNhAunw"
             + "rhvng2GP75DM7w4q4AWLdjtYgYy8K+edaMc7afUeVg3aqMhy6ahN75VzSUuj";
 
+    /// An explicit-parameters EC public key whose fieldID is "30 02 05 00".
+    private static final String EC_SPKI_EXPLICIT_BAD_FIELDID = ""
+            + "MIIBIDCB2QYHKoZIzj0CATCBzQIBATACBQAwWwQg/////wAAAAEAAAAAAAAAAAAA"
+            + "AAD///////////////wEIFrGNdiqOpPns+u9VXaYhrxlHQawzFOw9jvOPD4n0mBL"
+            + "AxUAxJ02CIbnBJNqZnjhE50mt4GffpAEQQRrF9Hy4SxCR/i85uVjpEDydwN9gS3r"
+            + "M6D0oTlF2JjClk/jQuL+Gn+bjufrSnwPnhYrzjNXazFezsu2QGg3v1H1AiEA////"
+            + "/wAAAAD//////////7zm+q2nF56E87nKwvxjJVECAQEDQgAELryQVp8o9+EzTdiZ"
+            + "FP3DYQLp8K4b54Nhj++QzO8OKuAFi3Y7WIGMvCvnnWjHO2n1HlYN2qjIcumoTe+V"
+            + "c0lLow==";
+
     private static String pem(String label, String base64) {
         StringBuilder sb = new StringBuilder("-----BEGIN ").append(label).append("-----\n");
         for (int i = 0; i < base64.length(); i += 64) {
@@ -1224,6 +1234,41 @@ class PemKeyTest extends UITestBase {
 
         // a named curve and real explicit parameters both still load
         assertEquals(PublicKey.EC, PublicKey.fromPem(pem(EC_SPKI_LABEL, EC_SPKI)).getAlgorithm());
+        assertArrayEquals(der(EC_PKCS8_EXPLICIT),
+                PrivateKey.fromPem(pem(EC_SEC1_EXPLICIT_LABEL, EC_SEC1_EXPLICIT)).getEncoded());
+    }
+
+    @Test
+    void aTraditionalEncryptedKeyNamesItsProblem() {
+        // "openssl genrsa -traditional -aes256" keeps the ordinary RSA PRIVATE
+        // KEY label and puts the encryption in RFC 1421 headers above the
+        // ciphertext. Without noticing them the headers reach the base64
+        // decoder, and the answer was that "-" is not a base64 character --
+        // true, and no help at all.
+        String encrypted = "-----BEGIN RSA PRIVATE KEY-----\n"
+                + "Proc-Type: 4,ENCRYPTED\n"
+                + "DEK-Info: AES-256-CBC,CD9BBDACF7A0540A106C7F7405EEAC9C\n"
+                + "\n"
+                + RSA_PKCS1
+                + "\n-----END RSA PRIVATE KEY-----\n";
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(encrypted));
+        assertTrue(e.getMessage().contains("encrypted"), e.getMessage());
+        assertTrue(e.getMessage().contains("openssl pkcs8"), e.getMessage());
+    }
+
+    @Test
+    void specifiedEcDomainFieldsAreParsedNotCounted() {
+        // FieldID is SEQUENCE { fieldType OID, parameters ANY } and Curve is
+        // SEQUENCE { a OCTET STRING, b OCTET STRING, seed BIT STRING OPTIONAL }.
+        // Counting the five outer tags let "30 02 05 00" stand in for the field
+        // a curve is defined over; OpenSSL refuses that key.
+        byte[] key = der(EC_SPKI_EXPLICIT_BAD_FIELDID);
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem("PUBLIC KEY", EC_SPKI_EXPLICIT_BAD_FIELDID)));
+        assertTrue(key.length > 0);
+
+        // and the real explicit-parameters key still converts
         assertArrayEquals(der(EC_PKCS8_EXPLICIT),
                 PrivateKey.fromPem(pem(EC_SEC1_EXPLICIT_LABEL, EC_SEC1_EXPLICIT)).getEncoded());
     }
