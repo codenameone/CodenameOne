@@ -30,3 +30,6 @@ Ports/JavaScriptPort/src/main/webapp/js/sqlite3mc.js | SQLite3 Multiple Ciphers 
 Ports/JavaScriptPort/src/main/webapp/js/sqlite3-opfs-async-proxy.js | SQLite3 Multiple Ciphers OPFS proxy worker, MIT over public-domain SQLite
 vm/JavaAPI/src/java/util/LinkedHashMap.java | Apache Harmony source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/util/Collections.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/HashMap.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Hashtable.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/IdentityHashMap.java | Apache Harmony source retaining its original Apache-2.0 notice
