@@ -185,9 +185,23 @@ final class Pem {
                 && !(parameters.length == 2 && parameters[0] == 0x05 && parameters[1] == 0x00)) {
             throw new CryptoException("malformed key: rsaEncryption parameters must be NULL");
         }
-        if (equal(oid, OID_EC) && !hasParameters) {
-            throw new CryptoException("EC key names no curve: id-ecPublicKey requires "
-                    + "ECParameters in the AlgorithmIdentifier");
+        if (equal(oid, OID_EC)) {
+            if (!hasParameters) {
+                throw new CryptoException("EC key names no curve: id-ecPublicKey requires "
+                        + "ECParameters in the AlgorithmIdentifier");
+            }
+            // ECParameters is a CHOICE of a named-curve OID or the SEQUENCE that
+            // spells a curve out. Its third arm, implicitlyCA (NULL), leaves the
+            // domain parameters to be supplied from somewhere else, and neither
+            // the JDK nor OpenSSL will take a key that does that -- so presence
+            // alone was not enough to mean a curve had been named.
+            int parametersTag = parameters[0] & 0xFF;
+            if (parametersTag == 0x06) {
+                requireOid(new Cursor(parameters).read(0x06));
+            } else if (parametersTag != 0x30) {
+                throw new CryptoException("EC key names no curve: ECParameters must be a "
+                        + "named-curve OID or explicit parameters");
+            }
         }
         return oid;
     }

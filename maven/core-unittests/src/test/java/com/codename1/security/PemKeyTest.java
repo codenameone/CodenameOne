@@ -1175,6 +1175,46 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void ecParametersMustNameOrSpellOutACurve() {
+        // ECParameters' third arm, implicitlyCA (NULL), leaves the domain
+        // parameters to come from elsewhere, and neither the JDK nor OpenSSL
+        // takes a key that does that -- so a parameter being present was not
+        // the same as a curve having been named.
+        byte[] key = der(EC_SPKI);
+        byte[] curve = hex("06082a8648ce3d030107");
+        int at = -1;
+        for (int i = 0; i + curve.length <= key.length && at < 0; i++) {
+            boolean match = true;
+            for (int j = 0; j < curve.length && match; j++) {
+                match = key[i + j] == curve[j];
+            }
+            if (match) {
+                at = i;
+            }
+        }
+        assertTrue(at > 0, "the fixture should name prime256v1");
+
+        byte[] nulled = new byte[key.length - curve.length + 2];
+        System.arraycopy(key, 0, nulled, 0, at);
+        nulled[at] = 0x05;
+        nulled[at + 1] = 0x00;
+        System.arraycopy(key, at + curve.length, nulled, at + 2, key.length - at - curve.length);
+        nulled[1] -= (curve.length - 2);
+        nulled[3] -= (curve.length - 2);
+
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(EC_SPKI_LABEL, Base64.encodeNoNewline(nulled))));
+        assertTrue(e.getMessage().contains("curve"), e.getMessage());
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(PublicKey.EC, pem(EC_SPKI_LABEL, Base64.encodeNoNewline(nulled))));
+
+        // a named curve and explicit parameters both still load
+        assertEquals(PublicKey.EC, PublicKey.fromPem(pem(EC_SPKI_LABEL, EC_SPKI)).getAlgorithm());
+        assertArrayEquals(der(EC_PKCS8_EXPLICIT),
+                PrivateKey.fromPem(pem(EC_SEC1_EXPLICIT_LABEL, EC_SEC1_EXPLICIT)).getEncoded());
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));
