@@ -12307,7 +12307,11 @@ static long long cn1StallPercentileUs(int cause, double q) {
 #define CN1_ALLOC_PROFILE_SLOTS 65536
 static _Atomic long long cn1AllocProfBytes[CN1_ALLOC_PROFILE_SLOTS];
 static _Atomic long cn1AllocProfCount[CN1_ALLOC_PROFILE_SLOTS];
-static struct clazz* cn1AllocProfClass[CN1_ALLOC_PROFILE_SLOTS];
+// Atomic like the counters beside it. Several mutators allocating the same class
+// write this slot at once, and same-value concurrent writes are still a race in
+// C; the atexit report also reads it while allocation continues, so a torn read
+// would be dereferenced as a class pointer to print a name.
+static _Atomic(struct clazz*) cn1AllocProfClass[CN1_ALLOC_PROFILE_SLOTS];
 static _Atomic long long cn1AllocProfOutOfRangeBytes = 0;
 static _Atomic long cn1AllocProfOutOfRangeCount = 0;
 static _Atomic int cn1AllocProfMaxSeenId = 0;
@@ -12396,7 +12400,7 @@ void cn1RecordAllocation(struct clazz* parent, int size) {
         }
         return;
     }
-    cn1AllocProfClass[id] = parent;
+    atomic_store_explicit(&cn1AllocProfClass[id], parent, memory_order_relaxed);
     atomic_fetch_add_explicit(&cn1AllocProfBytes[id], (long long)size, memory_order_relaxed);
     atomic_fetch_add_explicit(&cn1AllocProfCount[id], 1, memory_order_relaxed);
 }
@@ -12479,9 +12483,11 @@ static void cn1ReportAllocProfile(void) {
         if(best < 0) {
             break;
         }
+        struct clazz* cn1AllocProfBest =
+                atomic_load_explicit(&cn1AllocProfClass[best], memory_order_relaxed);
         fprintf(stderr, "[ALLOCPROF] %-44s bytes=%-12lld count=%-10ld avg=%lld\n",
-                (cn1AllocProfClass[best] != 0 && cn1AllocProfClass[best]->clsName != 0)
-                        ? cn1AllocProfClass[best]->clsName : "?",
+                (cn1AllocProfBest != 0 && cn1AllocProfBest->clsName != 0)
+                        ? cn1AllocProfBest->clsName : "?",
                 bestBytes,
                 atomic_load_explicit(&cn1AllocProfCount[best], memory_order_relaxed),
                 cn1AllocProfAvg(bestBytes,

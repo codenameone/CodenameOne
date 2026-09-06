@@ -855,9 +855,19 @@ else if (IS_DOUBLE_WORD(-1)) SP=BC_DUP2_X2_DSS(SP);\
 
 #define BC_I2C() SP[-1].data.i = (SP[-1].data.i & 0xffff)
 
-#define BC_ISHL() SP--; SP[-1].data.i = (SP[-1].data.i << (0x1f & (*SP).data.i))
-#define BC_ISHL_EXPR(val1, val2) (val1 << (0x1f & val2))
-#define BC_LSHL() SP--; SP[-1].data.l = (SP[-1].data.l << (0x3f & (*SP).data.l))
+// Java defines << as two's-complement wraparound. C does not: shifting a signed
+// value left so that the result is not representable -- 1 << 31, or any negative
+// left operand -- is UNDEFINED, not merely implementation-defined, so the
+// optimizer is entitled to assume it never happens. Shifting through the
+// unsigned type of the same width gives Java's answer with no undefined step,
+// and the conversion back is the ordinary two's-complement reinterpretation.
+//
+// The signed RIGHT shifts below are left alone deliberately: a negative >> n is
+// implementation-defined rather than undefined, and every compiler this VM is
+// built with defines it as the arithmetic shift Java specifies.
+#define BC_ISHL() SP--; SP[-1].data.i = (JAVA_INT)(((unsigned int)SP[-1].data.i) << (0x1f & (*SP).data.i))
+#define BC_ISHL_EXPR(val1, val2) ((JAVA_INT)(((unsigned int)(JAVA_INT)(val1)) << (0x1f & (val2))))
+#define BC_LSHL() SP--; SP[-1].data.l = (JAVA_LONG)(((unsigned long long)SP[-1].data.l) << (0x3f & (*SP).data.l))
 /* val1 is CAST, and that cast is the whole point.
  *
  * The translator emits a long constant as a bare C literal, so LCONST_1 reaches
@@ -875,7 +885,10 @@ else if (IS_DOUBLE_WORD(-1)) SP=BC_DUP2_X2_DSS(SP);\
  *
  * BC_LUSHR_EXPR below already casts, so this class of bug was fixed once for the
  * unsigned shift and not carried across to its two siblings. */
-#define BC_LSHL_EXPR(val1, val2) (((JAVA_LONG)(val1)) << (0x3f & (val2)))
+// The inner JAVA_LONG cast is load-bearing and separate from the unsigned one:
+// the translator emits long constants as bare C literals, so without it LCONST_1
+// arrives as an int and 1L << 32 evaluates to 1. See the LongShift benchmark.
+#define BC_LSHL_EXPR(val1, val2) ((JAVA_LONG)(((unsigned long long)(JAVA_LONG)(val1)) << (0x3f & (val2))))
 
 #define BC_ISHR() SP--; SP[-1].data.i = (SP[-1].data.i >> (0x1f & (*SP).data.i))
 #define BC_ISHR_EXPR(val1, val2) (val1 >> (0x1f & val2))
