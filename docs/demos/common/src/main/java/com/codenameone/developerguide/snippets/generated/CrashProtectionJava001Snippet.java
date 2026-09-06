@@ -55,7 +55,7 @@ import com.codename1.crash.*;
 import java.util.*;
 
 
-class CrashProtectionJava001Snippet {
+class CrashProtectionJava001Snippet extends com.codename1.system.Lifecycle {
 
 
     Object context;
@@ -83,6 +83,10 @@ class CrashProtectionJava001Snippet {
     
     // tag::crash-protection-java-001[]
     public void init(Object context) {
+        // Lifecycle.init sets the theme, the global Toolbar, the network thread
+        // count and the network error listener, so an override that skips it
+        // loses all of that
+        super.init(context);
         // install() only registers the handler; nothing is sent while the
         // service is disabled, and disabled is the default
         CrashProtection.install();

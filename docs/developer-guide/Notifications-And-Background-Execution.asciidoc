@@ -142,7 +142,11 @@ and links `BackgroundTasks.framework` automatically.
 
 === Foreground service (Android)
 
-`ForegroundService` runs a long task while a persistent notification is shown:
+`ForegroundService` runs a long task while a persistent notification is shown.
+The first argument names a channel, but the Android service currently routes
+its notification through the app-wide channel -- `android.NotificationChannel.id`,
+defaulting to `cn1-channel` -- so the id here doesn't place the notification
+in a channel of its own today:
 
 [source,java]
 ----
