@@ -83,8 +83,16 @@ class CrashProtectionJava001Snippet {
     
     // tag::crash-protection-java-001[]
     public void init(Object context) {
+        // install() only registers the handler; nothing is sent while the
+        // service is disabled, and disabled is the default
         CrashProtection.install();
-        CrashProtection.setEnabled(true);  // default is false; user-controlled opt-in
+    }
+
+    /// Call this from the flow where the user agrees to send crash reports.
+    /// Doing it in init() would opt every user in on each launch, drain the
+    /// buffered reports, and undo an opt-out they had already made.
+    void onUserAcceptedCrashReporting() {
+        CrashProtection.setEnabled(true);
     }
     // end::crash-protection-java-001[]
 }

@@ -28,7 +28,7 @@ The `codename1.arg.` prefix marks it as a build hint -- when the property reache
 
 ==== Runtime hook
 
-In your `Lifecycle.init`:
+In your `Lifecycle.init`, with the opt-in kept where the user gives it:
 
 [source,java]
 ----
