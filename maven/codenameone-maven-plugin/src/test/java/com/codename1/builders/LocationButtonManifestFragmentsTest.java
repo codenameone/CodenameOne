@@ -782,6 +782,35 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aCallThroughAnInterfaceStillResolves() throws Exception {
+        // javac records the STATIC type of the receiver, so a library that
+        // declares an interface with setLocationListener, implements it on a
+        // LocationManager subclass and calls through the interface names the
+        // INTERFACE as owner. Following only superclasses left that owner
+        // unresolvable and accepted exclusivity over a real request.
+        File root = tempDir("cn1-lb-iface");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "mylib.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/mylib/Caller.class"));
+            zip.write(methodCallClass("com/mylib/Tracking",
+                    "setLocationListener"));
+            zip.closeEntry();
+            zip.putNextEntry(new ZipEntry("com/mylib/Impl.class"));
+            zip.write(implementorClass("com/mylib/Impl",
+                    "com/codename1/location/LocationManager",
+                    "com/mylib/Tracking"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesPersistentLocation(),
+                "an interface implemented by a LocationManager subclass is an "
+                + "edge in the hierarchy");
+    }
+
+    @Test
     void aSubclassInOurNamespaceIsStillTheLibrarys() throws Exception {
         // The same library, having put its implementation in com.codename1.*,
         // which it is allowed to do -- a relocated copy lands there, and so
@@ -1985,6 +2014,118 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void anUnrelatedLoaderCallDoesNotClaimTheButton() throws Exception {
+        // The two halves used to be independent searches: a loader method
+        // somewhere, the class name somewhere. Here the lookup is for
+        // something else entirely and the button's name is a diagnostic
+        // string, and that combination refused an unrelated Android build at
+        // the toolchain gate.
+        File root = tempDir("cn1-lb-loader-unrelated");
+        writeSource(new File(root, "com/example/Other.java"),
+                "package com.example;\n"
+                + "public class Other {\n"
+                + "  static final String NOTE = "
+                + "\"com.codename1.location.LocationButton\";\n"
+                + "  Object f() throws Exception {\n"
+                + "    return Class.forName(\"com.example.Thing\");\n"
+                + "  }\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments
+                        .sourcesNameTheButton(root),
+                "the name must be the loader's argument, not just present");
+    }
+
+    @Test
+    void anIdentifierEndingInLoadClassIsNotALoaderCall() throws Exception {
+        // "preloadClasses" contains "loadClass", which a substring test
+        // accepted -- so a method of the application's own naming plus the
+        // button in prose was button use.
+        File root = tempDir("cn1-lb-loader-identifier");
+        writeSource(new File(root, "com/example/Warm.java"),
+                "package com.example;\n"
+                + "public class Warm {\n"
+                + "  static final String NOTE = "
+                + "\"com.codename1.location.LocationButton\";\n"
+                + "  void preloadClasses() { }\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments
+                        .sourcesNameTheButton(root),
+                "an identifier that merely ends in loadClass is not a call");
+    }
+
+    @Test
+    void aLongerClassNameIsNotTheButton() throws Exception {
+        // com.codename1.location.LocationButtonHelper contains the button's
+        // name and is a different class. A substring match read it as the
+        // button and refused an unrelated Android build.
+        File root = tempDir("cn1-lb-longer-name");
+        writeSource(new File(root, "com/example/Helper.java"),
+                "package com.example;\n"
+                + "import com.codename1.location.LocationButtonHelper;\n"
+                + "public class Helper { LocationButtonHelper h; }\n");
+        assertFalse(LocationButtonManifestFragments
+                        .sourcesNameTheButton(root),
+                "a longer class name is a different class");
+    }
+
+    @Test
+    void aSamePackageSourceNeedsNoImport() throws Exception {
+        // A source declaring "package com.codename1.location;" may write
+        // LocationButton with no import at all, and requiring one lost the
+        // button from a file that plainly builds it.
+        File root = tempDir("cn1-lb-same-package");
+        writeSource(new File(root, "com/codename1/location/Native.java"),
+                "package com.codename1.location;\n"
+                + "public class Native {\n"
+                + "  LocationButton make() { return new LocationButton(); }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesNameTheButton(root),
+                "the declaring package is in scope without an import");
+    }
+
+    @Test
+    void aProviderDeclaredInOneFileAndCalledInAnother() throws Exception {
+        // The evidence split across FILES. A native implementation may hold
+        // the provider in one class and call it from another, and a per-file
+        // guard sees a name with no call, then a call with no name.
+        File root = tempDir("cn1-lb-cross-file");
+        writeSource(new File(root, "com/example/Holder.java"),
+                "package com.example;\n"
+                + "import android.location.LocationManager;\n"
+                + "public class Holder { public static LocationManager m; }\n");
+        writeSource(new File(root, "com/example/Tracker.java"),
+                "package com.example;\n"
+                + "public class Tracker {\n"
+                + "  void go() { Holder.m.requestLocationUpdates("
+                + "null, 0, 0, null); }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "the tree names a provider and calls it, in two files");
+    }
+
+    @Test
+    void aGnssRegistrationIsPreciseUse() throws Exception {
+        // registerGnssMeasurementsCallback needs the same permission and
+        // delivers the same accuracy as a fix.
+        File root = tempDir("cn1-lb-gnss");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "gnss.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/Gnss.class"));
+            zip.write(methodCallClass("android/location/LocationManager",
+                    "registerGnssMeasurementsCallback"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .callsPreciseLocation(),
+                "measuring satellites is precise-location use");
+    }
+
+    @Test
     void anInterpolatedLogLineIsNotButtonUse() throws Exception {
         // Found by crossing the rules rather than by review. A literal holding
         // ${...} is kept WHOLE for the provider scan, because what is inside a
@@ -2700,6 +2841,32 @@ class LocationButtonManifestFragmentsTest {
         }
         // access_flags, this_class=2, super_class=4, and no members.
         body.write(new byte[] {0, 33, 0, 2, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0});
+        return body.toByteArray();
+    }
+
+    /**
+     * A class that EXTENDS {@code superName} and IMPLEMENTS {@code iface},
+     * which is the shape that makes an interface an edge in the hierarchy.
+     */
+    private static byte[] implementorClass(String name, String superName,
+            String iface) throws Exception {
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        body.write(new byte[] {(byte) 0xca, (byte) 0xfe, (byte) 0xba,
+                (byte) 0xbe, 0, 0, 0, 52});
+        byte[][] entries = {
+            cpUtf8(name), cpOne(7, 1),
+            cpUtf8(superName), cpOne(7, 3),
+            cpUtf8(iface), cpOne(7, 5),
+        };
+        int count = entries.length + 1;
+        body.write((count >> 8) & 0xff);
+        body.write(count & 0xff);
+        for (byte[] entry : entries) {
+            body.write(entry);
+        }
+        // access, this=2, super=4, one interface (=6), no members.
+        body.write(new byte[] {0, 33, 0, 2, 0, 4, 0, 1, 0, 6,
+                0, 0, 0, 0, 0, 0});
         return body.toByteArray();
     }
 

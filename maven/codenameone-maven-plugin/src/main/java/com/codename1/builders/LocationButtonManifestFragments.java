@@ -127,6 +127,12 @@ final class LocationButtonManifestFragments {
             "requestSingleUpdate",
             "getCurrentLocation",
             "getLastKnownLocation",
+            // The GNSS callbacks need the same permission and deliver the
+            // same accuracy, so a library measuring satellites is asking for
+            // precise location as much as one asking for a fix.
+            "registerGnssMeasurementsCallback",
+            "registerGnssStatusCallback",
+            "addNmeaListener",
         },
         {
             "com/google/android/gms/location/FusedLocationProviderClient",
@@ -2134,15 +2140,15 @@ final class LocationButtonManifestFragments {
             //
             // Paired with a loader call, like the bytecode side: the literal
             // alone is prose, and the check just above keeps it that way.
-            // Literal text kept, COMMENTS still gone. Reading the raw
-            // source here counted a name that only ever appeared in a
-            // comment, so any class that reflects at all and mentions the
-            // button in prose was button use -- and the toolchain gate turns
-            // that into a refused build. Found by crossing the reflective rule
-            // against comment stripping rather than by review.
-            if (namesLoaderCall(stripped)
-                    && strippedSource(source, LITERAL_KEPT)
-                            .indexOf(BUTTON_MARKER.replace('/', '.')) >= 0) {
+            // The literal has to BE the loader's argument. Finding a loader
+            // method somewhere and the name somewhere else in the same file
+            // was two independent searches: "preloadClasses" satisfies a
+            // substring test for loadClass, and a diagnostic string or a
+            // comment supplied the name -- so a class that reflects for
+            // anything at all became button use, and the toolchain gate turns
+            // that into a refused build.
+            if (reflectivelyLoads(strippedSource(source, LITERAL_KEPT),
+                    BUTTON_MARKER.replace('/', '.'))) {
                 return true;
             }
         }
@@ -2248,7 +2254,30 @@ final class LocationButtonManifestFragments {
         if (root == null || !root.isDirectory()) {
             return false;
         }
-        return scanSources(root, new Executor.PermScanBudget());
+        // Two passes, because the evidence can be split across FILES. A
+        // native implementation may declare the provider in Holder.java and
+        // call it from Tracker.java, and a per-file guard sees a name with no
+        // call and then a call with no name. The first pass asks whether the
+        // tree names a provider at all; the second looks for its calls
+        // anywhere in the tree.
+        //
+        // Coarser than per-file on purpose: a tree that names a provider and
+        // separately calls one of its methods is reported, even when the two
+        // are unrelated. That over-reports, and over-reporting refuses a build
+        // with a reason where under-reporting downgrades a real request in
+        // silence.
+        Names names = new Names();
+        Executor.PermScanBudget budget = new Executor.PermScanBudget();
+        if (scanSources(root, budget, names)) {
+            return true;
+        }
+        return names.named && names.called;
+    }
+
+    /** What a whole staged tree said, when no single file said all of it. */
+    private static final class Names {
+        private boolean named;
+        private boolean called;
     }
 
     /**
@@ -2495,27 +2524,63 @@ final class LocationButtonManifestFragments {
     }
 
     /**
-     * Whether a source calls a reflective class loader.
+     * Whether a source reflectively loads exactly {@code dotted}.
      *
-     * <p>By method name, on the STRIPPED source, so a loader named in a
-     * comment does not count. Pairing it with the class name is what separates
-     * a lookup from prose -- the same rule
-     * {@link #namesReflectively(Pool, String)} applies to bytecode.</p>
+     * <p>The name must be the loader call's ARGUMENT --
+     * {@code forName("com.example.Thing")} -- not merely present in the file.
+     * Two independent searches, one for a loader and one for the name, agreed
+     * far too easily: {@code preloadClasses} contains {@code loadClass}, and
+     * any comment or diagnostic string supplied the other half.</p>
      *
-     * @param stripped the source with comments and literal text removed
-     * @return whether it looks up a class by name
+     * <p>The method name must also start on an identifier boundary, which is
+     * what stops {@code preloadClasses} matching at all.</p>
+     *
+     * @param source comments removed, literal TEXT kept -- the argument is a
+     *               literal, so masking literals would hide the thing sought
+     * @param dotted the class's dotted name
+     * @return whether the file loads that class by name
      */
-    private static boolean namesLoaderCall(String stripped) {
+    private static boolean reflectivelyLoads(String source, String dotted) {
         for (int row = 0; row < CLASS_LOADERS.length; row++) {
             String[] loader = CLASS_LOADERS[row];
             for (int iter = 1; iter < loader.length; iter++) {
-                if (stripped.indexOf(loader[iter]) >= 0) {
+                if (loadsWith(source, loader[iter], dotted)) {
                     return true;
                 }
             }
         }
         return false;
     }
+
+    /** One loader method, looking for {@code method("dotted")}. */
+    private static boolean loadsWith(String source, String method,
+            String dotted) {
+        int at = source.indexOf(method);
+        while (at >= 0) {
+            int after = at + method.length();
+            boolean starts = at == 0
+                    || !Character.isJavaIdentifierPart(source.charAt(at - 1));
+            if (starts) {
+                int walk = skipSpace(source, after);
+                if (walk < source.length() && source.charAt(walk) == '(') {
+                    walk = skipSpace(source, walk + 1);
+                    if (walk < source.length() && source.charAt(walk) == '"') {
+                        walk++;
+                        if (source.startsWith(dotted, walk)
+                                && walk + dotted.length() < source.length()
+                                && source.charAt(walk + dotted.length())
+                                        == '"') {
+                            return true;
+                        }
+                    }
+                }
+            }
+            at = source.indexOf(method, at + 1);
+        }
+        return false;
+    }
+
+
 
     /**
      * Whether a source file names a provider class, by either spelling.
@@ -2533,22 +2598,65 @@ final class LocationButtonManifestFragments {
      */
     private static boolean sourceNames(String text, String owner) {
         String dotted = owner.replace('/', '.');
-        if (text.indexOf(dotted) >= 0) {
+        if (namesToken(text, dotted)) {
             return true;
         }
         int lastDot = dotted.lastIndexOf('.');
         if (lastDot < 0) {
             return false;
         }
-        // The simple name as well as the wildcard, so a file that imports the
-        // package for something else entirely is not read as naming this.
-        return text.indexOf("import " + dotted.substring(0, lastDot) + ".*") >= 0
-                && text.indexOf(dotted.substring(lastDot + 1)) >= 0;
+        String pkg = dotted.substring(0, lastDot);
+        String simple = dotted.substring(lastDot + 1);
+        // The simple name is enough when the package is in scope: a wildcard
+        // import of it, or the file DECLARING it. A source that says
+        // "package com.codename1.location;" may write LocationButton with no
+        // import at all, and requiring one lost the button from a file that
+        // plainly builds it.
+        boolean inScope = text.indexOf("import " + pkg + ".*") >= 0
+                || namesToken(text, "package " + pkg);
+        return inScope && namesToken(text, simple);
+    }
+
+    /**
+     * Whether {@code token} appears as a whole identifier path.
+     *
+     * <p>Not a substring: {@code com.codename1.location.LocationButtonHelper}
+     * contains the button's name and is a different class, and reading it as
+     * the button refused an unrelated Android build at the toolchain gate.
+     * The character after the match may not continue the identifier, and the
+     * one before may not either -- a dot counts as continuing, so
+     * {@code my.LocationButton} does not match {@code LocationButton}
+     * alone.</p>
+     *
+     * @param text  the source
+     * @param token the name to find
+     * @return whether it appears bounded on both sides
+     */
+    private static boolean namesToken(String text, String token) {
+        int at = text.indexOf(token);
+        while (at >= 0) {
+            int after = at + token.length();
+            boolean startsClean = at == 0
+                    || (!Character.isJavaIdentifierPart(text.charAt(at - 1))
+                            && text.charAt(at - 1) != '.');
+            // A trailing dot is fine and must be: LocationServices.getFused
+            // ... is a USE of the class, not a longer name. Only the leading
+            // side disqualifies, which is what keeps a simple name from
+            // matching some other package's class of that name.
+            boolean endsClean = after >= text.length()
+                    || !Character.isJavaIdentifierPart(text.charAt(after));
+            if (startsClean && endsClean) {
+                return true;
+            }
+            at = text.indexOf(token, at + 1);
+        }
+        return false;
     }
 
     /** Walks a staged source tree looking for a platform location call. */
     private static boolean scanSources(java.io.File dir,
-            Executor.PermScanBudget budget) throws java.io.IOException {
+            Executor.PermScanBudget budget, Names names)
+            throws java.io.IOException {
         java.io.File[] children = dir.listFiles();
         if (children == null) {
             return false;
@@ -2556,7 +2664,7 @@ final class LocationButtonManifestFragments {
         for (int iter = 0; iter < children.length; iter++) {
             java.io.File child = children[iter];
             if (child.isDirectory()) {
-                if (scanSources(child, budget)) {
+                if (scanSources(child, budget, names)) {
                     return true;
                 }
                 continue;
@@ -2612,8 +2720,20 @@ final class LocationButtonManifestFragments {
             }
             for (int row = 0; row < SOURCE_LOCATION_OWNERS.length; row++) {
                 String[] owner = SOURCE_LOCATION_OWNERS[row];
-                if (!sourceNames(text, owner[0])
-                        && !sourceNamesByFactory(text, owner[0])) {
+                boolean here = sourceNames(text, owner[0])
+                        || sourceNamesByFactory(text, owner[0]);
+                if (here) {
+                    names.named = true;
+                }
+                // Remembered for the tree even when this file cannot answer:
+                // the declaration and the call may be in different files.
+                for (int m = 1; m < owner.length; m++) {
+                    if (text.indexOf(owner[m]) >= 0) {
+                        names.called = true;
+                        break;
+                    }
+                }
+                if (!here) {
                     continue;
                 }
                 for (int m = 1; m < owner.length; m++) {
@@ -3353,6 +3473,20 @@ final class LocationButtonManifestFragments {
         if (pair != null && pair[1] != null) {
             found.supers.put(pair[0], pair[1]);
         }
+        // Interfaces as well. The map holds one parent per class, so an
+        // implementor whose SUPERCLASS is already recorded keeps it and its
+        // interfaces are recorded pointing the other way -- interface to
+        // implementor is not a thing, so each interface is given the
+        // implementor's own parent chain to walk instead.
+        if (pair != null && pair[0] != null) {
+            java.util.List<String> faces = interfacesOf(text, pool);
+            for (int iter = 0; iter < faces.size(); iter++) {
+                String face = faces.get(iter);
+                if (!found.supers.containsKey(face)) {
+                    found.supers.put(face, pair[0]);
+                }
+            }
+        }
         collectDeferredOwners(pool, found);
     }
 
@@ -3372,6 +3506,40 @@ final class LocationButtonManifestFragments {
         int superClass = u2(text, at + 4);
         return new String[] {nameOfClassEntry(pool, thisClass),
                 nameOfClassEntry(pool, superClass)};
+    }
+
+    /**
+     * The interfaces a class declares, which are hierarchy edges too.
+     *
+     * <p>javac records the STATIC type of the receiver, so a library that
+     * declares an interface with {@code setLocationListener}, implements it on
+     * a LocationManager subclass and calls through the interface names the
+     * INTERFACE as the owner. Following only superclasses left that owner
+     * unresolvable and accepted exclusivity over a real request.</p>
+     *
+     * @param text the class file
+     * @param pool its parsed pool
+     * @return the interface names, possibly empty
+     */
+    private static java.util.List<String> interfacesOf(String text, Pool pool) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        int at = pool.end;
+        if (at + 8 > text.length()) {
+            return out;
+        }
+        int count = u2(text, at + 6);
+        int first = at + 8;
+        for (int iter = 0; iter < count; iter++) {
+            int off = first + iter * 2;
+            if (off + 2 > text.length()) {
+                return out;
+            }
+            String name = nameOfClassEntry(pool, u2(text, off));
+            if (name != null) {
+                out.add(name);
+            }
+        }
+        return out;
     }
 
     /** The internal name behind a CONSTANT_Class index, or null. */
