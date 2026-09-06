@@ -1938,6 +1938,30 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void reflectionElsewhereDoesNotMakeACommentButtonUse() throws Exception {
+        // The reflective rule reads a string's TEXT, which is the point --
+        // Class.forName's argument is a literal. It was reading the raw
+        // source to do it, so a comment counted too: any class that reflects
+        // at all and mentions the button in prose became button use, and the
+        // toolchain gate turns that into a refused build.
+        //
+        // Comments are stripped for that check now; literals are not. Found
+        // by crossing the reflective rule against comment stripping.
+        File root = tempDir("cn1-lb-reflect-comment");
+        writeSource(new File(root, "com/example/Other.java"),
+                "package com.example;\n"
+                + "public class Other {\n"
+                + "  // com.codename1.location.LocationButton, one day\n"
+                + "  Object f() throws Exception {\n"
+                + "    return Class.forName(\"com.example.Thing\");\n"
+                + "  }\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments
+                        .sourcesNameTheButton(root),
+                "reflection elsewhere does not make a comment into use");
+    }
+
+    @Test
     void anInterpolatedLogLineIsNotButtonUse() throws Exception {
         // Found by crossing the rules rather than by review. A literal holding
         // ${...} is kept WHOLE for the provider scan, because what is inside a

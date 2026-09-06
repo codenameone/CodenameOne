@@ -2114,7 +2114,7 @@ final class LocationButtonManifestFragments {
             // off `source` below, so nothing is lost by refusing to read a
             // string as code, and keeping template-bearing literals turned a
             // log line that interpolates into a refused build.
-            String stripped = strippedSource(source, false);
+            String stripped = strippedSource(source, LITERAL_MASKED);
             if (sourceNames(stripped, BUTTON_MARKER)) {
                 return true;
             }
@@ -2126,8 +2126,15 @@ final class LocationButtonManifestFragments {
             //
             // Paired with a loader call, like the bytecode side: the literal
             // alone is prose, and the check just above keeps it that way.
+            // Literal text kept, COMMENTS still gone. Reading the raw
+            // source here counted a name that only ever appeared in a
+            // comment, so any class that reflects at all and mentions the
+            // button in prose was button use -- and the toolchain gate turns
+            // that into a refused build. Found by crossing the reflective rule
+            // against comment stripping rather than by review.
             if (namesLoaderCall(stripped)
-                    && source.indexOf(BUTTON_MARKER.replace('/', '.')) >= 0) {
+                    && strippedSource(source, LITERAL_KEPT)
+                            .indexOf(BUTTON_MARKER.replace('/', '.')) >= 0) {
                 return true;
             }
         }
@@ -2267,8 +2274,17 @@ final class LocationButtonManifestFragments {
      * @return the same text with comments and literal contents blanked
      */
     private static String strippedSource(String text) {
-        return strippedSource(text, true);
+        return strippedSource(text, LITERAL_TEMPLATES_KEPT);
     }
+
+    /** Literal text is blanked: it is not code and must not read as code. */
+    private static final int LITERAL_MASKED = 0;
+
+    /** Blanked unless it holds a template, whose contents ARE compiled. */
+    private static final int LITERAL_TEMPLATES_KEPT = 1;
+
+    /** Kept verbatim, for a caller that means to read a string's text. */
+    private static final int LITERAL_KEPT = 2;
 
     /**
      * The same, with a say over template-bearing literals.
@@ -2291,7 +2307,7 @@ final class LocationButtonManifestFragments {
      * @param keepTemplates whether a literal holding {@code ${} survives whole
      * @return the same text with comments and literal contents blanked
      */
-    private static String strippedSource(String text, boolean keepTemplates) {
+    private static String strippedSource(String text, int literals) {
         StringBuilder out = new StringBuilder(text.length());
         int at = 0;
         int length = text.length();
@@ -2320,7 +2336,7 @@ final class LocationButtonManifestFragments {
                     && text.charAt(at + 2) == '"') {
                 int end = text.indexOf("\"\"\"", at + 3);
                 end = end < 0 ? length : end + 3;
-                appendMasked(out, text, at, end, keepTemplates);
+                appendMasked(out, text, at, end, literals);
                 at = end;
                 continue;
             }
@@ -2339,7 +2355,7 @@ final class LocationButtonManifestFragments {
                     walk++;
                 }
                 int end = walk > length ? length : walk;
-                appendMasked(out, text, at, end, keepTemplates);
+                appendMasked(out, text, at, end, literals);
                 at = end;
                 continue;
             }
@@ -2379,11 +2395,16 @@ final class LocationButtonManifestFragments {
      * @param to   one past its last
      */
     private static void appendMasked(StringBuilder out, String text, int from,
-            int to, boolean keepTemplates) {
+            int to, int literals) {
+        if (literals == LITERAL_KEPT) {
+            out.append(text, from, to);
+            return;
+        }
         // Any template at all, and the whole literal is treated as code --
         // unless the caller has its own way of reading a literal, which the
         // button scan does.
-        if (keepTemplates && text.lastIndexOf("${", to - 1) >= from) {
+        if (literals == LITERAL_TEMPLATES_KEPT
+                && text.lastIndexOf("${", to - 1) >= from) {
             out.append(text, from, to);
             return;
         }
