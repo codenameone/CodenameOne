@@ -205,15 +205,7 @@ public class AndroidLocationButtonBridge implements LocationButtonBridge {
             return;
         }
         final View view = (View) nativePeer;
-        Activity activity = AndroidImplementation.getActivity();
-        if (activity == null) {
-            return;
-        }
-        // Posted rather than blocking. Unlike createButton, whose caller needs
-        // the peer before it can lay anything out, nothing here waits on the
-        // result -- and setEnabled arrives from the EDT, which must not park on
-        // the Android UI thread when it does not have to.
-        activity.runOnUiThread(new Runnable() {
+        Runnable apply = new Runnable() {
             public void run() {
                 try {
                     view.setEnabled(enabled);
@@ -221,7 +213,27 @@ public class AndroidLocationButtonBridge implements LocationButtonBridge {
                     Log.e(gone);
                 }
             }
-        });
+        };
+        Activity activity = AndroidImplementation.getActivity();
+        if (activity == null) {
+            // No activity does not mean no answer. Android clears the current
+            // one while it recreates it, and returning here dropped the state
+            // change on the floor: PeerComponent.setEnabled does not reach the
+            // native view, so a control the application had disabled stayed
+            // live and could still be tapped for a location.
+            //
+            // View.post is what covers that. Its runnable goes to the view's
+            // handler when there is one and into the view's run queue when
+            // there is not, which runs it as soon as the view is attached --
+            // which is precisely when the successor activity exists.
+            view.post(apply);
+            return;
+        }
+        // Posted rather than blocking. Unlike createButton, whose caller needs
+        // the peer before it can lay anything out, nothing here waits on the
+        // result -- and setEnabled arrives from the EDT, which must not park on
+        // the Android UI thread when it does not have to.
+        activity.runOnUiThread(apply);
     }
 
     /// Builds and configures the native control. Android UI thread only.
