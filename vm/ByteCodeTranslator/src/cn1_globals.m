@@ -10807,6 +10807,19 @@ static int gcMarkResolveThreadCount() {
 #ifdef CN1_GC_MARK_THREADS
     int n = CN1_GC_MARK_THREADS;
 #elif 1
+    // NOTE (later): this verdict predates the fixes. The isolation experiment
+    // below ran on 2026-07-03. The SATB write barrier that closes the
+    // concurrent-mark cross-thread race landed 2026-07-05, as did the freed-slot
+    // rejection in gcMarkObject, the grace-subtree drain before sweep, the belt
+    // pass for mark-drain completeness and the looped stop-the-world final mark;
+    // and on 2026-07-06 object-bearing frameless was defaulted off as "unsound
+    // under conservative GC on arm64", which is an arm64 heap corruptor that has
+    // nothing to do with this pool. Parallel marking was never re-tested after
+    // the experiment, and gcMarkDrainParallel/gcMarkObject/gcMarkFlushLocal/
+    // gcMarkWorklistPush have all been reworked since. Treat the text below as a
+    // record of what was believed that day, not as a current finding -- see
+    // .github/workflows/parparvm-parallel-mark.yml, which re-tests it on arm64.
+    //
     // ISOLATION EXPERIMENT (git-A/B): default to SERIAL marking. The acquire-load
     // fix removed the parallel mark-worker crash, but arm64 Linux still corrupts the
     // heap (crash moved to a frameless method reading a smashed threadStateData), so

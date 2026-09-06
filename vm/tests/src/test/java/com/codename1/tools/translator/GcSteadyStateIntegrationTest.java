@@ -885,7 +885,7 @@ class GcSteadyStateIntegrationTest {
         cmake.addAll(CompilerHelper.cmakeToolchainArgs());
         // CMAKE_C_FLAGS composes with the target's own options, so the mandatory
         // -fwrapv / -fno-strict-aliasing the generated project adds are kept.
-        cmake.add("-DCMAKE_C_FLAGS=" + cFlags);
+        cmake.add("-DCMAKE_C_FLAGS=" + extraCFlags() + cFlags);
         CleanTargetIntegrationTest.runCommand(cmake, distDir);
         CleanTargetIntegrationTest.runCommand(
                 Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
@@ -1181,4 +1181,21 @@ class GcSteadyStateIntegrationTest {
             // best effort
         }
     }
+
+    /**
+     * Extra compile flags for the C build, from the {@code CN1_TEST_EXTRA_CFLAGS}
+     * environment variable, appended to whatever this test already passes.
+     *
+     * The parallel mark pool is compiled out by default (see
+     * gcMarkResolveThreadCount) because arm64 Linux corrupted the heap with it on
+     * and the second ordering hole was never located. Reproducing that needs the
+     * existing GC tests run against a parallel marker on real arm64 hardware,
+     * which this hook allows without changing any default: unset, every test
+     * compiles exactly as before.
+     */
+    static String extraCFlags() {
+        String v = System.getenv("CN1_TEST_EXTRA_CFLAGS");
+        return v == null ? "" : (" " + v);
+    }
+
 }

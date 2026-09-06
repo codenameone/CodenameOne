@@ -1,0 +1,121 @@
+# Runs the collector's own tests against a PARALLEL marker on real arm64 Linux.
+#
+# gcMarkResolveThreadCount compiles the mark pool out by default, and the comment
+# there reads as a standing verdict: arm64 Linux corrupted the heap with the pool
+# on, and "a SECOND ordering hole remains somewhere in the branch-only
+# parallel-GC work". Read in isolation that says parallel marking is broken.
+#
+# The history says something narrower. Inside PR #5327 the sequence was:
+#
+#   Jul 3  30257f5234  acquire-load the mark word in parallel marking (arm64 corruption)
+#   Jul 3  3ad67971e9  default parallel marking to serial -- "arm64 isolation experiment"
+#   Jul 4  78752a21a2  gcMarkObject must reject freed BiBOP slots
+#   Jul 5  ff7a1f1947  SATB write barrier, closing the concurrent-mark cross-thread race
+#   Jul 5  017168581c  drain grace-object subtrees before sweep (swept-while-reachable)
+#   Jul 5  60ef4c7d85  belt pass: guarantee mark-drain completeness before sweep
+#   Jul 5  4888b66cd0  stop-the-world final mark, looped to a fixpoint
+#   Jul 6  c6144beb7a  object-bearing frameless OFF: "unsound under conservative GC on arm64"
+#   Jul 10 ff93b1c415  clazz-registry invariant (arm64 SIGSEGV in cn1GcRegisterClazz)
+#
+# The experiment that produced the comment ran on Jul 3. Every mechanism that
+# makes concurrent marking sound arrived after it -- the SATB barrier most of
+# all, which did not exist when the conclusion was drawn -- and at least one
+# other arm64 heap corruptor was found and disabled on Jul 6 that had nothing to
+# do with the mark pool. Parallel marking was never re-tested at any point after
+# Jul 3, and gcMarkDrainParallel, gcMarkObject, gcMarkFlushLocal and
+# gcMarkWorklistPush have all been reworked since.
+#
+# So the comment records what was believed on one day, before the fixes, and the
+# switch under it was never revisited. This workflow is how that gets settled
+# with evidence instead of archaeology.
+#
+# The cost of leaving it alone is measured. On the GcPause benchmark -- one
+# mutator, 20M short-lived objects, a 4096-node live set -- the worst mutator
+# pause is 2.2-3.3s with one marker and 0.3-0.9s with four, against Go's 20ms on
+# the identical loop. Median and p99 already match Go at 32ns/64ns, so the single
+# marker is a large part of why the tail loses.
+#
+# It could not be reproduced on an Apple-silicon podman guest: GcPause ran clean
+# with four markers, and a multi-threaded stress with graph rewiring and
+# cross-thread resurrection ran clean too -- but that second result proves
+# nothing, because the same stress passes with the SATB barrier compiled out
+# (-DCN1_DISABLE_SATB) and under -DCN1_GC_VERIFY at 6.6M references checked. A
+# four-CPU hypervisor guest is a weak generator of store interleavings. These
+# runners are native arm64 hardware, which is where the corruption was seen.
+#
+# NOTHING HERE CHANGES A DEFAULT. The pool is switched on for this workflow only,
+# through CN1_TEST_EXTRA_CFLAGS; every other build still compiles it out.
+name: ParparVM parallel mark (arm64 Linux)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'vm/ByteCodeTranslator/src/cn1_globals.m'
+      - 'vm/ByteCodeTranslator/src/cn1_globals.h'
+      - 'vm/tests/src/test/java/com/codename1/tools/translator/Gc*.java'
+      - '.github/workflows/parparvm-parallel-mark.yml'
+
+concurrency:
+  group: parparvm-parallel-mark-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gc-suite:
+    name: GC suite (${{ matrix.markers }} marker(s), ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The control. A failure here is not the parallel path and the arm below
+          # cannot be read as evidence of anything until this one is green.
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            markers: 1
+            cflags: ''
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            markers: 4
+            cflags: '-DCN1_GC_MARK_THREADS=4'
+          # x64 as well, so a failure can be attributed to the architecture rather
+          # than to the pool itself.
+          - arch: x64
+            runner: ubuntu-latest
+            markers: 4
+            cflags: '-DCN1_GC_MARK_THREADS=4'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: Install clang and cmake
+        run: bash scripts/ci/apt-get-install.sh clang cmake
+
+      - name: Build the translator
+        run: mvn -q -B -pl ByteCodeTranslator package -DskipTests
+        working-directory: vm
+
+      # The integration tests reload the translator from its packaged jar, so -am
+      # here would run them against classes that are not in it.
+      - name: GC suite
+        env:
+          CN1_TEST_EXTRA_CFLAGS: ${{ matrix.cflags }}
+        run: |
+          mvn -B -pl tests test \
+            -Dtest='GcHeapIntegrityIntegrationTest,GcOverflowSpiralIntegrationTest,GcUncooperativeThreadIntegrationTest,LargeArrayGcIntegrationTest,LowMemoryThrottleIntegrationTest,BibopPageFloorIntegrationTest'
+        working-directory: vm
+
+      - name: Surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gc-suite-${{ matrix.arch }}-${{ matrix.markers }}marker
+          path: vm/tests/target/surefire-reports/
+          if-no-files-found: ignore
