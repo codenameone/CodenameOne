@@ -116,4 +116,21 @@ public interface LocationButtonBridge {
     PeerComponent createButton(int textType, int backgroundColor,
             int textColor, SuccessCallback<Boolean> onResult,
             Runnable onUnavailable);
+
+    /// Whether a control this bridge built can no longer serve a tap.
+    ///
+    /// A platform may retire the context a control was built against while
+    /// the control itself survives -- Android recreates its activity on a
+    /// configuration change and the port re-attaches the SAME view -- and the
+    /// system session a tap needs belongs to the retired one. The control
+    /// still draws, so nothing else can tell.
+    ///
+    /// Asked before a peer that is already in place is left alone, so the
+    /// answer has to be cheap and must not build anything. A bridge with no
+    /// such notion returns false.
+    ///
+    /// @param button a peer this bridge returned from
+    ///               [#createButton(int,int,int,SuccessCallback,Runnable)]
+    /// @return whether it must be replaced rather than reused
+    boolean isStale(PeerComponent button);
 }

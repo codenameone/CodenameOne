@@ -149,6 +149,9 @@ public class AndroidLocationButtonBridge implements LocationButtonBridge {
                     "the location button could not be built", failure[0]);
         }
         PeerComponent peer = PeerComponent.create(created[0]);
+        // Remembered so isStale can answer later. The activity the control
+        // was built against is the one its system session belongs to.
+        builtAgainst.put(created[0], activity);
         // The peer's preferred size is NOT derived from the native view --
         // AndroidImplementation's own instructions for building a peer say so
         // in as many words -- so without this the component reports 0x0 and a
@@ -193,6 +196,35 @@ public class AndroidLocationButtonBridge implements LocationButtonBridge {
     ///
     /// - `button`: a peer this bridge created
     /// - `enabled`: whether the button should accept taps
+    /// Which activity each control was built against.
+    ///
+    /// Weak, because the bridge outlives every control it makes and must not
+    /// be the reason a destroyed activity or a discarded view stays reachable.
+    private final java.util.Map<View, Activity> builtAgainst =
+            new java.util.WeakHashMap<View, Activity>();
+
+    @Override
+    public boolean isStale(PeerComponent button) {
+        if (button == null) {
+            return false;
+        }
+        Object nativePeer = button.getNativePeer();
+        if (!(nativePeer instanceof View)) {
+            return false;
+        }
+        Activity built = builtAgainst.get((View) nativePeer);
+        if (built == null) {
+            // Not one of ours, or the entry has been collected. Either way
+            // there is nothing to compare and a working control is kept.
+            return false;
+        }
+        Activity now = AndroidImplementation.getActivity();
+        // Only when there IS a successor. During teardown getActivity() is
+        // null for a moment, and reporting stale then would rebuild a control
+        // against nothing.
+        return now != null && built != now;
+    }
+
     public void setButtonEnabled(PeerComponent button, final boolean enabled) {
         if (button == null) {
             return;

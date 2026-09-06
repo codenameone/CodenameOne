@@ -837,6 +837,26 @@ public class LocationButton extends Container {
         }
     }
 
+    /// Whether the port considers this peer unable to serve a tap.
+    ///
+    /// False whenever there is no bridge to ask, which is every platform that
+    /// draws the fallback -- there is no system session to go stale there.
+    private boolean systemButtonIsStale(PeerComponent peer) {
+        LocationButtonBridge bridge = Display.getInstance()
+                .getLocationButtonBridge();
+        if (bridge == null) {
+            return false;
+        }
+        try {
+            return bridge.isStale(peer);
+        } catch (Throwable broken) {
+            // A bridge that cannot answer is not a reason to discard a
+            // working control; the tap path reports its own failures.
+            Log.e(broken);
+            return false;
+        }
+    }
+
     /// Turns a grant into a fix, then tells the listeners.
     ///
     /// On the EDT throughout. `getCurrentLocationSync` blocks through
@@ -1081,7 +1101,17 @@ public class LocationButton extends Container {
             return;
         }
         // A peer already here and nothing owed: leave a working control alone.
-        if (body instanceof PeerComponent && !rebuildPending) {
+        //
+        // Unless the port says it is STALE. A platform can retire the context
+        // a control was built against while the control survives -- Android
+        // recreates its activity and the port re-attaches the same view --
+        // and the session a tap needs belongs to the retired one. The control
+        // still draws, so this is the only place that can notice, and
+        // rebuilding is the only cure: the AndroidX control opens its session
+        // from onAttachedToWindow, which has already run by the time anything
+        // could hand it a new activity.
+        if (body instanceof PeerComponent && !rebuildPending
+                && !systemButtonIsStale((PeerComponent) body)) {
             return;
         }
         PeerComponent system = createSystemButton();

@@ -131,7 +131,9 @@ final class LocationButtonManifestFragments {
             // same accuracy, so a library measuring satellites is asking for
             // precise location as much as one asking for a fix.
             "registerGnssMeasurementsCallback",
+            "registerGnssNavigationMessageCallback",
             "registerGnssStatusCallback",
+            "registerAntennaInfoListener",
             "addNmeaListener",
         },
         {
@@ -1685,8 +1687,8 @@ final class LocationButtonManifestFragments {
         private boolean libraryPreciseCall;
 
         /// Class to superclass, for every class this scan read.
-        private final java.util.Map<String, String> supers =
-                new java.util.HashMap<String, String>();
+        private final java.util.Map<String, java.util.Set<String>> supers =
+                new java.util.HashMap<String, java.util.Set<String>>();
 
         /// Which element declared the library's own precise-location request.
         private final java.util.Set<String> preciseTags =
@@ -2728,7 +2730,10 @@ final class LocationButtonManifestFragments {
                 // Remembered for the tree even when this file cannot answer:
                 // the declaration and the call may be in different files.
                 for (int m = 1; m < owner.length; m++) {
-                    if (text.indexOf(owner[m]) >= 0) {
+                    String property = kotlin ? propertyName(owner[m]) : null;
+                    if (text.indexOf(owner[m]) >= 0
+                            || (property != null
+                                    && text.indexOf(property) >= 0)) {
                         names.called = true;
                         break;
                     }
@@ -3471,7 +3476,7 @@ final class LocationButtonManifestFragments {
         // its entries appear. Resolved once the whole scan is done.
         String[] pair = classAndSuper(text, pool);
         if (pair != null && pair[1] != null) {
-            found.supers.put(pair[0], pair[1]);
+            addEdge(found, pair[0], pair[1]);
         }
         // Interfaces as well. The map holds one parent per class, so an
         // implementor whose SUPERCLASS is already recorded keeps it and its
@@ -3481,10 +3486,12 @@ final class LocationButtonManifestFragments {
         if (pair != null && pair[0] != null) {
             java.util.List<String> faces = interfacesOf(text, pool);
             for (int iter = 0; iter < faces.size(); iter++) {
-                String face = faces.get(iter);
-                if (!found.supers.containsKey(face)) {
-                    found.supers.put(face, pair[0]);
-                }
+                // Every edge is kept. One parent per name lost this one: the
+                // interface's OWN class file records I -> Object first, and a
+                // containsKey guard then refused the implementor edge, while
+                // the other scan order overwrote it. Either way a call
+                // compiled as invokeinterface never reached LocationManager.
+                addEdge(found, faces.get(iter), pair[0]);
             }
         }
         collectDeferredOwners(pool, found);
@@ -3617,6 +3624,35 @@ final class LocationButtonManifestFragments {
         found.persistent = resolves(found.deferredOwners, found.supers);
     }
 
+    /** Records one parent for a name, keeping any already there. */
+    private static void addEdge(LocationUsage found, String child,
+            String parent) {
+        if (child == null || parent == null) {
+            return;
+        }
+        java.util.Set<String> parents = found.supers.get(child);
+        if (parents == null) {
+            parents = new java.util.HashSet<String>();
+            found.supers.put(child, parents);
+        }
+        parents.add(parent);
+    }
+
+    /** Adds every edge of {@code from} into {@code into}, keeping both. */
+    private static void mergeEdges(
+            java.util.Map<String, java.util.Set<String>> into,
+            java.util.Map<String, java.util.Set<String>> from) {
+        for (java.util.Map.Entry<String, java.util.Set<String>> entry
+                : from.entrySet()) {
+            java.util.Set<String> parents = into.get(entry.getKey());
+            if (parents == null) {
+                parents = new java.util.HashSet<String>();
+                into.put(entry.getKey(), parents);
+            }
+            parents.addAll(entry.getValue());
+        }
+    }
+
     /**
      * Whether a deferred owner reaches LocationManager across TWO scans.
      *
@@ -3642,9 +3678,12 @@ final class LocationButtonManifestFragments {
         if (first == null || second == null) {
             return false;
         }
-        java.util.Map<String, String> supers =
-                new java.util.HashMap<String, String>(first.supers);
-        supers.putAll(second.supers);
+        java.util.Map<String, java.util.Set<String>> supers =
+                new java.util.HashMap<String, java.util.Set<String>>();
+        // UNIONED per name, not overwritten: putAll would drop one scan's
+        // parents for any name both of them saw.
+        mergeEdges(supers, first.supers);
+        mergeEdges(supers, second.supers);
         java.util.Set<String> owners =
                 new java.util.HashSet<String>(first.deferredOwners);
         owners.addAll(second.deferredOwners);
@@ -3653,16 +3692,27 @@ final class LocationButtonManifestFragments {
 
     /** Walks each owner up the hierarchy, bounded against a cyclic map. */
     private static boolean resolves(java.util.Set<String> owners,
-            java.util.Map<String, String> supers) {
+            java.util.Map<String, java.util.Set<String>> supers) {
         for (String owner : owners) {
-            String at = owner;
-            // Bounded, because the map comes from files: a hand-made class can
-            // name itself as its own superclass.
-            for (int step = 0; at != null && step < 32; step++) {
+            // A walk over a GRAPH, because a name has more than one parent: a
+            // superclass and, for an interface, every class that implements
+            // it. Visited-bounded rather than depth-bounded, since the map
+            // comes from files and a hand-made class can name itself.
+            java.util.Set<String> seen = new java.util.HashSet<String>();
+            java.util.List<String> queue = new java.util.ArrayList<String>();
+            queue.add(owner);
+            while (!queue.isEmpty()) {
+                String at = queue.remove(queue.size() - 1);
+                if (at == null || !seen.add(at)) {
+                    continue;
+                }
                 if (LOCATION_MANAGER.equals(at)) {
                     return true;
                 }
-                at = supers.get(at);
+                java.util.Set<String> parents = supers.get(at);
+                if (parents != null) {
+                    queue.addAll(parents);
+                }
             }
         }
         return false;

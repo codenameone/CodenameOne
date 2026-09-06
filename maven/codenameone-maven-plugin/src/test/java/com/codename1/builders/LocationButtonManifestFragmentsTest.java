@@ -811,6 +811,38 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void anInterfaceKeepsBothOfItsEdges() throws Exception {
+        // The interface's OWN class file records I -> Object, and one parent
+        // per name then lost the implementor edge -- whichever order the jar
+        // was walked in. A call compiled as invokeinterface never reached
+        // LocationManager, so exclusivity was accepted over a real request.
+        File root = tempDir("cn1-lb-iface-edges");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "mylib.jar")));
+        try {
+            // The interface itself, whose superclass is Object.
+            zip.putNextEntry(new ZipEntry("com/mylib/Tracking.class"));
+            zip.write(subclassCallClass("com/mylib/Tracking",
+                    "java/lang/Object", "unrelated"));
+            zip.closeEntry();
+            zip.putNextEntry(new ZipEntry("com/mylib/Caller.class"));
+            zip.write(methodCallClass("com/mylib/Tracking",
+                    "setLocationListener"));
+            zip.closeEntry();
+            zip.putNextEntry(new ZipEntry("com/mylib/Impl.class"));
+            zip.write(implementorClass("com/mylib/Impl",
+                    "com/codename1/location/LocationManager",
+                    "com/mylib/Tracking"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesPersistentLocation(),
+                "the interface keeps its Object edge AND its implementor one");
+    }
+
+    @Test
     void aSubclassInOurNamespaceIsStillTheLibrarys() throws Exception {
         // The same library, having put its implementation in com.codename1.*,
         // which it is allowed to do -- a relocated copy lands there, and so
@@ -2103,6 +2135,44 @@ class LocationButtonManifestFragmentsTest {
         assertTrue(LocationButtonManifestFragments
                         .sourcesCallPlatformLocation(root),
                 "the tree names a provider and calls it, in two files");
+    }
+
+    @Test
+    void aKotlinPropertyCrossesFilesToo() throws Exception {
+        // The cross-file aggregation recorded only the Java spellings, so a
+        // Kotlin file reading Holder.client.lastLocation contributed nothing
+        // and the tree looked like a name with no call.
+        File root = tempDir("cn1-lb-cross-kt");
+        writeSource(new File(root, "com/example/Holder.kt"),
+                "package com.example\n"
+                + "import com.google.android.gms.location"
+                + ".FusedLocationProviderClient\n"
+                + "object Holder { lateinit var client: "
+                + "FusedLocationProviderClient }\n");
+        writeSource(new File(root, "com/example/Tracker.kt"),
+                "package com.example\n"
+                + "class Tracker { fun f() = Holder.client.lastLocation }\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "a Kotlin property read counts across files as well");
+    }
+
+    @Test
+    void aGnssNavigationCallbackIsPreciseUse() throws Exception {
+        File root = tempDir("cn1-lb-gnss-nav");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "nav.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/Nav.class"));
+            zip.write(methodCallClass("android/location/LocationManager",
+                    "registerGnssNavigationMessageCallback"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .callsPreciseLocation(),
+                "GNSS navigation messages need fine location too");
     }
 
     @Test

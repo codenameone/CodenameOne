@@ -26,7 +26,9 @@ import com.codename1.junit.UITestBase;
 import com.codename1.location.spi.LocationButtonBridge;
 import com.codename1.testing.TestUtils;
 import com.codename1.ui.Button;
+import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.Form;
 import com.codename1.ui.PeerComponent;
 import com.codename1.util.SuccessCallback;
 import org.junit.jupiter.api.AfterEach;
@@ -73,6 +75,15 @@ class LocationButtonRebuildTest extends UITestBase {
 
         /** When true isSupported throws, as a port consulting native state can. */
         private boolean probeThrows;
+
+        /** Peers this fake reports as retired, as a port does after an
+         * activity is recreated. */
+        private final java.util.Set<PeerComponent> stale =
+                new java.util.HashSet<PeerComponent>();
+
+        public boolean isStale(PeerComponent button) {
+            return stale.contains(button);
+        }
 
         public boolean isSupported() {
             if (probeThrows) {
@@ -944,6 +955,39 @@ class LocationButtonRebuildTest extends UITestBase {
         drain();
         assertTrue(button.isUnavailable(),
                 "the CURRENT control failing is what unavailable means");
+    }
+
+    @Test
+    void aStalePeerIsRebuiltRatherThanReused() {
+        // A platform can retire the context a control was built against while
+        // the control survives: Android recreates its activity and the port
+        // re-attaches the SAME view, so the system session a tap needs belongs
+        // to the destroyed one. The control still draws, so initComponent is
+        // the only place that can notice.
+        //
+        // Patching the activity afterwards does not work -- the AndroidX
+        // control opens its session from onAttachedToWindow, which has already
+        // run -- so the peer has to be replaced.
+        RecordingBridge bridge = install();
+        LocationButton button = new LocationButton();
+        assertEquals(1, bridge.sessions.size());
+        Component first = button.getComponentAt(0);
+
+        // Re-initialised with nothing wrong: the same control is kept.
+        button.setTextType(LocationButton.TEXT_USE_PRECISE_LOCATION);
+        int afterSetter = bridge.sessions.size();
+        assertEquals(2, afterSetter, "the setter rebuilds, as it always did");
+
+        // Now the port reports the current peer retired.
+        bridge.stale.add((PeerComponent) button.getComponentAt(0));
+        Form form = new Form();
+        form.add(button);
+        form.show();
+        drain();
+
+        assertTrue(bridge.sessions.size() > afterSetter,
+                "a stale peer must be replaced, not reused");
+        assertNotNull(first, "sanity: the first control existed");
     }
 
     @Test
