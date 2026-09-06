@@ -327,6 +327,29 @@ public final class MapBench {
         return checksum;
     }
 
+    // ---- 11. low load factor build ---------------------------------------
+    // The regression guard for the growth rule. A table asked for a load factor
+    // below 0.5 used to reach its threshold while still less than half full,
+    // rebuild at the SAME capacity, and so rebuild again on the very next put:
+    // 20000 inserts cost 19999 full rebuilds and 200 million rehashed entries.
+    // Nothing at a default load factor can see that, so it needs its own shape.
+    public static long lowLoadFactorBuild() {
+        int perRound = 20000;
+        Integer[] keys = new Integer[perRound];
+        for (int i = 0; i < perRound; i++) {
+            keys[i] = Integer.valueOf(i);
+        }
+        long checksum = 0;
+        for (int round = 0; round < 20; round++) {
+            HashMap<Integer, Integer> map = new HashMap<Integer, Integer>(16, 0.25f);
+            for (int i = 0; i < perRound; i++) {
+                map.put(keys[i], keys[i]);
+            }
+            checksum += map.size();
+        }
+        return checksum;
+    }
+
     private static final int WARMUP = 3;
     private static final int MEASURE = 5;
 
@@ -380,6 +403,9 @@ public final class MapBench {
         });
         runBench("identityMapBuild", new BenchFn() {
             public long run() { return identityMapBuild(); }
+        });
+        runBench("lowLoadFactorBuild", new BenchFn() {
+            public long run() { return lowLoadFactorBuild(); }
         });
         System.out.println("DONE");
     }

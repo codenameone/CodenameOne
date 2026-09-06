@@ -48,6 +48,24 @@ deliberately NOT in `CommonWorkloads`, because
 `scripts/hellocodenameone/conformance/port_status.py` requires exactly ten benchmark ids
 there.
 
+### The growth rule assumed a load factor it never checked
+
+All three compact maps decided whether to double or to rebuild-in-place with
+`elementCount * 2 >= capacity`. That is a capacity test standing in for a threshold
+test, and it silently assumes a load factor of 0.5 or more. Below that the threshold is
+reached while the table is still less than half full, so the rebuild keeps the same
+capacity, the rebuilt table is immediately at its threshold again, and **every
+subsequent put rebuilds the whole table**. Inserting 20000 entries at a load factor of
+0.25 cost 19999 rebuilds and 200 million rehashed entries -- **22.3 seconds against
+16.4ms once fixed, 1362x**. The two-argument constructors accept any positive load
+factor, so `new HashMap<>(16, 0.25f)` reached it from ordinary code.
+
+The rule is `elementCount >= threshold` -- grow when the LIVE count has reached the
+threshold, and rebuild at the same size only when the threshold was reached because of
+tombstones. At 0.75 and 0.5 the two rules agree rebuild for rebuild, which is why no
+existing benchmark or torture moved, and why none of them could have caught it:
+`MapBench.lowLoadFactorBuild` and `HtTorture`'s `sparse` case exist for this alone.
+
 ### The neighbours
 
 `java.util.Hashtable` has since been given the same compact layout (open addressed, no

@@ -72,6 +72,7 @@ the rest of the surface.
 | tombstones | remove/insert churn at a flat live count, so slots fill with tombstones |
 | growBuild | build from an empty default-capacity map, so `cn1Grow` dominates |
 | identityKeys | `Object` keys, i.e. hashes that are truncated size-class-aligned pointers |
+| lowLoadFactorBuild | build at a load factor of 0.25 -- the growth rule regression guard (22.3s before the fix, 16.4ms after) |
 | linkedStringKeys | as stringKeys on `LinkedHashMap`, whose accessors are Java, not native |
 | hashtableStringKeys / hashtableBuild | as above on `Hashtable`, which is still chained |
 

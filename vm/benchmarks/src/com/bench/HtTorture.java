@@ -145,6 +145,25 @@ public class HtTorture {
         emit("tight.size", tight.size());
         emit("tight.digest", digest(tight));
 
+        // A load factor BELOW 0.5. The growth rule used to test capacity
+        // directly, which assumed 0.5 or more and rebuilt the table at the same
+        // size forever below that; nothing with a default load factor can see
+        // it, which is why this case is here explicitly.
+        Hashtable<Integer, Integer> sparse = new Hashtable<Integer, Integer>(4, 0.25f);
+        for (int i = 0; i < 3000; i++) {
+            sparse.put(Integer.valueOf(i * 3), Integer.valueOf(i));
+        }
+        emit("sparse.size", sparse.size());
+        emit("sparse.digest", digest(sparse));
+        long sparseFound = 0;
+        for (int i = 0; i < 3000; i++) {
+            Integer v = sparse.get(Integer.valueOf(i * 3));
+            if (v != null && v.intValue() == i) {
+                sparseFound++;
+            }
+        }
+        emit("sparse.allFound", sparseFound);
+
         // ---- Enumerations (the Dictionary half) -----------------------------
         long keySum = 0;
         long keyXor = 0;

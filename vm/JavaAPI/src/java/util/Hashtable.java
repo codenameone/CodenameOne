@@ -405,7 +405,12 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
      * @see java.lang.Object#equals
      */
     public synchronized boolean containsKey(Object key) {
-        return getEntry(key) != null;
+        // Deliberately NOT getEntry(key) != null: that builds an Entry purely
+        // to compare it against null, so every successful membership test
+        // would allocate. The chained representation this replaced handed back
+        // the entry it already had; the compact probe can answer from the
+        // index alone. keySet().contains() routes here, so it is a hot path.
+        return cn1FindSlot(key) >= 0;
     }
 
     /**
@@ -780,9 +785,19 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
      */
     protected void rehash() {
         int capacity = cn1Meta.length;
-        // Double only when genuinely full; a table that is merely
-        // tombstone-heavy is rebuilt at the same size, which purges them.
-        int newCapacity = (elementCount * 2 >= capacity) ? capacity << 1 : capacity;
+        // Grow when the LIVE count has reached the threshold; rebuild at the
+        // same size only when the threshold was reached because of TOMBSTONES.
+        //
+        // Testing capacity directly (elementCount * 2 >= cap) silently assumed
+        // a load factor of 0.5 or more. Below that the threshold is reached
+        // while the table is still less than half full, so the rebuild kept the
+        // same capacity, the rebuilt table was immediately at its threshold
+        // again, and every subsequent put rebuilt the whole table: inserting
+        // 20000 entries at a load factor of 0.25 did 19999 rebuilds and
+        // rehashed 200 million entries. The two-argument constructor accepts
+        // any positive load factor, so this was reachable from ordinary code.
+        // At 0.75 and 0.5 the two rules agree exactly, rebuild for rebuild.
+        int newCapacity = (elementCount >= threshold) ? capacity << 1 : capacity;
         if (newCapacity <= 0) {
             newCapacity = capacity;
         }
