@@ -341,6 +341,27 @@ final class LocationButtonManifestFragments {
     }
 
     /**
+     * Whether the project's own block asks for background location where the
+     * location button exists.
+     *
+     * <p>{@link #declaresBackgroundLocation(String)} with the API bound the
+     * contributed manifests already get. I scoped that bound to the LIBRARY
+     * read when I added it and wrote that the project's own block was left
+     * alone; there was no reason for the asymmetry. A permission capped by
+     * {@code android:maxSdkVersion} below the button's API asks for nothing
+     * where {@code onlyForLocationButton} means anything, and that is as true
+     * of the application's declaration as of an aar's -- so the build refused
+     * the hint over a permission that had already expired.</p>
+     *
+     * @param xPermissions the project's permission block, or null
+     * @return whether it asks for background location where it can conflict
+     */
+    static boolean declaresLiveBackgroundLocation(String xPermissions) {
+        return collectUncapped(xPermissions, BACKGROUND_LOCATION,
+                new java.util.TreeSet<String>());
+    }
+
+    /**
      * Whether {@code at} falls inside an XML comment.
      *
      * <p>By the nearest {@code <!--} before it and where that comment closes,
@@ -553,9 +574,26 @@ final class LocationButtonManifestFragments {
                 // supposed to be tidying it up, which is the very failure the
                 // non-self-closing case was added to fix.
                 int lead = skipIgnorable(tail, 0);
-                String close = "</" + elementName(out, start) + ">";
+                // Whitespace is allowed before the '>' of an END tag --
+                // </uses-permission   > is valid XML -- so the delimiter is
+                // looked for past it rather than required to sit against the
+                // name. Matching the whole "</name>" exactly left that spelling
+                // unconsumed and produced the orphan this block exists to
+                // prevent.
+                String close = "</" + elementName(out, start);
                 if (tail.regionMatches(lead, close, 0, close.length())) {
-                    tail = tail.substring(lead + close.length());
+                    int after = lead + close.length();
+                    while (after < tail.length()
+                            && isXmlSpace(tail.charAt(after))) {
+                        after++;
+                    }
+                    // The delimiter itself, and nothing else. Requiring it
+                    // here is also what keeps </uses-permission> from eating
+                    // </uses-permission-sdk-23>: a '-' is neither space nor
+                    // '>', so the longer name simply does not match.
+                    if (after < tail.length() && tail.charAt(after) == '>') {
+                        tail = tail.substring(after + 1);
+                    }
                 }
             }
             if (tail.startsWith("\r\n")) {
@@ -1980,6 +2018,82 @@ final class LocationButtonManifestFragments {
         // read after the call site.
         resolveDeferredOwners(found);
         return found;
+    }
+
+    /**
+     * Whether staged Android sources name the location button.
+     *
+     * <p>A native implementation can reach the component -- it is on the
+     * classpath the generated project compiles against -- and that source is
+     * compiled by Gradle, so it is in no jar and no class tree here. Without
+     * this the flag stayed false, and the build then deleted the bridge
+     * package and left out the dependency and the permission for a component
+     * the application really does build.</p>
+     *
+     * <p>UNGATED, unlike {@link #sourcesCallPlatformLocation}, and that is not
+     * an oversight. That scan answers a question only an exclusive build asks,
+     * so running it otherwise cost a build nothing could read. This one
+     * decides whether the button exists at all, which every Android build
+     * needs to know.</p>
+     *
+     * <p>So it must never REFUSE a build. A file the budget will not read is
+     * skipped rather than fatal: missing a reference in a source too large to
+     * read costs an unused implementation package, where throwing costs a
+     * developer the build itself -- and no real source file is 16 MiB. That is
+     * the opposite resolution to the scans that can refuse a build, and it is
+     * the opposite because the cost of being wrong points the other way.</p>
+     *
+     * @param root the staged source directory
+     * @return whether any staged source names the button
+     * @throws java.io.IOException if the tree cannot be walked at all
+     */
+    static boolean sourcesNameTheButton(java.io.File root)
+            throws java.io.IOException {
+        if (root == null || !root.isDirectory()) {
+            return false;
+        }
+        return scanSourcesForButton(root, new Executor.PermScanBudget());
+    }
+
+    /** Walks a staged source tree looking for the button's name. */
+    private static boolean scanSourcesForButton(java.io.File dir,
+            Executor.PermScanBudget budget) throws java.io.IOException {
+        java.io.File[] children = dir.listFiles();
+        if (children == null) {
+            return false;
+        }
+        for (int iter = 0; iter < children.length; iter++) {
+            java.io.File child = children[iter];
+            if (child.isDirectory()) {
+                if (scanSourcesForButton(child, budget)) {
+                    return true;
+                }
+                continue;
+            }
+            String name = child.getName();
+            if (!name.endsWith(".java") && !name.endsWith(".kt")) {
+                continue;
+            }
+            byte[] raw;
+            java.io.InputStream in = new java.io.FileInputStream(child);
+            try {
+                budget.entry(child.getPath());
+                raw = budget.readEntry(in, child.getPath(), child.length());
+            } catch (Executor.ScanBudgetExceeded tooBig) {
+                // Skipped, not fatal. See the contract above.
+                continue;
+            } finally {
+                in.close();
+            }
+            if (raw == null) {
+                continue;
+            }
+            if (sourceNames(strippedSource(new String(raw, "ISO-8859-1")),
+                    BUTTON_MARKER)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -3617,6 +3731,7 @@ final class LocationButtonManifestFragments {
             String internalName) {
         String descriptor = "L" + internalName + ";";
         java.util.Set<Integer> annotated = null;
+        java.util.Set<Integer> annotationText = new java.util.HashSet<Integer>();
         boolean walked = false;
         for (int index = 1; index < pool.tag.length; index++) {
             if (pool.tag[index] != TAG_UTF8) {
@@ -3648,12 +3763,17 @@ final class LocationButtonManifestFragments {
             // an ANNOTATION before it counts. Anything else that spells this
             // descriptor -- a field's type, a method's parameter or return --
             // is real use and is not a string constant, so it never asks.
-            if (!isStringConstant(pool, index)) {
-                return true;
-            }
             if (!walked) {
-                annotated = descriptorIndexes(text, pool);
+                annotated = descriptorIndexes(text, pool, annotationText);
                 walked = true;
+            }
+            // TEXT, by either route. A CONSTANT_String is one; an annotation's
+            // string value is the other, and it points straight at the Utf8
+            // with no CONSTANT_String anywhere -- so @Note("Lcom/...;") slipped
+            // past a check that only knew the first shape.
+            if (!isStringConstant(pool, index)
+                    && !annotationText.contains(Integer.valueOf(index))) {
+                return true;
             }
             // Null when the class could not be walked, and then the match
             // stands. Every failure of this parser has to fall THAT way: a
@@ -3775,7 +3895,7 @@ final class LocationButtonManifestFragments {
      * @return the indexes, or null when the class could not be walked
      */
     private static java.util.Set<Integer> descriptorIndexes(String text,
-            Pool pool) {
+            Pool pool, java.util.Set<Integer> annotationText) {
         int at = pool.end;
         if (at + 6 > text.length()) {
             return null;
@@ -3790,9 +3910,9 @@ final class LocationButtonManifestFragments {
                 out.add(Integer.valueOf(pool.second[index]));
             }
         }
-        at = memberDescriptors(text, pool, at, out);    // fields
-        at = memberDescriptors(text, pool, at, out);    // methods
-        at = attributeAnnotations(text, pool, at, out);
+        at = memberDescriptors(text, pool, at, out, annotationText);
+        at = memberDescriptors(text, pool, at, out, annotationText);
+        at = attributeAnnotations(text, pool, at, out, annotationText);
         return at < 0 ? null : out;
     }
 
@@ -3801,7 +3921,7 @@ final class LocationButtonManifestFragments {
      * reading its attributes.
      */
     private static int memberDescriptors(String text, Pool pool, int at,
-            java.util.Set<Integer> out) {
+            java.util.Set<Integer> out, java.util.Set<Integer> text_) {
         if (at < 0 || at + 2 > text.length()) {
             return -1;
         }
@@ -3813,7 +3933,7 @@ final class LocationButtonManifestFragments {
             }
             // access_flags, name_index, descriptor_index -- the third.
             out.add(Integer.valueOf(u2(text, at + 4)));
-            at = attributeAnnotations(text, pool, at + 6, out);
+            at = attributeAnnotations(text, pool, at + 6, out, text_);
             if (at < 0) {
                 return -1;
             }
@@ -3823,7 +3943,7 @@ final class LocationButtonManifestFragments {
 
     /** Walks an attributes table, reading the ones that carry annotations. */
     private static int attributeAnnotations(String text, Pool pool, int at,
-            java.util.Set<Integer> out) {
+            java.util.Set<Integer> out, java.util.Set<Integer> text_) {
         if (at < 0 || at + 2 > text.length()) {
             return -1;
         }
@@ -3842,7 +3962,7 @@ final class LocationButtonManifestFragments {
             int end = body + (int) length;
             if ("RuntimeVisibleAnnotations".equals(name)
                     || "RuntimeInvisibleAnnotations".equals(name)) {
-                if (readAnnotations(text, body, end, out) < 0) {
+                if (readAnnotations(text, body, end, out, text_) < 0) {
                     return -1;
                 }
             } else if ("RuntimeVisibleParameterAnnotations".equals(name)
@@ -3853,13 +3973,13 @@ final class LocationButtonManifestFragments {
                 int parameters = text.charAt(body) & 0xff;
                 int walk = body + 1;
                 for (int p = 0; p < parameters; p++) {
-                    walk = readAnnotations(text, walk, end, out);
+                    walk = readAnnotations(text, walk, end, out, text_);
                     if (walk < 0) {
                         return -1;
                     }
                 }
             } else if ("AnnotationDefault".equals(name)) {
-                if (readElementValue(text, body, end, out) < 0) {
+                if (readElementValue(text, body, end, out, text_) < 0) {
                     return -1;
                 }
             }
@@ -3870,14 +3990,14 @@ final class LocationButtonManifestFragments {
 
     /** Reads a {@code u2} count followed by that many annotations. */
     private static int readAnnotations(String text, int at, int end,
-            java.util.Set<Integer> out) {
+            java.util.Set<Integer> out, java.util.Set<Integer> text_) {
         if (at < 0 || at + 2 > end) {
             return -1;
         }
         int count = u2(text, at);
         at += 2;
         for (int iter = 0; iter < count; iter++) {
-            at = readAnnotation(text, at, end, out);
+            at = readAnnotation(text, at, end, out, text_);
             if (at < 0) {
                 return -1;
             }
@@ -3887,7 +4007,7 @@ final class LocationButtonManifestFragments {
 
     /** Reads one annotation structure (JVMS 4.7.16). */
     private static int readAnnotation(String text, int at, int end,
-            java.util.Set<Integer> out) {
+            java.util.Set<Integer> out, java.util.Set<Integer> text_) {
         if (at < 0 || at + 4 > end) {
             return -1;
         }
@@ -3898,7 +4018,7 @@ final class LocationButtonManifestFragments {
             if (at + 2 > end) {
                 return -1;
             }
-            at = readElementValue(text, at + 2, end, out);
+            at = readElementValue(text, at + 2, end, out, text_);
             if (at < 0) {
                 return -1;
             }
@@ -3908,7 +4028,7 @@ final class LocationButtonManifestFragments {
 
     /** Reads one element_value (JVMS 4.7.16.1). */
     private static int readElementValue(String text, int at, int end,
-            java.util.Set<Integer> out) {
+            java.util.Set<Integer> out, java.util.Set<Integer> text_) {
         if (at < 0 || at + 1 > end) {
             return -1;
         }
@@ -3927,7 +4047,7 @@ final class LocationButtonManifestFragments {
             return at + 4 > end ? -1 : at + 4;
         }
         if (tag == '@') {
-            return readAnnotation(text, at, end, out);
+            return readAnnotation(text, at, end, out, text_);
         }
         if (tag == '[') {
             if (at + 2 > end) {
@@ -3936,7 +4056,7 @@ final class LocationButtonManifestFragments {
             int values = u2(text, at);
             at += 2;
             for (int iter = 0; iter < values; iter++) {
-                at = readElementValue(text, at, end, out);
+                at = readElementValue(text, at, end, out, text_);
                 if (at < 0) {
                     return -1;
                 }
@@ -3948,6 +4068,14 @@ final class LocationButtonManifestFragments {
         // it, so the walk gives up and the caller keeps the match.
         if ("BCDFIJSZs".indexOf(tag) < 0) {
             return -1;
+        }
+        if (tag == 's' && at + 2 <= end) {
+            // An annotation's STRING value, which points straight at a Utf8
+            // and creates no CONSTANT_String at all. @Note("Lcom/...;") is
+            // therefore text that isStringConstant cannot see, and reading it
+            // as a type reference refused an unrelated Android build at the
+            // toolchain gate.
+            text_.add(Integer.valueOf(u2(text, at)));
         }
         return at + 2 > end ? -1 : at + 2;
     }

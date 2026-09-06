@@ -1048,6 +1048,36 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void theProjectsOwnExpiredBackgroundRequestIsNoConflict() {
+        // The bound the contributed manifests already had. I scoped it to the
+        // LIBRARY read when I added it and wrote that the project's own block
+        // was left alone; there was no reason for that. A permission capped
+        // below the button's API asks for nothing where onlyForLocationButton
+        // means anything, whoever declared it.
+        String block = "    <uses-permission android:name=\"android.permission"
+                + ".ACCESS_BACKGROUND_LOCATION\" android:maxSdkVersion=\"30\""
+                + " />\n";
+        assertFalse(LocationButtonManifestFragments
+                        .declaresLiveBackgroundLocation(block),
+                "an expired background request cannot conflict");
+        assertTrue(LocationButtonManifestFragments
+                        .declaresBackgroundLocation(block),
+                "and the cap-blind reading still sees it, which is what made "
+                + "the two paths disagree");
+    }
+
+    @Test
+    void theProjectsOwnLiveBackgroundRequestStillConflicts() {
+        // The direction that must not move: an uncapped request from the
+        // project itself is exactly what exclusivity contradicts.
+        String block = "    <uses-permission android:name=\"android.permission"
+                + ".ACCESS_BACKGROUND_LOCATION\" />\n";
+        assertTrue(LocationButtonManifestFragments
+                        .declaresLiveBackgroundLocation(block),
+                "a live background request is still a conflict");
+    }
+
+    @Test
     void anUnkeyedRemoveAllCoversALibrarysDeclaration() {
         // <uses-permission tools:node="removeAll" /> carries no permission
         // name, so the keyed walk never reaches it -- and it takes every
@@ -1831,6 +1861,42 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void nativeSourcesNamingTheButtonCount() throws Exception {
+        // A native implementation can reach the component -- it is on the
+        // classpath the generated project compiles against -- and Gradle
+        // compiles that source, so it is in no jar and no class tree. Without
+        // this the flag stayed false and the build deleted the bridge package
+        // out from under a button the application really does construct.
+        File root = tempDir("cn1-lb-native-button");
+        writeSource(new File(root, "com/example/Native.java"),
+                "package com.example;\n"
+                + "import com.codename1.location.LocationButton;\n"
+                + "public class Native {\n"
+                + "  LocationButton make() { return new LocationButton(); }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesNameTheButton(root),
+                "a native source naming the button uses it");
+    }
+
+    @Test
+    void aButtonNamedOnlyInProseIsNotUse() throws Exception {
+        // Same stripping as the provider pass: a comment or a string naming
+        // the component is not constructing it, and this flag drives a
+        // toolchain gate that refuses the build.
+        File root = tempDir("cn1-lb-native-button-prose");
+        writeSource(new File(root, "com/example/Note.java"),
+                "package com.example;\n"
+                + "public class Note {\n"
+                + "  // com.codename1.location.LocationButton is not used\n"
+                + "  String s = \"com.codename1.location.LocationButton\";\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments
+                        .sourcesNameTheButton(root),
+                "prose about the button is not the button");
+    }
+
+    @Test
     void namingThePlatformManagerWithoutCallingItIsNotUse() throws Exception {
         // The narrow half. This scan refuses builds, and a source file is
         // prose as much as code: an import left behind by a deleted feature,
@@ -2036,6 +2102,33 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void anAnnotationTextValueIsNotATypeReference() throws Exception {
+        // The shape isStringConstant cannot see. An annotation's STRING value
+        // points straight at a Utf8 and creates no CONSTANT_String at all, so
+        // @Note("Lcom/codename1/location/LocationButton;") -- text, not a type
+        // -- was read as use of the button and refused an unrelated Android
+        // build at the toolchain gate.
+        File root = tempDir("cn1-lb-annotation-text");
+        ClassWriter w = new ClassWriter(0);
+        w.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "com/example/Noted", null,
+                "java/lang/Object", null);
+        AnnotationVisitor a = w.visitAnnotation("Lcom/example/Note;", true);
+        a.visit("value", "Lcom/codename1/location/LocationButton;");
+        a.visitEnd();
+        w.visitEnd();
+        byte[] bytes = w.toByteArray();
+        // The premise, checked rather than trusted: the descriptor is in the
+        // file, and nothing points at it but the annotation's text value.
+        assertTrue(new String(bytes, StandardCharsets.ISO_8859_1)
+                        .contains("Lcom/codename1/location/LocationButton;"),
+                "sanity: the text really is in the constant pool");
+        writeClassBytes(new File(root, "com/example/Noted.class"), bytes);
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "an annotation's text value is not a type reference");
+    }
+
+    @Test
     void anAnnotationValueSurvivesAStringOfTheSameText() throws Exception {
         // And the case that makes the string test insufficient on its own: a
         // constant pool holds ONE Utf8 for a given text, so a class that both
@@ -2070,6 +2163,55 @@ class LocationButtonManifestFragmentsTest {
         assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
                         .usesButton(),
                 "the annotation still names the button");
+    }
+
+    @Test
+    void anEndTagPaddedBeforeItsDelimiterIsStillConsumed() {
+        // </uses-permission   > is valid XML. Matching "</name>" exactly left
+        // it behind while the opening tag was spliced out, and an orphan end
+        // tag is a manifest that no longer parses -- produced by the path
+        // meant to be tidying it up.
+        String block = "    <uses-permission android:name=\"android.permission"
+                + ".ACCESS_FINE_LOCATION\" tools:node=\"remove\">"
+                + "</uses-permission   >\n";
+        String out = LocationButtonManifestFragments.inject(block, false);
+        assertFalse(out.contains("</uses-permission"),
+                "no orphan end tag may survive: " + out);
+    }
+
+    @Test
+    void aMismatchedEndTagIsLeftAloneRatherThanHalfEaten() {
+        // Why the '>' is REQUIRED after the name rather than assumed. On
+        // malformed input -- an opening uses-permission closed by
+        // </uses-permission-sdk-23> -- matching the name alone would consume
+        // "</uses-permission" and leave "-sdk-23>" behind, turning a manifest
+        // that was merely wrong into one that is wrong AND mangled by us.
+        // Nothing else can observe this check: elementName always derives the
+        // element's own name, so well-formed input never reaches the case.
+        String block = "    <uses-permission android:name=\"android.permission"
+                + ".ACCESS_FINE_LOCATION\" tools:node=\"remove\">"
+                + "</uses-permission-sdk-23>\n";
+        String out = LocationButtonManifestFragments.inject(block, false);
+        assertFalse(out.contains("-sdk-23>") && !out.contains("</uses"),
+                "a mismatched end tag is left whole, not half consumed: "
+                + out);
+    }
+
+    @Test
+    void anEndTagOfTheOtherElementTypeIsNotConsumed() {
+        // And the boundary the padding must not blur. </uses-permission> must
+        // not eat </uses-permission-sdk-23>: they are different elements, and
+        // consuming the wrong one truncates a declaration that should stay.
+        String block = "    <uses-permission-sdk-23 android:name=\"android"
+                + ".permission.ACCESS_FINE_LOCATION\" tools:node=\"remove\">"
+                + "</uses-permission-sdk-23>\n"
+                + "    <uses-permission android:name=\"android.permission"
+                + ".CAMERA\" />\n";
+        String out = LocationButtonManifestFragments.inject(block, false);
+        assertTrue(out.contains("android.permission.CAMERA"),
+                "the unrelated declaration survives: " + out);
+        assertFalse(out.contains("</uses-permission-sdk-23>"),
+                "and its own end tag went with it: " + out);
     }
 
     @Test

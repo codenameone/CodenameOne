@@ -3196,6 +3196,17 @@ public class AndroidGradleBuilder extends Executor {
             // unpacked into the same srcDir further down: the port's own
             // sources call the platform manager, and reading them would refuse
             // every application that sets the hint.
+            // The staged native sources too, which no bytecode scan can
+            // reach. This one is NOT gated on the hint: it decides whether the
+            // button exists at all, and every Android build reads that -- the
+            // toolchain gate and the bridge package both hang off it. It
+            // cannot refuse a build either, which is why it skips a file the
+            // budget will not read rather than failing.
+            if (!locationBlocked && LocationButtonManifestFragments
+                    .sourcesNameTheButton(srcDir)) {
+                debug("Location button found in the staged native sources");
+                usesLocationButton = true;
+            }
             if (appLocation.usesButton() && !usesLocationButton) {
                 debug("Location button found in the application by the "
                         + "byte-level scan, which reads annotation class "
@@ -3846,7 +3857,7 @@ public class AndroidGradleBuilder extends Executor {
                             // working. See declaresBackgroundLocation.
                             appBackgroundLocation
                                     || LocationButtonManifestFragments
-                                            .declaresBackgroundLocation(
+                                            .declaresLiveBackgroundLocation(
                                                     xPermissions),
                             usesPersistentLocation,
                             // A submitted library's OWN precise-location
