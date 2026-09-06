@@ -1880,6 +1880,104 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aSourceTooLargeToBufferIsStillSearched() throws Exception {
+        // The file the scan budget refuses. Skipping it was my first answer,
+        // justified by saying a missed reference costs an unused package --
+        // it does not. usesLocationButton false also leaves gpsPermission
+        // false and drops the AndroidX dependency, so an app whose only
+        // location use is the button gets no bridge, no dependency and no
+        // permission, and then prompts for one the manifest never declares.
+        //
+        // Over the per-entry cap deliberately, so the streaming path is the
+        // one under test rather than the ordinary read.
+        File root = tempDir("cn1-lb-huge");
+        File src = new File(root, "com/example/Huge.java");
+        src.getParentFile().mkdirs();
+        OutputStream out = new FileOutputStream(src);
+        try {
+            out.write("package com.example;\n".getBytes("UTF-8"));
+            byte[] filler = new byte[64 * 1024];
+            java.util.Arrays.fill(filler, (byte) ' ');
+            for (int written = 0; written < 17 * 1024 * 1024;
+                    written += filler.length) {
+                out.write(filler);
+            }
+            out.write(("class Huge { com.codename1.location.LocationButton b; }"
+                    + "\n").getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+        assertTrue(src.length() > 16L * 1024 * 1024,
+                "sanity: the file must exceed the per-entry cap, or this "
+                + "tests the ordinary path");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "a source too large to buffer is still searched");
+    }
+
+    @Test
+    void aNameStraddlingAReadBoundaryIsStillFound() throws Exception {
+        // Why the streaming search carries a tail between reads. With the
+        // chunk given, the boundary is known: the name starts ten characters
+        // before the end of the first read and finishes in the second, so a
+        // search looking at each read alone sees neither half.
+        //
+        // The chunk is a parameter for exactly this. A test cannot place a
+        // name across a 64 KiB boundary it does not control -- a Reader may
+        // return short -- and an earlier version of this test passed with the
+        // carry removed, proving nothing.
+        String marker = "com.codename1.location.LocationButton";
+        int chunk = 64;
+        StringBuilder source = new StringBuilder();
+        while (source.length() < chunk + marker.length() - 10) {
+            source.append(' ');
+        }
+        source.append(marker).append(" b;");
+        assertTrue(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source.toString()), chunk),
+                "a name split across two reads is still found");
+    }
+
+    @Test
+    void anInterpolatedLogLineIsNotButtonUse() throws Exception {
+        // Found by crossing the rules rather than by review. A literal holding
+        // ${...} is kept WHOLE for the provider scan, because what is inside a
+        // template is compiled; the button scan inherited that and read the
+        // rest of the string as code. So this line was button use and the same
+        // line without the interpolation was not -- adding a ${} to a message
+        // decided whether the project compiled, since the toolchain gate
+        // refuses a build that uses the button.
+        File root = tempDir("cn1-lb-interpolated");
+        writeSource(new File(root, "com/example/Log.kt"),
+                "package com.example\n"
+                + "class Log(val n: Int) {\n"
+                + "  fun f() = \"building ${n} of "
+                + "com.codename1.location.LocationButton\"\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments
+                        .sourcesNameTheButton(root),
+                "a message that interpolates is still a message");
+    }
+
+    @Test
+    void aTemplateStillCarriesAProviderCall() throws Exception {
+        // And the rule the button scan departs from stays where it was. The
+        // provider scan keeps template-bearing literals whole on purpose: what
+        // is inside ${...} is compiled, and masking it would lose a real
+        // lookup in the direction that downgrades a request in silence.
+        File root = tempDir("cn1-lb-template-still");
+        writeSource(new File(root, "com/example/Note.kt"),
+                "package com.example\n"
+                + "import com.google.android.gms.location"
+                + ".FusedLocationProviderClient\n"
+                + "class Note(val c: FusedLocationProviderClient) {\n"
+                + "  fun f() = \"at ${c.lastLocation}\"\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "the provider scan still reads inside a template");
+    }
+
+    @Test
     void aReflectiveLookupInNativeSourceIsUse() throws Exception {
         // Where two of my own changes met. The button's name lives in a string
         // literal here, and masking literal text -- added so prose about an

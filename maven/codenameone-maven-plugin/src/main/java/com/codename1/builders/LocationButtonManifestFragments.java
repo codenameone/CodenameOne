@@ -2080,7 +2080,27 @@ final class LocationButtonManifestFragments {
                 budget.entry(child.getPath());
                 raw = budget.readEntry(in, child.getPath(), child.length());
             } catch (Executor.ScanBudgetExceeded tooBig) {
-                // Skipped, not fatal. See the contract above.
+                // NOT skipped, and not fatal either: read without buffering.
+                //
+                // I first wrote this as a skip and justified it by saying a
+                // missed reference costs an unused implementation package.
+                // That was wrong, and it is the third time today I described
+                // what a flag costs without tracing who reads it. usesLocation
+                // Button false ALSO leaves gpsPermission false and drops the
+                // AndroidX dependency, so an application whose only location
+                // use is the button gets no bridge, no dependency and no
+                // permission -- and the component then falls back to prompting
+                // for one the manifest never declares. That is a broken app,
+                // not an unused class.
+                //
+                // So the file is streamed for the name instead. No stripping
+                // is possible without holding the text, so prose in a source
+                // this large counts -- which over-reports, and over-reporting
+                // here refuses a build with a reason rather than shipping
+                // something that cannot ask for location.
+                if (namesButtonWithoutBuffering(child)) {
+                    return true;
+                }
                 continue;
             } finally {
                 in.close();
@@ -2089,7 +2109,12 @@ final class LocationButtonManifestFragments {
                 continue;
             }
             String source = new String(raw, "ISO-8859-1");
-            String stripped = strippedSource(source);
+            // Literals masked WHOLE here, templates included. See
+            // strippedSource(String, boolean): the reflective spelling is read
+            // off `source` below, so nothing is lost by refusing to read a
+            // string as code, and keeping template-bearing literals turned a
+            // log line that interpolates into a refused build.
+            String stripped = strippedSource(source, false);
             if (sourceNames(stripped, BUTTON_MARKER)) {
                 return true;
             }
@@ -2107,6 +2132,73 @@ final class LocationButtonManifestFragments {
             }
         }
         return false;
+    }
+
+    /**
+     * Searches a file for the button's name without holding it in memory.
+     *
+     * <p>For the one case the scan budget refuses: a source too large to
+     * buffer. Read in chunks that overlap by the marker's length, so a name
+     * lying across a boundary is still found.</p>
+     *
+     * <p>Both spellings, because either can be the only reference: the
+     * internal name a type reference compiles from, and the dotted name a
+     * reflective lookup uses.</p>
+     *
+     * @param file the staged source
+     * @return whether either spelling appears anywhere in it
+     * @throws java.io.IOException if it cannot be read
+     */
+    private static boolean namesButtonWithoutBuffering(java.io.File file)
+            throws java.io.IOException {
+        java.io.Reader in = new java.io.InputStreamReader(
+                new java.io.FileInputStream(file), "ISO-8859-1");
+        try {
+            return namesButtonInStream(in, 65536);
+        } finally {
+            in.close();
+        }
+    }
+
+    /**
+     * The streaming search itself, with the chunk size as a parameter.
+     *
+     * <p>A parameter because the carry between reads is the only interesting
+     * thing here and nothing could observe it otherwise: a test cannot place a
+     * name across a 64 KiB boundary it does not control, since a Reader is
+     * free to return short. With the chunk given, the boundary is known and
+     * the split can be built exactly.</p>
+     *
+     * @param in    the source, already opened
+     * @param chunk how much to read at a time
+     * @return whether either spelling of the button's name appears
+     * @throws java.io.IOException if it cannot be read
+     */
+    static boolean namesButtonInStream(java.io.Reader in, int chunk)
+            throws java.io.IOException {
+        String[] spellings = {BUTTON_MARKER, BUTTON_MARKER.replace('/', '.')};
+        int longest = 0;
+        for (int iter = 0; iter < spellings.length; iter++) {
+            longest = Math.max(longest, spellings[iter].length());
+        }
+        char[] buffer = new char[chunk + longest];
+        int carried = 0;
+        while (true) {
+            int read = in.read(buffer, carried, buffer.length - carried);
+            if (read < 0) {
+                return false;
+            }
+            String window = new String(buffer, 0, carried + read);
+            for (int iter = 0; iter < spellings.length; iter++) {
+                if (window.indexOf(spellings[iter]) >= 0) {
+                    return true;
+                }
+            }
+            // Carry the tail, so a name split across two reads is seen.
+            carried = Math.min(longest, window.length());
+            window.getChars(window.length() - carried, window.length(),
+                    buffer, 0);
+        }
     }
 
     /**
@@ -2175,6 +2267,31 @@ final class LocationButtonManifestFragments {
      * @return the same text with comments and literal contents blanked
      */
     private static String strippedSource(String text) {
+        return strippedSource(text, true);
+    }
+
+    /**
+     * The same, with a say over template-bearing literals.
+     *
+     * <p>The provider scan keeps them whole, because what is inside
+     * {@code ${...}} is compiled and lexing it properly is a Kotlin lexer's
+     * job -- masking it wrongly hides a real call, which downgrades a request
+     * in silence.</p>
+     *
+     * <p>The BUTTON scan masks them, and can afford to: a genuine
+     * {@code new LocationButton()} is code either way, and the reflective
+     * spelling is read off the UNMASKED source beside a loader call. Keeping
+     * them whole there made a Kotlin log line that merely interpolates --
+     * {@code "building ${n} of com.codename1.location.LocationButton"} -- into
+     * button use, which the toolchain gate turns into a refused build. The
+     * same line without the interpolation was correctly ignored, so adding a
+     * ${} to a message decided whether a project compiled.</p>
+     *
+     * @param text          the source file
+     * @param keepTemplates whether a literal holding {@code ${} survives whole
+     * @return the same text with comments and literal contents blanked
+     */
+    private static String strippedSource(String text, boolean keepTemplates) {
         StringBuilder out = new StringBuilder(text.length());
         int at = 0;
         int length = text.length();
@@ -2203,7 +2320,7 @@ final class LocationButtonManifestFragments {
                     && text.charAt(at + 2) == '"') {
                 int end = text.indexOf("\"\"\"", at + 3);
                 end = end < 0 ? length : end + 3;
-                appendMasked(out, text, at, end);
+                appendMasked(out, text, at, end, keepTemplates);
                 at = end;
                 continue;
             }
@@ -2222,7 +2339,7 @@ final class LocationButtonManifestFragments {
                     walk++;
                 }
                 int end = walk > length ? length : walk;
-                appendMasked(out, text, at, end);
+                appendMasked(out, text, at, end, keepTemplates);
                 at = end;
                 continue;
             }
@@ -2262,9 +2379,11 @@ final class LocationButtonManifestFragments {
      * @param to   one past its last
      */
     private static void appendMasked(StringBuilder out, String text, int from,
-            int to) {
-        // Any template at all, and the whole literal is treated as code.
-        if (text.lastIndexOf("${", to - 1) >= from) {
+            int to, boolean keepTemplates) {
+        // Any template at all, and the whole literal is treated as code --
+        // unless the caller has its own way of reading a literal, which the
+        // button scan does.
+        if (keepTemplates && text.lastIndexOf("${", to - 1) >= from) {
             out.append(text, from, to);
             return;
         }
