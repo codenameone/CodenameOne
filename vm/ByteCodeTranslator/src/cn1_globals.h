@@ -858,13 +858,32 @@ else if (IS_DOUBLE_WORD(-1)) SP=BC_DUP2_X2_DSS(SP);\
 #define BC_ISHL() SP--; SP[-1].data.i = (SP[-1].data.i << (0x1f & (*SP).data.i))
 #define BC_ISHL_EXPR(val1, val2) (val1 << (0x1f & val2))
 #define BC_LSHL() SP--; SP[-1].data.l = (SP[-1].data.l << (0x3f & (*SP).data.l))
-#define BC_LSHL_EXPR(val1, val2) (val1 << (0x3f & val2))
+/* val1 is CAST, and that cast is the whole point.
+ *
+ * The translator emits a long constant as a bare C literal, so LCONST_1 reaches
+ * here as `BC_LSHL_EXPR(1, n)` -- and in C `1` is an int, which makes this an
+ * int shift no matter what the 0x3f mask says. The result was silently wrong for
+ * every shift of a long CONSTANT by 31 or more:
+ *
+ *     1L << 31  gave -2147483648   (int overflow, then sign-extended)
+ *     1L << 32  gave 1             (int shift counts are masked to 5 bits)
+ *     1L << 33  gave 2
+ *
+ * `x << n` for a long VARIABLE was always right, which is why this survived: the
+ * variable carries JAVA_LONG into the macro and the constant does not. Found by a
+ * histogram whose bucket labels came out negative.
+ *
+ * BC_LUSHR_EXPR below already casts, so this class of bug was fixed once for the
+ * unsigned shift and not carried across to its two siblings. */
+#define BC_LSHL_EXPR(val1, val2) (((JAVA_LONG)(val1)) << (0x3f & (val2)))
 
 #define BC_ISHR() SP--; SP[-1].data.i = (SP[-1].data.i >> (0x1f & (*SP).data.i))
 #define BC_ISHR_EXPR(val1, val2) (val1 >> (0x1f & val2))
 
 #define BC_LSHR() SP--; SP[-1].data.l = (SP[-1].data.l >> (0x3f & (*SP).data.l))
-#define BC_LSHR_EXPR(val1, val2) (val1 >> (0x3f & val2))
+/* Cast for the same reason as BC_LSHL_EXPR above: a long constant arrives as an
+ * int literal and would otherwise be shifted 32 bits wide. */
+#define BC_LSHR_EXPR(val1, val2) (((JAVA_LONG)(val1)) >> (0x3f & (val2)))
 
 #define BC_IUSHL() SP--; SP[-1].data.i = (((unsigned int)SP[-1].data.i) << (0x1f & ((unsigned int)(*SP).data.i)))
 #define BC_IUSHL_EXPR(val1, val2) (((unsigned int)val1) << (0x1f & ((unsigned int)val2)))
