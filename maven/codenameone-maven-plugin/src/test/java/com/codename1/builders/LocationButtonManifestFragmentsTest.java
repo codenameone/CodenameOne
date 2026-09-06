@@ -1497,6 +1497,71 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void nativeSourcesCallingOurOwnManagerCountToo() throws Exception {
+        // An Android native implementation can call Codename One's
+        // LocationManager as readily as the platform's -- it is on the
+        // classpath the generated project compiles against -- and that source
+        // is compiled by Gradle, so it reaches neither bytecode scan. The
+        // source scan covered the platform providers and not ours.
+        File root = tempDir("cn1-lb-native-ours");
+        writeSource(new File(root, "com/example/Native.java"),
+                "package com.example;\n"
+                + "import com.codename1.location.LocationManager;\n"
+                + "public class Native {\n"
+                + "  void go(LocationManager m) {\n"
+                + "    m.setLocationListener(null);\n"
+                + "  }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "our own manager is a provider too");
+    }
+
+    @Test
+    void theSourceOwnersCoverEveryPersistentMarker() throws Exception {
+        // The list is DERIVED from PERSISTENT_MARKERS rather than written out
+        // again, and this is what makes that worth doing: a marker added there
+        // is covered here without anybody remembering to, and a future edit
+        // that hard-codes the list fails this instead of going quiet.
+        for (String marker : LocationButtonManifestFragments
+                .persistentMarkers()) {
+            File root = tempDir("cn1-lb-marker-" + marker);
+            writeSource(new File(root, "com/example/Each.java"),
+                    "package com.example;\n"
+                    + "import com.codename1.location.LocationManager;\n"
+                    + "public class Each {\n"
+                    + "  void go(LocationManager m) {\n"
+                    + "    m." + marker + "(null);\n"
+                    + "  }\n"
+                    + "}\n");
+            assertTrue(LocationButtonManifestFragments
+                            .sourcesCallPlatformLocation(root),
+                    marker + " must be seen in a native source");
+        }
+    }
+
+    @Test
+    void aTemplateWithBracesOfItsOwnIsStillCode() throws Exception {
+        // A template may hold braces. Taking the first '}' as its end masked
+        // the rest of the expression -- including the call -- and lost a real
+        // lookup, which is the direction that downgrades a request in
+        // silence.
+        File root = tempDir("cn1-lb-nested-template");
+        writeSource(new File(root, "com/example/Pick.kt"),
+                "package com.example\n"
+                + "import com.google.android.gms.location"
+                + ".FusedLocationProviderClient\n"
+                + "class Pick(val client: FusedLocationProviderClient,\n"
+                + "           val ok: Boolean, val cached: Any) {\n"
+                + "  fun note() = \"at ${if (ok) { cached } else "
+                + "{ client.lastLocation }}\"\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "the whole template is code, braces and all");
+    }
+
+    @Test
     void namingThePlatformManagerWithoutCallingItIsNotUse() throws Exception {
         // The narrow half. This scan refuses builds, and a source file is
         // prose as much as code: an import left behind by a deleted feature,

@@ -1703,6 +1703,41 @@ final class LocationButtonManifestFragments {
             "com/codename1/location/LocationManager";
 
     /**
+     * The providers the SOURCE scan looks for: the platform's, and ours.
+     *
+     * <p>An Android native implementation can call Codename One's own
+     * {@code LocationManager} as readily as the platform's -- it is on the
+     * classpath the generated project compiles against -- and that source is
+     * compiled by Gradle, so it reaches neither bytecode scan. Covering only
+     * the platform providers left such a call invisible and let exclusivity be
+     * accepted over it.</p>
+     *
+     * <p>Derived from the two lists rather than written out again, so a marker
+     * added to either is covered here without anybody remembering to. Declared
+     * AFTER both, because a static initialiser runs in declaration order and
+     * would otherwise read a null.</p>
+     *
+     * <p>The bytecode scans need no equivalent: they already ask
+     * {@code callsMethodOn(LOCATION_MANAGER, PERSISTENT_MARKERS)} with the
+     * owner attributed.</p>
+     */
+    private static final String[][] SOURCE_LOCATION_OWNERS = sourceOwners();
+
+    /** Builds {@link #SOURCE_LOCATION_OWNERS} from the two marker lists. */
+    private static String[][] sourceOwners() {
+        String[][] out =
+                new String[PLATFORM_LOCATION_OWNERS.length + 1][];
+        System.arraycopy(PLATFORM_LOCATION_OWNERS, 0, out, 0,
+                PLATFORM_LOCATION_OWNERS.length);
+        String[] ours = new String[PERSISTENT_MARKERS.length + 1];
+        ours[0] = LOCATION_MANAGER;
+        System.arraycopy(PERSISTENT_MARKERS, 0, ours, 1,
+                PERSISTENT_MARKERS.length);
+        out[out.length - 1] = ours;
+        return out;
+    }
+
+    /**
      * The framework wrappers whose CONSTRUCTION is a non-button precise
      * location use, counted by being referenced at all.
      *
@@ -2032,8 +2067,28 @@ final class LocationButtonManifestFragments {
         while (at < to) {
             if (text.charAt(at) == '$' && at + 1 < to
                     && text.charAt(at + 1) == '{') {
-                int close = text.indexOf('}', at + 2);
-                if (close < 0 || close >= to) {
+                // BALANCED, not the first '}'. A template may hold braces of
+                // its own -- "${if (ok) { a } else { client.lastLocation }}"
+                // is ordinary Kotlin -- and stopping at the first one masked
+                // the rest of the expression, losing a real call in the
+                // direction that downgrades a request in silence.
+                int close = at + 2;
+                int depth = 1;
+                while (close < to) {
+                    char ch = text.charAt(close);
+                    if (ch == '{') {
+                        depth++;
+                    } else if (ch == '}') {
+                        depth--;
+                        if (depth == 0) {
+                            break;
+                        }
+                    }
+                    close++;
+                }
+                // Unbalanced, so the file is not valid Kotlin anyway: take the
+                // rest of the literal as code, which can only ADD a match.
+                if (close >= to) {
                     close = to - 1;
                 }
                 out.append(text, at, close + 1);
@@ -2194,8 +2249,8 @@ final class LocationButtonManifestFragments {
             // documented deleting the thing had the build refused for it.
             String text = strippedSource(new String(raw, "ISO-8859-1"));
             boolean kotlin = name.endsWith(".kt");
-            for (int row = 0; row < PLATFORM_LOCATION_OWNERS.length; row++) {
-                String[] owner = PLATFORM_LOCATION_OWNERS[row];
+            for (int row = 0; row < SOURCE_LOCATION_OWNERS.length; row++) {
+                String[] owner = SOURCE_LOCATION_OWNERS[row];
                 if (!sourceNames(text, owner[0])
                         && !sourceNamesByFactory(text, owner[0])) {
                     continue;
@@ -2767,6 +2822,16 @@ final class LocationButtonManifestFragments {
     }
 
     /** The framework classes this scan ignores, for the coverage test. */
+    /**
+     * The persistent-location markers, for the check that every one of them is
+     * reachable from a native source.
+     *
+     * @return a copy of the list
+     */
+    static String[] persistentMarkers() {
+        return PERSISTENT_MARKERS.clone();
+    }
+
     static String[] frameworkClasses() {
         return FRAMEWORK_CLASSES.clone();
     }
