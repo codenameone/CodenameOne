@@ -93,7 +93,13 @@ class NativeThemesJava001Snippet {
         override.put("@accent-on-container-color", "ffffff");
         override.put("@accent-on-container-color-dark", "ffffff");
         UIManager.getInstance().addThemeProps(override);
-        CN.getCurrentForm().refreshTheme();
+        // null before the first form is shown, which is exactly when a branded
+        // flavour applies its overrides; forms built afterwards pick the new
+        // props up on their own
+        Form current = CN.getCurrentForm();
+        if (current != null) {
+            current.refreshTheme();
+        }
         // end::native-themes-java-001[]
     }
 }

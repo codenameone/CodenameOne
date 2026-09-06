@@ -86,11 +86,14 @@ class AnnotationSqliteOrmJava002Snippet {
         try {
             users.insert(u1);
             users.insert(u2);
-            em.commitTransaction();
         } catch (IOException e) {
             em.rollbackTransaction();
             throw e;
         }
+        // outside the catch on purpose: a commit that fails has already ended
+        // the transaction, so rolling back here would throw "No transaction is
+        // in progress" over the top of the real failure
+        em.commitTransaction();
         // end::annotation-sqlite-orm-java-002[]
     }
     com.codename1.orm.EntityManager em;
