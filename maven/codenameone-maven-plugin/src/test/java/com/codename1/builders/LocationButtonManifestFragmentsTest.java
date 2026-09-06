@@ -2200,6 +2200,91 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aProximityAlertIsPreciseUse() throws Exception {
+        // The platform's own geofence. Play services' client was the reviewed
+        // gap; this is the same request made against the system service, and
+        // it was missing for the same reason.
+        File root = tempDir("cn1-lb-proximity");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "fence.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/Near.class"));
+            zip.write(methodCallClass("android/location/LocationManager",
+                    "addProximityAlert"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .callsPreciseLocation(),
+                "a proximity alert is precise use");
+    }
+
+    @Test
+    void theDeprecatedGeofencingApiIsPreciseUse() throws Exception {
+        // The pre-GoogleApi shape, carried for the same reason the deprecated
+        // fused provider is: shipped libraries still hold it.
+        File root = tempDir("cn1-lb-geoapi");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "old.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/OldFences.class"));
+            zip.write(methodCallClass(
+                    "com/google/android/gms/location/GeofencingApi",
+                    "addGeofences"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .callsPreciseLocation(),
+                "the deprecated geofencing api is precise use");
+    }
+
+    @Test
+    void aLocationAvailabilityQueryIsPreciseUse() throws Exception {
+        // Annotated @RequiresPermission for the location permissions, so
+        // under the hint the app cannot make this call either.
+        File root = tempDir("cn1-lb-availability");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "avail.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/Avail.class"));
+            zip.write(methodCallClass(
+                    "com/google/android/gms/location/FusedLocationProviderClient",
+                    "getLocationAvailability"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .callsPreciseLocation(),
+                "a location availability query is precise use");
+    }
+
+    @Test
+    void anUnannotatedFlushIsNotPreciseUse() throws Exception {
+        // The other direction, and the one that keeps the rule honest: the
+        // vendor does NOT annotate flushLocations, so however much the name
+        // suggests location it must not refuse anyone's build.
+        File root = tempDir("cn1-lb-flush");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "flush.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/Flush.class"));
+            zip.write(methodCallClass(
+                    "com/google/android/gms/location/FusedLocationProviderClient",
+                    "flushLocations"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .callsPreciseLocation(),
+                "an unannotated call is not precise use");
+    }
+
+    @Test
     void aGeofencingClientIsPreciseUse() throws Exception {
         // Geofencing needs precise location as much as a fix does, and a
         // plain jar using Play services' client has no manifest to say so.

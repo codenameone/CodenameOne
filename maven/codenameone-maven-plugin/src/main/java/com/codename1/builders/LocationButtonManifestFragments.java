@@ -119,6 +119,23 @@ final class LocationButtonManifestFragments {
      * its calls; adding a provider means adding a row, and adding its markers
      * to LocationButtonMarkerCoverageTest so the framework's own users of it
      * stay filtered.</p>
+     *
+     * <p>Which calls belong is not a judgement call: a row lists exactly the
+     * methods the vendor annotates {@code @RequiresPermission} with
+     * ACCESS_FINE_LOCATION or ACCESS_COARSE_LOCATION. That is re-derivable
+     * rather than remembered -- the Play services and AndroidX annotations are
+     * in the bytecode of their own artifacts, and the platform's are in the
+     * SDK's {@code platforms/android-NN/data/annotations.zip}, which is where
+     * they have to be read from because android.jar strips them.</p>
+     *
+     * <p>The releases are here for the same reason as the requests. They carry
+     * the permission requirement too, so under the hint they are calls the app
+     * cannot make either; the rule is the annotation, not whether a call
+     * happens to hand back coordinates. What is NOT here is anything the
+     * vendor leaves unannotated -- {@code flushLocations} is not a location
+     * call by this measure however much its name suggests otherwise -- and
+     * anything an app cannot reach, such as AndroidX's package-private
+     * {@code registerLocationListenerTransport}.</p>
      */
     private static final String[][] PLATFORM_LOCATION_OWNERS = {
         {
@@ -140,12 +157,25 @@ final class LocationButtonManifestFragments {
             // to declare it.
             "addGpsStatusListener",
             "addNmeaListener",
+            "getGpsStatus",
+            // The platform's own geofence. It is the same request the Play
+            // services client makes, made against the system service, and a
+            // library that only ever fences reads as no location call at all
+            // without it.
+            "addProximityAlert",
+            // The releases carry the permission requirement too, so under
+            // exclusivity they are calls the app cannot make either.
+            "removeProximityAlert",
+            "removeUpdates",
         },
         {
             "com/google/android/gms/location/FusedLocationProviderClient",
             "requestLocationUpdates",
             "getCurrentLocation",
             "getLastLocation",
+            "getLocationAvailability",
+            "setMockLocation",
+            "setMockMode",
         },
         {
             // The deprecated shape of the same thing, which plenty of shipped
@@ -154,12 +184,21 @@ final class LocationButtonManifestFragments {
             "requestLocationUpdates",
             "getCurrentLocation",
             "getLastLocation",
+            "getLocationAvailability",
+            "setMockLocation",
+            "setMockMode",
         },
         {
             // Play services' geofencing client. Geofencing needs precise
             // location as much as a fix does, and a plain jar using it has no
             // manifest to say so either.
             "com/google/android/gms/location/GeofencingClient",
+            "addGeofences",
+        },
+        {
+            // The deprecated shape of the geofencing client, carried for the
+            // same reason the deprecated fused provider is.
+            "com/google/android/gms/location/GeofencingApi",
             "addGeofences",
         },
         {
@@ -173,6 +212,7 @@ final class LocationButtonManifestFragments {
             // need the same permission through it as they do direct.
             "registerGnssStatusCallback",
             "registerGnssMeasurementsCallback",
+            "removeUpdates",
         },
     };
 

@@ -70,6 +70,16 @@ public class LocationButtonMarkerCoverageTest {
         // AndroidX's wrapper over the platform manager.
         "androidx/core/location/LocationManagerCompat",
         "getLastLocation",
+        "getLocationAvailability",
+        // Geofencing, in both of Play services' shapes, and the platform's
+        // own equivalent.
+        "com/google/android/gms/location/GeofencingClient",
+        "com/google/android/gms/location/GeofencingApi",
+        "addGeofences",
+        "addProximityAlert",
+        // The releases the scan charges for, which the ports do make.
+        "removeUpdates",
+        "removeProximityAlert",
         "com/codename1/location/GeofenceManager",
         "com/codename1/maps/MapComponent",
     };
