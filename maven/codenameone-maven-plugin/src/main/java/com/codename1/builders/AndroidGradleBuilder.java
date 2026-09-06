@@ -3163,6 +3163,20 @@ public class AndroidGradleBuilder extends Executor {
             // only come from a manifest inside a staged archive, and archives
             // the developer submitted are what libsDir covers below.
             usesPersistentLocation |= appLocation.usesPersistentLocation();
+            // And the application's own ANDROID sources, which no bytecode
+            // scan can reach: a native interface implemented in .java or .kt
+            // is compiled by Gradle from the staged tree, so it is in no jar
+            // and no class directory here. Code there calling
+            // android.location.LocationManager needs precise location as
+            // surely as ours does, and accepting exclusivity over it
+            // downgrades those requests to approximate results silently.
+            //
+            // This has to run HERE, before the Codename One Android port is
+            // unpacked into the same srcDir further down: the port's own
+            // sources call the platform manager, and reading them would refuse
+            // every application that sets the hint.
+            usesPersistentLocation |= LocationButtonManifestFragments
+                    .sourcesCallPlatformLocation(srcDir);
             if (appLocation.usesButton() && !usesLocationButton) {
                 debug("Location button found in the application by the "
                         + "byte-level scan, which reads annotation class "

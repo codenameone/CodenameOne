@@ -789,6 +789,39 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aSiblingsAliasIsNotInScopeOnThisElement() {
+        // A sibling binds an alias for the tools namespace and the fine
+        // element rebinds the conventional prefix, so the document contains a
+        // usable-looking prefix that is not in scope HERE. candidatePrefixes
+        // collects document-wide on purpose -- the readers want every spelling
+        // -- and writing under that alias emitted a:remove with nothing
+        // binding a, which is a manifest no XML parser accepts. A fragment is
+        // where it bites, because there is no root element to fall back on.
+        String fragment = "    <uses-permission"
+                + " xmlns:a=\"http://schemas.android.com/tools\""
+                + " android:name=\"android.permission.CAMERA\" />\n"
+                + "    <uses-permission xmlns:tools=\"urn:fake\""
+                + " android:name=\"android.permission.ACCESS_FINE_LOCATION\""
+                + " />\n";
+        String out = LocationButtonManifestFragments.inject(fragment, false);
+        int fine = out.indexOf("android.permission.ACCESS_FINE_LOCATION");
+        String element = out.substring(out.lastIndexOf('<', fine),
+                out.indexOf('>', fine));
+        int marker = element.indexOf(":remove=\"android:maxSdkVersion\"");
+        assertTrue(marker > 0, "the cap is removed at all: " + element);
+        // Read the prefix back off the output and demand THAT one is bound
+        // here, rather than naming the prefix this is expected to choose.
+        int from = marker;
+        while (from > 0 && element.charAt(from - 1) != ' ') {
+            from--;
+        }
+        String prefix = element.substring(from, marker);
+        assertTrue(element.contains(" xmlns:" + prefix
+                        + "=\"http://schemas.android.com/tools\""),
+                "the prefix it wrote is bound on this element: " + element);
+    }
+
+    @Test
     void theRemoveMarkerNamesTheAttributeInTheRightNamespace() {
         // The value of tools:remove is a QName. On an element that rebound the
         // conventional prefix and carries the real Android namespace under an
@@ -969,6 +1002,127 @@ class LocationButtonManifestFragmentsTest {
         assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
                         .usesButton(),
                 "a class referenced only from an annotation is still used");
+    }
+
+    @Test
+    void nativeAndroidSourcesAskingForLocationAreUse() throws Exception {
+        // A native interface implemented in Android .java or .kt is compiled
+        // by Gradle out of the staged sources: it is in no jar and no class
+        // tree, so neither bytecode scan can see it. Calling the platform's
+        // location manager there needs precise location as surely as calling
+        // ours, and accepting android.locationButton.exclusive over it
+        // downgrades those requests to approximate results silently.
+        File root = tempDir("cn1-lb-native-src");
+        writeSource(new File(root, "com/example/Tracker.java"),
+                "package com.example;\n"
+                + "import android.location.LocationManager;\n"
+                + "public class Tracker {\n"
+                + "  void go(LocationManager m) {\n"
+                + "    m.requestLocationUpdates(null, 0, 0, null);\n"
+                + "  }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "native sources calling the platform manager are location use");
+    }
+
+    @Test
+    void kotlinNativeSourcesCountTheSameWay() throws Exception {
+        // Android native interfaces may be written in Kotlin, and a scan that
+        // read only .java would miss exactly the same call.
+        File root = tempDir("cn1-lb-native-kt");
+        writeSource(new File(root, "com/example/Tracker.kt"),
+                "package com.example\n"
+                + "import android.location.LocationManager\n"
+                + "class Tracker {\n"
+                + "  fun last(m: LocationManager) = "
+                + "m.getLastKnownLocation(\"gps\")\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "Kotlin native sources are read too");
+    }
+
+    @Test
+    void namingThePlatformManagerWithoutCallingItIsNotUse() throws Exception {
+        // The narrow half. This scan refuses builds, and a source file is
+        // prose as much as code: an import left behind by a deleted feature,
+        // or the class named in a comment, is not a location request. Both
+        // halves have to be there.
+        File root = tempDir("cn1-lb-native-mention");
+        writeSource(new File(root, "com/example/Leftover.java"),
+                "package com.example;\n"
+                + "// android.location.LocationManager was used here once.\n"
+                + "import android.location.LocationManager;\n"
+                + "public class Leftover {\n"
+                + "  Object unused;\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "naming the class is not asking it for a location");
+    }
+
+    @Test
+    void aStringLiteralOfTheDescriptorIsNotUse() throws Exception {
+        // The other half of the same fact. A Utf8 holding
+        // "Lcom/codename1/location/LocationButton;" is byte for byte what an
+        // annotation class value points at AND what a string LITERAL of that
+        // text points at -- reflection and bytecode-handling code writes such
+        // literals -- so accepting every match read a library that merely
+        // spells the name as a user of the button and refused its whole
+        // Android build at the toolchain gate. referencesClass has said this
+        // about the plain name from the start; the descriptor form had the
+        // same hole.
+        File root = tempDir("cn1-lb-literal");
+        ClassWriter w = new ClassWriter(0);
+        w.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "com/example/Speller", null,
+                "java/lang/Object", null);
+        w.visitField(Opcodes.ACC_STATIC | Opcodes.ACC_FINAL, "NAME",
+                "Ljava/lang/String;", null,
+                "Lcom/codename1/location/LocationButton;").visitEnd();
+        w.visitEnd();
+        writeClassBytes(new File(root, "com/example/Speller.class"),
+                w.toByteArray());
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "spelling the descriptor in a string is not using the button");
+    }
+
+    @Test
+    void anAnnotationValueSurvivesAStringOfTheSameText() throws Exception {
+        // And the case that makes the string test insufficient on its own: a
+        // constant pool holds ONE Utf8 for a given text, so a class that both
+        // annotates with LocationButton.class and spells the descriptor in a
+        // literal points a CONSTANT_String and an element_value at the same
+        // entry. Deciding on the string alone would delete the bridge from an
+        // app that really does build the button, which is the failure this
+        // whole check has to avoid -- so the annotation structures are read.
+        File root = tempDir("cn1-lb-both");
+        ClassWriter w = new ClassWriter(0);
+        w.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "com/example/Both", null,
+                "java/lang/Object", null);
+        AnnotationVisitor a = w.visitAnnotation("Lcom/example/Widget;", true);
+        a.visit("value",
+                Type.getObjectType("com/codename1/location/LocationButton"));
+        a.visitEnd();
+        w.visitField(Opcodes.ACC_STATIC | Opcodes.ACC_FINAL, "NAME",
+                "Ljava/lang/String;", null,
+                "Lcom/codename1/location/LocationButton;").visitEnd();
+        w.visitEnd();
+        byte[] bytes = w.toByteArray();
+        // The premise, checked rather than trusted: one Utf8, two referrers.
+        // If ASM ever stopped sharing it the test would pass while testing
+        // nothing.
+        String text = new String(bytes, StandardCharsets.ISO_8859_1);
+        int first = text.indexOf("Lcom/codename1/location/LocationButton;");
+        assertTrue(first > 0 && text.indexOf(
+                        "Lcom/codename1/location/LocationButton;", first + 1)
+                        < 0,
+                "sanity: the descriptor is one shared Utf8");
+        writeClassBytes(new File(root, "com/example/Both.class"), bytes);
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "the annotation still names the button");
     }
 
     @Test
@@ -1157,6 +1311,29 @@ class LocationButtonManifestFragmentsTest {
      * is where the difference between a class reference and a string constant
      * lives.</p>
      */
+    /** Writes a staged source file, creating the package directories. */
+    private static void writeSource(File at, String text) throws Exception {
+        at.getParentFile().mkdirs();
+        OutputStream out = new FileOutputStream(at);
+        try {
+            out.write(text.getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+    }
+
+    /** Writes finished class bytes, creating the package directories. */
+    private static void writeClassBytes(File at, byte[] bytes)
+            throws Exception {
+        at.getParentFile().mkdirs();
+        OutputStream out = new FileOutputStream(at);
+        try {
+            out.write(bytes);
+        } finally {
+            out.close();
+        }
+    }
+
     private static void writePoolClass(File at, byte[]... entries)
             throws Exception {
         at.getParentFile().mkdirs();

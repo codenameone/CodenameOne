@@ -982,11 +982,31 @@ final class LocationButtonManifestFragments {
         // The Android side needs no such fallback: an element only reaches
         // these editors because a candidate prefix NAMED the permission on it,
         // so a usable prefix is known to exist there.
-        String prefix;
+        //
+        // And a candidate is only usable here if it is in scope HERE.
+        // candidatePrefixes collects aliases document-wide on purpose -- for
+        // the readers, which want to notice every spelling of a marker -- so a
+        // sibling's xmlns:a survives its filter even though this element and
+        // the root never bound it. Writing a:remove under that prefix produced
+        // a manifest no XML parser accepts, and an xpermissions fragment is
+        // where it happens, because a fragment has no root to fall back on.
+        //
+        // The conventional prefix is the one exception, and only because the
+        // filter above has already checked it: reaching here still on the list
+        // means nothing in scope rebound it, and the manifest this fragment is
+        // spliced into declares it.
+        String prefix = null;
         String binding = "";
-        if (prefixes.length > 0) {
-            prefix = prefixes[0];
-        } else {
+        String root = rootElement(xPermissions);
+        for (int iter = 0; iter < prefixes.length; iter++) {
+            if ("tools".equals(prefixes[iter])
+                    || TOOLS_NS.equals(bindingInScope(element, root,
+                            prefixes[iter]))) {
+                prefix = prefixes[iter];
+                break;
+            }
+        }
+        if (prefix == null) {
             prefix = freePrefix(element, "cn1tools");
             binding = " xmlns:" + prefix + "=\"" + TOOLS_NS + "\"";
         }
@@ -1280,19 +1300,41 @@ final class LocationButtonManifestFragments {
             // is where a manifest declares its namespaces -- so a decoy
             // android:name on an element that binds nothing itself was still
             // read as an Android attribute.
-            String owner = element;
-            int[] bound = findAttribute(element, "xmlns:" + prefix);
-            if (bound == null && root.length() > 0) {
-                owner = root;
-                bound = findAttribute(root, "xmlns:" + prefix);
-            }
-            if (bound != null
-                    && !uri.equals(owner.substring(bound[2], bound[3])
-                            .trim())) {
+            String bound = bindingInScope(element, root, prefix);
+            if (bound != null && !uri.equals(bound)) {
                 out.remove(iter);
             }
         }
         return out.toArray(new String[out.size()]);
+    }
+
+    /**
+     * The namespace a prefix is bound to on this element, or failing that on
+     * the document's root.
+     *
+     * <p>The two scopes a {@code uses-permission} has, innermost first. Null
+     * when neither binds it -- which is not the same as "bound to nothing
+     * useful": a fragment has no root, so a prefix another element declared is
+     * simply not in scope here.</p>
+     *
+     * @param element the element's text
+     * @param root    the root element's text, or {@code ""}
+     * @param prefix  the prefix to resolve
+     * @return the namespace URI it is bound to here, or null
+     */
+    private static String bindingInScope(String element, String root,
+            String prefix) {
+        int[] bound = findAttribute(element, "xmlns:" + prefix);
+        if (bound != null) {
+            return element.substring(bound[2], bound[3]).trim();
+        }
+        if (root.length() > 0) {
+            bound = findAttribute(root, "xmlns:" + prefix);
+            if (bound != null) {
+                return root.substring(bound[2], bound[3]).trim();
+            }
+        }
+        return null;
     }
 
     /**
@@ -1793,6 +1835,92 @@ final class LocationButtonManifestFragments {
         return found;
     }
 
+    /**
+     * Whether staged Android sources call the platform's location manager.
+     *
+     * <p>An application may implement a native interface in Android
+     * {@code .java} or {@code .kt}, and that code is compiled by Gradle from
+     * the staged sources -- it is in no jar and no class tree, so neither
+     * bytecode scan can see it. Calling
+     * {@code android.location.LocationManager} there is precise-location use
+     * as surely as calling ours, and accepting
+     * {@code android.locationButton.exclusive} over it downgrades those
+     * requests to approximate results with nothing in the build to say so.</p>
+     *
+     * <p>Text, because there is no bytecode to attribute yet, and narrow for
+     * the same reason: the file has to name the platform class AND one of its
+     * calls. A rejection here is a refused build, so a mention on its own --
+     * an import left behind, a class named in a comment -- is not enough.</p>
+     *
+     * <p>ORDER MATTERS. This reads whatever is staged, and the Codename One
+     * Android port is unpacked into the same directory later in the build:
+     * those sources do call the platform manager, and scanning after they
+     * arrive would refuse every application that sets the hint. Call it while
+     * the tree still holds only what the developer submitted.</p>
+     *
+     * @param root the staged source directory
+     * @return whether the application's own Android sources ask for location
+     * @throws java.io.IOException if a source file cannot be read
+     */
+    static boolean sourcesCallPlatformLocation(java.io.File root)
+            throws java.io.IOException {
+        if (root == null || !root.isDirectory()) {
+            return false;
+        }
+        return scanSources(root, new Executor.PermScanBudget());
+    }
+
+    /** Walks a staged source tree looking for a platform location call. */
+    private static boolean scanSources(java.io.File dir,
+            Executor.PermScanBudget budget) throws java.io.IOException {
+        java.io.File[] children = dir.listFiles();
+        if (children == null) {
+            return false;
+        }
+        for (int iter = 0; iter < children.length; iter++) {
+            java.io.File child = children[iter];
+            if (child.isDirectory()) {
+                if (scanSources(child, budget)) {
+                    return true;
+                }
+                continue;
+            }
+            String name = child.getName();
+            if (!name.endsWith(".java") && !name.endsWith(".kt")) {
+                continue;
+            }
+            // Through the budget, like every other file this class reads: a
+            // staged tree comes out of a zip the developer submitted, and its
+            // aggregate cap is what stops a tree of merely large files
+            // exhausting the heap on a shared build host.
+            byte[] raw;
+            java.io.InputStream in = new java.io.FileInputStream(child);
+            try {
+                budget.entry(child.getPath());
+                raw = budget.readEntry(in, child.getPath(), child.length());
+            } finally {
+                in.close();
+            }
+            if (raw == null) {
+                continue;
+            }
+            // ISO-8859-1 for the reason the class scan uses it: every byte
+            // maps to one character, so nothing is dropped and the markers --
+            // all ASCII -- are found wherever they sit. A UTF-8 decode would
+            // fail on a source file saved in some other encoding.
+            String text = new String(raw, "ISO-8859-1");
+            if (text.indexOf("android.location.LocationManager") < 0) {
+                continue;
+            }
+            for (int m = 0; m < PLATFORM_LOCATION_MARKERS.length; m++) {
+                if (text.indexOf(PLATFORM_LOCATION_MARKERS[m]) >= 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private static void scanTree(java.io.File root, java.io.File dir,
             LocationUsage found, Executor.PermScanBudget budget)
             throws java.io.IOException {
@@ -2291,7 +2419,7 @@ final class LocationButtonManifestFragments {
         // appearing in somebody's signature. This one only ever keeps an
         // implementation package that would otherwise be removed.
         if (referencesClass(pool, BUTTON_MARKER)
-                || referencesDescriptor(pool, BUTTON_MARKER)) {
+                || referencesDescriptor(text, pool, BUTTON_MARKER)) {
             found.button = true;
         }
         // The geofencing wrapper counts as persistent use on its own. Its calls
@@ -2854,9 +2982,11 @@ final class LocationButtonManifestFragments {
      * @param internalName the class, in internal form
      * @return whether some Utf8 is exactly that class's descriptor
      */
-    private static boolean referencesDescriptor(Pool pool,
+    private static boolean referencesDescriptor(String text, Pool pool,
             String internalName) {
         String descriptor = "L" + internalName + ";";
+        java.util.Set<Integer> annotated = null;
+        boolean walked = false;
         for (int index = 1; index < pool.tag.length; index++) {
             if (pool.tag[index] != TAG_UTF8) {
                 continue;
@@ -2872,11 +3002,231 @@ final class LocationButtonManifestFragments {
             while (at < value.length() && value.charAt(at) == '[') {
                 at++;
             }
-            if (descriptor.equals(value.substring(at))) {
+            if (!descriptor.equals(value.substring(at))) {
+                continue;
+            }
+            // A Utf8 is not evidence by itself. The same entry serves a string
+            // LITERAL of that text -- "Lcom/codename1/location/LocationButton;"
+            // written out in reflection or bytecode-handling code -- which is
+            // not use of the button, and reading it as use refuses that
+            // library's whole Android build at the toolchain gate.
+            // referencesClass already says this about the plain name; the
+            // descriptor form had the same hole.
+            //
+            // So a Utf8 that some CONSTANT_String points at has to be found in
+            // an ANNOTATION before it counts. Anything else that spells this
+            // descriptor -- a field's type, a method's parameter or return --
+            // is real use and is not a string constant, so it never asks.
+            if (!isStringConstant(pool, index)) {
+                return true;
+            }
+            if (!walked) {
+                annotated = annotationDescriptorIndexes(text, pool);
+                walked = true;
+            }
+            // Null when the class could not be walked, and then the match
+            // stands. Every failure of this parser has to fall THAT way: a
+            // missed annotation deletes the bridge package from an app that
+            // does use the button, which is worse than accepting a library
+            // that merely spells the name.
+            if (annotated == null || annotated.contains(Integer.valueOf(index))) {
                 return true;
             }
         }
         return false;
+    }
+
+    /** Whether some CONSTANT_String in the pool points at this Utf8. */
+    private static boolean isStringConstant(Pool pool, int utf8Index) {
+        for (int index = 1; index < pool.tag.length; index++) {
+            if (pool.tag[index] == TAG_STRING
+                    && pool.first[index] == utf8Index) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The Utf8 entries the class's annotations name: each annotation's own
+     * type, and every {@code Foo.class} value inside one.
+     *
+     * <p>Walked at all three levels -- the class, its fields and its methods --
+     * because an annotation carrying a class value sits wherever the developer
+     * wrote it.</p>
+     *
+     * <p>Type annotations are not read. Their {@code target_info} varies by
+     * target kind and a class value inside one is exotic; leaving them out
+     * costs an accepted match, never a missed one, because a descriptor this
+     * does not account for is treated as still referenced.</p>
+     *
+     * @param text the class file, decoded ISO-8859-1
+     * @param pool its parsed pool
+     * @return the indexes, or null when the class could not be walked
+     */
+    private static java.util.Set<Integer> annotationDescriptorIndexes(
+            String text, Pool pool) {
+        int at = pool.end;
+        if (at + 6 > text.length()) {
+            return null;
+        }
+        at = skipTable(text, at + 6, 2);        // interfaces
+        java.util.Set<Integer> out = new java.util.HashSet<Integer>();
+        at = memberAnnotations(text, pool, at, out);    // fields
+        at = memberAnnotations(text, pool, at, out);    // methods
+        at = attributeAnnotations(text, pool, at, out);
+        return at < 0 ? null : out;
+    }
+
+    /** Walks a fields or methods table, reading each member's attributes. */
+    private static int memberAnnotations(String text, Pool pool, int at,
+            java.util.Set<Integer> out) {
+        if (at < 0 || at + 2 > text.length()) {
+            return -1;
+        }
+        int count = u2(text, at);
+        at += 2;
+        for (int iter = 0; iter < count; iter++) {
+            if (at + 6 > text.length()) {
+                return -1;
+            }
+            at = attributeAnnotations(text, pool, at + 6, out);
+            if (at < 0) {
+                return -1;
+            }
+        }
+        return at;
+    }
+
+    /** Walks an attributes table, reading the ones that carry annotations. */
+    private static int attributeAnnotations(String text, Pool pool, int at,
+            java.util.Set<Integer> out) {
+        if (at < 0 || at + 2 > text.length()) {
+            return -1;
+        }
+        int count = u2(text, at);
+        at += 2;
+        for (int iter = 0; iter < count; iter++) {
+            if (at + 6 > text.length()) {
+                return -1;
+            }
+            String name = utf8At(pool, u2(text, at));
+            long length = u4(text, at + 2);
+            int body = at + 6;
+            if (length < 0 || body + length > text.length()) {
+                return -1;
+            }
+            int end = body + (int) length;
+            if ("RuntimeVisibleAnnotations".equals(name)
+                    || "RuntimeInvisibleAnnotations".equals(name)) {
+                if (readAnnotations(text, body, end, out) < 0) {
+                    return -1;
+                }
+            } else if ("RuntimeVisibleParameterAnnotations".equals(name)
+                    || "RuntimeInvisibleParameterAnnotations".equals(name)) {
+                if (body >= end) {
+                    return -1;
+                }
+                int parameters = text.charAt(body) & 0xff;
+                int walk = body + 1;
+                for (int p = 0; p < parameters; p++) {
+                    walk = readAnnotations(text, walk, end, out);
+                    if (walk < 0) {
+                        return -1;
+                    }
+                }
+            } else if ("AnnotationDefault".equals(name)) {
+                if (readElementValue(text, body, end, out) < 0) {
+                    return -1;
+                }
+            }
+            at = end;
+        }
+        return at;
+    }
+
+    /** Reads a {@code u2} count followed by that many annotations. */
+    private static int readAnnotations(String text, int at, int end,
+            java.util.Set<Integer> out) {
+        if (at < 0 || at + 2 > end) {
+            return -1;
+        }
+        int count = u2(text, at);
+        at += 2;
+        for (int iter = 0; iter < count; iter++) {
+            at = readAnnotation(text, at, end, out);
+            if (at < 0) {
+                return -1;
+            }
+        }
+        return at;
+    }
+
+    /** Reads one annotation structure (JVMS 4.7.16). */
+    private static int readAnnotation(String text, int at, int end,
+            java.util.Set<Integer> out) {
+        if (at < 0 || at + 4 > end) {
+            return -1;
+        }
+        out.add(Integer.valueOf(u2(text, at)));
+        int pairs = u2(text, at + 2);
+        at += 4;
+        for (int iter = 0; iter < pairs; iter++) {
+            if (at + 2 > end) {
+                return -1;
+            }
+            at = readElementValue(text, at + 2, end, out);
+            if (at < 0) {
+                return -1;
+            }
+        }
+        return at;
+    }
+
+    /** Reads one element_value (JVMS 4.7.16.1). */
+    private static int readElementValue(String text, int at, int end,
+            java.util.Set<Integer> out) {
+        if (at < 0 || at + 1 > end) {
+            return -1;
+        }
+        char tag = text.charAt(at);
+        at++;
+        if (tag == 'c') {
+            // The one that matters: Foo.class, whose class_info_index is a
+            // Utf8 holding the DESCRIPTOR, not a CONSTANT_Class.
+            if (at + 2 > end) {
+                return -1;
+            }
+            out.add(Integer.valueOf(u2(text, at)));
+            return at + 2;
+        }
+        if (tag == 'e') {
+            return at + 4 > end ? -1 : at + 4;
+        }
+        if (tag == '@') {
+            return readAnnotation(text, at, end, out);
+        }
+        if (tag == '[') {
+            if (at + 2 > end) {
+                return -1;
+            }
+            int values = u2(text, at);
+            at += 2;
+            for (int iter = 0; iter < values; iter++) {
+                at = readElementValue(text, at, end, out);
+                if (at < 0) {
+                    return -1;
+                }
+            }
+            return at;
+        }
+        // Every remaining tag -- the primitives and 's' -- is a single u2 into
+        // the pool. An unknown one is not, and there is no way to resume from
+        // it, so the walk gives up and the caller keeps the match.
+        if ("BCDFIJSZs".indexOf(tag) < 0) {
+            return -1;
+        }
+        return at + 2 > end ? -1 : at + 2;
     }
 
     /**
