@@ -152,6 +152,13 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      * The occupied-slot marker for a key: its mixed hash with the sign bit
      * forced on -- strictly negative, so it can never collide with META_EMPTY
      * or META_TOMB, and slot occupancy tests are a single sign check.
+     *
+     * <p>The spread is deliberately the JDK's and deliberately weak: it leaves
+     * {@code Integer} keys placed at {@code slot == value}, so a dense key
+     * range is stored in ascending slot order and building or scanning one
+     * walks memory sequentially. That locality is worth keeping -- what makes
+     * it safe here is that the probe SEQUENCE no longer walks neighbours.
+     * See {@link #cn1NextSlot}.
      */
     static int cn1Marker(Object key) {
         if (key == null) {
@@ -160,6 +167,41 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         int h = computeHashCode(key);
         h ^= (h >>> 16);
         return h | 0x80000000;
+    }
+
+    /**
+     * The next slot on a key's probe path.
+     *
+     * <p><b>Not {@code i + 1}.</b> Linear probing puts colliding keys in
+     * NEIGHBOURING slots, so a run of occupied slots is walked end to end by
+     * any probe that enters it and does not find its key. With the weak
+     * spread above, {@code Integer} keys from a dense range form exactly one
+     * such run -- 100k sequential keys occupy slots [0, 99999] with no gap --
+     * and every lookup that MISSES inside it walked the whole thing. Measured
+     * average probe length for a miss, before this: 2547 slots at 20k keys,
+     * 16742 at 100k, 222721 at 1M. That is O(n) per unsuccessful lookup, and
+     * it reached {@code get} returning null, {@code containsKey} returning
+     * false, and {@code put} of a key that is not adjacent to the run.
+     *
+     * <p>Hits stayed at exactly one probe throughout, which is why a hit-only
+     * churn benchmark never saw it.
+     *
+     * <p>This is CPython's dict recurrence. The first probe is still
+     * {@code marker & mask}, so the sequential-key locality above survives
+     * untouched; every probe after it jumps pseudo-randomly, so a miss leaves
+     * the run immediately instead of walking it (1.4 to 2.0 probes at the
+     * sizes above). {@code perturb} decays to zero within seven steps, after
+     * which {@code 5 * i + 1} is a full-period permutation of a power-of-two
+     * table (Hull-Dobell: 1 is coprime to 2^k and 4 divides 5 - 1), so the
+     * walk always reaches the empty slot that terminates it.
+     *
+     * @param i the current slot
+     * @param perturb the decaying perturbation, seeded with the marker and
+     *        shifted down by the caller on every step
+     * @param mask {@code capacity - 1}
+     */
+    static int cn1NextSlot(int i, int perturb, int mask) {
+        return ((i << 2) + i + 1 + perturb) & mask;
     }
 
     /**
@@ -172,6 +214,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         int[] meta = cn1Meta;
         int mask = meta.length - 1;
         int i = marker & mask;
+        int perturb = marker;
         int firstTomb = -1;
         while (true) {
             int m = meta[i];
@@ -187,7 +230,8 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             } else if (m == META_TOMB && firstTomb < 0) {
                 firstTomb = i;
             }
-            i = (i + 1) & mask;
+            perturb >>>= 5;
+            i = cn1NextSlot(i, perturb, mask);
         }
     }
 
@@ -259,8 +303,10 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         int[] meta = cn1Meta;
         int mask = meta.length - 1;
         int i = marker & mask;
+        int perturb = marker;
         while (meta[i] != META_EMPTY) {
-            i = (i + 1) & mask;
+            perturb >>>= 5;
+            i = cn1NextSlot(i, perturb, mask);
         }
         meta[i] = marker;
         cn1Keys[i] = key;

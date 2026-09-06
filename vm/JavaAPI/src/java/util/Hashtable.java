@@ -33,17 +33,25 @@ package java.util;
  */
 
 public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
+    /** slot metadata: empty slot. */
+    static final int META_EMPTY = 0;
+    /** slot metadata: tombstone (previously occupied). */
+    static final int META_TOMB = 1;
+
+    /** parallel storage; length is always a power of two. */
+    transient Object[] cn1Keys;
+    transient Object[] cn1Vals;
+    transient int[] cn1Meta;
+
+    /** live mappings. */
     transient int elementCount;
 
-    transient Entry<K, V>[] elementData;
+    /** live + tombstones (drives resizing). */
+    transient int cn1Occupied;
 
     private float loadFactor;
 
     private int threshold;
-
-    transient int firstSlot;
-
-    transient int lastSlot = -1;
 
     transient int modCount;
 
@@ -72,18 +80,25 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
         }
     };
 
-    private static <K, V> Entry<K, V> newEntry(K key, V value, int hash) {
-        return new Entry<K, V>(key, value);
-    }
-
+    /**
+     * A view of one occupied slot.
+     *
+     * <p>There are no node objects in this representation, so unlike the
+     * chained layout this replaced -- where the Entry WAS the storage and cost
+     * an allocation per mapping -- an Entry is built only when an iterator
+     * hands one out, and only for {@code entrySet()}. It keeps the table and
+     * slot so {@link #setValue} still writes through.
+     */
     private static class Entry<K, V> extends MapEntry<K, V> {
-        Entry<K, V> next;
+        private final Hashtable<K, V> table;
 
-        final int hashcode;
+        private final int index;
 
-        Entry(K theKey, V theValue) {
-            super(theKey, theValue);
-            hashcode = theKey.hashCode();
+        @SuppressWarnings("unchecked")
+        Entry(Hashtable<K, V> table, int index) {
+            super((K) table.cn1Keys[index], (V) table.cn1Vals[index]);
+            this.table = table;
+            this.index = index;
         }
 
         @Override
@@ -93,15 +108,8 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
             }
             V result = value;
             value = object;
+            table.cn1Vals[index] = object;
             return result;
-        }
-
-        public int getKeyHash() {
-            return key.hashCode();
-        }
-
-        public boolean equalsKey(Object aKey, int hash) {
-            return hashcode == aKey.hashCode() && key.equals(aKey);
         }
 
         @Override
@@ -110,100 +118,163 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
         }
     }
 
+    /**
+     * The occupied-slot marker for a key: its spread hash with the sign bit
+     * forced on -- strictly negative, so it can never collide with META_EMPTY
+     * or META_TOMB and an occupancy test is a single sign check.
+     *
+     * <p>Null keys are rejected by {@code put}, and every read path reaches
+     * {@code key.hashCode()} here, so a null key still faults exactly where it
+     * did before rather than being silently accepted.
+     */
+    static int cn1Marker(Object key) {
+        int h = key.hashCode();
+        h ^= (h >>> 16);
+        return h | 0x80000000;
+    }
+
+    /**
+     * The next slot on a key's probe path -- the same recurrence
+     * {@link HashMap#cn1NextSlot} uses, and for the same reason: linear
+     * probing walks a run of occupied slots end to end, which turns a dense
+     * key range into an O(n) miss. See the rationale there.
+     */
+    static int cn1NextSlot(int i, int perturb, int mask) {
+        return ((i << 2) + i + 1 + perturb) & mask;
+    }
+
+    /** Round up to a power of two, at least 8. */
+    static int cn1Capacity(int requested) {
+        int cap = 8;
+        while (cap < requested && cap < (1 << 30)) {
+            cap <<= 1;
+        }
+        return cap;
+    }
+
+    final void cn1Alloc(int capacity) {
+        cn1Keys = new Object[capacity];
+        cn1Vals = new Object[capacity];
+        cn1Meta = new int[capacity];
+        elementCount = 0;
+        cn1Occupied = 0;
+        computeMaxSize();
+    }
+
+    /**
+     * Probe for a key. Returns the slot index (>= 0) when found; otherwise
+     * {@code -(insertionPoint + 1)}, where insertionPoint is the first
+     * tombstone on the path (reuse) or the terminating empty slot.
+     */
+    final int cn1FindSlot(Object key) {
+        int marker = cn1Marker(key);
+        int[] meta = cn1Meta;
+        int mask = meta.length - 1;
+        int i = marker & mask;
+        int perturb = marker;
+        int firstTomb = -1;
+        while (true) {
+            int m = meta[i];
+            if (m == META_EMPTY) {
+                return -((firstTomb >= 0 ? firstTomb : i) + 1);
+            }
+            if (m == marker) {
+                Object k = cn1Keys[i];
+                if (key == k || key.equals(k)) {
+                    return i;
+                }
+            } else if (m == META_TOMB && firstTomb < 0) {
+                firstTomb = i;
+            }
+            perturb >>>= 5;
+            i = cn1NextSlot(i, perturb, mask);
+        }
+    }
+
+    /** raw insert into a table known not to contain the key (rebuild path). */
+    final void cn1Insert(Object key, Object value, int marker) {
+        int[] meta = cn1Meta;
+        int mask = meta.length - 1;
+        int i = marker & mask;
+        int perturb = marker;
+        while (meta[i] != META_EMPTY) {
+            perturb >>>= 5;
+            i = cn1NextSlot(i, perturb, mask);
+        }
+        meta[i] = marker;
+        cn1Keys[i] = key;
+        cn1Vals[i] = value;
+    }
+
+    /** Tombstone a found slot. The single mutation point for removals. */
+    final void cn1RemoveAtIndex(int idx) {
+        cn1Meta[idx] = META_TOMB;
+        cn1Keys[idx] = null;
+        cn1Vals[idx] = null;
+        elementCount--;
+        modCount++;
+    }
+
     private class HashIterator<E> implements Iterator<E> {
-        int position, expectedModCount;
+        /** next slot to examine. */
+        int position;
+
+        /** slot of the entry last returned, or -1. */
+        int lastPosition = -1;
+
+        int expectedModCount;
 
         final MapEntry.Type<E, K, V> type;
-
-        Entry<K, V> lastEntry;
-
-        int lastPosition;
 
         boolean canRemove = false;
 
         HashIterator(MapEntry.Type<E, K, V> value) {
             type = value;
-            position = lastSlot;
+            position = 0;
             expectedModCount = modCount;
         }
 
-        public boolean hasNext() {
-            if (lastEntry != null && lastEntry.next != null) {
-                return true;
-            }
-            while (position >= firstSlot) {
-                if (elementData[position] == null) {
-                    position--;
-                } else {
+        /** Advance past empty and tombstoned slots. */
+        final boolean advance() {
+            int[] meta = cn1Meta;
+            while (position < meta.length) {
+                if (meta[position] < 0) {
                     return true;
                 }
+                position++;
             }
             return false;
         }
 
+        public boolean hasNext() {
+            return advance();
+        }
+
         public E next() {
-            if (expectedModCount == modCount) {
-                if (lastEntry != null) {
-                    lastEntry = lastEntry.next;
-                }
-                if (lastEntry == null) {
-                    while (position >= firstSlot
-                            && (lastEntry = elementData[position]) == null) {
-                        position--;
-                    }
-                    if (lastEntry != null) {
-                        lastPosition = position;
-                        // decrement the position so we don't find the same slot
-                        // next time
-                        position--;
-                    }
-                }
-                if (lastEntry != null) {
-                    canRemove = true;
-                    return type.get(lastEntry);
-                }
+            if (expectedModCount != modCount) {
+                throw new ConcurrentModificationException();
+            }
+            if (!advance()) {
                 throw new NoSuchElementException();
             }
-            throw new ConcurrentModificationException();
+            lastPosition = position;
+            position++;
+            canRemove = true;
+            return type.get(new Entry<K, V>(Hashtable.this, lastPosition));
         }
 
         public void remove() {
-            if (expectedModCount == modCount) {
-                if (canRemove) {
-                    canRemove = false;
-                    synchronized (Hashtable.this) {
-                        boolean removed = false;
-                        Entry<K, V> entry = elementData[lastPosition];
-                        if (entry == lastEntry) {
-                            elementData[lastPosition] = entry.next;
-                            removed = true;
-                        } else {
-                            while (entry != null && entry.next != lastEntry) {
-                                entry = entry.next;
-                            }
-                            if (entry != null) {
-                                entry.next = lastEntry.next;
-                                removed = true;
-                            }
-                        }
-                        if (removed) {
-                            modCount++;
-                            elementCount--;
-                            expectedModCount++;
-                            return;
-                        }
-                        // the entry must have been (re)moved outside of the
-                        // iterator
-                        // but this condition wasn't caught by the modCount
-                        // check
-                        // throw ConcurrentModificationException() outside of
-                        // synchronized block
-                    }
-                } else {
-                    throw new IllegalStateException();
-                }
+            if (expectedModCount != modCount) {
+                throw new ConcurrentModificationException();
             }
-            throw new ConcurrentModificationException();
+            if (!canRemove) {
+                throw new IllegalStateException();
+            }
+            canRemove = false;
+            synchronized (Hashtable.this) {
+                cn1RemoveAtIndex(lastPosition);
+                expectedModCount++;
+            }
         }
     }
 
@@ -224,11 +295,8 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
      */
     public Hashtable(int capacity) {
         if (capacity >= 0) {
-            elementCount = 0;
-            elementData = newElementArray(capacity == 0 ? 1 : capacity);
-            firstSlot = elementData.length;
             loadFactor = 0.75f;
-            computeMaxSize();
+            cn1Alloc(cn1Capacity(capacity));
         } else {
             throw new IllegalArgumentException();
         }
@@ -245,11 +313,8 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
      */
     public Hashtable(int capacity, float loadFactor) {
         if (capacity >= 0 && loadFactor > 0) {
-            elementCount = 0;
-            firstSlot = capacity;
-            elementData = newElementArray(capacity == 0 ? 1 : capacity);
             this.loadFactor = loadFactor;
-            computeMaxSize();
+            cn1Alloc(cn1Capacity(capacity));
         } else {
             throw new IllegalArgumentException();
         }
@@ -267,11 +332,6 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
         putAll(map);
     }
 
-    @SuppressWarnings("unchecked")
-    private Entry<K, V>[] newElementArray(int size) {
-        return new Entry[size];
-    }
-
     /**
      * Removes all key/value pairs from this {@code Hashtable}, leaving the
      * size zero and the capacity unchanged.
@@ -280,14 +340,32 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
      * @see #size
      */
     public synchronized void clear() {
-        elementCount = 0;
-        Arrays.fill(elementData, null);
-        modCount++;
+        if (elementCount > 0 || cn1Occupied > 0) {
+            Arrays.fill(cn1Keys, null);
+            Arrays.fill(cn1Vals, null);
+            Arrays.fill(cn1Meta, META_EMPTY);
+            elementCount = 0;
+            cn1Occupied = 0;
+            modCount++;
+        }
     }
 
 
+    /**
+     * The occupancy at which the table is rebuilt.
+     *
+     * <p>Clamped below the capacity, which chaining did not have to do: an open
+     * addressed probe terminates on an empty slot, so a completely full table
+     * would loop forever. A load factor of 1 or more is legal to ASK for -- the
+     * two-argument constructor accepts any positive float -- so the clamp is
+     * load-bearing rather than defensive.
+     */
     private void computeMaxSize() {
-        threshold = (int) (elementData.length * loadFactor);
+        int capacity = cn1Meta.length;
+        threshold = (int) (capacity * loadFactor);
+        if (threshold >= capacity) {
+            threshold = capacity - 1;
+        }
     }
 
     /**
@@ -306,13 +384,10 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
             throw new NullPointerException();
         }
 
-        for (int i = elementData.length; --i >= 0;) {
-            Entry<K, V> entry = elementData[i];
-            while (entry != null) {
-                if (entry.value.equals(value)) {
-                    return true;
-                }
-                entry = entry.next;
+        int[] meta = cn1Meta;
+        for (int i = 0; i < meta.length; i++) {
+            if (meta[i] < 0 && value.equals(cn1Vals[i])) {
+                return true;
             }
         }
         return false;
@@ -467,30 +542,15 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
      * @see #put
      */
     @Override
+    @SuppressWarnings("unchecked")
     public synchronized V get(Object key) {
-        int hash = key.hashCode();
-        int index = (hash & 0x7FFFFFFF) % elementData.length;
-        Entry<K, V> entry = elementData[index];
-        while (entry != null) {
-            if (entry.equalsKey(key, hash)) {
-                return entry.value;
-            }
-            entry = entry.next;
-        }
-        return null;
+        int idx = cn1FindSlot(key);
+        return idx < 0 ? null : (V) cn1Vals[idx];
     }
 
     Entry<K, V> getEntry(Object key) {
-        int hash = key.hashCode();
-        int index = (hash & 0x7FFFFFFF) % elementData.length;
-        Entry<K, V> entry = elementData[index];
-        while (entry != null) {
-            if (entry.equalsKey(key, hash)) {
-                return entry;
-            }
-            entry = entry.next;
-        }
-        return null;
+        int idx = cn1FindSlot(key);
+        return idx < 0 ? null : new Entry<K, V>(this, idx);
     }
 
     @Override
@@ -600,10 +660,6 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
 
         private boolean isEnumeration = false;
 
-        int start;
-
-        Entry<K, V> entry;
-
         HashEnumIterator(MapEntry.Type<E, K, V> value) {
             super(value);
         }
@@ -611,31 +667,16 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
         HashEnumIterator(MapEntry.Type<E, K, V> value, boolean isEnumeration) {
             super(value);
             this.isEnumeration = isEnumeration;
-            start = lastSlot + 1;
         }
 
         public boolean hasMoreElements() {
-            if (isEnumeration) {
-                if (entry != null) {
-                    return true;
-                }
-                while (start > firstSlot) {
-                    if (elementData[--start] != null) {
-                        entry = elementData[start];
-                        return true;
-                    }
-                }
-                return false;
-            }
-            // iterator
-            return super.hasNext();
+            return advance();
         }
 
         public boolean hasNext() {
             if (isEnumeration) {
                 return hasMoreElements();
             }
-            // iterator
             return super.hasNext();
         }
 
@@ -643,34 +684,35 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
             if (isEnumeration) {
                 if (expectedModCount == modCount) {
                     return nextElement();
-                } else {
-                    throw new ConcurrentModificationException();
                 }
+                throw new ConcurrentModificationException();
             }
-            // iterator
             return super.next();
         }
 
-        @SuppressWarnings("unchecked")
+        /**
+         * An Enumeration is deliberately NOT fail-fast -- the class docs say
+         * its results "may be affected if the contents are modified" -- so this
+         * does not consult modCount, matching the chained implementation it
+         * replaces. {@link #next} still does.
+         */
         public E nextElement() {
             if (isEnumeration) {
-                if (hasMoreElements()) {
-                    Object result = type.get(entry);
-                    entry = entry.next;
-                    return (E) result;
+                if (!advance()) {
+                    throw new NoSuchElementException();
                 }
-                throw new NoSuchElementException();
+                int idx = position;
+                position++;
+                return type.get(new Entry<K, V>(Hashtable.this, idx));
             }
-            // iterator
             return super.next();
         }
 
         public void remove() {
             if (isEnumeration) {
                 throw new UnsupportedOperationException();
-            } else {
-                super.remove();
             }
+            super.remove();
         }
     }
 
@@ -693,32 +735,27 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
     @Override
     public synchronized V put(K key, V value) {
         if (key != null && value != null) {
-            int hash = key.hashCode();
-            int index = (hash & 0x7FFFFFFF) % elementData.length;
-            Entry<K, V> entry = elementData[index];
-            while (entry != null && !entry.equalsKey(key, hash)) {
-                entry = entry.next;
+            int idx = cn1FindSlot(key);
+            if (idx >= 0) {
+                @SuppressWarnings("unchecked")
+                V result = (V) cn1Vals[idx];
+                cn1Vals[idx] = value;
+                return result;
             }
-            if (entry == null) {
-                modCount++;
-                if (++elementCount > threshold) {
-                    rehash();
-                    index = (hash & 0x7FFFFFFF) % elementData.length;
-                }
-                if (index < firstSlot) {
-                    firstSlot = index;
-                }
-                if (index > lastSlot) {
-                    lastSlot = index;
-                }
-                entry = newEntry(key, value, hash);
-                entry.next = elementData[index];
-                elementData[index] = entry;
-                return null;
+            int ins = -idx - 1;
+            boolean wasEmpty = cn1Meta[ins] == META_EMPTY;
+            cn1Meta[ins] = cn1Marker(key);
+            cn1Keys[ins] = key;
+            cn1Vals[ins] = value;
+            elementCount++;
+            if (wasEmpty) {
+                cn1Occupied++;
             }
-            V result = entry.value;
-            entry.value = value;
-            return result;
+            modCount++;
+            if (cn1Occupied >= threshold) {
+                rehash();
+            }
+            return null;
         }
         throw new NullPointerException();
     }
@@ -742,33 +779,28 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
      * when the size of this {@code Hashtable} exceeds the load factor.
      */
     protected void rehash() {
-        int length = (elementData.length << 1) + 1;
-        if (length == 0) {
-            length = 1;
+        int capacity = cn1Meta.length;
+        // Double only when genuinely full; a table that is merely
+        // tombstone-heavy is rebuilt at the same size, which purges them.
+        int newCapacity = (elementCount * 2 >= capacity) ? capacity << 1 : capacity;
+        if (newCapacity <= 0) {
+            newCapacity = capacity;
         }
-        int newFirst = length;
-        int newLast = -1;
-        Entry<K, V>[] newData = newElementArray(length);
-        for (int i = lastSlot + 1; --i >= firstSlot;) {
-            Entry<K, V> entry = elementData[i];
-            while (entry != null) {
-                int index = (entry.getKeyHash() & 0x7FFFFFFF) % length;
-                if (index < newFirst) {
-                    newFirst = index;
-                }
-                if (index > newLast) {
-                    newLast = index;
-                }
-                Entry<K, V> next = entry.next;
-                entry.next = newData[index];
-                newData[index] = entry;
-                entry = next;
+        Object[] oldKeys = cn1Keys;
+        Object[] oldVals = cn1Vals;
+        int[] oldMeta = cn1Meta;
+        cn1Alloc(newCapacity);
+        int count = 0;
+        for (int i = 0; i < oldMeta.length; i++) {
+            if (oldMeta[i] < 0) {
+                // The stored marker is reused, so a rebuild makes no
+                // hashCode() calls at all.
+                cn1Insert(oldKeys[i], oldVals[i], oldMeta[i]);
+                count++;
             }
         }
-        firstSlot = newFirst;
-        lastSlot = newLast;
-        elementData = newData;
-        computeMaxSize();
+        elementCount = count;
+        cn1Occupied = count;
     }
 
     /**
@@ -783,28 +815,15 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
      * @see #put
      */
     @Override
+    @SuppressWarnings("unchecked")
     public synchronized V remove(Object key) {
-        int hash = key.hashCode();
-        int index = (hash & 0x7FFFFFFF) % elementData.length;
-        Entry<K, V> last = null;
-        Entry<K, V> entry = elementData[index];
-        while (entry != null && !entry.equalsKey(key, hash)) {
-            last = entry;
-            entry = entry.next;
+        int idx = cn1FindSlot(key);
+        if (idx < 0) {
+            return null;
         }
-        if (entry != null) {
-            modCount++;
-            if (last == null) {
-                elementData[index] = entry.next;
-            } else {
-                last.next = entry.next;
-            }
-            elementCount--;
-            V result = entry.value;
-            entry.value = null;
-            return result;
-        }
-        return null;
+        V result = (V) cn1Vals[idx];
+        cn1RemoveAtIndex(idx);
+        return result;
     }
 
     /**
@@ -832,24 +851,25 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
 
         StringBuffer buffer = new StringBuffer(size() * 28);
         buffer.append('{');
-        for (int i = lastSlot; i >= firstSlot; i--) {
-            Entry<K, V> entry = elementData[i];
-            while (entry != null) {
-                if (entry.key != this) {
-                    buffer.append(entry.key);
+        int[] meta = cn1Meta;
+        for (int i = 0; i < meta.length; i++) {
+            if (meta[i] < 0) {
+                Object k = cn1Keys[i];
+                Object v = cn1Vals[i];
+                if (k != this) {
+                    buffer.append(k);
                 } else {
                     // luni.04=this Map
                     buffer.append("(this)"); //$NON-NLS-1$//$NON-NLS-2$//$NON-NLS-3$
                 }
                 buffer.append('=');
-                if (entry.value != this) {
-                    buffer.append(entry.value);
+                if (v != this) {
+                    buffer.append(v);
                 } else {
                     // luni.04=this Map
                     buffer.append("(this)"); //$NON-NLS-1$//$NON-NLS-2$//$NON-NLS-3$
                 }
                 buffer.append(", "); //$NON-NLS-1$
-                entry = entry.next;
             }
         }
         // Remove the last ", "

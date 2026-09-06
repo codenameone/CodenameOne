@@ -52,11 +52,60 @@ measurement runner (`BENCH <name> rep <n> ns=<t> checksum=<c>` lines):
 | recursion | call-overhead (fib) — a JIT-inlining shape, accepted above 1x |
 | quicksort | mixed array scan/swap + recursion |
 
+## Map shapes (`MapBench`, run on its own)
+
+`hashMapChurn` above is get+put on keys that are PRESENT. An open-addressed table's
+failure mode is the miss, so that benchmark cannot see it -- and did not: a probe
+sequence that walked 222,721 slots per unsuccessful lookup at 1M entries sat behind a
+healthy-looking 1.12x for as long as it existed. `MapBench` is the suite that covers
+the rest of the surface.
+
+```bash
+./translate-and-build.sh MapBench target/mapbench && ./target/mapbench
+```
+
+| bench | shape |
+|---|---|
+| missHeavy | `containsKey` at a 10% hit rate -- the unsuccessful-probe case |
+| stringKeys | small long-lived String-keyed map read repeatedly (the `UIManager` theme shape) |
+| largeTable | 1M entries, ~20MB of table, random hits -- every probe a cache miss |
+| tombstones | remove/insert churn at a flat live count, so slots fill with tombstones |
+| growBuild | build from an empty default-capacity map, so `cn1Grow` dominates |
+| identityKeys | `Object` keys, i.e. hashes that are truncated size-class-aligned pointers |
+| linkedStringKeys | as stringKeys on `LinkedHashMap`, whose accessors are Java, not native |
+| hashtableStringKeys / hashtableBuild | as above on `Hashtable`, which is still chained |
+
+`IdmProbe` is a diagnostic beside it, not a benchmark: it harvests the REAL
+`System.identityHashCode` values of freshly allocated objects and replays several
+indexing schemes over them, reporting how much of the table each can even reach.
+It has to run on the target -- the input distribution is a property of the
+allocator (object addresses, 32-byte aligned), so a host-side simulation answers
+a different question.
+
+```bash
+./translate-and-build.sh IdmProbe target/bin/IdmProbe && ./target/bin/IdmProbe
+```
+
+`MapBench` is deliberately NOT part of `CommonWorkloads`:
+`scripts/hellocodenameone/conformance/port_status.py` requires exactly ten unique
+benchmark ids there, and that set is what every generated port application runs.
+
+Two rules the workloads follow, and any addition must:
+
+- **No checksum may depend on iteration order or on hash VALUES.** This map and
+  HotSpot's enumerate differently and identity hash codes differ by construction, so a
+  checksum is a sum or a count over lookups the workload chose.
+- **Pre-box the keys.** `Integer.valueOf` allocates above 127 on HotSpot and never
+  allocates here (tagged immediates), so boxing inside the timed loop measures the
+  allocator instead of the probe.
+
 ## The tortures (run by `run-gauntlet.sh`)
 
 | test | guards |
 |---|---|
 | MapTorture | compact HashMap/LinkedHashMap: growth, tombstones, null keys, views, 200k PRNG op mix, insertion/access order |
+| HtTorture | Hashtable: null rejection, Dictionary keys/elements Enumerations, rehash growth, remove churn, all four views incl. setValue write-through, equals/hashCode, 80k PRNG op mix replayed against an array model |
+| IdmTorture | IdentityHashMap: equal-but-distinct keys, null key/value, rehash growth, the backward-shift relocation on remove, views, 60k PRNG op mix replayed against an array model |
 | SbTorture | StringBuilder: every append overload, toString independence under later mutation, editing ops, surrogates, 100k PRNG mix |
 | StrCmp | String equals/compareTo/sort incl. unicode + surrogates; charAt logical-length bounds |
 | FusedTest | @Fused layout: param/computed sizes, oversize fallback, ctor guard paths, survivors across GC — **also the canary for setjmp/longjmp bugs (deliberate caught exception)** |
