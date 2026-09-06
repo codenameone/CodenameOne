@@ -83,35 +83,44 @@ class MiscellaneousFeaturesJava042Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     
-    void snippet() throws Exception {
-        // tag::miscellaneous-features-java-042[]
+    // tag::miscellaneous-features-java-042[]
+    void applyLargerText(Component someComponent) {
         Display display = Display.getInstance();
-        if (display.isLargerTextEnabled()) {
-            float scale = display.getLargerTextScale();
-            // take the base from the component's own style: derive() keeps the
-            // typeface of its receiver, so deriving Label's font would replace
-            // whatever face this component was given
-            Font base = someComponent.getUnselectedStyle().getFont();
-            // derive() only works on TrueType/native fonts and throws on a
-            // legacy bitmap font, and it takes a requested pixel size rather
-            // than getHeight(), which is the rendered line height. Both checks
-            // mirror UIManager's own scaleFontForLargerText.
-            if (base != null && base.isTTFNativeFont()) {
-                float baseSize = base.getPixelSize();
-                if (baseSize <= 0) {
-                    baseSize = base.getHeight();
-                }
-                if (baseSize > 0) {
-                    Font scaled = base.derive(baseSize * scale, base.getStyle());
-                    // getAllStyles writes through to selected, pressed and
-                    // disabled too, so the text does not snap back to the
-                    // original size when the component changes state
-                    someComponent.getAllStyles().setFont(scaled);
-                }
-            }
+        if (!display.isLargerTextEnabled()) {
+            return;
         }
-        // end::miscellaneous-features-java-042[]
+        float scale = display.getLargerTextScale();
+        // each state can carry its own face -- a bold selected font, say -- so
+        // derive from the font that state already has instead of broadcasting
+        // one scaled font to all four
+        Style unselected = someComponent.getUnselectedStyle();
+        unselected.setFont(scaleForLargerText(unselected.getFont(), scale));
+        Style selected = someComponent.getSelectedStyle();
+        selected.setFont(scaleForLargerText(selected.getFont(), scale));
+        Style pressed = someComponent.getPressedStyle();
+        pressed.setFont(scaleForLargerText(pressed.getFont(), scale));
+        Style disabled = someComponent.getDisabledStyle();
+        disabled.setFont(scaleForLargerText(disabled.getFont(), scale));
     }
+
+    /// Mirrors UIManager's own scaler: derive() handles only TrueType and
+    /// native fonts, and takes a requested pixel size rather than the rendered
+    /// line height getHeight() reports. Anything it cannot scale comes back
+    /// unchanged rather than throwing.
+    private Font scaleForLargerText(Font font, float scale) {
+        if (font == null || !font.isTTFNativeFont() || scale <= 1f) {
+            return font;
+        }
+        float baseSize = font.getPixelSize();
+        if (baseSize <= 0) {
+            baseSize = font.getHeight();
+        }
+        if (baseSize <= 0) {
+            return font;
+        }
+        return font.derive(baseSize * scale, font.getStyle());
+    }
+    // end::miscellaneous-features-java-042[]
 
     Component someComponent = new Label();
 
