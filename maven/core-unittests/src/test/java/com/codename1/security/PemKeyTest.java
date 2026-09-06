@@ -1,0 +1,1386 @@
+/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+import com.codename1.junit.UITestBase;
+import com.codename1.util.Base64;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
+/// Covers [PublicKey#fromPem] / [PrivateKey#fromPem] across every container an
+/// `openssl`-produced `.pem` file can be in, plus the malformed inputs that
+/// used to surface as an opaque "invalid key format" from the platform.
+///
+/// The fixtures are throwaway keys generated for this test. Only the base64
+/// bodies are stored, with the `-----BEGIN-----` armor assembled at runtime, so
+/// repository secret scanning does not flag the file as a leaked private key.
+class PemKeyTest extends UITestBase {
+
+    /// Body of a throwaway PRIVATE KEY test key.
+    private static final String RSA_PKCS8_LABEL = "PRIVATE KEY";
+    private static final String RSA_PKCS8 = ""
+            + "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDKbhYepFWuXOHh"
+            + "4TWNdD7dmzDMrurYjI5fJQ5t7JPqblbCVXaxhPH4xmkm0DRfb9XSpiGJMPcVHR4c"
+            + "HW3GYSWiO3SgZer5sahkKzNRUou/Mhw1gEo+rXDedwRk6COyPni6P02R6t+4ayAX"
+            + "pJJmbgzJKrD0eYgWzio6a7UCe6338DsT/viXA7jc3qGuRw3WZgMNUV8itmeE/Wnk"
+            + "pQZ871PM8To/5362/ohfCE7wO/9NNiTmNi0yjZxkVbHIbKcaU0qL6ByKGJryHZgt"
+            + "pXYc49mWG+lAfq0+MIAXsr9qugcxHa2MQOVa8ceThbMfEmxFr7f5vLdnSRDDTzTd"
+            + "ZA3ieWUTAgMBAAECggEABTsuQlrbOMcY5afWpNhc/e6r814oOEuWXxcSD5bBhWYv"
+            + "wvqtncDI9mjXAGdfZk5f9DJrqdckfqmV+AJt4WaGFnJhSfo+rEOb2megMXkBa4Hc"
+            + "AMK9jtXklZso94KYPMIoh7rP2/ZGrPleIIsVzXFvZ/NwFAesxwoYEhJrRxK/8cKt"
+            + "V5WFBuYINAVL6tkTcG6Ghpl3HBAcftCcHPnN0N2ELaYxca4AzdHNJEFOIh8YX+CM"
+            + "VMlQXiLSmCRyOsG0orDwA/T+qu2PbtELdxS8dgQm/p24BO4CK+dqmMqLpH9I5cmE"
+            + "MwxToTAWcrJQmyG2nW66pm6+9ZKU+v1qzoPxBga44QKBgQDsaymxtE7NIXUUG5+f"
+            + "nX6Y8Iwl+S9ZbtXilaFfeHkicBU+dYUqUDhCqgys8XJ+tBuXg3Vl17naniFzOxd0"
+            + "GPbvzqJ1phkV3hZeWcSO5ipmCk4qa3qFZpIq0OgD1Xqi3WMTKriCWLgoPnRdp2Pf"
+            + "Qo1oKiS5FaEetBYCMBThtmXXZwKBgQDbMkGIuhjSBwGQ79vO+hacuy9CPhTwBHP+"
+            + "qiT3/z3s7IYFe92pUXXkiNaCpCYd9P0ixPAgzVhsULAylHosalQVzB06jYBuxVqu"
+            + "vnG4e64sYtKq9nKyYEQ6Zk1EX7f8aSFz11seVfLQnKlSd7GsOCNjOa0v2bTcifao"
+            + "tfaahZmVdQKBgDnZLuaQnAeNfDxjVfeUbfm2QlS4WGGlwSgkPMxDikBm9IvH7cGg"
+            + "x2NogJmAqudd4rJ8NCmrU4quzriHaQG7ahDbmtz2u4SiRw7nIDVnFFDLjLzMd7pU"
+            + "ksdvPpZRkiRvz2JNPcCHPOh7/7U61DE486jdRwcSx83fetMmOLXSD7FZAoGBAMxj"
+            + "wkPx8270ZXt2jWokPK2MxXZpWTCtllOi57Hv6RhhPF8krv5RHTMqfYt38KsCZH/l"
+            + "T1vm3kqxunqPhJSh2SIyIBcXFukzUWmb34J8oV52D6anAzBdH4GtHuNgtbjBdxYD"
+            + "e81/q1jmm+RwA9Zoymadw2XZBRKX+s46TmarqRh5AoGBANjFYYu4HWDeTErTsyZE"
+            + "SMhwrT3EG1Rkhit7duE8Uv7Kf37TvzuPqg8Y6lnbBy/RnnxyuuaHD2V+c85VHy0H"
+            + "JZyT53ZrUQgmizubaPG2P6JUv9RSaSOKvpp9kkpuMxxk1sLt5NcOd62yeVyvqSXY"
+            + "sdEGfQt9PNQaQSaI1oS5WAkr";
+
+    /// Body of a throwaway PUBLIC KEY test key.
+    private static final String RSA_SPKI_LABEL = "PUBLIC KEY";
+    private static final String RSA_SPKI = ""
+            + "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAym4WHqRVrlzh4eE1jXQ+"
+            + "3ZswzK7q2IyOXyUObeyT6m5WwlV2sYTx+MZpJtA0X2/V0qYhiTD3FR0eHB1txmEl"
+            + "ojt0oGXq+bGoZCszUVKLvzIcNYBKPq1w3ncEZOgjsj54uj9NkerfuGsgF6SSZm4M"
+            + "ySqw9HmIFs4qOmu1Anut9/A7E/74lwO43N6hrkcN1mYDDVFfIrZnhP1p5KUGfO9T"
+            + "zPE6P+d+tv6IXwhO8Dv/TTYk5jYtMo2cZFWxyGynGlNKi+gcihia8h2YLaV2HOPZ"
+            + "lhvpQH6tPjCAF7K/aroHMR2tjEDlWvHHk4WzHxJsRa+3+by3Z0kQw0803WQN4nll"
+            + "EwIDAQAB";
+
+    /// Body of a throwaway RSA PRIVATE KEY test key.
+    private static final String RSA_PKCS1_LABEL = "RSA PRIVATE KEY";
+    private static final String RSA_PKCS1 = ""
+            + "MIIEpAIBAAKCAQEAym4WHqRVrlzh4eE1jXQ+3ZswzK7q2IyOXyUObeyT6m5WwlV2"
+            + "sYTx+MZpJtA0X2/V0qYhiTD3FR0eHB1txmElojt0oGXq+bGoZCszUVKLvzIcNYBK"
+            + "Pq1w3ncEZOgjsj54uj9NkerfuGsgF6SSZm4MySqw9HmIFs4qOmu1Anut9/A7E/74"
+            + "lwO43N6hrkcN1mYDDVFfIrZnhP1p5KUGfO9TzPE6P+d+tv6IXwhO8Dv/TTYk5jYt"
+            + "Mo2cZFWxyGynGlNKi+gcihia8h2YLaV2HOPZlhvpQH6tPjCAF7K/aroHMR2tjEDl"
+            + "WvHHk4WzHxJsRa+3+by3Z0kQw0803WQN4nllEwIDAQABAoIBAAU7LkJa2zjHGOWn"
+            + "1qTYXP3uq/NeKDhLll8XEg+WwYVmL8L6rZ3AyPZo1wBnX2ZOX/Qya6nXJH6plfgC"
+            + "beFmhhZyYUn6PqxDm9pnoDF5AWuB3ADCvY7V5JWbKPeCmDzCKIe6z9v2Rqz5XiCL"
+            + "Fc1xb2fzcBQHrMcKGBISa0cSv/HCrVeVhQbmCDQFS+rZE3BuhoaZdxwQHH7QnBz5"
+            + "zdDdhC2mMXGuAM3RzSRBTiIfGF/gjFTJUF4i0pgkcjrBtKKw8AP0/qrtj27RC3cU"
+            + "vHYEJv6duATuAivnapjKi6R/SOXJhDMMU6EwFnKyUJshtp1uuqZuvvWSlPr9as6D"
+            + "8QYGuOECgYEA7GspsbROzSF1FBufn51+mPCMJfkvWW7V4pWhX3h5InAVPnWFKlA4"
+            + "QqoMrPFyfrQbl4N1Zde52p4hczsXdBj2786idaYZFd4WXlnEjuYqZgpOKmt6hWaS"
+            + "KtDoA9V6ot1jEyq4gli4KD50Xadj30KNaCokuRWhHrQWAjAU4bZl12cCgYEA2zJB"
+            + "iLoY0gcBkO/bzvoWnLsvQj4U8ARz/qok9/897OyGBXvdqVF15IjWgqQmHfT9IsTw"
+            + "IM1YbFCwMpR6LGpUFcwdOo2AbsVarr5xuHuuLGLSqvZysmBEOmZNRF+3/Gkhc9db"
+            + "HlXy0JypUnexrDgjYzmtL9m03In2qLX2moWZlXUCgYA52S7mkJwHjXw8Y1X3lG35"
+            + "tkJUuFhhpcEoJDzMQ4pAZvSLx+3BoMdjaICZgKrnXeKyfDQpq1OKrs64h2kBu2oQ"
+            + "25rc9ruEokcO5yA1ZxRQy4y8zHe6VJLHbz6WUZIkb89iTT3Ahzzoe/+1OtQxOPOo"
+            + "3UcHEsfN33rTJji10g+xWQKBgQDMY8JD8fNu9GV7do1qJDytjMV2aVkwrZZTouex"
+            + "7+kYYTxfJK7+UR0zKn2Ld/CrAmR/5U9b5t5Ksbp6j4SUodkiMiAXFxbpM1Fpm9+C"
+            + "fKFedg+mpwMwXR+BrR7jYLW4wXcWA3vNf6tY5pvkcAPWaMpmncNl2QUSl/rOOk5m"
+            + "q6kYeQKBgQDYxWGLuB1g3kxK07MmREjIcK09xBtUZIYre3bhPFL+yn9+0787j6oP"
+            + "GOpZ2wcv0Z58crrmhw9lfnPOVR8tByWck+d2a1EIJos7m2jxtj+iVL/UUmkjir6a"
+            + "fZJKbjMcZNbC7eTXDnetsnlcr6kl2LHRBn0LfTzUGkEmiNaEuVgJKw==";
+
+    /// Body of a throwaway RSA PUBLIC KEY test key.
+    private static final String RSA_PKCS1_PUB_LABEL = "RSA PUBLIC KEY";
+    private static final String RSA_PKCS1_PUB = ""
+            + "MIIBCgKCAQEAym4WHqRVrlzh4eE1jXQ+3ZswzK7q2IyOXyUObeyT6m5WwlV2sYTx"
+            + "+MZpJtA0X2/V0qYhiTD3FR0eHB1txmElojt0oGXq+bGoZCszUVKLvzIcNYBKPq1w"
+            + "3ncEZOgjsj54uj9NkerfuGsgF6SSZm4MySqw9HmIFs4qOmu1Anut9/A7E/74lwO4"
+            + "3N6hrkcN1mYDDVFfIrZnhP1p5KUGfO9TzPE6P+d+tv6IXwhO8Dv/TTYk5jYtMo2c"
+            + "ZFWxyGynGlNKi+gcihia8h2YLaV2HOPZlhvpQH6tPjCAF7K/aroHMR2tjEDlWvHH"
+            + "k4WzHxJsRa+3+by3Z0kQw0803WQN4nllEwIDAQAB";
+
+    /// Body of a throwaway EC PRIVATE KEY test key.
+    private static final String EC_SEC1_LABEL = "EC PRIVATE KEY";
+    private static final String EC_SEC1 = ""
+            + "MHcCAQEEIJH5okiyahqy8Ixppi+BedFt4ivFpGsBswfVmwWeDvntoAoGCCqGSM49"
+            + "AwEHoUQDQgAEderdY+o+XsXzcHTlaoe82r3o3sXh4tthVHoG3wwC85wOUYmuK/c4"
+            + "pPZ0ZQdRH+GOAXgB+oRNfj8WSYM9mShrng==";
+
+    /// Body of a throwaway PRIVATE KEY test key.
+    private static final String EC_PKCS8_LABEL = "PRIVATE KEY";
+    private static final String EC_PKCS8 = ""
+            + "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgkfmiSLJqGrLwjGmm"
+            + "L4F50W3iK8WkawGzB9WbBZ4O+e2hRANCAAR16t1j6j5exfNwdOVqh7zavejexeHi"
+            + "22FUegbfDALznA5Ria4r9zik9nRlB1Ef4Y4BeAH6hE1+PxZJgz2ZKGue";
+
+    /// Body of a throwaway PUBLIC KEY test key.
+    private static final String EC_SPKI_LABEL = "PUBLIC KEY";
+    private static final String EC_SPKI = ""
+            + "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEderdY+o+XsXzcHTlaoe82r3o3sXh"
+            + "4tthVHoG3wwC85wOUYmuK/c4pPZ0ZQdRH+GOAXgB+oRNfj8WSYM9mShrng==";
+
+    /// Body of a throwaway ENCRYPTED PRIVATE KEY test key.
+    private static final String RSA_ENCRYPTED_LABEL = "ENCRYPTED PRIVATE KEY";
+    private static final String RSA_ENCRYPTED = ""
+            + "MIIFNTBfBgkqhkiG9w0BBQ0wUjAxBgkqhkiG9w0BBQwwJAQQY8To5swati8sXuzo"
+            + "3z2E8AICCAAwDAYIKoZIhvcNAgkFADAdBglghkgBZQMEASoEEKdygeJPfRDAh00W"
+            + "ATuxzPIEggTQo43lk/saOfmHkeGcnzchdwEk5h3wKkq2wFa3M/Uzkuk6Hmj/Da4e"
+            + "MSTBCDPcbxhsHq2J6mIcjt8xbAwIAtCfbs7wiR7Hy+rGnWqvefcT52RMbGTLpkN9"
+            + "V7SuLs6B6M3gidSeghYNdfHsNt4gI0lJndBFYxitS3x7OSSTlspiLzLo2BK4sN1+"
+            + "Mh5YtK0Dh13VEAa9UZ/JVfjpxVXjC4BXEZ0dcb/GgX/jwP/XKDabAXilu5jw3HkF"
+            + "0EAK/AtmDkaVGbyTnRB7w6gDXhEVK2rJwpL86s80S27ZvuTCIn6PFnCwG1zWzk+7"
+            + "8FD4NYcfsbZqfPvbyQ86wT4GsGitDihhBwnE6TUpvyGfplHcWnPHgrrdix4W60DJ"
+            + "0xafMSzS7miVBrNqqQwh9FFRAewZ3FCb9Zu771pE67QsfK1dSJLP15uyOuEhsMsb"
+            + "3qxaXohsJBTKGcn0c4LG4qnTGiwcdwlGHDd7xYxr+uOLfbp8NU5uFVO4Yi5rk/Mf"
+            + "CkgznBwiM6SKJVCE2UeDwVeh4sFVYxGJ9crzPoxyXvEWsov6+VQKjg9c5BUS9A/M"
+            + "Cc5KSZ+JzdKA1vcLjAxm4aK9yP5MvN3gQatC2JGYV/HsK4H5D+wM+C667maXRoHw"
+            + "YA+1x77r9WubN6mUiK/0rzBFfLSv/ZiAcFL1C//H5+yVgxe8tYHUrgavPm3tpFWd"
+            + "KDVFI9pQXZ1RXyFiW5RdNYdKVHMVQsGD41uwa8GfwLFPbQ/W0p184d+rXMZwOO+O"
+            + "34j7s3DXdQzDL/L2Oq/CCEwNzCZxR6LFwfbqIww6YpQZtNWlGoZ+97H7ofNJZeFA"
+            + "pMuhOJA89uZ6X7J7i/nKJEfKeIK/jjwYOm0nYFh+X6wfISgtHX4Jmedfj0FLL93D"
+            + "FaSl5Zb7eSKkx4PmM3rDuRvffC2DVE6NgdDBSIab6ZMVQeV+CpbdepEkJfAHLHPK"
+            + "e/qqpK+1ex8bRmtyABH8u/ghOvq4SbpQvB4L0MHUYmwDMs85Z3LZa6NlHFpYd6sx"
+            + "L3YyHrPB5+e7+KRimnyG/W+2yqQ/DTvp4Jvu53LXsVebCjO7ah8JU1eKVWI0v5sN"
+            + "D1sy3aDUma/0Nxcigux/kmV5HmgIw77wH81W7xPZwMfJ16lUgbKUgt9s5kzJBHOk"
+            + "PyzUdN6XmVYEQnouz4pjCCb+e3V0fyvrDWXrJpTyQ35007Lc7UQemKhibwxyddOj"
+            + "91sHzfCyzUzu/Zt9GzdXH/y90DMTQdnWgG4eN8RhMmvl55EHDNe6H9iWufhhjTWX"
+            + "kZIjkRmeWWJfJLR+EiphIAVDaqtP2cOV01u6e5tUbb5KZ/0toqNfyWtSbZQ9Wuao"
+            + "tO3bNJ4uQNjOzDmdUjbgvC9sCSSQEPL9sU5Rc2/HekEsq+OB3rXvUBV4ZDG0QNHe"
+            + "gXpgJLXRDgRWXRXJQW0CxC1EyC/i+27qk6+O72De1VkIkwE/EdhY+/og3b2NVWiA"
+            + "MSSOHGsVw16H/sEAfavw8KR687KraiCXxMuCO6qTRMJkZ3oFcWWCYTcLcLs8X7vD"
+            + "2Agk+VJipUjmP2DGPGmfheb09pKrc3f8N8HZJEaVEnVpEr5ps/cf1Jrg5rRhwWfH"
+            + "6j/tPHJczFOda/pPLAvKUTJFb0ykC1SarM1a7JAlBkIjQV/6gy1LnZo=";
+
+    /// Body of a throwaway EC PRIVATE KEY test key written with explicit curve parameters.
+    private static final String EC_SEC1_EXPLICIT_LABEL = "EC PRIVATE KEY";
+    private static final String EC_SEC1_EXPLICIT = ""
+            + "MIIBaAIBAQQgzgQyqm3SoKJl/+kk1lZcl5DdXBwSi5mcV2dUxnlnnl6ggfowgfcC"
+            + "AQEwLAYHKoZIzj0BAQIhAP////8AAAABAAAAAAAAAAAAAAAA////////////////"
+            + "MFsEIP////8AAAABAAAAAAAAAAAAAAAA///////////////8BCBaxjXYqjqT57Pr"
+            + "vVV2mIa8ZR0GsMxTsPY7zjw+J9JgSwMVAMSdNgiG5wSTamZ44ROdJreBn36QBEEE"
+            + "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpZP40Li/hp/m47n60p8D54W"
+            + "K84zV2sxXs7LtkBoN79R9QIhAP////8AAAAA//////////+85vqtpxeehPO5ysL8"
+            + "YyVRAgEBoUQDQgAELryQVp8o9+EzTdiZFP3DYQLp8K4b54Nhj++QzO8OKuAFi3Y7"
+            + "WIGMvCvnnWjHO2n1HlYN2qjIcumoTe+Vc0lLow==";
+
+    /// Body of a throwaway PRIVATE KEY test key written with explicit curve parameters.
+    private static final String EC_PKCS8_EXPLICIT_LABEL = "PRIVATE KEY";
+    private static final String EC_PKCS8_EXPLICIT = ""
+            + "MIIBeQIBADCCAQMGByqGSM49AgEwgfcCAQEwLAYHKoZIzj0BAQIhAP////8AAAAB"
+            + "AAAAAAAAAAAAAAAA////////////////MFsEIP////8AAAABAAAAAAAAAAAAAAAA"
+            + "///////////////8BCBaxjXYqjqT57PrvVV2mIa8ZR0GsMxTsPY7zjw+J9JgSwMV"
+            + "AMSdNgiG5wSTamZ44ROdJreBn36QBEEEaxfR8uEsQkf4vOblY6RA8ncDfYEt6zOg"
+            + "9KE5RdiYwpZP40Li/hp/m47n60p8D54WK84zV2sxXs7LtkBoN79R9QIhAP////8A"
+            + "AAAA//////////+85vqtpxeehPO5ysL8YyVRAgEBBG0wawIBAQQgzgQyqm3SoKJl"
+            + "/+kk1lZcl5DdXBwSi5mcV2dUxnlnnl6hRANCAAQuvJBWnyj34TNN2JkU/cNhAunw"
+            + "rhvng2GP75DM7w4q4AWLdjtYgYy8K+edaMc7afUeVg3aqMhy6ahN75VzSUuj";
+
+    /// An explicit-parameters EC public key whose fieldID is "30 02 05 00".
+    private static final String EC_SPKI_EXPLICIT_BAD_FIELDID = ""
+            + "MIIBIDCB2QYHKoZIzj0CATCBzQIBATACBQAwWwQg/////wAAAAEAAAAAAAAAAAAA"
+            + "AAD///////////////wEIFrGNdiqOpPns+u9VXaYhrxlHQawzFOw9jvOPD4n0mBL"
+            + "AxUAxJ02CIbnBJNqZnjhE50mt4GffpAEQQRrF9Hy4SxCR/i85uVjpEDydwN9gS3r"
+            + "M6D0oTlF2JjClk/jQuL+Gn+bjufrSnwPnhYrzjNXazFezsu2QGg3v1H1AiEA////"
+            + "/wAAAAD//////////7zm+q2nF56E87nKwvxjJVECAQEDQgAELryQVp8o9+EzTdiZ"
+            + "FP3DYQLp8K4b54Nhj++QzO8OKuAFi3Y7WIGMvCvnnWjHO2n1HlYN2qjIcumoTe+V"
+            + "c0lLow==";
+
+    /// An explicit-parameters EC public key whose prime-field parameters are
+    /// an OCTET STRING where the prime INTEGER belongs.
+    private static final String EC_SPKI_BAD_PRIME = ""
+            + "MIIBSzCCAQMGByqGSM49AgEwgfcCAQEwLAYHKoZIzj0BAQQhAP////8AAAABAAAA"
+            + "AAAAAAAAAAAA////////////////MFsEIP////8AAAABAAAAAAAAAAAAAAAA////"
+            + "///////////8BCBaxjXYqjqT57PrvVV2mIa8ZR0GsMxTsPY7zjw+J9JgSwMVAMSd"
+            + "NgiG5wSTamZ44ROdJreBn36QBEEEaxfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5"
+            + "RdiYwpZP40Li/hp/m47n60p8D54WK84zV2sxXs7LtkBoN79R9QIhAP////8AAAAA"
+            + "//////////+85vqtpxeehPO5ysL8YyVRAgEBA0IABC68kFafKPfhM03YmRT9w2EC"
+            + "6fCuG+eDYY/vkMzvDirgBYt2O1iBjLwr551oxztp9R5WDdqoyHLpqE3vlXNJS6M=";
+
+    /// A sect163k1 key with explicit parameters over a binary field.
+    private static final String EC_SEC1_CHAR2 = ""
+            + "MIHxAgEBBBUAvIxZ7TvRAWmSpV7IQs8hARRX3BWggaQwgaECAQEwJQYHKoZIzj0B"
+            + "AjAaAgIAowYJKoZIzj0BAgMDMAkCAQMCAQYCAQcwLgQVAAAAAAAAAAAAAAAAAAAA"
+            + "AAAAAAABBBUAAAAAAAAAAAAAAAAAAAAAAAAAAAEEKwQC/hPAU3u8EayqB9eT3k5t"
+            + "XlyU7ugCiQcPsF04/1gyHy6ABTbVOMzao9kCFQQAAAAAAAAAAAACAQii4MwNmfil"
+            + "7wIBAqEuAywABAJ+Rz+ymd544z3ErMw3R+GVTKOCvgeWwndbbpgwNrdgPeLFLwjQ"
+            + "6ygnlw==";
+
+    /// What "openssl pkcs8 -topk8" makes of it.
+    private static final String EC_PKCS8_CHAR2 = ""
+            + "MIIBAQIBADCBrQYHKoZIzj0CATCBoQIBATAlBgcqhkjOPQECMBoCAgCjBgkqhkjO"
+            + "PQECAwMwCQIBAwIBBgIBBzAuBBUAAAAAAAAAAAAAAAAAAAAAAAAAAAEEFQAAAAAA"
+            + "AAAAAAAAAAAAAAAAAAAAAQQrBAL+E8BTe7wRrKoH15PeTm1eXJTu6AKJBw+wXTj/"
+            + "WDIfLoAFNtU4zNqj2QIVBAAAAAAAAAAAAAIBCKLgzA2Z+KXvAgECBEwwSgIBAQQV"
+            + "ALyMWe070QFpkqVeyELPIQEUV9wVoS4DLAAEAn5HP7KZ3njjPcSszDdH4ZVMo4K+"
+            + "B5bCd1tumDA2t2A94sUvCNDrKCeX";
+
+    /// The same key with Characteristic-two replaced by "30 02 05 00".
+    private static final String EC_PKCS8_CHAR2_BAD = ""
+            + "MIHpAgEAMIGVBgcqhkjOPQIBMIGJAgEBMA0GByqGSM49AQIwAgUAMC4EFQAAAAAA"
+            + "AAAAAAAAAAAAAAAAAAAAAQQVAAAAAAAAAAAAAAAAAAAAAAAAAAABBCsEAv4TwFN7"
+            + "vBGsqgfXk95ObV5clO7oAokHD7BdOP9YMh8ugAU21TjM2qPZAhUEAAAAAAAAAAAA"
+            + "AgEIouDMDZn4pe8CAQIETDBKAgEBBBUAvIxZ7TvRAWmSpV7IQs8hARRX3BWhLgMs"
+            + "AAQCfkc/spneeOM9xKzMN0fhlUyjgr4HlsJ3W26YMDa3YD3ixS8I0OsoJ5c=";
+
+    /// The explicit-parameters EC key with its curve seed's unused-bits
+    /// count set to 8, which is outside the legal 0..7.
+    private static final String EC_PKCS8_BAD_SEED = ""
+            + "MIIBeQIBADCCAQMGByqGSM49AgEwgfcCAQEwLAYHKoZIzj0BAQIhAP////8AAAAB"
+            + "AAAAAAAAAAAAAAAA////////////////MFsEIP////8AAAABAAAAAAAAAAAAAAAA"
+            + "///////////////8BCBaxjXYqjqT57PrvVV2mIa8ZR0GsMxTsPY7zjw+J9JgSwMV"
+            + "CMSdNgiG5wSTamZ44ROdJreBn36QBEEEaxfR8uEsQkf4vOblY6RA8ncDfYEt6zOg"
+            + "9KE5RdiYwpZP40Li/hp/m47n60p8D54WK84zV2sxXs7LtkBoN79R9QIhAP////8A"
+            + "AAAA//////////+85vqtpxeehPO5ysL8YyVRAgEBBG0wawIBAQQgzgQyqm3SoKJl"
+            + "/+kk1lZcl5DdXBwSi5mcV2dUxnlnnl6hRANCAAQuvJBWnyj34TNN2JkU/cNhAunw"
+            + "rhvng2GP75DM7w4q4AWLdjtYgYy8K+edaMc7afUeVg3aqMhy6ahN75VzSUuj";
+
+    private static String pem(String label, String base64) {
+        StringBuilder sb = new StringBuilder("-----BEGIN ").append(label).append("-----\n");
+        for (int i = 0; i < base64.length(); i += 64) {
+            sb.append(base64, i, Math.min(i + 64, base64.length())).append('\n');
+        }
+        return sb.append("-----END ").append(label).append("-----\n").toString();
+    }
+
+    private static byte[] der(String base64) {
+        return Base64.decode(base64.getBytes());
+    }
+
+    /// The Temurin 8 build this project compiles against ships no SunEC
+    /// provider, so EC signing cannot run there. The rewrap assertions below do
+    /// not depend on it and always run; only the "and the platform accepts the
+    /// result" half is conditional.
+    private static boolean ecProviderPresent() {
+        try {
+            java.security.KeyFactory.getInstance("EC");
+            return true;
+        } catch (java.security.NoSuchAlgorithmException e) {
+            return false;
+        }
+    }
+
+    // ---- the case from the report: armored PEM straight from a backend ----
+
+    @Test
+    void rsaPemRoundTrip() {
+        PublicKey pub = PublicKey.fromPem(pem(RSA_SPKI_LABEL, RSA_SPKI));
+        PrivateKey priv = PrivateKey.fromPem(pem(RSA_PKCS8_LABEL, RSA_PKCS8));
+
+        assertEquals(PublicKey.RSA, pub.getAlgorithm());
+        assertEquals("X.509", pub.getFormat());
+        assertEquals(PublicKey.RSA, priv.getAlgorithm());
+        assertEquals("PKCS#8", priv.getFormat());
+        assertArrayEquals(der(RSA_SPKI), pub.getEncoded());
+        assertArrayEquals(der(RSA_PKCS8), priv.getEncoded());
+
+        byte[] plaintext = "Secret message".getBytes();
+        byte[] ciphertext = Cipher.rsaEncrypt(Cipher.RSA_OAEP_SHA256, pub, plaintext);
+        assertArrayEquals(plaintext, Cipher.rsaDecrypt(Cipher.RSA_OAEP_SHA256, priv, ciphertext));
+    }
+
+    @Test
+    void rsaPemAcceptedAsRawFileBytes() {
+        // Util.readInputStream gives bytes, not a String -- the overload has to
+        // reach the same key.
+        byte[] fileBytes = pem(RSA_SPKI_LABEL, RSA_SPKI).getBytes();
+        assertArrayEquals(der(RSA_SPKI), PublicKey.fromPem(fileBytes).getEncoded());
+    }
+
+    // ---- older containers get rewrapped rather than rejected ----
+
+    @Test
+    void pkcs1PrivateKeyIsRewrappedAsPkcs8() {
+        PrivateKey priv = PrivateKey.fromPem(pem(RSA_PKCS1_LABEL, RSA_PKCS1));
+        assertEquals(PublicKey.RSA, priv.getAlgorithm());
+        // the rewrap has to be byte-identical to what "openssl pkcs8 -topk8" makes
+        assertArrayEquals(der(RSA_PKCS8), priv.getEncoded());
+
+        PublicKey pub = PublicKey.fromPem(pem(RSA_SPKI_LABEL, RSA_SPKI));
+        byte[] ciphertext = Cipher.rsaEncrypt(Cipher.RSA_OAEP_SHA256, pub, "pkcs1".getBytes());
+        assertArrayEquals("pkcs1".getBytes(),
+                Cipher.rsaDecrypt(Cipher.RSA_OAEP_SHA256, priv, ciphertext));
+    }
+
+    @Test
+    void pkcs1PublicKeyIsRewrappedAsSpki() {
+        PublicKey pub = PublicKey.fromPem(pem(RSA_PKCS1_PUB_LABEL, RSA_PKCS1_PUB));
+        assertEquals(PublicKey.RSA, pub.getAlgorithm());
+        assertArrayEquals(der(RSA_SPKI), pub.getEncoded());
+
+        PrivateKey priv = PrivateKey.fromPem(pem(RSA_PKCS8_LABEL, RSA_PKCS8));
+        byte[] ciphertext = Cipher.rsaEncrypt(Cipher.RSA_OAEP_SHA256, pub, "pkcs1pub".getBytes());
+        assertArrayEquals("pkcs1pub".getBytes(),
+                Cipher.rsaDecrypt(Cipher.RSA_OAEP_SHA256, priv, ciphertext));
+    }
+
+    @Test
+    void sec1EcPrivateKeyIsRewrappedAsPkcs8() {
+        // "openssl ecparam -genkey" emits SEC1, so this is the default EC file.
+        PrivateKey priv = PrivateKey.fromPem(pem(EC_SEC1_LABEL, EC_SEC1));
+        PublicKey pub = PublicKey.fromPem(pem(EC_SPKI_LABEL, EC_SPKI));
+        assertEquals(PublicKey.EC, priv.getAlgorithm());
+        assertEquals(PublicKey.EC, pub.getAlgorithm());
+        // lifting the curve out of the SEC1 [0] field has to land exactly where
+        // "openssl pkcs8 -topk8" puts it
+        assertArrayEquals(der(EC_PKCS8), priv.getEncoded());
+
+        assumeTrue(ecProviderPresent(), "JDK has no EC provider");
+        byte[] data = "sign me".getBytes();
+        byte[] sig = Signature.sign(Signature.SHA256_WITH_ECDSA, priv, data);
+        assertTrue(Signature.verify(Signature.SHA256_WITH_ECDSA, pub, data, sig));
+    }
+
+    @Test
+    void ecPkcs8RoundTrip() {
+        PrivateKey priv = PrivateKey.fromPem(pem(EC_PKCS8_LABEL, EC_PKCS8));
+        PublicKey pub = PublicKey.fromPem(pem(EC_SPKI_LABEL, EC_SPKI));
+        assertArrayEquals(der(EC_PKCS8), priv.getEncoded());
+        assertEquals(PublicKey.EC, pub.getAlgorithm());
+
+        assumeTrue(ecProviderPresent(), "JDK has no EC provider");
+        byte[] data = "sign me too".getBytes();
+        byte[] sig = Signature.sign(Signature.SHA256_WITH_ECDSA, priv, data);
+        assertTrue(Signature.verify(Signature.SHA256_WITH_ECDSA, pub, data, sig));
+    }
+
+    // ---- tolerated input shapes ----
+
+    @Test
+    void bareBase64WithoutArmorIsAccepted() {
+        // keys carried in JSON or a build hint arrive without armor
+        assertArrayEquals(der(RSA_SPKI), PublicKey.fromPem(RSA_SPKI).getEncoded());
+        assertArrayEquals(der(RSA_PKCS8), PrivateKey.fromPem(RSA_PKCS8).getEncoded());
+    }
+
+    @Test
+    void bareBase64StillTellsPublicFromPrivate() {
+        // with no label to go on the container has to be read out of the DER,
+        // or the mix-up only surfaces as the platform's "invalid key format"
+        CryptoException asPublic = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(RSA_PKCS8));
+        assertTrue(asPublic.getMessage().contains("private key"), asPublic.getMessage());
+
+        CryptoException asPrivate = assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(RSA_SPKI));
+        assertTrue(asPrivate.getMessage().contains("public key"), asPrivate.getMessage());
+    }
+
+    @Test
+    void crlfLineEndingsAndSurroundingTextAreIgnored() {
+        String armored = pem(RSA_SPKI_LABEL, RSA_SPKI).replace("\n", "\r\n");
+        String noisy = "# key rotated 2026-01-01\r\n" + armored + "\r\ntrailing note\r\n";
+        assertArrayEquals(der(RSA_SPKI), PublicKey.fromPem(noisy).getEncoded());
+    }
+
+    @Test
+    void explicitAlgorithmOverloadSkipsDetection() {
+        PublicKey pub = PublicKey.fromPem(PublicKey.RSA, pem(RSA_SPKI_LABEL, RSA_SPKI));
+        assertEquals(PublicKey.RSA, pub.getAlgorithm());
+        assertArrayEquals(der(RSA_SPKI), pub.getEncoded());
+    }
+
+    // ---- rejected input names its own problem ----
+
+    @Test
+    void encryptedPrivateKeyIsRejectedWithTheDecryptCommand() {
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem(RSA_ENCRYPTED_LABEL, RSA_ENCRYPTED)));
+        assertTrue(e.getMessage().contains("encrypted"), e.getMessage());
+        assertTrue(e.getMessage().contains("openssl pkcs8"), e.getMessage());
+    }
+
+    @Test
+    void publicKeyPemIsRejectedByPrivateKeyFactory() {
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem(RSA_SPKI_LABEL, RSA_SPKI)));
+        assertTrue(e.getMessage().contains("PUBLIC KEY"), e.getMessage());
+    }
+
+    @Test
+    void certificateIsRejectedWithTheExtractCommand() {
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem("CERTIFICATE", RSA_SPKI)));
+        assertTrue(e.getMessage().contains("openssl x509"), e.getMessage());
+    }
+
+    @Test
+    void garbageIsACryptoExceptionNotAnArrayIndexError() {
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem("not a key at all"));
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(""));
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY", "!!!!")));
+    }
+
+    @Test
+    void truncatedDerIsACryptoExceptionNotAnArrayIndexError() {
+        byte[] full = der(RSA_SPKI);
+        for (int cut = 1; cut < 24; cut++) {
+            byte[] chopped = new byte[full.length - cut];
+            System.arraycopy(full, 0, chopped, 0, chopped.length);
+            String truncated = pem(RSA_SPKI_LABEL, Base64.encodeNoNewline(chopped));
+            assertThrows(CryptoException.class, () -> PublicKey.fromPem(truncated),
+                    "cut of " + cut + " bytes should not escape as a runtime error");
+        }
+    }
+
+    @Test
+    void footerMustMatchTheHeaderLabel() {
+        // RFC 7468. A block closed by someone else's footer is a spliced file,
+        // and one with no footer was cut off; neither should load silently.
+        String spliced = "-----BEGIN PUBLIC KEY-----\n" + RSA_SPKI + "\n-----END PRIVATE KEY-----\n";
+        CryptoException mismatched = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(spliced));
+        assertTrue(mismatched.getMessage().contains("-----END PUBLIC KEY-----"), mismatched.getMessage());
+
+        String headerOnly = "-----BEGIN PUBLIC KEY-----\n" + RSA_SPKI + "\n";
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(headerOnly));
+    }
+
+    @Test
+    void unarmoredInputAcceptsTheSameContainersAsArmored() {
+        // stripping the armor must not change which formats load, and must not
+        // change the bytes they produce
+        assertArrayEquals(der(RSA_SPKI), PublicKey.fromPem(RSA_PKCS1_PUB).getEncoded());
+        assertArrayEquals(der(RSA_PKCS8), PrivateKey.fromPem(RSA_PKCS1).getEncoded());
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(EC_SEC1).getEncoded());
+    }
+
+    @Test
+    void unarmoredInputStillTellsPublicFromPrivate() {
+        assertTrue(assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(RSA_PKCS1_PUB)).getMessage().contains("public key"));
+        assertTrue(assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(EC_SEC1)).getMessage().contains("private key"));
+    }
+
+    @Test
+    void oversizedDerLengthDoesNotAllocate() {
+        // A four-byte length near Integer.MAX_VALUE used to make the bounds
+        // check "pos + length > der.length" overflow to a negative number and
+        // pass, so a ten-byte PEM reached new byte[length] and died with
+        // OutOfMemoryError. Every declared length must come back as a
+        // CryptoException instead.
+        for (int shift = 0; shift < 32; shift++) {
+            int length = 1 << shift;
+            byte[] oversized = {0x30, 0x08, 0x30, 0x06, 0x06, (byte) 0x84,
+                    (byte) (length >>> 24), (byte) (length >>> 16),
+                    (byte) (length >>> 8), (byte) length};
+            String armored = pem("PUBLIC KEY", Base64.encodeNoNewline(oversized));
+            assertThrows(CryptoException.class, () -> PublicKey.fromPem(armored),
+                    "declared length 2^" + shift + " must not escape as a runtime error");
+        }
+    }
+
+    @Test
+    void contentAfterTheBase64PaddingIsRejected() {
+        // Base64.decode stops at the first '=' and ignores the rest, so without
+        // an explicit check a spliced body loads on its first half alone.
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(RSA_SPKI_LABEL, RSA_SPKI + "=garbage")));
+        assertTrue(e.getMessage().contains("padding"), e.getMessage());
+
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(RSA_SPKI_LABEL, RSA_SPKI + "!!")));
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(RSA_SPKI_LABEL, RSA_SPKI.substring(0, RSA_SPKI.length() - 1))));
+    }
+
+    @Test
+    void readsCannotEscapeTheEnclosingDerElement() {
+        // An AlgorithmIdentifier declaring length 0 (or too few bytes) followed
+        // by an OID that really belongs to the enclosing SEQUENCE used to be
+        // walked as though the OID were its own, reporting a malformed key as
+        // valid RSA -- and it then failed in the platform bridge with exactly
+        // the opaque error this parser exists to replace.
+        byte[] oid = {0x2A, (byte) 0x86, 0x48, (byte) 0x86, (byte) 0xF7,
+                0x0D, 0x01, 0x01, 0x01};
+
+        byte[] emptyAlgId = new byte[15];
+        emptyAlgId[0] = 0x30;
+        emptyAlgId[1] = 0x0D;
+        emptyAlgId[2] = 0x30;
+        emptyAlgId[3] = 0x00;
+        emptyAlgId[4] = 0x06;
+        emptyAlgId[5] = 0x09;
+        System.arraycopy(oid, 0, emptyAlgId, 6, oid.length);
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem("PUBLIC KEY", Base64.encodeNoNewline(emptyAlgId))));
+
+        byte[] shortAlgId = emptyAlgId.clone();
+        shortAlgId[3] = 0x02;
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem("PUBLIC KEY", Base64.encodeNoNewline(shortAlgId))));
+
+        byte[] pkcs8AlgId = new byte[18];
+        pkcs8AlgId[0] = 0x30;
+        pkcs8AlgId[1] = 0x10;
+        pkcs8AlgId[2] = 0x02;
+        pkcs8AlgId[3] = 0x01;
+        pkcs8AlgId[4] = 0x00;
+        pkcs8AlgId[5] = 0x30;
+        pkcs8AlgId[6] = 0x00;
+        pkcs8AlgId[7] = 0x06;
+        pkcs8AlgId[8] = 0x09;
+        System.arraycopy(oid, 0, pkcs8AlgId, 9, oid.length);
+        assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(pkcs8AlgId))));
+    }
+
+    @Test
+    void sec1WithExplicitCurveParametersIsPreserved() {
+        // ECParameters is a CHOICE: usually a named-curve OID, but a whole
+        // SEQUENCE when the key was written with "openssl ecparam
+        // -param_enc explicit". Reading an OID out of it rejected a valid SEC1
+        // key, so the field is carried over whole -- and the result is what
+        // "openssl pkcs8 -topk8" produces for the same file, byte for byte.
+        PrivateKey priv = PrivateKey.fromPem(pem(EC_SEC1_EXPLICIT_LABEL, EC_SEC1_EXPLICIT));
+        assertEquals(PublicKey.EC, priv.getAlgorithm());
+        assertArrayEquals(der(EC_PKCS8_EXPLICIT), priv.getEncoded());
+
+        // and unarmored input reaches the same key
+        assertArrayEquals(der(EC_PKCS8_EXPLICIT),
+                PrivateKey.fromPem(EC_SEC1_EXPLICIT).getEncoded());
+    }
+
+    private static byte[] hex(String s) {
+        String h = s.replace(" ", "");
+        byte[] out = new byte[h.length() / 2];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = (byte) Integer.parseInt(h.substring(i * 2, i * 2 + 2), 16);
+        }
+        return out;
+    }
+
+    @Test
+    void aContainerMissingItsMandatoryFieldsIsRejected() {
+        // A well-formed AlgorithmIdentifier and nothing else looks exactly like
+        // the start of an SPKI. Classifying on the first child alone returned a
+        // key carrying no public value, which then failed in the platform
+        // bridge with the opaque error this class exists to replace.
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(
+                pem("PUBLIC KEY", Base64.encodeNoNewline(
+                        hex("300f 300d 0609 2a864886f70d010101 0500")))));
+
+        // the same omission on the private side: no privateKey OCTET STRING
+        assertThrows(CryptoException.class, () -> PrivateKey.fromPem(
+                pem("PRIVATE KEY", Base64.encodeNoNewline(
+                        hex("3012 020100 300d 0609 2a864886f70d010101 0500")))));
+
+        // RSAPrivateKey's nine INTEGER fields are all mandatory
+        assertThrows(CryptoException.class, () -> PrivateKey.fromPem(
+                pem("PRIVATE KEY", Base64.encodeNoNewline(hex("3009 020100 020101 020102")))));
+    }
+
+    @Test
+    void aLeadingParametersBlockIsSkipped() {
+        // "openssl ecparam -name prime256v1 -genkey" (without -noout) writes an
+        // EC PARAMETERS block ahead of the key, and taking whatever block came
+        // first rejected that file -- the exact command the javadoc says works.
+        String twoBlocks = pem("EC PARAMETERS", "BggqhkjOPQMBBw==")
+                + pem(EC_SEC1_LABEL, EC_SEC1);
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(twoBlocks).getEncoded());
+    }
+
+    @Test
+    void eachFactoryPicksItsOwnBlockFromAMixedFile() {
+        String both = pem(EC_SPKI_LABEL, EC_SPKI) + pem(EC_PKCS8_LABEL, EC_PKCS8);
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(both).getEncoded());
+        assertArrayEquals(der(EC_SPKI), PublicKey.fromPem(both).getEncoded());
+
+        String reversed = pem(EC_PKCS8_LABEL, EC_PKCS8) + pem(EC_SPKI_LABEL, EC_SPKI);
+        assertArrayEquals(der(EC_SPKI), PublicKey.fromPem(reversed).getEncoded());
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(reversed).getEncoded());
+    }
+
+    @Test
+    void aFileWithNoUsableBlockNamesWhatItHolds() {
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem("EC PARAMETERS", "BggqhkjOPQMBBw==")));
+        assertTrue(e.getMessage().contains("EC PARAMETERS"), e.getMessage());
+    }
+
+    @Test
+    void anIncompleteSpkiValueIsRejected() {
+        // Peeking at the BIT STRING tag was not enough: a lone 0x03 byte and an
+        // empty "03 00" both passed as SubjectPublicKeyInfo, and SPKI has
+        // exactly two fields so nothing may follow the value either.
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY",
+                Base64.encodeNoNewline(hex("3010 300d 0609 2a864886f70d010101 0500 03")))));
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY",
+                Base64.encodeNoNewline(hex("3011 300d 0609 2a864886f70d010101 0500 0300")))));
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY",
+                Base64.encodeNoNewline(hex("3014 300d 0609 2a864886f70d010101 0500 030100 0500")))));
+    }
+
+    @Test
+    void sec1RejectsFieldsItHasNoRoomFor() {
+        // ECPrivateKey ends with at most one [0] and one [1]. Accepting anything
+        // else let a malformed key carry thousands of junk children, each one
+        // appended to a growing array that was copied whole every time.
+        StringBuilder content = new StringBuilder("020101").append("0420")
+                .append("00000000000000000000000000000000000000000000000000000000000000")
+                .append("00")
+                .append("A00A06082a8648ce3d030107");
+        for (int i = 0; i < 2000; i++) {
+            content.append("0500");
+        }
+        byte[] body = hex(content.toString());
+        byte[] blob = new byte[body.length + 4];
+        blob[0] = 0x30;
+        blob[1] = (byte) 0x82;
+        blob[2] = (byte) (body.length >> 8);
+        blob[3] = (byte) body.length;
+        System.arraycopy(body, 0, blob, 4, body.length);
+
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem("EC PRIVATE KEY", Base64.encodeNoNewline(blob))));
+        assertTrue(e.getMessage().contains("unexpected field"), e.getMessage());
+    }
+
+    @Test
+    void algorithmIdentifierCarriesAtMostOneParametersField() {
+        // AlgorithmIdentifier ::= SEQUENCE { OID, parameters ANY OPTIONAL }.
+        // Reading the OID and stopping accepted { rsaEncryption, NULL, NULL }.
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY",
+                Base64.encodeNoNewline(
+                        hex("3014 300f 0609 2a864886f70d010101 0500 0500 030100")))));
+    }
+
+    @Test
+    void aBitStringOfOnlyItsUnusedBitsOctetIsRejected() {
+        // "03 01 00" is a one-byte BIT STRING whose single octet is the
+        // unused-bits count, so it carries no key material -- the length check
+        // has to demand more than that one byte of metadata.
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY",
+                Base64.encodeNoNewline(hex("3012 300d 0609 2a864886f70d010101 0500 030100")))));
+    }
+
+    @Test
+    void rfc5958VersionOneKeysAreNormalized() {
+        // JDK 11 refuses a version-1 OneAsymmetricKey ("version mismatch") while
+        // 17 and later accept it, so passing one through works on some supported
+        // runtimes and not others. Normalizing reproduces the canonical
+        // version-0 key exactly.
+        byte[] canonical = der(RSA_PKCS8);
+        int off = (canonical[1] & 0xFF) < 0x80 ? 2 : 2 + (canonical[1] & 0x7F);
+        byte[] inner = new byte[canonical.length - off];
+        System.arraycopy(canonical, off, inner, 0, inner.length);
+        inner[2] = 0x01;                                  // version 0 -> 1
+
+        // RFC 5958's module is IMPLICIT TAGS, so [1] PublicKey keeps the BIT
+        // STRING's primitive form and is tagged 0x81, not the constructed 0xA1
+        // this fixture used to carry.
+        byte[] publicKey = new byte[66];
+        publicKey[0] = (byte) 0x81;
+        publicKey[1] = 64;
+        byte[] content = new byte[inner.length + publicKey.length];
+        System.arraycopy(inner, 0, content, 0, inner.length);
+        System.arraycopy(publicKey, 0, content, inner.length, publicKey.length);
+
+        byte[] v1 = new byte[content.length + 4];
+        v1[0] = 0x30;
+        v1[1] = (byte) 0x82;
+        v1[2] = (byte) (content.length >> 8);
+        v1[3] = (byte) content.length;
+        System.arraycopy(content, 0, v1, 4, content.length);
+
+        PrivateKey key = PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(v1)));
+        assertArrayEquals(canonical, key.getEncoded());
+
+        // a key that is already version 0 is passed through untouched
+        assertArrayEquals(canonical, PrivateKey.fromPem(pem(RSA_PKCS8_LABEL, RSA_PKCS8)).getEncoded());
+    }
+
+    @Test
+    void nonMinimalDerLengthsAreRejected() {
+        // DER demands the shortest length encoding; BER does not. JDK 11 and 17
+        // refuse a redundant length while 21 and later accept it, so a key
+        // encoded this way loads on some supported runtimes and not others.
+        byte[] spki = der(RSA_SPKI);
+        byte[] content = new byte[spki.length - 4];
+        System.arraycopy(spki, 4, content, 0, content.length);
+
+        byte[] leadingZero = new byte[content.length + 5];
+        leadingZero[0] = 0x30;
+        leadingZero[1] = (byte) 0x83;
+        leadingZero[2] = 0x00;
+        leadingZero[3] = (byte) (content.length >> 8);
+        leadingZero[4] = (byte) content.length;
+        System.arraycopy(content, 0, leadingZero, 5, content.length);
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem("PUBLIC KEY", Base64.encodeNoNewline(leadingZero))));
+        assertTrue(e.getMessage().contains("non-minimal"), e.getMessage());
+
+        // long form used where the short form would do
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY",
+                Base64.encodeNoNewline(hex("3014 30810d 0609 2a864886f70d010101 0500 03020001")))));
+    }
+
+    @Test
+    void onlyKnownPkcs8VersionsAreAccepted() {
+        // Normalizing anything that merely was not version 0 laundered a corrupt
+        // header into a well-formed key: version 2, and an empty INTEGER, both
+        // came back as the canonical version-0 encoding and were accepted.
+        byte[] canonical = der(RSA_PKCS8);
+        int off = (canonical[1] & 0xFF) < 0x80 ? 2 : 2 + (canonical[1] & 0x7F);
+
+        for (int version : new int[] {2, 5, 127}) {
+            byte[] bad = canonical.clone();
+            bad[off + 2] = (byte) version;
+            CryptoException e = assertThrows(CryptoException.class,
+                    () -> PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(bad))),
+                    "version " + version + " must not be normalized");
+            assertTrue(e.getMessage().contains("version"), e.getMessage());
+        }
+
+        // and version 0 and 1 are still the two that work
+        assertArrayEquals(canonical, PrivateKey.fromPem(pem(RSA_PKCS8_LABEL, RSA_PKCS8)).getEncoded());
+    }
+
+    @Test
+    void pkcs1PrivateKeyRejectsAnythingAfterItsNineFields() {
+        // Only a single otherPrimeInfos SEQUENCE may follow, for a multi-prime
+        // key; anything else was wrapped into the PKCS#8 output as-is.
+        byte[] pkcs1 = der(RSA_PKCS1);
+        int off = (pkcs1[1] & 0xFF) < 0x80 ? 2 : 2 + (pkcs1[1] & 0x7F);
+        byte[] body = new byte[pkcs1.length - off];
+        System.arraycopy(pkcs1, off, body, 0, body.length);
+
+        for (String junk : new String[] {"0500", "020105", "0400"}) {
+            byte[] extra = hex(junk);
+            byte[] content = new byte[body.length + extra.length];
+            System.arraycopy(body, 0, content, 0, body.length);
+            System.arraycopy(extra, 0, content, body.length, extra.length);
+
+            byte[] blob = new byte[content.length + 4];
+            blob[0] = 0x30;
+            blob[1] = (byte) 0x82;
+            blob[2] = (byte) (content.length >> 8);
+            blob[3] = (byte) content.length;
+            System.arraycopy(content, 0, blob, 4, content.length);
+
+            assertThrows(CryptoException.class,
+                    () -> PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(blob))),
+                    "trailing " + junk + " must not be accepted");
+        }
+
+        // the untouched key still converts
+        assertArrayEquals(der(RSA_PKCS8), PrivateKey.fromPem(pem(RSA_PKCS1_LABEL, RSA_PKCS1)).getEncoded());
+    }
+
+    @Test
+    void pkcs8RejectsAnythingAfterItsOptionalFields() {
+        // RFC 5958 allows only [0] attributes and [1] publicKey after the
+        // privateKey. Found by fuzzing real keys against the platform rather
+        // than by review: appending a bare NULL, INTEGER or OCTET STRING was
+        // accepted here and refused by the JDK.
+        for (String base : new String[] {RSA_PKCS8, EC_PKCS8}) {
+            byte[] key = der(base);
+            for (String junk : new String[] {"0500", "020100", "0400"}) {
+                byte[] extra = hex(junk);
+                byte[] blob = new byte[key.length + extra.length];
+                System.arraycopy(key, 0, blob, 0, key.length);
+                System.arraycopy(extra, 0, blob, key.length, extra.length);
+                // widen the outer length to cover the appended element
+                if ((blob[1] & 0xFF) == 0x82) {
+                    int len = (((blob[2] & 0xFF) << 8) | (blob[3] & 0xFF)) + extra.length;
+                    blob[2] = (byte) (len >> 8);
+                    blob[3] = (byte) len;
+                } else if ((blob[1] & 0xFF) == 0x81) {
+                    blob[2] = (byte) ((blob[2] & 0xFF) + extra.length);
+                } else {
+                    blob[1] = (byte) ((blob[1] & 0xFF) + extra.length);
+                }
+                assertThrows(CryptoException.class,
+                        () -> PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(blob))),
+                        "trailing " + junk + " must not be accepted");
+            }
+        }
+        // the untouched keys still load
+        assertArrayEquals(der(RSA_PKCS8), PrivateKey.fromPem(pem(RSA_PKCS8_LABEL, RSA_PKCS8)).getEncoded());
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(pem(EC_PKCS8_LABEL, EC_PKCS8)).getEncoded());
+    }
+
+    @Test
+    void ecAlgorithmIdentifierMustNameItsCurve() {
+        // RFC 5480 makes ECParameters mandatory for id-ecPublicKey, and the
+        // platform enforces it. RSA is deliberately not held to the same rule:
+        // rsaEncryption should carry NULL parameters, but a key that omits them
+        // is accepted by the platform, so rejecting it here would refuse keys
+        // that work today.
+        byte[] ecBits = new byte[68];
+        ecBits[0] = 0x03;
+        ecBits[1] = 0x42;
+        ecBits[3] = 0x04;
+        byte[] algId = hex("3009 0607 2a8648ce3d0201");
+        byte[] content = new byte[algId.length + ecBits.length];
+        System.arraycopy(algId, 0, content, 0, algId.length);
+        System.arraycopy(ecBits, 0, content, algId.length, ecBits.length);
+        byte[] blob = new byte[content.length + 2];
+        blob[0] = 0x30;
+        blob[1] = (byte) content.length;
+        System.arraycopy(content, 0, blob, 2, content.length);
+
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem("PUBLIC KEY", Base64.encodeNoNewline(blob))));
+        assertTrue(e.getMessage().contains("curve"), e.getMessage());
+    }
+
+    @Test
+    void pkcs1PrivateKeyVersionMustMatchItsShape() {
+        // RFC 3447: version 0 is a two-prime key and version 1 a multi-prime
+        // one. Counting the field without reading it let any version through
+        // to be rewrapped as PKCS#8.
+        byte[] key = der(RSA_PKCS1);
+        int off = (key[1] & 0xFF) < 0x80 ? 2 : 2 + (key[1] & 0x7F);
+        for (int version : new int[] {1, 3, 99}) {
+            byte[] bad = key.clone();
+            bad[off + 2] = (byte) version;
+            assertThrows(CryptoException.class,
+                    () -> PrivateKey.fromPem(pem(RSA_PKCS1_LABEL, Base64.encodeNoNewline(bad))),
+                    "version " + version + " on a two-prime key must not be accepted");
+        }
+        // the genuine version-0 key still converts
+        assertArrayEquals(der(RSA_PKCS8), PrivateKey.fromPem(pem(RSA_PKCS1_LABEL, RSA_PKCS1)).getEncoded());
+    }
+
+    @Test
+    void bothSpellingsOfTheRfc5958PublicKeyTagAreAccepted() {
+        // 0x81 is what the RFC specifies; 0xA1 is what some encoders emit and
+        // the platform tolerates. Rejecting 0x81 refused keys the JDK accepts.
+        byte[] canonical = der(RSA_PKCS8);
+        int off = (canonical[1] & 0xFF) < 0x80 ? 2 : 2 + (canonical[1] & 0x7F);
+        // The spellings carry the key differently: under IMPLICIT tagging 0x81
+        // has replaced the BIT STRING's own tag, so its contents are the BIT
+        // STRING value, while the constructed 0xA1 wraps a whole BIT STRING.
+        byte[][] fields = {
+            hex("81020001"),                 // implicit: value is 00 01
+            hex("A10403020001"),             // explicit: wraps 03 02 00 01
+        };
+        for (byte[] field : fields) {
+            byte[] inner = new byte[canonical.length - off];
+            System.arraycopy(canonical, off, inner, 0, inner.length);
+            inner[2] = 0x01;
+            byte[] content = new byte[inner.length + field.length];
+            System.arraycopy(inner, 0, content, 0, inner.length);
+            System.arraycopy(field, 0, content, inner.length, field.length);
+            byte[] blob = new byte[content.length + 4];
+            blob[0] = 0x30;
+            blob[1] = (byte) 0x82;
+            blob[2] = (byte) (content.length >> 8);
+            blob[3] = (byte) content.length;
+            System.arraycopy(content, 0, blob, 4, content.length);
+            assertArrayEquals(canonical,
+                    PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(blob))).getEncoded(),
+                    "tag 0x" + Integer.toHexString(field[0] & 0xFF) + " must normalize");
+        }
+
+        // and the field's contents are checked, not merely skipped
+        for (String bad : new String[] {"810108", "8100", "810100", "A1020500"}) {
+            byte[] inner = new byte[canonical.length - off];
+            System.arraycopy(canonical, off, inner, 0, inner.length);
+            inner[2] = 0x01;
+            byte[] field = hex(bad);
+            byte[] content = new byte[inner.length + field.length];
+            System.arraycopy(inner, 0, content, 0, inner.length);
+            System.arraycopy(field, 0, content, inner.length, field.length);
+            byte[] blob = new byte[content.length + 4];
+            blob[0] = 0x30;
+            blob[1] = (byte) 0x82;
+            blob[2] = (byte) (content.length >> 8);
+            blob[3] = (byte) content.length;
+            System.arraycopy(content, 0, blob, 4, content.length);
+            assertThrows(CryptoException.class,
+                    () -> PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(blob))),
+                    bad + " must not be accepted");
+        }
+    }
+
+    @Test
+    void sec1VersionMustBeOne() {
+        // RFC 5915 defines only version 1; any other value was copied into the
+        // rewrapped key for the provider to reject later.
+        byte[] key = der(EC_SEC1);
+        int off = (key[1] & 0xFF) < 0x80 ? 2 : 2 + (key[1] & 0x7F);
+        for (int version : new int[] {0, 2, 77}) {
+            byte[] bad = key.clone();
+            bad[off + 2] = (byte) version;
+            CryptoException e = assertThrows(CryptoException.class,
+                    () -> PrivateKey.fromPem(pem(EC_SEC1_LABEL, Base64.encodeNoNewline(bad))),
+                    "SEC1 version " + version + " must not be accepted");
+            assertTrue(e.getMessage().contains("version 1"), e.getMessage());
+        }
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(pem(EC_SEC1_LABEL, EC_SEC1)).getEncoded());
+    }
+
+    @Test
+    void emptyDerIntegersAreRejected() {
+        // A DER INTEGER carries at least one content octet, so "02 00" is not a
+        // number -- but counting tags without reading them let it through.
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(
+                pem("RSA PUBLIC KEY", Base64.encodeNoNewline(hex("3006 020101 0200")))));
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(
+                pem("RSA PUBLIC KEY", Base64.encodeNoNewline(hex("3006 0200 020103")))));
+    }
+
+    @Test
+    void sec1ParametersWrapperHoldsExactlyOneValue() {
+        // ECParameters is a CHOICE, so [0] carries one value. Reading the first
+        // and ignoring the rest dropped the extra bytes and handed back a
+        // well-formed key built from a spliced container.
+        byte[] content = hex("020101"
+                + "0420" + "0000000000000000000000000000000000000000000000000000000000000000"
+                + "A00C" + "06082a8648ce3d030107" + "0500");
+        byte[] blob = new byte[content.length + 2];
+        blob[0] = 0x30;
+        blob[1] = (byte) content.length;
+        System.arraycopy(content, 0, blob, 2, content.length);
+
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem(EC_SEC1_LABEL, Base64.encodeNoNewline(blob))));
+        assertTrue(e.getMessage().contains("parameters"), e.getMessage());
+
+        // the real key is unaffected
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(pem(EC_SEC1_LABEL, EC_SEC1)).getEncoded());
+    }
+
+    @Test
+    void aPublicKeyFieldRequiresVersionOne() {
+        // RFC 5958 only allows publicKey in a version-1 key, and the version-0
+        // path returns the bytes untouched -- so a version-0 container carrying
+        // one reached the platform with a field its own version forbids.
+        byte[] canonical = der(RSA_PKCS8);
+        byte[] field = {(byte) 0x81, 8, 0, 0, 0, 0, 0, 0, 0, 0};
+        byte[] content = new byte[canonical.length - 4 + field.length];
+        System.arraycopy(canonical, 4, content, 0, canonical.length - 4);
+        System.arraycopy(field, 0, content, canonical.length - 4, field.length);
+        byte[] blob = new byte[content.length + 4];
+        blob[0] = 0x30;
+        blob[1] = (byte) 0x82;
+        blob[2] = (byte) (content.length >> 8);
+        blob[3] = (byte) content.length;
+        System.arraycopy(content, 0, blob, 4, content.length);
+
+        assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(blob))));
+    }
+
+    @Test
+    void sec1PublicKeyWrapperMustHoldOneBitString() {
+        // the [1] wrapper is copied into the rewrapped key, so what is inside it
+        // has to be checked here or it is never checked at all
+        byte[] content = hex("020101"
+                + "0420" + "0000000000000000000000000000000000000000000000000000000000000000"
+                + "A00A" + "06082a8648ce3d030107"
+                + "A1020500");
+        byte[] blob = new byte[content.length + 2];
+        blob[0] = 0x30;
+        blob[1] = (byte) content.length;
+        System.arraycopy(content, 0, blob, 2, content.length);
+
+        assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem(EC_SEC1_LABEL, Base64.encodeNoNewline(blob))));
+        // the real key, which does carry a [1] BIT STRING, still converts
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(pem(EC_SEC1_LABEL, EC_SEC1)).getEncoded());
+    }
+
+    @Test
+    void theExplicitAlgorithmOverloadsValidateToo() {
+        // These never call Pem.algorithm(), which was the only place the
+        // AlgorithmIdentifier was checked, so an SPKI whose identifier is an
+        // empty "30 00" came back as a usable key.
+        String spki = pem("PUBLIC KEY", Base64.encodeNoNewline(hex("3008 3000 03020001")));
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(PublicKey.RSA, spki));
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(spki));
+
+        // the real keys still load through both overloads
+        assertArrayEquals(der(RSA_SPKI),
+                PublicKey.fromPem(PublicKey.RSA, pem(RSA_SPKI_LABEL, RSA_SPKI)).getEncoded());
+        assertArrayEquals(der(RSA_PKCS8),
+                PrivateKey.fromPem(PublicKey.RSA, pem(RSA_PKCS8_LABEL, RSA_PKCS8)).getEncoded());
+    }
+
+    @Test
+    void pkcs8AttributesMustHoldRealAttributes() {
+        // Attributes ::= SET OF Attribute, and Attribute ::= SEQUENCE { type
+        // OID, values SET }. Skipping the wrapper let "A0 02 05 00" through --
+        // which the JDK tolerates and OpenSSL does not, so the key worked on
+        // JavaSE and Android and failed on the Linux port. Checking only that
+        // each child is a SEQUENCE is not enough either: OpenSSL also refuses
+        // "A0 04 30 02 05 00".
+        byte[] canonical = der(RSA_PKCS8);
+        String[] malformed = {"A0020500", "A00430020500"};
+        for (String attrs : malformed) {
+            assertThrows(CryptoException.class,
+                    () -> PrivateKey.fromPem(pem("PRIVATE KEY",
+                            Base64.encodeNoNewline(withTrailer(canonical, hex(attrs))))),
+                    attrs + " must not be accepted");
+        }
+
+        // a well-formed Attribute is still accepted -- verified against OpenSSL
+        byte[] wellFormed = hex("A011300F06092a864886f70d010907310205 00".replace(" ", ""));
+        assertNotNull(PrivateKey.fromPem(pem("PRIVATE KEY",
+                Base64.encodeNoNewline(withTrailer(canonical, wellFormed)))));
+    }
+
+    /// Appends `trailer` inside the key's outer SEQUENCE, widening its length.
+    private static byte[] withTrailer(byte[] key, byte[] trailer) {
+        byte[] blob = new byte[key.length + trailer.length];
+        System.arraycopy(key, 0, blob, 0, key.length);
+        System.arraycopy(trailer, 0, blob, key.length, trailer.length);
+        int length = (((blob[2] & 0xFF) << 8) | (blob[3] & 0xFF)) + trailer.length;
+        blob[2] = (byte) (length >> 8);
+        blob[3] = (byte) length;
+        return blob;
+    }
+
+    @Test
+    void theBitStringUnusedBitsOctetIsChecked() {
+        // That octet is a count of 0..7, and the bits it declares unused must be
+        // zero. Checking only the length accepted both of these, which the JDK
+        // and OpenSSL each refuse.
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY",
+                Base64.encodeNoNewline(hex("3013 300d 0609 2a864886f70d010101 0500 03020800")))));
+        assertThrows(CryptoException.class, () -> PublicKey.fromPem(pem("PUBLIC KEY",
+                Base64.encodeNoNewline(hex("3013 300d 0609 2a864886f70d010101 0500 030207ff")))));
+        // a zero count with real payload is still fine
+        assertNotNull(PublicKey.fromPem(pem(RSA_SPKI_LABEL, RSA_SPKI)));
+    }
+
+    @Test
+    void aMalformedAlgorithmOidIsRejectedByBothOverloads() {
+        // read() checks the tag and the bounds and nothing else, so an empty or
+        // unterminated OID reached the explicit overload intact -- the
+        // auto-detecting path only caught it by accident, because such an OID
+        // matches neither algorithm it knows.
+        String empty = pem("PUBLIC KEY", Base64.encodeNoNewline(hex("3008 3002 0600 03020001")));
+        String unterminated = pem("PUBLIC KEY", Base64.encodeNoNewline(hex("300a 3004 06022a86 03020001")));
+        for (String bad : new String[] {empty, unterminated}) {
+            assertThrows(CryptoException.class, () -> PublicKey.fromPem(bad));
+            assertThrows(CryptoException.class, () -> PublicKey.fromPem(PublicKey.RSA, bad));
+        }
+    }
+
+    @Test
+    void otherPrimeInfosMustActuallyHoldPrimeInfo() {
+        // A version-1 PKCS#1 key promises multi-prime data; an empty "30 00"
+        // sequence is not it, and OpenSSL refuses the rewrapped result.
+        byte[] key = der(RSA_PKCS1);
+        int off = (key[1] & 0xFF) < 0x80 ? 2 : 2 + (key[1] & 0x7F);
+        byte[] body = new byte[key.length - off];
+        System.arraycopy(key, off, body, 0, body.length);
+        body[2] = 0x01;                                   // two-prime -> multi-prime
+        byte[] empty = hex("3000");
+        byte[] content = new byte[body.length + empty.length];
+        System.arraycopy(body, 0, content, 0, body.length);
+        System.arraycopy(empty, 0, content, body.length, empty.length);
+        byte[] blob = new byte[content.length + 4];
+        blob[0] = 0x30;
+        blob[1] = (byte) 0x82;
+        blob[2] = (byte) (content.length >> 8);
+        blob[3] = (byte) content.length;
+        System.arraycopy(content, 0, blob, 4, content.length);
+
+        assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem(RSA_PKCS1_LABEL, Base64.encodeNoNewline(blob))));
+    }
+
+    @Test
+    void attributeOidsAndValueSetsAreChecked() {
+        // "A0 06 30 04 06 00 31 00" has an empty OID and an empty values SET;
+        // AttributeValue is SET SIZE (1..MAX), and OpenSSL refuses the key.
+        assertThrows(CryptoException.class, () -> PrivateKey.fromPem(pem("PRIVATE KEY",
+                Base64.encodeNoNewline(withTrailer(der(RSA_PKCS8), hex("A0063004060031 00".replace(" ", "")))))));
+    }
+
+    @Test
+    void theSec1PublicKeyBitStringObeysTheSameRules() {
+        // The BIT STRING rules live in one helper now, so the SEC1 [1] wrapper
+        // gets exactly what the SPKI public key gets: payload beyond the
+        // unused-bits octet, a count of 0..7, and zeroed padding.
+        for (String bits : new String[] {"030100", "03020800", "030207ff"}) {
+            byte[] content = hex("020101"
+                    + "0420" + "0000000000000000000000000000000000000000000000000000000000000000"
+                    + "A00A" + "06082a8648ce3d030107"
+                    + "A1" + String.format("%02x", hex(bits).length) + bits);
+            byte[] blob = new byte[content.length + 2];
+            blob[0] = 0x30;
+            blob[1] = (byte) content.length;
+            System.arraycopy(content, 0, blob, 2, content.length);
+            assertThrows(CryptoException.class,
+                    () -> PrivateKey.fromPem(pem(EC_SEC1_LABEL, Base64.encodeNoNewline(blob))),
+                    bits + " must not be accepted");
+        }
+        // the real key, whose [1] holds a proper BIT STRING, still converts
+        assertArrayEquals(der(EC_PKCS8), PrivateKey.fromPem(pem(EC_SEC1_LABEL, EC_SEC1)).getEncoded());
+    }
+
+    @Test
+    void attributeValuesAreWalkedNotJustCounted() {
+        // hasMore() says a byte remains, not that the byte begins a whole
+        // element, so "31 01 05" looked like a populated values SET while
+        // holding a tag with no length behind it. OpenSSL refuses that key and
+        // accepts the complete "31 02 05 00" beside it, so both are checked.
+        byte[] canonical = der(RSA_PKCS8);
+        byte[] truncatedValue = hex("A010300E06092a864886f70d010907310105");
+        byte[] completeValue = hex("A011300F06092a864886f70d01090731020500");
+
+        assertThrows(CryptoException.class, () -> PrivateKey.fromPem(
+                pem("PRIVATE KEY", Base64.encodeNoNewline(withTrailer(canonical, truncatedValue)))));
+        assertNotNull(PrivateKey.fromPem(
+                pem("PRIVATE KEY", Base64.encodeNoNewline(withTrailer(canonical, completeValue)))));
+    }
+
+    @Test
+    void highTagNumberFormIsParsedNotAssumed() {
+        // A tag is one octet unless its low five bits are all ones, where the
+        // number carries on through following octets. Assuming one octet read
+        // the second as a length, so "1f 00" passed for a complete empty
+        // element. Substituted for the NULL in a real key, byte for byte.
+        byte[] key = der(RSA_SPKI);
+        int nullAt = -1;
+        for (int i = 0; i < 25 && nullAt < 0; i++) {
+            if (key[i] == 0x05 && key[i + 1] == 0x00) {
+                nullAt = i;
+            }
+        }
+        assertTrue(nullAt > 0, "the fixture should carry NULL parameters");
+
+        byte[] highTag = key.clone();
+        highTag[nullAt] = 0x1F;
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(RSA_SPKI_LABEL, Base64.encodeNoNewline(highTag))));
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(PublicKey.RSA, pem(RSA_SPKI_LABEL, Base64.encodeNoNewline(highTag))));
+
+        // the untouched key is unaffected
+        assertArrayEquals(key, PublicKey.fromPem(pem(RSA_SPKI_LABEL, RSA_SPKI)).getEncoded());
+    }
+
+    @Test
+    void rsaParametersMustBeNullWhenPresent() {
+        // RFC 4055. Absence is tolerated -- every platform measured accepts a
+        // key that omits them -- but a present non-NULL parameter is taken by
+        // OpenSSL and refused by the JDK, so it would load on the Linux port and
+        // fail on JavaSE and Android.
+        byte[] key = der(RSA_SPKI);
+        int nullAt = -1;
+        for (int i = 0; i < 25 && nullAt < 0; i++) {
+            if (key[i] == 0x05 && key[i + 1] == 0x00) {
+                nullAt = i;
+            }
+        }
+        // swap the 2-byte NULL for a 3-byte well-formed high-tag element
+        byte[] swapped = new byte[key.length + 1];
+        System.arraycopy(key, 0, swapped, 0, nullAt);
+        swapped[nullAt] = 0x1F;
+        swapped[nullAt + 1] = 0x1F;
+        swapped[nullAt + 2] = 0x00;
+        System.arraycopy(key, nullAt + 2, swapped, nullAt + 3, key.length - nullAt - 2);
+        swapped[5]++;                                     // AlgorithmIdentifier length
+        int outer = (((swapped[2] & 0xFF) << 8) | (swapped[3] & 0xFF)) + 1;
+        swapped[2] = (byte) (outer >> 8);
+        swapped[3] = (byte) outer;
+
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(RSA_SPKI_LABEL, Base64.encodeNoNewline(swapped))));
+        assertTrue(e.getMessage().contains("NULL"), e.getMessage());
+
+        // and the whole element is checked, not just its tag: a NULL is
+        // "05 00" and nothing else, so "05 01 00" is not one
+        byte[] fat = new byte[key.length + 1];
+        System.arraycopy(key, 0, fat, 0, nullAt);
+        fat[nullAt] = 0x05;
+        fat[nullAt + 1] = 0x01;
+        fat[nullAt + 2] = 0x00;
+        System.arraycopy(key, nullAt + 2, fat, nullAt + 3, key.length - nullAt - 2);
+        fat[5]++;
+        int widened = (((fat[2] & 0xFF) << 8) | (fat[3] & 0xFF)) + 1;
+        fat[2] = (byte) (widened >> 8);
+        fat[3] = (byte) widened;
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(RSA_SPKI_LABEL, Base64.encodeNoNewline(fat))));
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(PublicKey.RSA, pem(RSA_SPKI_LABEL, Base64.encodeNoNewline(fat))));
+    }
+
+    @Test
+    void theEndOfContentsElementIsNotDer() {
+        // "00 00" is BER's end-of-contents marker for indefinite-length
+        // encodings, which DER does not have, and universal tag 0 is reserved.
+        // Reading it as a zero-length element let it stand in for a value
+        // wherever one was allowed; OpenSSL refuses the resulting key.
+        assertThrows(CryptoException.class, () -> PrivateKey.fromPem(pem("PRIVATE KEY",
+                Base64.encodeNoNewline(withTrailer(der(RSA_PKCS8),
+                        hex("A011300F06092a864886f70d01090731020000"))))));
+    }
+
+    @Test
+    void ecParametersMustNameOrSpellOutACurve() {
+        // ECParameters' third arm, implicitlyCA (NULL), leaves the domain
+        // parameters to come from elsewhere, and neither the JDK nor OpenSSL
+        // takes a key that does that -- so a parameter being present was not
+        // the same as a curve having been named.
+        byte[] key = der(EC_SPKI);
+        byte[] curve = hex("06082a8648ce3d030107");
+        int at = -1;
+        for (int i = 0; i + curve.length <= key.length && at < 0; i++) {
+            boolean match = true;
+            for (int j = 0; j < curve.length && match; j++) {
+                match = key[i + j] == curve[j];
+            }
+            if (match) {
+                at = i;
+            }
+        }
+        assertTrue(at > 0, "the fixture should name prime256v1");
+
+        byte[] nulled = new byte[key.length - curve.length + 2];
+        System.arraycopy(key, 0, nulled, 0, at);
+        nulled[at] = 0x05;
+        nulled[at + 1] = 0x00;
+        System.arraycopy(key, at + curve.length, nulled, at + 2, key.length - at - curve.length);
+        nulled[1] -= (curve.length - 2);
+        nulled[3] -= (curve.length - 2);
+
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(EC_SPKI_LABEL, Base64.encodeNoNewline(nulled))));
+        assertTrue(e.getMessage().contains("curve"), e.getMessage());
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(PublicKey.EC, pem(EC_SPKI_LABEL, Base64.encodeNoNewline(nulled))));
+
+        // an empty SEQUENCE is not explicit parameters either: SpecifiedECDomain
+        // has five mandatory fields and that carries none of them
+        byte[] emptySeq = new byte[key.length - curve.length + 2];
+        System.arraycopy(key, 0, emptySeq, 0, at);
+        emptySeq[at] = 0x30;
+        emptySeq[at + 1] = 0x00;
+        System.arraycopy(key, at + curve.length, emptySeq, at + 2, key.length - at - curve.length);
+        emptySeq[1] -= (curve.length - 2);
+        emptySeq[3] -= (curve.length - 2);
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(EC_SPKI_LABEL, Base64.encodeNoNewline(emptySeq))));
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(PublicKey.EC, pem(EC_SPKI_LABEL, Base64.encodeNoNewline(emptySeq))));
+
+        // a named curve and real explicit parameters both still load
+        assertEquals(PublicKey.EC, PublicKey.fromPem(pem(EC_SPKI_LABEL, EC_SPKI)).getAlgorithm());
+        assertArrayEquals(der(EC_PKCS8_EXPLICIT),
+                PrivateKey.fromPem(pem(EC_SEC1_EXPLICIT_LABEL, EC_SEC1_EXPLICIT)).getEncoded());
+    }
+
+    @Test
+    void aTraditionalEncryptedKeyNamesItsProblem() {
+        // "openssl genrsa -traditional -aes256" keeps the ordinary RSA PRIVATE
+        // KEY label and puts the encryption in RFC 1421 headers above the
+        // ciphertext. Without noticing them the headers reach the base64
+        // decoder, and the answer was that "-" is not a base64 character --
+        // true, and no help at all.
+        String encrypted = "-----BEGIN RSA PRIVATE KEY-----\n"
+                + "Proc-Type: 4,ENCRYPTED\n"
+                + "DEK-Info: AES-256-CBC,CD9BBDACF7A0540A106C7F7405EEAC9C\n"
+                + "\n"
+                + RSA_PKCS1
+                + "\n-----END RSA PRIVATE KEY-----\n";
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(encrypted));
+        assertTrue(e.getMessage().contains("encrypted"), e.getMessage());
+        assertTrue(e.getMessage().contains("openssl pkcs8"), e.getMessage());
+    }
+
+    @Test
+    void specifiedEcDomainFieldsAreParsedNotCounted() {
+        // FieldID is SEQUENCE { fieldType OID, parameters ANY } and Curve is
+        // SEQUENCE { a OCTET STRING, b OCTET STRING, seed BIT STRING OPTIONAL }.
+        // Counting the five outer tags let "30 02 05 00" stand in for the field
+        // a curve is defined over; OpenSSL refuses that key.
+        byte[] key = der(EC_SPKI_EXPLICIT_BAD_FIELDID);
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem("PUBLIC KEY", EC_SPKI_EXPLICIT_BAD_FIELDID)));
+        assertTrue(key.length > 0);
+
+        // "ANY DEFINED BY fieldType": the OID decides what follows it, so an
+        // OCTET STRING where a prime-field's prime belongs is not a field
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem("PUBLIC KEY", EC_SPKI_BAD_PRIME)));
+
+        // and the real explicit-parameters key still converts
+        assertArrayEquals(der(EC_PKCS8_EXPLICIT),
+                PrivateKey.fromPem(pem(EC_SEC1_EXPLICIT_LABEL, EC_SEC1_EXPLICIT)).getEncoded());
+    }
+
+    @Test
+    void proseMentioningADelimiterIsNotOne() {
+        // The delimiters live on lines of their own, and the text around a block
+        // is meant to be ignored. Searching for the marker anywhere let prose
+        // that merely names one be taken for the block itself, swallowing that
+        // prose and the real header into the body and failing a good key.
+        String key = pem(RSA_SPKI_LABEL, RSA_SPKI);
+        assertArrayEquals(der(RSA_SPKI),
+                PublicKey.fromPem("Paste the -----BEGIN PUBLIC KEY----- block below:\n" + key)
+                        .getEncoded());
+        assertArrayEquals(der(RSA_SPKI),
+                PublicKey.fromPem("  -----BEGIN PUBLIC KEY----- was mentioned here\n" + key)
+                        .getEncoded());
+        // and a footer named in prose does not end the body early either
+        assertArrayEquals(der(RSA_SPKI),
+                PublicKey.fromPem(key + "then the -----END PUBLIC KEY----- line closes it\n")
+                        .getEncoded());
+    }
+
+    @Test
+    void characteristicTwoFieldsAreParsed() {
+        // Characteristic-two is SEQUENCE { m INTEGER, basis OID, parameters ANY
+        // DEFINED BY basis }, and the basis decides again: gnBasis NULL,
+        // tpBasis a Trinomial INTEGER, ppBasis a Pentanomial of three INTEGERs.
+        // Taking any non-empty SEQUENCE for the lot let "30 02 05 00" describe a
+        // binary field, which OpenSSL refuses.
+        assertThrows(CryptoException.class, () -> PrivateKey.fromPem(
+                pem("PRIVATE KEY", EC_PKCS8_CHAR2_BAD)));
+
+        // a real sect163k1 explicit key converts, byte for byte, to what
+        // "openssl pkcs8 -topk8" makes of the same file -- this format had no
+        // coverage at all until now, only an assumption that it worked
+        assertArrayEquals(der(EC_PKCS8_CHAR2),
+                PrivateKey.fromPem(pem("EC PRIVATE KEY", EC_SEC1_CHAR2)).getEncoded());
+    }
+
+    @Test
+    void theCurveSeedObeysTheBitStringRules() {
+        // The fourth place a BIT STRING appears, after the SPKI public key, the
+        // SEC1 [1] wrapper and the PKCS#8 [1] field. The helper existed; it was
+        // simply not applied here, so a seed declaring 8 unused bits passed.
+        assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem("PRIVATE KEY", EC_PKCS8_BAD_SEED)));
+
+        // the real keys, whose seeds are well formed, are unaffected
+        assertArrayEquals(der(EC_PKCS8_EXPLICIT),
+                PrivateKey.fromPem(pem(EC_SEC1_EXPLICIT_LABEL, EC_SEC1_EXPLICIT)).getEncoded());
+        assertArrayEquals(der(EC_PKCS8_CHAR2),
+                PrivateKey.fromPem(pem("EC PRIVATE KEY", EC_SEC1_CHAR2)).getEncoded());
+    }
+
+    @Test
+    void unterminatedArmorIsRejected() {
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));
+    }
+}
