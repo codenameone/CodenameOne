@@ -626,10 +626,22 @@ final class LocationButtonManifestFragments {
         // shipped the button against a permission the manifest stopped
         // granting at API 30.
         out = declareUncapped(out, FINE_LOCATION);
+        // And across the MERGE, not just in this block. declareUncapped strips
+        // a cap that is here; a lower-priority manifest's cap is not here yet.
+        // The merger takes the union of an element's attributes, so a
+        // submitted aar declaring ACCESS_FINE_LOCATION with its own
+        // maxSdkVersion -- which older Bluetooth and location libraries
+        // commonly do -- has that attribute merged INTO the declaration added
+        // above, and the button ships against a permission the manifest stops
+        // granting. tools:remove is the merger's own answer to that, and it
+        // reaches caps this scan never sees, including an aar resolved through
+        // android.gradleDependencies.
+        out = removeCapAcrossMerge(out, FINE_LOCATION);
         // COARSE alongside FINE. From Android 12 the two are granted together
         // -- the system shows one dialog offering precise or approximate -- and
         // the platform button requests both.
         out = declareUncapped(out, COARSE_LOCATION);
+        out = removeCapAcrossMerge(out, COARSE_LOCATION);
 
         if (exclusive) {
             out = addPermissionFlag(out, FINE_LOCATION,
@@ -802,6 +814,88 @@ final class LocationButtonManifestFragments {
                 + element.substring(insert);
         return xPermissions.substring(0, start) + replacement
                 + xPermissions.substring(end + 1);
+    }
+
+    /**
+     * Makes the active declaration of {@code name} strip any cap a merged
+     * manifest brings with it.
+     *
+     * <p>{@code declareUncapped} settles what is in THIS block. It cannot
+     * settle what a lower-priority manifest contributes, because the merger
+     * takes the union of an element's attributes: a library that declares the
+     * same permission with its own {@code maxSdkVersion} has that attribute
+     * merged into ours, and the permission the button needs stops being
+     * granted above whatever the library chose.</p>
+     *
+     * <p>{@code tools:remove="android:maxSdkVersion"} is the merger's own
+     * instruction for that, and it reaches caps this scan cannot see at all --
+     * an aar pulled in through {@code android.gradleDependencies} is resolved
+     * by Gradle and never passes through here.</p>
+     *
+     * <p>Merged into an existing {@code tools:remove} rather than written
+     * beside it: that attribute is a comma-separated list, and two of them on
+     * one element is not a thing a manifest may contain.</p>
+     *
+     * @param xPermissions the permission block
+     * @param name         the permission whose cap must not survive the merge
+     * @return the block with the instruction in place
+     */
+    private static String removeCapAcrossMerge(String xPermissions,
+            String name) {
+        int at = activePermissionIndex(xPermissions, name);
+        if (at < 0) {
+            return xPermissions;
+        }
+        int start = xPermissions.lastIndexOf('<', at);
+        int end = xPermissions.indexOf('>', at);
+        if (start < 0 || end < 0) {
+            return xPermissions;
+        }
+        String element = xPermissions.substring(start, end + 1);
+        String[] prefixes = candidatePrefixes(element, xPermissions, TOOLS_NS,
+                "tools");
+        String cap = "android:maxSdkVersion";
+        for (int iter = 0; iter < prefixes.length; iter++) {
+            int[] existing = findAttribute(element,
+                    prefixes[iter] + ":remove");
+            if (existing == null) {
+                continue;
+            }
+            String value = element.substring(existing[2], existing[3]);
+            if (hasListed(value, cap)) {
+                return xPermissions;
+            }
+            String merged = element.substring(0, existing[2])
+                    + (value.trim().length() == 0 ? cap : value + "," + cap)
+                    + element.substring(existing[3]);
+            return xPermissions.substring(0, start) + merged
+                    + xPermissions.substring(end + 1);
+        }
+        // None to merge into, so the element gains one -- under the prefix the
+        // block already binds for the tools namespace.
+        String prefix = prefixes.length > 0 ? prefixes[0] : "tools";
+        int insert = element.length() - 1;
+        while (insert > 0 && (element.charAt(insert - 1) == '/'
+                || element.charAt(insert - 1) == ' '
+                || element.charAt(insert - 1) == '\t')) {
+            insert--;
+        }
+        String replacement = element.substring(0, insert)
+                + " " + prefix + ":remove=\"" + cap + "\""
+                + element.substring(insert);
+        return xPermissions.substring(0, start) + replacement
+                + xPermissions.substring(end + 1);
+    }
+
+    /** Whether a comma-separated list already names {@code wanted}. */
+    private static boolean hasListed(String list, String wanted) {
+        String[] parts = list.split(",");
+        for (int iter = 0; iter < parts.length; iter++) {
+            if (wanted.equals(parts[iter].trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

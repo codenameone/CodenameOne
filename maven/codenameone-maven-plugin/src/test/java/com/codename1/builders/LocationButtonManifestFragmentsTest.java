@@ -112,7 +112,7 @@ class LocationButtonManifestFragmentsTest {
         String out = LocationButtonManifestFragments.inject(bluetooth, false);
         assertEquals(1, count(out, "android.permission.ACCESS_FINE_LOCATION"),
                 out);
-        assertFalse(out.contains("android:maxSdkVersion"), out);
+        assertFalse(out.contains("android:maxSdkVersion=\""), out);
     }
 
     @Test
@@ -420,6 +420,48 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void theCapIsRemovedAcrossTheMergeToo() {
+        // declareUncapped settles what is in THIS block. The merger takes the
+        // union of an element's attributes, so a library that declares the
+        // same permission with its own maxSdkVersion has it merged INTO ours
+        // -- and the button ships against a permission the manifest stops
+        // granting. tools:remove is the merger's own answer, and it reaches
+        // caps this scan never sees at all.
+        String out = LocationButtonManifestFragments.inject("", false);
+        int fine = out.indexOf("android.permission.ACCESS_FINE_LOCATION");
+        int close = out.indexOf('>', fine);
+        assertTrue(out.substring(fine, close).contains(
+                        "tools:remove=\"android:maxSdkVersion\""),
+                "the fine-location declaration carries the instruction: "
+                + out);
+        int coarse = out.indexOf("android.permission.ACCESS_COARSE_LOCATION");
+        int coarseClose = out.indexOf('>', coarse);
+        assertTrue(out.substring(coarse, coarseClose).contains(
+                        "tools:remove=\"android:maxSdkVersion\""),
+                "and so does coarse, which is granted alongside it: " + out);
+    }
+
+    @Test
+    void anExistingToolsRemoveIsAddedToRatherThanDuplicated() {
+        // tools:remove is a comma-separated list, and two of them on one
+        // element is not a thing a manifest may contain.
+        String existing = "    <uses-permission android:name=\"android."
+                + "permission.ACCESS_FINE_LOCATION\" tools:remove=\""
+                + "android:usesPermissionFlags\" />\n";
+        String out = LocationButtonManifestFragments.inject(existing, false);
+        // Within the FINE element: coarse gets an instruction of its own, so a
+        // count over the whole block would be two for a correct result.
+        int fine = out.indexOf("android.permission.ACCESS_FINE_LOCATION");
+        String element = out.substring(out.lastIndexOf('<', fine),
+                out.indexOf('>', fine));
+        assertEquals(1, count(element, "tools:remove"),
+                "one list, not two: " + element);
+        assertTrue(element.contains("android:usesPermissionFlags,"
+                        + "android:maxSdkVersion"),
+                "and the existing entry is kept: " + element);
+    }
+
+    @Test
     void everySpellingOfTheCapIsStripped() {
         // A decoy cap under the conventional prefix, and the real one under
         // another prefix bound to the Android namespace. Stripping the first
@@ -431,7 +473,7 @@ class LocationButtonManifestFragmentsTest {
                 + "ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"99\""
                 + " a:maxSdkVersion=\"30\" />\n";
         String out = LocationButtonManifestFragments.inject(decoyed, false);
-        assertFalse(out.contains("maxSdkVersion"),
+        assertFalse(out.contains("maxSdkVersion=\""),
                 "no spelling of the cap may survive: " + out);
         assertEquals(1, count(out, "android.permission.ACCESS_FINE_LOCATION"),
                 out);
@@ -573,7 +615,7 @@ class LocationButtonManifestFragmentsTest {
         String out = LocationButtonManifestFragments.inject(aliased, true);
         assertEquals(1, count(out, "android.permission.ACCESS_FINE_LOCATION"),
                 out);
-        assertFalse(out.contains("maxSdkVersion"),
+        assertFalse(out.contains("maxSdkVersion=\""),
                 "the aliased cap must be removed, not left in place: " + out);
         assertTrue(out.contains("onlyForLocationButton"),
                 "and the aliased declaration is the one that gets flagged: "
@@ -590,7 +632,7 @@ class LocationButtonManifestFragmentsTest {
         String out = LocationButtonManifestFragments.inject(wifi, true);
         assertEquals(1, count(out, "android.permission.ACCESS_FINE_LOCATION"),
                 out);
-        assertFalse(out.contains("android:maxSdkVersion"), out);
+        assertFalse(out.contains("android:maxSdkVersion=\""), out);
         assertTrue(out.contains("onlyForLocationButton"), out);
     }
 
@@ -1532,7 +1574,10 @@ class LocationButtonManifestFragmentsTest {
         String out = LocationButtonManifestFragments.inject(
                 "<uses-permission android:name=\"android.permission"
                 + ".ACCESS_FINE_LOCATION\" tools:node = 'remove' />\n", false);
-        assertFalse(out.indexOf("remove") > -1,
+        // The removal DIRECTIVE, not the word: inject now also writes
+        // tools:remove="android:maxSdkVersion", which is an instruction to the
+        // merger rather than a removal of this element.
+        assertFalse(out.indexOf("tools:node") > -1,
                 "the spaced removal must be deleted too: " + out);
     }
 
@@ -1686,7 +1731,7 @@ class LocationButtonManifestFragmentsTest {
                 + "</uses-permission>\n", false);
         assertFalse(out.indexOf("</uses-permission>") > -1,
                 "the closing tag must go with its element: " + out);
-        assertFalse(out.indexOf("remove") > -1,
+        assertFalse(out.indexOf("tools:node") > -1,
                 "and the removal itself: " + out);
         assertTrue(out.indexOf("ACCESS_FINE_LOCATION") > -1,
                 "with a real declaration in its place: " + out);
@@ -1698,7 +1743,7 @@ class LocationButtonManifestFragmentsTest {
         String out = LocationButtonManifestFragments.inject(
                 "<uses-permission android:name=\"android.permission"
                 + ".ACCESS_FINE_LOCATION\" tools:node=\"remove\" />\n", false);
-        assertFalse(out.indexOf("remove") > -1, out);
+        assertFalse(out.indexOf("tools:node") > -1, out);
         assertTrue(out.indexOf("ACCESS_FINE_LOCATION") > -1, out);
     }
     /**
