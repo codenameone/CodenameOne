@@ -54,7 +54,8 @@ import java.io.*;
 import java.util.*;
 
 
-class MiscellaneousFeaturesJava001Snippet {
+class AnimationsJava002Snippet {
+
 
     Object context;
     Object url;
@@ -78,18 +79,20 @@ class MiscellaneousFeaturesJava001Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    void snippet() throws Exception {
-        // tag::miscellaneous-features-java-001[]
-        try {
-            // true opens the platform composer, which is what both Android and
-            // iOS offer. iOS opens it either way, but Android takes the flag
-            // literally and its background path is not implemented
-            Display.getInstance().sendSMS("+999999999", "My SMS Message", true);
-            // Or: CN.sendSMS("+999999999", "My SMS Message", true);
-        } catch(IOException err) {
-            Log.e(err);
-            Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
-        }
-        // end::miscellaneous-features-java-001[]
+    
+    // tag::animations-java-002[]
+    /**
+     * Useful when passing a value that might not exist to a function, e.g. When we
+     * pass a form that we might need to construct dynamically later on.
+     */
+    public interface LazyValue<T> {
+        /**
+         * Returns the actual value.
+         *
+         * @param args optional arguments for the creation of the lazy value
+         * @return the value
+         */
+        T get(Object... args);
     }
+    // end::animations-java-002[]
 }

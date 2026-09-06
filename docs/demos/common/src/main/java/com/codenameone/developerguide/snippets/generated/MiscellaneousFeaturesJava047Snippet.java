@@ -51,10 +51,14 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.util.EasyThread;
+import com.codename1.notifications.LocalNotification;
+import com.codename1.ui.table.TableLayout;
 import java.util.*;
 
 
-class MiscellaneousFeaturesJava001Snippet {
+class MiscellaneousFeaturesJava047Snippet {
+
 
     Object context;
     Object url;
@@ -78,18 +82,29 @@ class MiscellaneousFeaturesJava001Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    void snippet() throws Exception {
-        // tag::miscellaneous-features-java-001[]
-        try {
-            // true opens the platform composer, which is what both Android and
-            // iOS offer. iOS opens it either way, but Android takes the flag
-            // literally and its background path is not implemented
-            Display.getInstance().sendSMS("+999999999", "My SMS Message", true);
-            // Or: CN.sendSMS("+999999999", "My SMS Message", true);
-        } catch(IOException err) {
-            Log.e(err);
-            Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
+    
+    // tag::miscellaneous-features-java-047[]
+    public class GeofenceListenerImpl implements GeofenceListener {
+        @Override
+        public void onExit(String id) {
         }
-        // end::miscellaneous-features-java-001[]
+
+        @Override
+        public void onEntered(String id) {
+            if(Display.getInstance().isMinimized()) {
+                // backgrounded, so there is no form to show a dialog on
+                LocalNotification ln = new LocalNotification();
+                ln.setId("geofence-welcome");
+                ln.setAlertTitle("Welcome");
+                ln.setAlertBody("Thanks for arriving!");
+                Display.getInstance().scheduleLocalNotification(ln,
+                        System.currentTimeMillis() + 10, LocalNotification.REPEAT_NONE);
+            } else {
+                Display.getInstance().callSerially(() -> {
+                    Dialog.show("Welcome", "Thanks for arriving", "OK", null);
+                });
+            }
+        }
     }
+    // end::miscellaneous-features-java-047[]
 }

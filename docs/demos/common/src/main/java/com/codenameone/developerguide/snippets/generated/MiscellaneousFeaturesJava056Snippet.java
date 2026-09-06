@@ -51,10 +51,15 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.util.EasyThread;
+import com.codename1.notifications.LocalNotification;
+import com.codename1.ui.table.TableLayout;
 import java.util.*;
 
 
-class MiscellaneousFeaturesJava001Snippet {
+class MiscellaneousFeaturesJava056Snippet {
+
+
 
     Object context;
     Object url;
@@ -78,18 +83,32 @@ class MiscellaneousFeaturesJava001Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
+    
     void snippet() throws Exception {
-        // tag::miscellaneous-features-java-001[]
-        try {
-            // true opens the platform composer, which is what both Android and
-            // iOS offer. iOS opens it either way, but Android takes the flag
-            // literally and its background path is not implemented
-            Display.getInstance().sendSMS("+999999999", "My SMS Message", true);
-            // Or: CN.sendSMS("+999999999", "My SMS Message", true);
-        } catch(IOException err) {
-            Log.e(err);
-            Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
-        }
-        // end::miscellaneous-features-java-001[]
+        // tag::miscellaneous-features-java-056[]
+        // the port reads these through UIManager.localize(). There is only one
+        // bundle, so add to the installed one rather than replacing it -- a
+        // fresh map here would drop every other localized string in the app.
+        // setBundle keeps whatever map it was handed, so the installed one may
+        // be immutable -- copy before adding
+        java.util.Map<String, String> installed = UIManager.getInstance().getBundle();
+        java.util.Map<String, String> bundle = installed == null
+                ? new java.util.HashMap<String, String>()
+                : new java.util.HashMap<String, String>(installed);
+        // the bare key is the body of the first prompt; the suffixed ones
+        // dress the follow-up dialog that sends the user to settings
+        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION",
+                "Reminders need your location while the app is closed.");
+        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.title",
+                "Location needed");
+        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.explanation_body",
+                "Choose \"Allow all the time\" so reminders still arrive when the app is closed.");
+        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.explanation_title",
+                "One more step");
+        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.settings", "Open settings");
+        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.ok", "Done");
+        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.cancel", "Not now");
+        UIManager.getInstance().setBundle(bundle);
+        // end::miscellaneous-features-java-056[]
     }
 }

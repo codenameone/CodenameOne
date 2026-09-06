@@ -13,26 +13,40 @@ Codename One supports sending SMS messages but not receiving them as this functi
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava001Snippet.java[tag=miscellaneous-features-java-001,indent=0]
 ----
 
-Android supports sending SMS messages in the background without any UI. iOS doesn't provide that ability, so the best it can offer is to launch the native SMS app with your message composed for the user to send. Android supports that interactive flow as well (launching the OS native SMS app).
+Both Android and iOS launch the native SMS application with your message
+composed, for the user to send. Neither sends in the background, so check
+`getSMSSupport` rather than assuming -- the constant is the contract, and the
+base implementation defaults to `SMS_SEAMLESS`.
 
-The default `sendSMS` API ignores that difference and works interactively on iOS while sending
-in the background for Android when the platform allows it.
+That's why the samples pass `true` for the interactive argument. On Android
+the two-argument overload does nothing at all -- it asks for the seamless
+send, and that branch isn't implemented. The iOS port ignores the flag and
+opens the composer either way, so passing `true` is what works on both.
 
 The `getSMSSupport` API returns one of the following options:
 
 - SMS_NOT_SUPPORTED - for desktop, tablet etc.
 - SMS_SEAMLESS - `sendSMS` won't show a UI and will send in the background
 - SMS_INTERACTIVE - `sendSMS` will show an SMS sending UI
-- SMS_BOTH - `sendSMS` can support both seamless and interactive mode, this works on Android
+- SMS_BOTH - `sendSMS` can support both seamless and interactive mode
 
 The `sendSMS` can accept an interactive argument: `sendSMS(String phoneNumber, String message, boolean interactive)`
 
-The last argument will be ignored unless `SMS_BOTH` is returned from `getSMSSupport` at which point you
-would be able to choose one way or the other. The default behavior (when not using that flag) is the background
-sending which is the current behavior on Android.
+Pass `true` for it whenever `getSMSSupport` reports `SMS_INTERACTIVE`. The
+two-argument overload asks for a seamless send, and a port that only offers the
+system composer does nothing with that request -- on Android nothing happens at
+all, because the background-send path isn't implemented there. Both the Android and
+the iOS port report `SMS_INTERACTIVE`. A platform reporting `SMS_SEAMLESS`
+sends without a composer, and one reporting `SMS_BOTH` does whichever the
+`interactive` argument asks for, which is why the switch above branches on the
+constant instead of hard coding one call.
 
 A typical use of this API would be something like this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava055Snippet.java[tag=miscellaneous-features-java-055,indent=0]
+----
 
 ==== Dialing
 
@@ -77,6 +91,10 @@ NOTE: You need to use files from `FileSystemStorage` and *NOT* `Storage` files!
 
 You can add more than one attachment by putting them directly into the attachment map for example:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava041Snippet.java[tag=miscellaneous-features-java-041,indent=0]
+----
 
 NOTE: Some features such as attachments etc. Don't work in the simulator but should work on iOS/Android
 
@@ -93,8 +111,14 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 You can also enable this behavior in the theme by setting the `useLargerTextScaleBool` theme constant to `true`.
 
-If you need to apply the scale manually for custom fonts or layout calculations, read the values directly:
+Component fonts are the theme's job -- don't scale them by hand. For anything
+the theme can't reach, a custom-painted row or an icon measured in code,
+read the values directly:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava042Snippet.java[tag=miscellaneous-features-java-042,indent=0]
+----
 
 ==== How the scale is computed per platform
 
@@ -178,8 +202,16 @@ Each file inside this directory is treated as a resource bundle and will be pack
 
 When you're iterating on translations you can also use the simulator to capture bundles automatically.
 Open the Simulator menu and enable *Auto Update Default Bundle* so that running your app in the Codename One simulator will create any missing resource bundles on the fly as you interact with the UI, which makes it simple to populate keys without manually editing files during development.
-You can install the bundle using code like this:
+The resource is keyed by the properties file's base name rather than by the
+directory holding it, so the archetype's `common/src/main/l10n/Bundle.properties`
+becomes `Bundle`. The locale comes from the `_xx` suffix, and a file without one
+is filed under the empty locale, so ask for that when the device's language has
+no bundle of its own:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava043Snippet.java[tag=miscellaneous-features-java-043,indent=0]
+----
 
 The device language (as an ISO 639 two-letter code) could be retrieved with this:
 
@@ -197,6 +229,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 The list of available languages in the resource bundle could be retrieved like this. Notice that this a list that was set by you and doesn't need to confirm to the ISO language code standards:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava044Snippet.java[tag=miscellaneous-features-java-044,indent=0]
+----
 
 An exception for localization is the `TextField`/`TextArea` components both of which contain user data, in those cases the text won't be localized to avoid accidental localization of user input.
 
@@ -218,6 +254,10 @@ The https://www.codenameone.com/javadoc/com/codename1/l10n/L10NManager.html[L10N
 
 It allows formatting numbers/dates & time based on platform locale. It also provides a great deal of the information you need such as the language/locale information you need to pick the proper resource bundle:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava045Snippet.java[tag=miscellaneous-features-java-045,indent=0]
+----
 
 .Localization formatting/parsing and information
 image::img/l10n-manager.png[Localization formatting/parsing and information,scaledwidth=20%]
@@ -420,14 +460,33 @@ Class names are problematic since device builds are obfuscated, you should use l
 
 The following code demonstrates usage of the GeoFence API:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava046Snippet.java[tag=miscellaneous-features-java-046,indent=0]
+----
+
+The listener it registers looks like this:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava047Snippet.java[tag=miscellaneous-features-java-047,indent=0]
+----
 
 
 ===== Android background location permissions (API 30+)
 
 On Android 11 (API level 30) and higher, requesting background location permission requires a two-step process. First, foreground location permissions must be granted. Then, the app must request background location access, which will direct the user to the system settings to select `Allow all the time`. Codename One handles this flow automatically when you use `LocationManager`.
 
-For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize the permission prompt message using the localization key `android.permission.ACCESS_BACKGROUND_LOCATION`:
+For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize both dialogs through localization keys under
+`android.permission.ACCESS_BACKGROUND_LOCATION`. The first one, offering to open
+the settings screen, takes its body from the bare key and its title and buttons
+from `.title`, `.settings` and `.cancel`. The second, shown after the user comes
+back, uses `.explanation_title`, `.explanation_body` and `.ok`:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava056Snippet.java[tag=miscellaneous-features-java-056,indent=0]
+----
 
 === Background music playback
 
@@ -457,6 +516,10 @@ IMPORTANT: The returned file is a temporary file, you shouldn't store a referenc
 
 For example: you can copy the `Image` to `Storage` using:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava048Snippet.java[tag=miscellaneous-features-java-048,indent=0]
+----
 
 TIP: When running on the simulator the `Capture` API opens a file chooser API instead of physically capturing the data. This makes debugging device or situation specific issues simpler
 
@@ -532,6 +595,10 @@ request depends on the input device already providing two channels.
 
 The `Capture` API also includes a callback based API that uses the `ActionListener` interface to implement capture. For example: you can adapt the previous sample to use this API as such:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava049Snippet.java[tag=miscellaneous-features-java-049,indent=0]
+----
 
 === Gallery
 
@@ -729,17 +796,33 @@ That's why `EasyThread` exists: it takes some concepts of Codename One's threadi
 
 Easy thread can be created like this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava051Snippet.java[tag=miscellaneous-features-java-051,indent=0]
+----
 
 You can send a task to the thread using:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava052Snippet.java[tag=miscellaneous-features-java-052,indent=0]
+----
 
 However, it gets better, say you want to return a value:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava053Snippet.java[tag=miscellaneous-features-java-053,indent=0]
+----
 
-Lets break that down... You ran the thread with the success callback on the new thread then the callback got invoked on the EDT as a result. This code `(success) -> success.onSuccess(doThisOnTheThread())` ran off the EDT in the thread and when you invoked the `onSuccess` callback it sent it asynchronously to the EDT here: `(myResult) -> onEDTGotResult(myRsult)`.
+Lets break that down. `(success) -> success.onSucess(doThisOnTheThread())` runs on the `EasyThread`, off the EDT, and the result callback runs there too: `EasyThread` hands your `SuccessCallback` straight to the worker and never marshals it. Anything that touches the UI has to be sent back with `callSerially`, which is what the second lambda does.
 
 These asynchronous calls make things a bit painful to wade through, so the API wraps them in a simplified synchronous version:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava054Snippet.java[tag=miscellaneous-features-java-054,indent=0]
+----
 
 There are a few other variants like `runAndWait` and there is a `kill()` method which stops a thread and releases its resources.
 

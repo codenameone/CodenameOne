@@ -51,10 +51,14 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.util.EasyThread;
+import com.codename1.notifications.LocalNotification;
+import com.codename1.ui.table.TableLayout;
 import java.util.*;
 
 
-class MiscellaneousFeaturesJava001Snippet {
+class MiscellaneousFeaturesJava042Snippet {
+
 
     Object context;
     Object url;
@@ -78,18 +82,29 @@ class MiscellaneousFeaturesJava001Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
+    
+    // tag::miscellaneous-features-java-042[]
     void snippet() throws Exception {
-        // tag::miscellaneous-features-java-001[]
-        try {
-            // true opens the platform composer, which is what both Android and
-            // iOS offer. iOS opens it either way, but Android takes the flag
-            // literally and its background path is not implemented
-            Display.getInstance().sendSMS("+999999999", "My SMS Message", true);
-            // Or: CN.sendSMS("+999999999", "My SMS Message", true);
-        } catch(IOException err) {
-            Log.e(err);
-            Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
-        }
-        // end::miscellaneous-features-java-001[]
+        Display display = Display.getInstance();
+        // 1.0 when the user has not asked for larger text, so the same
+        // arithmetic works either way
+        float scale = display.isLargerTextEnabled() ? display.getLargerTextScale() : 1f;
+
+        // a custom-painted row has no Style for the theme to scale, so give it
+        // the same preference the theme fonts get
+        int rowHeight = Math.round(baseRowHeight * scale);
+        int iconSize = Math.round(baseIconSize * scale);
+        drawingArea.setPreferredH(rowHeight);
+        g.drawRect(0, 0, iconSize, iconSize);
     }
+    // end::miscellaneous-features-java-042[]
+
+    Component someComponent = new Label();
+
+    int baseRowHeight = 40;
+
+    int baseIconSize = 24;
+
+    Component drawingArea = new Label();
+
 }

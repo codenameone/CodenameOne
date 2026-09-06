@@ -51,10 +51,14 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.util.EasyThread;
+import com.codename1.notifications.LocalNotification;
+import com.codename1.ui.table.TableLayout;
 import java.util.*;
 
 
-class MiscellaneousFeaturesJava001Snippet {
+class MiscellaneousFeaturesJava045Snippet {
+
 
     Object context;
     Object url;
@@ -78,18 +82,33 @@ class MiscellaneousFeaturesJava001Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
+    
     void snippet() throws Exception {
-        // tag::miscellaneous-features-java-001[]
-        try {
-            // true opens the platform composer, which is what both Android and
-            // iOS offer. iOS opens it either way, but Android takes the flag
-            // literally and its background path is not implemented
-            Display.getInstance().sendSMS("+999999999", "My SMS Message", true);
-            // Or: CN.sendSMS("+999999999", "My SMS Message", true);
-        } catch(IOException err) {
-            Log.e(err);
-            Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
-        }
-        // end::miscellaneous-features-java-001[]
+        // tag::miscellaneous-features-java-045[]
+        Form hi = new Form("L10N", new TableLayout(16, 2));
+        L10NManager l10n = L10NManager.getInstance();
+        // the parsers take locale-formatted input -- a hard coded "34.35" is
+        // read as 3435 anywhere "." groups digits -- so round-trip the
+        // formatters' own output
+        String localeDouble = l10n.format(34.35);
+        String localeCurrency = l10n.formatCurrency(33.77);
+        hi.add("format(double)").add(l10n.format(11.11)).
+            add("format(int)").add(l10n.format(33)).
+            add("formatCurrency").add(l10n.formatCurrency(53.267)).
+            add("formatDateLongStyle").add(l10n.formatDateLongStyle(new Date())).
+            add("formatDateShortStyle").add(l10n.formatDateShortStyle(new Date())).
+            add("formatDateTime").add(l10n.formatDateTime(new Date())).
+            add("formatDateTimeMedium").add(l10n.formatDateTimeMedium(new Date())).
+            add("formatDateTimeShort").add(l10n.formatDateTimeShort(new Date())).
+            add("getCurrencySymbol").add(l10n.getCurrencySymbol()).
+            add("getLanguage").add(l10n.getLanguage()).
+            add("getLocale").add(l10n.getLocale()).
+            add("isRTLLocale").add("" + l10n.isRTLLocale()).
+            add("parseCurrency").add(l10n.formatCurrency(l10n.parseCurrency(localeCurrency))).
+            add("parseDouble").add(l10n.format(l10n.parseDouble(localeDouble))).
+            add("parseInt").add(l10n.format(l10n.parseInt("56"))).
+            add("parseLong").add("" + l10n.parseLong("4444444"));
+        hi.show();
+        // end::miscellaneous-features-java-045[]
     }
 }

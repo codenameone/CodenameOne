@@ -51,10 +51,14 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.util.EasyThread;
+import com.codename1.notifications.LocalNotification;
+import com.codename1.ui.table.TableLayout;
 import java.util.*;
 
 
-class MiscellaneousFeaturesJava001Snippet {
+class MiscellaneousFeaturesJava055Snippet {
+
 
     Object context;
     Object url;
@@ -78,18 +82,35 @@ class MiscellaneousFeaturesJava001Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
+    
     void snippet() throws Exception {
-        // tag::miscellaneous-features-java-001[]
+        // tag::miscellaneous-features-java-055[]
         try {
-            // true opens the platform composer, which is what both Android and
-            // iOS offer. iOS opens it either way, but Android takes the flag
-            // literally and its background path is not implemented
-            Display.getInstance().sendSMS("+999999999", "My SMS Message", true);
-            // Or: CN.sendSMS("+999999999", "My SMS Message", true);
+            switch(Display.getInstance().getSMSSupport()) {
+                case Display.SMS_NOT_SUPPORTED:
+                    return;
+                case Display.SMS_SEAMLESS:
+                    showUIDialogToEditMessageData();
+                    Display.getInstance().sendSMS(phone, data);
+                    return;
+                default:
+                    // interactive ports hand off to the platform composer. On
+                    // Android the two-argument overload asks for a seamless
+                    // send it does not implement, and nothing happens at all
+                    Display.getInstance().sendSMS(phone, data, true);
+                    return;
+            }
         } catch(IOException err) {
             Log.e(err);
             Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
         }
-        // end::miscellaneous-features-java-001[]
+        // end::miscellaneous-features-java-055[]
     }
+
+    String data = "message body";
+
+
+    void showUIDialogToEditMessageData() { }
+    String phone = "555-0100";
+
 }

@@ -51,10 +51,14 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.util.EasyThread;
+import com.codename1.notifications.LocalNotification;
+import com.codename1.ui.table.TableLayout;
 import java.util.*;
 
 
-class MiscellaneousFeaturesJava001Snippet {
+class MiscellaneousFeaturesJava043Snippet {
+
 
     Object context;
     Object url;
@@ -78,18 +82,22 @@ class MiscellaneousFeaturesJava001Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
+    
     void snippet() throws Exception {
-        // tag::miscellaneous-features-java-001[]
-        try {
-            // true opens the platform composer, which is what both Android and
-            // iOS offer. iOS opens it either way, but Android takes the flag
-            // literally and its background path is not implemented
-            Display.getInstance().sendSMS("+999999999", "My SMS Message", true);
-            // Or: CN.sendSMS("+999999999", "My SMS Message", true);
-        } catch(IOException err) {
-            Log.e(err);
-            Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
+        // tag::miscellaneous-features-java-043[]
+        // the bundle id is the .properties base name, not the directory: the
+        // archetype ships common/src/main/l10n/Bundle.properties
+        Hashtable<String, String> bundle = res.getL10N("Bundle", local);
+        if (bundle == null) {
+            // a file with no _locale suffix is filed under the empty locale,
+            // and getL10N is an exact lookup that will not fall back for you
+            bundle = res.getL10N("Bundle", "");
         }
-        // end::miscellaneous-features-java-001[]
+        UIManager.getInstance().setBundle(bundle);
+        // end::miscellaneous-features-java-043[]
     }
+
+    Resources res;
+    String local = "en";
+
 }
