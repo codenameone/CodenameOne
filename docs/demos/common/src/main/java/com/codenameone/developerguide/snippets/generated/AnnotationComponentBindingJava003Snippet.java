@@ -51,13 +51,15 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
-import com.codename1.annotations.Required;
+import com.codename1.ui.validation.Validator;
+import com.codename1.binding.*;
 import java.util.*;
 import com.codename1.annotations.*;
 import com.codename1.binding.BindAttr;
 import com.codename1.properties.Property;
 
-class AnnotationComponentBindingJava001Snippet {
+class AnnotationComponentBindingJava003Snippet {
+
 
     Object context;
     Object url;
@@ -81,31 +83,33 @@ class AnnotationComponentBindingJava001Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::annotation-component-binding-java-001[]
-    @Bindable
-    public class LoginModel {
+    
+    void snippet() throws Exception {
+        // tag::annotation-component-binding-java-003[]
+        // set this first: bind() attaches the constraints, and each one picks a
+        // data-change or an action listener from this flag as it attaches
+        Validator.setValidateOnEveryKey(true);
 
-        @Bind(name = "userField", attr = BindAttr.TEXT)
-        @Required
-        private String user;
-        public String getUser()              { return user; }
-        public void   setUser(String u)      { this.user = u; }                  // <1>
+        LoginModel model = new LoginModel();
+        Binding b = Binders.bind(model, form);
 
-        @Bind(name = "rememberMe", attr = BindAttr.SELECTED)
-        public boolean remember;                                                   // <2>
+        // Auto-disable a submit button until everything is valid. Pass the
+        // button you built the form with: Container has no lookup by name.
+        b.getValidator().addSubmitButtons(submitButton);
 
-        @Bind(name = "banner", attr = BindAttr.UIID, twoWay = false)
-        public String bannerStyle;
-
-        @Bind(name = "fullName",
-              attr = BindAttr.TEXT,
-              getter = "computeFullName",
-              setter = "applyFullName")                                           // <3>
-        private String fullName;
-        // both run during the initial bind, against a model that may still be
-        // empty, so neither can assume a value is present
-        public String computeFullName()      { return fullName == null ? "" : fullName.toUpperCase(); }
-        public void   applyFullName(String f){ this.fullName = f == null ? null : f.trim(); }
+        // Programmatic gate before saving:
+        if (b.getValidator().isValid()) {
+            repository.save(model);
+        }
+        // end::annotation-component-binding-java-003[]
     }
-    // end::annotation-component-binding-java-001[]
+
+    static class LoginModel { }
+
+
+    Button submitButton = new Button("Submit");
+
+    static class Repository { void save(LoginModel m) { } }
+    Repository repository = new Repository();
+
 }

@@ -4,14 +4,10 @@
 Advanced-Topics-Under-The-Hood.asciidoc	You can override these methods in the draggable components:
 Advertising.asciidoc	identifier. The recommended order is to initialize, gather consent, then load:
 Advertising.asciidoc	method that registers its provider with `AdManager`:
-Annotation-Component-Binding.asciidoc	ASM and inserts the equivalent of:
-Annotation-Component-Binding.asciidoc	After binding, drive validation through the returned handle:
 Annotation-JSON-XML-Mapping.asciidoc	Hand-write a `Mapper<T>` and register it at startup:
-Annotation-JSON-XML-Mapping.asciidoc	mutation:
 Annotation-SQLite-ORM.asciidoc	dao surface isn't enough. Transactions:
 Apple-Wallet-Extension.asciidoc	In Java, publish the user's cards whenever they change (typically after login) and keep a fresh token published so Wallet can skip the login screen:
 Authentication-And-Identity.asciidoc	Firebase Auth isn't an OIDC provider -- it issues Google-Identity-Toolkit-style tokens via REST endpoints. `com.codename1.social.FirebaseAuth` wraps those endpoints:
-Crash-Protection.asciidoc	In your `Lifecycle.init`:
 Deep-Links-Routing.asciidoc	`AssetLinksBuilder` produces the payload:
 Deep-Links-Routing.asciidoc	without redirects. The plugin's `AasaBuilder` produces the payload:
 Desktop-Integration.asciidoc	same scheduling and handling code is shared across phone and desktop:
@@ -30,11 +26,6 @@ Monetization.asciidoc	The general usage is as follows:
 Monetization.asciidoc	The source for your ReceiptStore is as follows:
 Monetization.asciidoc	You are now ready to see the full magic of the `validateAndSaveReceipt()` method in all its glory:
 Native-Themes.asciidoc	`UIManager.addThemeProps` after the theme has been installed:
-Network-Connectivity.asciidoc	To advertise an HTTP server you wrote on port 8080:
-Network-Connectivity.asciidoc	To associate the device with a specific SSID:
-Notifications-And-Background-Execution.asciidoc	before; the bean has been extended with fluent, backward-compatible setters:
-Notifications-And-Background-Execution.asciidoc	then reference it from a notification with `setChannelId(...)`:
-Printing.asciidoc	`Printer.printImage(image, listener)` prints a `com.codename1.ui.Image` directly. The image is encoded to a temporary PNG file behind the scenes and the file is deleted once the print flow finishes:
 SVG-Transcoder.asciidoc	the generated class directly:
 The-Components-Of-Codename-One.asciidoc	Call the builder from a Maven plugin, an Ant task or a one-shot `main`:
 The-Components-Of-Codename-One.asciidoc	Let start by exploring how you can achieve this UI that fetches data from a webservice:

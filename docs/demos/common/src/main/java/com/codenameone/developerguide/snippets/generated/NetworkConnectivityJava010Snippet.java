@@ -51,13 +51,13 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
-import com.codename1.annotations.Required;
+import com.codename1.io.bonjour.*;
+import com.codename1.io.wifi.*;
 import java.util.*;
-import com.codename1.annotations.*;
-import com.codename1.binding.BindAttr;
-import com.codename1.properties.Property;
+import com.codename1.io.wifi.WiFi;
 
-class AnnotationComponentBindingJava001Snippet {
+class NetworkConnectivityJava010Snippet {
+
 
     Object context;
     Object url;
@@ -81,31 +81,20 @@ class AnnotationComponentBindingJava001Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::annotation-component-binding-java-001[]
-    @Bindable
-    public class LoginModel {
-
-        @Bind(name = "userField", attr = BindAttr.TEXT)
-        @Required
-        private String user;
-        public String getUser()              { return user; }
-        public void   setUser(String u)      { this.user = u; }                  // <1>
-
-        @Bind(name = "rememberMe", attr = BindAttr.SELECTED)
-        public boolean remember;                                                   // <2>
-
-        @Bind(name = "banner", attr = BindAttr.UIID, twoWay = false)
-        public String bannerStyle;
-
-        @Bind(name = "fullName",
-              attr = BindAttr.TEXT,
-              getter = "computeFullName",
-              setter = "applyFullName")                                           // <3>
-        private String fullName;
-        // both run during the initial bind, against a model that may still be
-        // empty, so neither can assume a value is present
-        public String computeFullName()      { return fullName == null ? "" : fullName.toUpperCase(); }
-        public void   applyFullName(String f){ this.fullName = f == null ? null : f.trim(); }
+    
+    void snippet() throws Exception {
+        // tag::network-connectivity-java-010[]
+        WiFi.connect("MyAccessPoint", "s3cret!", WiFiSecurity.WPA_PSK,
+                new WiFiConnectCallback() {
+            @Override
+            public void onConnectResult(boolean connected, Throwable error) {
+                if (!connected) {
+                    Log.e(error);
+                    return;
+                }
+                // ssid is now joined
+            }
+        });
+        // end::network-connectivity-java-010[]
     }
-    // end::annotation-component-binding-java-001[]
 }

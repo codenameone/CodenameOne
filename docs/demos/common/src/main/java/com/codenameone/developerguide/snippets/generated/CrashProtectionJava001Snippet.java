@@ -51,13 +51,12 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
-import com.codename1.annotations.Required;
+import com.codename1.crash.*;
 import java.util.*;
-import com.codename1.annotations.*;
-import com.codename1.binding.BindAttr;
-import com.codename1.properties.Property;
 
-class AnnotationComponentBindingJava001Snippet {
+
+class CrashProtectionJava001Snippet extends com.codename1.system.Lifecycle {
+
 
     Object context;
     Object url;
@@ -81,31 +80,23 @@ class AnnotationComponentBindingJava001Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::annotation-component-binding-java-001[]
-    @Bindable
-    public class LoginModel {
-
-        @Bind(name = "userField", attr = BindAttr.TEXT)
-        @Required
-        private String user;
-        public String getUser()              { return user; }
-        public void   setUser(String u)      { this.user = u; }                  // <1>
-
-        @Bind(name = "rememberMe", attr = BindAttr.SELECTED)
-        public boolean remember;                                                   // <2>
-
-        @Bind(name = "banner", attr = BindAttr.UIID, twoWay = false)
-        public String bannerStyle;
-
-        @Bind(name = "fullName",
-              attr = BindAttr.TEXT,
-              getter = "computeFullName",
-              setter = "applyFullName")                                           // <3>
-        private String fullName;
-        // both run during the initial bind, against a model that may still be
-        // empty, so neither can assume a value is present
-        public String computeFullName()      { return fullName == null ? "" : fullName.toUpperCase(); }
-        public void   applyFullName(String f){ this.fullName = f == null ? null : f.trim(); }
+    
+    // tag::crash-protection-java-001[]
+    public void init(Object context) {
+        // Lifecycle.init sets the theme, the global Toolbar, the network thread
+        // count and the network error listener, so an override that skips it
+        // loses all of that
+        super.init(context);
+        // install() only registers the handler; nothing is sent while the
+        // service is disabled, and disabled is the default
+        CrashProtection.install();
     }
-    // end::annotation-component-binding-java-001[]
+
+    /// Call this from the flow where the user agrees to send crash reports.
+    /// Doing it in init() would opt every user in on each launch, drain the
+    /// buffered reports, and undo an opt-out they had already made.
+    void onUserAcceptedCrashReporting() {
+        CrashProtection.setEnabled(true);
+    }
+    // end::crash-protection-java-001[]
 }
