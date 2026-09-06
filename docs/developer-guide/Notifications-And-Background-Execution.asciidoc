@@ -114,6 +114,13 @@ reconstructed after a cold launch -- pass state through the input data, not fiel
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NotificationsAndBackgroundExecutionJava004Snippet.java[tag=notifications-and-background-execution-java-004,indent=0]
 ----
 
+iOS needs the identifier declared at build time before `BGTaskScheduler` will
+accept the request, and nothing detects `BackgroundWork` on the classpath for
+you. Set `ios.usesBackgroundProcessing=true`, which declares
+`<packageName>.processing` -- the id the sample derives -- or list your own ids
+with `ios.backgroundProcessingIds`. Without one of those the scheduling call is
+rejected on the device.
+
 [options="header"]
 |===
 | | iOS | Android | Simulator

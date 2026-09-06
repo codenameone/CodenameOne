@@ -103,10 +103,9 @@ class NotificationsAndBackgroundExecutionJava004Snippet {
     }
 
     void scheduleSync() {
-        // on iOS the id must appear in BGTaskSchedulerPermittedIdentifiers. The
-        // build injects <packageName>.processing by default, so deriving it
-        // from the package matches whatever this app is called; declare any
-        // other id with the ios.backgroundProcessingIds build hint
+        // on iOS the id must appear in BGTaskSchedulerPermittedIdentifiers, and
+        // it gets there only if you ask: ios.usesBackgroundProcessing=true
+        // declares <packageName>.processing, which is what this derives
         String taskId = Display.getInstance().getProperty("package_name", "") + ".processing";
         WorkRequest req = WorkRequest.builder(taskId, SyncWorker.class)
                 .setRequiresNetwork(true)
