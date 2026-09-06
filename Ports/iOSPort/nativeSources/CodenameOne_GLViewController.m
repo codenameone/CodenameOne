@@ -3598,6 +3598,12 @@ bool lockDrawing;
 //
 // CN1 key listeners not firing during text editing is the intended outcome:
 // arrow keys and backspace belong to the caret while a field is focused.
+//
+// The test is the port's existing "editing is live" sentinel, the same one
+// CN1TapGestureRecognizer and the touch path below use. Narrowing it to
+// [editingComponent isFirstResponder] would put the swallow back for the
+// window between the editor being created and UIKit granting it focus,
+// which is exactly when the first keystroke of a fast typist arrives.
 // UIKit-only declaration: the type in its signature does not exist on macOS,
 // so the whole declaration is dropped rather than just its body. Guarding
 // only the body would leave a signature naming an unknown type.

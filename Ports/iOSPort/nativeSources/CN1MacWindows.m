@@ -266,19 +266,6 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
  */
 - (void)deliverPresses:(NSSet<UIPress*>*)presses pressed:(BOOL)pressed
                  event:(UIPressesEvent*)event {
-    /* A native text editor owns the keyboard while it is up. UIKit inserts typed
-     * text only after every responder has declined the press, so claiming one
-     * here would swallow it before the focused CN1UITextField could ever see it
-     * -- the defect issue #5709 reports against the main controller, which this
-     * method was copied from. */
-    if (editingComponent != nil) {
-        if (pressed) {
-            [super pressesBegan:presses withEvent:event];
-        } else {
-            [super pressesEnded:presses withEvent:event];
-        }
-        return;
-    }
     if (@available(iOS 13.4, *)) {
         BOOL handled = NO;
         for (UIPress* press in presses) {
@@ -300,15 +287,50 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
     }
 }
 
+/*
+ * A native text editor owns the keyboard while it is up, so every press is
+ * forwarded untouched. UIKit inserts typed text only after every responder has
+ * declined the press, so claiming one here would swallow it before the focused
+ * CN1UITextField could ever see it -- the defect issue #5709 reports against
+ * the main controller, which deliverPresses: was copied from.
+ *
+ * The guard sits in each override rather than in deliverPresses: because that
+ * helper flattens the three phases into a BOOL, which is right for the
+ * framework delivery below and wrong for UIKit: a cancellation forwarded as
+ * pressesEnded: tells the text-input chain a key completed when it was aborted.
+ * Keep each phase forwarded as itself.
+ *
+ * editingComponent is global rather than per-window, so an editor open in a
+ * sibling Codename One window makes this controller transparent too. That is
+ * deliberate: scoping it with [editingComponent isDescendantOfView:self.view]
+ * reads as more precise and is worse, because the editor host is re-parented
+ * across scene grants -- editStringAtImpl puts the field on the MAIN view when
+ * CN1MacWindowEditingHostView() has no content view yet and
+ * CN1MacWindowReattachEditor moves it later -- so the scoped test would swallow
+ * the keys of the very editor it is meant to protect. A key lost to a window
+ * whose sibling has an editor open is the smaller failure.
+ */
 - (void)pressesBegan:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
+    if (editingComponent != nil) {
+        [super pressesBegan:presses withEvent:event];
+        return;
+    }
     [self deliverPresses:presses pressed:YES event:event];
 }
 
 - (void)pressesEnded:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
+    if (editingComponent != nil) {
+        [super pressesEnded:presses withEvent:event];
+        return;
+    }
     [self deliverPresses:presses pressed:NO event:event];
 }
 
 - (void)pressesCancelled:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
+    if (editingComponent != nil) {
+        [super pressesCancelled:presses withEvent:event];
+        return;
+    }
     /* Treated as a release: leaving a key latched down in the framework is worse
      * than an extra release the focused component ignores. */
     [self deliverPresses:presses pressed:NO event:event];
