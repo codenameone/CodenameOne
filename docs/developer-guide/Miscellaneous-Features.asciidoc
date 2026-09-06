@@ -36,9 +36,10 @@ Pass `true` for it whenever `getSMSSupport` reports `SMS_INTERACTIVE`. The
 two-argument overload asks for a seamless send, and a port that only offers the
 system composer does nothing with that request -- on Android nothing happens at
 all, because the background-send path isn't implemented there. Both the Android and
-the iOS port report `SMS_INTERACTIVE`. A platform reporting `SMS_SEAMLESS` or
-`SMS_BOTH` sends without a composer, which is why the switch above branches on
-the constant instead of hard coding one call.
+the iOS port report `SMS_INTERACTIVE`. A platform reporting `SMS_SEAMLESS`
+sends without a composer, and one reporting `SMS_BOTH` does whichever the
+`interactive` argument asks for, which is why the switch above branches on the
+constant instead of hard coding one call.
 
 A typical use of this API would be something like this:
 
@@ -201,7 +202,9 @@ Each file inside this directory is treated as a resource bundle and will be pack
 
 When you're iterating on translations you can also use the simulator to capture bundles automatically.
 Open the Simulator menu and enable *Auto Update Default Bundle* so that running your app in the Codename One simulator will create any missing resource bundles on the fly as you interact with the UI, which makes it simple to populate keys without manually editing files during development.
-You can install the bundle using code like this:
+The resource is keyed by the properties file's base name rather than by the
+directory holding it, so the archetype's `common/src/main/l10n/Bundle.properties`
+becomes `Bundle`. You can install it using code like this:
 
 [source,java]
 ----

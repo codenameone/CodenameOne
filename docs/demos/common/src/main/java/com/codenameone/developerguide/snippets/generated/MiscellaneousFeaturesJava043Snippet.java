@@ -85,7 +85,9 @@ class MiscellaneousFeaturesJava043Snippet {
     
     void snippet() throws Exception {
         // tag::miscellaneous-features-java-043[]
-        UIManager.getInstance().setBundle(res.getL10N("l10n", local));
+        // the bundle id is the .properties base name, not the directory: the
+        // archetype ships common/src/main/l10n/Bundle.properties
+        UIManager.getInstance().setBundle(res.getL10N("Bundle", local));
         // end::miscellaneous-features-java-043[]
     }
 

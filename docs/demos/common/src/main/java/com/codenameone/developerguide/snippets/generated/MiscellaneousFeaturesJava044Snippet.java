@@ -86,7 +86,7 @@ class MiscellaneousFeaturesJava044Snippet {
     void snippet() throws Exception {
         // tag::miscellaneous-features-java-044[]
         Resources res = fetchResourceFile();
-        Enumeration locales = res.listL10NLocales( "l10n" );
+        Enumeration locales = res.listL10NLocales("Bundle");
         // end::miscellaneous-features-java-044[]
     }
 
