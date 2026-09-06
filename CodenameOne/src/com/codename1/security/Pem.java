@@ -168,10 +168,7 @@ final class Pem {
         // DEFINED BY algorithm OPTIONAL } -- at most one parameters element,
         // and nothing after it. Stopping at the OID accepted { OID, NULL, NULL }.
         boolean hasParameters = c.hasMore();
-        int parametersTag = hasParameters ? c.peek() : -1;
-        if (hasParameters) {
-            c.skip();
-        }
+        byte[] parameters = hasParameters ? c.element() : null;
         if (c.hasMore()) {
             throw new CryptoException("malformed key: AlgorithmIdentifier carries more than one "
                     + "parameters field");
@@ -182,7 +179,10 @@ final class Pem {
         // and is not NULL is a different case: OpenSSL takes it and the JDK does
         // not, so such a key loads on the Linux port and fails on JavaSE and
         // Android -- the sort of split this class exists to settle up front.
-        if (equal(oid, OID_RSA) && hasParameters && parametersTag != 0x05) {
+        // The whole element, not just its tag: a NULL is "05 00" and nothing
+        // else, so "05 01 00" is not one however much it looks like one.
+        if (equal(oid, OID_RSA) && hasParameters
+                && !(parameters.length == 2 && parameters[0] == 0x05 && parameters[1] == 0x00)) {
             throw new CryptoException("malformed key: rsaEncryption parameters must be NULL");
         }
         if (equal(oid, OID_EC) && !hasParameters) {

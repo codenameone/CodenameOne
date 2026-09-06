@@ -1144,6 +1144,23 @@ class PemKeyTest extends UITestBase {
         CryptoException e = assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem(pem(RSA_SPKI_LABEL, Base64.encodeNoNewline(swapped))));
         assertTrue(e.getMessage().contains("NULL"), e.getMessage());
+
+        // and the whole element is checked, not just its tag: a NULL is
+        // "05 00" and nothing else, so "05 01 00" is not one
+        byte[] fat = new byte[key.length + 1];
+        System.arraycopy(key, 0, fat, 0, nullAt);
+        fat[nullAt] = 0x05;
+        fat[nullAt + 1] = 0x01;
+        fat[nullAt + 2] = 0x00;
+        System.arraycopy(key, nullAt + 2, fat, nullAt + 3, key.length - nullAt - 2);
+        fat[5]++;
+        int widened = (((fat[2] & 0xFF) << 8) | (fat[3] & 0xFF)) + 1;
+        fat[2] = (byte) (widened >> 8);
+        fat[3] = (byte) widened;
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(RSA_SPKI_LABEL, Base64.encodeNoNewline(fat))));
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(PublicKey.RSA, pem(RSA_SPKI_LABEL, Base64.encodeNoNewline(fat))));
     }
 
     @Test
