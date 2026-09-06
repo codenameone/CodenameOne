@@ -1091,6 +1091,62 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void highTagNumberFormIsParsedNotAssumed() {
+        // A tag is one octet unless its low five bits are all ones, where the
+        // number carries on through following octets. Assuming one octet read
+        // the second as a length, so "1f 00" passed for a complete empty
+        // element. Substituted for the NULL in a real key, byte for byte.
+        byte[] key = der(RSA_SPKI);
+        int nullAt = -1;
+        for (int i = 0; i < 25 && nullAt < 0; i++) {
+            if (key[i] == 0x05 && key[i + 1] == 0x00) {
+                nullAt = i;
+            }
+        }
+        assertTrue(nullAt > 0, "the fixture should carry NULL parameters");
+
+        byte[] highTag = key.clone();
+        highTag[nullAt] = 0x1F;
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(RSA_SPKI_LABEL, Base64.encodeNoNewline(highTag))));
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(PublicKey.RSA, pem(RSA_SPKI_LABEL, Base64.encodeNoNewline(highTag))));
+
+        // the untouched key is unaffected
+        assertArrayEquals(key, PublicKey.fromPem(pem(RSA_SPKI_LABEL, RSA_SPKI)).getEncoded());
+    }
+
+    @Test
+    void rsaParametersMustBeNullWhenPresent() {
+        // RFC 4055. Absence is tolerated -- every platform measured accepts a
+        // key that omits them -- but a present non-NULL parameter is taken by
+        // OpenSSL and refused by the JDK, so it would load on the Linux port and
+        // fail on JavaSE and Android.
+        byte[] key = der(RSA_SPKI);
+        int nullAt = -1;
+        for (int i = 0; i < 25 && nullAt < 0; i++) {
+            if (key[i] == 0x05 && key[i + 1] == 0x00) {
+                nullAt = i;
+            }
+        }
+        // swap the 2-byte NULL for a 3-byte well-formed high-tag element
+        byte[] swapped = new byte[key.length + 1];
+        System.arraycopy(key, 0, swapped, 0, nullAt);
+        swapped[nullAt] = 0x1F;
+        swapped[nullAt + 1] = 0x1F;
+        swapped[nullAt + 2] = 0x00;
+        System.arraycopy(key, nullAt + 2, swapped, nullAt + 3, key.length - nullAt - 2);
+        swapped[5]++;                                     // AlgorithmIdentifier length
+        int outer = (((swapped[2] & 0xFF) << 8) | (swapped[3] & 0xFF)) + 1;
+        swapped[2] = (byte) (outer >> 8);
+        swapped[3] = (byte) outer;
+
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(RSA_SPKI_LABEL, Base64.encodeNoNewline(swapped))));
+        assertTrue(e.getMessage().contains("NULL"), e.getMessage());
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));

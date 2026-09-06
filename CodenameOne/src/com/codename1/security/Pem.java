@@ -168,6 +168,7 @@ final class Pem {
         // DEFINED BY algorithm OPTIONAL } -- at most one parameters element,
         // and nothing after it. Stopping at the OID accepted { OID, NULL, NULL }.
         boolean hasParameters = c.hasMore();
+        int parametersTag = hasParameters ? c.peek() : -1;
         if (hasParameters) {
             c.skip();
         }
@@ -175,10 +176,15 @@ final class Pem {
             throw new CryptoException("malformed key: AlgorithmIdentifier carries more than one "
                     + "parameters field");
         }
-        // RFC 4055 says rsaEncryption carries NULL parameters, but a key that
-        // omits them is accepted by the platform, so refusing it here would
-        // reject keys that work. Only the EC requirement is enforced, because
-        // that one the platform does enforce.
+        // RFC 4055: rsaEncryption's parameters are NULL. Absence is tolerated,
+        // because a key omitting them is accepted by every platform measured and
+        // refusing it would reject keys that work. A parameter that is present
+        // and is not NULL is a different case: OpenSSL takes it and the JDK does
+        // not, so such a key loads on the Linux port and fails on JavaSE and
+        // Android -- the sort of split this class exists to settle up front.
+        if (equal(oid, OID_RSA) && hasParameters && parametersTag != 0x05) {
+            throw new CryptoException("malformed key: rsaEncryption parameters must be NULL");
+        }
         if (equal(oid, OID_EC) && !hasParameters) {
             throw new CryptoException("EC key names no curve: id-ecPublicKey requires "
                     + "ECParameters in the AlgorithmIdentifier");
@@ -847,8 +853,7 @@ final class Pem {
 
         /// Consumes an element whole, contents included.
         void skip() {
-            peek();
-            pos++;
+            tag();
             // length() advances pos past the length bytes, so its result has to
             // be read into a local first -- "pos += length()" would capture the
             // old pos and throw that advance away.
@@ -912,12 +917,53 @@ final class Pem {
         }
 
         private void expect(int expectedTag) {
-            if (peek() != expectedTag) {
+            int found = tag();
+            if (found != expectedTag) {
                 throw new CryptoException("malformed key: expected DER tag 0x"
                         + Integer.toHexString(expectedTag) + " but found 0x"
-                        + Integer.toHexString(peek()));
+                        + Integer.toHexString(found));
             }
+        }
+
+        /// Consumes a tag and returns its first octet, which is what every
+        /// caller compares against.
+        ///
+        /// A tag is one octet unless its low five bits are all ones -- DER's
+        /// high-tag-number form -- where the number carries on through the
+        /// following octets while their high bit is set. Assuming one octet
+        /// read the second one as a length, so "1f 00" passed for a complete
+        /// empty element and a key carrying it was handed on for the platform
+        /// to refuse. None of the containers here has a field that needs the
+        /// long form, so a well-formed one still will not match any tag this
+        /// code expects; it is parsed rather than assumed so that the refusal
+        /// happens for the right reason.
+        private int tag() {
+            int first = peek();
             pos++;
+            if ((first & 0x1F) != 0x1F) {
+                return first;
+            }
+            long number = 0;
+            int octet;
+            boolean leading = true;
+            do {
+                if (pos >= end) {
+                    throw new CryptoException("malformed key: truncated DER tag");
+                }
+                octet = der[pos++] & 0xFF;
+                if (leading && octet == 0x80) {
+                    throw new CryptoException("malformed key: non-minimal DER tag number");
+                }
+                leading = false;
+                number = (number << 7) | (octet & 0x7F);
+                if (number > Integer.MAX_VALUE) {
+                    throw new CryptoException("malformed key: DER tag number out of range");
+                }
+            } while ((octet & 0x80) != 0);
+            if (number < 31) {
+                throw new CryptoException("malformed key: high-tag-number form used for tag " + number);
+            }
+            return first;
         }
 
         private int length() {
