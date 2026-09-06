@@ -88,6 +88,11 @@ class NativeThemesJava001Snippet {
         override.put("@accent-pressed-color", "c71a75");
         override.put("@accent-pressed-color-dark", "c71a75");
         override.put("@accent-on-color", "ffffff");
+        // every colour that has a -dark twin needs both, or dark mode keeps the
+        // theme's original value for the half you left out
+        override.put("@accent-on-color-dark", "ffffff");
+        override.put("@accent-disabled-color", "f9a8d0");
+        override.put("@accent-disabled-color-dark", "7a1547");
         override.put("@accent-container-color", "ff2d95");
         override.put("@accent-container-color-dark", "ff2d95");
         override.put("@accent-on-container-color", "ffffff");
