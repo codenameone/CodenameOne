@@ -1324,7 +1324,6 @@ When dragging on top of a child component of a drop target the code recursively 
 
 You can override these methods in the draggable components:
 
-
 * `getDragImage` - this generates an image preview of the component that will be dragged. This automatically generates a sensible default so you don't need to override it.
 
 * `drawDraggedImage` - this method will be invoked to draw the dragged image at a given location, it might be useful to override it if you want to display some drag related information such as an icon based on location etc. (for example: a move/copy icon).
