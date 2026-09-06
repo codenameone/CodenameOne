@@ -6339,7 +6339,20 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
         // reading to 16MB precisely to make the per-thread pending table fill, and
         // a live-set floor collects early enough that it never does -- the test
         // then fails itself as measuring nothing, which is exactly what it did.
-        if(oldTrigger != CN1_BIBOP_GC_TRIGGER_BYTES) {
+        // LOWER ONLY. This used to assign the constant, which on master could
+        // only ever bring the trigger down because nothing there put it below
+        // 24MB. Once a deployment can define CN1_BIBOP_GC_MIN_TRIGGER_BYTES lower
+        // -- the server sets 4MB -- the same assignment RAISES a trigger that the
+        // low-survival path had already shrunk, so an OS memory warning would
+        // postpone collection at the moment headroom is scarcest, and lift the
+        // pacing cap derived from it as well.
+        //
+        // Pinning to the constant from above is still the intent and is unchanged
+        // at the default: GcSteadyState pins the free-memory reading to 16MB to
+        // make the per-thread pending table fill, and it runs with the default
+        // minimum, so its trigger is at or above the constant and takes exactly
+        // the branch it always did.
+        if(oldTrigger > CN1_BIBOP_GC_TRIGGER_BYTES) {
             atomic_store_explicit(&bibopGcTriggerBytes,
                                   CN1_BIBOP_GC_TRIGGER_BYTES,
                                   memory_order_relaxed);
