@@ -762,6 +762,43 @@ int cn1MapUIKeyToKeyCode(UIKey *key) API_AVAILABLE(ios(13.4)) {
 #endif
 #endif
 
+/* Identity of the physical control behind a press, deliberately NOT its CN1
+ * keycode. cn1MapUIKeyToKeyCode is many-to-one -- Return and keypad Enter both
+ * become CN1_IOS_KEY_ENTER, and a keypad digit produces the same codepoint as
+ * its top-row twin -- so ownership keyed by the CN1 code cannot tell two such
+ * presses apart, and one key's release would be handed to the other key's
+ * owner. The HID usage is per physical key.
+ *
+ * The three sources are namespaced so they can share one set without ever
+ * colliding: a HID usage, a tvOS remote button (which carries no UIKey at all),
+ * and, only when neither exists, the mapped CN1 code -- tracked imprecisely
+ * beats untracked, an untracked press being the stuck repeat timer this whole
+ * mechanism exists to prevent. Every value involved is far below the namespace
+ * stride.
+ *
+ * Not static: the Mac Catalyst window controller keys its own ownership set the
+ * same way, and two copies of this rule would drift. */
+#if !TARGET_OS_WATCH
+#if !TARGET_OS_OSX
+#define CN1_PRESS_ID_HID_KEY        0x1000000LL
+#define CN1_PRESS_ID_REMOTE_BUTTON  0x2000000LL
+#define CN1_PRESS_ID_MAPPED_CODE    0x3000000LL
+
+long long cn1PressIdentity(UIPress *press, int code) API_AVAILABLE(ios(13.4)) {
+    UIKey *key = press.key;
+    if (key != nil && key.keyCode != 0) {
+        return CN1_PRESS_ID_HID_KEY + (long long) key.keyCode;
+    }
+#if TARGET_OS_TV
+    if (key == nil) {
+        return CN1_PRESS_ID_REMOTE_BUTTON + (long long) press.type;
+    }
+#endif
+    return CN1_PRESS_ID_MAPPED_CODE + (long long) code;
+}
+#endif
+#endif
+
 void pointerPressedC(int* x, int* y, int length) {
     //CN1Log(@"pointerPressedC started");
     pointerPressed(x, y, length);
@@ -3585,33 +3622,34 @@ bool lockDrawing;
 // converse pairs up too: a press that went to UIKit while an editor was open
 // has its release forwarded there even if the editor closed meanwhile.
 //
-// Keyed by code rather than by UIPress, which is how the framework itself
-// identifies a key and cannot be ambiguous -- the same key cannot be down
-// twice. Main thread only, like every other UIKit callback in this file, so it
-// needs no synchronization.
+// Keyed by cn1PressIdentity, the physical control rather than the CN1 code the
+// framework was handed, so two keys that share a code cannot take each other's
+// entry. The same physical key cannot be down twice, so the identity is
+// unambiguous. Main thread only, like every other UIKit callback in this file,
+// so it needs no synchronization.
 //
 // A press whose terminal phase never arrives (the app suspended mid-key) leaves
 // its code behind. The cost is one later release of that same key routed to the
 // framework instead of UIKit; the repeat-timer wedge this prevents is the
 // larger failure, and before this the release was misrouted unconditionally.
 #if !TARGET_OS_OSX
-static NSMutableSet *cn1FrameworkOwnedKeys = nil;
+static NSMutableSet *cn1FrameworkOwnedPresses = nil;
 
-static void cn1NoteFrameworkOwnsKey(int code) {
-    if (cn1FrameworkOwnedKeys == nil) {
-        cn1FrameworkOwnedKeys = [[NSMutableSet alloc] init];
+static void cn1NoteFrameworkOwnsPress(long long identity) {
+    if (cn1FrameworkOwnedPresses == nil) {
+        cn1FrameworkOwnedPresses = [[NSMutableSet alloc] init];
     }
-    [cn1FrameworkOwnedKeys addObject:[NSNumber numberWithInt:code]];
+    [cn1FrameworkOwnedPresses addObject:[NSNumber numberWithLongLong:identity]];
 }
 
 /* YES exactly once per recorded press, so the release reaches the framework and
  * nothing is left armed for the next press of the same key. */
-static BOOL cn1TakeFrameworkOwnedKey(int code) {
-    NSNumber *boxed = [NSNumber numberWithInt:code];
-    if (![cn1FrameworkOwnedKeys containsObject:boxed]) {
+static BOOL cn1TakeFrameworkOwnedPress(long long identity) {
+    NSNumber *boxed = [NSNumber numberWithLongLong:identity];
+    if (![cn1FrameworkOwnedPresses containsObject:boxed]) {
         return NO;
     }
-    [cn1FrameworkOwnedKeys removeObject:boxed];
+    [cn1FrameworkOwnedPresses removeObject:boxed];
     return YES;
 }
 #endif
@@ -3676,7 +3714,7 @@ static BOOL cn1TakeFrameworkOwnedKey(int code) {
             }
             if (code != 0) {
                 keyPressedNative(code);
-                cn1NoteFrameworkOwnsKey(code);
+                cn1NoteFrameworkOwnsPress(cn1PressIdentity(press, code));
                 handled = YES;
             } else {
                 if (passthrough == nil) {
@@ -3720,7 +3758,7 @@ static BOOL cn1TakeFrameworkOwnedKey(int code) {
             if (code == 0 && key == nil) {
                 continue;
             }
-            if (code != 0 && cn1TakeFrameworkOwnedKey(code)) {
+            if (code != 0 && cn1TakeFrameworkOwnedPress(cn1PressIdentity(press, code))) {
                 keyReleasedNative(code);
                 handled = YES;
             } else {
@@ -3763,7 +3801,7 @@ static BOOL cn1TakeFrameworkOwnedKey(int code) {
             if (code == 0 && key == nil) {
                 continue;
             }
-            if (code != 0 && cn1TakeFrameworkOwnedKey(code)) {
+            if (code != 0 && cn1TakeFrameworkOwnedPress(cn1PressIdentity(press, code))) {
                 keyReleasedNative(code);
             }
         }

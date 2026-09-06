@@ -53,6 +53,9 @@ extern void cn1CapturePointerMetadata(UITouch* touch);
 
 /* The main view controller's UIKey mapping, shared so the two cannot drift. */
 extern int cn1MapUIKeyToKeyCode(UIKey* key) API_AVAILABLE(ios(13.4));
+/* Identity of the physical control behind a press, shared for the same reason:
+ * the CN1 keycode is many-to-one, so ownership cannot be keyed on it. */
+extern long long cn1PressIdentity(UIPress* press, int code) API_AVAILABLE(ios(13.4));
 extern CN1View *editingComponent;
 
 #define CN1_MAC_MAX_WINDOWS 32
@@ -131,10 +134,11 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
 @interface CN1MacWindowController : UIViewController
 @property (nonatomic, assign) int windowId;
 @property (nonatomic, assign) CN1MacWindowView* content;
-/* Key codes this window handed to the framework from pressesBegan:, so the end
- * and the cancellation of a press follow the decision made when it started
- * rather than whatever the editor is doing by then. See the presses overrides. */
-@property (nonatomic, retain) NSMutableSet* cn1FrameworkOwnedKeys;
+/* Presses this window handed to the framework from pressesBegan:, keyed by
+ * physical control (cn1PressIdentity), so the end and the cancellation of a
+ * press follow the decision made when it started rather than whatever the
+ * editor is doing by then. See the presses overrides. */
+@property (nonatomic, retain) NSMutableSet* cn1FrameworkOwnedPresses;
 @end
 
 @implementation CN1MacWindowController
@@ -303,9 +307,9 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
  * editor's state, because the two can disagree: Display.keyPressedImpl arms the
  * key-repeat and long-press timers and only keyReleased cancels them, so a
  * release diverted to UIKit because an editor opened mid-press would leave the
- * framework repeating a key the user has let go of. A code cannot be ambiguous
- * -- the same key cannot be down twice -- and everything here is on the main
- * thread, so the set needs no synchronization.
+ * framework repeating a key the user has let go of. Keyed by physical control
+ * rather than by CN1 keycode, which is many-to-one, and everything here is on
+ * the main thread, so the set needs no synchronization.
  *
  * The guard sits in each override rather than in deliverPresses: because that
  * helper flattens the three phases into a BOOL, which is right for the
@@ -341,14 +345,16 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
     *owned = nil;
     *passthrough = nil;
     for (UIPress* press in presses) {
-        int code = 0;
+        NSNumber* boxed = nil;
         if (@available(iOS 13.4, *)) {
             UIKey* key = press.key;
-            code = key != nil ? cn1MapUIKeyToKeyCode(key) : 0;
+            int code = key != nil ? cn1MapUIKeyToKeyCode(key) : 0;
+            if (code != 0) {
+                boxed = [NSNumber numberWithLongLong:cn1PressIdentity(press, code)];
+            }
         }
-        NSNumber* boxed = code != 0 ? [NSNumber numberWithInt:code] : nil;
-        if (boxed != nil && [self.cn1FrameworkOwnedKeys containsObject:boxed]) {
-            [self.cn1FrameworkOwnedKeys removeObject:boxed];
+        if (boxed != nil && [self.cn1FrameworkOwnedPresses containsObject:boxed]) {
+            [self.cn1FrameworkOwnedPresses removeObject:boxed];
             if (*owned == nil) {
                 *owned = [NSMutableSet set];
             }
@@ -362,7 +368,7 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
     }
 }
 
-- (void)cn1NoteOwnedKeysFrom:(NSSet<UIPress*>*)presses {
+- (void)cn1NoteOwnedPressesFrom:(NSSet<UIPress*>*)presses {
     if (@available(iOS 13.4, *)) {
         for (UIPress* press in presses) {
             UIKey* key = press.key;
@@ -370,17 +376,18 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
             if (code == 0) {
                 continue;
             }
-            if (self.cn1FrameworkOwnedKeys == nil) {
-                self.cn1FrameworkOwnedKeys = [NSMutableSet set];
+            if (self.cn1FrameworkOwnedPresses == nil) {
+                self.cn1FrameworkOwnedPresses = [NSMutableSet set];
             }
-            [self.cn1FrameworkOwnedKeys addObject:[NSNumber numberWithInt:code]];
+            [self.cn1FrameworkOwnedPresses addObject:
+                    [NSNumber numberWithLongLong:cn1PressIdentity(press, code)]];
         }
     }
 }
 
 /* The port builds without ARC, so the retained set is ours to give back. */
 - (void)dealloc {
-    [_cn1FrameworkOwnedKeys release];
+    [_cn1FrameworkOwnedPresses release];
     [super dealloc];
 }
 
@@ -389,7 +396,7 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
         [super pressesBegan:presses withEvent:event];
         return;
     }
-    [self cn1NoteOwnedKeysFrom:presses];
+    [self cn1NoteOwnedPressesFrom:presses];
     [self deliverPresses:presses pressed:YES event:event];
 }
 
