@@ -3175,8 +3175,19 @@ public class AndroidGradleBuilder extends Executor {
             // unpacked into the same srcDir further down: the port's own
             // sources call the platform manager, and reading them would refuse
             // every application that sets the hint.
-            usesPersistentLocation |= LocationButtonManifestFragments
-                    .sourcesCallPlatformLocation(srcDir);
+            // Only when the hint is actually set. This walks every staged
+            // .java and .kt through the scan budget, which REFUSES a tree
+            // over its cap -- so an app with large generated native
+            // sources and no interest in the location button was failed
+            // by a check whose answer nothing would have read.
+            // exclusiveConflict returns null unless exclusive is set, so
+            // this result is unused in every other build.
+            if (LocationButtonManifestFragments.isExclusive(
+                    request.getArg("android.locationButton.exclusive",
+                            "false"))) {
+                usesPersistentLocation |= LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(srcDir);
+            }
             if (appLocation.usesButton() && !usesLocationButton) {
                 debug("Location button found in the application by the "
                         + "byte-level scan, which reads annotation class "

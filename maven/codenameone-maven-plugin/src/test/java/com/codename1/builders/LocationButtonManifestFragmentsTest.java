@@ -1562,6 +1562,29 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aStringNestedInsideATemplateDoesNotHideTheCall() throws Exception {
+        // The case that ended the attempt to lex templates. A nested string
+        // may hold a quote or a brace -- "${if (ok) "}" else client
+        // .lastLocation}" holds both -- and every partial lexer got it wrong
+        // in the same direction, masking the real lookup. A literal carrying
+        // a template is copied through whole now, so no amount of nesting
+        // inside one can hide what it contains.
+        File root = tempDir("cn1-lb-nested-string");
+        writeSource(new File(root, "com/example/Odd.kt"),
+                "package com.example\n"
+                + "import com.google.android.gms.location"
+                + ".FusedLocationProviderClient\n"
+                + "class Odd(val client: FusedLocationProviderClient,\n"
+                + "          val ok: Boolean) {\n"
+                + "  fun note() = \"at ${if (ok) \\\"}\\\" else "
+                + "client.lastLocation}\"\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "a nested string cannot hide the call after it");
+    }
+
+    @Test
     void namingThePlatformManagerWithoutCallingItIsNotUse() throws Exception {
         // The narrow half. This scan refuses builds, and a source file is
         // prose as much as code: an import left behind by a deleted feature,
@@ -1578,6 +1601,39 @@ class LocationButtonManifestFragmentsTest {
         assertFalse(LocationButtonManifestFragments
                         .sourcesCallPlatformLocation(root),
                 "naming the class is not asking it for a location");
+    }
+
+    @Test
+    void aReflectiveLookupIsUseOfTheButton() throws Exception {
+        // Class.forName("com.codename1.location.LocationButton") creates no
+        // CONSTANT_Class and no descriptor: the DOTTED name sits in a string
+        // constant, which both other tests miss. The bridge package was then
+        // deleted out from under a component the application really builds,
+        // and API 37 silently fell back to the ordinary prompt.
+        File root = tempDir("cn1-lb-reflective");
+        ClassWriter w = new ClassWriter(0);
+        w.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "com/example/Reflect", null,
+                "java/lang/Object", null);
+        MethodVisitor mv = w.visitMethod(Opcodes.ACC_PUBLIC, "make",
+                "()Ljava/lang/Object;", null, null);
+        mv.visitCode();
+        mv.visitLdcInsn("com.codename1.location.LocationButton");
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Class",
+                "forName", "(Ljava/lang/String;)Ljava/lang/Class;", false);
+        mv.visitInsn(Opcodes.ARETURN);
+        mv.visitMaxs(1, 1);
+        mv.visitEnd();
+        w.visitEnd();
+        byte[] bytes = w.toByteArray();
+        // The premise, checked rather than trusted: the SLASHED name appears
+        // nowhere, so nothing but the dotted string can be answering here.
+        assertFalse(new String(bytes, StandardCharsets.ISO_8859_1)
+                        .contains("com/codename1/location/LocationButton"),
+                "sanity: the reflective form is dotted, not slashed");
+        writeClassBytes(new File(root, "com/example/Reflect.class"), bytes);
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "a reflective lookup builds the button too");
     }
 
     @Test

@@ -2048,13 +2048,28 @@ final class LocationButtonManifestFragments {
     }
 
     /**
-     * Copies a string literal with its text blanked and its code kept.
+     * Copies a string literal, blanking it only when it cannot hold code.
      *
-     * <p>Every character becomes a space, so the literal occupies the same
-     * ground and separates the tokens either side of it without any of its
-     * contents being searchable -- except a Kotlin {@code ${...}} template,
-     * which is an expression the compiler really evaluates and is copied
-     * through as the code it is.</p>
+     * <p>A literal with no {@code ${} in it is text and nothing else, so every
+     * character becomes a space: it keeps its ground and separates the tokens
+     * either side without any of its contents being searchable.</p>
+     *
+     * <p>A literal that DOES carry a Kotlin template is copied through whole,
+     * and that is a deliberate retreat rather than a shortcut. What is inside
+     * {@code ${...}} is compiled, and lexing it properly means handling
+     * strings nested in templates nested in strings, to any depth, plus
+     * comments and escapes inside those -- a Kotlin lexer, in a class whose
+     * whole approach to sources is a substring search. Two attempts at half of
+     * it were both wrong in the same direction: first {@code indexOf('}')}
+     * ended a template at a brace belonging to an inner block, then the
+     * balancer counted braces inside a nested string. Each masked a real
+     * lookup, which is the failure that downgrades a request in silence.</p>
+     *
+     * <p>Copying it whole cannot do that. What it can do is read the literal's
+     * text as code and report a use that is not there, which refuses a build
+     * with a reason -- the direction this file resolves ambiguity in
+     * everywhere else. The cost is a Kotlin string that both interpolates and
+     * names a provider and one of its methods.</p>
      *
      * @param out  the stripped source being built
      * @param text the whole file
@@ -2063,40 +2078,13 @@ final class LocationButtonManifestFragments {
      */
     private static void appendMasked(StringBuilder out, String text, int from,
             int to) {
-        int at = from;
-        while (at < to) {
-            if (text.charAt(at) == '$' && at + 1 < to
-                    && text.charAt(at + 1) == '{') {
-                // BALANCED, not the first '}'. A template may hold braces of
-                // its own -- "${if (ok) { a } else { client.lastLocation }}"
-                // is ordinary Kotlin -- and stopping at the first one masked
-                // the rest of the expression, losing a real call in the
-                // direction that downgrades a request in silence.
-                int close = at + 2;
-                int depth = 1;
-                while (close < to) {
-                    char ch = text.charAt(close);
-                    if (ch == '{') {
-                        depth++;
-                    } else if (ch == '}') {
-                        depth--;
-                        if (depth == 0) {
-                            break;
-                        }
-                    }
-                    close++;
-                }
-                // Unbalanced, so the file is not valid Kotlin anyway: take the
-                // rest of the literal as code, which can only ADD a match.
-                if (close >= to) {
-                    close = to - 1;
-                }
-                out.append(text, at, close + 1);
-                at = close + 1;
-                continue;
-            }
+        // Any template at all, and the whole literal is treated as code.
+        if (text.lastIndexOf("${", to - 1) >= from) {
+            out.append(text, from, to);
+            return;
+        }
+        for (int at = from; at < to; at++) {
             out.append(' ');
-            at++;
         }
     }
 
@@ -2890,7 +2878,8 @@ final class LocationButtonManifestFragments {
         // appearing in somebody's signature. This one only ever keeps an
         // implementation package that would otherwise be removed.
         if (referencesClass(pool, BUTTON_MARKER)
-                || referencesDescriptor(text, pool, BUTTON_MARKER)) {
+                || referencesDescriptor(text, pool, BUTTON_MARKER)
+                || namesReflectively(pool, BUTTON_MARKER)) {
             found.button = true;
         }
         // The geofencing wrapper counts as persistent use on its own. Its calls
@@ -3510,6 +3499,47 @@ final class LocationButtonManifestFragments {
             // that merely spells the name.
             if (annotated == null
                     || annotated.contains(Integer.valueOf(index))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a CONSTANT_String in the pool is the class's DOTTED name.
+     *
+     * <p>Which is how {@code Class.forName("com.codename1.location
+     * .LocationButton")} names it: no CONSTANT_Class is created and no
+     * descriptor either, so both other tests miss it and the bridge package is
+     * deleted out from under a component the application really does
+     * build.</p>
+     *
+     * <p>Note this deliberately DOES accept a bare string constant, where
+     * referencesDescriptor deliberately does not. The two forms are not the
+     * same evidence: {@code Lcom/codename1/location/LocationButton;} is a
+     * descriptor that bytecode-handling code carries as text for its own
+     * reasons, while the dotted name in a string is what a reflective lookup
+     * is made of. The cost of accepting it is a class that merely mentions the
+     * name in a message, and that costs an implementation package staying in
+     * an app that does not use it.</p>
+     *
+     * <p>Codename One obfuscates, so a reflective lookup of a framework class
+     * is fragile in a built app whatever this scan decides -- the platform's
+     * own guidance is not to write one. This exists so that the build does not
+     * add a SECOND failure on top of that one when obfuscation happens to be
+     * off.</p>
+     *
+     * @param pool         the parsed pool
+     * @param internalName the class's internal name
+     * @return whether a string constant names it
+     */
+    private static boolean namesReflectively(Pool pool, String internalName) {
+        String dotted = internalName.replace('/', '.');
+        for (int index = 1; index < pool.tag.length; index++) {
+            if (pool.tag[index] != TAG_STRING) {
+                continue;
+            }
+            if (dotted.equals(utf8At(pool, pool.first[index]))) {
                 return true;
             }
         }
