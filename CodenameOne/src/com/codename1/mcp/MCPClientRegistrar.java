@@ -83,8 +83,19 @@ public final class MCPClientRegistrar {
                 ".claude.json", ".claude.json", WIN_UNDER_HOME, ".claude.json", FORMAT_JSON));
         // Codex keeps its servers as [mcp_servers.<name>] tables in a TOML file that the
         // ChatGPT desktop app, the Codex CLI and the Codex IDE extension all share, so one
-        // writer serves all three. CODEX_HOME defaults to ~/.codex on every platform,
-        // which on Windows is %USERPROFILE%, not %APPDATA%.
+        // writer serves all three. CODEX_HOME names that directory and defaults to
+        // ~/.codex on every platform - which on Windows is %USERPROFILE%, not %APPDATA%.
+        //
+        // A machine that SETS CODEX_HOME is not followed, and cannot be from here: the
+        // Codename One runtime has no System.getenv. It is absent from both bootclasspaths
+        // core is compiled against - ../cn1-binaries/CLDC11.jar and the java-runtime jar
+        // the bytecode compliance check uses - so the call does not compile, whatever a
+        // desktop JVM would do at runtime. (Check that with javac, not javap: javap
+        // resolves java.lang.System from the JDK even when a jar is on the classpath, and
+        // reports a getenv that core cannot call.) Following it would mean a desktop port,
+        // which does have an environment, handing it to this class through new API. Until
+        // then such a machine either fails to detect Codex at all, or - if a stale
+        // ~/.codex survives the move - has that stale copy updated instead.
         knownClients.add(new KnownClient("codex", "Codex",
                 ".codex/config.toml", ".codex/config.toml", WIN_UNDER_HOME,
                 ".codex/config.toml", FORMAT_TOML));
