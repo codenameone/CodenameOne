@@ -6367,6 +6367,37 @@ static long cn1BibopTriggerFloor(long liveBytes) {
         }
         floor = (long)scaled;
     }
+    // Memory pressure bounds the live-set floor, because the floor is an argument
+    // about how OFTEN to retrace a live heap and says nothing about whether the
+    // heap it justifies will fit. Without this a 100MB live set asks for 192MB
+    // (growth is 100%, clamped by the max) no matter how little is left, and the
+    // high-survival branch below then RAISES its own free-memory ceiling to meet
+    // it -- deferring collection past the remaining headroom.
+    //
+    // lowMemoryMode does not cover this. It is set by iOS didReceiveMemoryWarning
+    // and by the CI simulation hook, and by nothing else -- so on Linux, which is
+    // where the server runs and where this floor was introduced to cut resident
+    // memory, it is never set at all and there is otherwise no memory bound here.
+    //
+    // The cap floors at the old constant rather than at freeMem/8 directly, and
+    // that is the load-bearing half: GcSteadyState pins the free-memory reading to
+    // 16MB, and a bare eighth of that is 2MB. A 2MB trigger is the collector
+    // running continuously, which is the failure this constant already caused
+    // twice. Bounded this way the pinned-memory case lands exactly on the value
+    // the trigger had before any of this, so the floor can be lowered by pressure
+    // but never below what was always safe.
+    {
+        long freeMem = atomic_load_explicit(&cn1CachedFreeMem, memory_order_relaxed);
+        if(freeMem > 0) {
+            long memCap = freeMem / 8;
+            if(memCap < CN1_BIBOP_GC_MIN_TRIGGER_BYTES) {
+                memCap = CN1_BIBOP_GC_MIN_TRIGGER_BYTES;
+            }
+            if(floor > memCap) {
+                floor = memCap;
+            }
+        }
+    }
     if(floor < CN1_BIBOP_GC_MIN_TRIGGER_BYTES) {
         floor = CN1_BIBOP_GC_MIN_TRIGGER_BYTES;
     }
