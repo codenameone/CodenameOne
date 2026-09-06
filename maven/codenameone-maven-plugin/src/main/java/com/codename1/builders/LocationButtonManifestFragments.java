@@ -3514,14 +3514,24 @@ final class LocationButtonManifestFragments {
      * deleted out from under a component the application really does
      * build.</p>
      *
-     * <p>Note this deliberately DOES accept a bare string constant, where
-     * referencesDescriptor deliberately does not. The two forms are not the
-     * same evidence: {@code Lcom/codename1/location/LocationButton;} is a
-     * descriptor that bytecode-handling code carries as text for its own
-     * reasons, while the dotted name in a string is what a reflective lookup
-     * is made of. The cost of accepting it is a class that merely mentions the
-     * name in a message, and that costs an implementation package staying in
-     * an app that does not use it.</p>
+     * <p>The string alone is NOT enough, and the class has to reflect as well.
+     * The first version of this accepted every matching CONSTANT_String and
+     * justified it by saying a false positive costs an unused implementation
+     * package. That was wrong: {@code usesLocationButton} also drives the
+     * toolchain gate, which REFUSES the build until this builder moves to AGP
+     * 9 -- so a library holding the name in a diagnostic or a configuration
+     * constant would have failed every Android build that consumed it.</p>
+     *
+     * <p>Requiring a loader call in the same class file is not dataflow, and
+     * it does not prove the string is the argument. It does mean a class that
+     * never reflects at all cannot match, which is the shape the false
+     * positive actually took.</p>
+     *
+     * <p>Note the descriptor form is still refused outright, where this one is
+     * accepted under that condition. They are not the same evidence:
+     * {@code Lcom/codename1/location/LocationButton;} is what bytecode-handling
+     * code carries as text for its own reasons, while the dotted name beside a
+     * {@code Class.forName} is what a reflective lookup is made of.</p>
      *
      * <p>Codename One obfuscates, so a reflective lookup of a framework class
      * is fragile in a built app whatever this scan decides -- the platform's
@@ -3534,6 +3544,16 @@ final class LocationButtonManifestFragments {
      * @return whether a string constant names it
      */
     private static boolean namesReflectively(Pool pool, String internalName) {
+        boolean reflects = false;
+        for (int row = 0; row < CLASS_LOADERS.length && !reflects; row++) {
+            String[] loader = CLASS_LOADERS[row];
+            String[] methods = new String[loader.length - 1];
+            System.arraycopy(loader, 1, methods, 0, methods.length);
+            reflects = callsMethodOn(pool, loader[0], methods);
+        }
+        if (!reflects) {
+            return false;
+        }
         String dotted = internalName.replace('/', '.');
         for (int index = 1; index < pool.tag.length; index++) {
             if (pool.tag[index] != TAG_STRING) {
@@ -3545,6 +3565,12 @@ final class LocationButtonManifestFragments {
         }
         return false;
     }
+
+    /** The loaders a reflective lookup goes through, and their calls. */
+    private static final String[][] CLASS_LOADERS = {
+        {"java/lang/Class", "forName"},
+        {"java/lang/ClassLoader", "loadClass"},
+    };
 
     /** Whether some CONSTANT_String in the pool points at this Utf8. */
     private static boolean isStringConstant(Pool pool, int utf8Index) {

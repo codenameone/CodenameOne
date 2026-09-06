@@ -1668,6 +1668,57 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void theNameInAConstantIsNotAReflectiveLookup() throws Exception {
+        // The other half of the reflective test, and the one that matters
+        // most: usesLocationButton drives the TOOLCHAIN GATE, which refuses
+        // the build until this builder moves to AGP 9. So a library holding
+        // the dotted name in a diagnostic or configuration constant, and never
+        // reflecting at all, would have failed every Android build that
+        // consumed it. The first version of that check accepted every matching
+        // string and its comment claimed the cost was an unused package.
+        File root = tempDir("cn1-lb-constant");
+        ClassWriter w = new ClassWriter(0);
+        w.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "com/example/Help", null,
+                "java/lang/Object", null);
+        w.visitField(Opcodes.ACC_STATIC | Opcodes.ACC_FINAL, "HELP",
+                "Ljava/lang/String;", null,
+                "com.codename1.location.LocationButton").visitEnd();
+        w.visitEnd();
+        writeClassBytes(new File(root, "com/example/Help.class"),
+                w.toByteArray());
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "a class that never reflects is not building the button");
+    }
+
+    @Test
+    void aLoaderLookupOfTheNameIsUseOfTheButton() throws Exception {
+        // And ClassLoader.loadClass counts as well as Class.forName -- a
+        // library that resolves through a loader of its own reaches the same
+        // component, and missing it deletes the bridge.
+        File root = tempDir("cn1-lb-loader");
+        ClassWriter w = new ClassWriter(0);
+        w.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "com/example/Loader", null,
+                "java/lang/Object", null);
+        MethodVisitor mv = w.visitMethod(Opcodes.ACC_PUBLIC, "make",
+                "(Ljava/lang/ClassLoader;)Ljava/lang/Object;", null, null);
+        mv.visitCode();
+        mv.visitVarInsn(Opcodes.ALOAD, 1);
+        mv.visitLdcInsn("com.codename1.location.LocationButton");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/ClassLoader",
+                "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;", false);
+        mv.visitInsn(Opcodes.ARETURN);
+        mv.visitMaxs(2, 2);
+        mv.visitEnd();
+        w.visitEnd();
+        writeClassBytes(new File(root, "com/example/Loader.class"),
+                w.toByteArray());
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "a loader lookup builds the button too");
+    }
+
+    @Test
     void aStringLiteralOfTheDescriptorIsNotUse() throws Exception {
         // The other half of the same fact. A Utf8 holding
         // "Lcom/codename1/location/LocationButton;" is byte for byte what an
