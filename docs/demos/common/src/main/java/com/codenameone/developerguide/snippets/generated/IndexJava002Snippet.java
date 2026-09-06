@@ -98,7 +98,10 @@ class IndexJava002Snippet {
 
         @Override
         public void runApp() {
-            new Form("Hi World", BoxLayout.y()).show();
+            editor = new TextArea(Preferences.get("draft", ""));            // <3>
+            Form hi = new Form("Hi World", BoxLayout.y());
+            hi.add(editor);
+            hi.show();
         }
 
         private void saveDraft() {

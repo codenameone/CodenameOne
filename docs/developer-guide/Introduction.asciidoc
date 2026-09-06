@@ -382,6 +382,9 @@ theme, so the app comes up unstyled.
 <2> Called as the app is suspended, which is the moment to persist anything the
 user would hate to lose.
 
+<3> The other half of that: `runApp` puts the saved draft back, so the pair
+survives the app being killed while suspended.
+
 That's it. You should now have a general sense of the code. It's time to run on the device.
 
 ==== Building and deploying on devices
