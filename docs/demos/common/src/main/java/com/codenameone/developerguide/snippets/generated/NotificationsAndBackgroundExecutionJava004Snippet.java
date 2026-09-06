@@ -96,16 +96,19 @@ class NotificationsAndBackgroundExecutionJava004Snippet {
             // was scheduled with, because no foreground state survives
             String account = inputData.get("account");
             boolean ok = account != null;
-            // TRUE for done, FALSE to ask the platform to retry later
+            // TRUE for done. FALSE asks for a retry on Android; the iOS port
+            // ignores the value, so do not rely on it to recover from failure
             onComplete.onSucess(Boolean.valueOf(ok));
         }
     }
 
     void scheduleSync() {
-        // on iOS the id has to be one of the permitted identifiers, so either
-        // use the default the build injects or declare your own with the
-        // ios.backgroundProcessingIds build hint
-        WorkRequest req = WorkRequest.builder("com.example.myapp.processing", SyncWorker.class)
+        // on iOS the id must appear in BGTaskSchedulerPermittedIdentifiers. The
+        // build injects <packageName>.processing by default, so deriving it
+        // from the package matches whatever this app is called; declare any
+        // other id with the ios.backgroundProcessingIds build hint
+        String taskId = Display.getInstance().getProperty("package_name", "") + ".processing";
+        WorkRequest req = WorkRequest.builder(taskId, SyncWorker.class)
                 .setRequiresNetwork(true)
                 .setRequiresCharging(true)
                 .setPeriodic(6 * 60 * 60 * 1000L)

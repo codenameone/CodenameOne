@@ -130,7 +130,9 @@ date one minute out and with both the network and power requirements cleared, so
 the work can recur far more often than the period you asked for and outside the
 constraints you set. Treat a periodic request on iOS as "sometime after the app
 is next backgrounded," and re-check the conditions you care about at the top of
-the worker.
+the worker. The completion value is Android-only for the same reason: the iOS
+port resubmits periodic work whichever value you report, and never resubmits
+one-shot work, so a `FALSE` there doesn't buy you a retry.
 
 `BackgroundTask.scheduleProcessing(id, earliestBeginDate, requiresNetwork, requiresPower,
 runnable)` is a one-shot variant for occasional maintenance work. On iOS the identifiers
