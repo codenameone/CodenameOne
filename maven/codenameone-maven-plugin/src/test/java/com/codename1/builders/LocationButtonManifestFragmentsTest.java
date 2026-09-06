@@ -501,6 +501,77 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aJarCallingThePlatformLocationManagerWantsPreciseLocation()
+            throws Exception {
+        // A plain jar has no manifest to declare a permission with -- the
+        // application supplies it -- so its bytecode is the only evidence that
+        // the library wants precise location for itself.
+        File root = tempDir("cn1-lb-platform");
+        File jar = new File(root, "sdk.jar");
+        ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(jar));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/Tracker.class"));
+            zip.write(methodCallClass("android/location/LocationManager",
+                    "requestLocationUpdates"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresPreciseLocation(),
+                "a platform location call is the library wanting precise "
+                + "location of its own");
+    }
+
+    @Test
+    void anAppRemovalOfTheLibrarysFineLocationIsHonoured() throws Exception {
+        // The developer took the library's request out of the merged manifest,
+        // and inject() then declares fine location itself with
+        // onlyForLocationButton -- so the library cannot obtain ordinary
+        // precise location either way and nothing contradicts.
+        File root = tempDir("cn1-lb-fineremoval");
+        writeAar(new File(root, "native.aar"),
+                "<manifest xmlns:android=\"http://schemas.android.com/apk/res/"
+                + "android\"><uses-permission android:name=\"android."
+                + "permission.ACCESS_FINE_LOCATION\"/></manifest>");
+        LocationButtonManifestFragments.LocationUsage usage =
+                LocationButtonManifestFragments.scanForLocationUsage(root);
+        assertTrue(usage.preciseElements().contains("uses-permission"),
+                "the declaring element travels with the fact: "
+                + usage.preciseElements());
+
+        String removal = "    <uses-permission android:name=\"android."
+                + "permission.ACCESS_FINE_LOCATION\" tools:node=\"remove\""
+                + " />\n";
+        assertTrue(LocationButtonManifestFragments
+                        .removesPermission(removal,
+                                LocationButtonManifestFragments.FINE_LOCATION)
+                        .containsAll(usage.preciseElements()),
+                "and an unscoped removal of the same type covers it");
+    }
+
+    @Test
+    void aSubclassInsideALibraryIsStillLocationManager() throws Exception {
+        // javac records the STATIC type of the receiver as a method's owner, so
+        // a cn1lib that subclasses LocationManager and calls an inherited
+        // setLocationListener through its own type names the SUBCLASS. The
+        // loose application scan resolves that through declaresType; without
+        // the same resolution here, the same library was seen one way in a
+        // merged tree and another inside its own jar -- and exclusive mode was
+        // accepted over a request it really makes.
+        File root = tempDir("cn1-lb-subclass");
+        // The subclass, declaring its superclass and calling the method on
+        // ITSELF, which is what the compiler emits.
+        writeSubclassCall(new File(root, "com/example/MyManager.class"),
+                "com/example/MyManager",
+                "com/codename1/location/LocationManager",
+                "setLocationListener");
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesPersistentLocation(),
+                "a call through a LocationManager subclass is persistent use");
+    }
+
+    @Test
     void aLibrarysOwnPreciseRequestConflictsWithExclusivity() throws Exception {
         // A native SDK inside an aar calls android.location.LocationManager
         // directly, so no marker of ours ever names it -- its manifest asking
@@ -1087,6 +1158,62 @@ class LocationButtonManifestFragmentsTest {
         } finally {
             out.close();
         }
+    }
+
+    /**
+     * Writes a class that EXTENDS {@code superName} and calls {@code method} on
+     * itself, which is the shape javac emits for an inherited call made through
+     * a subclass-typed reference.
+     */
+    private static void writeSubclassCall(File at, String name,
+            String superName, String method) throws Exception {
+        at.getParentFile().mkdirs();
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        body.write(new byte[] {(byte) 0xca, (byte) 0xfe, (byte) 0xba,
+                (byte) 0xbe, 0, 0, 0, 52});
+        byte[][] entries = {
+            cpUtf8(name), cpOne(7, 1),
+            cpUtf8(superName), cpOne(7, 3),
+            cpUtf8(method),
+            cpUtf8("(Lcom/codename1/location/LocationListener;)V"),
+            cpTwo(12, 5, 6),
+            cpTwo(10, 2, 7),
+        };
+        int count = entries.length + 1;
+        body.write((count >> 8) & 0xff);
+        body.write(count & 0xff);
+        for (byte[] entry : entries) {
+            body.write(entry);
+        }
+        // access_flags, this_class=2, super_class=4, and no members.
+        body.write(new byte[] {0, 33, 0, 2, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0});
+        OutputStream out = new FileOutputStream(at);
+        try {
+            out.write(body.toByteArray());
+        } finally {
+            out.close();
+        }
+    }
+
+    /** A class whose pool holds a Methodref for {@code owner.method}. */
+    private static byte[] methodCallClass(String owner, String method)
+            throws Exception {
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        body.write(new byte[] {(byte) 0xca, (byte) 0xfe, (byte) 0xba,
+                (byte) 0xbe, 0, 0, 0, 52});
+        byte[][] entries = {
+            cpUtf8(owner), cpOne(7, 1),
+            cpUtf8(method), cpUtf8("()V"), cpTwo(12, 3, 4), cpTwo(10, 2, 5),
+            cpUtf8("java/lang/Object"), cpOne(7, 7),
+        };
+        int count = entries.length + 1;
+        body.write((count >> 8) & 0xff);
+        body.write(count & 0xff);
+        for (byte[] entry : entries) {
+            body.write(entry);
+        }
+        body.write(new byte[] {0, 33, 0, 8, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0});
+        return body.toByteArray();
     }
 
     /** CONSTANT_Utf8. */

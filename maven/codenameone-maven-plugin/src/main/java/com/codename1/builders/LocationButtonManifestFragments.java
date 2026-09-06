@@ -88,6 +88,22 @@ final class LocationButtonManifestFragments {
     static final String USE_LOCATION_BUTTON =
             "android.permission.USE_LOCATION_BUTTON";
 
+    /** Android's own location manager, which a native SDK calls directly. */
+    private static final String PLATFORM_LOCATION_MANAGER =
+            "android/location/LocationManager";
+
+    /**
+     * The platform calls that need a location permission to return anything.
+     *
+     * <p>Requesting updates, in any of its shapes. A library doing this wants
+     * precise location for itself and cannot have it under the hint.</p>
+     */
+    private static final String[] PLATFORM_LOCATION_MARKERS = {
+        "requestLocationUpdates",
+        "requestSingleUpdate",
+        "getCurrentLocation",
+    };
+
     static final String FINE_LOCATION =
             "android.permission.ACCESS_FINE_LOCATION";
 
@@ -123,13 +139,26 @@ final class LocationButtonManifestFragments {
      */
     static java.util.Set<String> removesBackgroundLocation(
             String xPermissions) {
+        return removesPermission(xPermissions, BACKGROUND_LOCATION);
+    }
+
+    /**
+     * The element types whose declaration of {@code name} the project removes
+     * outright.
+     *
+     * @param xPermissions the permission block, or null
+     * @param name         the permission
+     * @return the tag names of unscoped removals, which may be empty
+     */
+    static java.util.Set<String> removesPermission(String xPermissions,
+            String name) {
         java.util.Set<String> removed = new java.util.TreeSet<String>();
         if (xPermissions == null) {
             return removed;
         }
-        int at = xPermissions.indexOf(BACKGROUND_LOCATION);
+        int at = xPermissions.indexOf(name);
         while (at >= 0) {
-            if (declaresPermissionAt(xPermissions, at, BACKGROUND_LOCATION)
+            if (declaresPermissionAt(xPermissions, at, name)
                     && isRemovalDirective(xPermissions, at)
                     && !isSelectorScoped(xPermissions, at)) {
                 int open = xPermissions.lastIndexOf('<', at);
@@ -137,8 +166,7 @@ final class LocationButtonManifestFragments {
                     removed.add(elementName(xPermissions, open));
                 }
             }
-            at = xPermissions.indexOf(BACKGROUND_LOCATION,
-                    at + BACKGROUND_LOCATION.length());
+            at = xPermissions.indexOf(name, at + name.length());
         }
         return removed;
     }
@@ -151,21 +179,31 @@ final class LocationButtonManifestFragments {
      * @return the tag names, which may be empty
      */
     static java.util.Set<String> backgroundElements(String text) {
+        return elementsDeclaring(text, BACKGROUND_LOCATION);
+    }
+
+    /**
+     * The element types that actively ask for {@code name} in {@code text}.
+     *
+     * @param text a manifest or permission block
+     * @param name the permission
+     * @return the tag names, which may be empty
+     */
+    static java.util.Set<String> elementsDeclaring(String text, String name) {
         java.util.Set<String> tags = new java.util.TreeSet<String>();
         if (text == null) {
             return tags;
         }
-        int at = text.indexOf(BACKGROUND_LOCATION);
+        int at = text.indexOf(name);
         while (at >= 0) {
-            if (declaresPermissionAt(text, at, BACKGROUND_LOCATION)
+            if (declaresPermissionAt(text, at, name)
                     && !isRemovalDirective(text, at)) {
                 int open = text.lastIndexOf('<', at);
                 if (open >= 0) {
                     tags.add(elementName(text, open));
                 }
             }
-            at = text.indexOf(BACKGROUND_LOCATION,
-                    at + BACKGROUND_LOCATION.length());
+            at = text.indexOf(name, at + name.length());
         }
         return tags;
     }
@@ -1445,6 +1483,23 @@ final class LocationButtonManifestFragments {
         /// A submitted archive's manifest asks for ACCESS_FINE_LOCATION.
         private boolean libraryPrecise;
 
+        /// Class to superclass, for every class this scan read.
+        private final java.util.Map<String, String> supers =
+                new java.util.HashMap<String, String>();
+
+        /// Which element declared the library's own precise-location request.
+        private final java.util.Set<String> preciseTags =
+                new java.util.TreeSet<String>();
+
+        /** The element types that asked for precise location. */
+        public java.util.Set<String> preciseElements() {
+            return preciseTags;
+        }
+
+        /// Owners of a persistent call that were not LocationManager itself.
+        private final java.util.Set<String> deferredOwners =
+                new java.util.HashSet<String>();
+
         /** Whether a submitted archive asks for precise location itself. */
         public boolean declaresPreciseLocation() {
             return libraryPrecise;
@@ -1723,6 +1778,11 @@ final class LocationButtonManifestFragments {
         if (root != null && root.isDirectory()) {
             scanTree(root, root, found, new Executor.PermScanBudget());
         }
+        // Owners resolved against the hierarchy now that all of it is read.
+        // See collectDeferredOwners: a call through a subclass-typed reference
+        // names the subclass, and the class that says what it extends may be
+        // read after the call site.
+        resolveDeferredOwners(found);
         return found;
     }
 
@@ -1966,6 +2026,7 @@ final class LocationButtonManifestFragments {
         // anything of ours. See exclusiveConflict.
         if (declaresPermission(text, FINE_LOCATION)) {
             found.libraryPrecise = true;
+            found.preciseTags.addAll(elementsDeclaring(text, FINE_LOCATION));
         }
     }
 
@@ -2241,6 +2302,119 @@ final class LocationButtonManifestFragments {
         }
         if (callsMethodOn(pool, LOCATION_MANAGER, PERSISTENT_MARKERS)) {
             found.persistent = true;
+        }
+        // The PLATFORM's location manager, which a native SDK calls directly.
+        //
+        // A submitted aar says so in its manifest, and that is what the
+        // manifest check reads -- but a plain jar has no manifest to say it
+        // with, and the application supplies the permission on its behalf. Its
+        // bytecode is the only evidence, and it is right here.
+        if (callsMethodOn(pool, PLATFORM_LOCATION_MANAGER,
+                PLATFORM_LOCATION_MARKERS)) {
+            found.libraryPrecise = true;
+        }
+        // The hierarchy this class contributes, and any owner that might turn
+        // out to be a LocationManager once the rest of it is known.
+        //
+        // javac records the STATIC type of the receiver as a method's owner, so
+        // a cn1lib that subclasses LocationManager and calls an inherited
+        // setLocationListener through its own type names the SUBCLASS -- and
+        // the exact test above never fires. The loose application scan resolves
+        // that through declaresType; this side had no equivalent, so the same
+        // library was seen one way in a merged tree and another inside its own
+        // jar.
+        //
+        // Deferred because the class that says what a subclass extends may be
+        // read after the call site, and an archive is walked in whatever order
+        // its entries appear. Resolved once the whole scan is done.
+        String[] pair = classAndSuper(text, pool);
+        if (pair != null && pair[1] != null) {
+            found.supers.put(pair[0], pair[1]);
+        }
+        collectDeferredOwners(pool, found);
+    }
+
+    /**
+     * The class's own name and the one it extends.
+     *
+     * @param text the class file
+     * @param pool its parsed pool
+     * @return {@code {name, superName}}, either of which may be null, or null
+     */
+    private static String[] classAndSuper(String text, Pool pool) {
+        int at = pool.end;
+        if (at + 6 > text.length()) {
+            return null;
+        }
+        int thisClass = u2(text, at + 2);
+        int superClass = u2(text, at + 4);
+        return new String[] {nameOfClassEntry(pool, thisClass),
+                nameOfClassEntry(pool, superClass)};
+    }
+
+    /** The internal name behind a CONSTANT_Class index, or null. */
+    private static String nameOfClassEntry(Pool pool, int index) {
+        if (index < 1 || index >= pool.tag.length
+                || pool.tag[index] != TAG_CLASS) {
+            return null;
+        }
+        return utf8At(pool, pool.first[index]);
+    }
+
+    /**
+     * Records owners of a persistent-location call that are not LocationManager
+     * itself, for resolution against the hierarchy once the scan ends.
+     *
+     * @param pool  the parsed pool
+     * @param found the running result
+     */
+    private static void collectDeferredOwners(Pool pool, LocationUsage found) {
+        for (int index = 1; index < pool.tag.length; index++) {
+            if (pool.tag[index] != TAG_METHODREF
+                    && pool.tag[index] != TAG_INTERFACE_METHODREF) {
+                continue;
+            }
+            String owner = nameOfClassEntry(pool, pool.first[index]);
+            if (owner == null || LOCATION_MANAGER.equals(owner)
+                    || owner.startsWith("com/codename1/")) {
+                continue;
+            }
+            int natIndex = pool.second[index];
+            if (natIndex < 1 || natIndex >= pool.tag.length
+                    || pool.tag[natIndex] != TAG_NAME_AND_TYPE) {
+                continue;
+            }
+            String method = utf8At(pool, pool.first[natIndex]);
+            for (int iter = 0; iter < PERSISTENT_MARKERS.length; iter++) {
+                if (PERSISTENT_MARKERS[iter].equals(method)) {
+                    found.deferredOwners.add(owner);
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * Walks each deferred owner up the hierarchy the scan collected.
+     *
+     * <p>Bounded, because the map comes from files: a hand-made class can name
+     * itself as its own superclass.</p>
+     *
+     * @param found the completed scan
+     */
+    private static void resolveDeferredOwners(LocationUsage found) {
+        if (found.persistent) {
+            return;
+        }
+        for (String owner : found.deferredOwners) {
+            String at = owner;
+            for (int step = 0; at != null && step < 32; step++) {
+                if (LOCATION_MANAGER.equals(at)) {
+                    found.persistent = true;
+                    return;
+                }
+                at = found.supers.get(at);
+            }
         }
     }
 

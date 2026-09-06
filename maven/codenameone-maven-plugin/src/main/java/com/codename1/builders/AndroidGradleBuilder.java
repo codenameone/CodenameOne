@@ -3200,7 +3200,27 @@ public class AndroidGradleBuilder extends Executor {
             // also geofences would have passed the conflict check and then had
             // its background behaviour refused the grant on Android 17.
             usesPersistentLocation |= libraryLocation.usesPersistentLocation();
-            libraryPreciseLocation |= libraryLocation.declaresPreciseLocation();
+            // Unless the application REMOVES it, exactly as the background
+            // flag beside this one is discounted. An unscoped tools:node
+            // ="remove" of fine location takes the library's request out of the
+            // merged manifest, and inject() then declares fine location itself
+            // with onlyForLocationButton -- so the library cannot obtain
+            // ordinary precise location either way and nothing contradicts.
+            // Refusing the hint over a permission the developer already opted
+            // out of punishes them for doing the thing that makes the hint
+            // correct.
+            //
+            // A bytecode hit has no element type to match, so it is not
+            // discounted: a plain jar calling the platform's location manager
+            // is still going to call it whatever the manifest says.
+            libraryPreciseLocation |= libraryLocation.declaresPreciseLocation()
+                    && !(!libraryLocation.preciseElements().isEmpty()
+                            && LocationButtonManifestFragments
+                                    .removesPermission(xPermissions,
+                                            LocationButtonManifestFragments
+                                                    .FINE_LOCATION)
+                                    .containsAll(libraryLocation
+                                            .preciseElements()));
             // A submitted aar's own manifest asking for background location.
             // It calls nothing of ours -- a native location SDK does its own --
             // so no bytecode scan sees it, and its permission still merges into
