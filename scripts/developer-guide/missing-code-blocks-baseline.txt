@@ -5,12 +5,9 @@ Advanced-Topics-Under-The-Hood.asciidoc	You can override these methods in the dr
 Advertising.asciidoc	identifier. The recommended order is to initialize, gather consent, then load:
 Advertising.asciidoc	method that registers its provider with `AdManager`:
 Annotation-JSON-XML-Mapping.asciidoc	Hand-write a `Mapper<T>` and register it at startup:
-Annotation-SQLite-ORM.asciidoc	dao surface isn't enough. Transactions:
-Apple-Wallet-Extension.asciidoc	In Java, publish the user's cards whenever they change (typically after login) and keep a fresh token published so Wallet can skip the login screen:
 Authentication-And-Identity.asciidoc	Firebase Auth isn't an OIDC provider -- it issues Google-Identity-Toolkit-style tokens via REST endpoints. `com.codename1.social.FirebaseAuth` wraps those endpoints:
 Deep-Links-Routing.asciidoc	`AssetLinksBuilder` produces the payload:
 Deep-Links-Routing.asciidoc	without redirects. The plugin's `AasaBuilder` produces the payload:
-Desktop-Integration.asciidoc	same scheduling and handling code is shared across phone and desktop:
 Introduction.asciidoc	In a cold start `init(Object)` is invoked followed by the `start()` method. For example, `start()` can be invoked more than once if an app is minimized and restored, see the sidebar <<ApplicationLifecycle,Application Lifecycle>>:
 Introduction.asciidoc	Next consider the first lifecycle method `init(Object)`. The <<ApplicationLifecycle,Application Lifecycle Sidebar>> discusses the lifecycle in depth:
 Introduction.asciidoc	Now that you have a general sense of the lifecycle lets look at the last two lifecycle methods:
@@ -25,12 +22,10 @@ Monetization.asciidoc	The `createRESTClient()` method shown there creates a `RES
 Monetization.asciidoc	The general usage is as follows:
 Monetization.asciidoc	The source for your ReceiptStore is as follows:
 Monetization.asciidoc	You are now ready to see the full magic of the `validateAndSaveReceipt()` method in all its glory:
-Native-Themes.asciidoc	`UIManager.addThemeProps` after the theme has been installed:
 SVG-Transcoder.asciidoc	the generated class directly:
 The-Components-Of-Codename-One.asciidoc	Call the builder from a Maven plugin, an Ant task or a one-shot `main`:
 The-Components-Of-Codename-One.asciidoc	Let start by exploring how you can achieve this UI that fetches data from a webservice:
 The-Components-Of-Codename-One.asciidoc	This code should output "The result was 7" to the console. It's fully asynchronous, so you can include this code anywhere without worrying about it "bogging down" your code. The full signature of this form of the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute(java.lang.String,com.codename1.util.SuccessCallback)[execute()] method is:
-Working-With-iOS.asciidoc	Repeating notifications will continue until they're canceled by the app. You can cancel a single notification by calling:
 appendix_goal_generate_graphql.adoc	The `@GraphQLClient` interface looks like:
 appendix_goal_generate_graphql.adoc	an `OnComplete<GraphQLResponse<T>>`:
 appendix_goal_generate_graphql.adoc	ends the stream:
