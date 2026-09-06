@@ -241,6 +241,18 @@ class PemKeyTest extends UITestBase {
             + "AgEIouDMDZn4pe8CAQIETDBKAgEBBBUAvIxZ7TvRAWmSpV7IQs8hARRX3BWhLgMs"
             + "AAQCfkc/spneeOM9xKzMN0fhlUyjgr4HlsJ3W26YMDa3YD3ixS8I0OsoJ5c=";
 
+    /// The explicit-parameters EC key with its curve seed's unused-bits
+    /// count set to 8, which is outside the legal 0..7.
+    private static final String EC_PKCS8_BAD_SEED = ""
+            + "MIIBeQIBADCCAQMGByqGSM49AgEwgfcCAQEwLAYHKoZIzj0BAQIhAP////8AAAAB"
+            + "AAAAAAAAAAAAAAAA////////////////MFsEIP////8AAAABAAAAAAAAAAAAAAAA"
+            + "///////////////8BCBaxjXYqjqT57PrvVV2mIa8ZR0GsMxTsPY7zjw+J9JgSwMV"
+            + "CMSdNgiG5wSTamZ44ROdJreBn36QBEEEaxfR8uEsQkf4vOblY6RA8ncDfYEt6zOg"
+            + "9KE5RdiYwpZP40Li/hp/m47n60p8D54WK84zV2sxXs7LtkBoN79R9QIhAP////8A"
+            + "AAAA//////////+85vqtpxeehPO5ysL8YyVRAgEBBG0wawIBAQQgzgQyqm3SoKJl"
+            + "/+kk1lZcl5DdXBwSi5mcV2dUxnlnnl6hRANCAAQuvJBWnyj34TNN2JkU/cNhAunw"
+            + "rhvng2GP75DM7w4q4AWLdjtYgYy8K+edaMc7afUeVg3aqMhy6ahN75VzSUuj";
+
     private static String pem(String label, String base64) {
         StringBuilder sb = new StringBuilder("-----BEGIN ").append(label).append("-----\n");
         for (int i = 0; i < base64.length(); i += 64) {
@@ -1347,6 +1359,21 @@ class PemKeyTest extends UITestBase {
         // a real sect163k1 explicit key converts, byte for byte, to what
         // "openssl pkcs8 -topk8" makes of the same file -- this format had no
         // coverage at all until now, only an assumption that it worked
+        assertArrayEquals(der(EC_PKCS8_CHAR2),
+                PrivateKey.fromPem(pem("EC PRIVATE KEY", EC_SEC1_CHAR2)).getEncoded());
+    }
+
+    @Test
+    void theCurveSeedObeysTheBitStringRules() {
+        // The fourth place a BIT STRING appears, after the SPKI public key, the
+        // SEC1 [1] wrapper and the PKCS#8 [1] field. The helper existed; it was
+        // simply not applied here, so a seed declaring 8 unused bits passed.
+        assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem("PRIVATE KEY", EC_PKCS8_BAD_SEED)));
+
+        // the real keys, whose seeds are well formed, are unaffected
+        assertArrayEquals(der(EC_PKCS8_EXPLICIT),
+                PrivateKey.fromPem(pem(EC_SEC1_EXPLICIT_LABEL, EC_SEC1_EXPLICIT)).getEncoded());
         assertArrayEquals(der(EC_PKCS8_CHAR2),
                 PrivateKey.fromPem(pem("EC PRIVATE KEY", EC_SEC1_CHAR2)).getEncoded());
     }

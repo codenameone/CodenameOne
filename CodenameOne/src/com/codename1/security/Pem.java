@@ -634,8 +634,11 @@ final class Pem {
         if (!isPrimitive(c, 0x04) || !isPrimitive(c, 0x02)) {
             return false;
         }
-        if (c.hasMore() && c.peek() == 0x02) {
-            c.skip();
+        if (c.hasMore() && c.peek() == 0x02 && !isPrimitive(c, 0x02)) {
+            // cofactor: an INTEGER, so not an empty one. Found by auditing the
+            // remaining bare skips rather than by report -- it is the same shape
+            // as the seed above.
+            return false;
         }
         if (c.hasMore() && c.peek() == 0x30) {
             // hash is a HashAlgorithm, which is an AlgorithmIdentifier: an OID
@@ -752,8 +755,10 @@ final class Pem {
         if (!isPrimitive(c, 0x04) || !isPrimitive(c, 0x04)) {
             return false;
         }
-        if (c.hasMore() && c.peek() == 0x03) {
-            c.skip();
+        if (c.hasMore() && c.peek() == 0x03 && !isBitString(c.read(0x03))) {
+            // the fourth place a BIT STRING turns up, and the fourth time the
+            // rules had to be applied rather than assumed
+            return false;
         }
         return !c.hasMore();
     }
