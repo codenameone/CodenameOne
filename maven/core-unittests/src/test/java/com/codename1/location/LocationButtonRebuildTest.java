@@ -1217,12 +1217,115 @@ class LocationButtonRebuildTest extends UITestBase {
         drain();
         drain();
         int built = bridge.sessions.size() - before;
-        // ONE attempt. The port gets a chance to replace the peer; when the
-        // replacement is stale too the component stops asking, because
-        // rebuild() revalidates and a revalidate lays out, so asking again is
-        // a loop that runs for as long as the button is on screen.
+        // ONE attempt for this burst. rebuild() revalidates and a revalidate
+        // lays out, so asking every time is a loop that runs for as long as
+        // the button is on screen -- and these five layouts all fall inside
+        // one window.
         assertEquals(1, built,
-                "a port that cannot rebuild is asked once, not once per "
-                + "layout: built=" + built);
+                "a port that cannot rebuild is asked once per window, not "
+                + "once per layout: built=" + built);
+    }
+    @Test
+    void aPortThatRecoversIsPickedUpRatherThanWrittenOff() {
+        // What giving up permanently got wrong. An activity recreated AGAIN
+        // while the replacement is being built makes that replacement stale
+        // through no fault of the port -- and a component that has written the
+        // port off is then tied to a retired session for good, which is the
+        // exact state this check exists to end.
+        //
+        // Note the peer in place after the churn is still a stale one, so a
+        // rule that recovers only on seeing a HEALTHY peer never fires. That
+        // was the first attempt at this and a probe caught it.
+        RecordingBridge bridge = install();
+        LocationButton button = new LocationButton();
+        Form form = new Form();
+        form.add(button);
+        form.show();
+        drain();
+
+        // Churn: everything built comes out stale. Kept up until the component
+        // stops asking, which is the state recovery has to undo.
+        bridge.staleAlways = true;
+        int settled = -1;
+        for (int burst = 0; burst < 8 && settled != bridge.sessions.size();
+                burst++) {
+            settled = bridge.sessions.size();
+            button.revalidate();
+            drain();
+            drain();
+        }
+        int during = bridge.sessions.size();
+        assertEquals(during, settled,
+                "sanity: the component has stopped asking a port that cannot "
+                + "answer");
+
+        // It settles. The peer in place is STILL from a retired activity --
+        // that is the whole problem -- so the only thing that has changed is
+        // that time has passed.
+        bridge.staleAlways = false;
+        if (button.getComponentAt(0) instanceof PeerComponent) {
+            bridge.stale.add((PeerComponent) button.getComponentAt(0));
+        }
+        long until = System.currentTimeMillis() + 900;
+        while (System.currentTimeMillis() < until) {
+            drain();
+        }
+        button.revalidate();
+        drain();
+        drain();
+
+        waitUntil("the settled port was asked again", new Settled() {
+            public boolean isSo() {
+                return bridge.sessions.size() > during;
+            }
+        });
+        assertTrue(bridge.sessions.size() > during,
+                "a port that recovers must be asked again, not written off "
+                + "for the life of the component");
+        assertFalse(button.isUnavailable(),
+                "and recovering is not a failure");
+    }
+
+    @Test
+    void aRebuildDeferredWithNoActivityIsRetriedOnLayout() {
+        // rebuild() keeps the working peer and remembers the rebuild when the
+        // platform declines right then -- the Android bridge answers null
+        // without a current Activity. The retry it waits for is in
+        // initComponent, which an activity recreation never reaches, so on
+        // that path the setter's change stayed unapplied for good and the peer
+        // stayed bound to the activity that went away.
+        RecordingBridge bridge = install();
+        LocationButton button = new LocationButton();
+        Form form = new Form();
+        form.add(button);
+        form.show();
+        drain();
+        int before = bridge.sessions.size();
+        assertTrue(button.getComponentAt(0) instanceof PeerComponent,
+                "sanity: a real control is in place");
+
+        // The platform declines, and a setter asks for a rebuild anyway.
+        bridge.building = false;
+        button.setTextType(LocationButton.TEXT_USE_PRECISE_LOCATION);
+        drain();
+        assertEquals(before, bridge.sessions.size(),
+                "a declining platform builds nothing, and the working control "
+                + "is kept rather than downgraded");
+
+        // The activity comes back. Nothing re-initialises the component -- no
+        // attach -- so only a layout can serve the rebuild that is owed.
+        bridge.building = true;
+        button.revalidate();
+        drain();
+        drain();
+
+        waitUntil("the deferred rebuild was served", new Settled() {
+            public boolean isSo() {
+                return bridge.sessions.size() > before;
+            }
+        });
+        assertTrue(bridge.sessions.size() > before,
+                "a rebuild deferred for want of an activity must be retried "
+                + "once one is available, because no attach is coming");
     }
 }

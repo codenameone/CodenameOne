@@ -303,20 +303,31 @@ public class LocationButton extends Container {
     /// control it cannot rebuild queues them forever.
     private boolean staleRebuildPending;
 
-    /// True once a layout-driven rebuild produced a peer the port ALSO calls
-    /// stale, which means it cannot currently give this component a working
-    /// control.
+    /// When the last layout-driven rebuild was attempted, or 0 for never.
     ///
-    /// The pending flag above is not enough on its own. rebuild() revalidates,
-    /// a revalidate lays out, and a layout asks again -- so a port that answers
-    /// stale for everything it builds drives an unbounded rebuild loop, one
-    /// native control per turn, for as long as the component is on screen.
+    /// rebuild() revalidates, a revalidate lays out, and a layout asks again,
+    /// so a port that answers stale for everything it builds would drive an
+    /// unbounded rebuild loop -- one native control per turn, for as long as
+    /// the component is on screen. One attempt per window bounds that.
     ///
-    /// Latched rather than counted, and cleared the moment a layout finds a
-    /// peer the port is happy with, so an ordinary recreation -- where the
-    /// replacement works -- never sets it, and a port that recovers is picked
-    /// up on the next layout without anything having to reset it by hand.
-    private boolean staleRebuildFutile;
+    /// A window rather than a count, and this was a count first, and a latch
+    /// before that. Both give up permanently, and giving up is wrong here: an
+    /// activity recreated AGAIN while the replacement is being built makes
+    /// that replacement stale through no fault of the port, and the component
+    /// is then tied to a retired session for good -- the exact state this
+    /// check exists to end. Nothing in the tree can say when the churn has
+    /// passed except that it has stopped happening, so elapsed time is the
+    /// signal. A count also cannot recover on its own: after the churn the
+    /// peer in place is still the stale one, so a rule that resets on seeing a
+    /// healthy peer never fires.
+    private long lastStaleRebuildAt;
+
+    /// The shortest gap between two layout-driven rebuild attempts.
+    ///
+    /// Long enough that a port which cannot build a working control costs a
+    /// bounded trickle rather than one per frame, short enough that a real
+    /// recreation recovers before the user reaches for the button.
+    private static final long STALE_REBUILD_WINDOW_MS = 750;
 
     /// The stamp for an answer that belongs to no platform session.
     ///
@@ -1200,19 +1211,45 @@ public class LocationButton extends Container {
     /// middle of laying its parent out mutates the tree the layout is walking;
     /// the next EDT cycle is soon enough for a control the user cannot usefully
     /// tap yet anyway.
+    ///
+    /// Serves a rebuild the setters DEFERRED as well as a stale peer, and for
+    /// the same reason: [#rebuild()] keeps the working peer and raises
+    /// [#rebuildPending] when the platform declines at that moment, and the
+    /// retry it waits for is in [#initComponent()], which an activity
+    /// recreation never reaches. Excluding that case here -- which this method
+    /// did at first -- left the flag set for good, the setter's change
+    /// unapplied, and the peer bound to an activity that had gone away.
     @Override
     public void layoutContainer() {
         super.layoutContainer();
-        if (unavailable || rebuildPending || staleRebuildPending
-                || staleRebuildFutile || !(body instanceof PeerComponent)) {
+        if (unavailable || staleRebuildPending
+                || !(body instanceof PeerComponent)) {
             return;
         }
-        if (!systemButtonIsStale((PeerComponent) body)) {
-            // A control the port is happy with, so whatever went wrong before
-            // is over and the latch comes off.
-            staleRebuildFutile = false;
+        boolean stale = systemButtonIsStale((PeerComponent) body);
+        if (!stale) {
+            // A control the port is happy with, so nothing is owed and the
+            // next attempt need not wait.
+            lastStaleRebuildAt = 0;
+            if (!rebuildPending) {
+                return;
+            }
+            // Except that a rebuild is still OWED. rebuild() keeps a working
+            // peer and sets that flag when the platform declines right then --
+            // the Android bridge answers null without a current Activity --
+            // and the retry it was waiting for lives in initComponent, which
+            // an activity recreation never reaches. So the setter's change
+            // stayed unapplied and the peer stayed bound to the activity that
+            // went away. This is the only hook left that can serve it.
+        }
+        long now = System.currentTimeMillis();
+        if (lastStaleRebuildAt != 0
+                && now - lastStaleRebuildAt < STALE_REBUILD_WINDOW_MS) {
+            // Inside the window, which is where the rebuild's own revalidate
+            // lands. Skipping it here is what stops the loop.
             return;
         }
+        lastStaleRebuildAt = now;
         staleRebuildPending = true;
         Display.getInstance().callSerially(new Runnable() {
             @Override
@@ -1228,17 +1265,9 @@ public class LocationButton extends Container {
                     // already have been replaced by the setter path between
                     // the question and this runnable.
                     if (!unavailable && body instanceof PeerComponent
-                            && systemButtonIsStale((PeerComponent) body)) {
+                            && (rebuildPending || systemButtonIsStale(
+                                    (PeerComponent) body))) {
                         rebuild();
-                        // Did that help? A replacement the port calls stale as
-                        // well means it cannot serve this component right now,
-                        // and asking again on the layout the revalidate below
-                        // causes would loop for as long as the button is on
-                        // screen.
-                        if (body instanceof PeerComponent
-                                && systemButtonIsStale((PeerComponent) body)) {
-                            staleRebuildFutile = true;
-                        }
                         revalidate();
                     }
                 } finally {
