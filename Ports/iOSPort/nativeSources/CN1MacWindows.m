@@ -324,23 +324,42 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
  * the keys of the very editor it is meant to protect. A key lost to a window
  * whose sibling has an editor open is the smaller failure.
  */
-- (BOOL)cn1TakeOwnedKeysFrom:(NSSet<UIPress*>*)presses {
-    BOOL owned = NO;
-    if (@available(iOS 13.4, *)) {
-        for (UIPress* press in presses) {
+/* Split a terminal set by who owns each press, because one UIPressesEvent can
+ * carry both -- a key held from before an editor opened ends in the same event
+ * as one pressed after it. Routing the whole batch by an aggregate answer gives
+ * the framework a release for a key it never saw pressed and costs UIKit the
+ * key-up for one it did. Each press leaves by the door its beginning chose,
+ * exactly as CodenameOne_GLViewController does it.
+ *
+ * A press whose key does not map -- a bare modifier, or anything at all before
+ * iOS 13.4, where nothing could have been claimed in the first place -- was
+ * never owned and passes through. Both sets are left nil when empty so the
+ * common single-press case allocates nothing. */
+- (void)cn1PartitionTerminal:(NSSet<UIPress*>*)presses
+                       owned:(NSMutableSet**)owned
+                 passthrough:(NSMutableSet**)passthrough {
+    *owned = nil;
+    *passthrough = nil;
+    for (UIPress* press in presses) {
+        int code = 0;
+        if (@available(iOS 13.4, *)) {
             UIKey* key = press.key;
-            int code = key != nil ? cn1MapUIKeyToKeyCode(key) : 0;
-            if (code == 0) {
-                continue;
+            code = key != nil ? cn1MapUIKeyToKeyCode(key) : 0;
+        }
+        NSNumber* boxed = code != 0 ? [NSNumber numberWithInt:code] : nil;
+        if (boxed != nil && [self.cn1FrameworkOwnedKeys containsObject:boxed]) {
+            [self.cn1FrameworkOwnedKeys removeObject:boxed];
+            if (*owned == nil) {
+                *owned = [NSMutableSet set];
             }
-            NSNumber* boxed = [NSNumber numberWithInt:code];
-            if ([self.cn1FrameworkOwnedKeys containsObject:boxed]) {
-                [self.cn1FrameworkOwnedKeys removeObject:boxed];
-                owned = YES;
+            [*owned addObject:press];
+        } else {
+            if (*passthrough == nil) {
+                *passthrough = [NSMutableSet set];
             }
+            [*passthrough addObject:press];
         }
     }
-    return owned;
 }
 
 - (void)cn1NoteOwnedKeysFrom:(NSSet<UIPress*>*)presses {
@@ -375,21 +394,29 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
 }
 
 - (void)pressesEnded:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
-    if (![self cn1TakeOwnedKeysFrom:presses]) {
-        [super pressesEnded:presses withEvent:event];
-        return;
+    NSMutableSet* owned = nil;
+    NSMutableSet* passthrough = nil;
+    [self cn1PartitionTerminal:presses owned:&owned passthrough:&passthrough];
+    if (owned.count > 0) {
+        [self deliverPresses:owned pressed:NO event:event];
     }
-    [self deliverPresses:presses pressed:NO event:event];
+    if (passthrough.count > 0) {
+        [super pressesEnded:passthrough withEvent:event];
+    }
 }
 
 - (void)pressesCancelled:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
-    if (![self cn1TakeOwnedKeysFrom:presses]) {
-        [super pressesCancelled:presses withEvent:event];
-        return;
+    NSMutableSet* owned = nil;
+    NSMutableSet* passthrough = nil;
+    [self cn1PartitionTerminal:presses owned:&owned passthrough:&passthrough];
+    if (owned.count > 0) {
+        /* Treated as a release: leaving a key latched down in the framework is
+         * worse than an extra release the focused component ignores. */
+        [self deliverPresses:owned pressed:NO event:event];
     }
-    /* Treated as a release: leaving a key latched down in the framework is worse
-     * than an extra release the focused component ignores. */
-    [self deliverPresses:presses pressed:NO event:event];
+    if (passthrough.count > 0) {
+        [super pressesCancelled:passthrough withEvent:event];
+    }
 }
 
 - (void)viewDidLayoutSubviews {
