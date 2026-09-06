@@ -6361,9 +6361,15 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
         long oldTrigger = atomic_load_explicit(&bibopGcTriggerBytes,
                                                memory_order_relaxed);
         bibopTriggerHighSurvivalStreak = 0;
-        long lowFloor = cn1BibopTriggerFloor(liveBytes);
-        if(oldTrigger != lowFloor) {
-            atomic_store_explicit(&bibopGcTriggerBytes, lowFloor,
+        // The live-set floor deliberately does NOT apply here. Low memory mode is
+        // about surviving pressure rather than about footprint, and it pins the
+        // trigger to the constant on purpose: GcSteadyState pins the free-memory
+        // reading to 16MB precisely to make the per-thread pending table fill, and
+        // a live-set floor collects early enough that it never does -- the test
+        // then fails itself as measuring nothing, which is exactly what it did.
+        if(oldTrigger != CN1_BIBOP_GC_TRIGGER_BYTES) {
+            atomic_store_explicit(&bibopGcTriggerBytes,
+                                  CN1_BIBOP_GC_TRIGGER_BYTES,
                                   memory_order_relaxed);
         }
     } else if(occupiedBytes >= (2 * 1024 * 1024)) {
@@ -6396,6 +6402,14 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
                 if(newTrigger < floorBytes) {
                     newTrigger = floorBytes;
                 }
+            } else if(oldTrigger < floorBytes) {
+                // The floor is a bound in BOTH directions. Low survival on a big
+                // live set means the trigger should not stay under what that live
+                // set justifies: a 4MB trigger against 20MB live would retrace
+                // the whole live heap every 4MB of allocation. Raising it here is
+                // the only path that corrects a trigger which adapted down before
+                // the live set grew.
+                newTrigger = floorBytes;
             }
         }
         if(newTrigger != oldTrigger) {
