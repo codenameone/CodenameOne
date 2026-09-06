@@ -848,20 +848,35 @@ public class LocationButton extends Container {
             @Override
             public void run() {
                 if (!stillCurrent(generation)) {
-                    // A control that is no longer on screen answering for a
-                    // tap on a control that is. Serving it would fire the
-                    // listeners of a button the user has not touched, and on
-                    // the granted path would spend the one session the
-                    // replacement was waiting for.
+                    // ANSWERED, not dropped. systemButtonGeneration is this
+                    // component's own counter, so a stale generation here does
+                    // not mean some other button -- it means THIS component
+                    // rebuilt its peer, which setText and the colour setters
+                    // do, and which can happen while the permission UI is
+                    // open. The user tapped this control and the listeners are
+                    // this control's; saying nothing leaves a tap that was
+                    // made, and possibly granted, with no answer at all.
                     //
-                    // SILENT here, where the queue answers a stale entry with
-                    // null instead, and the difference is deliberate: once an
-                    // answer has been queued this component has taken
-                    // responsibility for reporting it, and dropping it there
-                    // is the "never reports anything" failure the queue exists
-                    // to prevent. Before that it has promised nothing, and a
-                    // null for a button the app itself replaced is a
-                    // completion the caller never asked for.
+                    // An earlier revision returned silently and argued the
+                    // component had "promised nothing" before an answer was
+                    // queued. That read the generation as identifying a
+                    // different button. It does not, and serveGrant already
+                    // states the rule this now follows: a tap asked a question
+                    // and deserves to report, even from a request that lost
+                    // its slot.
+                    //
+                    // Null rather than the fix, even where the grant arrived:
+                    // the session belonged to a peer that no longer exists, so
+                    // this reports an attempt that produced nothing and leaves
+                    // the user free to tap the control that is on screen. It
+                    // is what the queue answers a superseded entry with, so
+                    // the two paths no longer disagree.
+                    //
+                    // systemButtonFailed keeps its silent return, and that
+                    // asymmetry is deliberate: it decides whether to RETIRE
+                    // the component, and a dead old peer is no reason to kill
+                    // the healthy control that replaced it.
+                    fire(null);
                     return;
                 }
                 if (!granted) {

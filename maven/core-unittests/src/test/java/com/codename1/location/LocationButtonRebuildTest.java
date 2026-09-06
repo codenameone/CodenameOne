@@ -947,24 +947,47 @@ class LocationButtonRebuildTest extends UITestBase {
     }
 
     @Test
-    void aGrantFromAReplacedControlIsNotServed() {
+    void aGrantArrivingAfterARebuildIsAnsweredRatherThanDropped() {
+        // The tap that never reaches the queue. A setter rebuilds the peer
+        // while the permission UI is still open -- setText and the colour
+        // setters both do -- and the OLD peer's result then arrives carrying
+        // the previous generation with nothing in flight, so the queue that
+        // answers superseded entries with null never sees it.
+        //
+        // This asserted the opposite until review caught it, on the reasoning
+        // that the result belonged to "a button the user has not touched".
+        // There is only one button here, and the listeners are its own:
+        // systemButtonGeneration is the COMPONENT'S counter, so a stale
+        // generation is this control's rebuilt peer rather than somebody
+        // else's control. The user tapped, possibly granted, and heard
+        // nothing at all -- which serveGrant already calls the one outcome
+        // that must not happen.
         RecordingBridge bridge = install();
+        ParkingManager manager = parkingManager();
+        bridge.granted = manager;
+
         LocationButton button = new LocationButton();
         final int[] answers = new int[1];
+        final Location[] seen = new Location[1];
         button.addLocationSharedListener(new LocationSharedListener() {
             public void locationShared(Location location) {
                 answers[0]++;
+                seen[0] = location;
             }
         });
         button.setTextType(LocationButton.TEXT_USE_PRECISE_LOCATION);
         assertEquals(2, bridge.sessions.size());
 
-        // The retired view reports a grant. Serving it would fire the listeners
-        // of a button the user has not touched.
+        // The retired peer reports its grant.
         bridge.sessions.get(0).onResult.onSucess(Boolean.TRUE);
         drain();
-        assertEquals(0, answers[0],
-                "a permission result from a replaced control is not this "
-                + "button's answer");
+
+        assertEquals(1, answers[0],
+                "the tap happened, so it is answered rather than dropped");
+        assertNull(seen[0],
+                "with null: the session belonged to a peer that no longer "
+                + "exists, so there is no fix to report");
+        assertEquals(0, manager.lookups,
+                "and no lookup is run against a session nobody can serve");
     }
 }

@@ -716,6 +716,82 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void theCapIsFoundUnderAnyAndroidAlias() throws Exception {
+        // Two prefixes bound to the Android namespace on one element is legal,
+        // and nothing says the cap has to travel under the same one that names
+        // the permission. Reading only the naming prefix left the cap unseen
+        // and refused a build over a permission that had already expired.
+        File root = tempDir("cn1-lb-alias-cap");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "aliased.aar")));
+        try {
+            zip.putNextEntry(new ZipEntry("AndroidManifest.xml"));
+            zip.write(("<manifest xmlns:a=\"http://schemas.android.com"
+                    + "/apk/res/android\" xmlns:b=\"http://schemas.android"
+                    + ".com/apk/res/android\">\n"
+                    + "  <uses-permission a:name=\"android.permission"
+                    + ".ACCESS_FINE_LOCATION\" b:maxSdkVersion=\"30\" />\n"
+                    + "</manifest>\n").getBytes("UTF-8"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresPreciseLocation(),
+                "the cap counts whichever Android alias carries it");
+    }
+
+    @Test
+    void anExpiredBackgroundRequestIsNoConflictEither() throws Exception {
+        // The same bound on the other permission. A library that asks for
+        // background location up to API 30 asks for nothing where
+        // onlyForLocationButton exists, so it cannot contradict the hint --
+        // and only the fine-location path had been given the check.
+        File root = tempDir("cn1-lb-capped-bg");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "legacy.aar")));
+        try {
+            zip.putNextEntry(new ZipEntry("AndroidManifest.xml"));
+            zip.write(("<manifest xmlns:android=\"http://schemas.android.com"
+                    + "/apk/res/android\">\n"
+                    + "  <uses-permission android:name=\"android.permission"
+                    + ".ACCESS_BACKGROUND_LOCATION\""
+                    + " android:maxSdkVersion=\"30\" />\n"
+                    + "</manifest>\n").getBytes("UTF-8"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresBackgroundLocation(),
+                "an expired background request is no conflict");
+    }
+
+    @Test
+    void anUncappedBackgroundRequestStillConflicts() throws Exception {
+        // And the direction that must not move: an ordinary background
+        // request, with no cap at all, is exactly what exclusivity
+        // contradicts.
+        File root = tempDir("cn1-lb-live-bg");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "tracker.aar")));
+        try {
+            zip.putNextEntry(new ZipEntry("AndroidManifest.xml"));
+            zip.write(("<manifest xmlns:android=\"http://schemas.android.com"
+                    + "/apk/res/android\">\n"
+                    + "  <uses-permission android:name=\"android.permission"
+                    + ".ACCESS_BACKGROUND_LOCATION\" />\n"
+                    + "</manifest>\n").getBytes("UTF-8"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresBackgroundLocation(),
+                "a live background request is still a conflict");
+    }
+
+    @Test
     void aLibraryCapAtTheButtonsApiStillConflicts() throws Exception {
         // The boundary, in the direction that matters. maxSdkVersion is
         // INCLUSIVE, so a cap at the button's own API is still a live request

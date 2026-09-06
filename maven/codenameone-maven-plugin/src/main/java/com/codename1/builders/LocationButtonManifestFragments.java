@@ -2338,9 +2338,18 @@ final class LocationButtonManifestFragments {
         // match, which is the safe direction: the exclusivity check then rests
         // on the other signals rather than on a string found in a resource
         // table by accident.
-        if (declaresBackgroundLocation(text)) {
+        //
+        // Capped declarations are skipped here for the reason they are skipped
+        // for fine location below: an aar that asks for background location up
+        // to API 30 asks for nothing where onlyForLocationButton means
+        // anything, so refusing exclusivity over it refuses a build with no
+        // conflict in it. Only this LIBRARY read is bounded that way -- the
+        // project's own permission block is read by declaresBackgroundLocation
+        // elsewhere and is left alone.
+        java.util.Set<String> background = new java.util.TreeSet<String>();
+        if (collectUncapped(text, BACKGROUND_LOCATION, background)) {
             found.background = true;
-            found.backgroundTags.addAll(backgroundElements(text));
+            found.backgroundTags.addAll(background);
         }
         // And precise location, which a native SDK asks for without touching
         // anything of ours. See exclusiveConflict.
@@ -2381,7 +2390,7 @@ final class LocationButtonManifestFragments {
         while (at >= 0) {
             if (declaresPermissionAt(text, at, name)
                     && !isRemovalDirective(text, at)
-                    && !cappedBeforeLocationButton(text, at, name)) {
+                    && !cappedBeforeLocationButton(text, at)) {
                 asked = true;
                 int open = text.lastIndexOf('<', at);
                 if (open >= 0) {
@@ -2397,9 +2406,9 @@ final class LocationButtonManifestFragments {
      * Whether the declaration at {@code at} stops applying before the API the
      * location button exists on.
      *
-     * <p>Read through the prefix that NAMES the permission on this element,
-     * like every other attribute here: an element that rebound
-     * {@code android} carries the real namespace under an alias, and a literal
+     * <p>Read through the Android prefixes in scope on this element, like
+     * every other attribute here: an element that rebound {@code android}
+     * carries the real namespace under an alias, and a literal
      * {@code android:maxSdkVersion} there is somebody else's attribute.</p>
      *
      * <p>A cap that is not a plain number is treated as no cap at all. That
@@ -2408,33 +2417,45 @@ final class LocationButtonManifestFragments {
      *
      * @param text the manifest
      * @param at   where the permission name sits
-     * @param name the permission
      * @return whether it is capped below the location button's API
      */
-    private static boolean cappedBeforeLocationButton(String text, int at,
-            String name) {
+    private static boolean cappedBeforeLocationButton(String text, int at) {
         int open = text.lastIndexOf('<', at);
         int close = text.indexOf('>', at);
         if (open < 0 || close < 0) {
             return false;
         }
         String element = text.substring(open, close + 1);
-        String prefix = androidPrefixNaming(element,
-                candidatePrefixes(element, text, ANDROID_NS, "android"), name);
-        int[] cap = findAttribute(element, prefix + ":maxSdkVersion");
-        if (cap == null) {
-            return false;
+        // EVERY alias in scope, not the one that happens to name the
+        // permission. Two prefixes may be bound to the Android namespace on
+        // one element -- a:name beside b:maxSdkVersion is legal -- and reading
+        // only a's left the cap unseen, so a permission that had already
+        // expired was counted as a live conflict and refused the build.
+        //
+        // candidatePrefixes has already dropped anything rebound to another
+        // namespace in scope, so an alias reaching here is Android's.
+        String[] prefixes = candidatePrefixes(element, text, ANDROID_NS,
+                "android");
+        for (int iter = 0; iter < prefixes.length; iter++) {
+            int[] cap = findAttribute(element,
+                    prefixes[iter] + ":maxSdkVersion");
+            if (cap == null) {
+                continue;
+            }
+            String value = element.substring(cap[2], cap[3]).trim();
+            if (!isAllDigits(value)) {
+                continue;
+            }
+            try {
+                if (Integer.parseInt(value) < LOCATION_BUTTON_API) {
+                    return true;
+                }
+            } catch (NumberFormatException tooBig) {
+                // A number too large for an int is not a cap below anything.
+                continue;
+            }
         }
-        String value = element.substring(cap[2], cap[3]).trim();
-        if (!isAllDigits(value)) {
-            return false;
-        }
-        try {
-            return Integer.parseInt(value) < LOCATION_BUTTON_API;
-        } catch (NumberFormatException tooBig) {
-            // A number too large for an int is not a cap below anything.
-            return false;
-        }
+        return false;
     }
 
     /**
