@@ -1892,6 +1892,35 @@ final class LocationButtonManifestFragments {
         return scanSources(root, new Executor.PermScanBudget());
     }
 
+    /**
+     * Whether a source file names a provider class, by either spelling.
+     *
+     * <p>The qualified name, or the wildcard import of its package and the
+     * simple name. {@code import android.location.*} is ordinary Java and
+     * ordinary Kotlin, and it leaves the qualified name nowhere in the file --
+     * so requiring it read a native implementation that calls
+     * {@code LocationManager.requestLocationUpdates} as naming nothing, and
+     * exclusivity was accepted over a request it really makes.</p>
+     *
+     * @param text  the source file
+     * @param owner the provider's internal name
+     * @return whether this file names that class
+     */
+    private static boolean sourceNames(String text, String owner) {
+        String dotted = owner.replace('/', '.');
+        if (text.indexOf(dotted) >= 0) {
+            return true;
+        }
+        int lastDot = dotted.lastIndexOf('.');
+        if (lastDot < 0) {
+            return false;
+        }
+        // The simple name as well as the wildcard, so a file that imports the
+        // package for something else entirely is not read as naming this.
+        return text.indexOf("import " + dotted.substring(0, lastDot) + ".*") >= 0
+                && text.indexOf(dotted.substring(lastDot + 1)) >= 0;
+    }
+
     /** Walks a staged source tree looking for a platform location call. */
     private static boolean scanSources(java.io.File dir,
             Executor.PermScanBudget budget) throws java.io.IOException {
@@ -1933,7 +1962,7 @@ final class LocationButtonManifestFragments {
             String text = new String(raw, "ISO-8859-1");
             for (int row = 0; row < PLATFORM_LOCATION_OWNERS.length; row++) {
                 String[] owner = PLATFORM_LOCATION_OWNERS[row];
-                if (text.indexOf(owner[0].replace('/', '.')) < 0) {
+                if (!sourceNames(text, owner[0])) {
                     continue;
                 }
                 for (int m = 1; m < owner.length; m++) {
@@ -3051,15 +3080,16 @@ final class LocationButtonManifestFragments {
                 return true;
             }
             if (!walked) {
-                annotated = annotationDescriptorIndexes(text, pool);
+                annotated = descriptorIndexes(text, pool);
                 walked = true;
             }
             // Null when the class could not be walked, and then the match
             // stands. Every failure of this parser has to fall THAT way: a
-            // missed annotation deletes the bridge package from an app that
+            // missed reference deletes the bridge package from an app that
             // does use the button, which is worse than accepting a library
             // that merely spells the name.
-            if (annotated == null || annotated.contains(Integer.valueOf(index))) {
+            if (annotated == null
+                    || annotated.contains(Integer.valueOf(index))) {
                 return true;
             }
         }
@@ -3078,8 +3108,19 @@ final class LocationButtonManifestFragments {
     }
 
     /**
-     * The Utf8 entries the class's annotations name: each annotation's own
-     * type, and every {@code Foo.class} value inside one.
+     * The Utf8 entries this class uses as a TYPE rather than as text.
+     *
+     * <p>Three sources, and all three are real use of the class named: the
+     * descriptor of every field the class declares, the descriptor of every
+     * field or method it refers to, and every {@code Foo.class} value inside
+     * an annotation together with each annotation's own type.</p>
+     *
+     * <p>The field tables are here because a pool entry is SHARED. A class
+     * that declares a {@code LocationButton} field and also spells
+     * "Lcom/codename1/location/LocationButton;" in a string literal points a
+     * CONSTANT_String and its own descriptor_index at one Utf8 -- so deciding
+     * on the string alone deleted the bridge package from a library whose
+     * field is its only reference to the button.</p>
      *
      * <p>Walked at all three levels -- the class, its fields and its methods --
      * because an annotation carrying a class value sits wherever the developer
@@ -3094,22 +3135,33 @@ final class LocationButtonManifestFragments {
      * @param pool its parsed pool
      * @return the indexes, or null when the class could not be walked
      */
-    private static java.util.Set<Integer> annotationDescriptorIndexes(
-            String text, Pool pool) {
+    private static java.util.Set<Integer> descriptorIndexes(String text,
+            Pool pool) {
         int at = pool.end;
         if (at + 6 > text.length()) {
             return null;
         }
         at = skipTable(text, at + 6, 2);        // interfaces
         java.util.Set<Integer> out = new java.util.HashSet<Integer>();
-        at = memberAnnotations(text, pool, at, out);    // fields
-        at = memberAnnotations(text, pool, at, out);    // methods
+        // Every NameAndType's descriptor: a class that READS a
+        // LocationButton-typed field of somebody else's names the type here
+        // and may name it nowhere else.
+        for (int index = 1; index < pool.tag.length; index++) {
+            if (pool.tag[index] == TAG_NAME_AND_TYPE) {
+                out.add(Integer.valueOf(pool.second[index]));
+            }
+        }
+        at = memberDescriptors(text, pool, at, out);    // fields
+        at = memberDescriptors(text, pool, at, out);    // methods
         at = attributeAnnotations(text, pool, at, out);
         return at < 0 ? null : out;
     }
 
-    /** Walks a fields or methods table, reading each member's attributes. */
-    private static int memberAnnotations(String text, Pool pool, int at,
+    /**
+     * Walks a fields or methods table, taking each member's own descriptor and
+     * reading its attributes.
+     */
+    private static int memberDescriptors(String text, Pool pool, int at,
             java.util.Set<Integer> out) {
         if (at < 0 || at + 2 > text.length()) {
             return -1;
@@ -3120,6 +3172,8 @@ final class LocationButtonManifestFragments {
             if (at + 6 > text.length()) {
                 return -1;
             }
+            // access_flags, name_index, descriptor_index -- the third.
+            out.add(Integer.valueOf(u2(text, at + 4)));
             at = attributeAnnotations(text, pool, at + 6, out);
             if (at < 0) {
                 return -1;

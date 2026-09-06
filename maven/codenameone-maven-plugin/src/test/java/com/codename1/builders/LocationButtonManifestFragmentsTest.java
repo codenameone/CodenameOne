@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
@@ -1109,6 +1110,44 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aWildcardImportNamesTheProviderToo() throws Exception {
+        // import android.location.* is ordinary Java and ordinary Kotlin, and
+        // it leaves the qualified name nowhere in the file. Requiring it read
+        // a native implementation calling LocationManager.requestLocationUpdates
+        // as naming nothing at all.
+        File root = tempDir("cn1-lb-wildcard");
+        writeSource(new File(root, "com/example/Wild.java"),
+                "package com.example;\n"
+                + "import android.location.*;\n"
+                + "public class Wild {\n"
+                + "  void go(LocationManager m) {\n"
+                + "    m.requestLocationUpdates(null, 0, 0, null);\n"
+                + "  }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "a wildcard import still names the provider");
+    }
+
+    @Test
+    void aWildcardImportOfSomethingElseIsNotTheProvider() throws Exception {
+        // The narrow half of the wildcard rule. Importing the package for
+        // Location or Criteria is not importing LocationManager, so the simple
+        // name has to be there as well -- a build is refused on this answer.
+        File root = tempDir("cn1-lb-wildcard-other");
+        writeSource(new File(root, "com/example/Other.java"),
+                "package com.example;\n"
+                + "import android.location.*;\n"
+                + "public class Other {\n"
+                + "  Location last;\n"
+                + "  void getCurrentLocation() { }\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "importing the package is not naming the manager");
+    }
+
+    @Test
     void namingThePlatformManagerWithoutCallingItIsNotUse() throws Exception {
         // The narrow half. This scan refuses builds, and a source file is
         // prose as much as code: an import left behind by a deleted feature,
@@ -1151,6 +1190,82 @@ class LocationButtonManifestFragmentsTest {
         assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
                         .usesButton(),
                 "spelling the descriptor in a string is not using the button");
+    }
+
+    @Test
+    void aFieldOfThatTypeSurvivesAStringOfTheSameText() throws Exception {
+        // The trap the string gate opened. A pool holds ONE Utf8 per text, so
+        // a class that declares a LocationButton field and also spells
+        // "Lcom/codename1/location/LocationButton;" in a literal points its
+        // own descriptor_index and a CONSTANT_String at the same entry --
+        // and sending that through the annotation-only branch deleted the
+        // bridge package from a library whose field is its only reference.
+        File root = tempDir("cn1-lb-field");
+        ClassWriter w = new ClassWriter(0);
+        w.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "com/example/Holder", null,
+                "java/lang/Object", null);
+        w.visitField(Opcodes.ACC_PUBLIC, "button",
+                "Lcom/codename1/location/LocationButton;", null, null)
+                .visitEnd();
+        w.visitField(Opcodes.ACC_STATIC | Opcodes.ACC_FINAL, "NAME",
+                "Ljava/lang/String;", null,
+                "Lcom/codename1/location/LocationButton;").visitEnd();
+        w.visitEnd();
+        byte[] bytes = w.toByteArray();
+        String text = new String(bytes, StandardCharsets.ISO_8859_1);
+        int first = text.indexOf("Lcom/codename1/location/LocationButton;");
+        assertTrue(first > 0 && text.indexOf(
+                        "Lcom/codename1/location/LocationButton;", first + 1)
+                        < 0,
+                "sanity: the descriptor is one shared Utf8");
+        writeClassBytes(new File(root, "com/example/Holder.class"), bytes);
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "a field of that type is use of the button");
+    }
+
+    @Test
+    void readingAFieldOfThatTypeSurvivesAStringOfTheSameText()
+            throws Exception {
+        // And the same for a class that only READS such a field. The Fieldref
+        // names the OWNER class, not the type, so LocationButton appears
+        // nowhere but in the NameAndType's descriptor -- which is the same
+        // shared Utf8 the string literal points at.
+        File root = tempDir("cn1-lb-fieldref");
+        ClassWriter w = new ClassWriter(0);
+        w.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "com/example/Reader", null,
+                "java/lang/Object", null);
+        w.visitField(Opcodes.ACC_STATIC | Opcodes.ACC_FINAL, "NAME",
+                "Ljava/lang/String;", null,
+                "Lcom/codename1/location/LocationButton;").visitEnd();
+        MethodVisitor mv = w.visitMethod(Opcodes.ACC_PUBLIC, "read",
+                "(Lcom/example/Other;)V", null, null);
+        mv.visitCode();
+        mv.visitVarInsn(Opcodes.ALOAD, 1);
+        mv.visitFieldInsn(Opcodes.GETFIELD, "com/example/Other", "button",
+                "Lcom/codename1/location/LocationButton;");
+        mv.visitInsn(Opcodes.POP);
+        mv.visitInsn(Opcodes.RETURN);
+        mv.visitMaxs(1, 2);
+        mv.visitEnd();
+        w.visitEnd();
+        byte[] bytes = w.toByteArray();
+        // The premise: no CONSTANT_Class for the button anywhere -- the
+        // Fieldref names com/example/Other -- and one shared Utf8 for the
+        // descriptor.
+        String text = new String(bytes, StandardCharsets.ISO_8859_1);
+        assertFalse(text.contains(
+                        "com/codename1/location/LocationButton\u0000"),
+                "sanity: no bare class name in this file");
+        int first = text.indexOf("Lcom/codename1/location/LocationButton;");
+        assertTrue(first > 0 && text.indexOf(
+                        "Lcom/codename1/location/LocationButton;", first + 1)
+                        < 0,
+                "sanity: the descriptor is one shared Utf8");
+        writeClassBytes(new File(root, "com/example/Reader.class"), bytes);
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "reading a field of that type is use of the button");
     }
 
     @Test
