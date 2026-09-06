@@ -3826,8 +3826,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             if(menuDisplayed){
                 return;
             }
-            long blitStartNanos = BLIT_TRACE ? System.nanoTime() : 0;
-            long bufferDoneNanos = 0;
 
             // We keep a blitCounter that gets reset in paintComponent()
             // If blit is called a number of times with no call to paintComponet
@@ -3887,9 +3885,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
             }
             
-            if (BLIT_TRACE) {
-                bufferDoneNanos = System.nanoTime();
-            }
             try {
                 Runnable r = new Runnable() {
                     public void run() {
@@ -3946,10 +3941,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             } catch(Exception err) {
                 err.printStackTrace();
-            }
-            if (BLIT_TRACE) {
-                recordBlit(bufferDoneNanos - blitStartNanos,
-                        System.nanoTime() - bufferDoneNanos, bufferSafeMode);
             }
         }
 
@@ -12378,60 +12369,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
-    /**
-     * Diagnostic for simulator frame pacing, enabled with -Dcn1.blit.trace=true.
-     *
-     * <p>The simulator presents a frame by handing the buffer to AWT through
-     * {@code SwingUtilities.invokeAndWait}, which BLOCKS the Codename One EDT until the
-     * AWT event thread has run it. That makes the simulator's frame rate a property of
-     * AWT's scheduling rather than of how long the app takes to paint, and it is
-     * invisible to any measurement taken inside Codename One - which is exactly why an
-     * app can paint a frame in 5ms and still advance only a few times a second.</p>
-     *
-     * <p>The two phases are reported separately because they have different causes: the
-     * buffer copy is work the simulator does (and in {@code bufferSafeMode} it copies
-     * the whole screen under a lock, every frame), while the present time is pure
-     * waiting on AWT.</p>
-     */
-    private static final boolean BLIT_TRACE = "true".equals(System.getProperty("cn1.blit.trace"));
-    private static int blitTraceCount;
-    private static long blitTraceBufferNanos;
-    private static long blitTracePresentNanos;
-    private static long blitTraceWorstPresentNanos;
-    private static long blitTraceLastReport;
-    private static int blitTraceSafeModeFrames;
-
-    private static synchronized void recordBlit(long bufferNanos, long presentNanos,
-            boolean safeMode) {
-        blitTraceCount++;
-        blitTraceBufferNanos += bufferNanos;
-        blitTracePresentNanos += presentNanos;
-        blitTraceWorstPresentNanos = Math.max(blitTraceWorstPresentNanos, presentNanos);
-        if (safeMode) {
-            blitTraceSafeModeFrames++;
-        }
-        long now = System.currentTimeMillis();
-        if (blitTraceLastReport == 0) {
-            blitTraceLastReport = now;
-            return;
-        }
-        if (now - blitTraceLastReport < 1000) {
-            return;
-        }
-        System.out.println("BLITTRACE frames=" + blitTraceCount
-                + " fps=" + (blitTraceCount * 1000L / Math.max(1, now - blitTraceLastReport))
-                + " bufferMs=" + (blitTraceBufferNanos / 1000000.0 / blitTraceCount)
-                + " presentMs=" + (blitTracePresentNanos / 1000000.0 / blitTraceCount)
-                + " worstPresentMs=" + (blitTraceWorstPresentNanos / 1000000.0)
-                + " safeModeFrames=" + blitTraceSafeModeFrames);
-        blitTraceCount = 0;
-        blitTraceBufferNanos = 0;
-        blitTracePresentNanos = 0;
-        blitTraceWorstPresentNanos = 0;
-        blitTraceSafeModeFrames = 0;
-        blitTraceLastReport = now;
-    }
-
     public void flushGraphics(int x, int y, int width, int height) {
         if (isShowEDTWarnings()) {
             checkEDT();
