@@ -875,9 +875,24 @@ final class LocationButtonManifestFragments {
             return xPermissions.substring(0, start) + merged
                     + xPermissions.substring(end + 1);
         }
-        // None to merge into, so the element gains one -- under the prefix the
-        // block already binds for the tools namespace.
-        String prefix = prefixes.length > 0 ? prefixes[0] : "tools";
+        // None to merge into, so the element gains one. If nothing here is
+        // bound to the tools namespace -- an element may rebind the
+        // conventional prefix and offer no alias, and candidatePrefixes drops
+        // it for exactly that reason -- then a prefix has to be BOUND, not
+        // assumed: writing tools:remove into a namespace somebody else took
+        // leaves the marker inert and the library cap merges in anyway.
+        //
+        // The Android side needs no such fallback: an element only reaches
+        // these editors because a candidate prefix NAMED the permission on it,
+        // so a usable prefix is known to exist there.
+        String prefix;
+        String binding = "";
+        if (prefixes.length > 0) {
+            prefix = prefixes[0];
+        } else {
+            prefix = freePrefix(element, "cn1tools");
+            binding = " xmlns:" + prefix + "=\"" + TOOLS_NS + "\"";
+        }
         int insert = element.length() - 1;
         while (insert > 0 && (element.charAt(insert - 1) == '/'
                 || element.charAt(insert - 1) == ' '
@@ -885,7 +900,7 @@ final class LocationButtonManifestFragments {
             insert--;
         }
         String replacement = element.substring(0, insert)
-                + " " + prefix + ":remove=\"" + cap + "\""
+                + binding + " " + prefix + ":remove=\"" + cap + "\""
                 + element.substring(insert);
         return xPermissions.substring(0, start) + replacement
                 + xPermissions.substring(end + 1);
@@ -916,6 +931,24 @@ final class LocationButtonManifestFragments {
             }
         }
         return candidates.length > 0 ? candidates[0] : "android";
+    }
+
+    /**
+     * A prefix this element has not already bound.
+     *
+     * @param element the element
+     * @param wanted  the name to use if it is free
+     * @return {@code wanted}, or it with a digit appended until it is free
+     */
+    private static String freePrefix(String element, String wanted) {
+        String candidate = wanted;
+        for (int suffix = 2; suffix < 100; suffix++) {
+            if (findAttribute(element, "xmlns:" + candidate) == null) {
+                return candidate;
+            }
+            candidate = wanted + suffix;
+        }
+        return candidate;
     }
 
     /** Whether a comma-separated list already names {@code wanted}. */
@@ -2445,8 +2478,21 @@ final class LocationButtonManifestFragments {
             String internalName) {
         String descriptor = "L" + internalName + ";";
         for (int index = 1; index < pool.tag.length; index++) {
-            if (pool.tag[index] == TAG_UTF8
-                    && descriptor.equals(utf8At(pool, index))) {
+            if (pool.tag[index] != TAG_UTF8) {
+                continue;
+            }
+            String value = utf8At(pool, index);
+            if (value == null) {
+                continue;
+            }
+            // The descriptor itself, or an array of it: an annotation value of
+            // Foo[].class is "[Lcom/example/Foo;", and an array of the button
+            // is a reference to the button.
+            int at = 0;
+            while (at < value.length() && value.charAt(at) == '[') {
+                at++;
+            }
+            if (descriptor.equals(value.substring(at))) {
                 return true;
             }
         }
@@ -2464,6 +2510,12 @@ final class LocationButtonManifestFragments {
      * that library's whole Android build at the toolchain gate.</p>
      */
     private static boolean referencesClass(Pool pool, String internalName) {
+        // EXACT. An array class literal -- Foo[].class, whose CONSTANT_Class
+        // is named "[Lcom/example/Foo;" -- is caught by referencesDescriptor
+        // instead: that same name IS a Utf8 entry, and stripping the array
+        // brackets there leaves the descriptor it compares. Widening this test
+        // as well changed no outcome that a test could tell apart, so it is
+        // not here.
         for (int index = 1; index < pool.tag.length; index++) {
             if (pool.tag[index] == TAG_CLASS
                     && internalName.equals(utf8At(pool, pool.first[index]))) {

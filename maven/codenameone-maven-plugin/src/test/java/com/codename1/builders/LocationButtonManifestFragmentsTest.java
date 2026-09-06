@@ -420,6 +420,47 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void anArrayOfTheButtonIsAReferenceToIt() throws Exception {
+        // Foo[].class puts "[Lcom/example/Foo;" in a CONSTANT_Class rather than
+        // the bare name, and an array of the button is a reference to it: a
+        // factory holding the array type can ask it for its component type and
+        // build one. Missing it deletes the bridge.
+        File root = tempDir("cn1-lb-array");
+        writePoolClass(new File(root, "com/example/Uses.class"),
+                cpUtf8("[Lcom/codename1/location/LocationButton;"),
+                cpOne(7, 1));
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "an array class literal names the button");
+    }
+
+    @Test
+    void aToolsPrefixIsBoundWhenTheElementTookTheConventionalOne() {
+        // The element rebinds tools to something of its own and offers no
+        // alias, so there is NO prefix here for the real tools namespace.
+        // Falling back to the conventional spelling writes the marker into the
+        // rebound namespace, where the merger never looks -- so a prefix has to
+        // be bound rather than assumed.
+        String rebound = "    <uses-permission xmlns:tools=\"urn:fake\""
+                + " android:name=\"android.permission.ACCESS_FINE_LOCATION\""
+                + " />\n";
+        String out = LocationButtonManifestFragments.inject(rebound, false);
+        int fine = out.indexOf("android.permission.ACCESS_FINE_LOCATION");
+        String element = out.substring(out.lastIndexOf('<', fine),
+                out.indexOf('>', fine));
+        // With the leading space, so this is the ATTRIBUTE and not a suffix
+        // of another prefix: "cn1tools:remove=" contains "tools:remove=", and
+        // the first version of this assertion failed on the correct output.
+        assertFalse(element.contains(" tools:remove="),
+                "not under the prefix the element took: " + element);
+        assertTrue(element.contains(
+                        "=\"http://schemas.android.com/tools\""),
+                "a prefix for the real tools namespace is bound: " + element);
+        assertTrue(element.contains(":remove=\"android:maxSdkVersion\""),
+                "and the marker uses it: " + element);
+    }
+
+    @Test
     void theRemoveMarkerNamesTheAttributeInTheRightNamespace() {
         // The value of tools:remove is a QName. On an element that rebound the
         // conventional prefix and carries the real Android namespace under an

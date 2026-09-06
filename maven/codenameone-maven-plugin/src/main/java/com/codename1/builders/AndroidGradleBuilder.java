@@ -1098,6 +1098,34 @@ public class AndroidGradleBuilder extends Executor {
     /// ship, which is not this change's business.
     private boolean appBackgroundLocation;
 
+    /// Every class the scan saw, mapped to the class it extends.
+    ///
+    /// Kept so a method owner can be resolved through the hierarchy after the
+    /// scan, which is the only time the whole hierarchy is known.
+    private final java.util.Map<String, String> scannedSupers =
+            new java.util.HashMap<String, String>();
+
+    /// Owners of a non-button location call that were not LocationManager
+    /// itself, waiting to be tested against the hierarchy.
+    private final java.util.Set<String> deferredLocationOwners =
+            new java.util.HashSet<String>();
+
+    /// Whether {@code owner} is LocationManager or something that extends it.
+    ///
+    /// Bounded, because the map is built from files: a hand-made class can
+    /// name itself as its own superclass, and a cycle would otherwise spin
+    /// here. Nothing javac emits comes near this depth.
+    private boolean extendsLocationManager(String owner) {
+        String at = owner;
+        for (int step = 0; at != null && step < 32; step++) {
+            if ("com/codename1/location/LocationManager".equals(at)) {
+                return true;
+            }
+            at = scannedSupers.get(at);
+        }
+        return false;
+    }
+
     /// True when this reference is the APPLICATION asking for background
     /// location, as opposed to the framework staged beside it.
     ///
@@ -2256,6 +2284,14 @@ public class AndroidGradleBuilder extends Executor {
                 public void declaresType(String cls, String superName,
                         boolean isConcrete) {
                     healthScan.declaresType(cls, superName, isConcrete);
+                    // Kept for the location resolution below: a call through a
+                    // SUBCLASS-typed reference records the subclass as the
+                    // method's owner, and the scan cannot tell whether that
+                    // subclass is a LocationManager until it has seen the
+                    // class that declares it -- which may be after the call.
+                    if (cls != null && superName != null) {
+                        scannedSupers.put(cls, superName);
+                    }
                 }
 
 
@@ -2895,6 +2931,22 @@ public class AndroidGradleBuilder extends Executor {
                                     .isFrameworkOwner(scanningLocationType)) {
                         usesPersistentLocation = true;
                     }
+                    // The same call made through a subclass-typed reference.
+                    // javac records the STATIC type as the method's owner, so
+                    // `MyLocationManager m; m.setLocationListener(l)` names
+                    // MyLocationManager and the exact test above never fires --
+                    // and an exclusive build was then accepted over continuous
+                    // location the application really does request.
+                    //
+                    // Deferred rather than decided here: whether that owner is
+                    // a LocationManager depends on a declaresType that may not
+                    // have arrived yet. Resolved once the scan is complete.
+                    if (cls != null && !cls.startsWith("com/codename1/")
+                            && isNonButtonLocationMethod(method)
+                            && !LocationButtonManifestFragments
+                                    .isFrameworkOwner(scanningLocationType)) {
+                        deferredLocationOwners.add(cls);
+                    }
 
                     if (cls.indexOf("com/codename1/location/LocationManager") == 0 && (method.indexOf("addGeoFencing") > -1 || method.indexOf("setBackgroundLocationListener") > -1)) {
                         if (!"true".equals(playServicesValue)) {
@@ -3022,6 +3074,21 @@ public class AndroidGradleBuilder extends Executor {
         // missing from the manifest as well -- so the application would fall
         // back to the ordinary permission prompt on exactly the Android
         // version where that is a Play policy violation.
+        // Owners resolved through the hierarchy, now that all of it is known.
+        //
+        // A call through a subclass-typed reference records the subclass as the
+        // method's owner, so the exact test during the scan cannot see it, and
+        // the class that says what that subclass extends may be scanned after
+        // the call site. Walking up from each deferred owner answers it once.
+        for (String owner : deferredLocationOwners) {
+            if (extendsLocationManager(owner)) {
+                debug("Persistent location through a LocationManager subclass: "
+                        + owner);
+                usesPersistentLocation = true;
+                break;
+            }
+        }
+
         // And the application's own tree, for the BUTTON alone.
         //
         // The loose scan is ASM, and ASM is handed a visitor that returns null
