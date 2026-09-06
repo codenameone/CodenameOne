@@ -87,6 +87,11 @@ class MiscellaneousFeaturesJava045Snippet {
         // tag::miscellaneous-features-java-045[]
         Form hi = new Form("L10N", new TableLayout(16, 2));
         L10NManager l10n = L10NManager.getInstance();
+        // the parsers take locale-formatted input -- a hard coded "34.35" is
+        // read as 3435 anywhere "." groups digits -- so round-trip the
+        // formatters' own output
+        String localeDouble = l10n.format(34.35);
+        String localeCurrency = l10n.formatCurrency(33.77);
         hi.add("format(double)").add(l10n.format(11.11)).
             add("format(int)").add(l10n.format(33)).
             add("formatCurrency").add(l10n.formatCurrency(53.267)).
@@ -99,8 +104,8 @@ class MiscellaneousFeaturesJava045Snippet {
             add("getLanguage").add(l10n.getLanguage()).
             add("getLocale").add(l10n.getLocale()).
             add("isRTLLocale").add("" + l10n.isRTLLocale()).
-            add("parseCurrency").add(l10n.formatCurrency(l10n.parseCurrency("33.77$"))).
-            add("parseDouble").add(l10n.format(l10n.parseDouble("34.35"))).
+            add("parseCurrency").add(l10n.formatCurrency(l10n.parseCurrency(localeCurrency))).
+            add("parseDouble").add(l10n.format(l10n.parseDouble(localeDouble))).
             add("parseInt").add(l10n.format(l10n.parseInt("56"))).
             add("parseLong").add("" + l10n.parseLong("4444444"));
         hi.show();
