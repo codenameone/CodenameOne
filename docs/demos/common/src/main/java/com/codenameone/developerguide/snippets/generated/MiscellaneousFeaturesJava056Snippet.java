@@ -89,10 +89,12 @@ class MiscellaneousFeaturesJava056Snippet {
         // the port reads these through UIManager.localize(). There is only one
         // bundle, so add to the installed one rather than replacing it -- a
         // fresh map here would drop every other localized string in the app.
-        java.util.Map<String, String> bundle = UIManager.getInstance().getBundle();
-        if (bundle == null) {
-            bundle = new java.util.HashMap<String, String>();
-        }
+        // setBundle keeps whatever map it was handed, so the installed one may
+        // be immutable -- copy before adding
+        java.util.Map<String, String> installed = UIManager.getInstance().getBundle();
+        java.util.Map<String, String> bundle = installed == null
+                ? new java.util.HashMap<String, String>()
+                : new java.util.HashMap<String, String>(installed);
         // the bare key is the body of the first prompt; the suffixed ones
         // dress the follow-up dialog that sends the user to settings
         bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION",
@@ -106,9 +108,6 @@ class MiscellaneousFeaturesJava056Snippet {
         bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.settings", "Open settings");
         bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.ok", "Done");
         bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.cancel", "Not now");
-        // the rationale dialog Android shows before the request uses these two
-        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.askAgain", "Ask again");
-        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.dontAsk", "Don't ask");
         UIManager.getInstance().setBundle(bundle);
         // end::miscellaneous-features-java-056[]
     }

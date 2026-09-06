@@ -465,8 +465,7 @@ For Android 11+ (API 30+), Codename One detects if background location is needed
 `android.permission.ACCESS_BACKGROUND_LOCATION` key is the body of the first
 prompt, and the port looks up `.title`, `.explanation_title`,
 `.explanation_body`, `.settings`, `.ok` and `.cancel` beneath it for the
-follow-up dialog that sends the user to the settings screen. `.askAgain` and
-`.dontAsk` label the rationale dialog Android shows before a repeat request:
+follow-up dialog that sends the user to the settings screen:
 
 [source,java]
 ----

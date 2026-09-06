@@ -94,7 +94,10 @@ class MiscellaneousFeaturesJava055Snippet {
                     Display.getInstance().sendSMS(phone, data);
                     return;
                 default:
-                    Display.getInstance().sendSMS(phone, data);
+                    // interactive ports hand off to the platform composer; the
+                    // two-argument overload asks for a seamless send they do
+                    // not implement, so nothing would happen
+                    Display.getInstance().sendSMS(phone, data, true);
                     return;
             }
         } catch(IOException err) {

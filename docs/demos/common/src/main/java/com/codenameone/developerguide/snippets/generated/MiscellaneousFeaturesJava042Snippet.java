@@ -89,7 +89,14 @@ class MiscellaneousFeaturesJava042Snippet {
         if (display.isLargerTextEnabled()) {
             float scale = display.getLargerTextScale();
             Font base = UIManager.getInstance().getComponentStyle("Label").getFont();
-            Font scaled = base.derive(base.getHeight() * scale, base.getStyle());
+            // derive() takes a requested pixel size; getHeight() is the rendered
+            // line height, which is larger. This is what the framework's own
+            // larger-text scaler does.
+            float baseSize = base.getPixelSize();
+            if (baseSize <= 0) {
+                baseSize = base.getHeight();
+            }
+            Font scaled = base.derive(baseSize * scale, base.getStyle());
             someComponent.getUnselectedStyle().setFont(scaled);
         }
         // end::miscellaneous-features-java-042[]
