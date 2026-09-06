@@ -766,11 +766,14 @@ jobs:
           fi
           if [ "$fail" -ne 0 ]; then echo "Windows x64 screenshot gate failed."; exit 1; fi
 
-      - name: Upload Windows x64 port status
+      # windows-cross-build-run.yml owns the public windows-x64 report. Keep
+      # native-build diagnostics out of the publisher/backfill port-status-*
+      # selection so a green native run cannot hide a shipping-pipeline failure.
+      - name: Upload Windows native x64 diagnostics
         if: always()
         uses: ./.github/actions/upload-artifact-with-retry
         with:
-          name: port-status-windows-x64
+          name: windows-native-x64-diagnostics
           path: artifacts/windows-port/port-status-windows-x64.json
           if-no-files-found: error
           retention-days: 14

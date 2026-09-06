@@ -47,6 +47,7 @@ def api(endpoint, method="GET", payload=None):
         print(f"Transient API failure ({detail}); retrying {method} in {2 ** (attempt + 1)}s",
               file=sys.stderr)
         time.sleep(2 ** (attempt + 1))
+    raise ApiError(f"{method} {endpoint}: API retry loop exhausted")
 
 
 def stamp(value):
