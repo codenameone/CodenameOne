@@ -222,6 +222,16 @@ BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
 // FileProvider symbols at all.
 //#define CN1_USE_DOCUMENTS
 
+// CN1_USE_CONTINUITY gates state restoration and cross-device continuity: the IOSNative
+// continuity* implementations (NSUserActivity for handing work to a nearby device,
+// NSUbiquitousKeyValueStore for the synced store) plus the continuity branch in
+// CodenameOne_GLAppDelegate. IPhoneBuilder uncomments this only when the classpath scanner saw
+// com.codename1.continuity.*, so an app that restores nothing links neither.
+//
+// Note what this define does NOT gate: saving and restoring state on this device is pure Java
+// over com.codename1.io.Storage and works in every build, define or no define.
+//#define CN1_USE_CONTINUITY
+
 // CN1_APP_INTENTS_DECLARED is the narrower question: did the build actually generate App Intent
 // declarations? CN1_USE_INTENTS only says the app references the package, and an app can use
 // indexing and donation while switching declarations off with ios.intents.appIntents=false.
@@ -232,9 +242,26 @@ BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
 //#define CN1_APP_INTENTS_DECLARED
 
 // Core Spotlight and App Intents are unavailable on watchOS / tvOS; undo the defines there.
+// Continuity goes with them, as a SCOPE decision rather than an availability one, and the
+// difference matters because the comment here used to claim the wrong thing. Both APIs exist on
+// these platforms: Foundation declares NSUserActivity as watchos(2.0)/tvos(9.0) and
+// NSUbiquitousKeyValueStore as watchos(9.0)/tvos(9.0). What this feature ships and tests is the
+// phone-to-phone and phone-to-Mac case, so the natives are left out of the watch and TV slices
+// rather than shipped untested.
+//
+// Nothing misreports itself as a result. isContinuationSupported() and isSyncedStoreSupported()
+// both answer false on those slices, which is true of the build even though it is not true of
+// the platform, and an application branches on those rather than on which device it is. The Java
+// half is unaffected either way -- a watch app still saves and restores its own state, which is
+// the half that needs no native support.
+//
+// Turning either on later means giving the synced store its own define rather than widening this
+// one, since the two capabilities are advertised independently and only one of them has anything
+// to do with Handoff.
 #if TARGET_OS_WATCH || TARGET_OS_TV
 #undef CN1_USE_INTENTS
 #undef CN1_APP_INTENTS_DECLARED
+#undef CN1_USE_CONTINUITY
 #endif
 
 // CN1_USE_WATCHCONNECTIVITY gates the phone-to-watch link (CN1WatchConnectivity.{h,m} + the

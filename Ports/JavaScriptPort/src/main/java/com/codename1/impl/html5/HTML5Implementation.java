@@ -13843,7 +13843,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private static String firstClipboardImageDataUrl(ClipboardContent rich) {
         String[] mimes = { ClipboardContent.MIME_PNG, ClipboardContent.MIME_JPEG, ClipboardContent.MIME_GIF };
         for (int i = 0; i < mimes.length; i++) {
-            byte[] bytes = rich.getBytes(mimes[i]);
+            byte[] bytes = clipboardBytes(rich, mimes[i]);
             if (bytes != null && bytes.length > 0) {
                 return "data:" + mimes[i] + ";base64," + Base64.encodeNoNewline(bytes);
             }
@@ -13868,7 +13868,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
             } catch (Throwable ignored) {
             }
-            obj = rich.getText(ClipboardContent.MIME_TEXT);
+            // Through clipboardValue, like every other port read: a provider is
+            // permitted to fail, and one that did threw the whole copy away.
+            obj = clipboardText(rich, ClipboardContent.MIME_TEXT);
         }
         if (!(obj instanceof String)) {
             return;
@@ -13879,10 +13881,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // path that works on the worker-based port; the textarea/execCommand
         // dance below runs in the worker where document is unavailable.
         if (nativeBrowserCopyToClipboard(selectedText,
-                rich == null ? null : rich.getText(ClipboardContent.MIME_HTML),
-                rich == null ? null : rich.getText(ClipboardContent.MIME_RTF),
-                rich == null ? null : rich.getText(ClipboardContent.MIME_MARKDOWN),
-                rich == null ? null : rich.getText(ClipboardContent.MIME_ASCIIDOC))) {
+                clipboardText(rich, ClipboardContent.MIME_HTML),
+                clipboardText(rich, ClipboardContent.MIME_RTF),
+                clipboardText(rich, ClipboardContent.MIME_MARKDOWN),
+                clipboardText(rich, ClipboardContent.MIME_ASCIIDOC))) {
             return;
         }
         HTMLDocument doc = Window.current().getDocument();

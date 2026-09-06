@@ -110,6 +110,13 @@ extern CN1View *editingComponent;
 // where this class is not translated and the header does not exist.
 #import "com_codename1_impl_ios_IOSIntentCallbacks.h"
 #endif
+#ifdef CN1_USE_CONTINUITY
+// Same reasoning as the intents header above, and the same guard: the continuity branch below
+// calls a translated entry point, and an implicit declaration is a hard error on some slices and
+// a wrong-registers call on the rest. CodenameOne_GLViewController.h undefines
+// CN1_USE_CONTINUITY for watchOS and tvOS, where this class is not translated.
+#import "com_codename1_impl_ios_IOSContinuityCallbacks.h"
+#endif
 
 // A signal handler to handle bad accesses.  This will throw NPEs that we can catch
 // rather than crashing the app.
@@ -279,6 +286,73 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
 #endif
         return YES;
     }
+#ifdef CN1_USE_CONTINUITY
+    // Continuity is matched BEFORE intents, and the order is load-bearing. The intents block
+    // below ends in a general branch that hands any remaining activity type to Java and returns
+    // Java's answer -- and Intents.dispatchUserActivity correctly answers NO for a type it never
+    // declared. An app using both would therefore have its own continuation asked about by the
+    // wrong framework, told no, and dropped. Matching here first keeps each framework answering
+    // only for the types it published.
+    //
+    // Placed after the browsing-web branch rather than before it for the reason that branch is
+    // first: Universal Link behaviour must be bit-identical whether or not continuity is in play.
+    //
+    // Matched EXACTLY, against the type the BUILD resolved. A suffix test claimed any activity
+    // whose type merely ended in ".continuity" -- a donated App Intent with such an id, say --
+    // and on a cold launch that arrival was parked and reported handled before anything could
+    // tell it apart, so it never reached the intents dispatcher below and nothing rerouted it
+    // once initialization revealed the mismatch.
+    //
+    // Read from the plist rather than derived from [[NSBundle mainBundle] bundleIdentifier].
+    // Deriving it looks equivalent and is wrong on the Mac slice:
+    // DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER makes the Catalyst bundle id
+    // "<package>.maccatalyst", so the derived type would be "<package>.maccatalyst.continuity"
+    // while the type declared in NSUserActivityTypes and published by every device is
+    // "<package>.continuity" -- Handoff silently dead on Catalyst, which is the Mac-to-iPhone
+    // case this feature is for. IPhoneBuilder writes CN1ContinuityActivityType beside that
+    // declaration from the one value it resolved, and the Mac plist is generated from the
+    // finished iOS one, so both slices read the same string.
+    //
+    // Absent means no builder that knows this feature generated the project, so the activity is
+    // left to the branch below rather than guessed at.
+    NSString *cn1ContinuityExpected = [[NSBundle mainBundle]
+            objectForInfoDictionaryKey:@"CN1ContinuityActivityType"];
+    if (![cn1ContinuityExpected isKindOfClass:[NSString class]]
+            || [cn1ContinuityExpected length] == 0) {
+        cn1ContinuityExpected = nil;
+    }
+    if (userActivity != nil && cn1ContinuityExpected != nil
+            && [userActivity.activityType isEqualToString:cn1ContinuityExpected]) {
+        NSString *payload = nil;
+        if (userActivity.userInfo != nil
+                && [NSJSONSerialization isValidJSONObject:userActivity.userInfo]) {
+            NSData *data = [NSJSONSerialization dataWithJSONObject:userActivity.userInfo
+                                                           options:0 error:nil];
+            if (data != nil) {
+                // Autoreleased: the app target is manual-reference-counted and this method
+                // returns without a release, so every continuation would otherwise retain its
+                // serialized payload for the life of the process.
+                payload = [[[NSString alloc] initWithData:data
+                                                 encoding:NSUTF8StringEncoding] autorelease];
+            }
+        }
+        JAVA_OBJECT jtype = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG userActivity.activityType);
+        JAVA_OBJECT jpayload = payload == nil ? JAVA_NULL
+                : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG payload);
+#ifdef NEW_CODENAME_ONE_VM
+        JAVA_BOOLEAN claimed = com_codename1_impl_ios_IOSContinuityCallbacks_nativeContinuation___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG jtype, jpayload);
+#else
+        JAVA_BOOLEAN claimed = com_codename1_impl_ios_IOSContinuityCallbacks_nativeContinuation___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG jtype, jpayload);
+#endif
+        if (claimed == JAVA_TRUE) {
+            return YES;
+        }
+        // Not claimed: the suffix matched but the framework did not recognize the type as its
+        // own, which is what a third-party activity whose type happens to end the same way looks
+        // like. Falls through rather than returning NO, so the intents branch below still gets
+        // its chance at it.
+    }
+#endif
 #ifdef CN1_USE_INTENTS
     // Everything below is compiled only for an app that references
     // com.codename1.intents, so a build without it produces exactly the function above.
@@ -524,13 +598,30 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
         if (activityDictionary) {
             NSUserActivity *userActivity = [activityDictionary valueForKey:@"UIApplicationLaunchOptionsUserActivityKey"];
             if (userActivity != nil) {
-#ifdef CN1_USE_INTENTS
-                // A donated activity cold-launching the app arrives here, before the VM
-                // callback below has run the application's init/start -- so the framework's
-                // dispatcher exists (the generated bootstrap installed it from main) while
-                // Display does not, and the handler would run inline with no event thread and
-                // no window. Held until initialization instead; browsing-web keeps its existing
-                // path, which only stores AppArg and is safe this early.
+#if defined(CN1_USE_INTENTS) || defined(CN1_USE_CONTINUITY)
+                // A donated activity or a continuation cold-launching the app arrives here,
+                // before the VM callback below has run the application's init/start -- so the
+                // framework's dispatcher exists (the generated bootstrap installed it from main)
+                // while Display does not, and the handler would run inline with no event thread
+                // and no window. Held until initialization instead; browsing-web keeps its
+                // existing path, which only stores AppArg and is safe this early.
+                //
+                // Continuity needs the hold for a second reason of its own: its Java callback is
+                // installed by Continuity.enable(), which the application calls from init(). An
+                // activity delivered before that finds no callback at all and is dropped -- so an
+                // app that used continuity WITHOUT intents used to lose exactly the cold launch
+                // the feature exists for.
+                //
+                // This dictionary is the LEGACY lifecycle's cold-launch path only. On the default
+                // UIScene build the activity arrives through UISceneConnectionOptions instead,
+                // and CodenameOne_GLSceneDelegate's willConnectToSession already forwards
+                // connectionOptions.userActivities to cn1ContinueUserActivity: at the end of the
+                // same method that installs the root view controller. A review read that method
+                // as not forwarding them and asked for this block to cover the scene path; it
+                // does not need to. The scene path's own ordering problem -- willConnectToSession
+                // runs before init() -- is solved on the Java side, where
+                // IOSContinuityCallbacks holds an activity that arrives before setCallback and
+                // delivers it when Continuity.enable() installs one.
                 if (![NSUserActivityTypeBrowsingWeb isEqualToString:userActivity.activityType]) {
                     cn1PendingLaunchActivity = [userActivity retain];
                 } else {
@@ -686,10 +777,13 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
 }
 #endif
 
-// Compiled for universal links OR intents: without the second condition a Spotlight tap on a
-// legacy-lifecycle build (ios.uiscene=false) would silently do nothing, since the scene delegate
-// is what routes this on a default build.
-#if defined(CN1_HANDLE_UNIVERSAL_LINKS) || defined(CN1_USE_INTENTS)
+// Compiled for universal links OR intents OR continuity: without the second and third conditions
+// a Spotlight tap, or a handoff from the user's other device, on a legacy-lifecycle build
+// (ios.uiscene=false) would silently do nothing, since the scene delegate is what routes this on
+// a default build. Continuity was added here for exactly the reason intents was: the branch it
+// needs inside cn1ContinueUserActivity: is compiled, and on a legacy build nothing ever calls it.
+#if defined(CN1_HANDLE_UNIVERSAL_LINKS) || defined(CN1_USE_INTENTS) \
+        || defined(CN1_USE_CONTINUITY)
 // https://developer.apple.com/documentation/uikit/core_app/allowing_apps_and_websites_to_link_to_your_content?language=objc
 // https://github.com/codenameone/CodenameOne/issues/2677
 - (BOOL)application:(UIApplication *)application

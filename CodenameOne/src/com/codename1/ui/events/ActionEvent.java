@@ -569,5 +569,22 @@ public class ActionEvent {
         OpenGallery,
 
         IsGalleryTypeSupported,
+
+        /// Fired when a native operating system drag enters a component that is a native drop
+        /// target, see `com.codename1.ui.Component#addNativeDropListener(com.codename1.ui.events.ActionListener)`
+        NativeDragEnter,
+
+        /// Fired repeatedly while a native operating system drag moves over a native drop target
+        NativeDragOver,
+
+        /// Fired when a native operating system drag leaves a native drop target
+        NativeDragExit,
+
+        /// Fired when a native operating system drag is dropped on a native drop target
+        NativeDrop,
+
+        /// Fired on the source of a native drag once the operating system has finished the
+        /// transfer, telling the source which action -- if any -- was actually performed
+        NativeDragCompleted,
     }
 }

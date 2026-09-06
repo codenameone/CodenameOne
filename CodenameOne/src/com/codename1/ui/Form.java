@@ -2785,6 +2785,13 @@ public class Form extends Container implements TopLevelContainer {
             }
         }
         reclaimTransferredListeners();
+        // And whatever a press on this form staged for the operating system. A press handler
+        // that shows another form -- which is what a great many of them do -- leaves the
+        // gesture behind on a form the user can no longer see, and nothing else clears it:
+        // the release goes to the new form, and on a platform whose own recognizer starts the
+        // session the drag begins later still. It would then have carried the hidden form's
+        // payload, and reported its outcome to a component that is no longer anywhere.
+        NativeDragAndDrop.topLevelInputCancelled(this);
         super.deinitializeImpl();
         animMananger.flush();
         componentsAwaitingRelease = null;
@@ -4160,6 +4167,12 @@ public class Form extends Container implements TopLevelContainer {
                 if (cmp != null) {
 
                     cmp = LeadUtil.leadParentImpl(cmp);
+                    // Native drag and drop is primed here too. This branch does not call
+                    // initDragAndDrop -- the lightweight drag has never worked in the title
+                    // area -- so without this a Toolbar component given a native drag operation
+                    // silently could not be dragged, while the same component in the content
+                    // pane could.
+                    NativeDragAndDrop.pressedOn(cmp, x, y);
                     setPressedCmp(cmp);
                     LeadUtil.pointerPressed(cmp, x, y);
 
@@ -4274,7 +4287,29 @@ public class Form extends Container implements TopLevelContainer {
         // disable the drag stop flag if we are dragging again
         boolean isScrollWheeling = Display.impl.isScrollWheeling();
         if (dragStopFlag) {
+            // The press this gesture really was, dispatched now and at *this* position. What
+            // the original press staged for the operating system goes first: it was staged
+            // where the finger landed, on a payload the component may pick per position, and
+            // the press about to run stages this gesture again from where it now is. Without
+            // that, the staging guard -- which refuses one press the slot another press owns --
+            // would keep the older one, and with it a drag origin two hundred pixels back that
+            // makes this very packet look like a drag.
+            NativeDragAndDrop.gestureCancelled();
             pointerPressed(x, y);
+        }
+        // A press that landed on a native drag source becomes an operating system drag here,
+        // as soon as it has moved far enough to be a drag rather than a click. From that point
+        // the platform owns the gesture, so nothing below runs for it.
+        //
+        // After the dragStopFlag recovery above, deliberately. A press that lands on a
+        // momentum-scrolling container is stopping the glide, and the press it was is only
+        // dispatched by that recovery -- so asking first handed the row to the operating system
+        // on the very first motion packet, and grabbing a moving list started an outbound drag
+        // instead of stopping it. Run afterwards, the recovery restages the press at this
+        // position, which leaves this packet below the drag threshold; a gesture that really
+        // does go on to drag still starts one on the next.
+        if (NativeDragAndDrop.pointerDragged(x, y)) {
+            return;
         }
         autoRelease(x, y);
         boolean localPointerPressedAgainDuringDrag = pointerPressedAgainDuringDrag;
@@ -4352,7 +4387,34 @@ public class Form extends Container implements TopLevelContainer {
         // disable the drag stop flag if we are dragging again
         boolean isScrollWheeling = Display.impl.isScrollWheeling();
         if (dragStopFlag) {
+            // The press this gesture really was, dispatched now and at *this* position. What
+            // the original press staged for the operating system goes first: it was staged
+            // where the finger landed, on a payload the component may pick per position, and
+            // the press about to run stages this gesture again from where it now is. Without
+            // that, the staging guard -- which refuses one press the slot another press owns --
+            // would keep the older one, and with it a drag origin two hundred pixels back that
+            // makes this very packet look like a drag.
+            NativeDragAndDrop.gestureCancelled();
             pointerPressed(x, y);
+        }
+        // The same hook the scalar overload runs, and the one that matters: an ordinary
+        // one-finger drag reaches a Form through *this* method. CodenameOneImplementation wraps
+        // its coordinates into one-element arrays and Display dispatches them here, and this
+        // overload is a separate implementation rather than a call to the scalar one -- so with
+        // the hook only there, a gesture never started a native drag on any port that begins
+        // one itself, which is every port except the one whose operating system owns the
+        // gesture. Placed after the dragStopFlag recovery for the reason the scalar overload
+        // gives.
+        //
+        // One pointer only. A second finger makes this a pinch or a two-finger scroll, and
+        // handing that to the operating system as a drag is not what the user is doing --
+        // and the press that staged one is spent, because the gesture has become
+        // something else. Merely skipping the hook left it staged, so lifting the second
+        // finger and moving on could still start the drag the first finger had prepared.
+        if (x.length > 1) {
+            NativeDragAndDrop.gestureCancelled();
+        } else if (NativeDragAndDrop.pointerDragged(x[0], y[0])) {
+            return;
         }
         autoRelease(x[0], y[0]);
         boolean localPointerPressedAgainDuringDrag = pointerPressedAgainDuringDrag;
@@ -4591,6 +4653,14 @@ public class Form extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
+        // A press that never became a drag releases the operation the press staged, so a
+        // later gesture somewhere else cannot start the drag this one declined to.
+        //
+        // Before the stylus callback, not after. That callback is application code and may
+        // open a nested event loop -- a dialog -- inside which a whole new press is
+        // dispatched and stages an operation of its own. Clearing afterwards then threw the
+        // *new* gesture's staging away, and the drag it was about to become never started.
+        NativeDragAndDrop.pointerReleased(getCurrentPointerPress(), x, y);
         if (Display.getInstance().isStylusPointer()) {
             Component stylusCmp = resolveInputComponent(x, y);
             if (stylusCmp != null) {

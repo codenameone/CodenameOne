@@ -976,7 +976,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 // vale-skip: Microsoft.HeadingPunctuation: "vs." is the abbreviation for "versus"; the period is part of the abbreviation, not a heading-end terminator.
 ==== InfiniteContainer/InfiniteScrollAdapter vs. List/ContainerList
 
-Your recommendation is to always go with `Container`, `InfiniteContainer` or `InfiniteScrollAdapter`.
+The recommendation is to always go with `Container`, `InfiniteContainer` or `InfiniteScrollAdapter`.
 
 Recommend avoiding `List` or its subclasses/related classes specifically `ContainerList` & `MultiList`.
 
@@ -992,7 +992,7 @@ Since animation, swiping and other capabilities that are so common in mobile are
 
 ==== Why isn't list deprecated
 
-You deprecated `ContainerList` which performs badly and has some inherent complexity issues. `List` has some unique use cases and is still used all over Codename One.
+`ContainerList` is deprecated because it performs badly and has some inherent complexity issues. `List` has some unique use cases and is still used all over Codename One.
 
 `MultiList` is a reasonable version of `List` that's far easier to use without most of the pains related to renderer configuration.
 
@@ -1096,7 +1096,7 @@ TIP: Since the `MultiList` uses the `GenericListCellRenderer` internally you can
 
 ===== Going further with the ListModel
 
-Suppose that http://www.georgerrmartin.com/[GRRM] was prolific and wrote 1 million books. The default list model won't make much sense in that case but you would still be able to render everything in a list model.
+Suppose that https://georgerrmartin.com/[GRRM] was prolific and wrote 1 million books. The default list model won't make much sense in that case but you would still be able to render everything in a list model.
 
 You will fake it a bit but notice that 1M components won't be created even if you somehow scroll all the way down...
 
@@ -1707,7 +1707,7 @@ You can dynamically download images directly into the `ImageViewer` with a custo
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava189Snippet.java[tag=the-components-of-codename-one-java-189,indent=0]
 ----
 
-.Dynamically fetching an image URL from the internet footnote:[Image was fetched from http://awoiaf.westeros.org/index.php/Portal:Books]
+.Dynamically fetching an image URL from the internet footnote:[Image was fetched from https://awoiaf.westeros.org/index.php/Portal:Books]
 image::img/components-imageviewer-dynamic.png[Dynamically fetching an image URL from the internet,scaledwidth=20%]
 
 This fetches the images in the URL asynchronously and fires a data change event when the data arrives to automatically refresh the `ImageViewer` when that happens.
@@ -1844,7 +1844,7 @@ This places the component below the side menu bar. Notice that this component co
 
 Modern UI's often animate the title upon scrolling to balance the highly functional smaller title advantage with the gorgeous large image based title. This is pretty easy to do with the Toolbar API through the Title animation API.
 
-The code below shows off an attractive title based on a book by GRRM on top of text footnote:[The text below is from A Wiki of Ice & Fire: http://awoiaf.westeros.org/index.php/A_Game_of_Thrones] that's scrollable. As the text is scrolled the title fades out:
+The code below shows off an attractive title based on a book by GRRM on top of text footnote:[The text below is from A Wiki of Ice & Fire: https://awoiaf.westeros.org/index.php/A_Game_of_Thrones] that's scrollable. As the text is scrolled the title fades out:
 
 [source,java]
 ----
@@ -2028,7 +2028,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 Prints `The result was 7`.
 
-IMPORTANT: When using the `andWait()` variant, it's critical that your JavaScript calls your callback method at some point - otherwise it will block *indefinitely*. You provide variants of executeAndWait() that include a timeout in case you want to hedge against this possibility.
+IMPORTANT: When using the `andWait()` variant, it's critical that your JavaScript calls your callback method at some point - otherwise it will block *indefinitely*. Codename One provides variants of `executeAndWait()` that include a timeout in case you want to hedge against this possibility.
 
 ===== Multi-use callbacks
 
@@ -2054,7 +2054,7 @@ Now it will work no matter how many times the button is clicked.
 
 ===== Passing parameters to JavaScript
 
-Often, the JavaScript expressions that you execute will include parameters from your Java code. Escaping these parameters is tricky at worst, and annoying at best. For example: If you’re passing a string, you need to make sure that it escapes quotes and new lines or it will cause the JavaScript to have a syntax error. You provide variants of `execute()` and https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#addJSCallback(java.lang.String,com.codename1.util.SuccessCallback)[addJSCallback()] that allow you to pass your parameters and have them automatically escaped.
+Often, the JavaScript expressions that you execute will include parameters from your Java code. Escaping these parameters is tricky at worst, and annoying at best. For example: If you’re passing a string, you need to make sure that it escapes quotes and new lines or it will cause the JavaScript to have a syntax error. Codename One provides variants of `execute()` and https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#addJSCallback(java.lang.String,com.codename1.util.SuccessCallback)[addJSCallback()] that allow you to pass your parameters and have them automatically escaped.
 
 For example, suppose you want to pass a string with text to set in a textarea within the webpage. You can do something like:
 
@@ -2106,7 +2106,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 ===== Legacy JSObject support
 
-This section describes the now deprecated `JSObject` approach. It's here for reference by developers working with older code. You suggest using the new API when starting a new project.
+This section describes the now deprecated `JSObject` approach. It's here for reference by developers working with older code. Use the new API when starting a new project.
 
 `BrowserComponent` can communicate with the HTML code using JavaScript calls. For example: you can create HTML like this:
 
@@ -2496,7 +2496,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/Calendar.html[Calendar] class allows you to display a traditional calendar picker and optionally highlight days in various ways.
 
-NOTE: You recommend developers use the <<picker-section,Picker UI>> rather than use the calendar to pick a date. It looks better on the devices.
+NOTE: Prefer the <<picker-section,Picker UI>> over the calendar for picking a date. It looks better on the devices.
 
 Simple usage of the `Calendar` class looks something like this:
 

@@ -419,8 +419,13 @@ final class BuildHintsAndroid {
         h.add(new Hint("android.file_paths")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
-                .def("    <files-path name=\"app_files\" path=\".\" />")
-                .platform("android"));
+                .def("    <files-path name=\"app_files\" path=\".\" /><external-files-path name=\"app_external_files\" path=\".\" /><external-cache-path name=\"app_external_cache\" path=\".\" /><external-path name=\"external\" path=\".\" />")
+                .platform("android")
+                .doc("The FileProvider roots written into file_paths.xml, besides the"
+                        + " cache/intent_files one the framework always needs. A file has to"
+                        + " be under one of these for the application to hand it to another"
+                        + " application -- when sharing, or when dragging it out. Setting this"
+                        + " replaces the default rather than adding to it."));
 
         h.add(new Hint("android.firebaseAnalytics")
                 .group(HintGroup.ANDROID)

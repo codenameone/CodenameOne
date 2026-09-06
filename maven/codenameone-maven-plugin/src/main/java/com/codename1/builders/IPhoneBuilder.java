@@ -1336,6 +1336,21 @@ public class IPhoneBuilder extends Executor {
     // extension, no Swift glue): the surfaces API compiles but answers unsupported at runtime.
     private boolean surfacesExtensionEnabled;
 
+    // Set when the app references com.codename1.continuity. Gates the CN1_USE_CONTINUITY native
+    // define and this app's entry in NSUserActivityTypes -- which is all continuation costs,
+    // there being no entitlement behind NSUserActivity handoff.
+    //
+    // Note what this does NOT gate: saving and restoring state on the device is pure Java over
+    // com.codename1.io.Storage and works in every build. Only the cross-device half is here.
+    private boolean usesContinuity;
+
+    // Set when the app references com.codename1.continuity.sync -- deliberately narrower than
+    // usesContinuity, and for the reason usesHomeAccessoryData is narrower than usesSmartHome.
+    // The synced store is NSUbiquitousKeyValueStore, whose entitlement has to be granted on the
+    // App ID, so handing it to an app that only wanted to pass work to the tablet in the user's
+    // other hand would fail its codesigning for a capability it never asked for.
+    private boolean usesContinuitySync;
+
     // Set when the app references com.codename1.documents. Gates the CN1_USE_DOCUMENTS native
     // define, the CN1Documents file provider extension and the app group that lets the two
     // processes meet.
@@ -2717,6 +2732,31 @@ public class IPhoneBuilder extends Executor {
                     // that publish documents.
                     if (!usesDocuments && cls.indexOf("com/codename1/documents/") == 0) {
                         usesDocuments = true;
+                    }
+                    // State restoration and continuity (com.codename1.continuity.*). Gated on
+                    // actual usage so the CN1_USE_CONTINUITY natives and the NSUserActivityTypes
+                    // entry are only added for apps that hand work between devices.
+                    //
+                    // A cn1lib needs no separate pass, and must not get one. CN1BuildMojo merges
+                    // every compile-classpath element into one jar-with-dependencies and submits
+                    // that as dist.jar (blacklisting only codenameone-core and java-runtime), so
+                    // library code reaches the server already indistinguishable from the app's
+                    // own and is walked by this scan. Folding buildinRes in the way the call/VPN
+                    // pair does would also be actively wrong here: Navigation calls
+                    // Continuity.routeStackChanged, so the framework's own classes name this
+                    // package, and LibraryClassPrefixScan only filters classes INSIDE the scanned
+                    // prefix -- it would report usage for every app ever built and demand an
+                    // iCloud entitlement that fails codesigning wherever the App ID lacks it.
+                    if (!usesContinuity && cls.indexOf("com/codename1/continuity/") == 0) {
+                        usesContinuity = true;
+                    }
+                    // The synced store, which is the only half that costs an entitlement. Its own
+                    // package, so this prefix is a strict extension of the one above and both
+                    // flags are set for an app that uses it -- which is correct: the store needs
+                    // the native define too.
+                    if (!usesContinuitySync
+                            && cls.indexOf("com/codename1/continuity/sync/") == 0) {
+                        usesContinuitySync = true;
                     }
                     // Phone-to-watch link (com.codename1.wearable.*). Gated on actual usage
                     // so WatchConnectivity.framework and the CN1_USE_WATCHCONNECTIVITY
@@ -4196,6 +4236,38 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_DOCUMENTS", "#define CN1_USE_DOCUMENTS");
             }
 
+            // com.codename1.continuity usage compiles the NSUserActivity / NSUbiquitousKeyValueStore
+            // glue (gated by CN1_USE_CONTINUITY so other builds carry no such symbols), and opens
+            // the continuity branch in the app delegate. The define lives in the shared
+            // CodenameOne_GLViewController.h so it reaches every continuity translation unit,
+            // mirroring CN1_USE_INTENTS.
+            //
+            // Not gated on the sync opt-out below: the store reports its own availability at
+            // runtime from whether the entitlement actually granted one, and the continuation half
+            // needs these symbols regardless.
+            // An explicit ios.continuity.sync=true is a DECLARATION, not only a veto. The hint
+            // documents itself as "set true to say so explicitly", and the signing preflight
+            // already reads it exactly that way -- it is how a project says it wants the store
+            // without that check having to read bytecode. The build ignored it unless the scan
+            // had already found the package, so a project that says so and whose usage the scan
+            // cannot see got neither the entitlement nor the define, while the preflight warned
+            // about a profile for a capability the build was never going to ask for.
+            //
+            // Both flags, because the scan sets both for the same reason its own comment gives:
+            // the store needs the native define as well as the entitlement, and an entitlement
+            // without the define is a SyncedStore that reports itself unsupported on a device.
+            //
+            // Only an explicit true does this. Unset still means "the bytecode decides", which is
+            // what keeps an app that merely hands work to a nearby device from being handed an
+            // iCloud entitlement its App ID may not carry.
+            if ("true".equals(request.getArg("ios.continuity.sync", null))) {
+                usesContinuity = true;
+                usesContinuitySync = true;
+            }
+            if (usesContinuity) {
+                replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_CONTINUITY", "#define CN1_USE_CONTINUITY");
+            }
+
             // com.codename1.wearable usage compiles the WatchConnectivity glue (gated by
             // CN1_USE_WATCHCONNECTIVITY so other builds carry no WCSession symbols). The define
             // lives in the shared CodenameOne_GLViewController.h so it reaches every wearable
@@ -5636,6 +5708,38 @@ public class IPhoneBuilder extends Executor {
                         + " remote VPN server. On Android the same tunnel"
                         + " can, because it runs in the app's own process.");
             }
+            // The synced key/value store behind com.codename1.continuity.sync.
+            //
+            // Earned by the sync package alone, never by com.codename1.continuity. This
+            // entitlement has to be granted on the App ID before the app will sign at all,
+            // so giving it to an app that only hands work to a nearby device -- which costs
+            // nothing but a declared activity type -- would fail its codesigning for a
+            // capability it never asked for. Same reasoning as the HomeKit split above.
+            //
+            // The value is the two Xcode variables Apple documents for it rather than a
+            // literal, so it stays correct when the team or the bundle id changes, and so a
+            // build for a second team needs no edit here.
+            if (usesContinuitySync
+                    && !"false".equals(request.getArg("ios.continuity.sync", "true"))) {
+                String kvStore = request.getArg("ios.entitlements.com.apple.developer"
+                        + ".ubiquity-kvstore-identifier", null);
+                // A BLANK hint counts as absent, for the reason the VPN entitlement below
+                // spells out: buildNamespacedEntitlements skips an empty value entirely, so a
+                // project that set this to "" would suppress the generated entry and
+                // contribute nothing itself -- shipping an app whose SyncedStore silently
+                // stores nothing, which fails only at runtime on a device.
+                if (kvStore == null || kvStore.trim().length() == 0) {
+                    request.putArgument("ios.entitlements.com.apple.developer"
+                            + ".ubiquity-kvstore-identifier",
+                            "$(TeamIdentifierPrefix)$(CFBundleIdentifier)");
+                }
+                // An explicit non-blank value is left exactly as the project wrote it. Unlike
+                // the VPN entitlement there IS more than one legitimate value here -- an app
+                // sharing a store with a sibling app names that sibling's container -- so
+                // refusing anything but the default would break a configuration Apple
+                // supports.
+            }
+
             // VPN configuration management.
             //
             // Both entitlements here are single-element arrays, which the
@@ -11185,7 +11289,11 @@ public class IPhoneBuilder extends Executor {
     private static final int MAX_SETTING_EXPANSIONS = 16;
 
     /// One build setting, in either of the two spellings Xcode accepts for a reference.
-    private static String replaceBuildSetting(String path, String name, String value) {
+    ///
+    /// Package-visible rather than private because MacNativeBuilder needs the SAME answer: the
+    /// Catalyst entitlement has to materialize the iOS bundle id, and hand-listing the spellings
+    /// there was how "$(CFBundleIdentifier)" got handled while "${CFBundleIdentifier}" did not.
+    static String replaceBuildSetting(String path, String name, String value) {
         String out = path.replace("$(" + name + ")", value).replace("${" + name + "}", value);
         return applyModifiers(out, name, value);
     }
@@ -12170,6 +12278,83 @@ public class IPhoneBuilder extends Executor {
     /// supported configuration silently useless: the content was findable, and tapping it did
     /// nothing, because without this key iOS never continues the activity and
     /// nativeSpotlightItemSelected is never reached.
+    /// Declares the continuity activity type where the app's own native code can read it.
+    ///
+    /// `NSUserActivityTypes` tells iOS which activities to offer; this tells the delegate which
+    /// of them is this framework's. It has to be a value the BUILD resolved, because the delegate
+    /// decides before any Java is running and cannot ask the framework -- and the obvious
+    /// substitute is wrong on the Mac slice: `DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER` makes
+    /// the Catalyst bundle id `<package>.maccatalyst`, so a type derived there from the bundle id
+    /// would be `<package>.maccatalyst.continuity` while every device publishes
+    /// `<package>.continuity`. The Mac plist is generated from the finished iOS one, so writing
+    /// it once here gives both slices the same string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inject`: the plist fragment being built
+    ///
+    /// - `continuityType`: the resolved activity type, or null when the app does not use the
+    ///   feature
+    ///
+    /// #### Returns
+    ///
+    /// the fragment, with the key added when one is needed
+    ///
+    /// #### Throws
+    ///
+    /// - `BuildException`: when the project injects a different type of its own
+    static String withContinuityActivityType(String inject, String continuityType)
+            throws BuildException {
+        if (continuityType == null) {
+            return inject;
+        }
+        // Refused rather than left alone when it disagrees, exactly as CN1DocumentsAppGroup is,
+        // because this is not a hint. An injected key naming a different type has the delegate
+        // rejecting the application's own continuations while iOS goes on offering them.
+        // Two live root declarations of the key, refused for the reason NSUserActivityTypes and
+        // UIApplicationSceneManifest already are: a property list takes the LAST of a duplicated
+        // key while every lookup here answers with the first, so an agreeing first declaration
+        // would be left alone while the delegate reads a different second one -- the generated
+        // array advertising one type and the native side accepting another, which is Handoff
+        // silently dead. The scalar case was left out of the round that refused the array; it is
+        // the same trap on the neighbouring key.
+        if (inject != null
+                && plistMemberDuplicated(inject, 0, inject.length(), "CN1ContinuityActivityType")) {
+            throw new BuildException("ios.plistInject declares CN1ContinuityActivityType twice. A "
+                    + "property list takes the last of a duplicated key, so this build cannot "
+                    + "tell which value the delegate will read. Leave one of them.");
+        }
+        String injected = topLevelPlistString(inject, "CN1ContinuityActivityType");
+        if (injected == null && declaresTopLevelPlistKey(inject, "CN1ContinuityActivityType")) {
+            // Declared, but not as a string. topLevelPlistString answers null for an array, a
+            // dict or anything else, so this used to fall through both branches: the value was
+            // left alone because something was declared, and ours was not added because the key
+            // was present. The build then succeeded and the delegate found a value that is not an
+            // NSString, which it treats as absent -- so every continuation quietly bypassed the
+            // handler on a build that looked configured.
+            throw new BuildException("ios.plistInject declares CN1ContinuityActivityType with a "
+                    + "non-string value. It has to be the activity type this build publishes, '"
+                    + continuityType + "', or be left out so the build writes it.");
+        }
+        if (injected != null && !injected.equals(continuityType)) {
+            throw new BuildException("ios.plistInject sets CN1ContinuityActivityType to '"
+                    + injected + "' while this build publishes '" + continuityType
+                    + "'. The application would refuse its own continuations. Remove the "
+                    + "injected key.");
+        }
+        // Only an AGREEING declaration reaches here. A value that differs was refused by the
+        // check above and a non-string one by the check above that, so this cannot leave the
+        // fragment advertising one type through NSUserActivityTypes while the delegate reads
+        // another -- both keys are written from the same resolved string a few lines apart in the
+        // caller, and a declaration that disagrees with it fails the build rather than being
+        // stood aside for.
+        if (declaresTopLevelPlistKey(inject, "CN1ContinuityActivityType")) {
+            return inject;
+        }
+        return inject + "\n<key>CN1ContinuityActivityType</key><string>"
+                + xmlEscape(continuityType) + "</string>";
+    }
+
     static String withSpotlightContinuation(String inject, boolean usesIntents) {
         if (!usesIntents || inject.contains("CoreSpotlightContinuation")) {
             return inject;
@@ -12189,12 +12374,30 @@ public class IPhoneBuilder extends Executor {
     /// `IOSAppIntentsBuilder.publishesUserActivity` for why advertising the rest is not
     /// harmlessly generous.
     static String userActivityTypesKey(List<Map<String, Object>> intents) {
+        return userActivityTypesKey(intents, null);
+    }
+
+    /// The same key, carrying the continuity activity type alongside the intent ids.
+    ///
+    /// One key, not two. `NSUserActivityTypes` appears once in a property list or iOS reads the
+    /// file unpredictably, so the two features that contribute to it -- app intents and
+    /// continuity -- have to meet here rather than each emitting their own. An app that uses both
+    /// is the ordinary case, not a corner.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intents`: the app's intent declarations, possibly empty
+    /// - `continuityType`: this app's continuity activity type, or null when it uses none
+    static String userActivityTypesKey(List<Map<String, Object>> intents, String continuityType) {
         StringBuilder types = new StringBuilder();
         for (Map<String, Object> intent : intents) {
             Object id = intent.get("id");
             if (id instanceof String && IOSAppIntentsBuilder.publishesUserActivity(intent)) {
                 types.append("<string>").append((String) id).append("</string>");
             }
+        }
+        if (continuityType != null && continuityType.length() > 0) {
+            types.append("<string>").append(continuityType).append("</string>");
         }
         if (types.length() == 0) {
             // An app whose only assistant-exposed intent is destructive reaches here and
@@ -12206,18 +12409,375 @@ public class IPhoneBuilder extends Executor {
         return "\n<key>NSUserActivityTypes</key><array>" + types + "</array>";
     }
 
-    static String mergeUserActivityTypes(String inject, List<Map<String, Object>> intents) {
+    /// The index of the first `<key>` element naming `key` that is NOT inside an XML comment.
+    ///
+    /// `plistKeyIndex` reads structure but not liveness, so it answers with a declaration the
+    /// project commented out. Every use that goes on to EDIT what it found needs this instead.
+    ///
+    /// @param plist the fragment
+    /// @param key the key name
+    /// @return the index of the live key element, or -1
+    /// The dictionary nesting depth of `at`, counting live tags only.
+    ///
+    /// The fragment `ios.plistInject` supplies is a sequence of the ROOT dictionary's own
+    /// members, so depth 0 is the plist's root. A member's value may itself be a `<dict>`, and a
+    /// key inside one belongs to that dictionary rather than to the plist. iOS reads
+    /// NSUserActivityTypes at the root and nowhere else, so treating a nested one as the app's
+    /// declaration merged the continuity type into a dictionary nobody reads for it AND skipped
+    /// appending the root key -- an app whose Handoff simply never gets advertised, with an
+    /// unrelated property quietly rewritten, and nothing logged either way.
+    static int plistDictDepth(String plist, int at) {
+        int depth = 0;
+        int i = 0;
+        while (i < at) {
+            int open = plist.indexOf('<', i);
+            if (open < 0 || open >= at) {
+                break;
+            }
+            // The SHARED scanner, not a local "is this a comment" test. A CDATA section, a
+            // comment, a processing instruction and a declaration can all carry text shaped like
+            // an element, and a plist parser reads none of it as markup. A hand-rolled comment
+            // check got this wrong in the way that matters: "<![CDATA[a > <dict>]]>" ended at the
+            // FIRST ">", so the "<dict>" written inside the character data was counted as real
+            // structure, a following root key was classified as nested, and the branch above
+            // appended a SECOND NSUserActivityTypes -- the duplicate key this whole area exists
+            // to prevent.
+            int skipped = WatchNativeBuilder.skipMarkupBefore(plist, open, i);
+            if (skipped < 0) {
+                // Unterminated: nothing after it can be read reliably, so stop counting rather
+                // than guess, and answer with the depth established so far.
+                break;
+            }
+            if (skipped != open) {
+                i = skipped;
+                continue;
+            }
+            int end = plist.indexOf('>', open);
+            if (end < 0) {
+                break;
+            }
+            String tag = plist.substring(open, end + 1);
+            if ("dict".equals(plistTagName(tag))) {
+                if (tag.startsWith("</")) {
+                    depth--;
+                } else if (!tag.endsWith("/>")) {
+                    // "<dict/>" opens and closes in one element, so it changes nothing.
+                    depth++;
+                }
+            }
+            i = end + 1;
+        }
+        return depth;
+    }
+
+    /// The element name of a tag, without the closing slash or any attributes.
+    static String plistTagName(String tag) {
+        int from = tag.startsWith("</") ? 2 : 1;
+        int to = from;
+        while (to < tag.length()) {
+            char c = tag.charAt(to);
+            if (c == '>' || c == '/' || c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+                break;
+            }
+            to++;
+        }
+        return tag.substring(from, to);
+    }
+
+    /// The first live key at the fragment's own level, skipping any a nested dictionary owns.
+    ///
+    /// Both the branch that decides whether to append and the merge itself have to use this, or
+    /// they disagree: one sees a declaration the other cannot find, which is how a key gets
+    /// appended twice or an array gets merged into that iOS never reads.
+    /// Whether `at` is a position a plist parser would read as markup.
+    ///
+    /// The same four constructs `skipMarkupBefore` knows, walked forward rather than guessed at
+    /// backwards: the old `lastIndexOf("<!--")` test read a `<!--` written inside a CDATA section
+    /// as if it opened a real comment, and answered "commented out" for a key that is really
+    /// there.
+    static boolean isLivePosition(String plist, int at) {
+        int i = 0;
+        for (;;) {
+            int skipped = WatchNativeBuilder.skipMarkupBefore(plist, at, i);
+            if (skipped < 0 || skipped > at) {
+                // Unterminated, or `at` falls inside the construct that skipping it lands past.
+                return false;
+            }
+            if (skipped == at) {
+                return true;
+            }
+            i = skipped;
+        }
+    }
+
+    static int firstLiveRootIndex(String plist, String key) {
+        int at = plistKeyIndex(plist, key);
+        while (at >= 0 && (!isLivePosition(plist, at) || plistDictDepth(plist, at) != 0)) {
+            at = plistKeyIndex(plist, key, at + 1);
+        }
+        return at;
+    }
+
+    static int firstLiveIndex(String plist, String key) {
+        int at = plistKeyIndex(plist, key);
+        while (at >= 0 && insideComment(plist, at)) {
+            at = plistKeyIndex(plist, key, at + 1);
+        }
+        return at;
+    }
+
+    /// Whether `at` falls inside an `<!-- ... -->` span.
+    ///
+    /// An unterminated comment swallows the rest of the fragment, which is what a parser does
+    /// with it too -- see plistWithoutComments.
+    static boolean insideComment(String plist, int at) {
+        int open = plist.lastIndexOf("<!--", at);
+        if (open < 0) {
+            return false;
+        }
+        int close = plist.indexOf("-->", open + 4);
+        return close < 0 || close > at;
+    }
+
+    /// The index of the element that is the key's IMMEDIATE value, or -1.
+    ///
+    /// Whitespace and live comments are stepped over, because
+    /// `<key>NSUserActivityTypes</key><!-- why --><array/>` is a fragment a person writes and a
+    /// plist parser reads the array as the key's value regardless. Anything else stops the walk:
+    /// scanning onwards for the next element of the shape we want is what let a merge reach past
+    /// a NON-array value and insert into some later key's array instead, corrupting a property
+    /// this code was never asked about.
+    ///
+    /// @param plist the fragment
+    /// @param keyIndex the index of the `<key>` element
+    /// @return the index of the value element, or -1
+    static int immediateValueIndex(String plist, int keyIndex) {
+        if (plist == null || keyIndex < 0) {
+            return -1;
+        }
+        // plistKeyEnd, not a literal search for "</key". A key may legitimately carry a comment,
+        // and a comment may contain the text "</key>" -- at which point a raw search ends the key
+        // inside the comment, decides the value is not an array, and drops every activity type
+        // without a word. The structural helper resolves the element the way the branch that
+        // decided to merge already did.
+        int at = plistKeyEnd(plist, keyIndex);
+        if (at < 0) {
+            return -1;
+        }
+        for (;;) {
+            while (at < plist.length() && Character.isWhitespace(plist.charAt(at))) {
+                at++;
+            }
+            if (at >= plist.length()) {
+                return -1;
+            }
+            // The SHARED scanner, not a local comment test. A processing instruction, a
+            // declaration and a CDATA section are every bit as invisible to a plist parser as a
+            // comment is, and it steps over all of them on its way to the key's value. Stopping
+            // on one made immediateValueIndex answer with the "<?", so both the expansion and the
+            // merge decided the value was not an array and dropped every activity type without a
+            // word. An unterminated construct still yields -1: nothing after it can be read.
+            int skipped = WatchNativeBuilder.skipMarkupBefore(plist, at, at);
+            if (skipped < 0) {
+                return -1;
+            }
+            if (skipped != at) {
+                at = skipped;
+                continue;
+            }
+            return at;
+        }
+    }
+
+    /// Rewrites a self-closing `NSUserActivityTypes` array into an open/close pair.
+    ///
+    /// `<array/>` is the ordinary XML spelling of an empty array and a plist parser reads it
+    /// exactly as `<array></array>`. `mergeUserActivityTypes` looks for the literal pair, so
+    /// without this an application that declared the key that way took the merge branch and had
+    /// every id silently dropped -- the one outcome worse than a duplicate key, because nothing
+    /// says so until Handoff does not work on a device.
+    ///
+    /// Only this key's array is touched, and only when it is the key's immediate value: another
+    /// key's empty array is none of this method's business.
+    ///
+    /// @param inject the plist fragment the application supplied
+    /// @return the fragment, with this one array expanded when it needed it
+    static String expandEmptyUserActivityArray(String inject) {
+        if (inject == null) {
+            return null;
+        }
+        int key = firstLiveRootIndex(inject, "NSUserActivityTypes");
+        if (key < 0) {
+            return inject;
+        }
+        int at = immediateValueIndex(inject, key);
+        if (at < 0 || !inject.startsWith("<array", at)) {
+            return inject;
+        }
+        int close = inject.indexOf('>', at);
+        if (close < 0 || inject.charAt(close - 1) != '/') {
+            // Already an open/close pair, which the merge understands as it is.
+            return inject;
+        }
+        return inject.substring(0, at) + "<array></array>" + inject.substring(close + 1);
+    }
+
+    /// Whether an array's text already lists `value` as a LIVE entry.
+    ///
+    /// Through the shared live scanner, so an entry the project commented out does not count as
+    /// declared. It is the array iOS reads that has to carry the type, and a disabled line looks
+    /// identical to a raw text search.
+    static boolean listsLiveString(String arrayText, String value) {
+        return plistIndexOfLive(arrayText, "<string>" + value + "</string>", 0) >= 0;
+    }
+
+    static String mergeUserActivityTypes(String inject, List<Map<String, Object>> intents)
+            throws BuildException {
+        return mergeUserActivityTypes(inject, intents, null);
+    }
+
+    /// Refuses a build whose continuity type has nowhere to go.
+    ///
+    /// Returning the fragment untouched is the right answer for the intents-only merge -- writing
+    /// a SECOND NSUserActivityTypes key produces a plist iOS reads unpredictably, which is worse
+    /// than the ids being absent -- but it is the wrong answer once a continuity type depends on
+    /// that array. The caller has already seen the key and so writes no array of its own, so the
+    /// type reaches no array at all: the build succeeds, CN1ContinuityActivityType is present,
+    /// and Handoff is never advertised, with nothing anywhere saying so.
+    ///
+    /// The declaration is malformed either way -- iOS requires an array here -- so this is not
+    /// this build's failure to report in general, and an intents-only project keeps the behaviour
+    /// it has today. It is reported when continuity depends on it, for the same reason
+    /// withContinuityActivityType refuses a CN1ContinuityActivityType that is not a string: a
+    /// feature that is silently inert on the device is the one outcome worth failing a build for.
+    private static void requireArrayForContinuity(String continuityType, String what)
+            throws BuildException {
+        if (continuityType == null || continuityType.length() == 0) {
+            return;
+        }
+        throw new BuildException("ios.plistInject declares NSUserActivityTypes with a value that "
+                + what + ". This build publishes the continuity activity type '" + continuityType
+                + "', which iOS only reads from an <array> under that key. Declare it as an "
+                + "array -- the build adds the type to an array it can find -- or leave the key "
+                + "out so the build writes the whole array itself.");
+    }
+
+    /// Refuses an App Intent whose id IS the continuity activity type.
+    ///
+    /// An intent's id is published as its NSUserActivity activityType verbatim -- see
+    /// userActivityTypesKey, which appends it unchanged -- and the continuity type goes into the
+    /// same array. Declare both and the array carries the string twice, which is untidy; the part
+    /// that matters is that the native delegate has nothing left to tell them apart, so whichever
+    /// handler looks first claims an activity meant for the other. Handoff resuming into an
+    /// intent's screen, or an intent invocation restoring a route stack, with nothing logged.
+    ///
+    /// Refused rather than renamed. The id is the application's, published to the system and
+    /// possibly already donated on a device, so a build that quietly changed it would break the
+    /// donations already out there; and the continuity type is what the delegate compiles in.
+    /// Naming the collision is the only repair that leaves both meanings intact.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intents`: the parsed intents manifest
+    ///
+    /// - `continuityType`: the resolved activity type, or null when the app does not use it
+    ///
+    /// #### Throws
+    ///
+    /// - `BuildException`: when an intent publishes the continuity type as its own
+    static void requireNoIntentClaimsTheContinuityType(List<Map<String, Object>> intents,
+            String continuityType) throws BuildException {
+        if (intents == null || continuityType == null || continuityType.length() == 0) {
+            return;
+        }
+        for (Map<String, Object> intent : intents) {
+            Object id = intent.get("id");
+            if (!(id instanceof String) || !IOSAppIntentsBuilder.publishesUserActivity(intent)) {
+                // Only the ones that reach NSUserActivityTypes. An intent that donates nothing
+                // shares no namespace with continuity and is none of this check's business.
+                continue;
+            }
+            if (continuityType.equals(id)) {
+                throw new BuildException("An App Intent declares the id '" + id + "', which is "
+                        + "the activity type this build publishes for continuity. Both are "
+                        + "advertised through NSUserActivityTypes and the native side has "
+                        + "nothing left to tell them apart, so one handler would claim the "
+                        + "other's activity. Give the intent an id of its own.");
+            }
+        }
+    }
+
+    /// Refuses a fragment that declares NSUserActivityTypes twice at the root.
+    ///
+    /// The trap UIApplicationSceneManifest is already refused for, and it resolves the same way: a
+    /// property list takes the LAST of a duplicated key, while every lookup here answers with the
+    /// first. Merging into the first would leave the second in force on the device -- a build that
+    /// succeeds with the activity types sitting in an array iOS never reads, so Handoff and
+    /// Spotlight are silently not advertised and nothing says so until they do not work.
+    ///
+    /// There is no safe pick between them. Fragments composed by more than one injector are how
+    /// this arises, and merging into either one is a guess about which the parser will keep, so it
+    /// is reported rather than guessed at.
+    ///
+    /// Comment-aware, because plistMemberRange walks live elements only: a declaration the project
+    /// kept COMMENTED OUT above its real one is not a second declaration, and refusing that would
+    /// break the very projects the live-element handling was added for.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inject`: the plist fragment the application supplied
+    ///
+    /// #### Throws
+    ///
+    /// - `BuildException`: when the key is declared more than once at the root
+    static void requireSingleUserActivityTypes(String inject) throws BuildException {
+        if (!plistMemberDuplicated(inject, 0, inject.length(), "NSUserActivityTypes")) {
+            return;
+        }
+        throw new BuildException("ios.plistInject declares NSUserActivityTypes twice. A property "
+                + "list takes the last of a duplicated key, so this build cannot tell which array "
+                + "the device will read -- and the activity types would go into the other one. "
+                + "Compose them into one array.");
+    }
+
+    /// The same merge, adding the continuity activity type alongside the intent ids.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inject`: the plist fragment the application supplied
+    /// - `intents`: the app's intent declarations, possibly empty
+    /// - `continuityType`: this app's continuity activity type, or null when it uses none
+    static String mergeUserActivityTypes(String inject, List<Map<String, Object>> intents,
+            String continuityType) throws BuildException {
         // The same structural reading the rest of the plist parsing uses: this walks a
         // fragment the application supplied, so "<array >" and "</array >" are shapes it
         // has to accept. Found by enumerating every literal closing tag left in this
         // file rather than waiting for the next one to be reported.
-        int key = plistKeyIndex(inject, "NSUserActivityTypes");
-        int open = key < 0 ? -1 : plistElementIndex(inject, "array", key);
-        int close = open < 0 ? -1 : plistCloseElementIndex(inject, "array", open);
+        // The LIVE key, not the first one that matches. A project that kept an old declaration
+        // commented out above its real one had the ids merged into the comment: the branch above
+        // correctly saw a live key, and this then found the dead one first. The plist that
+        // shipped had no continuity type in the array iOS actually reads, so Handoff was never
+        // advertised and nothing anywhere said so.
+        int key = firstLiveRootIndex(inject, "NSUserActivityTypes");
+        // The key's OWN value, not the next array anywhere after it. An unbounded search reached
+        // past a NSUserActivityTypes whose value was not an array and inserted the ids into some
+        // later key's array -- corrupting a property this method was never asked about, while the
+        // documented behaviour for "no array here" is to return the fragment untouched.
+        int open = immediateValueIndex(inject, key);
+        if (open < 0 || !inject.startsWith("<array", open)) {
+            requireArrayForContinuity(continuityType, "is not an array");
+            return inject;
+        }
+        int close = plistCloseElementIndex(inject, "array", open);
         if (close < 0) {
+            requireArrayForContinuity(continuityType, "opens an array that is never closed");
             return inject;
         }
         String existing = inject.substring(open, close);
+        // Compared against LIVE entries below. A raw contains() answered yes for
+        // "<!-- <string>com.example.app.continuity</string> -->", so the builder added nothing and
+        // the array iOS actually reads never carried the type -- Handoff silently not advertised,
+        // which is the same failure the commented-out KEY case already had one level up.
         StringBuilder add = new StringBuilder();
         for (Map<String, Object> intent : intents) {
             Object id = intent.get("id");
@@ -12225,9 +12785,13 @@ public class IPhoneBuilder extends Executor {
             // business in the app's own array either. See publishesUserActivity.
             if (id instanceof String
                     && IOSAppIntentsBuilder.publishesUserActivity(intent)
-                    && !existing.contains("<string>" + (String) id + "</string>")) {
+                    && !listsLiveString(existing, (String) id)) {
                 add.append("<string>").append((String) id).append("</string>");
             }
+        }
+        if (continuityType != null && continuityType.length() > 0
+                && !listsLiveString(existing, continuityType)) {
+            add.append("<string>").append(continuityType).append("</string>");
         }
         if (add.length() == 0) {
             return inject;
@@ -13154,16 +13718,59 @@ public class IPhoneBuilder extends Executor {
             return null;
         }
         String value = plist.substring(range[0], range[1]).trim();
-        if (value.startsWith("<true")) {
+        // The element's NAME, not its spelling. "<string >" opens a string exactly as "<string>"
+        // does, and a comment or a processing instruction may sit between the key and its value
+        // -- all three are ordinary plist, and a literal startsWith() answered "not a string" to
+        // every one of them. withContinuityActivityType() then refused the declaration as
+        // non-string and FAILED A CORRECT BUILD, which is worse than the silent mismatch this
+        // method's other readers would have got.
+        //
+        // The same structural rule the container tags a few hundred lines up already follow:
+        // plistElementIndex() was made to see "<array >" for this reason, and this was the last
+        // literal check left beside it.
+        String name = nextElementName(value, 0);
+        if ("true".equals(name)) {
             return "true";
         }
-        if (value.startsWith("<false")) {
+        if ("false".equals(name)) {
             return "false";
         }
-        if (!value.startsWith("<string>") || !value.endsWith("</string>")) {
+        if (!"string".equals(name)) {
             return null;
         }
-        return value.substring("<string>".length(), value.length() - "</string>".length()).trim();
+        int open = plistElementIndex(value, "string", 0);
+        int contentStart = open < 0 ? -1 : plistOpenTagEnd(value, open);
+        int contentEnd = contentStart < 0
+                ? -1 : plistCloseElementIndex(value, "string", contentStart);
+        if (contentEnd < 0) {
+            return null;
+        }
+        value = "<string>" + value.substring(contentStart, contentEnd) + "</string>";
+        // The element's CONTENT through the shared resolver, not a slice of its serialization.
+        // A plist author may spell a value with character references -- "com&#46;example.app" --
+        // or wrap it in CDATA, or put a comment inside the element, and Foundation reads all
+        // three as the same string. Handing back the raw text made every caller compare the
+        // serialization instead: withContinuityActivityType saw "com&#46;example.app.continuity"
+        // where the build publishes "com.example.app.continuity", called that a conflicting
+        // declaration, and failed a build that was correct.
+        //
+        // The key side of this method already resolves the same way -- plistMemberRange compares
+        // key names through this helper -- so the two halves were answering one question two
+        // different ways.
+        //
+        // TRIMMED, and it stays trimmed. A review asked for the exact value on the grounds that
+        // Foundation preserves padding inside a <string>, so "<string> com.example.app </string>"
+        // would compare equal to the unpadded type here and leave a fragment whose delegate reads
+        // the padded one. True, and not worth what closing it costs: this method is the shared
+        // reader for every top-level plist string in this builder -- entitlement values, bundle
+        // ids, the container identifier -- and making it significant-whitespace would change what
+        // all of them accept for the sake of an activity type somebody wrote with spaces around
+        // it. The failure it leaves is a Handoff that does not work in an app whose plist says
+        // something the author did not mean, which is diagnosable; the failure it would introduce
+        // is spread across every other key this reads.
+        String content = WatchNativeBuilder.plistStringContentExact(
+                value.substring("<string>".length(), value.length() - "</string>".length()));
+        return content == null ? null : content.trim();
     }
 
     /// Whether the fragment declares the key as a member of ITS OWN level.
@@ -14785,21 +15392,57 @@ public class IPhoneBuilder extends Executor {
         // Emitted whenever the app declares intents, including the appIntents=false opt-out:
         // donation still runs there, and iOS only offers an activity whose type is declared
         // here, so omitting it would make the opt-out donate into a void.
-        if (declaresAppIntents || appIntentsSuppressed) {
+        //
+        // Continuity contributes to the SAME key. iOS only continues an activity whose type the
+        // app declared here, so an app that references com.codename1.continuity and never lands
+        // in this branch publishes activities no other device is ever offered -- and the symptom
+        // is the feature appearing to do nothing at all, on both devices, with nothing logged.
+        String continuityActivityType = usesContinuity
+                ? request.getPackageName() + ".continuity" : null;
+        if (declaresAppIntents || appIntentsSuppressed || usesContinuity) {
             // Each key is decided on its own. Treating any existing NSUserActivityTypes as
             // complete configuration meant an app that already declared one Handoff activity
             // through ios.plistInject silently lost every intent id -- and lost
             // CoreSpotlightContinuation too, which is a different key entirely, so a Spotlight
             // result could not continue into the app either.
-            if (!inject.contains("NSUserActivityTypes")) {
-                inject += userActivityTypesKey(intentsManifest);
+            // LIVE elements only, and the array normalized first. A plain contains() answered
+            // yes for a declaration the project had COMMENTED OUT -- the builder then stood
+            // aside, merged the ids into the comment, and shipped an app with no live activity
+            // type at all, which is Handoff and Spotlight silently doing nothing on a device.
+            // The same question is asked of UIBackgroundModes a few hundred lines up, and for
+            // the same reason.
+            // The fragment itself, NOT plistWithoutComments(inject). firstLiveRootIndex already
+            // skips a key that is commented out, and pre-stripping introduced a failure of its
+            // own: a valid CDATA value containing the text "<!--" and no "-->" looked like an
+            // unterminated comment, so everything after it was truncated and a live root key
+            // beyond it went missing -- and this branch then appended a SECOND one.
+            requireSingleUserActivityTypes(inject);
+            requireNoIntentClaimsTheContinuityType(intentsManifest, continuityActivityType);
+            if (firstLiveRootIndex(inject, "NSUserActivityTypes") < 0) {
+                inject += userActivityTypesKey(intentsManifest, continuityActivityType);
             } else {
                 // Merge into the array the application supplied rather than replacing it: its
                 // own activity types have to keep working. Appended just before the closing
                 // </array> of that key, and only ids it does not already list.
-                inject = mergeUserActivityTypes(inject, intentsManifest);
+                //
+                // Expanded first: "<array/>" is a valid empty array and the merge looks for a
+                // literal open/close pair, so an app that declared the key that way took the
+                // merge branch and had every id dropped on the floor.
+                inject = mergeUserActivityTypes(expandEmptyUserActivityArray(inject),
+                        intentsManifest, continuityActivityType);
             }
         }
+
+        // The resolved type, written where the NATIVE side can read it. The delegate decides
+        // whether an arriving NSUserActivity is this framework's before any Java is running, and
+        // deriving that from [[NSBundle mainBundle] bundleIdentifier] is WRONG on the Mac slice:
+        // DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER makes that id "<package>.maccatalyst", so
+        // the derived type would be "<package>.maccatalyst.continuity" while the type this build
+        // declares above and the app publishes is "<package>.continuity". Handoff would be dead
+        // on Catalyst, which is the Mac-to-iPhone case the feature exists for. One value, decided
+        // here, read by both slices: the Mac plist is generated from this finished one, so it
+        // carries the key unchanged.
+        inject = withContinuityActivityType(inject, continuityActivityType);
         // CoreSpotlightContinuation is about Spotlight, not about App Intents, and gating it on
         // a declaration made an entire supported configuration silently useless: an app that
         // only calls Intents.index() declares no intent at all -- parseIntentsManifest treats a

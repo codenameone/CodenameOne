@@ -32,8 +32,20 @@ NDEF records carry one of the well-known types (`T`, `U`, `Sp`), a MIME media ty
 
 Beyond NDEF, the discovered `Tag` exposes accessors for the underlying technologies:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NearFieldCommunicationJava002Snippet.java[tag=near-field-communication-java-002,indent=0]
+----
 
 Each accessor returns `null` when the tag doesn't advertise the corresponding technology, so always null-check before calling.
+
+NOTE: On iOS the AIDs handed to `setIsoSelectAids` must also be listed in
+`Info.plist` under
+`com.apple.developer.nfc.readersession.iso7816.select-identifiers`. Core NFC only
+discovers an application the app declared up front, and the builders can't read a
+runtime argument, so inject that key with `ios.plistInject` too. The
+`nfc.hce.iso7816.select-identifiers` entitlement the builders do set is the
+host-card-emulation key, which is a different thing.
 
 [options="header"]
 |===
@@ -49,13 +61,31 @@ Each accessor returns `null` when the tag doesn't advertise the corresponding te
 
 For FeliCa on iOS, set the system codes in `NfcReadOptions`:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NearFieldCommunicationJava003Snippet.java[tag=near-field-communication-java-003,indent=0]
+----
 
-The Codename One Maven plugin and build daemon automatically register `com.apple.developer.nfc.readersession.felica.systemcodes` from these values.
+The builders can't derive that from the call -- the codes are a runtime argument
+they never see. iOS wants them in `Info.plist`, so inject the key at build time:
+
+----
+codename1.arg.ios.plistInject=<key>com.apple.developer.nfc.readersession.felica.systemcodes</key><array><string>0003</string><string>8008</string></array>
+----
+
+Seeing `com.codename1.nfc` on the classpath gets you CoreNFC, a default
+`NFCReaderUsageDescription` and the
+`com.apple.developer.nfc.readersession.formats` entitlement automatically. These
+system codes are the one part you supply.
 
 === Quick start: Host card emulation
 
 Host Card Emulation (HCE) lets the device pretend to be a contactless smart card. A nearby reader (Android phone, payment terminal, access control gate) sends ISO 7816 APDUs and your app responds. Subclass `HostCardEmulationService` and register the instance:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NearFieldCommunicationJava004Snippet.java[tag=near-field-communication-java-004,indent=0]
+----
 
 Set the AIDs as a build hint so they appear in the platform routing tables:
 

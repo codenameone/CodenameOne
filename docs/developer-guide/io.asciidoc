@@ -522,11 +522,11 @@ run reports both for every platform it covers.
 
 === Network manager & connection request
 
-One of the more common problems in Network programming is spawning a new thread to handle the network operations. In Codename One this is done seamlessly and becomes unessential thanks to the http://www.codenameone.com/javadoc/com/codename1/io/NetworkManager.html[NetworkManager].
+One of the more common problems in Network programming is spawning a new thread to handle the network operations. In Codename One this is done seamlessly and becomes unessential thanks to the https://www.codenameone.com/javadoc/com/codename1/io/NetworkManager.html[NetworkManager].
 
 `NetworkManager` effectively alleviates the need for managing network threads by managing the complexity of network threading. The connection request class can be used to ease web service requests when coupled with the JSON/XML parsing capabilities.
 
-To open a connection one needs to use a http://www.codenameone.com/javadoc/com/codename1/io/ConnectionRequest.html[ConnectionRequest]
+To open a connection one needs to use a https://www.codenameone.com/javadoc/com/codename1/io/ConnectionRequest.html[ConnectionRequest]
 object, which has some similarities to the networking mechanism in JavaScript but is obviously somewhat more elaborate.
 
 You can send a get request to a URL using something like:
@@ -799,7 +799,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 The response is a `Map` containing a nested hierarchy of `Collection` (`java.util.List`), Strings and numbers to represent the content of the submitted JSON. To extract the data from a specific path iterate the `Map` keys and recurs into it.
 
-The sample below uses results from https://anapioficeandfire.com/[an API of ice and fire] that queries structured data about the "Song Of Ice & Fire" book series. Here is a sample result returned from the API for the query http://www.anapioficeandfire.com/api/characters?page=5&pageSize=3 :
+The sample below uses results from https://anapioficeandfire.com/[an API of ice and fire] that queries structured data about the "Song Of Ice & Fire" book series. Here is a sample result returned from the API for the query https://www.anapioficeandfire.com/api/characters?page=5&pageSize=3 :
 
 [source,JavaScript]
 ----
@@ -815,7 +815,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 <1> The `JSONParser` returns a `Map` which is great if the root object is a `Map` but sometimes its a list of elements (as is the case above). In this case a special case "root" element is created to contain the actual list of elements.
 
-<2> You rely that the entries are all maps, this might not be the case for every API type.
+<2> This relies on the entries all being maps, which might not be the case for every API type.
 
 <3> Notice that the "titles" and "aliases" entries are both lists of elements. You use `java.util.List` to avoid a clash with `com.codename1.ui.List`.
 
@@ -1061,7 +1061,7 @@ This effectively maps the `ConnectionRequest` directly to a https://www.codename
 
 `URLImage` is great. It changed the way you do some things in Codename One.
 
-For example, when you introduced it you didn't have support for the cache filesystem or for the JavaScript port. The cache filesystem is probably the best place for images of `URLImage` so supporting that as a target is an obvious choice, but JavaScript seems to work so why would it need a special case?
+For example, when it was introduced there was no support for the cache filesystem or for the JavaScript port. The cache filesystem is probably the best place for images of `URLImage` so supporting that as a target is an obvious choice, but JavaScript seems to work so why would it need a special case?
 
 JavaScript already knows how to download and cache images from the web. `URLImage` is actually a step back from the things a good browser can do so why not use the native abilities of the browser when you're running there and fallback to using the cache filesystem if it's available and as a last resort go to storage...
 
@@ -1170,7 +1170,7 @@ The code in the kitchen sink webservice sample was updated to use this API. The 
 
 The best way to explain the usage of this API is through a concrete "real world" example. Twilio provides many great telephony-oriented webservices to developers. One of those is an SMS sending webservice which can be useful for things such as "device activation."
 
-To get started you would need to sign up to http://twillo.com/[Twilio] and have the following 3 variable values:
+To get started you would need to sign up to https://www.twilio.com/[Twilio] and have the following 3 variable values:
 
 [source,java]
 ----
@@ -1241,7 +1241,7 @@ HTTP provides two ways to do that the https://en.wikipedia.org/wiki/HTTP_ETag[ET
 https://developer.mozilla.org/en-You/docs/Web/HTTP/Headers/Last-Modified[Last-Modified]. While both are
 great they're non-trivial to use and by no definition seamless.
 
-You added an experimental feature to connection request that allows you to set the caching mode to one of
+Connection request has an experimental feature that allows you to set the caching mode to one of
 4 states either globally or per connection request:
 
 - *OFF* is the default meaning no caching.
@@ -1561,7 +1561,7 @@ but sqlite isn't big iron so it might be good enough.
 One of the problematic issues with constructors is that any change starts propagating everywhere. If you have
 fields in the constructor and you add a new field later you need to keep the old constructor for compatibility.
 
-You added a new syntax:
+Codename One added a new syntax:
 
 [source,java]
 ----
@@ -1667,33 +1667,41 @@ The `SQLMap` API is simplistic and doesn't try to be Hibernate/JPA for mobile. B
 
 ====== Relational Mappings/JOIN
 
-Right now you can't map an object to another object in the database with the typical one-many, one-one etc. relationships that you could do with JPA. The `SQLMap` API is simplistic and isn't suited for that level of mapping now.
-
-If there is demand for this it's something you might add moving forward but your goal isn't to re-invent hibernate.
+There's no way to map an object to another object in the database with the
+one-many or one-one relationships JPA offers. The `SQLMap` API isn't suited to
+that level of mapping.
 
 ====== Threading
 
-SQLite is sensitive to threading issues on iOS. You ignored the issue of threading and issue all calls in process. This can be a problem for larger data sets as the calls would go on the EDT.
-
-This is something you might want to fix for the generic SQLite API so low-level SQL queries will work with your mapping in a sensible way.
+SQLite is sensitive to threading issues on iOS, so `SQLMap` issues its calls in
+process rather than moving them off the caller's thread. That can be a problem
+for larger data sets, because the calls then run on the EDT.
 
 ====== Alter
 
-Right now you don't support table altering to support updated schemas. This is doable and shouldn't be too hard to implement so if there is demand for doing it you will probably add support for this.
+Altering a table to match a schema that changed after the table was created
+isn't supported. Migrating such a schema means issuing that SQL directly.
 
 ====== Complex SQL/Transactions
 
-You ignored functions, joins, transactions and a lot of other SQL capabilities.
+Functions, joins, transactions and a good deal of other SQL sit outside the
+mapping.
 
-You can use SQL directly to use all these capabilities for example: if you begin a transaction before inserting/updating or deleting this will work as advertised but if a rollback occurs your mapping will be unaware of that so you will need to re-fetch the data.
+SQL can be used directly for any of that. A transaction begun before an insert,
+update or delete works as advertised, but the mapping is unaware of a rollback,
+so the data has to be re-fetched afterward.
 
-The mapping covers autoincrement and the cases that map cleanly onto a table; a use case that needs more than that subset is better served by dropping to SQL directly.
+The mapping covers autoincrement and the cases that map cleanly onto a table; a
+use case that needs more than that subset is better served by dropping to SQL
+directly.
 
 ====== Caching/Collision
 
-As mentioned above, you don't cache anything and there might be a collision if you select the same object twice you will get two separate instances that might collide if you update both (one will "win").
+Nothing is cached, so selecting the same row twice produces two separate
+instances. Update both and one of them wins, with no indication that the other was discarded.
 
-That means you need to pay attention to the way you cache objects to avoid a case of a modified version of an object kept with an older version.
+That means the application has to keep track of the objects it holds, so a
+modified version isn't left sitting beside an older one.
 
 ===== Preferences binding
 

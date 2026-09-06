@@ -43,6 +43,7 @@
 #import "METALView.h"
 #import "CN1Metalcompat.h"
 #endif
+#import "CN1DragAndDrop.h"
 #import "ExecutableOp.h"
 #import "FillRect.h"
 #import "ClipRect.h"
@@ -758,6 +759,43 @@ int cn1MapUIKeyToKeyCode(UIKey *key) API_AVAILABLE(ios(13.4)) {
         }
     }
 #endif
+}
+#endif
+#endif
+
+/* Identity of the physical control behind a press, deliberately NOT its CN1
+ * keycode. cn1MapUIKeyToKeyCode is many-to-one -- Return and keypad Enter both
+ * become CN1_IOS_KEY_ENTER, and a keypad digit produces the same codepoint as
+ * its top-row twin -- so ownership keyed by the CN1 code cannot tell two such
+ * presses apart, and one key's release would be handed to the other key's
+ * owner. The HID usage is per physical key.
+ *
+ * The three sources are namespaced so they can share one set without ever
+ * colliding: a HID usage, a tvOS remote button (which carries no UIKey at all),
+ * and, only when neither exists, the mapped CN1 code -- tracked imprecisely
+ * beats untracked, an untracked press being the stuck repeat timer this whole
+ * mechanism exists to prevent. Every value involved is far below the namespace
+ * stride.
+ *
+ * Not static: the Mac Catalyst window controller keys its own ownership set the
+ * same way, and two copies of this rule would drift. */
+#if !TARGET_OS_WATCH
+#if !TARGET_OS_OSX
+#define CN1_PRESS_ID_HID_KEY        0x1000000LL
+#define CN1_PRESS_ID_REMOTE_BUTTON  0x2000000LL
+#define CN1_PRESS_ID_MAPPED_CODE    0x3000000LL
+
+long long cn1PressIdentity(UIPress *press, int code) API_AVAILABLE(ios(13.4)) {
+    UIKey *key = press.key;
+    if (key != nil && key.keyCode != 0) {
+        return CN1_PRESS_ID_HID_KEY + (long long) key.keyCode;
+    }
+#if TARGET_OS_TV
+    if (key == nil) {
+        return CN1_PRESS_ID_REMOTE_BUTTON + (long long) press.type;
+    }
+#endif
+    return CN1_PRESS_ID_MAPPED_CODE + (long long) code;
 }
 #endif
 #endif
@@ -3396,6 +3434,8 @@ static CodenameOne_GLViewController *sharedSingleton;
     [self cn1InstallHoverRecognizer];
     [self cn1InstallScrollRecognizer];
     [self cn1InstallPinchRecognizer];
+    // Native drag and drop, both directions. Inert where the platform has no drag interaction.
+    CN1InstallDragAndDrop(self.view);
     [self cn1InstallRotationRecognizer];
     //replaceViewDidLoad
     [self initGoogleConnect];
@@ -3417,6 +3457,8 @@ static CodenameOne_GLViewController *sharedSingleton;
     [self cn1InstallHoverRecognizer];
     [self cn1InstallScrollRecognizer];
     [self cn1InstallPinchRecognizer];
+    // Native drag and drop, both directions. Inert where the platform has no drag interaction.
+    CN1InstallDragAndDrop(self.view);
     [self cn1InstallRotationRecognizer];
     //replaceViewDidLoad
     [self initGoogleConnect];
@@ -3711,10 +3753,77 @@ bool lockDrawing;
 }
 #endif
 
+// Key codes this controller handed to the framework from pressesBegan:. A press
+// the framework owns has to be completed with the framework whatever the editor
+// does in between -- Display.keyPressedImpl arms the key-repeat and long-press
+// timers and only keyReleased cancels them, so a release diverted to UIKit
+// instead would leave CN1 repeating a key the user has already let go of. The
+// converse pairs up too: a press that went to UIKit while an editor was open
+// has its release forwarded there even if the editor closed meanwhile.
+//
+// Keyed by cn1PressIdentity, the physical control rather than the CN1 code the
+// framework was handed, so two keys that share a code cannot take each other's
+// entry. The same physical key cannot be down twice, so the identity is
+// unambiguous. Main thread only, like every other UIKit callback in this file,
+// so it needs no synchronization.
+//
+// A press whose terminal phase never arrives (the app suspended mid-key) leaves
+// its code behind. The cost is one later release of that same key routed to the
+// framework instead of UIKit; the repeat-timer wedge this prevents is the
+// larger failure, and before this the release was misrouted unconditionally.
+#if !TARGET_OS_OSX
+static NSMutableSet *cn1FrameworkOwnedPresses = nil;
+
+static void cn1NoteFrameworkOwnsPress(long long identity) {
+    if (cn1FrameworkOwnedPresses == nil) {
+        cn1FrameworkOwnedPresses = [[NSMutableSet alloc] init];
+    }
+    [cn1FrameworkOwnedPresses addObject:[NSNumber numberWithLongLong:identity]];
+}
+
+/* YES exactly once per recorded press, so the release reaches the framework and
+ * nothing is left armed for the next press of the same key. */
+static BOOL cn1TakeFrameworkOwnedPress(long long identity) {
+    NSNumber *boxed = [NSNumber numberWithLongLong:identity];
+    if (![cn1FrameworkOwnedPresses containsObject:boxed]) {
+        return NO;
+    }
+    [cn1FrameworkOwnedPresses removeObject:boxed];
+    return YES;
+}
+#endif
+
 // Hardware keyboard support (BT keyboard on iPad/iPhone, Magic Keyboard,
 // Mac Catalyst host keyboard, hardware keyboard in the iOS simulator via
 // Cmd-Shift-K). UIKey arrived in iOS 13.4 -- on older versions the
 // responder chain falls back to the existing UITextField editing path.
+//
+// Whether a press belongs to the framework is decided ONCE, in pressesBegan:,
+// and the end and cancellation follow that decision through
+// cn1TakeFrameworkOwnedKey above rather than re-reading the editor's state.
+//
+// While a native text editor is up (editingComponent != nil) the press is
+// forwarded untouched and never recorded. UIKit inserts typed text at the END
+// of the responder chain, after every responder has declined the press, so
+// consuming one here is what stops it reaching the focused CN1UITextField /
+// CN1UITextView -- and cn1MapUIKeyToKeyCode maps a printable character to its
+// unicode codepoint, which is never zero, so "handled" swallowed every key. A
+// hardware keyboard then typed nothing at all while the on-screen keyboard,
+// which raises no UIPress, kept working: issue #5709.
+//
+// Forwarding rather than returning early is deliberate. [super pressesBegan:]
+// is exactly what an app that does not override this method does, and it is
+// the only way the press reaches UIKit's text-input pipeline; returning here
+// swallows it just as effectively as claiming it did.
+//
+// CN1 key listeners not firing during text editing is the intended outcome:
+// arrow keys and backspace belong to the caret while a field is focused.
+//
+// The test is the port's existing "editing is live" sentinel, the same one
+// CN1TapGestureRecognizer and the touch path below use. Narrowing it to
+// [editingComponent isFirstResponder] would put the swallow back for the
+// window between the editor being created and UIKit granting it focus,
+// which is exactly when the first keystroke of a fast typist arrives.
 // UIKit-only declaration: the type in its signature does not exist on macOS,
 // so the whole declaration is dropped rather than just its body. Guarding
 // only the body would leave a signature naming an unknown type.
@@ -3724,6 +3833,10 @@ bool lockDrawing;
 // renamed one, so this is inert on the native macOS port until it is ported.
 #if TARGET_OS_OSX
 #else
+    if (editingComponent != nil) {
+        [super pressesBegan:presses withEvent:event];
+        return;
+    }
     if (@available(iOS 13.4, *)) {
         BOOL handled = NO;
         NSMutableSet *passthrough = nil;
@@ -3740,6 +3853,7 @@ bool lockDrawing;
             }
             if (code != 0) {
                 keyPressedNative(code);
+                cn1NoteFrameworkOwnsPress(cn1PressIdentity(press, code));
                 handled = YES;
             } else {
                 if (passthrough == nil) {
@@ -3783,7 +3897,7 @@ bool lockDrawing;
             if (code == 0 && key == nil) {
                 continue;
             }
-            if (code != 0) {
+            if (code != 0 && cn1TakeFrameworkOwnedPress(cn1PressIdentity(press, code))) {
                 keyReleasedNative(code);
                 handled = YES;
             } else {
@@ -3826,7 +3940,7 @@ bool lockDrawing;
             if (code == 0 && key == nil) {
                 continue;
             }
-            if (code != 0) {
+            if (code != 0 && cn1TakeFrameworkOwnedPress(cn1PressIdentity(press, code))) {
                 keyReleasedNative(code);
             }
         }

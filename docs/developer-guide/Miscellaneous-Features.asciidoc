@@ -13,26 +13,40 @@ Codename One supports sending SMS messages but not receiving them as this functi
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava001Snippet.java[tag=miscellaneous-features-java-001,indent=0]
 ----
 
-Android supports sending SMS messages in the background without any UI. iOS doesn't provide that ability, so the best it can offer is to launch the native SMS app with your message composed for the user to send. Android supports that interactive flow as well (launching the OS native SMS app).
+Both Android and iOS launch the native SMS application with your message
+composed, for the user to send. Neither sends in the background, so check
+`getSMSSupport` rather than assuming -- the constant is the contract, and the
+base implementation defaults to `SMS_SEAMLESS`.
 
-The default `sendSMS` API ignores that difference and works interactively on iOS while sending
-in the background for Android when the platform allows it.
+That's why the samples pass `true` for the interactive argument. On Android
+the two-argument overload does nothing at all -- it asks for the seamless
+send, and that branch isn't implemented. The iOS port ignores the flag and
+opens the composer either way, so passing `true` is what works on both.
 
 The `getSMSSupport` API returns one of the following options:
 
 - SMS_NOT_SUPPORTED - for desktop, tablet etc.
 - SMS_SEAMLESS - `sendSMS` won't show a UI and will send in the background
 - SMS_INTERACTIVE - `sendSMS` will show an SMS sending UI
-- SMS_BOTH - `sendSMS` can support both seamless and interactive mode, this works on Android
+- SMS_BOTH - `sendSMS` can support both seamless and interactive mode
 
 The `sendSMS` can accept an interactive argument: `sendSMS(String phoneNumber, String message, boolean interactive)`
 
-The last argument will be ignored unless `SMS_BOTH` is returned from `getSMSSupport` at which point you
-would be able to choose one way or the other. The default behavior (when not using that flag) is the background
-sending which is the current behavior on Android.
+Pass `true` for it whenever `getSMSSupport` reports `SMS_INTERACTIVE`. The
+two-argument overload asks for a seamless send, and a port that only offers the
+system composer does nothing with that request -- on Android nothing happens at
+all, because the background-send path isn't implemented there. Both the Android and
+the iOS port report `SMS_INTERACTIVE`. A platform reporting `SMS_SEAMLESS`
+sends without a composer, and one reporting `SMS_BOTH` does whichever the
+`interactive` argument asks for, which is why the switch above branches on the
+constant instead of hard coding one call.
 
 A typical use of this API would be something like this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava055Snippet.java[tag=miscellaneous-features-java-055,indent=0]
+----
 
 ==== Dialing
 
@@ -77,6 +91,10 @@ NOTE: You need to use files from `FileSystemStorage` and *NOT* `Storage` files!
 
 You can add more than one attachment by putting them directly into the attachment map for example:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava041Snippet.java[tag=miscellaneous-features-java-041,indent=0]
+----
 
 NOTE: Some features such as attachments etc. Don't work in the simulator but should work on iOS/Android
 
@@ -93,8 +111,14 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 You can also enable this behavior in the theme by setting the `useLargerTextScaleBool` theme constant to `true`.
 
-If you need to apply the scale manually for custom fonts or layout calculations, read the values directly:
+Component fonts are the theme's job -- don't scale them by hand. For anything
+the theme can't reach, a custom-painted row or an icon measured in code,
+read the values directly:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava042Snippet.java[tag=miscellaneous-features-java-042,indent=0]
+----
 
 ==== How the scale is computed per platform
 
@@ -178,8 +202,16 @@ Each file inside this directory is treated as a resource bundle and will be pack
 
 When you're iterating on translations you can also use the simulator to capture bundles automatically.
 Open the Simulator menu and enable *Auto Update Default Bundle* so that running your app in the Codename One simulator will create any missing resource bundles on the fly as you interact with the UI, which makes it simple to populate keys without manually editing files during development.
-You can install the bundle using code like this:
+The resource is keyed by the properties file's base name rather than by the
+directory holding it, so the archetype's `common/src/main/l10n/Bundle.properties`
+becomes `Bundle`. The locale comes from the `_xx` suffix, and a file without one
+is filed under the empty locale, so ask for that when the device's language has
+no bundle of its own:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava043Snippet.java[tag=miscellaneous-features-java-043,indent=0]
+----
 
 The device language (as an ISO 639 two-letter code) could be retrieved with this:
 
@@ -197,6 +229,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 The list of available languages in the resource bundle could be retrieved like this. Notice that this a list that was set by you and doesn't need to confirm to the ISO language code standards:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava044Snippet.java[tag=miscellaneous-features-java-044,indent=0]
+----
 
 An exception for localization is the `TextField`/`TextArea` components both of which contain user data, in those cases the text won't be localized to avoid accidental localization of user input.
 
@@ -218,6 +254,10 @@ The https://www.codenameone.com/javadoc/com/codename1/l10n/L10NManager.html[L10N
 
 It allows formatting numbers/dates & time based on platform locale. It also provides a great deal of the information you need such as the language/locale information you need to pick the proper resource bundle:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava045Snippet.java[tag=miscellaneous-features-java-045,indent=0]
+----
 
 .Localization formatting/parsing and information
 image::img/l10n-manager.png[Localization formatting/parsing and information,scaledwidth=20%]
@@ -420,14 +460,33 @@ Class names are problematic since device builds are obfuscated, you should use l
 
 The following code demonstrates usage of the GeoFence API:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava046Snippet.java[tag=miscellaneous-features-java-046,indent=0]
+----
+
+The listener it registers looks like this:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava047Snippet.java[tag=miscellaneous-features-java-047,indent=0]
+----
 
 
 ===== Android background location permissions (API 30+)
 
 On Android 11 (API level 30) and higher, requesting background location permission requires a two-step process. First, foreground location permissions must be granted. Then, the app must request background location access, which will direct the user to the system settings to select `Allow all the time`. Codename One handles this flow automatically when you use `LocationManager`.
 
-For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize the permission prompt message using the localization key `android.permission.ACCESS_BACKGROUND_LOCATION`:
+For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize both dialogs through localization keys under
+`android.permission.ACCESS_BACKGROUND_LOCATION`. The first one, offering to open
+the settings screen, takes its body from the bare key and its title and buttons
+from `.title`, `.settings` and `.cancel`. The second, shown after the user comes
+back, uses `.explanation_title`, `.explanation_body` and `.ok`:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava056Snippet.java[tag=miscellaneous-features-java-056,indent=0]
+----
 
 === Background music playback
 
@@ -457,6 +516,10 @@ IMPORTANT: The returned file is a temporary file, you shouldn't store a referenc
 
 For example: you can copy the `Image` to `Storage` using:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava048Snippet.java[tag=miscellaneous-features-java-048,indent=0]
+----
 
 TIP: When running on the simulator the `Capture` API opens a file chooser API instead of physically capturing the data. This makes debugging device or situation specific issues simpler
 
@@ -532,6 +595,10 @@ request depends on the input device already providing two channels.
 
 The `Capture` API also includes a callback based API that uses the `ActionListener` interface to implement capture. For example: you can adapt the previous sample to use this API as such:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava049Snippet.java[tag=miscellaneous-features-java-049,indent=0]
+----
 
 === Gallery
 
@@ -678,8 +745,10 @@ invoked at the same moment; only the visual rendering differs.
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] class's `execute` method allows you to invoke a URL which is bound to a particular application.
 
-This works rather well assuming the application is installed. For example: link:http://wiki.akosma.com/IPhone_URL_Schemes[this list]
-contains a set of valid URLs that can be used on iOS to run common applications and use built-in functionality.
+This works rather well assuming the application is installed. Apple's
+https://developer.apple.com/library/archive/featuredarticles/iPhoneURLScheme_Reference/Introduction/Introduction.html[URL scheme reference]
+lists the schemes iOS handles itself, for common applications and built-in
+functionality.
 
 Some URLs might not be supported if an app isn't installed, on Android there isn't much that can be done but iOS has a `canOpenURL` method for Objective-C.
 
@@ -727,17 +796,33 @@ That's why `EasyThread` exists: it takes some concepts of Codename One's threadi
 
 Easy thread can be created like this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava051Snippet.java[tag=miscellaneous-features-java-051,indent=0]
+----
 
 You can send a task to the thread using:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava052Snippet.java[tag=miscellaneous-features-java-052,indent=0]
+----
 
 However, it gets better, say you want to return a value:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava053Snippet.java[tag=miscellaneous-features-java-053,indent=0]
+----
 
-Lets break that down... You ran the thread with the success callback on the new thread then the callback got invoked on the EDT as a result. This code `(success) -> success.onSuccess(doThisOnTheThread())` ran off the EDT in the thread and when you invoked the `onSuccess` callback it sent it asynchronously to the EDT here: `(myResult) -> onEDTGotResult(myRsult)`.
+Lets break that down. `(success) -> success.onSucess(doThisOnTheThread())` runs on the `EasyThread`, off the EDT, and the result callback runs there too: `EasyThread` hands your `SuccessCallback` straight to the worker and never marshals it. Anything that touches the UI has to be sent back with `callSerially`, which is what the second lambda does.
 
 These asynchronous calls make things a bit painful to wade through, so the API wraps them in a simplified synchronous version:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava054Snippet.java[tag=miscellaneous-features-java-054,indent=0]
+----
 
 There are a few other variants like `runAndWait` and there is a `kill()` method which stops a thread and releases its resources.
 
@@ -753,115 +838,34 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 Once this is enabled you can set the cursor over a specific region using `cmp.setCursor()` which accepts one of the cursor constants defined in `Component`.
 
 
-=== Working with GIT
+=== Working with git
 
-Working with GIT for storing Codename One projects isn't a feature but since it's so ubiquitous you think it's important to have a common guideline.
+A generated Maven project ships a `.gitignore` for its build output -- `target`,
+`build`, and the RAD schema generated under `common/src/main/rad`. It says
+nothing about your editor, and that's deliberate, because most of what sits in
+those directories belongs to the project rather than to you. The archetype
+generates `.idea` and `.vscode` itself, including run configurations for the
+debug proxy, on-device debugging and the certificate wizard, and a CodeRAD
+project needs `common/.settings/org.eclipse.m2e.apt.prefs` before Eclipse will
+run the annotation processor. Commit those.
 
-When you first started committing to git you used something like this for NetBeans projects:
+The part worth ignoring is the narrow set that records what you personally had
+open, chiefly `.idea/workspace.xml`, `.idea/shelf/` and `*.iml`. That set is the
+same in every project you work on, which makes it a good fit for a global ignore
+file rather than a per-project one -- `git config --global core.excludesFile
+~/.gitignore_global`, with the patterns in the file it names.
 
-----
+The theme used to be the hard part here, because a `.res` is a binary that git
+can't diff, and two people editing one produce a conflict no merge tool can
+resolve. A Maven project doesn't have that problem. The theme's source is
+`common/src/main/css/theme.css`, and the `.res` is compiled out of it into
+`target/classes` on each build, so what's under version control is text and the
+binary is an artifact the `.gitignore` above already excludes.
 
-*.jar
-nbproject/private/
-build/
-dist/
-lib/CodenameOne_SRC.zip
-----
-
-Removing the jars, build, private folder etc. makes a lot of sense but there are a few nuances that are missing here...
-
-==== cn1lib's
-
-You will notice you excluded the jars which are stored under lib and you exclude the Codename One source zip. However, cn1libs aren't excluded... That was an omission since the original project you committed didn't have cn1libs. However, should you commit a binary file to git?
-
-It's a fair question. Git isn't good with binaries but committing cn1libs can still make sense. In another project that did have a cn1lib the approach was this:
-
-----
-
-*.jar
-nbproject/private/
-build/
-dist/
-lib/CodenameOne_SRC.zip
-lib/impl/
-native/internal_tmp/
-----
-
-The important lines are `lib/impl/` and `native/internal_tmp/`. Technically cn1libs are zips. When you run a refresh-libs operation they unzip into the right directories under `lib/impl` and `native/internal_tmp`. By excluding these directories you can remove duplicates that can result in conflicts.
-
-==== Resource files
-
-Committing the res file is a matter of personal choice. It's committed in the git ignore files above but you can remove it. The res file is at risk of corruption and in that case having a history you can refer to, matters a lot.
-
-However, the resource file is a bit of a problematic file. As a binary file if you have a team working with it the conflicts can be a major blocker. This was far worse with the old GUI builder, that was one of the big motivations of moving into the new GUI builder which works better for teams.
-
-Still, if you want to keep an eye of every change in the resource file you can switch on the #File# -> #XML Team Mode# which should be on by default. This mode creates a file hierarchy under the `res` directory to match the res file you opened. For example: if you have a file named `src/theme.res` it will create a matching `res/theme.xml` and also nest all the images and resources you use in the res directory.
-
-That's useful as you can edit the files directly and keep track of every file in git. For example, this has two big drawbacks:
-
-- It's flaky - while this mode works it never reached the stability of the regular res file mode
-- It conflicts - the simulator/device are oblivious to this mode. If you fetch an update you also need to update the res file and you might still have conflicts related to that file
-
-Both of these issues shouldn't be a deal-breaker. Even though this mode is a bit flaky it's better than the alternative as you can "see" the content of the resource file. You can revert and reapply your changes to the res file when merging from git, it's tedious but again not a deal-breaker.
-
-==== Eclipse version
-
-Building on the gitignore you've for NetBeans the eclipse version should look like this:
-
-----
-
-.DS_Store
-*.jar
-build/
-dist/
-lib/impl/
-native/internal_tmp/
-.metadata
-bin/
-tmp/
-*.tmp
-*.bak
-*.swp
-*.zip
-*~.nib
-local.properties
-.settings/
-.loadpath
-.recommenders
-.externalToolBuilders/
-*.launch
-*.pydevproject
-.cproject
-.factorypath
-.buildpath
-.project
-.classpath
-----
-
-==== IntelliJ/IDEA
-
-----
-
-.DS_Store
-*.jar
-build/
-dist/
-lib/impl/
-native/internal_tmp/
-*.zip
-.idea/**/workspace.xml
-.idea/**/tasks.xml
-.idea/dictionaries
-.idea/**/dataSources/
-.idea/**/dataSources.ids
-.idea/**/dataSources.xml
-.idea/**/dataSources.local.xml
-.idea/**/sqlDataSources.xml
-.idea/**/dynamic.xml
-.idea/**/uiDesigner.xml
-.idea/**/gradle.xml
-.idea/**/libraries
-*.iws
-/out/
-atlassian-ide-plugin.xml
-----
+That leaves the resource editor's *File* -> *XML Team Mode*, which writes a
+matching `res/theme.xml` tree beside a resource file so its contents diff and
+merge like source. It's on by default, but it only fires for the older Ant
+layout, because `saveXML` wants the resource's own directory to be named `src`
+with `codenameone_settings.properties` beside it, and no Maven source path looks
+like that. Expect to meet it in an inherited project rather than to adopt it in
+a new one.

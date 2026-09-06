@@ -1,20 +1,13 @@
-# This test encodes six frames and decodes them back, so the pixels it compares
-# are whatever the platform's video codec returns -- lossy, and not reproducible
-# bit-for-bit between runs. Every other platform that performs this comparison
-# (android, ios, linux x64/arm, windows, mac-catalyst) therefore ships this same
-# sidecar; the browser/WebCodecs decoder is no more deterministic than those, but
-# this file was missing, so the JS run silently fell back to the harness defaults
-# of maxChannelDelta=4 / maxMismatchPercent=0.30 and failed intermittently on
-# ordinary decode noise -- on master and on unrelated branches alike.
+# The test encodes six frames and decodes them back, so it compares whatever
+# the platform codec returns -- lossy, and not bit-reproducible. Every other
+# comparing port ships this same sidecar at these values; JavaScript was the
+# one baseline without it, so readTolerance fell back to the harness defaults
+# (delta 4 / 0.30%) and ordinary decode noise failed the build.
 #
-# Measured on one such failure: the worst single-channel delta anywhere in the
-# 750x1332 frame was 20/255, and 2.611% of pixels exceeded a delta of 4 (over the
-# 0.30% default) while 0.000% exceeded a delta of 72. The values below are the
-# shared ones, not a number tuned to make that run pass.
-#
-# The regressions this test is built to catch -- digits not surviving the round
-# trip, frames decoding blank, in the wrong order, or in the wrong colour -- move
-# whole blocks of pixels across most of the channel range, so they stay well
-# outside this envelope.
+# Measured on the failure that prompted this: worst single-channel delta
+# anywhere was 20/255, 2.611% of pixels exceeded delta 4, and 0.000% exceeded
+# delta 72. The regressions this test exists to catch -- frames blank,
+# reordered, wrong colour -- move whole blocks across most of the channel
+# range, so they stay caught.
 maxChannelDelta=72
 maxMismatchPercent=18.0

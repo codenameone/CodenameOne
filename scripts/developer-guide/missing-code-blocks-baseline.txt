@@ -4,8 +4,6 @@
 Advanced-Topics-Under-The-Hood.asciidoc	You can override these methods in the draggable components:
 Advertising.asciidoc	identifier. The recommended order is to initialize, gather consent, then load:
 Advertising.asciidoc	method that registers its provider with `AdManager`:
-Animations.asciidoc	That one command will enable swiping back from `currentForm`. https://www.codenameone.com/javadoc/com/codename1/util/LazyValue.html[LazyValue] allows you to pass a value lazily:
-Animations.asciidoc	builder:
 Annotation-Component-Binding.asciidoc	ASM and inserts the equivalent of:
 Annotation-Component-Binding.asciidoc	After binding, drive validation through the returned handle:
 Annotation-JSON-XML-Mapping.asciidoc	Hand-write a `Mapper<T>` and register it at startup:
@@ -14,42 +12,16 @@ Annotation-SQLite-ORM.asciidoc	dao surface isn't enough. Transactions:
 Apple-Wallet-Extension.asciidoc	In Java, publish the user's cards whenever they change (typically after login) and keep a fresh token published so Wallet can skip the login screen:
 Authentication-And-Identity.asciidoc	Firebase Auth isn't an OIDC provider -- it issues Google-Identity-Toolkit-style tokens via REST endpoints. `com.codename1.social.FirebaseAuth` wraps those endpoints:
 Crash-Protection.asciidoc	In your `Lifecycle.init`:
-Deep-Links-Routing.asciidoc	Or annotate a static factory method:
 Deep-Links-Routing.asciidoc	`AssetLinksBuilder` produces the payload:
-Deep-Links-Routing.asciidoc	attempts so they can confirm before discarding unsaved work:
 Deep-Links-Routing.asciidoc	without redirects. The plugin's `AasaBuilder` produces the payload:
 Desktop-Integration.asciidoc	same scheduling and handling code is shared across phone and desktop:
-Device-Input-And-Form-Factors.asciidoc	(or `Display`), mirroring the existing `CN.isShiftKeyDown()` family:
-Device-Input-And-Form-Factors.asciidoc	Any pointer listener receives an `ActionEvent`; call `getPointerEvent()` on it:
-Device-Input-And-Form-Factors.asciidoc	React to fold changes with a posture listener:
-Device-Input-And-Form-Factors.asciidoc	handles desktop and touch:
-Device-Input-And-Form-Factors.asciidoc	https://www.codenameone.com/javadoc/com/codename1/ui/DevicePosture.html[`DevicePosture`]:
-Device-Input-And-Form-Factors.asciidoc	pointer is a stylus or eraser:
-In-Car-Experiences.asciidoc	Head units enforce a hard cap on the number of rows/items they display (driver-distraction rules). Query it and trim accordingly:
-In-Car-Experiences.asciidoc	Register a single `CarApplication` from your app's `init()` -- before a head unit connects -- and return a root `CarScreen` that builds a template:
-In-Car-Experiences.asciidoc	`CarContext` manages a back stack, mirroring `androidx.car.app`'s `ScreenManager` and CarPlay's `CPInterfaceController`:
-In-Car-Experiences.asciidoc	`CarScreen` exposes optional lifecycle hooks -- `onCreate()`, `onResume()`, `onPause()`, `onDestroy()` -- and `CarApplication` is notified of connection changes via `onCarConnected(CarContext)` / `onCarDisconnected()`. You can also observe connection globally:
 Introduction.asciidoc	In a cold start `init(Object)` is invoked followed by the `start()` method. For example, `start()` can be invoked more than once if an app is minimized and restored, see the sidebar <<ApplicationLifecycle,Application Lifecycle>>:
 Introduction.asciidoc	Next consider the first lifecycle method `init(Object)`. The <<ApplicationLifecycle,Application Lifecycle Sidebar>> discusses the lifecycle in depth:
 Introduction.asciidoc	Now that you have a general sense of the lifecycle lets look at the last two lifecycle methods:
 Introduction.asciidoc	The hello world Java source file looks like this (removed some comments and whitespace):
 Maven-Creating-CN1Libs.adoc	Now try it out. Try adding the following code to your application project's main class (or anywhere in the application project, for that matter):
 Maven-Creating-CN1Libs.adoc	The simulator dispatches every action on the Codename One EDT through `Display.callSerially`, so your method can call `Display.getInstance()`, `Form.show()`, `Dialog.show()`, `ToastBar.showInfoMessage()` and any other CN1 API. Reflection uses the same classloader that loaded `Display`, so cn1lib internals (including package-private classes) resolve normally:
-Miscellaneous-Features.asciidoc	A typical use of this API would be something like this:
-Miscellaneous-Features.asciidoc	Easy thread can be created like this:
-Miscellaneous-Features.asciidoc	For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize the permission prompt message using the localization key `android.permission.ACCESS_BACKGROUND_LOCATION`:
-Miscellaneous-Features.asciidoc	For example: you can copy the `Image` to `Storage` using:
-Miscellaneous-Features.asciidoc	However, it gets better, say you want to return a value:
-Miscellaneous-Features.asciidoc	If you need to apply the scale manually for custom fonts or layout calculations, read the values directly:
-Miscellaneous-Features.asciidoc	It allows formatting numbers/dates & time based on platform locale. It also provides a great deal of the information you need such as the language/locale information you need to pick the proper resource bundle:
-Miscellaneous-Features.asciidoc	The `Capture` API also includes a callback based API that uses the `ActionListener` interface to implement capture. For example: you can adapt the previous sample to use this API as such:
-Miscellaneous-Features.asciidoc	The following code demonstrates usage of the GeoFence API:
-Miscellaneous-Features.asciidoc	The list of available languages in the resource bundle could be retrieved like this. Notice that this a list that was set by you and doesn't need to confirm to the ISO language code standards:
-Miscellaneous-Features.asciidoc	These asynchronous calls make things a bit painful to wade through, so the API wraps them in a simplified synchronous version:
 Miscellaneous-Features.asciidoc	To solve this sort of used case you have two APIs in `Display`:
-Miscellaneous-Features.asciidoc	You can add more than one attachment by putting them directly into the attachment map for example:
-Miscellaneous-Features.asciidoc	You can install the bundle using code like this:
-Miscellaneous-Features.asciidoc	You can send a task to the thread using:
 Monetization.asciidoc	And you also provide a button to allow the user to manually synchronize the receipts:
 Monetization.asciidoc	In the hello world app you'll use this information in a few different places. On your main form you'll include a label to show the current expiry date, and you allow the user to press a button to synchronize receipts manually if they think the value is out of date:
 Monetization.asciidoc	On the server-side, your REST controller is a standard JAX-RS REST interface. The Netbeans web service wizard generated it and then it was modified to suit the purposes here. The methods of the `ReceiptsFacadeREST` class for the REST API are shown here:
@@ -57,15 +29,7 @@ Monetization.asciidoc	The `createRESTClient()` method shown there creates a `RES
 Monetization.asciidoc	The general usage is as follows:
 Monetization.asciidoc	The source for your ReceiptStore is as follows:
 Monetization.asciidoc	You are now ready to see the full magic of the `validateAndSaveReceipt()` method in all its glory:
-Monetization.asciidoc	You'll set these in your constants:
-Motion-Sensors.asciidoc	Callbacks arrive on the EDT, so the listener can update the UI directly. Sampling is reference counted: the hardware sensor draws power only while at least one listener is registered. Remove the listener once the screen is no longer visible, typically from the form's `removeNotify`, so the sensor powers down:
-Motion-Sensors.asciidoc	Register a `GestureListener` for one of the `GestureEvent.TYPE_*` gestures. The accelerometer powers on for the duration that a gesture listener stays registered:
-Motion-Sensors.asciidoc	The detection thresholds suit most apps as shipped, and you can tune them when a gesture needs to be more or less sensitive:
-Motion-Sensors.asciidoc	`MotionSensorManager.getInstance()` always returns a manager. On a device without motion hardware every sensor reports as unsupported, so application code can call the API without a null check on the manager itself. `getSensor(int)` returns `null` when the requested sensor isn't available on the current device:
 Native-Themes.asciidoc	`UIManager.addThemeProps` after the theme has been installed:
-Near-Field-Communication.asciidoc	Beyond NDEF, the discovered `Tag` exposes accessors for the underlying technologies:
-Near-Field-Communication.asciidoc	For FeliCa on iOS, set the system codes in `NfcReadOptions`:
-Near-Field-Communication.asciidoc	Host Card Emulation (HCE) lets the device pretend to be a contactless smart card. A nearby reader (Android phone, payment terminal, access control gate) sends ISO 7816 APDUs and your app responds. Subclass `HostCardEmulationService` and register the instance:
 Network-Connectivity.asciidoc	To advertise an HTTP server you wrote on port 8080:
 Network-Connectivity.asciidoc	To associate the device with a specific SSID:
 Notifications-And-Background-Execution.asciidoc	before; the bean has been extended with fluent, backward-compatible setters:
