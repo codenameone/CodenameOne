@@ -249,7 +249,10 @@ final class Pem {
             // rewrite either way.
             boolean hasPublicKey = false;
             if (c.hasMore() && (c.peek() == 0x81 || c.peek() == 0xA1)) {
-                c.skip();
+                int tag = c.peek();
+                if (!isTaggedPublicKey(c.element(), tag)) {
+                    return SHAPE_UNKNOWN;
+                }
                 hasPublicKey = true;
             }
             if (c.hasMore()) {
@@ -551,6 +554,24 @@ final class Pem {
             return false;
         }
         return unused == 0 || (contents[contents.length - 1] & ((1 << unused) - 1)) == 0;
+    }
+
+    /// True when a PKCS#8 `[1] publicKey` field holds a well-formed BIT STRING.
+    ///
+    /// The two spellings carry it differently, which is why this cannot simply
+    /// hand the field to [#isBitString]. Under RFC 5958's IMPLICIT tagging the
+    /// `[1]` tag has replaced the BIT STRING's own, so `0x81`'s contents are the
+    /// BIT STRING value; the constructed `0xA1` some encoders emit wraps a
+    /// whole BIT STRING element instead. Skipping the field outright accepted
+    /// "81 01 08" and even "81 00", and the version-0 rewrite then dropped the
+    /// evidence on its way out.
+    private static boolean isTaggedPublicKey(byte[] element, int tag) {
+        Cursor c = new Cursor(element);
+        if (tag == 0x81) {
+            return isBitString(c.read(0x81)) && !c.hasMore();
+        }
+        c.enter(0xA1);
+        return isBitString(c.read(0x03)) && !c.hasMore();
     }
 
     /// True when `element` is a well-formed `OtherPrimeInfos`.

@@ -809,13 +809,17 @@ class PemKeyTest extends UITestBase {
         // the platform tolerates. Rejecting 0x81 refused keys the JDK accepts.
         byte[] canonical = der(RSA_PKCS8);
         int off = (canonical[1] & 0xFF) < 0x80 ? 2 : 2 + (canonical[1] & 0x7F);
-        for (int tag : new int[] {0x81, 0xA1}) {
+        // The spellings carry the key differently: under IMPLICIT tagging 0x81
+        // has replaced the BIT STRING's own tag, so its contents are the BIT
+        // STRING value, while the constructed 0xA1 wraps a whole BIT STRING.
+        byte[][] fields = {
+            hex("81020001"),                 // implicit: value is 00 01
+            hex("A10403020001"),             // explicit: wraps 03 02 00 01
+        };
+        for (byte[] field : fields) {
             byte[] inner = new byte[canonical.length - off];
             System.arraycopy(canonical, off, inner, 0, inner.length);
             inner[2] = 0x01;
-            byte[] field = new byte[10];
-            field[0] = (byte) tag;
-            field[1] = 8;
             byte[] content = new byte[inner.length + field.length];
             System.arraycopy(inner, 0, content, 0, inner.length);
             System.arraycopy(field, 0, content, inner.length, field.length);
@@ -827,7 +831,27 @@ class PemKeyTest extends UITestBase {
             System.arraycopy(content, 0, blob, 4, content.length);
             assertArrayEquals(canonical,
                     PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(blob))).getEncoded(),
-                    "tag 0x" + Integer.toHexString(tag) + " must normalize");
+                    "tag 0x" + Integer.toHexString(field[0] & 0xFF) + " must normalize");
+        }
+
+        // and the field's contents are checked, not merely skipped
+        for (String bad : new String[] {"810108", "8100", "810100", "A1020500"}) {
+            byte[] inner = new byte[canonical.length - off];
+            System.arraycopy(canonical, off, inner, 0, inner.length);
+            inner[2] = 0x01;
+            byte[] field = hex(bad);
+            byte[] content = new byte[inner.length + field.length];
+            System.arraycopy(inner, 0, content, 0, inner.length);
+            System.arraycopy(field, 0, content, inner.length, field.length);
+            byte[] blob = new byte[content.length + 4];
+            blob[0] = 0x30;
+            blob[1] = (byte) 0x82;
+            blob[2] = (byte) (content.length >> 8);
+            blob[3] = (byte) content.length;
+            System.arraycopy(content, 0, blob, 4, content.length);
+            assertThrows(CryptoException.class,
+                    () -> PrivateKey.fromPem(pem("PRIVATE KEY", Base64.encodeNoNewline(blob))),
+                    bad + " must not be accepted");
         }
     }
 
