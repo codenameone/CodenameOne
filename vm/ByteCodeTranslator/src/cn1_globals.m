@@ -6491,9 +6491,27 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         // bibopCycleAllocatedBytes alone would call it quiet and splice every
         // partial page in every sweep -- the O(all pages) regression issue 5425
         // fixed, reintroduced for exactly the workload that reported it.
+        //
+        // The cutoff is a QUARTER OF THE TRIGGER IN FORCE, not a fixed constant.
+        // "Quiet" is meant to describe a cycle that ran without the application
+        // allocating much, and what counts as much is relative to how much
+        // allocation it takes to start a cycle at all. A fixed cutoff derived
+        // from the 24MB default breaks as soon as the trigger is lower than it:
+        // a deployment that sets CN1_BIBOP_GC_MIN_TRIGGER_BYTES to 4MB collects
+        // every 4-6MB, every one of those ordinary allocation-driven cycles is
+        // below a 6MB cutoff, and every single collection then splices every
+        // partial pool -- the O(all pages) behaviour issue 5425 removed, handed
+        // straight back to the workload that reported it. Tracking the live
+        // trigger keeps the ratio the constant was chosen to express, at every
+        // trigger the policy can reach.
+        long quietCutoff = (long)(atomic_load_explicit(&bibopGcTriggerBytes,
+                                                       memory_order_relaxed) / 4);
+        if(quietCutoff > CN1_BIBOP_MAJOR_SWEEP_QUIET_BYTES) {
+            quietCutoff = CN1_BIBOP_MAJOR_SWEEP_QUIET_BYTES;
+        }
         JAVA_BOOLEAN quiet =
                 ((long long)bibopCycleAllocatedBytes + legacyCycleAllocatedBytes)
-                        < (long long)CN1_BIBOP_MAJOR_SWEEP_QUIET_BYTES;
+                        < (long long)quietCutoff;
         int major = atomic_load_explicit(&lowMemoryMode, memory_order_relaxed)
                 || quiet
                 || bibopCyclesSinceMajorSweep >= CN1_BIBOP_MAJOR_SWEEP_CYCLES;
