@@ -6449,6 +6449,7 @@ static long cn1BibopTriggerFloor(long liveBytes, int sampleCoversHeap) {
 
 static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
                                     long reclaimedBytes, long excludedOccupiedBytes,
+                                    long excludedLiveBytes, int majorSweep,
                                     long* classSlots, long* classLive) {
     bibopLastCycleOccupiedBytes = occupiedBytes;
     bibopLastCycleLiveBytes = liveBytes;
@@ -6479,13 +6480,26 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
         long oldTrigger = atomic_load_explicit(&bibopGcTriggerBytes,
                                                memory_order_relaxed);
         long newTrigger = oldTrigger;
-        // The sweep withheld excludedOccupiedBytes from the numbers above. If that
-        // is a small part of what it did measure, the objects it could not see
-        // cannot amount to much either and a low liveBytes really is a collapse.
-        // An eighth is deliberately strict: a wrong "yes" retraces a live heap
-        // every cycle, a wrong "no" only means the decay takes the old path.
-        int sampleCoversHeap = excludedOccupiedBytes <= (occupiedBytes >> 3);
-        long floorBytes = cn1BibopTriggerFloor(liveBytes, sampleCoversHeap);
+        // Only a MAJOR sweep can say anything about the size of the live set, and
+        // when it does it must be asked for the WHOLE of it.
+        //
+        // An ordinary sweep walks retired pages alone; every live object on a
+        // partial page is invisible to it, so its liveBytes is not a small live
+        // set, it is a small sample. A major sweep splices the partial pools in
+        // and walks them too -- but withholds their slots from the survival ratio,
+        // which is why liveBytes still understates even there. The complete figure
+        // is liveBytes plus what was withheld, and that number is already computed;
+        // it was simply being thrown away.
+        //
+        // An earlier revision of this gate tested the withheld BYTES instead, which
+        // is backwards in both directions: an ordinary sweep withholds nothing and
+        // was called complete precisely when it saw least, while a major sweep
+        // withholds exactly the pages it added and was called incomplete when it
+        // had in fact seen everything.
+        int sampleCoversHeap = majorSweep;
+        long completeLiveBytes = liveBytes + excludedLiveBytes;
+        long floorBytes = cn1BibopTriggerFloor(
+                sampleCoversHeap ? completeLiveBytes : liveBytes, sampleCoversHeap);
         if(survival >= CN1_BIBOP_BYPASS_SURVIVAL_PERCENT) {
             bibopTriggerHighSurvivalStreak++;
             if(bibopTriggerHighSurvivalStreak >= 2) {
@@ -6582,6 +6596,13 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
 // pages it processes are off the SWEEP stack (owner==0), so no mutator is
 // allocating into them and no marking is in flight -> plain header access.
 static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
+    // Live bytes on pages this sweep excluded from the survival ratio, and whether
+    // it walked the partial pools at all. Only a MAJOR sweep does: an ordinary one
+    // sees retired pages alone, so its liveBytes omits every live object sitting
+    // on a partial page and is not a live-set measurement. Declared here because
+    // the major-sweep decision below is made before the accumulators.
+    long excludedLiveBytes = 0;
+    int majorSweep = 0;
 #ifdef CN1_GC_VERIFY
     extern int cn1GcFaultEarlyFree;
     { extern void cn1GcFaultInitPublic(void); cn1GcFaultInitPublic(); }
@@ -6628,6 +6649,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 || quiet
                 || bibopCyclesSinceMajorSweep >= CN1_BIBOP_MAJOR_SWEEP_CYCLES;
         if(major) {
+            majorSweep = 1;
             bibopCyclesSinceMajorSweep = 0;
             int spliced = 0;
             pthread_mutex_lock(&bibopMutex);
@@ -6916,6 +6938,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         }
         if(statsExcluded) {
             excludedOccupiedBytes += (long)sampledSlots * page->slotSize;
+            excludedLiveBytes += (long)policySurvivors * page->slotSize;
         }
         if(!statsExcluded) {
             occupiedBytes += (long)sampledSlots * page->slotSize;
@@ -6949,7 +6972,8 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         }
         pthread_mutex_unlock(&bibopMutex);
     }
-    cn1BibopAdaptAfterSweep(occupiedBytes, liveBytes, reclaimedBytes, excludedOccupiedBytes,
+    cn1BibopAdaptAfterSweep(occupiedBytes, liveBytes, reclaimedBytes,
+                            excludedOccupiedBytes, excludedLiveBytes, majorSweep,
                             classSlots, classLive);
     // Hand surplus empty pages back to the OS (issue 5537). Last, so it sees the
     // pool this sweep just refilled, and outside the per-page loop so the madvise
@@ -11140,19 +11164,27 @@ static void gcMarkWorkerDrainLoop() {
  *
  * Returns the number of entries marked, 0 if there was nothing to do.
  */
+// A/B switch for the assist, so it can be measured against the sleep it replaces
+// in one binary rather than two builds. Resolved through pthread_once because
+// this runs on every PACED MUTATOR: with more than one marker several of them
+// reach their first assist together, and a plain function-local static would be
+// read and written by all of them at once -- a data race in exactly the parallel
+// configuration the new workflow exists to exercise.
+static pthread_once_t cn1GcAssistOnce = PTHREAD_ONCE_INIT;
+static int cn1GcAssistEnabled = 1;
+
+static void cn1GcResolveAssistEnabled(void) {
+    const char* v = getenv("CN1_GC_NO_MUTATOR_ASSIST");
+    cn1GcAssistEnabled = (v != 0 && v[0] != '0') ? 0 : 1;
+}
+
 static int cn1GcMutatorAssist(CODENAME_ONE_THREAD_STATE) {
-    // A/B switch, so the assist can be measured against the sleep it replaces in
-    // one binary rather than two builds.
-    static int enabled = -1;
     struct gcMarkLocalBuffer localBuf;
     struct gcMarkWorklistEntry batch[CN1_GC_MARK_BATCH];
     int n;
     int i;
-    if(enabled < 0) {
-        const char* v = getenv("CN1_GC_NO_MUTATOR_ASSIST");
-        enabled = (v != 0 && v[0] != '0') ? 0 : 1;
-    }
-    if(!enabled || gcMarkLocalBuf != 0) {
+    pthread_once(&cn1GcAssistOnce, cn1GcResolveAssistEnabled);
+    if(!cn1GcAssistEnabled || gcMarkLocalBuf != 0) {
         return 0;
     }
     pthread_mutex_lock(&gcMarkWorklistMutex);
