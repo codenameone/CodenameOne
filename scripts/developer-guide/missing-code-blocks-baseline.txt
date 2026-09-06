@@ -1,7 +1,6 @@
 # Prose that promises a code block where none follows.
 # A ratchet: entries may be removed as holes are filled, never added.
 # Regenerate with check-missing-code-blocks.py --write-baseline.
-Advanced-Topics-Under-The-Hood.asciidoc	You can override these methods in the draggable components:
 Advertising.asciidoc	identifier. The recommended order is to initialize, gather consent, then load:
 Advertising.asciidoc	method that registers its provider with `AdManager`:
 Annotation-JSON-XML-Mapping.asciidoc	Hand-write a `Mapper<T>` and register it at startup:
@@ -24,7 +23,6 @@ Monetization.asciidoc	The source for your ReceiptStore is as follows:
 Monetization.asciidoc	You are now ready to see the full magic of the `validateAndSaveReceipt()` method in all its glory:
 SVG-Transcoder.asciidoc	the generated class directly:
 The-Components-Of-Codename-One.asciidoc	Call the builder from a Maven plugin, an Ant task or a one-shot `main`:
-The-Components-Of-Codename-One.asciidoc	Let start by exploring how you can achieve this UI that fetches data from a webservice:
 The-Components-Of-Codename-One.asciidoc	This code should output "The result was 7" to the console. It's fully asynchronous, so you can include this code anywhere without worrying about it "bogging down" your code. The full signature of this form of the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute(java.lang.String,com.codename1.util.SuccessCallback)[execute()] method is:
 appendix_goal_generate_graphql.adoc	The `@GraphQLClient` interface looks like:
 appendix_goal_generate_graphql.adoc	an `OnComplete<GraphQLResponse<T>>`:

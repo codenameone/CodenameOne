@@ -920,7 +920,6 @@ Infinite scroll fetches the next batch of data dynamically as you reach the end 
 
 Let start by exploring how you can achieve this UI that fetches data from a webservice:
 
-
 .InfiniteScrollAdapter demo code fetching property cross data
 image::img/components-infinitescrolladapter.png[InfiniteScrollAdapter demo code fetching property cross data,scaledwidth=20%]
 
