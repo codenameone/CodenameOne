@@ -920,6 +920,20 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
             [CATransaction commit];
             // Reserved from here until a later frame takes its place, which is
             // what covers the window where the server does not own it yet.
+            //
+            // ONE slot is enough, and tracking every committed transaction would
+            // not buy anything. A layer holds a single contents value rather than
+            // a queue of pending ones, so when a later frame assigns over this
+            // one the earlier surface is superseded before the server ever sees
+            // it. That leaves an older slot in exactly two states, both already
+            // covered: the server latched it, and IOSurfaceIsInUse reports it --
+            // or it never did, and the surface will not be displayed at all.
+            //
+            // The pairing is what makes that safe. contents and this reservation
+            // are assigned together here, and the in-flight flag is only cleared
+            // afterwards, so the slot the layer points at is protected by one or
+            // the other at every instant -- including the gap between these two
+            // stores, where the slot is still marked in flight.
             atomic_store_explicit(&presentView->cn1PresentCurrent, completedIdx,
                                   memory_order_release);
         }
