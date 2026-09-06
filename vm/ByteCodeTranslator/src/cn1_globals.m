@@ -6348,7 +6348,7 @@ static long bibopLiveHighWater = 0;
 #define CN1_BIBOP_LIVE_DECAY_SHIFT 3
 #endif
 
-static long cn1BibopTriggerFloor(long liveBytes) {
+static long cn1BibopTriggerFloor(long liveBytes, int sampleCoversHeap) {
     long floor;
     if(liveBytes < 0) {
         liveBytes = 0;
@@ -6379,9 +6379,21 @@ static long cn1BibopTriggerFloor(long liveBytes) {
         }
         sampleFloor = liveBytes;
         liveBytes = bibopLiveHighWater;
-        if(sampleFloor < liveBytes) {
+        if(sampleCoversHeap && sampleFloor < liveBytes) {
             // Believe the smaller CURRENT reading, with one MIN of slack so a
             // sample that merely dipped does not slam the floor to the minimum.
+            //
+            // Only when the sweep actually LOOKED at the heap. liveBytes is not a
+            // live-set measurement, it is the part of the live set this sweep
+            // sampled: pages the major sweep splices out of a partial pool are
+            // withheld from the policy numbers, so a near-zero reading can equally
+            // mean "the objects are all on pages that were excluded". Believing
+            // that as a collapse would halve the trigger against a heap that never
+            // shrank and retrace it every cycle -- the exact cost the floor exists
+            // to avoid, and worse than the latch it replaces, because the latch at
+            // least erred toward collecting less. The caller decides coverage from
+            // how much the sweep withheld; when it withheld too much the
+            // high-water stands and the decay walks it down as before.
             long relaxed = sampleFloor + CN1_BIBOP_GC_MIN_TRIGGER_BYTES;
             if(relaxed < liveBytes) {
                 liveBytes = relaxed;
@@ -6436,7 +6448,7 @@ static long cn1BibopTriggerFloor(long liveBytes) {
 }
 
 static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
-                                    long reclaimedBytes,
+                                    long reclaimedBytes, long excludedOccupiedBytes,
                                     long* classSlots, long* classLive) {
     bibopLastCycleOccupiedBytes = occupiedBytes;
     bibopLastCycleLiveBytes = liveBytes;
@@ -6467,7 +6479,13 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
         long oldTrigger = atomic_load_explicit(&bibopGcTriggerBytes,
                                                memory_order_relaxed);
         long newTrigger = oldTrigger;
-        long floorBytes = cn1BibopTriggerFloor(liveBytes);
+        // The sweep withheld excludedOccupiedBytes from the numbers above. If that
+        // is a small part of what it did measure, the objects it could not see
+        // cannot amount to much either and a low liveBytes really is a collapse.
+        // An eighth is deliberately strict: a wrong "yes" retraces a live heap
+        // every cycle, a wrong "no" only means the decay takes the old path.
+        int sampleCoversHeap = excludedOccupiedBytes <= (occupiedBytes >> 3);
+        long floorBytes = cn1BibopTriggerFloor(liveBytes, sampleCoversHeap);
         if(survival >= CN1_BIBOP_BYPASS_SURVIVAL_PERCENT) {
             bibopTriggerHighSurvivalStreak++;
             if(bibopTriggerHighSurvivalStreak >= 2) {
@@ -6639,6 +6657,12 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     long occupiedBytes = 0;
     long liveBytes = 0;
     long reclaimedBytes = 0;
+    // Bytes on pages the major sweep spliced out of a partial pool, which are
+    // deliberately withheld from the policy numbers above. Kept so the policy can
+    // tell "the live set shrank" from "this sweep only looked at part of it" --
+    // the ratio is unaffected by the exclusion (both halves skip the same pages)
+    // but the ABSOLUTE liveBytes understates by exactly this much.
+    long excludedOccupiedBytes = 0;
     long classSlots[CN1_BIBOP_NUM_CLASSES] = {0};
     long classLive[CN1_BIBOP_NUM_CLASSES] = {0};
 #ifndef CN1_BIBOP_NO_FASTSWEEP
@@ -6890,6 +6914,9 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         if(policySurvivors < 0) {
             policySurvivors = 0;
         }
+        if(statsExcluded) {
+            excludedOccupiedBytes += (long)sampledSlots * page->slotSize;
+        }
         if(!statsExcluded) {
             occupiedBytes += (long)sampledSlots * page->slotSize;
             liveBytes += (long)policySurvivors * page->slotSize;
@@ -6922,7 +6949,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         }
         pthread_mutex_unlock(&bibopMutex);
     }
-    cn1BibopAdaptAfterSweep(occupiedBytes, liveBytes, reclaimedBytes,
+    cn1BibopAdaptAfterSweep(occupiedBytes, liveBytes, reclaimedBytes, excludedOccupiedBytes,
                             classSlots, classLive);
     // Hand surplus empty pages back to the OS (issue 5537). Last, so it sees the
     // pool this sweep just refilled, and outside the per-page loop so the madvise
@@ -12295,18 +12322,25 @@ static _Atomic int cn1AllocProfMaxSeenId = 0;
 // sizes is the expected case, and a site with a genuinely variable size shows up
 // as the overflow row rather than crowding out the fixed ones.
 #define CN1_ALLOC_SIZE_BUCKETS 48
+// pthread_once rather than a flag plus a pointer. Read and written by every
+// mutator's first allocation, those two are a data race in the C sense, and its
+// visible form is the wrong one for an instrument: a thread that sees the flag
+// set before the pointer is published reads a null name and silently drops its
+// early samples, so the histogram quietly loses exactly the allocations a
+// start-up question is about. Once-initialisation publishes both or neither.
+static pthread_once_t cn1AllocSizeClassOnce = PTHREAD_ONCE_INIT;
 static const char* cn1AllocSizeClassName = 0;
-static int cn1AllocSizeClassResolved = 0;
+
+static void cn1ResolveAllocSizeClass(void) {
+    cn1AllocSizeClassName = getenv("CN1_ALLOC_SIZE_CLASS");
+}
 static _Atomic int cn1AllocSizeKey[CN1_ALLOC_SIZE_BUCKETS];
 static _Atomic long long cn1AllocSizeCount[CN1_ALLOC_SIZE_BUCKETS];
 static _Atomic long long cn1AllocSizeOverflow = 0;
 
 static void cn1RecordAllocationSize(struct clazz* parent, int size) {
     int i;
-    if(!cn1AllocSizeClassResolved) {
-        cn1AllocSizeClassName = getenv("CN1_ALLOC_SIZE_CLASS");
-        cn1AllocSizeClassResolved = 1;
-    }
+    pthread_once(&cn1AllocSizeClassOnce, cn1ResolveAllocSizeClass);
     if(cn1AllocSizeClassName == 0 || parent->clsName == 0 ||
        strcmp(parent->clsName, cn1AllocSizeClassName) != 0) {
         return;
