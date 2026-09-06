@@ -101,8 +101,14 @@ class MiscellaneousFeaturesJava056Snippet {
                 "Location needed");
         bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.explanation_body",
                 "Choose \"Allow all the time\" so reminders still arrive when the app is closed.");
+        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.explanation_title",
+                "One more step");
         bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.settings", "Open settings");
+        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.ok", "Done");
         bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.cancel", "Not now");
+        // the rationale dialog Android shows before the request uses these two
+        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.askAgain", "Ask again");
+        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.dontAsk", "Don't ask");
         UIManager.getInstance().setBundle(bundle);
         // end::miscellaneous-features-java-056[]
     }
