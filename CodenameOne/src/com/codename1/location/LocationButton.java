@@ -1063,6 +1063,16 @@ public class LocationButton extends Container {
             return;
         }
         PeerComponent system = createSystemButton();
+        if (unavailable) {
+            // A supported control that threw while being built, exactly as in
+            // rebuild(). Leaving the fallback in place here left a LIVE button
+            // on a component already reporting itself unavailable, and a tap on
+            // it walks into the ordinary permission prompt -- refused outright
+            // in an exclusive build, and the persistent grant this component
+            // exists to avoid in any other.
+            setBody(createUnavailablePlaceholder());
+            return;
+        }
         if (system != null) {
             rebuildPending = false;
             setBody(system);

@@ -641,6 +641,30 @@ class LocationButtonRebuildTest extends UITestBase {
     }
 
     @Test
+    void anAttachTimeFailureRetiresTheFallbackToo() {
+        RecordingBridge bridge = install();
+        // No control at first, so the component carries the ordinary fallback.
+        bridge.building = false;
+        LocationButton button = new LocationButton();
+        assertFalse(button.isUnavailable());
+        assertTrue(button.getComponentAt(0).isEnabled(), "the fallback is up");
+
+        // The attach retry then meets a bridge that says it supports the
+        // control and throws building it -- a failed session, not an absent
+        // feature. rebuild() installs the placeholder for that; the retry has
+        // to as well, or the component reports itself unavailable while a live
+        // fallback goes on offering the ordinary permission prompt.
+        bridge.building = true;
+        bridge.throwing = true;
+        button.initComponent();
+
+        assertTrue(button.isUnavailable(), "the failure is recorded");
+        assertFalse(button.getComponentAt(0).isEnabled(),
+                "and what it shows is the disabled placeholder, not a live "
+                + "button that prompts");
+    }
+
+    @Test
     void aRetainedPeerStillOwnsItsCallbacks() {
         RecordingBridge bridge = install();
         LocationButton button = new LocationButton();

@@ -261,15 +261,16 @@ class LocationButtonManifestFragmentsTest {
         String scoped = "    <uses-permission android:name=\"android."
                 + "permission.ACCESS_BACKGROUND_LOCATION\" tools:node=\""
                 + "remove\" tools:selector=\"com.example.first\" />\n";
-        assertFalse(LocationButtonManifestFragments
-                        .removesBackgroundLocation(scoped),
+        assertTrue(LocationButtonManifestFragments
+                        .removesBackgroundLocation(scoped).isEmpty(),
                 "a scoped removal is not a blanket one: " + scoped);
         // The unscoped form still clears it.
         String blanket = "    <uses-permission android:name=\"android."
                 + "permission.ACCESS_BACKGROUND_LOCATION\" tools:node=\""
                 + "remove\" />\n";
         assertTrue(LocationButtonManifestFragments
-                .removesBackgroundLocation(blanket));
+                .removesBackgroundLocation(blanket).contains(
+                        "uses-permission"));
     }
 
     @Test
@@ -312,6 +313,46 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aRemovalOfOneElementTypeDoesNotCoverTheOther() throws Exception {
+        // uses-permission and uses-permission-sdk-23 are distinct element types
+        // to the merger, and a removal marker on one does not remove the other.
+        // The archive's declaration therefore survives, and clearing the
+        // aggregate on the mismatched removal accepted an exclusive build
+        // beside a permission that is still in the merged manifest.
+        File root = tempDir("cn1-lb-sdk23");
+        writeAar(new File(root, "sdk23.aar"),
+                "<manifest xmlns:android=\"http://schemas.android.com/apk/res/"
+                + "android\"><uses-permission-sdk-23 android:name=\"android."
+                + "permission.ACCESS_BACKGROUND_LOCATION\"/></manifest>");
+        LocationButtonManifestFragments.LocationUsage usage =
+                LocationButtonManifestFragments.scanForLocationUsage(root);
+        assertTrue(usage.declaresBackgroundLocation());
+        assertTrue(usage.backgroundElements().contains(
+                        "uses-permission-sdk-23"),
+                "the element that declared it travels with the fact: "
+                + usage.backgroundElements());
+
+        // A removal of the PLAIN form does not cover it.
+        String plain = "    <uses-permission android:name=\"android."
+                + "permission.ACCESS_BACKGROUND_LOCATION\" tools:node=\""
+                + "remove\" />\n";
+        assertFalse(LocationButtonManifestFragments
+                        .removesBackgroundLocation(plain)
+                        .containsAll(usage.backgroundElements()),
+                "a uses-permission removal does not remove a "
+                + "uses-permission-sdk-23 declaration");
+
+        // The matching form does.
+        String matching = "    <uses-permission-sdk-23 android:name=\"android."
+                + "permission.ACCESS_BACKGROUND_LOCATION\" tools:node=\""
+                + "remove\" />\n";
+        assertTrue(LocationButtonManifestFragments
+                        .removesBackgroundLocation(matching)
+                        .containsAll(usage.backgroundElements()),
+                "and the matching one does");
+    }
+
+    @Test
     void anApplicationRemovalOfBackgroundLocationIsRecognised() {
         // tools:node="remove" in the project's own block outranks a library
         // that contributed the permission, and the merger honours it. The
@@ -322,20 +363,22 @@ class LocationButtonManifestFragmentsTest {
                 + "permission.ACCESS_BACKGROUND_LOCATION\" tools:node=\""
                 + "remove\" />\n";
         assertTrue(LocationButtonManifestFragments
-                        .removesBackgroundLocation(removal),
+                        .removesBackgroundLocation(removal)
+                        .contains("uses-permission"),
                 "an active removal of background location is a removal");
         // And a plain declaration is not a removal, nor is a commented-out one
         // either kind.
-        assertFalse(LocationButtonManifestFragments.removesBackgroundLocation(
+        assertTrue(LocationButtonManifestFragments.removesBackgroundLocation(
                 "    <uses-permission android:name=\"android.permission."
-                + "ACCESS_BACKGROUND_LOCATION\" />\n"));
-        assertFalse(LocationButtonManifestFragments.removesBackgroundLocation(
+                + "ACCESS_BACKGROUND_LOCATION\" />\n").isEmpty(),
+                "a plain declaration removes nothing");
+        assertTrue(LocationButtonManifestFragments.removesBackgroundLocation(
                 "    <!-- <uses-permission android:name=\"android.permission."
                 + "ACCESS_BACKGROUND_LOCATION\" tools:node=\"remove\" /> -->"
-                + "\n"),
+                + "\n").isEmpty(),
                 "a commented-out removal removes nothing");
-        assertFalse(LocationButtonManifestFragments
-                .removesBackgroundLocation(null));
+        assertTrue(LocationButtonManifestFragments
+                .removesBackgroundLocation(null).isEmpty());
     }
 
     @Test

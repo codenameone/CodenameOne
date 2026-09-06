@@ -2941,7 +2941,11 @@ public class AndroidGradleBuilder extends Executor {
                     // Deferred rather than decided here: whether that owner is
                     // a LocationManager depends on a declaresType that may not
                     // have arrived yet. Resolved once the scan is complete.
-                    if (cls != null && !cls.startsWith("com/codename1/")
+                    // No null guard on cls: this callback dereferences it
+                    // several times above and SpotBugs reads a check here as
+                    // proof the earlier ones could NPE (RCN_REDUNDANT_NULLCHECK
+                    // _WOULD_HAVE_BEEN_A_NPE), which is a zero-findings gate.
+                    if (!cls.startsWith("com/codename1/")
                             && isNonButtonLocationMethod(method)
                             && !LocationButtonManifestFragments
                                     .isFrameworkOwner(scanningLocationType)) {
@@ -3202,7 +3206,8 @@ public class AndroidGradleBuilder extends Executor {
             // approached from the other side.
             appBackgroundLocation |= libraryLocation.declaresBackgroundLocation()
                     && !LocationButtonManifestFragments
-                            .removesBackgroundLocation(xPermissions);
+                            .removesBackgroundLocation(xPermissions)
+                            .containsAll(libraryLocation.backgroundElements());
             // The library hit declares the ORDINARY location permissions too,
             // not only the button's. inject() below adds fine and coarse, but
             // the uses-feature declarations that mark the location hardware

@@ -121,21 +121,53 @@ final class LocationButtonManifestFragments {
      * @param xPermissions the permission block, or null
      * @return whether some live element removes the background permission
      */
-    static boolean removesBackgroundLocation(String xPermissions) {
+    static java.util.Set<String> removesBackgroundLocation(
+            String xPermissions) {
+        java.util.Set<String> removed = new java.util.TreeSet<String>();
         if (xPermissions == null) {
-            return false;
+            return removed;
         }
         int at = xPermissions.indexOf(BACKGROUND_LOCATION);
         while (at >= 0) {
             if (declaresPermissionAt(xPermissions, at, BACKGROUND_LOCATION)
                     && isRemovalDirective(xPermissions, at)
                     && !isSelectorScoped(xPermissions, at)) {
-                return true;
+                int open = xPermissions.lastIndexOf('<', at);
+                if (open >= 0) {
+                    removed.add(elementName(xPermissions, open));
+                }
             }
             at = xPermissions.indexOf(BACKGROUND_LOCATION,
                     at + BACKGROUND_LOCATION.length());
         }
-        return false;
+        return removed;
+    }
+
+    /**
+     * The element types that actively ask for background location in
+     * {@code text}.
+     *
+     * @param text a manifest or permission block
+     * @return the tag names, which may be empty
+     */
+    static java.util.Set<String> backgroundElements(String text) {
+        java.util.Set<String> tags = new java.util.TreeSet<String>();
+        if (text == null) {
+            return tags;
+        }
+        int at = text.indexOf(BACKGROUND_LOCATION);
+        while (at >= 0) {
+            if (declaresPermissionAt(text, at, BACKGROUND_LOCATION)
+                    && !isRemovalDirective(text, at)) {
+                int open = text.lastIndexOf('<', at);
+                if (open >= 0) {
+                    tags.add(elementName(text, open));
+                }
+            }
+            at = text.indexOf(BACKGROUND_LOCATION,
+                    at + BACKGROUND_LOCATION.length());
+        }
+        return tags;
     }
 
     /**
@@ -1380,6 +1412,21 @@ final class LocationButtonManifestFragments {
         private boolean persistent;
         private boolean background;
 
+        /// Which ELEMENT declared the background permission, per archive.
+        ///
+        /// uses-permission and uses-permission-sdk-23 are distinct element
+        /// types to the merger, and a removal marker on one does not remove
+        /// the other. Clearing this flag on a removal of the wrong type left
+        /// the dependency's permission in the merged manifest and accepted an
+        /// exclusive build beside it, so the type has to travel with the fact.
+        private final java.util.Set<String> backgroundTags =
+                new java.util.TreeSet<String>();
+
+        /** The element types that asked for background location. */
+        public java.util.Set<String> backgroundElements() {
+            return backgroundTags;
+        }
+
         /** The tree references {@code com.codename1.location.LocationButton}. */
         public boolean usesButton() {
             return button;
@@ -1884,6 +1931,7 @@ final class LocationButtonManifestFragments {
         // table by accident.
         if (declaresBackgroundLocation(text)) {
             found.background = true;
+            found.backgroundTags.addAll(backgroundElements(text));
         }
     }
 
