@@ -6405,6 +6405,7 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
         long oldTrigger = atomic_load_explicit(&bibopGcTriggerBytes,
                                                memory_order_relaxed);
         long newTrigger = oldTrigger;
+        long floorBytes = cn1BibopTriggerFloor(liveBytes);
         if(survival >= CN1_BIBOP_BYPASS_SURVIVAL_PERCENT) {
             bibopTriggerHighSurvivalStreak++;
             if(bibopTriggerHighSurvivalStreak >= 2) {
@@ -6412,8 +6413,8 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
                 long freeMem = atomic_load_explicit(&cn1CachedFreeMem,
                                                     memory_order_relaxed);
                 if(freeMem > 0 && freeMem / 8 < ceiling) ceiling = freeMem / 8;
-                if(ceiling < cn1BibopTriggerFloor(liveBytes)) {
-                    ceiling = cn1BibopTriggerFloor(liveBytes);
+                if(ceiling < floorBytes) {
+                    ceiling = floorBytes;
                 }
                 newTrigger = oldTrigger * 2;
                 if(newTrigger > ceiling) newTrigger = ceiling;
@@ -6424,7 +6425,6 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
             // Shrink towards what the LIVE set justifies. This used to stop at
             // the 24MB constant, which is why a server holding nothing live
             // still held a 24MB trigger and ~98MB of resident memory.
-            long floorBytes = cn1BibopTriggerFloor(liveBytes);
             if(oldTrigger > floorBytes) {
                 newTrigger = oldTrigger / 2;
                 if(newTrigger < floorBytes) {
@@ -6439,6 +6439,17 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
                 // the live set grew.
                 newTrigger = floorBytes;
             }
+        }
+        // The floor is a property of the live set, not of the survival rate, so
+        // it is enforced outside the branches that react to survival. Those cover
+        // >= 25% and <= 20% and nothing between: a trigger that adapted down
+        // before the live set grew sat in that dead band uncorrected for as long
+        // as survival stayed at 21-24%, retracing a live heap it no longer had
+        // the headroom for. Raising is the only direction taken here, and the
+        // <= 20% branch already does exactly this, so the dead band gets the
+        // behaviour the branches either side of it already had.
+        if(newTrigger < floorBytes) {
+            newTrigger = floorBytes;
         }
         if(newTrigger != oldTrigger) {
             atomic_store_explicit(&bibopGcTriggerBytes, newTrigger,
@@ -12192,10 +12203,25 @@ static long long cn1StallPercentileUs(int cause, double q) {
 // rather than an argument.
 //
 // CONFORM-only, two relaxed atomics on the allocation path, printed at exit.
-#define CN1_ALLOC_PROFILE_SLOTS 8192
+// Class ids are numbered scalar classes first and array classes after them
+// (cn1_array_start_offset), one contiguous range, so the bound has to cover
+// BOTH -- an app well under the limit in scalar classes can still put its array
+// classes past it. The table is CONFORM-only and costs 24 bytes an entry, so it
+// is sized past any plausible translated app rather than tuned.
+//
+// Whatever still lands outside is counted and REPORTED rather than dropped. A
+// profile that silently omits the hottest class reads exactly like a profile
+// that found nothing there, and this file already has one instrument that lied
+// by omission (see the entry-point note on cn1RecordAllocation). The overflow
+// row is how a reader learns the bound was reached instead of trusting a total
+// that quietly excludes it.
+#define CN1_ALLOC_PROFILE_SLOTS 65536
 static _Atomic long long cn1AllocProfBytes[CN1_ALLOC_PROFILE_SLOTS];
 static _Atomic long cn1AllocProfCount[CN1_ALLOC_PROFILE_SLOTS];
 static struct clazz* cn1AllocProfClass[CN1_ALLOC_PROFILE_SLOTS];
+static _Atomic long long cn1AllocProfOutOfRangeBytes = 0;
+static _Atomic long cn1AllocProfOutOfRangeCount = 0;
+static _Atomic int cn1AllocProfMaxSeenId = 0;
 
 void cn1RecordAllocation(struct clazz* parent, int size) {
     int id;
@@ -12204,6 +12230,12 @@ void cn1RecordAllocation(struct clazz* parent, int size) {
     }
     id = parent->classId;
     if(id < 0 || id >= CN1_ALLOC_PROFILE_SLOTS) {
+        atomic_fetch_add_explicit(&cn1AllocProfOutOfRangeBytes, (long long)size,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&cn1AllocProfOutOfRangeCount, 1, memory_order_relaxed);
+        if(id > atomic_load_explicit(&cn1AllocProfMaxSeenId, memory_order_relaxed)) {
+            atomic_store_explicit(&cn1AllocProfMaxSeenId, id, memory_order_relaxed);
+        }
         return;
     }
     cn1AllocProfClass[id] = parent;
@@ -12236,7 +12268,22 @@ static void cn1ReportAllocProfile(void) {
     for(i = 0 ; i < CN1_ALLOC_PROFILE_SLOTS ; i++) {
         total += atomic_load_explicit(&cn1AllocProfBytes[i], memory_order_relaxed);
     }
-    fprintf(stderr, "[ALLOCPROF] totalBytes=%lld\n", total);
+    {
+        // Counted into the total so the headline figure stays the truth about the
+        // run, and printed separately so a non-zero row names the bound to raise.
+        long long oor = atomic_load_explicit(&cn1AllocProfOutOfRangeBytes,
+                                             memory_order_relaxed);
+        total += oor;
+        fprintf(stderr, "[ALLOCPROF] totalBytes=%lld\n", total);
+        if(oor > 0) {
+            fprintf(stderr, "[ALLOCPROF] %-44s bytes=%-12lld count=%-10ld "
+                            "(classId past %d, highest seen %d -- RAISE THE BOUND)\n",
+                    "<unattributed: classId out of range>", oor,
+                    atomic_load_explicit(&cn1AllocProfOutOfRangeCount, memory_order_relaxed),
+                    CN1_ALLOC_PROFILE_SLOTS - 1,
+                    atomic_load_explicit(&cn1AllocProfMaxSeenId, memory_order_relaxed));
+        }
+    }
     // Top twenty by bytes, selected by repeated max rather than a sort: this runs
     // once at exit and the table is small.
     while(printed < 20) {
