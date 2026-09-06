@@ -25,6 +25,7 @@ package com.codename1.mcp;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -238,7 +239,7 @@ public final class MCPClientRegistrar {
             root.put("mcpServers", servers);
             // mapToJson preserves booleans, integers and null values, so the user's other
             // settings survive the round trip; toJson would drop null-valued entries.
-            return writeConfigAtomic(fs, path, storagePath, MCPJson.toJson(root));
+            return writeConfig(fs, path, storagePath, MCPJson.toJson(root));
         } catch (Throwable ex) {
             Log.e(ex);
             return false;
@@ -281,7 +282,7 @@ public final class MCPClientRegistrar {
                 // entry to take out, so nothing was updated.
                 return descriptor != null;
             }
-            return writeConfigAtomic(fs, path, storagePath, result.getText());
+            return writeConfig(fs, path, storagePath, result.getText());
         } catch (Throwable ex) {
             Log.e(ex);
             return false;
@@ -357,10 +358,23 @@ public final class MCPClientRegistrar {
         return depth == 0 && !inString;
     }
 
-    /// Writes the config through a temporary file that is renamed into place, so an
-    /// interrupted write can never truncate the user's existing config.
-    private boolean writeConfigAtomic(FileSystemStorage fs, String path, String storagePath,
-                                      String content) {
+    /// Writes the config, staging the complete new content in a sibling file first so an
+    /// interrupted write never leaves the user with half a config and no copy of the rest.
+    ///
+    /// An EXISTING config is then written through rather than replaced. Deleting it and
+    /// renaming the staged file over it would turn a symlinked config - a common dotfiles
+    /// arrangement - into a regular file, and would reset the file's mode to whatever the
+    /// process umask says. These files carry other tools' API keys in their `env` blocks,
+    /// so widening a hand-set 600 to 644 is not cosmetic. {@link FileSystemStorage} cannot
+    /// read a link or copy a mode, so keeping the original file is the only portable way
+    /// to keep either.
+    ///
+    /// Writing through is not atomic - nothing available here is, since rename cannot
+    /// overwrite on every platform and delete-then-rename has a window of its own where
+    /// the config is missing entirely. The staged file is the recovery path: if the write
+    /// through fails, it still holds the complete content that should have landed.
+    private boolean writeConfig(FileSystemStorage fs, String path, String storagePath,
+                                String content) {
         try {
             String parent = parentOf(path);
             if (parent != null) {
@@ -374,27 +388,33 @@ public final class MCPClientRegistrar {
             String tmpName = fileName + ".cn1mcp-tmp";
             String tmpPath = parent == null ? fsPath(tmpName) : fsPath(parent + "/" + tmpName);
             byte[] data = content.getBytes("UTF-8");
-            OutputStream os = fs.openOutputStream(tmpPath);
-            try {
-                os.write(data);
-            } finally {
-                os.close();
-            }
-            // rename() takes a bare name and moves within the same directory. renameTo
-            // cannot overwrite an existing target on every platform, so remove it first;
-            // the temporary file is already fully written, so there is no truncation risk.
+            writeAll(fs, tmpPath, data);
             if (safeExists(fs, storagePath)) {
+                writeAll(fs, storagePath, data);
                 try {
-                    fs.delete(storagePath);
+                    fs.delete(tmpPath);
                 } catch (Throwable ignored) {
-                    // fall through and let rename report the real failure
+                    // the config is already correct; a leftover staging file is harmless
                 }
+            } else {
+                // Nothing to preserve: rename() takes a bare name and moves the staged
+                // file into place within the same directory.
+                fs.rename(tmpPath, fileName);
             }
-            fs.rename(tmpPath, fileName);
             return true;
         } catch (Throwable ex) {
             Log.e(ex);
             return false;
+        }
+    }
+
+    private static void writeAll(FileSystemStorage fs, String storagePath, byte[] data)
+            throws IOException {
+        OutputStream os = fs.openOutputStream(storagePath);
+        try {
+            os.write(data);
+        } finally {
+            os.close();
         }
     }
 
