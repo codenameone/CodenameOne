@@ -77,20 +77,20 @@ library requires. An app that never references the class sees no change at all.
 The library that renders the system button is an experimental Jetpack artifact,
 and its metadata requires Android Gradle plugin 9.1.0, Gradle 9 and compile SDK
 37. Codename One's generated project is on Android Gradle plugin 8 with Gradle
-8, and the hosted build images carry platforms through android-36 -- so an
-*Android* build that references `LocationButton` is refused, with a message
-naming every missing piece rather than producing an app that can't work.
+8, and the hosted build images carry platforms through android-36, so that
+library can't be resolved yet.
 
-No build hint gets past that, by design. Raising the plugin alone leaves Gradle
-as it was, and plugin 9 refuses that; a Gradle 9 that satisfied it would then
-reject DSL the generated project still writes. Moving Codename One onto that
-toolchain is its own piece of work, and this refusal is the last thing it
-deletes.
+Nothing about that is your problem. An Android build on the current toolchain
+simply uses the standard location API: `LocationButton` becomes an ordinary
+Codename One button that requests location permission the usual way -- the same
+fallback it already uses on every platform without the system control -- and the
+app builds and ships normally. The library is not added, `minSdkVersion` is not
+raised, and the ordinary location permissions are declared so the button works.
 
-Everything above the Android build works now: the component compiles into your
-app, and on iOS, the simulator, the desktop and the browser it behaves exactly
-as described. Write the code against `LocationButton` today and the Android half
-starts working when the toolchain lands, without touching your app.
+When Codename One moves to Android Gradle plugin 9 and compile SDK 37, the same
+code picks the system control up on its own. Write against `LocationButton`
+today and you get the platform button on Android 17 devices when the toolchain
+lands, without touching your app.
 ====
 
 There's one decision the build can't make for you.
@@ -116,6 +116,13 @@ build rejects the hint outright when it can see the contradiction -- an app that
 calls `addGeoFencing` or `setBackgroundLocationListener`, or that declares
 background location, fails with a sentence naming the conflict rather than
 shipping a manifest that fights itself.
+
+On a build whose toolchain can't carry the system control, the hint is ignored
+rather than applied, and the build log says so. Exclusivity means the
+fine-location grant belongs to the button alone; with no system button that
+would be a permission nothing could ever grant, so the app gets the ordinary
+declaration instead. Keep the hint set -- it starts working, unchanged, on the
+toolchain that brings the button.
 
 === Migrating a One-Time `getCurrentLocationSync`
 

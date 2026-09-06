@@ -3365,6 +3365,73 @@ public class AndroidGradleBuilder extends Executor {
             usesLocationButton = false;
         }
 
+        // A toolchain that cannot carry the library is NOT a build failure.
+        //
+        // androidx.core.locationbutton declares minCompileSdk 37 and
+        // minAndroidGradlePluginVersion 9.1.0 in its aar metadata, and AGP's
+        // checkAarMetadata enforces both with no opt-out. This builder pins
+        // AGP 8 with Gradle 8, and the hosted images carry platforms through
+        // android-36, so the artifact cannot be resolved here yet. A legacy
+        // support-library project cannot resolve it either: it is an AndroidX
+        // aar whose graph is appcompat, activity and lifecycle the whole way
+        // down, and such a project writes neither android.useAndroidX nor
+        // Jetifier.
+        //
+        // None of that is the application's problem. LocationButton already
+        // degrades to an ordinary Codename One button that asks for location
+        // the normal way -- that is its documented behaviour on every platform
+        // without the system control, and it is what the simulator and the
+        // desktop ports show. So a build on this toolchain simply takes that
+        // path: no dependency, no compile-SDK raise, no minimum-SDK raise, and
+        // the bridge package deleted further down because the flag is off. The
+        // app ships and works.
+        //
+        // This REPLACES a refusal, and the refusal was wrong. It made a
+        // component that works everywhere else un-buildable for Android over a
+        // library the developer never named, and told them to delete their code
+        // and come back later. Nothing needs to happen when the pin moves
+        // either: the same sources pick the system control up implicitly the
+        // moment compile SDK 37 and AGP 9 are what this builder writes, because
+        // that is the only condition standing between here and the live path.
+        //
+        // Ordered before the minimum-SDK raise and before compileSdkInt is
+        // asked for the first time, which is the whole reason it sits up here
+        // beside the hint above rather than where the refusal used to be. Read
+        // any later and the compile SDK has already been raised to 37 and the
+        // build fails looking for a platform the host does not have -- which is
+        // the failure this exists to avoid, arriving by a different route.
+        boolean locationButtonFallback = false;
+        if (usesLocationButton
+                && (!useAndroidX
+                    || gradleVersionInt < 8
+                    || !useGradle8
+                    || compareVersions(gradleVersion,
+                            LOCATION_BUTTON_MIN_GRADLE_VERSION) < 0
+                    || compareVersions(ANDROID_GRADLE_PLUGIN_8_VERSION,
+                            LOCATION_BUTTON_MIN_AGP_VERSION) < 0
+                    // The PLATFORM has to be on this machine as well. Nothing
+                    // here installs one, and a scan that found nothing reports
+                    // 31, so an unreadable SDK takes the fallback rather than
+                    // failing inside Gradle with a message naming a missing
+                    // Android target and not the feature that asked for it.
+                    || maxInstalledPlatformVersionInt
+                            < LOCATION_BUTTON_MIN_COMPILE_SDK)) {
+            log("com.codename1.location.LocationButton: this toolchain cannot"
+                    + " carry androidx.core.locationbutton, which needs Android"
+                    + " Gradle plugin " + LOCATION_BUTTON_MIN_AGP_VERSION
+                    + ", Gradle " + LOCATION_BUTTON_MIN_GRADLE_VERSION
+                    + ", compile SDK " + LOCATION_BUTTON_MIN_COMPILE_SDK
+                    + " and android.useAndroidX=true. Building with the"
+                    + " standard location API instead: the component falls back"
+                    + " to an ordinary button that requests location"
+                    + " permission the usual way. The system control is picked"
+                    + " up automatically once this builder moves to Android"
+                    + " Gradle plugin 9 and compile SDK "
+                    + LOCATION_BUTTON_MIN_COMPILE_SDK + ".");
+            usesLocationButton = false;
+            locationButtonFallback = true;
+        }
+
         // Fed to the CATALOG as well as to the flags. The flags decide which
         // sources survive and which manifest fragments are written; the
         // accumulator is what supplies the dependencies, the frameworks, the
@@ -3689,119 +3756,6 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
-        // And a toolchain that can carry the library at all, which this builder
-        // does not have yet.
-        //
-        // androidx.core.locationbutton declares minCompileSdk 37 and
-        // minAndroidGradlePluginVersion 9.1.0 in its aar metadata. AGP's
-        // checkAarMetadata task enforces both, is not a warning, and has no
-        // opt-out -- verified by building scripts/hellocodenameone, where AGP
-        // 8.13.2 fails at :app:checkDebugAarMetadata before compiling a line.
-        //
-        // There is deliberately NO build hint that gets past this, and an
-        // earlier revision of this check had one. It advertised an escape hatch
-        // that cannot work: raising the plugin alone leaves Gradle at
-        // GRADLE_8_VERSION, and AGP 9 refuses it outright ("Minimum supported
-        // Gradle version is 9.6.0"), while a Gradle 9 that satisfied it would
-        // then reject the DSL this builder still writes -- compileSdkVersion,
-        // minSdkVersion and targetSdkVersion as methods, dexOptions, jcenter,
-        // and a separate Kotlin plugin AGP 9 now supplies itself. A hint whose
-        // documented use fails three steps later is worse than no hint.
-        //
-        // AndroidX and Gradle 8 need no checks of their own beside this one:
-        // AGP 9 has no non-AndroidX mode, and Gradle 9 is not Gradle 8. Both
-        // fall out of the requirement below rather than being separate rules.
-        //
-        // So the refusal names every missing piece and is conditioned on the
-        // plugin this builder actually pins rather than written as an
-        // unconditional stop. That is not a formality: an unconditional one
-        // makes the manifest injection, the dependency and the deletable
-        // package below provably unreachable, which SpotBugs reports as a
-        // useless condition and which is the honest description of dead code.
-        // Conditioned this way the whole path goes live the moment the pin
-        // moves, and this block deletes itself -- the last step of the AGP 9
-        // migration rather than a workaround for it.
-        //
-        // It breaks nobody today: nothing shipped references the class. What it
-        // does prevent is an application shipping a transactional location flow
-        // in the belief that the system button is serving it.
-        // Gated on the plugin this build will ACTUALLY use, which is not the
-        // pinned constant alone: the selection below picks 2.1.2, 3.0.1, 3.2.0
-        // or 4.1.1 depending on the resolved Gradle, and only reaches
-        // ANDROID_GRADLE_PLUGIN_8_VERSION on the Gradle 8 branch. Reading the
-        // constant by itself would open this gate, once that constant moves, for
-        // a project pinned to an older Gradle that still gets AGP 4.1.1 -- and
-        // checkAarMetadata would reject the artifact after the build had
-        // committed to it.
-        boolean locationButtonAgpIsPinnedOne = gradleVersionInt >= 8;
-        String locationButtonAgp = locationButtonAgpIsPinnedOne
-                ? ANDROID_GRADLE_PLUGIN_8_VERSION : "an older plugin";
-        // AndroidX first, and refused by name rather than by AGP later. The
-        // artifact is an AndroidX aar whose graph is appcompat, activity and
-        // lifecycle the whole way down; a legacy support-library project writes
-        // neither android.useAndroidX nor Jetifier, and Gradle then fails
-        // resolving a coordinate the developer never typed. A comment here used
-        // to claim this was "caught with a sentence further up" -- it was not:
-        // the neighbouring checks cover the catalog features and the database,
-        // and the location button is in neither.
-        if (usesLocationButton && !useAndroidX) {
-            error("Error: com.codename1.location.LocationButton requires"
-                    + " android.useAndroidX=true. androidx.core.locationbutton"
-                    + " is an AndroidX library and cannot be resolved by a"
-                    + " support-library build. Remove"
-                    + " android.useAndroidX=false, or stop using"
-                    + " com.codename1.location.LocationButton.",
-                    new RuntimeException());
-            return false;
-        }
-        // MODERN SCAFFOLDING as well as a modern Gradle. This generator writes
-        // a namespace only when useGradle8 is on, and AGP 9 rejects a project
-        // without one during configuration -- so a build that pinned a modern
-        // Gradle with android.useGradle8=false satisfied every version test
-        // here and still died before compiling anything.
-        if (usesLocationButton && (!locationButtonAgpIsPinnedOne
-                || !useGradle8
-                || compareVersions(gradleVersion,
-                        LOCATION_BUTTON_MIN_GRADLE_VERSION) < 0
-                || compareVersions(ANDROID_GRADLE_PLUGIN_8_VERSION,
-                        LOCATION_BUTTON_MIN_AGP_VERSION) < 0
-                // The PLATFORM has to be on this machine as well. Nothing here
-                // installs one, and compileSdkInt raises the generated project
-                // to 37 regardless -- so a host with platforms only through 36
-                // failed inside Gradle, naming a missing Android target and not
-                // the feature that asked for it. maxPlatformVersionInt answers
-                // this even though useGradle8 floors it at 36, because the floor
-                // is 36 and this asks for 37: it can only be that high if a
-                // platform that new was really found. A scan that found nothing
-                // reports 31, so an unreadable SDK refuses here with an
-                // explanation rather than failing later without one.
-                || maxInstalledPlatformVersionInt
-                        < LOCATION_BUTTON_MIN_COMPILE_SDK)) {
-            error("Error: com.codename1.location.LocationButton cannot be built"
-                    + " for Android yet. androidx.core.locationbutton requires"
-                    + " Android Gradle plugin "
-                    + LOCATION_BUTTON_MIN_AGP_VERSION + " or newer, Gradle "
-                    + LOCATION_BUTTON_MIN_GRADLE_VERSION + " or newer, and"
-                    + " compile SDK "
-                    + LOCATION_BUTTON_MIN_COMPILE_SDK + "; this build uses"
-                    + " Android Gradle plugin " + locationButtonAgp
-                    + " with Gradle " + gradleVersion
-                    + " and has platforms installed through API "
-                    + (maxInstalledPlatformVersion.length() > 0
-                            ? maxInstalledPlatformVersion
-                            : String.valueOf(maxInstalledPlatformVersionInt))
-                    + ". Note that from Android 17 a platform package carries a"
-                    + " minor version -- install platforms;android-37.0 rather"
-                    + " than platforms;android-37, which does not exist."
-                    + " Remove the"
-                    + " reference to com.codename1.location.LocationButton for"
-                    + " now -- the component still works on every other"
-                    + " platform, and on Android it falls back to an ordinary"
-                    + " Codename One button once this builder moves to Android"
-                    + " Gradle plugin 9.", new RuntimeException());
-            return false;
-        }
-
         // The Android location button (com.codename1.location.LocationButton).
         //
         // Last of the location-touching injectors on purpose. Bluetooth, Wi-Fi
@@ -3907,6 +3861,44 @@ public class AndroidGradleBuilder extends Executor {
                     + (locationButtonExclusive ? " exclusive" : ""));
             xPermissions = LocationButtonManifestFragments.inject(
                     xPermissions, locationButtonExclusive);
+        } else if (locationButtonFallback) {
+            // The ordinary permissions, because the ordinary button needs them.
+            //
+            // The fallback asks for location through Codename One's own
+            // LocationManager, which is a normal runtime permission request
+            // against a normally declared permission. Without this an app whose
+            // only location use is the button ships a manifest that names no
+            // location permission at all -- the gpsPermission block declares
+            // them for an app that references com.codename1.location directly,
+            // and an app that only ever placed a LocationButton, or that gets
+            // one from a cn1lib, never trips it. The button would then draw
+            // correctly and never return a location, which is precisely the
+            // silent breakage the refusal this replaces was worried about.
+            //
+            // USE_LOCATION_BUTTON is NOT declared here: it is the permission
+            // that gates the system control, there is no system control on this
+            // build, and it does not exist before the API this toolchain cannot
+            // compile against.
+            //
+            // Nor is the exclusivity flag, whatever the hint says. Exclusivity
+            // means the fine-location grant belongs to the button alone; with
+            // no button that is a permission nothing can ever be granted, so
+            // honouring the hint here would ship exactly the dead permission it
+            // exists to prevent. The hint is not an error either -- a project
+            // shared between builds should not fail on the one whose toolchain
+            // is older -- so it is logged and ignored.
+            String ignoredExclusive =
+                    LocationButtonManifestFragments.isExclusive(
+                            request.getArg("android.locationButton.exclusive",
+                                    "false"))
+                    ? " (android.locationButton.exclusive ignored: exclusivity"
+                        + " needs the system control)"
+                    : "";
+            log("Location button fragments version "
+                    + LocationButtonManifestFragments.FRAGMENT_VERSION
+                    + " fallback" + ignoredExclusive);
+            xPermissions = LocationButtonManifestFragments
+                    .injectFallback(xPermissions);
         }
 
         // Smart home (com.codename1.home.*).

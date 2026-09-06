@@ -202,6 +202,18 @@ final class LocationButtonManifestFragments {
             "addGeofences",
         },
         {
+            // The map's own location layer. Not a location REQUEST in the
+            // shape of the rows above -- it is a rendering switch -- but it
+            // needs the same permission and then draws the device's position
+            // continuously, which is the least transactional use there is.
+            // Under exclusivity the layer is left approximate or dead, on a
+            // screen whose whole point is showing where you are. It is also
+            // the only location-annotated method in the entire maps artifact:
+            // 261 classes scanned, one hit.
+            "com/google/android/gms/maps/GoogleMap",
+            "setMyLocationEnabled",
+        },
+        {
             // AndroidX's wrapper over the platform manager. Its calls reach
             // the same provider and need the same permission, and a plain jar
             // using it has no manifest to say so either.
@@ -928,6 +940,45 @@ final class LocationButtonManifestFragments {
             out = addPermissionFlag(out, FINE_LOCATION,
                     ONLY_FOR_LOCATION_BUTTON);
         }
+        return out;
+    }
+
+    /**
+     * The permissions for a build where the system control is NOT available.
+     *
+     * <p>A toolchain that cannot resolve {@code androidx.core.locationbutton}
+     * builds the application anyway: {@code LocationButton} falls back to an
+     * ordinary Codename One button that asks for location the normal way, which
+     * is what it already does on every platform without the system control. An
+     * ordinary request needs an ordinary declaration, and nothing else in the
+     * build makes one for an application whose only location use is the button
+     * -- the gpsPermission block reads the loose class tree, so a button that
+     * arrives from a cn1lib never trips it.</p>
+     *
+     * <p>What is deliberately absent is as important as what is here.
+     * {@code USE_LOCATION_BUTTON} is not declared: it gates a control this
+     * build does not contain, and it does not exist before the API level this
+     * toolchain cannot compile against. The {@code onlyForLocationButton} flag
+     * is not applied either, whatever the hint asked for -- it would give the
+     * fine-location grant to a button that is not there, which is a permission
+     * nothing can ever be granted.</p>
+     *
+     * <p>The caps come off for the same reason they do in {@link #inject}:
+     * Bluetooth, Wi-Fi management and the nearby transport each declare
+     * ACCESS_FINE_LOCATION with a {@code maxSdkVersion} of their own, and
+     * whichever ran first wins a plain add.</p>
+     *
+     * @param xPermissions the permissions accumulated so far
+     * @return them, with the ordinary location permissions declared
+     */
+    static String injectFallback(String xPermissions) {
+        String out = xPermissions == null ? "" : xPermissions;
+        out = stripRemovals(out, FINE_LOCATION);
+        out = stripRemovals(out, COARSE_LOCATION);
+        out = declareUncapped(out, FINE_LOCATION);
+        out = removeCapAcrossMerge(out, FINE_LOCATION);
+        out = declareUncapped(out, COARSE_LOCATION);
+        out = removeCapAcrossMerge(out, COARSE_LOCATION);
         return out;
     }
 

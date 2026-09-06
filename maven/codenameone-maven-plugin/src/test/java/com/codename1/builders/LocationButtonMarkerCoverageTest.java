@@ -77,6 +77,9 @@ public class LocationButtonMarkerCoverageTest {
         "com/google/android/gms/location/GeofencingApi",
         "addGeofences",
         "addProximityAlert",
+        // The map's own location layer.
+        "com/google/android/gms/maps/GoogleMap",
+        "setMyLocationEnabled",
         // The releases the scan charges for, which the ports do make.
         "removeUpdates",
         "removeProximityAlert",

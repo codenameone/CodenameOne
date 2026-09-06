@@ -89,6 +89,42 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void theFallbackDeclaresTheOrdinaryPermissionsAndNotTheButtonsOwn() {
+        // A toolchain that cannot resolve the library builds the app anyway,
+        // with the component degraded to an ordinary button. That button asks
+        // for location the normal way, so the ordinary permissions have to be
+        // there -- an app whose only location use is the button trips nothing
+        // else that would declare them, and it would draw correctly and never
+        // return a location.
+        String out = LocationButtonManifestFragments.injectFallback("");
+        assertTrue(out.contains("android.permission.ACCESS_FINE_LOCATION"), out);
+        assertTrue(out.contains("android.permission.ACCESS_COARSE_LOCATION"),
+                out);
+        // Not the button's own permission: it gates a control this build does
+        // not contain, and it does not exist before the API level the
+        // toolchain cannot compile against.
+        assertFalse(out.contains("USE_LOCATION_BUTTON"), out);
+        // And never the exclusivity flag. There is no button to be exclusive
+        // to, so this would be a grant nothing could ever make.
+        assertFalse(out.contains("onlyForLocationButton"), out);
+    }
+
+    @Test
+    void theFallbackWidensACappedFineLocationTheSameWay() {
+        // Same reason as the button path: whichever feature declared
+        // ACCESS_FINE_LOCATION first wins a plain add, and a fallback button
+        // wired to a permission that stops being granted at API 30 is the
+        // same silent failure.
+        String bluetooth = "    <uses-permission android:name=\""
+                + "android.permission.ACCESS_FINE_LOCATION\""
+                + " android:maxSdkVersion=\"30\" />\n";
+        String out = LocationButtonManifestFragments.injectFallback(bluetooth);
+        assertEquals(1, count(out, "android.permission.ACCESS_FINE_LOCATION"),
+                out);
+        assertFalse(out.contains("android:maxSdkVersion=\""), out);
+    }
+
+    @Test
     void exclusiveFlagsFineLocationOnly() {
         String out = LocationButtonManifestFragments.inject("", true);
         int at = out.indexOf("android.permission.ACCESS_FINE_LOCATION");
@@ -2200,6 +2236,28 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void theMapsMyLocationLayerIsPreciseUse() throws Exception {
+        // A rendering switch rather than a request, and still the least
+        // transactional location use there is: it draws the device's position
+        // continuously. Under exclusivity the layer goes approximate or dead
+        // on a screen whose whole purpose is showing where you are.
+        File root = tempDir("cn1-lb-mylocation");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "maps.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/Screen.class"));
+            zip.write(methodCallClass("com/google/android/gms/maps/GoogleMap",
+                    "setMyLocationEnabled"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .callsPreciseLocation(),
+                "the map's my-location layer is precise use");
+    }
+
+    @Test
     void aProximityAlertIsPreciseUse() throws Exception {
         // The platform's own geofence. Play services' client was the reviewed
         // gap; this is the same request made against the system service, and
@@ -2924,12 +2982,11 @@ class LocationButtonManifestFragmentsTest {
 
     @Test
     void theButtonRaisesTheCompileSdkToWhatTheLibraryDemands() {
-        // Unreachable while the toolchain guard refuses these builds, and
-        // asserted anyway: the guard is conditioned on the pinned AGP version,
-        // so raising that pin lets location-button builds through, and without
-        // this raise they reach checkAarMetadata with a compile SDK the ladder
-        // caps at 36. It was removed once for being unreachable and this is
-        // what catches that.
+        // Reached by any build whose toolchain can carry the library; a
+        // toolchain that cannot never sets the flag, because it takes the
+        // fallback instead. Without this raise a capable build would reach
+        // checkAarMetadata with a compile SDK the ladder caps at 36. It was
+        // removed once for looking unreachable and this is what catches that.
         assertEquals(AndroidGradleBuilder.LOCATION_BUTTON_MIN_COMPILE_SDK,
                 AndroidGradleBuilder.compileSdkInt("28", "28", "28",
                         false, false, false, false, true));

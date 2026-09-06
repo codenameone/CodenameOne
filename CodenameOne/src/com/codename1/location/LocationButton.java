@@ -240,7 +240,24 @@ public class LocationButton extends Container {
     /// rule was written for: getCurrentLocationSync parks through
     /// invokeAndBlock, the EDT keeps pumping, and firing twice for one tap is
     /// the listener contract broken where callers notice least.
-    private int failedGeneration = NO_SESSION;
+    /// Its own sentinel, and deliberately NOT [#NO_SESSION].
+    ///
+    /// The fallback stamps its requests NO_SESSION, so initialising this to the
+    /// same value made "nothing has failed yet" indistinguishable from "the
+    /// fallback's own session failed". createSystemButton's catch sets
+    /// [#unavailable] without going through [#systemButtonFailed(int)] -- it has
+    /// no committed generation to report -- and a fallback tap parked in
+    /// getCurrentLocationSync at that moment came back to
+    /// `unavailable && failedGeneration == generation` and was suppressed.
+    /// Nothing had answered that tap: the catch fires no completion of its own,
+    /// so the listener simply waited forever.
+    ///
+    /// A value no request can carry keeps the suppression to what it is for --
+    /// a session that systemButtonFailed actually reported, and that therefore
+    /// already fired the null this would be duplicating.
+    private static final int NO_FAILURE = Integer.MIN_VALUE;
+
+    private int failedGeneration = NO_FAILURE;
 
     /// Which system button the callbacks now arriving belong to.
     ///

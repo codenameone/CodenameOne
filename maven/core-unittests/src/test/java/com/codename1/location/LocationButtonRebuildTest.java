@@ -1082,4 +1082,70 @@ class LocationButtonRebuildTest extends UITestBase {
         assertEquals(0, manager.lookups,
                 "and no lookup is run against a session nobody can serve");
     }
+    @Test
+    void aFallbackTapIsAnsweredWhenAConstructionFailureLandsUnderIt() {
+        // The tap nobody answers. createSystemButton's catch marks the
+        // component unavailable WITHOUT going through systemButtonFailed --
+        // it has no committed generation to report -- so failedGeneration
+        // kept its initial value. That value used to be NO_SESSION, which is
+        // exactly what the fallback stamps its own requests with, and the
+        // completion guard reads "unavailable, and the session that failed is
+        // this request's" and stays silent.
+        //
+        // Nothing else answers it either: the catch fires no completion of its
+        // own, so the listener waits for a callback that is never coming. That
+        // is worse than a wrong answer -- a caller that awaits this hangs.
+        RecordingBridge bridge = install();
+        // Parked and NOT released: the fallback's lookup has to still be in
+        // flight when the failure lands, which is the whole scenario.
+        ParkingManager ordinary = parkingManager();
+        implementation.setLocationManager(ordinary);
+
+        // No control, so the component carries the ordinary fallback button.
+        bridge.building = false;
+        LocationButton button = new LocationButton();
+        Button tapTarget = (Button) button.getComponentAt(0);
+        final int[] answers = new int[1];
+        button.addLocationSharedListener(new LocationSharedListener() {
+            public void locationShared(Location location) {
+                answers[0]++;
+            }
+        });
+
+        // The user taps it and the lookup parks. Through invokeAndBlock, so
+        // the EDT keeps pumping and the rebuild below can run underneath it.
+        tapTarget.pressed();
+        tapTarget.released();
+        drain();
+        waitUntil("the fallback tap started its lookup", new Settled() {
+            public boolean isSo() {
+                return ordinary.lookups == 1;
+            }
+        });
+
+        // Now the platform offers a control and throws building it, which is
+        // what a port that lost its native state does. setTextType is the
+        // rebuild an ordinary app performs.
+        bridge.building = true;
+        bridge.throwing = true;
+        button.setTextType(LocationButton.TEXT_USE_PRECISE_LOCATION);
+        drain();
+        assertTrue(button.isUnavailable(),
+                "a supported control that threw leaves the component "
+                + "unavailable");
+
+        // And the parked tap comes back.
+        ordinary.release();
+        drain();
+        drain();
+        waitUntil("the parked fallback tap completed", new Settled() {
+            public boolean isSo() {
+                return answers[0] > 0;
+            }
+        });
+        assertEquals(1, answers[0],
+                "the fallback tap is answered exactly once: no failure "
+                + "callback ever spoke for it, so suppressing it leaves the "
+                + "listener waiting forever");
+    }
 }
