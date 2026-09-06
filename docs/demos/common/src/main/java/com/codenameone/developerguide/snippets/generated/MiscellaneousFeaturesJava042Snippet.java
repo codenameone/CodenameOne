@@ -91,8 +91,7 @@ class MiscellaneousFeaturesJava042Snippet {
             // take the base from the component's own style: derive() keeps the
             // typeface of its receiver, so deriving Label's font would replace
             // whatever face this component was given
-            Style style = someComponent.getUnselectedStyle();
-            Font base = style.getFont();
+            Font base = someComponent.getUnselectedStyle().getFont();
             // derive() only works on TrueType/native fonts and throws on a
             // legacy bitmap font, and it takes a requested pixel size rather
             // than getHeight(), which is the rendered line height. Both checks
@@ -104,7 +103,10 @@ class MiscellaneousFeaturesJava042Snippet {
                 }
                 if (baseSize > 0) {
                     Font scaled = base.derive(baseSize * scale, base.getStyle());
-                    style.setFont(scaled);
+                    // getAllStyles writes through to selected, pressed and
+                    // disabled too, so the text does not snap back to the
+                    // original size when the component changes state
+                    someComponent.getAllStyles().setFont(scaled);
                 }
             }
         }
