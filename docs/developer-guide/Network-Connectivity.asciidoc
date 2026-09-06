@@ -61,6 +61,10 @@ Android throttles scans to 4 per 2 minutes per foreground app on API 28+; thrott
 
 To associate the device with a specific SSID:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NetworkConnectivityJava010Snippet.java[tag=network-connectivity-java-010,indent=0]
+----
 
 * On Android 10+ the OS shows a system confirmation dialog with the SSID before joining; this dialog can't be bypassed.
 * On Android 9 and below the framework falls back to the legacy `WifiConfiguration` API and joins without an in-app prompt.
@@ -85,6 +89,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 To advertise an HTTP server you wrote on port 8080:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NetworkConnectivityJava011Snippet.java[tag=network-connectivity-java-011,indent=0]
+----
 
 ==== iOS requirements
 
