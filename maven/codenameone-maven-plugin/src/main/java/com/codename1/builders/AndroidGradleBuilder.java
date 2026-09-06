@@ -3227,6 +3227,14 @@ public class AndroidGradleBuilder extends Executor {
             // A bytecode hit has no element type to match, so it is not
             // discounted: a plain jar calling the platform's location manager
             // is still going to call it whatever the manifest says.
+            // The library's CALL, which no manifest edit can discount. A
+            // tools:node="remove" takes a DECLARATION out of the merged
+            // manifest and takes nothing out of the library's bytecode, so
+            // folding the two into one flag let a removal discount the call
+            // as well: exclusivity was accepted, inject() then restored fine
+            // location with onlyForLocationButton, and the lookup the library
+            // still performs came back approximate with nothing to say so.
+            libraryPreciseLocation |= libraryLocation.callsPreciseLocation();
             libraryPreciseLocation |= libraryLocation.declaresPreciseLocation()
                     && !(!libraryLocation.preciseElements().isEmpty()
                             && LocationButtonManifestFragments

@@ -518,10 +518,16 @@ class LocationButtonManifestFragmentsTest {
         } finally {
             zip.close();
         }
-        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
-                        .declaresPreciseLocation(),
+        LocationButtonManifestFragments.LocationUsage bytecode =
+                LocationButtonManifestFragments.scanForLocationUsage(root);
+        assertTrue(bytecode.callsPreciseLocation(),
                 "a platform location call is the library wanting precise "
                 + "location of its own");
+        // The CALL, not a declaration. They are separate facts because a
+        // project's tools:node="remove" can discount a declaration and can
+        // take nothing out of this bytecode.
+        assertFalse(bytecode.declaresPreciseLocation(),
+                "and it is a call, not a manifest declaration");
     }
 
     @Test
@@ -545,10 +551,54 @@ class LocationButtonManifestFragmentsTest {
         } finally {
             zip.close();
         }
-        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
-                        .declaresPreciseLocation(),
+        LocationButtonManifestFragments.LocationUsage fused =
+                LocationButtonManifestFragments.scanForLocationUsage(root);
+        assertTrue(fused.callsPreciseLocation(),
                 "a fused-location call is the library wanting precise "
                 + "location of its own");
+        assertFalse(fused.declaresPreciseLocation(),
+                "and it is a call, not a manifest declaration");
+    }
+
+    @Test
+    void aFactoryReachesTheClientWithoutNamingIt() throws Exception {
+        // LocationServices.getFusedLocationProviderClient(this).lastLocation
+        // is how the fused client is ordinarily reached, and it spells
+        // FusedLocationProviderClient nowhere -- so the source scan skipped a
+        // file that plainly performs a lookup, and exclusivity was accepted
+        // over it.
+        File root = tempDir("cn1-lb-factory");
+        writeSource(new File(root, "com/example/Where.kt"),
+                "package com.example\n"
+                + "import com.google.android.gms.location.LocationServices\n"
+                + "class Where {\n"
+                + "  fun last(c: Any) = LocationServices"
+                + ".getFusedLocationProviderClient(c).lastLocation\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "the factory path reaches the same client");
+    }
+
+    @Test
+    void namingTheFactoryWithoutAskingItForAnythingIsNotUse()
+            throws Exception {
+        // And the factory alone is not a request. A class that obtains a
+        // client and only removes updates asks for no location, and refusing
+        // its build would be refusing it over an import.
+        File root = tempDir("cn1-lb-factory-only");
+        writeSource(new File(root, "com/example/Stopper.java"),
+                "package com.example;\n"
+                + "import com.google.android.gms.location.LocationServices;\n"
+                + "public class Stopper {\n"
+                + "  void stop(Object c) {\n"
+                + "    LocationServices.getFusedLocationProviderClient(c)"
+                + ".removeLocationUpdates(null);\n"
+                + "  }\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "obtaining a client is not asking it for a location");
     }
 
     @Test
@@ -567,7 +617,7 @@ class LocationButtonManifestFragmentsTest {
             zip.close();
         }
         assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
-                        .declaresPreciseLocation(),
+                        .callsPreciseLocation(),
                 "a method of the library's own name is not a fused call");
     }
 
@@ -589,7 +639,7 @@ class LocationButtonManifestFragmentsTest {
             zip.close();
         }
         assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
-                        .declaresPreciseLocation(),
+                        .callsPreciseLocation(),
                 "a cached platform lookup is precise use as well");
     }
 
@@ -815,6 +865,58 @@ class LocationButtonManifestFragmentsTest {
         assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
                         .declaresPreciseLocation(),
                 "a cap at the button's API is still a request there");
+    }
+
+    @Test
+    void aRemovalCannotDiscountTheLibrarysOwnCall() throws Exception {
+        // An aar that BOTH declares fine location and calls a provider. The
+        // project may take the declaration out of the merged manifest with
+        // tools:node="remove", and the builder discounts a declaration it
+        // removed -- but the removal takes nothing out of the library's
+        // bytecode, which still runs and still asks for a location.
+        //
+        // Both facts were one boolean, so the removal discounted the call as
+        // well: exclusivity was accepted, inject() restored fine location with
+        // onlyForLocationButton, and the library's lookup came back
+        // approximate with nothing in the build to say so. They are separate
+        // now, and this holds them apart.
+        File root = tempDir("cn1-lb-removal-call");
+        File aar = new File(root, "both.aar");
+        aar.getParentFile().mkdirs();
+        ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(aar));
+        try {
+            zip.putNextEntry(new ZipEntry("AndroidManifest.xml"));
+            zip.write(("<manifest xmlns:android=\"http://schemas.android.com"
+                    + "/apk/res/android\"><uses-permission android:name="
+                    + "\"android.permission.ACCESS_FINE_LOCATION\"/>"
+                    + "</manifest>").getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+            zip.putNextEntry(new ZipEntry("classes.jar"));
+            ByteArrayOutputStream inner = new ByteArrayOutputStream();
+            ZipOutputStream innerZip = new ZipOutputStream(inner);
+            try {
+                innerZip.putNextEntry(new ZipEntry("com/example/Sdk.class"));
+                innerZip.write(methodCallClass(
+                        "android/location/LocationManager",
+                        "requestLocationUpdates"));
+                innerZip.closeEntry();
+            } finally {
+                innerZip.close();
+            }
+            zip.write(inner.toByteArray());
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        LocationButtonManifestFragments.LocationUsage usage =
+                LocationButtonManifestFragments.scanForLocationUsage(root);
+        assertTrue(usage.declaresPreciseLocation(),
+                "the manifest declaration is seen");
+        assertTrue(usage.callsPreciseLocation(),
+                "and so is the call, as a fact of its own");
+        assertFalse(usage.preciseElements().isEmpty(),
+                "the declaration carries its element type, so a removal can "
+                + "match it -- which is what used to discount the call too");
     }
 
     @Test
@@ -1295,6 +1397,43 @@ class LocationButtonManifestFragmentsTest {
         assertFalse(LocationButtonManifestFragments
                         .sourcesCallPlatformLocation(root),
                 "prose about a call is not a call");
+    }
+
+    @Test
+    void aDiagnosticStringNamingTheApiIsNotACall() throws Exception {
+        // Consuming a literal is not the same as reading it. It has to be
+        // consumed, so the // in "http://host" cannot eat the line -- but its
+        // TEXT is not code, and a log line naming the provider and one of its
+        // methods was read as a call and refused the build.
+        File root = tempDir("cn1-lb-literal");
+        writeSource(new File(root, "com/example/Logs.java"),
+                "package com.example;\n"
+                + "public class Logs {\n"
+                + "  static final String NOTE = \"android.location"
+                + ".LocationManager.requestLocationUpdates is not used\";\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "a string naming the API is not a call to it");
+    }
+
+    @Test
+    void aKotlinTemplateInsideAStringIsStillCode() throws Exception {
+        // And the limit of that masking. What sits inside ${...} is compiled,
+        // so "at ${client.lastLocation}" really does ask for a location --
+        // blanking it would lose a real request in the direction that
+        // downgrades one in silence.
+        File root = tempDir("cn1-lb-template");
+        writeSource(new File(root, "com/example/Log.kt"),
+                "package com.example\n"
+                + "import com.google.android.gms.location"
+                + ".FusedLocationProviderClient\n"
+                + "class Log(val client: FusedLocationProviderClient) {\n"
+                + "  fun note() = \"at ${client.lastLocation}\"\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "a template is an expression, not text");
     }
 
     @Test

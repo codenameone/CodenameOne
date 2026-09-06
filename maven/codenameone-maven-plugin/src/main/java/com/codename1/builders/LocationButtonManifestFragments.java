@@ -1562,6 +1562,18 @@ final class LocationButtonManifestFragments {
         /// A submitted archive's manifest asks for ACCESS_FINE_LOCATION.
         private boolean libraryPrecise;
 
+        /// A submitted archive CALLS a precise-location provider.
+        ///
+        /// Separate from the manifest fact on purpose. The application can
+        /// take a library's DECLARATION out of the merged manifest with
+        /// tools:node="remove", and the builder discounts a declaration it
+        /// removed -- but a removal takes nothing out of the library's
+        /// bytecode. Folding both into one flag let a removal discount the
+        /// call as well, so exclusivity was accepted over a lookup the library
+        /// still performs, and inject() then restored fine location with
+        /// onlyForLocationButton and downgraded it in silence.
+        private boolean libraryPreciseCall;
+
         /// Class to superclass, for every class this scan read.
         private final java.util.Map<String, String> supers =
                 new java.util.HashMap<String, String>();
@@ -1582,6 +1594,18 @@ final class LocationButtonManifestFragments {
         /** Whether a submitted archive asks for precise location itself. */
         public boolean declaresPreciseLocation() {
             return libraryPrecise;
+        }
+
+        /**
+         * Whether a submitted archive CALLS a precise-location provider.
+         *
+         * <p>Not discountable by a manifest removal, which is why it is not
+         * folded into {@link #declaresPreciseLocation()}.</p>
+         *
+         * @return whether its bytecode makes such a call
+         */
+        public boolean callsPreciseLocation() {
+            return libraryPreciseCall;
         }
 
         /** The element types that asked for background location. */
@@ -1901,7 +1925,20 @@ final class LocationButtonManifestFragments {
     }
 
     /**
-     * The source with its comments removed.
+     * The source with everything that is not code taken out of it.
+     *
+     * <p>Comments and the CONTENTS of string literals both go. A literal is
+     * consumed rather than skipped, because the {@code //} in
+     * {@code "http://host"} is not a comment and treating it as one would eat
+     * the rest of the line with a real call on it -- but its text is masked
+     * rather than kept, because a diagnostic string naming a provider and one
+     * of its methods is not a call either, and reading it as one refused a
+     * build over a log line.</p>
+     *
+     * <p>Kotlin's {@code ${...}} templates survive the masking. What is inside
+     * one is compiled, so {@code "at ${client.lastLocation}"} really does ask
+     * for a location, and blanking it would lose the call in the direction
+     * that downgrades a request in silence.</p>
      *
      * <p>What is left is still searched by substring rather than parsed, so a
      * method DECLARED with a marker's name still counts and so does a method
@@ -1910,18 +1947,14 @@ final class LocationButtonManifestFragments {
      * matters: a missed call accepts exclusivity and downgrades a real request
      * silently, where an extra one refuses a build with a reason.</p>
      *
-     * <p>String literals are copied through whole, because the {@code //} in
-     * {@code "http://host"} is not a comment -- treating it as one would eat
-     * the rest of the line, and a real call sitting there would go unseen.</p>
-     *
      * <p>Block comments do NOT nest, which is Java's rule. Kotlin's do; a
      * nested one ends this early and leaves its tail read as code, which can
      * only ever ADD a match.</p>
      *
      * @param text the source file
-     * @return the same text with comment bodies replaced by a space
+     * @return the same text with comments and literal contents blanked
      */
-    private static String withoutComments(String text) {
+    private static String strippedSource(String text) {
         StringBuilder out = new StringBuilder(text.length());
         int at = 0;
         int length = text.length();
@@ -1950,7 +1983,7 @@ final class LocationButtonManifestFragments {
                     && text.charAt(at + 2) == '"') {
                 int end = text.indexOf("\"\"\"", at + 3);
                 end = end < 0 ? length : end + 3;
-                out.append(text, at, end);
+                appendMasked(out, text, at, end);
                 at = end;
                 continue;
             }
@@ -1969,7 +2002,7 @@ final class LocationButtonManifestFragments {
                     walk++;
                 }
                 int end = walk > length ? length : walk;
-                out.append(text, at, end);
+                appendMasked(out, text, at, end);
                 at = end;
                 continue;
             }
@@ -1977,6 +2010,39 @@ final class LocationButtonManifestFragments {
             at++;
         }
         return out.toString();
+    }
+
+    /**
+     * Copies a string literal with its text blanked and its code kept.
+     *
+     * <p>Every character becomes a space, so the literal occupies the same
+     * ground and separates the tokens either side of it without any of its
+     * contents being searchable -- except a Kotlin {@code ${...}} template,
+     * which is an expression the compiler really evaluates and is copied
+     * through as the code it is.</p>
+     *
+     * @param out  the stripped source being built
+     * @param text the whole file
+     * @param from the literal's first character
+     * @param to   one past its last
+     */
+    private static void appendMasked(StringBuilder out, String text, int from,
+            int to) {
+        int at = from;
+        while (at < to) {
+            if (text.charAt(at) == '$' && at + 1 < to
+                    && text.charAt(at + 1) == '{') {
+                int close = text.indexOf('}', at + 2);
+                if (close < 0 || close >= to) {
+                    close = to - 1;
+                }
+                out.append(text, at, close + 1);
+                at = close + 1;
+                continue;
+            }
+            out.append(' ');
+            at++;
+        }
     }
 
     /**
@@ -2004,6 +2070,52 @@ final class LocationButtonManifestFragments {
             return null;
         }
         return Character.toLowerCase(first) + marker.substring(4);
+    }
+
+    /**
+     * The factories that hand back a provider without the source ever naming
+     * its type, paired with the provider they return.
+     *
+     * <p>{@code LocationServices.getFusedLocationProviderClient(this)
+     * .lastLocation} is how the fused client is ordinarily reached, and it
+     * spells {@code FusedLocationProviderClient} nowhere at all -- so the
+     * source scan skipped a file that plainly performs a lookup.</p>
+     *
+     * <p>SOURCE only. Bytecode needs nothing of this: javac records the static
+     * type of the receiver, so the call on the returned client already names
+     * the client as its Methodref owner.</p>
+     */
+    private static final String[][] PROVIDER_FACTORIES = {
+        {
+            "com/google/android/gms/location/FusedLocationProviderClient",
+            "com/google/android/gms/location/LocationServices",
+        },
+    };
+
+    /**
+     * Whether a source reaches {@code owner} through one of its factories.
+     *
+     * <p>Naming the factory is not on its own a location request, so the
+     * caller still has to find one of the provider's own calls in the file --
+     * a class that obtains a client and only removes updates asks for
+     * nothing.</p>
+     *
+     * @param text  the source file
+     * @param owner the provider's internal name
+     * @return whether a factory for it is named here
+     */
+    private static boolean sourceNamesByFactory(String text, String owner) {
+        for (int row = 0; row < PROVIDER_FACTORIES.length; row++) {
+            if (!PROVIDER_FACTORIES[row][0].equals(owner)) {
+                continue;
+            }
+            for (int iter = 1; iter < PROVIDER_FACTORIES[row].length; iter++) {
+                if (sourceNames(text, PROVIDER_FACTORIES[row][iter])) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -2080,11 +2192,12 @@ final class LocationButtonManifestFragments {
             //   // was removed
             // carries both halves and no call at all -- so a developer who
             // documented deleting the thing had the build refused for it.
-            String text = withoutComments(new String(raw, "ISO-8859-1"));
+            String text = strippedSource(new String(raw, "ISO-8859-1"));
             boolean kotlin = name.endsWith(".kt");
             for (int row = 0; row < PLATFORM_LOCATION_OWNERS.length; row++) {
                 String[] owner = PLATFORM_LOCATION_OWNERS[row];
-                if (!sourceNames(text, owner[0])) {
+                if (!sourceNames(text, owner[0])
+                        && !sourceNamesByFactory(text, owner[0])) {
                     continue;
                 }
                 for (int m = 1; m < owner.length; m++) {
@@ -2742,7 +2855,10 @@ final class LocationButtonManifestFragments {
             String[] markers = new String[owner.length - 1];
             System.arraycopy(owner, 1, markers, 0, markers.length);
             if (callsMethodOn(pool, owner[0], markers)) {
-                found.libraryPrecise = true;
+                // The CALL flag, not the manifest one: a tools:node="remove"
+                // in the project takes a declaration out of the merged
+                // manifest and takes nothing at all out of this bytecode.
+                found.libraryPreciseCall = true;
                 break;
             }
         }
