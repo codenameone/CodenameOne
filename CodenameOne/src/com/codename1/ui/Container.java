@@ -296,7 +296,18 @@ public class Container extends Component implements Iterable<Component> {
                     parentLayout.addLayoutComponent(constraint, newParent, oldParent);
                 }
 
-                newParent.initComponentImpl();
+                // Only when we are splicing the wrapper into a hierarchy that is already
+                // live. initComponentImpl() recurses into every child, and doing that to a
+                // form that has not been shown runs initComponent() far too early: it binds
+                // the laf, registers animations, shows native overlays and - the way this
+                // surfaced in issue #2710 - makes InputComponent build its editor. The
+                // editor then exists when show() picks the initial focus, so merely asking
+                // a form for its layered pane before showing it left the first text field
+                // focused with a blinking caret. An uninitialized wrapper is initialized
+                // with the rest of the form when it is finally shown.
+                if (isInitialized()) {
+                    newParent.initComponentImpl();
+                }
                 if (oldParent != null) {
                     int cmpIndex = -1;
                     for (int i = 0; i < oldParent.getComponentCount(); i++) {
