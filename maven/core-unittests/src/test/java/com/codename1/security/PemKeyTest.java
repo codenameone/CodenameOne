@@ -1274,6 +1274,25 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void proseMentioningADelimiterIsNotOne() {
+        // The delimiters live on lines of their own, and the text around a block
+        // is meant to be ignored. Searching for the marker anywhere let prose
+        // that merely names one be taken for the block itself, swallowing that
+        // prose and the real header into the body and failing a good key.
+        String key = pem(RSA_SPKI_LABEL, RSA_SPKI);
+        assertArrayEquals(der(RSA_SPKI),
+                PublicKey.fromPem("Paste the -----BEGIN PUBLIC KEY----- block below:\n" + key)
+                        .getEncoded());
+        assertArrayEquals(der(RSA_SPKI),
+                PublicKey.fromPem("  -----BEGIN PUBLIC KEY----- was mentioned here\n" + key)
+                        .getEncoded());
+        // and a footer named in prose does not end the body early either
+        assertArrayEquals(der(RSA_SPKI),
+                PublicKey.fromPem(key + "then the -----END PUBLIC KEY----- line closes it\n")
+                        .getEncoded());
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));

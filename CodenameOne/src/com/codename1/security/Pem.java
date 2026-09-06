@@ -350,6 +350,21 @@ final class Pem {
         return SHAPE_PKCS1_PRIVATE;
     }
 
+    /// Finds `marker` where it begins a line.
+    ///
+    /// The delimiters live on lines of their own (RFC 7468), and the text around
+    /// a block is meant to be ignored. Searching for the marker anywhere let
+    /// prose that merely mentions one -- "paste the -----BEGIN PUBLIC KEY-----
+    /// block below" -- be taken for the block itself, which then swallowed the
+    /// prose and the real header into the body and failed on a good key.
+    private static int indexOfDelimiter(String pem, String marker, int from) {
+        int at = pem.indexOf(marker, from);
+        while (at > 0 && pem.charAt(at - 1) != '\n' && pem.charAt(at - 1) != '\r') {
+            at = pem.indexOf(marker, at + 1);
+        }
+        return at;
+    }
+
     /// Decodes the first armored block whose label is one of `wanted`.
     ///
     /// The first block is not necessarily the key: `openssl ecparam -genkey`
@@ -361,13 +376,13 @@ final class Pem {
         if (pem == null) {
             throw new CryptoException("pem must not be null");
         }
-        if (pem.indexOf(BEGIN) < 0) {
+        if (indexOfDelimiter(pem, BEGIN, 0) < 0) {
             return body(pem, null);
         }
         StringBuilder seen = new StringBuilder();
         int at = 0;
         while (true) {
-            int begin = pem.indexOf(BEGIN, at);
+            int begin = indexOfDelimiter(pem, BEGIN, at);
             if (begin < 0) {
                 break;
             }
@@ -408,7 +423,7 @@ final class Pem {
         if (label == null) {
             base64 = pem;
         } else {
-            int labelEnd = pem.indexOf(DASHES, pem.indexOf(BEGIN) + BEGIN.length());
+            int labelEnd = pem.indexOf(DASHES, indexOfDelimiter(pem, BEGIN, 0) + BEGIN.length());
             int bodyStart = labelEnd + DASHES.length();
             // RFC 7468 requires the footer to repeat the header's label. Stopping
             // at any "-----END" would accept a file whose blocks have been
@@ -416,7 +431,7 @@ final class Pem {
             // running to end-of-input would accept one that was cut off before
             // its footer ever arrived.
             String footer = END + label + DASHES;
-            int bodyEnd = pem.indexOf(footer, bodyStart);
+            int bodyEnd = indexOfDelimiter(pem, footer, bodyStart);
             if (bodyEnd < 0) {
                 throw new CryptoException("malformed PEM: no matching " + footer + " footer");
             }
