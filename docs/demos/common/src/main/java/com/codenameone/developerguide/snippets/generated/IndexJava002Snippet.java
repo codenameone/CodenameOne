@@ -82,6 +82,7 @@ class IndexJava002Snippet {
     Resources theme;
     // tag::index-java-002[]
     public class HelloWorld extends Lifecycle {
+        private TextArea editor;
 
         @Override
         public void init(Object context) {
@@ -99,8 +100,11 @@ class IndexJava002Snippet {
         public void runApp() {
             new Form("Hi World", BoxLayout.y()).show();
         }
+
+        private void saveDraft() {
+            Preferences.set("draft", editor.getText());
+        }
     }
     // end::index-java-002[]
 
-    void saveDraft() { }
 }
