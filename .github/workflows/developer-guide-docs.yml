@@ -161,10 +161,7 @@ jobs:
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
           set -euo pipefail
-          python3 scripts/developer-guide/find_unused_images.py docs/developer-guide \
-            --allow-unused img/autocomplete.png \
-            --allow-unused img/native-theme-menu.png \
-            --allow-unused img/tabs.png
+          python3 scripts/developer-guide/find_unused_images.py docs/developer-guide
 
       - name: Compile Android demo sources
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
@@ -457,9 +454,6 @@ jobs:
           mkdir -p "$REPORT_DIR"
           set +e
           python3 scripts/developer-guide/find_unused_images.py docs/developer-guide \
-            --allow-unused img/autocomplete.png \
-            --allow-unused img/native-theme-menu.png \
-            --allow-unused img/tabs.png \
             --output "$JSON_REPORT" | tee "$TEXT_REPORT"
           STATUS=${PIPESTATUS[0]}
           set -e
