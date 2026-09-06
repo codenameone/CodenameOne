@@ -102,8 +102,10 @@ class AnnotationComponentBindingJava001Snippet {
               getter = "computeFullName",
               setter = "applyFullName")                                           // <3>
         private String fullName;
-        public String computeFullName()      { return fullName.toUpperCase(); }
-        public void   applyFullName(String f){ this.fullName = f.trim(); }
+        // both run during the initial bind, against a model that may still be
+        // empty, so neither can assume a value is present
+        public String computeFullName()      { return fullName == null ? "" : fullName.toUpperCase(); }
+        public void   applyFullName(String f){ this.fullName = f == null ? null : f.trim(); }
     }
     // end::annotation-component-binding-java-001[]
 }
