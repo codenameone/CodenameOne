@@ -12173,11 +12173,53 @@ static _Atomic long long cn1AllocProfBytes[CN1_ALLOC_PROFILE_SLOTS];
 static _Atomic long cn1AllocProfCount[CN1_ALLOC_PROFILE_SLOTS];
 static struct clazz* cn1AllocProfClass[CN1_ALLOC_PROFILE_SLOTS];
 
+// A per-class total answers "what is being allocated" but not "which line
+// allocates it": byte[] is one class and a dozen unrelated call sites. Sizes
+// separate them, because the sites differ in what they allocate -- a 13-byte
+// body, a 48-byte empty array and a 120-byte header block are three distinct
+// buckets even though the profile calls all of them byte[]. Set
+// CN1_ALLOC_SIZE_CLASS to a class name to get its size histogram alongside the
+// totals; the table is tiny and linear-probed because a handful of distinct
+// sizes is the expected case, and a site with a genuinely variable size shows up
+// as the overflow row rather than crowding out the fixed ones.
+#define CN1_ALLOC_SIZE_BUCKETS 48
+static const char* cn1AllocSizeClassName = 0;
+static int cn1AllocSizeClassResolved = 0;
+static _Atomic int cn1AllocSizeKey[CN1_ALLOC_SIZE_BUCKETS];
+static _Atomic long long cn1AllocSizeCount[CN1_ALLOC_SIZE_BUCKETS];
+static _Atomic long long cn1AllocSizeOverflow = 0;
+
+static void cn1RecordAllocationSize(struct clazz* parent, int size) {
+    int i;
+    if(!cn1AllocSizeClassResolved) {
+        cn1AllocSizeClassName = getenv("CN1_ALLOC_SIZE_CLASS");
+        cn1AllocSizeClassResolved = 1;
+    }
+    if(cn1AllocSizeClassName == 0 || parent->clsName == 0 ||
+       strcmp(parent->clsName, cn1AllocSizeClassName) != 0) {
+        return;
+    }
+    for(i = 0 ; i < CN1_ALLOC_SIZE_BUCKETS ; i++) {
+        int k = atomic_load_explicit(&cn1AllocSizeKey[i], memory_order_relaxed);
+        if(k == size) {
+            atomic_fetch_add_explicit(&cn1AllocSizeCount[i], 1, memory_order_relaxed);
+            return;
+        }
+        if(k == 0) {
+            atomic_store_explicit(&cn1AllocSizeKey[i], size, memory_order_relaxed);
+            atomic_fetch_add_explicit(&cn1AllocSizeCount[i], 1, memory_order_relaxed);
+            return;
+        }
+    }
+    atomic_fetch_add_explicit(&cn1AllocSizeOverflow, 1, memory_order_relaxed);
+}
+
 void cn1RecordAllocation(struct clazz* parent, int size) {
     int id;
     if(parent == 0) {
         return;
     }
+    cn1RecordAllocationSize(parent, size);
     id = parent->classId;
     if(id < 0 || id >= CN1_ALLOC_PROFILE_SLOTS) {
         return;
@@ -12226,6 +12268,28 @@ static void cn1ReportAllocProfile(void) {
                         atomic_load_explicit(&cn1AllocProfCount[best], memory_order_relaxed)));
         atomic_store_explicit(&cn1AllocProfBytes[best], 0, memory_order_relaxed);
         printed++;
+    }
+    if(cn1AllocSizeClassName != 0) {
+        int i;
+        // Descending by count, selection-style: the table is 48 entries and this
+        // runs once at exit, so the quadratic scan costs nothing and keeps the
+        // hot recorder free of any ordering work.
+        for(;;) {
+            int bestIdx = -1;
+            long long bestCount = 0;
+            for(i = 0 ; i < CN1_ALLOC_SIZE_BUCKETS ; i++) {
+                long long c = atomic_load_explicit(&cn1AllocSizeCount[i], memory_order_relaxed);
+                if(c > bestCount) { bestCount = c; bestIdx = i; }
+            }
+            if(bestIdx < 0) { break; }
+            fprintf(stderr, "[ALLOCSIZE] %-28s bytes=%-8d count=%lld\n",
+                    cn1AllocSizeClassName,
+                    atomic_load_explicit(&cn1AllocSizeKey[bestIdx], memory_order_relaxed),
+                    bestCount);
+            atomic_store_explicit(&cn1AllocSizeCount[bestIdx], 0, memory_order_relaxed);
+        }
+        fprintf(stderr, "[ALLOCSIZE] %-28s overflow=%lld\n", cn1AllocSizeClassName,
+                atomic_load_explicit(&cn1AllocSizeOverflow, memory_order_relaxed));
     }
     fflush(stderr);
 }

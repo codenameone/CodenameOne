@@ -1999,6 +1999,28 @@ public final class HttpServer {
                     if(!ServerSocket.awaitReadable(fd, linger)) {
                         break;                  // quiet client; the poller can have it
                     }
+                    // The request this buffer was parsed from has been ANSWERED,
+                    // so nothing points into it any more and the borrow can be
+                    // dropped rather than copied.
+                    //
+                    // Without this, fill() below sees parsedFromBuffer still set
+                    // from the request just served, reads that as "midway through a
+                    // request", and takes detachPreservingOffsets -- a full copy of
+                    // the borrowed buffer on EVERY keep-alive request. Measured on
+                    // /plaintext under virtual threads: 1989689 detaches against
+                    // 2000000 reads, one 97-byte array per request, 37% of
+                    // everything the route allocated. The zero-copy read was
+                    // working perfectly and handing the saving straight back here.
+                    //
+                    // The flag's real job is the SECOND read within one request (a
+                    // body arriving after its headers), where slices into this
+                    // array are live and the copy is required. That case is
+                    // untouched: readRequest clears the flag on entry and raises it
+                    // once the header block is parsed, so it is set exactly across
+                    // the window where a Request exists. This point is outside that
+                    // window by construction -- the handler has returned and the
+                    // response is on the wire.
+                    conn.parsedFromBuffer = false;
                     more = conn.fill(scratch);
                 } catch (IOException err) {
                     drop(fd);
