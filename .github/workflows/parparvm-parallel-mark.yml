@@ -53,7 +53,19 @@ on:
     paths:
       - 'vm/ByteCodeTranslator/src/cn1_globals.m'
       - 'vm/ByteCodeTranslator/src/cn1_globals.h'
-      - 'vm/tests/src/test/java/com/codename1/tools/translator/Gc*.java'
+      # One entry per test the matrix below runs, plus the helper that injects
+      # CN1_TEST_EXTRA_CFLAGS. Keep this list and the -Dtest list in sync: a glob
+      # is what went wrong here, because Gc*.java matched three of the six tests
+      # and silently let the other three -- and every change to the flag plumbing
+      # every arm depends on to select its marker count -- land without the
+      # workflow that exercises them ever running.
+      - 'vm/tests/src/test/java/com/codename1/tools/translator/GcHeapIntegrityIntegrationTest.java'
+      - 'vm/tests/src/test/java/com/codename1/tools/translator/GcOverflowSpiralIntegrationTest.java'
+      - 'vm/tests/src/test/java/com/codename1/tools/translator/GcUncooperativeThreadIntegrationTest.java'
+      - 'vm/tests/src/test/java/com/codename1/tools/translator/LargeArrayGcIntegrationTest.java'
+      - 'vm/tests/src/test/java/com/codename1/tools/translator/LowMemoryThrottleIntegrationTest.java'
+      - 'vm/tests/src/test/java/com/codename1/tools/translator/BibopPageFloorIntegrationTest.java'
+      - 'vm/tests/src/test/java/com/codename1/tools/translator/CompilerHelper.java'
       - '.github/workflows/parparvm-parallel-mark.yml'
 
 concurrency:
