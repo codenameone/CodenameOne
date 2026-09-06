@@ -936,6 +936,44 @@ public class JavaSEPort extends CodenameOneImplementation {
         designMode = aDesignMode;
     }
 
+    /// The backing scale of the display the pixels actually land on.
+    ///
+    /// This port is a deployment target, not only the simulator -- a desktop
+    /// build runs on it -- and there the host display's scale is exactly the
+    /// question this API asks, the same thing UIScreen.scale answers on iOS.
+    /// It is what the port already sizes its own buffers and fonts with, so a
+    /// caller sizing a bitmap from it matches what gets rasterised.
+    ///
+    /// Under a device skin the simulator is imitating a phone whose real scale
+    /// may differ, but the pixels still land on this display, so this stays the
+    /// useful answer for anything choosing a bitmap resolution. It also honours
+    /// the cn1.retinaScale property and CN1_RETINA_SCALE, which is how a
+    /// developer pins the value when testing.
+    ///
+    /// Secondary windows can sit on a monitor with a different transform --
+    /// see canvasScale() -- but this question is asked of the Display as a
+    /// whole, so it answers for the main one.
+    ///
+    /// retinaScale is captured once at start-up and is NOT re-read when the main
+    /// window is dragged to a monitor with a different scale. That is deliberate
+    /// here rather than an oversight, and reading the current GraphicsConfiguration
+    /// instead would make this WRONG: the main canvas renders at exactly this
+    /// value. canvasScale() returns retinaScale for windowId 0, and that is what
+    /// sizes the surface, allocates the backing buffer, and sets the blit, paint
+    /// and pointer scales. Reporting a scale the renderer is not using would hand
+    /// callers a number their artwork then fails to match, which is the very
+    /// mismatch the question is asked to avoid.
+    ///
+    /// The main window not following its display IS a real limitation, but it is
+    /// one of the rendering path: the fix is for canvasScale() to track the
+    /// canvas's configuration for window 0 as it already does for the others, at
+    /// which point this method follows for free because it reports whatever the
+    /// port draws with. Changing only this accessor would just split the two.
+    @Override
+    public float getDevicePixelRatio() {
+        return retinaScale > 0 ? (float) retinaScale : super.getDevicePixelRatio();
+    }
+
     public int getDeviceDensity() {
         if(defaultPixelMilliRatio != null) {
             /*
@@ -3788,7 +3826,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if(menuDisplayed){
                 return;
             }
-            
+
             // We keep a blitCounter that gets reset in paintComponent()
             // If blit is called a number of times with no call to paintComponet
             // in between then it is probably safe to just use a shared 
@@ -3851,7 +3889,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 Runnable r = new Runnable() {
                     public void run() {
                         if (buffer != null) {
-                            
+
                             java.awt.Graphics g = getGraphics();
                             if (g == null) {
                                 return;

@@ -132,6 +132,10 @@ static GLuint getOGLProgram(){
 #endif
     return self;
 }
+-(void)setCornerRadius:(float)r {
+    cornerRadius = r;
+}
+
 #if TARGET_OS_WATCH
 -(void)execute {
     CN1Image *src = [img getImage];
@@ -143,7 +147,11 @@ static GLuint getOGLProgram(){
 #elif defined(USE_ES2)
 -(void)execute {
 #ifdef CN1_USE_METAL
-    CN1MetalDrawImage([img getMTLTexture], alpha, x, y, width, height);
+    if (cornerRadius > 0.0f) {
+        CN1MetalDrawImageRounded([img getMTLTexture], alpha, x, y, width, height, cornerRadius);
+    } else {
+        CN1MetalDrawImage([img getMTLTexture], alpha, x, y, width, height);
+    }
 #else
     glUseProgram(getOGLProgram());
     GLKVector4 color = GLKVector4Make(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);

@@ -65,6 +65,10 @@
     return scale > 0 ? (int)(bufferHeight / scale) : bufferHeight;
 }
 
+- (CGFloat)backingScale {
+    return scale;
+}
+
 - (void)setFramebuffer {
     // Bind the bitmap context to the CG backend for the upcoming op queue.
     CN1CGBeginFrame(bitmapContext, bufferWidth / scale, bufferHeight / scale);

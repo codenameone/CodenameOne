@@ -153,6 +153,14 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     private final EventDispatcher changeDispatcher = new EventDispatcher();
     private final int valign = CENTER;
     private boolean value;
+    /// Whether the THEME supplied the artwork, rather than this component
+    /// generating it. calcPreferredSize can derive the generated artwork's size
+    /// arithmetically because it is a pure function of the font and the scale
+    /// constants, but a theme image is any size at all and has to be measured.
+    /// Recorded when the theme is read, because the generated images are cached
+    /// into these same fields and a null check cannot tell the two apart later.
+    private boolean themedArtwork;
+
     private Image thumbOnImage;
     private Image thumbOffImage;
     private Image thumbDisabledImage;
@@ -370,8 +378,75 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         return img;
     }
 
+    /// Rasterised switch artwork, shared by every Switch in the application.
+    ///
+    /// The thumb and track are pure functions of their arguments and of the
+    /// theme, but each Switch used to rasterise its own six images - and the
+    /// thumb goes through a gaussian blur, which is the single most expensive
+    /// thing a component can do while it is being laid out for the first time.
+    /// A settings screen with a column of switches therefore paid that cost
+    /// once per row, on the first-frame critical path, for six pixel-identical
+    /// images. Keyed by everything that can change the result, and thrown away
+    /// whenever the theme changes (see UIManager.getThemeGeneration).
+    private static final java.util.HashMap<String, Image> SHARED_ART =
+            new java.util.HashMap<String, Image>();
+    private static int sharedArtGeneration = -1;
+
+    /// The default factory the cached artwork was built by. An app that installs a
+    /// new global factory does not advance the theme generation, so without this
+    /// a later switch matched an existing key and got an image the OLD factory
+    /// made -- and the new factory was never asked.
+    private static ImageFactory sharedArtFactory;
+
+    /// A ceiling on the shared artwork.
+    ///
+    /// The key carries the dimension, colour, inset and enabled state, so an app
+    /// that restyles a switch -- or makes many short-lived switches with
+    /// different colours -- generates a new entry each time, and each entry is a
+    /// mutable image holding a native texture. Bounded rather than reclaimable
+    /// because the whole point is to keep the six images a row of identical
+    /// switches shares; past the ceiling the artwork is still built, it is just
+    /// not remembered.
+    private static final int SHARED_ART_LIMIT = 64;
+
+    /// The shared artwork cache for the CURRENT theme, or null when {@code context}
+    /// carries a non-default ImageFactory (in which case the image is
+    /// context-specific and must not be shared).
+    private static java.util.HashMap<String, Image> sharedArt(Component context) {
+        // IDENTITY deliberately: the question is whether this context was given a
+        // different factory INSTANCE from the default, and two distinct factories
+        // that happened to compare equal would still produce images that must not
+        // be shared between contexts.
+        if (ImageFactory.getImageFactory(context) != ImageFactory.getImageFactory(null)) { //NOPMD CompareObjectsWithEquals
+            return null;
+        }
+        ImageFactory defaultFactory = ImageFactory.getImageFactory(null);
+        int gen = UIManager.getThemeGeneration();
+        if (gen != sharedArtGeneration || defaultFactory != sharedArtFactory) { //NOPMD CompareObjectsWithEquals
+            SHARED_ART.clear();
+            sharedArtGeneration = gen;
+            sharedArtFactory = defaultFactory;
+        }
+        return SHARED_ART;
+    }
+
     private static Image createPlatformThumbImage(Component context, int pxDim, int color, int shadowSpread, int thumbInset) {
-        return createRoundThumbImage(context, pxDim, color, shadowSpread, thumbInset);
+        java.util.HashMap<String, Image> cache = sharedArt(context);
+        if (cache == null) {
+            return createRoundThumbImage(context, pxDim, color, shadowSpread, thumbInset);
+        }
+        // isEnabled participates because the liquid-glass sheen is only drawn on
+        // an enabled switch.
+        String key = "t," + pxDim + ',' + color + ',' + shadowSpread + ',' + thumbInset
+                + ',' + (context != null && context.isEnabled());
+        Image img = cache.get(key);
+        if (img == null) {
+            img = createRoundThumbImage(context, pxDim, color, shadowSpread, thumbInset);
+            if (cache.size() < SHARED_ART_LIMIT) {
+                cache.put(key, img);
+            }
+        }
+        return img;
     }
 
     private static Image createRoundRectTrackImage(Component context, int width, int height, int color, int alpha, int thumbPadding, int outlineColor, int outlineWidth) {
@@ -399,7 +474,20 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     }
 
     private static Image createPlatformTrackImage(Component context, int width, int height, int color, int alpha, int thumbPadding, int outlineColor, int outlineWidth) {
-        return createRoundRectTrackImage(context, width, height, color, alpha, thumbPadding, outlineColor, outlineWidth);
+        java.util.HashMap<String, Image> cache = sharedArt(context);
+        if (cache == null) {
+            return createRoundRectTrackImage(context, width, height, color, alpha, thumbPadding, outlineColor, outlineWidth);
+        }
+        String key = "k," + width + ',' + height + ',' + color + ',' + alpha + ','
+                + thumbPadding + ',' + outlineColor + ',' + outlineWidth;
+        Image img = cache.get(key);
+        if (img == null) {
+            img = createRoundRectTrackImage(context, width, height, color, alpha, thumbPadding, outlineColor, outlineWidth);
+            if (cache.size() < SHARED_ART_LIMIT) {
+                cache.put(key, img);
+            }
+        }
+        return img;
     }
 
     private static int getAlignedCoord(int coord, int parentDim, int elemDim, int alignment) {
@@ -697,15 +785,92 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
-        // Each of these can be null if the platform failed to make an image, and
-        // the resulting NullPointerException names none of them.
-        requireImage(getCurrentThumbImage(), "thumb");
-        requireImage(getCurrentTrackOnImage(), "trackOn");
-        requireImage(getCurrentTrackOffImage(), "trackOff");
+        // MEASURED, not rasterised. This used to ask for the thumb and track
+        // images and read their dimensions -- which creates them, and creating
+        // the thumb runs a gaussian blur. Measuring a component happens during
+        // layout, and layout happens for everything on the screen including the
+        // parts of it that are off-screen, so a switch that is never painted
+        // still paid for its artwork on the first frame. Measured on a native
+        // Mac build of a screen whose settings panel sits off-screen behind the
+        // home page, that single blur was ~50ms of a ~155ms cold start.
+        //
+        // The images are pure functions of these same numbers (see
+        // createRoundThumbImage / createRoundRectTrackImage), so the size can be
+        // derived from them directly; the artwork is then built by the first
+        // paint that actually needs it.
+        // ... but only for artwork this component GENERATES. A theme that
+        // supplies its own thumb or track sets the size itself, and deriving it
+        // from the font would under-measure a larger image and clip it. There is
+        // nothing to derive from in that case, so it is measured as before --
+        // the switches that pay the rasterisation are exactly the ones whose
+        // size cannot be known without it.
+        if (themedArtwork) {
+            requireImage(getCurrentThumbImage(), "thumb");
+            requireImage(getCurrentTrackOnImage(), "trackOn");
+            requireImage(getCurrentTrackOffImage(), "trackOff");
+            return new Dimension(
+                    getStyle().getHorizontalPadding() + Math.max(getCurrentThumbImage().getWidth(),
+                            Math.max(getCurrentTrackOnImage().getWidth(), getCurrentTrackOffImage().getWidth())),
+                    getStyle().getVerticalPadding() + Math.max(getCurrentThumbImage().getHeight(),
+                            Math.max(getCurrentTrackOnImage().getHeight(), getCurrentTrackOffImage().getHeight())));
+        }
+        // The same on/off/disabled selection getCurrentThumbImage makes, so the
+        // measurement is identical to the one the images gave.
+        int fontSize = getFontSize();
+        int thumbInset = getThumbInset();
+        boolean onThumb = isEnabled() && value;
+        int thumbDim = (int) (fontSize * (onThumb ? getThumbScaleY() : getThumbOffScaleY()));
+        int thumbSpread = onThumb ? THUMB_ON_SHADOW_SPREAD : getThumbShadowSpread();
+        int thumbW = thumbWidth(thumbDim, thumbSpread, thumbInset);
+        int thumbH = thumbDim + 2 * thumbSpread;
+        // Both track images are built from the same width and height; the
+        // outline is drawn INSIDE the box, so it does not change the size.
+        int trackW = (int) (fontSize * getTrackScaleX()) + 2 * TRACK_THUMB_PADDING;
+        int trackH = (int) (fontSize * getTrackScaleY());
         return new Dimension(
-                getStyle().getHorizontalPadding() + Math.max(getCurrentThumbImage().getWidth(), Math.max(getCurrentTrackOnImage().getWidth(), getCurrentTrackOffImage().getWidth())),
-                getStyle().getVerticalPadding() + Math.max(getCurrentThumbImage().getHeight(), Math.max(getCurrentTrackOnImage().getHeight(), getCurrentTrackOffImage().getHeight())));
+                getStyle().getHorizontalPadding() + Math.max(thumbW, trackW),
+                getStyle().getVerticalPadding() + Math.max(thumbH, trackH));
+    }
 
+    /// TEST-ONLY: the artwork this switch would paint, for the test that pins
+    /// calcPreferredSize's arithmetic against the images it replaced.
+    Image currentThumbImageForTest() {
+        return getCurrentThumbImage();
+    }
+
+    Image currentTrackOnImageForTest() {
+        return getCurrentTrackOnImage();
+    }
+
+    Image currentTrackOffImageForTest() {
+        return getCurrentTrackOffImage();
+    }
+
+    /// TEST-ONLY: whether any of this switch's artwork has been built yet.
+    boolean hasRasterisedArtworkForTest() {
+        return thumbOnImage != null || thumbOffImage != null || thumbDisabledImage != null
+                || trackOnImage != null || trackOffImage != null || trackDisabledImage != null;
+    }
+
+    /// The shadow spread the ON thumb keeps on every platform; see getThumbOnImage.
+    private static final int THUMB_ON_SHADOW_SPREAD = 2;
+
+    /// The horizontal padding every track image is built with; see getTrackOnImage.
+    private static final int TRACK_THUMB_PADDING = 2;
+
+    /// The width createRoundThumbImage would produce for these inputs, without
+    /// producing it. Kept beside that method: the two must agree.
+    private static int thumbWidth(int pxDim, int shadowSpread, int thumbInset) {
+        float widthScale = 1.0f;
+        try {
+            widthScale = Float.parseFloat(UIManager.getInstance().getThemeConstant(
+                    "switchThumbWidthScale", "1.0"));
+        } catch (NumberFormatException malformed) {
+            widthScale = 1.0f;
+        }
+        int baseH = Math.max(1, pxDim - 2 * thumbInset);
+        int baseW = Math.max(baseH, Math.round(baseH * widthScale));
+        return baseW + 2 * (shadowSpread + thumbInset);
     }
 
     /// Fails with the name of the image that could not be built, rather than a
@@ -761,6 +926,11 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
                 getThemeImageConstant(getUIID().toLowerCase() + "OffTrackImage"));
         setTrackDisabledImage(UIManager.getInstance().
                 getThemeImageConstant(getUIID().toLowerCase() + "DisabledTrackImage"));
+        // Everything above assigns only when the theme actually supplied an
+        // image, so anything non-null here came from the theme.
+        themedArtwork = thumbOnImage != null || thumbOffImage != null
+                || thumbDisabledImage != null || trackOnImage != null
+                || trackOffImage != null || trackDisabledImage != null;
     }
 
     /// {@inheritDoc}
@@ -857,8 +1027,13 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     @Override
     public void paint(Graphics g) {
 
+        // Named here rather than in calcPreferredSize, which no longer asks for
+        // the artwork at all -- measuring a switch is arithmetic now, so this is
+        // the first place a platform that cannot build the images shows up.
         Image cthumbImage = getCurrentThumbImage();
+        requireImage(cthumbImage, "thumb");
         Image cTrackImage = value ? getCurrentTrackOnImage() : getCurrentTrackOffImage();
+        requireImage(cTrackImage, value ? "trackOn" : "trackOff");
         //Image ctrackOnImage = getCurrentTrackOnImage();
         //Image ctrackOffImage = getCurrentTrackOffImage();
         int strackLength = Math.max(cTrackImage.getWidth(), cTrackImage.getWidth());

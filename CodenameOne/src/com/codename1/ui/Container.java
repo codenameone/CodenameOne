@@ -2952,6 +2952,28 @@ public class Container extends Component implements Iterable<Component> {
 
     }
 
+    // NOT suppressed, deliberately -- see the history before changing this.
+    //
+    // The padding written by the safe-area snap is scaffolding: doLayout and
+    // calcPreferredSize set it, use it for one measurement, and hand it straight
+    // back to TmpInsets.restore, which has always suppressed events. Only the
+    // SETTING half announces, and a padding change is exactly what
+    // Component.styleChanged answers with revalidateLater() on the parent -- so
+    // laying out a safe-area container queues another revalidate of the whole
+    // Form, which lays it out again, which queues another. On a busy event
+    // dispatch thread that treadmill measured ~200ms per pass against ~15ms of
+    // real painting.
+    //
+    // Suppressing the announcement removes the treadmill and is WRONG here
+    // anyway: peer components rely on those repaints. The JavaSE video peer
+    // fills its buffer from the AWT side and never asks for a repaint itself
+    // (Peer.paint deliberately calls paintOnBuffer rather than cnt.repaint, to
+    // avoid a loop), so with nothing else repainting the form its frames never
+    // reach the screen -- a video that decoded correctly and displayed nothing.
+    //
+    // Fixing the treadmill therefore needs the peers to drive their own
+    // repaints first; until then the wasted passes are the cheaper defect.
+
     void doLayout() {
         doLayoutDepth++;
         boolean restoreBounds = false;

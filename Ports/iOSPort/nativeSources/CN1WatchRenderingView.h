@@ -67,6 +67,14 @@
 - (int)logicalWidth;
 - (int)logicalHeight;
 
+// Device pixels per logical point for the backing bitmap. CN1 draws this slice
+// in points -- the bitmap context carries a scale CTM -- so this, not the global
+// scaleValue, is the real device-pixel ratio here: scaleValue is only ever
+// assigned from [UIScreen mainScreen].scale, which the watch slice compiles out,
+// so it stays 1 forever. Sizing a bitmap resource from 1 on a Retina watch
+// produces a 1x asset that is then drawn through this scale CTM.
+- (CGFloat)backingScale;
+
 // The most recent rendered frame, or nil before the first present.
 - (CN1Image *)currentFrame;
 

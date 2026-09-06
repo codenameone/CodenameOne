@@ -423,6 +423,7 @@ public class Image implements ActionSource {
         }
     }
 
+
     /// The main use case of this method is the automatic rotation and flipping
     /// of an image returned from the camera or from the gallery, preserving the
     /// original format (jpeg or png); it detects the Exif Orientation Tag, if
@@ -1535,6 +1536,24 @@ public class Image implements ActionSource {
     /// - `h`: the height to occupy
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
         g.drawImageWH(image, x, y, w, h);
+    }
+
+    /// The native peer a rounded draw may use, or null if this image cannot be
+    /// drawn from its peer alone.
+    ///
+    /// Drawing an Image is a VIRTUAL call: ComponentImage, DynamicImage,
+    /// FontImage, RGBImage and SVGScaledView all override drawImage and paint
+    /// procedurally, and several of them have no native peer at all, so handing
+    /// getImage() to a rounded draw renders nothing. A rotation is lost the same
+    /// way -- rotate() hands back an image sharing this peer with the angle kept
+    /// in transform, which the peer does not carry.
+    ///
+    /// So the default answers only for a plain, unrotated Image, and anything
+    /// else -- including a subclass added later -- declines and is drawn square
+    /// by the normal path. That is the documented behaviour when a platform
+    /// cannot round, so a caller already handles it.
+    Object roundedDrawPeer() {
+        return getClass() == Image.class && transform == 0 ? image : null;
     }
 
     /// Callback invoked internally by Codename One to draw a portion of the image onto the display.

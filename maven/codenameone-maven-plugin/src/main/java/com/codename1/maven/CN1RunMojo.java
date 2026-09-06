@@ -69,6 +69,10 @@ public class CN1RunMojo extends AbstractCN1Mojo {
         request.setProfiles(Arrays.asList("simulator"));
         Properties props = nestedBuildProperties(
                 getSession() == null ? null : getSession().getUserProperties());
+        // nestedBuildProperties forwards the codename1.* user properties; the
+        // nested build also has to inherit -Dmaven.repo.local or it resolves
+        // against a different repository than the one this build installed into.
+        forwardLocalRepository(props);
         request.setProperties(props);
         request.setBaseDirectory(rootMavenProjectDir);
 
