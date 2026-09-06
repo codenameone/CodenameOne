@@ -6353,10 +6353,41 @@ static long cn1BibopTriggerFloor(long liveBytes) {
     if(liveBytes < 0) {
         liveBytes = 0;
     }
-    if(liveBytes > bibopLiveHighWater) {
-        bibopLiveHighWater = liveBytes;
+    // The high-water smooths the floor UPWARD and must not hold it up on the way
+    // down. Substituting it for the sample unconditionally latches: the floor is
+    // derived from a live set that is already gone, the raised trigger means the
+    // next sweep is far away, and the decay above only runs per sweep -- so a high
+    // floor buys itself the very scarcity of cycles that keeps it high.
+    //
+    // That is not hypothetical. cn1BibopTrimFreePool, which hands surplus pages
+    // back to the OS, runs ONLY at the end of a sweep. With the latch in place
+    // BibopPageFloorIntegrationTest dropped a 196MB live set and got 6% of its
+    // pages back instead of the 91% the same commit returned on a luckier run,
+    // because after the drop the trigger was raised toward the floor the departed
+    // live set justified and no further sweep arrived to trim anything. On master,
+    // which has no floor at all, low survival simply halves the trigger and the
+    // pages come back.
+    //
+    // So the two directions are treated differently, which is the asymmetry that
+    // was missing rather than a new policy: growth is damped through the
+    // high-water, and a collapse is believed immediately. A steady live set has
+    // sample and high-water in the same place and is unaffected either way.
+    {
+        long sampleFloor;
+        if(liveBytes > bibopLiveHighWater) {
+            bibopLiveHighWater = liveBytes;
+        }
+        sampleFloor = liveBytes;
+        liveBytes = bibopLiveHighWater;
+        if(sampleFloor < liveBytes) {
+            // Believe the smaller CURRENT reading, with one MIN of slack so a
+            // sample that merely dipped does not slam the floor to the minimum.
+            long relaxed = sampleFloor + CN1_BIBOP_GC_MIN_TRIGGER_BYTES;
+            if(relaxed < liveBytes) {
+                liveBytes = relaxed;
+            }
+        }
     }
-    liveBytes = bibopLiveHighWater;
     // The multiply is done in long long so a large live set cannot wrap the
     // percentage before the clamp sees it.
     {
