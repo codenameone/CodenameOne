@@ -642,6 +642,10 @@ static JAVA_BOOLEAN cn1GcPageIndexStale = JAVA_FALSE;
 // peak footprint. Tracer-gated, like the counters above.
 static _Atomic long long cn1GcAllocatedTotal = 0;
 static _Atomic int cn1GcOverflowTrace = -1;
+#ifdef CN1_GC_CONFORM
+void cn1RecordAllocation(struct clazz* parent, int size);
+#endif
+
 static int cn1GcOverflowTraceOn(void) {
     int on = atomic_load_explicit(&cn1GcOverflowTrace, memory_order_relaxed);
     if(on < 0) {
@@ -4118,8 +4122,32 @@ BOOL isAppSuspended = 0;
 // floor than the old constant (20MB live at 100% growth asks for 40MB, where the
 // constant gave 24MB), so this is more generous exactly where the old rule was
 // stingy and tighter only where it was wasteful.
+// The floor never drops BELOW the old constant by default, and that default is
+// the conservative one on purpose.
+//
+// Sizing the floor from the live set is right in principle, but liveBytes is a
+// per-sweep sample that systematically understates: the sweep walks the retired
+// list, and pages the major sweep splices out of a partial pool are withheld
+// from policy statistics (see statsExcluded). A decaying high-water delays the
+// consequence rather than removing it -- roughly twenty low-survival cycles and
+// a stable 20MB live set is estimated at the minimum, after which the collector
+// retraces that heap every few megabytes.
+//
+// Measured rather than argued: with the minimum at 4MB,
+// GcSteadyStateIntegrationTest fails itself in CI with "pinning the free-memory
+// reading to 16MB did not make the per-thread pending table fill, so this
+// scenario and its twin measure nothing" -- cyclesOnDemand=5598 and 22331 volume
+// parks, which is the collector running continuously because the trigger sat at
+// the floor. ProcessBudgetPacingIntegrationTest's 72MB static cap floor
+// (3 x 24MB) is derived from this constant too.
+//
+// So the proportional rule now only ever RAISES the floor: an application with a
+// real live set gets more headroom than the constant gave it, and nothing gets
+// less. A deployment that knows its live set is tiny -- the backend, whose
+// resident memory fell from 98MB to 38MB on this -- opts in by defining
+// CN1_BIBOP_GC_MIN_TRIGGER_BYTES lower at build time.
 #ifndef CN1_BIBOP_GC_MIN_TRIGGER_BYTES
-#define CN1_BIBOP_GC_MIN_TRIGGER_BYTES (4*1024*1024)
+#define CN1_BIBOP_GC_MIN_TRIGGER_BYTES CN1_BIBOP_GC_TRIGGER_BYTES
 #endif
 #ifndef CN1_BIBOP_HEAP_GROWTH_PERCENT
 #define CN1_BIBOP_HEAP_GROWTH_PERCENT 100
@@ -9091,6 +9119,9 @@ static void cn1GcSelfCheckThreadStack(struct ThreadLocalData* t, int stackSize) 
 #endif /* CN1_CONSERVATIVE_GC_ROOTS */
 
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
+#ifdef CN1_GC_CONFORM
+    cn1RecordAllocation(parent, size);
+#endif
 cn1GcMallocRetry:
     CN1_CLAZZ_REGISTER(parent); // first-alloc-per-class: exact clazz registry for the GC guard
     if(isAppSuspended) {
@@ -12129,6 +12160,72 @@ static long long cn1StallPercentileUs(int cause, double q) {
 
 // The whole-run table. Printed at exit so a run that ends in a kill still leaves the
 // 1Hz series behind, and a run that ends cleanly leaves the distribution too.
+#ifdef CN1_GC_CONFORM
+// PER-CLASS ALLOCATION PROFILE.
+//
+// Four attempts to cut allocation on the backend's hot path were aimed by
+// reading code, and all four missed: a per-request buffer copy that turned out
+// to be per-connection, a header materialisation the load generator never
+// triggers. 662 bytes per request on /plaintext is a fact; WHERE they come from
+// was guesswork. This counts every allocation by class so the answer is a table
+// rather than an argument.
+//
+// CONFORM-only, two relaxed atomics on the allocation path, printed at exit.
+#define CN1_ALLOC_PROFILE_SLOTS 8192
+static _Atomic long long cn1AllocProfBytes[CN1_ALLOC_PROFILE_SLOTS];
+static _Atomic long cn1AllocProfCount[CN1_ALLOC_PROFILE_SLOTS];
+static struct clazz* cn1AllocProfClass[CN1_ALLOC_PROFILE_SLOTS];
+
+void cn1RecordAllocation(struct clazz* parent, int size) {
+    int id;
+    if(parent == 0) {
+        return;
+    }
+    id = parent->classId;
+    if(id < 0 || id >= CN1_ALLOC_PROFILE_SLOTS) {
+        return;
+    }
+    cn1AllocProfClass[id] = parent;
+    atomic_fetch_add_explicit(&cn1AllocProfBytes[id], (long long)size, memory_order_relaxed);
+    atomic_fetch_add_explicit(&cn1AllocProfCount[id], 1, memory_order_relaxed);
+}
+
+static void cn1ReportAllocProfile(void) {
+    long long total = 0;
+    int i;
+    int printed = 0;
+    for(i = 0 ; i < CN1_ALLOC_PROFILE_SLOTS ; i++) {
+        total += atomic_load_explicit(&cn1AllocProfBytes[i], memory_order_relaxed);
+    }
+    fprintf(stderr, "[ALLOCPROF] totalBytes=%lld\n", total);
+    // Top twenty by bytes, selected by repeated max rather than a sort: this runs
+    // once at exit and the table is small.
+    while(printed < 20) {
+        int best = -1;
+        long long bestBytes = 0;
+        for(i = 0 ; i < CN1_ALLOC_PROFILE_SLOTS ; i++) {
+            long long b = atomic_load_explicit(&cn1AllocProfBytes[i], memory_order_relaxed);
+            if(b > bestBytes) {
+                bestBytes = b;
+                best = i;
+            }
+        }
+        if(best < 0) {
+            break;
+        }
+        fprintf(stderr, "[ALLOCPROF] %-44s bytes=%-12lld count=%-10ld avg=%lld\n",
+                (cn1AllocProfClass[best] != 0 && cn1AllocProfClass[best]->clsName != 0)
+                        ? cn1AllocProfClass[best]->clsName : "?",
+                bestBytes,
+                atomic_load_explicit(&cn1AllocProfCount[best], memory_order_relaxed),
+                bestBytes / (atomic_load_explicit(&cn1AllocProfCount[best], memory_order_relaxed) | 1));
+        atomic_store_explicit(&cn1AllocProfBytes[best], 0, memory_order_relaxed);
+        printed++;
+    }
+    fflush(stderr);
+}
+#endif
+
 static void cn1ReportStalls(void) {
     long long wallMs = cn1GcProbeElapsedMs();
     // Mutator-only, to match the thread count it is divided by; the per-cause table below
@@ -12441,6 +12538,9 @@ void initConstantPool() {
     cn1StartSimulatedMemoryWarnings();
 #ifdef CN1_GC_CONFORM
     atexit(cn1ReportStalls);
+#ifdef CN1_GC_CONFORM
+    atexit(cn1ReportAllocProfile);
+#endif
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     // The self test sorts the conservative extent table, which only exists on
     // this arm. Calling it under CN1_GC_CONFORM alone does not compile, so
