@@ -156,6 +156,13 @@ final class LocationButtonManifestFragments {
             "getLastLocation",
         },
         {
+            // Play services' geofencing client. Geofencing needs precise
+            // location as much as a fix does, and a plain jar using it has no
+            // manifest to say so either.
+            "com/google/android/gms/location/GeofencingClient",
+            "addGeofences",
+        },
+        {
             // AndroidX's wrapper over the platform manager. Its calls reach
             // the same provider and need the same permission, and a plain jar
             // using it has no manifest to say so either.
@@ -2563,6 +2570,52 @@ final class LocationButtonManifestFragments {
         return false;
     }
 
+    /**
+     * The constant string a loader call is given, or null.
+     *
+     * <p>Literals joined by {@code +} are one constant to the compiler --
+     * {@code Class.forName("com.codename1.location." + "LocationButton")}
+     * loads the button as surely as the whole name written out -- so the
+     * pieces are joined here rather than the first one compared alone.</p>
+     *
+     * <p>Constants only. A name built from a variable is not something this
+     * can read, and pretending otherwise would be worse than admitting the
+     * limit: nothing here inspects values.</p>
+     *
+     * @param source the source, comments gone and literal text kept
+     * @param at     the first character after the opening parenthesis
+     * @return the concatenated literal, or null if the argument is not one
+     */
+    private static String constantArgument(String source, int at) {
+        StringBuilder out = new StringBuilder();
+        int walk = at;
+        while (true) {
+            if (walk >= source.length() || source.charAt(walk) != '"') {
+                return null;
+            }
+            walk++;
+            int end = walk;
+            while (end < source.length() && source.charAt(end) != '"') {
+                // No escape handling: a class name has none, and a literal
+                // that needs one is not a class name this cares about.
+                if (source.charAt(end) == '\\') {
+                    return null;
+                }
+                end++;
+            }
+            if (end >= source.length()) {
+                return null;
+            }
+            out.append(source, walk, end);
+            walk = skipSpace(source, end + 1);
+            if (walk < source.length() && source.charAt(walk) == '+') {
+                walk = skipSpace(source, walk + 1);
+                continue;
+            }
+            return out.toString();
+        }
+    }
+
     /** One loader method, looking for {@code method("dotted")}. */
     private static boolean loadsWith(String source, String method,
             String dotted) {
@@ -2574,15 +2627,9 @@ final class LocationButtonManifestFragments {
             if (starts) {
                 int walk = skipSpace(source, after);
                 if (walk < source.length() && source.charAt(walk) == '(') {
-                    walk = skipSpace(source, walk + 1);
-                    if (walk < source.length() && source.charAt(walk) == '"') {
-                        walk++;
-                        if (source.startsWith(dotted, walk)
-                                && walk + dotted.length() < source.length()
-                                && source.charAt(walk + dotted.length())
-                                        == '"') {
-                            return true;
-                        }
+                    if (dotted.equals(constantArgument(source,
+                            skipSpace(source, walk + 1)))) {
+                        return true;
                     }
                 }
             }

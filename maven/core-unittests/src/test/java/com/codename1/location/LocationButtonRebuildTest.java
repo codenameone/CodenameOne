@@ -70,6 +70,17 @@ class LocationButtonRebuildTest extends UITestBase {
     }
 
     /** A bridge that builds peers and remembers what each one was given. */
+    /** A component that records whether the container ever initialised it. */
+    private static final class Marker extends Component {
+        private boolean inited;
+
+        @Override
+        protected void initComponent() {
+            super.initComponent();
+            inited = true;
+        }
+    }
+
     private static final class RecordingBridge implements LocationButtonBridge {
         private final List<Session> sessions = new ArrayList<Session>();
 
@@ -81,7 +92,13 @@ class LocationButtonRebuildTest extends UITestBase {
         private final java.util.Set<PeerComponent> stale =
                 new java.util.HashSet<PeerComponent>();
 
+        /** When true isStale throws, as a port querying native state can. */
+        boolean staleThrows;
+
         public boolean isStale(PeerComponent button) {
+            if (staleThrows) {
+                throw new RuntimeException("native state is being rebuilt");
+            }
             return stale.contains(button);
         }
 
@@ -955,6 +972,37 @@ class LocationButtonRebuildTest extends UITestBase {
         drain();
         assertTrue(button.isUnavailable(),
                 "the CURRENT control failing is what unavailable means");
+    }
+
+    @Test
+    void aLookupThatThrowsDoesNotAbortTheFormsInitialisation() {
+        // A port resolves the bridge against native state and may throw while
+        // that state is being rebuilt -- exactly when this is asked.
+        //
+        // The EDT logs an escaping Throwable rather than rethrowing, so the
+        // exception itself is invisible to a test. What IS visible is the
+        // damage: initComponent aborts, the container stops initialising, and
+        // every component added after this one is left uninitialised. That is
+        // what this asserts, and an earlier version of this test asserted only
+        // that the button survived -- which was true either way.
+        RecordingBridge bridge = install();
+        LocationButton button = new LocationButton();
+        assertEquals(1, bridge.sessions.size());
+
+        Marker after = new Marker();
+        Form form = new Form();
+        form.add(button);
+        form.add(after);
+
+        implementation.setLocationButtonBridgeThrows(true);
+        try {
+            form.show();
+            drain();
+            assertTrue(after.inited,
+                    "a sibling added after the button must still initialise");
+        } finally {
+            implementation.setLocationButtonBridgeThrows(false);
+        }
     }
 
     @Test

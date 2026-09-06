@@ -842,13 +842,15 @@ public class LocationButton extends Container {
     /// False whenever there is no bridge to ask, which is every platform that
     /// draws the fallback -- there is no system session to go stale there.
     private boolean systemButtonIsStale(PeerComponent peer) {
-        LocationButtonBridge bridge = Display.getInstance()
-                .getLocationButtonBridge();
-        if (bridge == null) {
-            return false;
-        }
         try {
-            return bridge.isStale(peer);
+            // The LOOKUP is inside the guard too. A port resolves this
+            // against native state and may throw while that state is being
+            // rebuilt -- which is exactly when this is asked -- and an
+            // exception escaping here aborts the form's initialisation over
+            // a question whose worst honest answer is "keep what you have".
+            LocationButtonBridge bridge = Display.getInstance()
+                    .getLocationButtonBridge();
+            return bridge != null && bridge.isStale(peer);
         } catch (Throwable broken) {
             // A bridge that cannot answer is not a reason to discard a
             // working control; the tap path reports its own failures.

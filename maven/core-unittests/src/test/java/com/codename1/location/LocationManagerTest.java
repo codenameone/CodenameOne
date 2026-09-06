@@ -165,16 +165,21 @@ class LocationManagerTest extends UITestBase {
         assertNull(timedOut, "sanity: the request must time out");
         assertEquals(1, manager.bindCount, "sanity: it bound once");
         assertEquals(0, manager.clearCount,
-                "the timeout must not start a platform clear");
-        assertNull(manager.getLocationListener(),
-                "but the slot is free, which is what the routing reads");
+                "the timeout must not start a platform clear of its own");
+        assertNotNull(manager.getLocationListener(),
+                "and the listener stays INSTALLED, or the next install has "
+                + "nothing to clear and the subscription is orphaned");
 
-        // And the retry starts a fresh timed request rather than falling
-        // through to getCurrentLocation().
+        // The retry starts a fresh timed request rather than falling through
+        // to getCurrentLocation()...
         manager.getCurrentLocationSync(50);
         assertEquals(2, manager.bindCount, "the retry binds again");
         assertEquals(0, manager.getCurrentLocationCalls,
                 "and does not take the already-listening path");
+        // ...and tearing the orphan down is what that same call does, inside
+        // one port call it controls the ordering of.
+        assertEquals(1, manager.clearCount,
+                "the retry's install clears the timed-out subscription");
     }
 
     private static class DummyLocationListener implements LocationListener {

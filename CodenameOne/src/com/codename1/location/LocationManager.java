@@ -91,6 +91,12 @@ public abstract class LocationManager {
     public static final int TEMPORARILY_UNAVAILABLE = 2;
     private static final Object LISTENER_LOCK = new Object();
     private static LocationListener listener;
+
+    /// The installed listener whose timed wait expired, or null.
+    ///
+    /// Routing treats it as absent; the slot still holds it so the next
+    /// install still tears the platform subscription down. See markTimedOut.
+    private static LocationListener timedOut;
     private static Class backgroundlistener;
     private LocationRequest request;
     private int status = TEMPORARILY_UNAVAILABLE;
@@ -160,7 +166,14 @@ public abstract class LocationManager {
     /// the current location or null in case of an error
     public Location getCurrentLocationSync(long timeout) {
         try {
-            if (listener == null) {
+            // A timed-out listener routes as absent, and is deliberately
+            // still INSTALLED. Nulling the field made this branch right and
+            // broke the next setLocationListener, which only calls
+            // clearListener() when it finds a listener to replace: the
+            // platform subscription was then never torn down at all, and on
+            // the JavaSE stub that is a non-daemon Timer still delivering to
+            // an expired LL.
+            if (listener == null || listener == timedOut) { //NOPMD CompareObjectsWithEquals
                 LL l = new LL();
                 l.timeout = timeout;
                 l.bind();
@@ -248,6 +261,9 @@ public abstract class LocationManager {
                 status = TEMPORARILY_UNAVAILABLE;
             }
             listener = l;
+            // Whatever timed out is gone now, whether it was replaced or
+            // cleared: the marker only ever describes the current occupant.
+            timedOut = null;
             if (l == null) {
                 return;
             }
@@ -304,17 +320,25 @@ public abstract class LocationManager {
     /// #### Parameters
     ///
     /// - `l`: the listener to remove if it is still current
-    /// Forgets `l` as the installed listener WITHOUT touching the platform.
+    /// Marks `l` as having timed out, leaving it INSTALLED.
     ///
-    /// For the timed-out request, whose only real damage is to this class's
-    /// own routing: `getCurrentLocationSync` branches on the field. A port
-    /// clear is asynchronous on Android and can overtake the next bind, so
-    /// starting one here would trade a routing bug for a lost subscription.
-    private void releaseIfStill(LocationListener l) {
+    /// Two things have to be true at once and neither may be traded for the
+    /// other. `getCurrentLocationSync` must stop routing through it, or the
+    /// next request takes `getCurrentLocation()` instead of starting a fresh
+    /// timed one. And the platform subscription must still be torn down when
+    /// something replaces it -- `setLocationListener` only calls
+    /// `clearListener()` when it finds a listener there, so forgetting the
+    /// field orphans the subscription for good.
+    ///
+    /// Marking does both: the retry's `setLocationListener` sees a listener,
+    /// clears it and binds within that ONE port call, which is the ordering
+    /// the port controls. Starting a clear here instead would be a separate
+    /// asynchronous one on Android, free to arrive after the retry's bind.
+    private void markTimedOut(LocationListener l) {
         synchronized (LISTENER_LOCK) {
             // Reference identity, for the reason clearListenerIfStill says.
             if (listener == l) { //NOPMD CompareObjectsWithEquals
-                listener = null;
+                timedOut = l;
             }
         }
     }
@@ -439,7 +463,7 @@ public abstract class LocationManager {
                 // parked here -- `finished` is false either way, so an
                 // unconditional release would forget a listener the application
                 // had just installed.
-                releaseIfStill(this);
+                markTimedOut(this);
             }
         }
 

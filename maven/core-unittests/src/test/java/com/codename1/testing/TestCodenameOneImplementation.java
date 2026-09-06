@@ -517,9 +517,23 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         locationButtonBridge = bridge;
     }
 
+    private boolean locationButtonBridgeThrows;
+
+    /**
+     * Makes the LOOKUP itself fail, which a port resolving native state can
+     * do while that state is being rebuilt -- distinct from a bridge that is
+     * present and cannot answer.
+     */
+    public void setLocationButtonBridgeThrows(boolean throwing) {
+        locationButtonBridgeThrows = throwing;
+    }
+
     @Override
     public com.codename1.location.spi.LocationButtonBridge
             getLocationButtonBridge() {
+        if (locationButtonBridgeThrows) {
+            throw new RuntimeException("native state is being rebuilt");
+        }
         return locationButtonBridge;
     }
 

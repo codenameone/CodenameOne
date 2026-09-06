@@ -2200,6 +2200,64 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aGeofencingClientIsPreciseUse() throws Exception {
+        // Geofencing needs precise location as much as a fix does, and a
+        // plain jar using Play services' client has no manifest to say so.
+        File root = tempDir("cn1-lb-geoclient");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "fences.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/Fences.class"));
+            zip.write(methodCallClass(
+                    "com/google/android/gms/location/GeofencingClient",
+                    "addGeofences"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .callsPreciseLocation(),
+                "the geofencing client is precise use");
+    }
+
+    @Test
+    void aConcatenatedReflectiveNameStillLoadsTheButton() throws Exception {
+        // Literals joined by + are one constant to the compiler, so this
+        // loads the button as surely as the whole name written out -- and
+        // comparing only the first piece missed it, which deletes the bridge.
+        File root = tempDir("cn1-lb-concat");
+        writeSource(new File(root, "com/example/Split.java"),
+                "package com.example;\n"
+                + "public class Split {\n"
+                + "  Object f() throws Exception {\n"
+                + "    return Class.forName(\"com.codename1.location.\" + "
+                + "\"LocationButton\");\n"
+                + "  }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesNameTheButton(root),
+                "constant concatenation is still the class name");
+    }
+
+    @Test
+    void aConcatenationOfSomethingElseIsNotTheButton() throws Exception {
+        // And the pieces still have to spell it. Joining two literals that
+        // are not the button's name must not become the button.
+        File root = tempDir("cn1-lb-concat-other");
+        writeSource(new File(root, "com/example/Other.java"),
+                "package com.example;\n"
+                + "public class Other {\n"
+                + "  Object f() throws Exception {\n"
+                + "    return Class.forName(\"com.codename1.location.\" + "
+                + "\"LocationButtonHelper\");\n"
+                + "  }\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments
+                        .sourcesNameTheButton(root),
+                "a different class is still a different class");
+    }
+
+    @Test
     void aGnssNavigationCallbackIsPreciseUse() throws Exception {
         File root = tempDir("cn1-lb-gnss-nav");
         ZipOutputStream zip = new ZipOutputStream(
