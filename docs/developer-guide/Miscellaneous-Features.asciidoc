@@ -14,14 +14,14 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 Both Android and iOS launch the native SMS application with your message
-composed, for the user to send. Neither sends in the background: the API keeps a
-seamless mode for platforms that allow it, and no port in the tree implements
-one today.
+composed, for the user to send. Neither sends in the background, so check
+`getSMSSupport` rather than assuming -- the constant is the contract, and the
+base implementation defaults to `SMS_SEAMLESS`.
 
 That's why the samples pass `true` for the interactive argument. On Android
 the two-argument overload does nothing at all -- it asks for the seamless
 send, and that branch isn't implemented. The iOS port ignores the flag and
-opens the composer either way, so passing `true` is what works everywhere.
+opens the composer either way, so passing `true` is what works on both.
 
 The `getSMSSupport` API returns one of the following options:
 
@@ -36,7 +36,9 @@ Pass `true` for it whenever `getSMSSupport` reports `SMS_INTERACTIVE`. The
 two-argument overload asks for a seamless send, and a port that only offers the
 system composer does nothing with that request -- on Android nothing happens at
 all, because the background-send path isn't implemented there. Both the Android and
-the iOS port report `SMS_INTERACTIVE`; no port in the tree returns `SMS_BOTH`.
+the iOS port report `SMS_INTERACTIVE`. A platform reporting `SMS_SEAMLESS` or
+`SMS_BOTH` sends without a composer, which is why the switch above branches on
+the constant instead of hard coding one call.
 
 A typical use of this API would be something like this:
 
