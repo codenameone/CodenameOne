@@ -217,7 +217,16 @@ public final class MCPDesktopMenu {
                     MCPClientRegistrar.getInstance().unregister(serverName(toolName));
             StringBuilder sb = new StringBuilder();
             if (updated.isEmpty()) {
-                sb.append("No matching MCP host entries were found.");
+                // Deliberately not "no matching entries were found": an empty result also
+                // covers a host whose config the registrar refused to rewrite, and the two
+                // are indistinguishable from here. Nor does this list the hosts that were
+                // not updated, the way Install does - on removal that set is every host
+                // the tool was never registered with, so naming them would report the
+                // normal case as a failure. The log says which host was refused and why.
+                sb.append("Nothing was removed.\n")
+                        .append("Either '").append(serverName(toolName))
+                        .append("' was not registered with any host, or a host's ")
+                        .append("configuration could not be edited - see the log.");
             } else {
                 sb.append("Removed '").append(serverName(toolName)).append("' from:\n\n");
                 for (int i = 0; i < updated.size(); i++) {

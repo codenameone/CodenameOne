@@ -58,28 +58,41 @@ public final class MCPClientRegistrar {
     /// A TOML config with one `[mcp_servers.<name>]` table per server.
     private static final int FORMAT_TOML = 2;
 
+    /// The Windows path is relative to the HOME directory, as a dotfile config is.
+    private static final boolean WIN_UNDER_HOME = false;
+    /// The Windows path is relative to %APPDATA%, as an installed application's own
+    /// per user directory is.
+    private static final boolean WIN_UNDER_APP_DATA = true;
+
     private final List<KnownClient> knownClients = new ArrayList<KnownClient>();
 
     private MCPClientRegistrar() {
         // Table driven registry: adding a host whose config is one of the shapes below is
         // a data change.
+        // The Windows column is relative to %APPDATA% for a host that keeps a per user
+        // application directory there, and to the HOME directory for one whose config is a
+        // dotfile. Getting that wrong is silent: the host is simply never detected, and the
+        // registrar has nothing to write to. Claude Desktop is an Electron app and really
+        // does live under %APPDATA%\Claude; the dotfile hosts do not.
         knownClients.add(new KnownClient("claude-desktop", "Claude Desktop",
                 "Library/Application Support/Claude/claude_desktop_config.json",
-                "Claude/claude_desktop_config.json",
+                "Claude/claude_desktop_config.json", WIN_UNDER_APP_DATA,
                 ".config/Claude/claude_desktop_config.json", FORMAT_JSON));
         knownClients.add(new KnownClient("claude-code", "Claude Code",
-                ".claude.json", ".claude.json", ".claude.json", FORMAT_JSON));
+                ".claude.json", ".claude.json", WIN_UNDER_HOME, ".claude.json", FORMAT_JSON));
         // Codex keeps its servers as [mcp_servers.<name>] tables in a TOML file that the
         // ChatGPT desktop app, the Codex CLI and the Codex IDE extension all share, so one
-        // writer serves all three.
+        // writer serves all three. CODEX_HOME defaults to ~/.codex on every platform,
+        // which on Windows is %USERPROFILE%, not %APPDATA%.
         knownClients.add(new KnownClient("codex", "Codex",
-                ".codex/config.toml", ".codex/config.toml", ".codex/config.toml", FORMAT_TOML));
+                ".codex/config.toml", ".codex/config.toml", WIN_UNDER_HOME,
+                ".codex/config.toml", FORMAT_TOML));
         // Detect only for now: opencode nests its servers in an "mcp" block whose entries
         // have a different shape, so it needs a writer of its own. It is surfaced so the
         // caller can guide the user manually.
         knownClients.add(new KnownClient("opencode", "opencode",
                 ".config/opencode/opencode.json",
-                "opencode/opencode.json",
+                "opencode/opencode.json", WIN_UNDER_APP_DATA,
                 ".config/opencode/opencode.json", FORMAT_MANUAL));
     }
 
@@ -123,6 +136,20 @@ public final class MCPClientRegistrar {
             }
         }
         return found;
+    }
+
+    /// Where the named host's config would live under the given home on THIS platform, or
+    /// null when the id is unknown. Package private: it exists so a test can pin each
+    /// host's per platform path convention without a filesystem, which is the only way a
+    /// wrong Windows base shows up - the failure is otherwise silent, the host simply
+    /// never being detected.
+    String configPathFor(String id, String home) {
+        for (KnownClient known : knownClients) {
+            if (known.id.equals(id)) {
+                return known.absolutePath(home);
+            }
+        }
+        return null;
     }
 
     /// Registers the descriptor with every detected, writable host. Returns the list of
@@ -454,11 +481,14 @@ public final class MCPClientRegistrar {
         return null;
     }
 
-    private static String appDataPath() {
-        // Derived from the home directory rather than the APPDATA environment variable:
-        // System.getenv is not available on every Codename One target, and this class
-        // lives in the portable core, so it must link everywhere.
-        String home = homePath();
+    /// %APPDATA% for the given home, derived from the home directory rather than read from
+    /// the APPDATA environment variable: System.getenv is not available on every Codename
+    /// One target, and this class lives in the portable core, so it must link everywhere.
+    ///
+    /// Takes the home as an argument rather than reading it back, so a path is a pure
+    /// function of the home it is resolved against and cannot half-follow one home and
+    /// half-follow another.
+    private static String appDataPath(String home) {
         return home == null ? null : home + "/AppData/Roaming";
     }
 
@@ -513,22 +543,27 @@ public final class MCPClientRegistrar {
         private final String displayName;
         private final String macRelative;
         private final String winRelative;
+        private final boolean winUnderAppData;
         private final String linuxRelative;
         private final int format;
 
         KnownClient(String id, String displayName, String macRelative, String winRelative,
-                    String linuxRelative, int format) {
+                    boolean winUnderAppData, String linuxRelative, int format) {
             this.id = id;
             this.displayName = displayName;
             this.macRelative = macRelative;
             this.winRelative = winRelative;
+            this.winUnderAppData = winUnderAppData;
             this.linuxRelative = linuxRelative;
             this.format = format;
         }
 
         String absolutePath(String home) {
             if (isWindows()) {
-                String base = appDataPath();
+                if (!winUnderAppData) {
+                    return home + "/" + winRelative;
+                }
+                String base = appDataPath(home);
                 return base == null ? null : base + "/" + winRelative;
             }
             if (isMac()) {

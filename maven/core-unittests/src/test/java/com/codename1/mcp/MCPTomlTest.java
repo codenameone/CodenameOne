@@ -225,10 +225,29 @@ class MCPTomlTest {
     }
 
     @Test
+    void aMultiLineStringMayEndInExtraQuotes() {
+        // TOML lets the VALUE end in one or two quotes, so the closing run is four or five
+        // characters and only the last three are the delimiter. Reading the first three as
+        // the terminator left a stray quote behind and refused a perfectly valid config.
+        String doc = "a = \"\"\"ends in one quote\"\"\"\"\n"
+                + "b = \"\"\"ends in two quotes\"\"\"\"\"\n"
+                + "c = '''literal ends in one quote''''\n"
+                + "d = \"\"\"two \"\" inside\"\"\"\n";
+        String updated = apply(doc, descriptor());
+        assertTrue(updated.startsWith(doc), updated);
+        assertTrue(updated.indexOf("[mcp_servers.cn1-my-app]") > 0);
+    }
+
+    @Test
     void refusesAConfigThatIsNotValidToml() {
         assertTrue(refuse("[mcp_servers.docs]\ncommand = \"unterminated\n", descriptor())
                 .indexOf("not valid TOML") >= 0);
         assertTrue(refuse("[unclosed\n", descriptor()).indexOf("not valid TOML") >= 0);
+        // A container has to close with the delimiter it opened with. Counting depth
+        // alone accepted this, and the file was then edited despite the promise not to.
+        assertTrue(refuse("value = [}\n", descriptor()).indexOf("wrong delimiter") >= 0);
+        assertTrue(refuse("value = { a = 1 ]\n", descriptor()).indexOf("wrong delimiter") >= 0);
+        assertTrue(refuse("value = [[1, 2}]\n", descriptor()).indexOf("wrong delimiter") >= 0);
     }
 
     @Test

@@ -170,9 +170,12 @@ final class MCPToml {
                 updated = append(text, block, newline);
             }
         } else {
-            // Back to front, so an earlier splice does not move a later region.
-            StringBuilder sb = new StringBuilder(text);
-            for (int r = regions.size() - 1; r >= 0; r--) {
+            // Copied front to back rather than spliced in place: StringBuilder.replace is
+            // a JDK method the Codename One runtime does not have (see vm/JavaAPI and
+            // Ports/CLDC11), so core cannot call it however well it compiles on a desktop.
+            StringBuilder sb = new StringBuilder();
+            int cursor = 0;
+            for (int r = 0; r < regions.size(); r++) {
                 int[] region = regions.get(r);
                 int start = region[0];
                 int end = region[1];
@@ -191,8 +194,19 @@ final class MCPToml {
                         start = backOverBlankLines(text, start);
                     }
                 }
-                sb.replace(start, end, removing ? "" : block);
+                if (start > cursor) {
+                    // Two runs separated by blank lines only: backOverBlankLines can reach
+                    // behind the previous run's end, and that text is already consumed.
+                    sb.append(text.substring(cursor, start));
+                }
+                if (!removing) {
+                    sb.append(block);
+                }
+                if (end > cursor) {
+                    cursor = end;
+                }
             }
+            sb.append(text.substring(cursor));
             updated = sb.toString();
         }
         return Result.applied(bom + updated);
@@ -697,21 +711,35 @@ final class MCPToml {
             boolean basic = quote == '"';
             if (i + 2 < s.length() && s.charAt(i + 1) == quote && s.charAt(i + 2) == quote) {
                 i += 3;
-                while (i < s.length()) {
+                boolean closed = false;
+                while (!closed && i < s.length()) {
                     char c = s.charAt(i);
                     if (basic && c == '\\') {
                         i += 2;
                         continue;
                     }
-                    if (c == quote && i + 2 < s.length()
-                            && s.charAt(i + 1) == quote && s.charAt(i + 2) == quote) {
-                        i += 3;
-                        return true;
+                    if (c != quote) {
+                        i++;
+                        continue;
                     }
-                    i++;
+                    int run = quoteRun(quote);
+                    if (run < 3) {
+                        // One or two quotes are ordinary content inside a multi line string.
+                        i += run;
+                    } else {
+                        // The delimiter is the LAST three of the run: TOML lets the value
+                        // itself end in one or two quotes, so a string opened with three
+                        // quotes can close on four or five. A longer run is not legal, so
+                        // consume three and let the leftovers be reported rather than
+                        // swallowed.
+                        i += run <= 5 ? run : 3;
+                        closed = true;
+                    }
                 }
-                error = "a multi line string is not closed";
-                return false;
+                if (!closed) {
+                    error = "a multi line string is not closed";
+                }
+                return closed;
             }
             i++;
             while (i < s.length()) {
@@ -733,11 +761,23 @@ final class MCPToml {
             return false;
         }
 
+        /// The number of consecutive `quote` characters starting at the cursor.
+        private int quoteRun(char quote) {
+            int run = 0;
+            while (i + run < s.length() && s.charAt(i + run) == quote) {
+                run++;
+            }
+            return run;
+        }
+
         /// Skips an array or an inline table, including nested ones and any strings or
         /// comments inside them, so a `[` at the head of a line inside an array is never
         /// mistaken for a table header.
         private boolean skipContainer() {
-            int depth = 0;
+            // A stack of the closers still owed, not a depth count: counting alone accepts
+            // `[}` as balanced, and this walk is what decides whether the document is
+            // trustworthy enough to edit at all.
+            StringBuilder expected = new StringBuilder();
             while (i < s.length()) {
                 char c = s.charAt(i);
                 if (c == '"' || c == '\'') {
@@ -751,14 +791,19 @@ final class MCPToml {
                     continue;
                 }
                 if (c == '[' || c == '{') {
-                    depth++;
+                    expected.append(c == '[' ? ']' : '}');
                     i++;
                     continue;
                 }
                 if (c == ']' || c == '}') {
-                    depth--;
+                    int last = expected.length() - 1;
+                    if (last < 0 || expected.charAt(last) != c) {
+                        error = "an array or inline table closes with the wrong delimiter";
+                        return false;
+                    }
+                    expected.deleteCharAt(last);
                     i++;
-                    if (depth == 0) {
+                    if (expected.length() == 0) {
                         return true;
                     }
                     continue;
