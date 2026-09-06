@@ -689,6 +689,59 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aLibraryCapItsRequestBeforeTheButtonIsNoConflict() throws Exception {
+        // A legacy library asking for fine location up to API 30 -- the
+        // ordinary shape for an old Bluetooth SDK -- stops asking long before
+        // the API the location button exists on. It contradicts nothing there,
+        // and refusing the hint over it refuses a build with no conflict in
+        // it.
+        File root = tempDir("cn1-lb-capped");
+        File aar = new File(root, "legacy.aar");
+        ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(aar));
+        try {
+            zip.putNextEntry(new ZipEntry("AndroidManifest.xml"));
+            zip.write(("<manifest xmlns:android=\"http://schemas.android.com"
+                    + "/apk/res/android\">\n"
+                    + "  <uses-permission android:name=\"android.permission"
+                    + ".ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"30\""
+                    + " />\n"
+                    + "</manifest>\n").getBytes("UTF-8"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresPreciseLocation(),
+                "a request capped below the button's API is no conflict");
+    }
+
+    @Test
+    void aLibraryCapAtTheButtonsApiStillConflicts() throws Exception {
+        // The boundary, in the direction that matters. maxSdkVersion is
+        // INCLUSIVE, so a cap at the button's own API is still a live request
+        // there -- reading it as spent would accept exclusivity over a
+        // permission the merged manifest really asks for.
+        File root = tempDir("cn1-lb-capped-at");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "current.aar")));
+        try {
+            zip.putNextEntry(new ZipEntry("AndroidManifest.xml"));
+            zip.write(("<manifest xmlns:android=\"http://schemas.android.com"
+                    + "/apk/res/android\">\n"
+                    + "  <uses-permission android:name=\"android.permission"
+                    + ".ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"37\""
+                    + " />\n"
+                    + "</manifest>\n").getBytes("UTF-8"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresPreciseLocation(),
+                "a cap at the button's API is still a request there");
+    }
+
+    @Test
     void aLibrarysOwnPreciseRequestConflictsWithExclusivity() throws Exception {
         // A native SDK inside an aar calls android.location.LocationManager
         // directly, so no marker of ours ever names it -- its manifest asking
@@ -1145,6 +1198,87 @@ class LocationButtonManifestFragmentsTest {
         assertFalse(LocationButtonManifestFragments
                         .sourcesCallPlatformLocation(root),
                 "importing the package is not naming the manager");
+    }
+
+    @Test
+    void aCallDescribedInACommentIsNotACall() throws Exception {
+        // A developer who documents deleting the thing had the build refused
+        // for saying so: the line carries the provider AND the marker and
+        // compiles to nothing at all. Both line and block comments, since a
+        // removed feature is as often commented out in bulk.
+        File root = tempDir("cn1-lb-commented");
+        writeSource(new File(root, "com/example/Gone.java"),
+                "package com.example;\n"
+                + "public class Gone {\n"
+                + "  // android.location.LocationManager"
+                + ".requestLocationUpdates was removed\n"
+                + "  /* and android.location.LocationManager"
+                + ".getLastKnownLocation with it */\n"
+                + "  Object nothing;\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "prose about a call is not a call");
+    }
+
+    @Test
+    void aSlashInAStringDoesNotHideTheCallAfterIt() throws Exception {
+        // The half that makes stripping comments safe. "http://host" holds a
+        // // that begins no comment, and treating it as one eats the rest of
+        // the line -- taking a real call with it and accepting exclusivity
+        // over a request that is really made.
+        File root = tempDir("cn1-lb-url");
+        writeSource(new File(root, "com/example/Mixed.java"),
+                "package com.example;\n"
+                + "import android.location.LocationManager;\n"
+                + "public class Mixed {\n"
+                + "  void go(LocationManager m) {\n"
+                + "    String url = \"http://host/x\"; "
+                + "m.requestLocationUpdates(null, 0, 0, null);\n"
+                + "  }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "a slash inside a string literal begins no comment");
+    }
+
+    @Test
+    void aKotlinPropertyIsTheGetterCall() throws Exception {
+        // Kotlin reaches a no-argument Java getter as a property, so
+        // client.lastLocation compiles to getLastLocation() and the getter's
+        // name appears nowhere in the file. That is how the call is usually
+        // written, so requiring the Java spelling missed the ordinary case and
+        // accepted exclusivity over a real request.
+        File root = tempDir("cn1-lb-kt-property");
+        writeSource(new File(root, "com/example/Fused.kt"),
+                "package com.example\n"
+                + "import com.google.android.gms.location"
+                + ".FusedLocationProviderClient\n"
+                + "class Fused(val client: FusedLocationProviderClient) {\n"
+                + "  fun last() = client.lastLocation\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "a Kotlin property call is still the getter");
+    }
+
+    @Test
+    void aJavaFileIsNotReadForKotlinProperties() throws Exception {
+        // And only for Kotlin. In Java "lastLocation" is a field name and
+        // nothing more, and reading it as a call would refuse a build over an
+        // identifier the language gives no such meaning.
+        File root = tempDir("cn1-lb-java-property");
+        writeSource(new File(root, "com/example/Holder.java"),
+                "package com.example;\n"
+                + "import com.google.android.gms.location"
+                + ".FusedLocationProviderClient;\n"
+                + "public class Holder {\n"
+                + "  FusedLocationProviderClient client;\n"
+                + "  Object lastLocation;\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "a Java field of that name is not a call");
     }
 
     @Test

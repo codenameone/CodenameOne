@@ -84,6 +84,14 @@ final class LocationButtonManifestFragments {
      */
     static final int FRAGMENT_VERSION = 1;
 
+    /**
+     * The Android API the location button exists on.
+     *
+     * <p>What {@code onlyForLocationButton} is about, so a permission that
+     * stops being asked for before it cannot contradict the hint.</p>
+     */
+    private static final int LOCATION_BUTTON_API = 37;
+
     /** The permission that lets an app render the system button. */
     static final String USE_LOCATION_BUTTON =
             "android.permission.USE_LOCATION_BUTTON";
@@ -1893,6 +1901,112 @@ final class LocationButtonManifestFragments {
     }
 
     /**
+     * The source with its comments removed.
+     *
+     * <p>What is left is still searched by substring rather than parsed, so a
+     * method DECLARED with a marker's name still counts and so does a method
+     * reference written without parentheses. Requiring a call shape would fix
+     * the first and break the second, and the second fails the direction that
+     * matters: a missed call accepts exclusivity and downgrades a real request
+     * silently, where an extra one refuses a build with a reason.</p>
+     *
+     * <p>String literals are copied through whole, because the {@code //} in
+     * {@code "http://host"} is not a comment -- treating it as one would eat
+     * the rest of the line, and a real call sitting there would go unseen.</p>
+     *
+     * <p>Block comments do NOT nest, which is Java's rule. Kotlin's do; a
+     * nested one ends this early and leaves its tail read as code, which can
+     * only ever ADD a match.</p>
+     *
+     * @param text the source file
+     * @return the same text with comment bodies replaced by a space
+     */
+    private static String withoutComments(String text) {
+        StringBuilder out = new StringBuilder(text.length());
+        int at = 0;
+        int length = text.length();
+        while (at < length) {
+            char c = text.charAt(at);
+            if (c == '/' && at + 1 < length) {
+                char next = text.charAt(at + 1);
+                if (next == '/') {
+                    while (at < length && text.charAt(at) != '\n') {
+                        at++;
+                    }
+                    // The newline itself is kept: it separates what is left.
+                    continue;
+                }
+                if (next == '*') {
+                    int end = text.indexOf("*/", at + 2);
+                    at = end < 0 ? length : end + 2;
+                    // A space, so the tokens either side cannot merge into a
+                    // name that was never written.
+                    out.append(' ');
+                    continue;
+                }
+            }
+            // Kotlin's raw string, which may hold anything at all.
+            if (c == '"' && at + 2 < length && text.charAt(at + 1) == '"'
+                    && text.charAt(at + 2) == '"') {
+                int end = text.indexOf("\"\"\"", at + 3);
+                end = end < 0 ? length : end + 3;
+                out.append(text, at, end);
+                at = end;
+                continue;
+            }
+            if (c == '"' || c == '\'') {
+                int walk = at + 1;
+                while (walk < length) {
+                    char q = text.charAt(walk);
+                    if (q == '\\') {
+                        walk += 2;
+                        continue;
+                    }
+                    if (q == c || q == '\n') {
+                        walk++;
+                        break;
+                    }
+                    walk++;
+                }
+                int end = walk > length ? length : walk;
+                out.append(text, at, end);
+                at = end;
+                continue;
+            }
+            out.append(c);
+            at++;
+        }
+        return out.toString();
+    }
+
+    /**
+     * The Kotlin synthetic property a Java getter is reached by.
+     *
+     * <p>{@code getLastLocation} becomes {@code lastLocation}. Null for a
+     * marker that is not a getter, so nothing else is broadened by this.</p>
+     *
+     * <p>Applied to {@code .kt} sources only, and derived for every getter
+     * rather than for the no-argument ones alone -- knowing which take
+     * arguments would mean carrying an API signature list here. The cost is a
+     * Kotlin file that names the provider and writes {@code lastKnownLocation}
+     * for something else, which refuses a build with a reason; the cost of the
+     * other direction is a real request downgraded in silence.</p>
+     *
+     * @param marker the method name
+     * @return the property spelling, or null
+     */
+    private static String propertyName(String marker) {
+        if (!marker.startsWith("get") || marker.length() < 4) {
+            return null;
+        }
+        char first = marker.charAt(3);
+        if (first < 'A' || first > 'Z') {
+            return null;
+        }
+        return Character.toLowerCase(first) + marker.substring(4);
+    }
+
+    /**
      * Whether a source file names a provider class, by either spelling.
      *
      * <p>The qualified name, or the wildcard import of its package and the
@@ -1959,7 +2073,15 @@ final class LocationButtonManifestFragments {
             // maps to one character, so nothing is dropped and the markers --
             // all ASCII -- are found wherever they sit. A UTF-8 decode would
             // fail on a source file saved in some other encoding.
-            String text = new String(raw, "ISO-8859-1");
+            //
+            // Comments first. This is a substring search over prose as much as
+            // code, and a line like
+            //   // android.location.LocationManager.requestLocationUpdates
+            //   // was removed
+            // carries both halves and no call at all -- so a developer who
+            // documented deleting the thing had the build refused for it.
+            String text = withoutComments(new String(raw, "ISO-8859-1"));
+            boolean kotlin = name.endsWith(".kt");
             for (int row = 0; row < PLATFORM_LOCATION_OWNERS.length; row++) {
                 String[] owner = PLATFORM_LOCATION_OWNERS[row];
                 if (!sourceNames(text, owner[0])) {
@@ -1967,6 +2089,15 @@ final class LocationButtonManifestFragments {
                 }
                 for (int m = 1; m < owner.length; m++) {
                     if (text.indexOf(owner[m]) >= 0) {
+                        return true;
+                    }
+                    // Kotlin calls a no-argument Java getter as a property, so
+                    // client.lastLocation compiles to getLastLocation() and the
+                    // getter's name is nowhere in the file. Idiomatic Kotlin is
+                    // the property, so requiring the Java spelling missed the
+                    // way the call is usually written.
+                    String property = kotlin ? propertyName(owner[m]) : null;
+                    if (property != null && text.indexOf(property) >= 0) {
                         return true;
                     }
                 }
@@ -2213,9 +2344,96 @@ final class LocationButtonManifestFragments {
         }
         // And precise location, which a native SDK asks for without touching
         // anything of ours. See exclusiveConflict.
-        if (declaresPermission(text, FINE_LOCATION)) {
+        //
+        // Only where it is still asked for. A declaration capped by
+        // android:maxSdkVersion below the API the location button exists on --
+        // a legacy Bluetooth library asking for fine location up to API 30 is
+        // the ordinary case -- contributes nothing on a device where
+        // onlyForLocationButton means anything, so refusing exclusivity over
+        // it refuses a build that has no conflict in it.
+        java.util.Set<String> precise = new java.util.TreeSet<String>();
+        if (collectUncapped(text, FINE_LOCATION, precise)) {
             found.libraryPrecise = true;
-            found.preciseTags.addAll(elementsDeclaring(text, FINE_LOCATION));
+            found.preciseTags.addAll(precise);
+        }
+    }
+
+    /**
+     * Whether {@code name} is asked for by an element that still asks for it
+     * where the location button exists, collecting those elements' names.
+     *
+     * <p>The set and the answer are separate on purpose: a declaration whose
+     * element cannot be identified still counts, and reporting "no elements"
+     * as "no request" would drop it.</p>
+     *
+     * @param text the manifest
+     * @param name the permission
+     * @param into collects the names of the elements that ask for it
+     * @return whether any uncapped element asks for it
+     */
+    private static boolean collectUncapped(String text, String name,
+            java.util.Set<String> into) {
+        if (text == null) {
+            return false;
+        }
+        boolean asked = false;
+        int at = text.indexOf(name);
+        while (at >= 0) {
+            if (declaresPermissionAt(text, at, name)
+                    && !isRemovalDirective(text, at)
+                    && !cappedBeforeLocationButton(text, at, name)) {
+                asked = true;
+                int open = text.lastIndexOf('<', at);
+                if (open >= 0) {
+                    into.add(elementName(text, open));
+                }
+            }
+            at = text.indexOf(name, at + name.length());
+        }
+        return asked;
+    }
+
+    /**
+     * Whether the declaration at {@code at} stops applying before the API the
+     * location button exists on.
+     *
+     * <p>Read through the prefix that NAMES the permission on this element,
+     * like every other attribute here: an element that rebound
+     * {@code android} carries the real namespace under an alias, and a literal
+     * {@code android:maxSdkVersion} there is somebody else's attribute.</p>
+     *
+     * <p>A cap that is not a plain number is treated as no cap at all. That
+     * counts the declaration as a conflict and refuses the build, which is the
+     * direction a manifest we cannot read should fail in.</p>
+     *
+     * @param text the manifest
+     * @param at   where the permission name sits
+     * @param name the permission
+     * @return whether it is capped below the location button's API
+     */
+    private static boolean cappedBeforeLocationButton(String text, int at,
+            String name) {
+        int open = text.lastIndexOf('<', at);
+        int close = text.indexOf('>', at);
+        if (open < 0 || close < 0) {
+            return false;
+        }
+        String element = text.substring(open, close + 1);
+        String prefix = androidPrefixNaming(element,
+                candidatePrefixes(element, text, ANDROID_NS, "android"), name);
+        int[] cap = findAttribute(element, prefix + ":maxSdkVersion");
+        if (cap == null) {
+            return false;
+        }
+        String value = element.substring(cap[2], cap[3]).trim();
+        if (!isAllDigits(value)) {
+            return false;
+        }
+        try {
+            return Integer.parseInt(value) < LOCATION_BUTTON_API;
+        } catch (NumberFormatException tooBig) {
+            // A number too large for an int is not a cap below anything.
+            return false;
         }
     }
 
