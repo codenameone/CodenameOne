@@ -59,9 +59,13 @@ import java.util.List;
 /// - **iOS** -- uses `LocalAuthentication.framework` (`LAContext`). Touch ID
 ///   and Face ID on supported devices. Add the `ios.NSFaceIDUsageDescription`
 ///   build hint when targeting Face ID hardware.
-/// - **Android** -- uses `BiometricPrompt` on API 29+ (Android 10) and the
-///   legacy `FingerprintManager` on API 23-28. Fingerprint, face, and iris
-///   modalities are reported per `PackageManager` features.
+/// - **Android** -- uses `BiometricPrompt` on API 29+ (Android 10) and
+///   `FingerprintManagerCompat` on API 23-28. Fingerprint, face, and iris
+///   modalities are reported per `PackageManager` features. The legacy path
+///   goes through the support library rather than
+///   `android.hardware.fingerprint` directly, which Android removed in API 37,
+///   so an app compiled against any platform still authenticates on an API
+///   23-28 device.
 /// - **JavaSE simulator** -- behaves as a real device with no enrolled
 ///   biometrics by default. The `Simulate -> Biometric Simulation` submenu
 ///   in the simulator lets you toggle hardware availability, enrolled
