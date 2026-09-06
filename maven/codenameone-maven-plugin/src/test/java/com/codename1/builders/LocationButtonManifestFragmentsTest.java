@@ -420,6 +420,93 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aReplaceInstructionGoesWithTheCapItNamed() {
+        // A project fighting a library's cap writes the pair: its own value,
+        // and tools:replace saying "override theirs with mine". Taking the
+        // value away and leaving the instruction is a replacement with nothing
+        // to replace, which the merger refuses -- and removeCapAcrossMerge then
+        // adds a tools:remove for the same attribute besides.
+        String pair = "    <uses-permission android:name=\"android.permission."
+                + "ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"32\""
+                + " tools:replace=\"android:maxSdkVersion\" />\n";
+        String out = LocationButtonManifestFragments.inject(pair, false);
+        int fine = out.indexOf("android.permission.ACCESS_FINE_LOCATION");
+        String element = out.substring(out.lastIndexOf('<', fine),
+                out.indexOf('>', fine));
+        assertFalse(element.contains("maxSdkVersion=\""),
+                "the cap is gone: " + element);
+        assertFalse(element.contains("replace"),
+                "and so is the instruction that named it: " + element);
+        assertTrue(element.contains(":remove=\"android:maxSdkVersion\""),
+                "leaving the cross-merge marker alone: " + element);
+    }
+
+    @Test
+    void aReplaceListKeepsTheEntriesThatAreNotTheCap() {
+        // The value is a list, and an entry naming something else is somebody's
+        // instruction about a different attribute.
+        String pair = "    <uses-permission android:name=\"android.permission."
+                + "ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"32\""
+                + " tools:replace=\"android:maxSdkVersion,android:required\""
+                + " />\n";
+        String out = LocationButtonManifestFragments.inject(pair, false);
+        int fine = out.indexOf("android.permission.ACCESS_FINE_LOCATION");
+        String element = out.substring(out.lastIndexOf('<', fine),
+                out.indexOf('>', fine));
+        assertTrue(element.contains("tools:replace=\"android:required\""),
+                "the other entry stays: " + element);
+    }
+
+    @Test
+    void anArchiveBelowTheTopLevelIsNotADependency() throws Exception {
+        // The dependency loop reads libsDir.listFiles() and the generated
+        // gradle includes fileTree(dir: 'libs', include: ['*.jar']) -- neither
+        // descends. An archive submitted at vendor/lib.aar is staged, never
+        // added, and never runs, so a reference in it is not the application's.
+        File root = tempDir("cn1-lb-nested");
+        File nested = new File(root, "vendor");
+        nested.mkdirs();
+        ByteArrayOutputStream inner = new ByteArrayOutputStream();
+        ZipOutputStream innerZip = new ZipOutputStream(inner);
+        try {
+            innerZip.putNextEntry(new ZipEntry("com/example/AarForm.class"));
+            innerZip.write(constantPoolEntry(
+                    "com/codename1/location/LocationButton"));
+            innerZip.closeEntry();
+        } finally {
+            innerZip.close();
+        }
+        ZipOutputStream outerZip = new ZipOutputStream(
+                new FileOutputStream(new File(nested, "sample.aar")));
+        try {
+            outerZip.putNextEntry(new ZipEntry("classes.jar"));
+            outerZip.write(inner.toByteArray());
+            outerZip.closeEntry();
+        } finally {
+            outerZip.close();
+        }
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "an archive the build never adds is not the app's use of it");
+
+        // The same archive at the top level IS a dependency, so this is about
+        // where it sits and not about the fixture.
+        File top = tempDir("cn1-lb-nested-top");
+        ZipOutputStream topZip = new ZipOutputStream(
+                new FileOutputStream(new File(top, "sample.aar")));
+        try {
+            topZip.putNextEntry(new ZipEntry("classes.jar"));
+            topZip.write(inner.toByteArray());
+            topZip.closeEntry();
+        } finally {
+            topZip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(top)
+                        .usesButton(),
+                "a top-level archive is a dependency");
+    }
+
+    @Test
     void anArrayOfTheButtonIsAReferenceToIt() throws Exception {
         // Foo[].class puts "[Lcom/example/Foo;" in a CONSTANT_Class rather than
         // the bare name, and an array of the button is a reference to it: a

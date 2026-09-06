@@ -951,6 +951,81 @@ final class LocationButtonManifestFragments {
         return candidate;
     }
 
+    /**
+     * Drops the {@code maxSdkVersion} entry from a tools list attribute.
+     *
+     * <p>The value is a comma-separated list of QNames, so this compares the
+     * PARTS: any entry whose local name is {@code maxSdkVersion} and whose
+     * prefix is one the element uses for the Android namespace. An entry
+     * naming something else is somebody's instruction about a different
+     * attribute and is left where it is, and an attribute left with no entries
+     * is removed rather than emptied -- an empty list is as unmergeable as a
+     * dangling one.</p>
+     *
+     * @param element      the element
+     * @param document     the block, for resolving prefixes
+     * @param androidNames the prefixes this element uses for Android
+     * @param local        the tools attribute, {@code replace} or {@code remove}
+     * @return the element, with the entry gone
+     */
+    private static String dropCapFromList(String element, String document,
+            String[] androidNames, String local) {
+        String[] toolsNames = candidatePrefixes(element, document, TOOLS_NS,
+                "tools");
+        for (int iter = 0; iter <= toolsNames.length; iter++) {
+            String attribute = iter < toolsNames.length
+                    ? toolsNames[iter] + ":" + local
+                    : local;
+            int[] value = findAttribute(element, attribute);
+            if (value == null) {
+                continue;
+            }
+            String[] parts = element.substring(value[2], value[3]).split(",");
+            StringBuilder kept = new StringBuilder();
+            boolean removed = false;
+            for (int part = 0; part < parts.length; part++) {
+                String entry = parts[part].trim();
+                if (entry.length() == 0) {
+                    continue;
+                }
+                if (namesTheCap(entry, androidNames)) {
+                    removed = true;
+                    continue;
+                }
+                if (kept.length() > 0) {
+                    kept.append(',');
+                }
+                kept.append(entry);
+            }
+            if (!removed) {
+                continue;
+            }
+            if (kept.length() > 0) {
+                return element.substring(0, value[2]) + kept
+                        + element.substring(value[3]);
+            }
+            // Nothing left, so the attribute goes with it. value[0]..value[1]
+            // is the whole attribute including the space before it.
+            return element.substring(0, value[0]) + element.substring(value[1]);
+        }
+        return element;
+    }
+
+    /** Whether a QName entry names the Android maxSdkVersion attribute. */
+    private static boolean namesTheCap(String entry, String[] androidNames) {
+        int colon = entry.indexOf(':');
+        if (colon < 0 || !"maxSdkVersion".equals(entry.substring(colon + 1))) {
+            return false;
+        }
+        String prefix = entry.substring(0, colon);
+        for (int iter = 0; iter < androidNames.length; iter++) {
+            if (androidNames[iter].equals(prefix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Whether a comma-separated list already names {@code wanted}. */
     private static boolean hasListed(String list, String wanted) {
         String[] parts = list.split(",");
@@ -1022,6 +1097,16 @@ final class LocationButtonManifestFragments {
         if (!stripped) {
             return xPermissions;
         }
+        // And the tools:replace that named it, if there is one.
+        //
+        // A project fighting a library's cap writes
+        // android:maxSdkVersion="32" tools:replace="android:maxSdkVersion" --
+        // "override theirs with mine". Taking the value away and leaving the
+        // instruction is a replacement with nothing to replace, which the
+        // merger REFUSES, and removeCapAcrossMerge then adds a tools:remove for
+        // the same attribute besides. Two contradictory instructions and a
+        // build that stops: worse than the cap this method came to lift.
+        widened = dropCapFromList(widened, xPermissions, prefixes, "replace");
         // The attribute left a double space behind it.
         widened = widened.replace("  ", " ");
         return xPermissions.substring(0, start) + widened
@@ -1579,8 +1664,22 @@ final class LocationButtonManifestFragments {
             String name = child.getName().toLowerCase(java.util.Locale.ROOT);
             if (child.isDirectory()) {
                 scanTree(root, child, found, budget);
-            } else if (name.endsWith(".jar") || name.endsWith(".aar")
-                    || name.endsWith(".zip")) {
+            } else if ((name.endsWith(".jar") || name.endsWith(".aar")
+                    || name.endsWith(".zip"))
+                    && dir.getPath().equals(root.getPath())) {
+                // TOP LEVEL only, because that is what the build consumes. The
+                // dependency loop reads libsDir.listFiles() and the generated
+                // gradle includes fileTree(dir: 'libs', include: ['*.jar']) --
+                // neither descends, so an archive submitted at vendor/lib.aar
+                // is staged, never added, and never runs. Reading a button
+                // reference out of one refused a build over code that is not
+                // in it, which is the same rule already applied to
+                // assets/sample.jar inside an archive, applied to the tree
+                // around them.
+                //
+                // Loose .class files stay recursive: those are read for the
+                // application tree, where the package directories ARE the
+                // layout.
                 scanArchive(child, found, budget);
             } else if (name.endsWith(".class")
                     && !isFrameworkClass(relativePath(root, child))) {
