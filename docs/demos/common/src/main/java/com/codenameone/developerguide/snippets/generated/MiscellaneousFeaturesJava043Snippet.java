@@ -87,7 +87,13 @@ class MiscellaneousFeaturesJava043Snippet {
         // tag::miscellaneous-features-java-043[]
         // the bundle id is the .properties base name, not the directory: the
         // archetype ships common/src/main/l10n/Bundle.properties
-        UIManager.getInstance().setBundle(res.getL10N("Bundle", local));
+        Hashtable<String, String> bundle = res.getL10N("Bundle", local);
+        if (bundle == null) {
+            // a file with no _locale suffix is filed under the empty locale,
+            // and getL10N is an exact lookup that will not fall back for you
+            bundle = res.getL10N("Bundle", "");
+        }
+        UIManager.getInstance().setBundle(bundle);
         // end::miscellaneous-features-java-043[]
     }
 

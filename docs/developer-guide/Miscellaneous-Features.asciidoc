@@ -204,7 +204,9 @@ When you're iterating on translations you can also use the simulator to capture 
 Open the Simulator menu and enable *Auto Update Default Bundle* so that running your app in the Codename One simulator will create any missing resource bundles on the fly as you interact with the UI, which makes it simple to populate keys without manually editing files during development.
 The resource is keyed by the properties file's base name rather than by the
 directory holding it, so the archetype's `common/src/main/l10n/Bundle.properties`
-becomes `Bundle`. You can install it using code like this:
+becomes `Bundle`. The locale comes from the `_xx` suffix, and a file without one
+is filed under the empty locale, so ask for that when the device's language has
+no bundle of its own:
 
 [source,java]
 ----
