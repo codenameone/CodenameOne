@@ -2546,7 +2546,9 @@ final class LocationButtonManifestFragments {
         while (at >= 0) {
             if (declaresPermissionAt(text, at, name)
                     && !isRemovalDirective(text, at)
-                    && !cappedBeforeLocationButton(text, at)) {
+                    && !cappedBeforeLocationButton(text, at)
+                    && !(FINE_LOCATION.equals(name)
+                            && restrictedToButton(text, at))) {
                 asked = true;
                 int open = text.lastIndexOf('<', at);
                 if (open >= 0) {
@@ -2556,6 +2558,50 @@ final class LocationButtonManifestFragments {
             at = text.indexOf(name, at + name.length());
         }
         return asked;
+    }
+
+    /**
+     * Whether the declaration at {@code at} already restricts itself to the
+     * location button.
+     *
+     * <p>{@code android:usesPermissionFlags="onlyForLocationButton"} is the
+     * exact restriction {@code android.locationButton.exclusive} asserts, so a
+     * library that has already written it is not asking for precise location
+     * outside the button -- it is agreeing. Reading it as a conflict refused
+     * the hint on the strength of a declaration that says the same thing the
+     * hint does.</p>
+     *
+     * <p>Fine location only. The flag has no meaning for background location,
+     * and a declaration carrying it there would say nothing about whether the
+     * library tracks in the background.</p>
+     *
+     * @param text the manifest
+     * @param at   where the permission name sits
+     * @return whether the declaration carries the button-only flag
+     */
+    private static boolean restrictedToButton(String text, int at) {
+        int open = text.lastIndexOf('<', at);
+        int close = text.indexOf('>', at);
+        if (open < 0 || close < 0) {
+            return false;
+        }
+        String element = text.substring(open, close + 1);
+        // Every alias in scope, for the reason the cap is read that way: two
+        // prefixes may be bound to the Android namespace on one element.
+        String[] prefixes = candidatePrefixes(element, text, ANDROID_NS,
+                "android");
+        for (int iter = 0; iter < prefixes.length; iter++) {
+            int[] slot = findAttribute(element,
+                    prefixes[iter] + ":usesPermissionFlags");
+            if (slot == null) {
+                continue;
+            }
+            if (hasFlag(element.substring(slot[2], slot[3]),
+                    ONLY_FOR_LOCATION_BUTTON)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

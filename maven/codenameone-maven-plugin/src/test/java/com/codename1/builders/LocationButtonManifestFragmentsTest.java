@@ -920,6 +920,67 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aLibraryThatRestrictsItselfToTheButtonIsNoConflict()
+            throws Exception {
+        // usesPermissionFlags="onlyForLocationButton" is the exact restriction
+        // the hint asserts, so a library that has already written it is
+        // agreeing rather than contradicting. Refusing the hint over it
+        // refused a build on the strength of a declaration saying the same
+        // thing the hint does.
+        File root = tempDir("cn1-lb-flagged");
+        writeAar(new File(root, "polite.aar"),
+                "<manifest xmlns:android=\"http://schemas.android.com/apk/res/"
+                + "android\"><uses-permission android:name=\"android."
+                + "permission.ACCESS_FINE_LOCATION\" android:"
+                + "usesPermissionFlags=\"onlyForLocationButton\"/></manifest>");
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresPreciseLocation(),
+                "a declaration already restricted to the button is no "
+                + "conflict");
+    }
+
+    @Test
+    void theButtonFlagDoesNotExcuseBackgroundLocation() throws Exception {
+        // The scoping, which nothing else can observe. onlyForLocationButton
+        // restricts FINE location to the button; it says nothing about
+        // whether a library tracks in the background, and Android gives it no
+        // meaning on ACCESS_BACKGROUND_LOCATION at all. Letting it excuse a
+        // background request -- which a copied manifest can easily carry --
+        // would accept exclusivity beside the one use it most clearly
+        // contradicts.
+        File root = tempDir("cn1-lb-flag-background");
+        writeAar(new File(root, "confused.aar"),
+                "<manifest xmlns:android=\"http://schemas.android.com/apk/res/"
+                + "android\"><uses-permission android:name=\"android."
+                + "permission.ACCESS_BACKGROUND_LOCATION\" android:"
+                + "usesPermissionFlags=\"onlyForLocationButton\"/></manifest>");
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresBackgroundLocation(),
+                "the button flag cannot restrict background location");
+    }
+
+    @Test
+    void anUnflaggedRequestBesideAFlaggedOneStillConflicts() throws Exception {
+        // And one library agreeing does not excuse another. Two aars, one
+        // restricted to the button and one asking for ordinary precise
+        // location: the second is exactly what exclusivity contradicts, and
+        // reading the pair as settled would downgrade it in silence.
+        File root = tempDir("cn1-lb-flagged-mixed");
+        writeAar(new File(root, "polite.aar"),
+                "<manifest xmlns:android=\"http://schemas.android.com/apk/res/"
+                + "android\"><uses-permission android:name=\"android."
+                + "permission.ACCESS_FINE_LOCATION\" android:"
+                + "usesPermissionFlags=\"onlyForLocationButton\"/></manifest>");
+        writeAar(new File(root, "greedy.aar"),
+                "<manifest xmlns:android=\"http://schemas.android.com/apk/res/"
+                + "android\"><uses-permission android:name=\"android."
+                + "permission.ACCESS_FINE_LOCATION\"/></manifest>");
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresPreciseLocation(),
+                "the unrestricted request still conflicts");
+    }
+
+    @Test
     void aLibrarysOwnPreciseRequestConflictsWithExclusivity() throws Exception {
         // A native SDK inside an aar calls android.location.LocationManager
         // directly, so no marker of ours ever names it -- its manifest asking
