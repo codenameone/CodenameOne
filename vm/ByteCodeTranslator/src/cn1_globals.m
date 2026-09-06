@@ -6322,143 +6322,12 @@ void cn1BibopNoteMonitorAttached(JAVA_OBJECT obj) {
 void cn1BibopNoteNativePeer(JAVA_OBJECT obj) { (void)obj; }
 #endif
 
-/**
- * The smallest trigger this live set justifies: live + growth%, clamped to the
- * absolute minimum. Answers in bytes.
- */
-// Recent live-set high-water, in bytes, decayed once per adapt.
-//
-// liveBytes as handed to cn1BibopAdaptAfterSweep is NOT the whole live set: the
-// sweep walks the retired-page list, and a page the major sweep splices out of a
-// partial pool is deliberately withheld from policy statistics (see
-// statsExcluded). Sizing the floor from one such sample lets it collapse toward
-// the minimum while a large live heap sits on pages this cycle never looked at,
-// and the collector would then retrace that heap every few megabytes.
-//
-// A decaying high-water is the cheap defence: any recent cycle that DID see a
-// large live set holds the floor up, and a genuinely small live set walks it
-// down within a few cycles. It costs one long and no extra walking, where an
-// exact answer needs a live count over every registered page and there is no
-// such figure today.
-static long bibopLiveHighWater = 0;
-
-// 1/8 per adapt: a real drop in the live set reaches the floor in a handful of
-// cycles, while a single unrepresentative sample cannot move it far.
-#ifndef CN1_BIBOP_LIVE_DECAY_SHIFT
-#define CN1_BIBOP_LIVE_DECAY_SHIFT 3
-#endif
-
-static long cn1BibopTriggerFloor(long liveBytes, int sampleCoversHeap) {
-    long floor;
-    if(liveBytes < 0) {
-        liveBytes = 0;
-    }
-    // The high-water smooths the floor UPWARD and must not hold it up on the way
-    // down. Substituting it for the sample unconditionally latches: the floor is
-    // derived from a live set that is already gone, the raised trigger means the
-    // next sweep is far away, and the decay above only runs per sweep -- so a high
-    // floor buys itself the very scarcity of cycles that keeps it high.
-    //
-    // That is not hypothetical. cn1BibopTrimFreePool, which hands surplus pages
-    // back to the OS, runs ONLY at the end of a sweep. With the latch in place
-    // BibopPageFloorIntegrationTest dropped a 196MB live set and got 6% of its
-    // pages back instead of the 91% the same commit returned on a luckier run,
-    // because after the drop the trigger was raised toward the floor the departed
-    // live set justified and no further sweep arrived to trim anything. On master,
-    // which has no floor at all, low survival simply halves the trigger and the
-    // pages come back.
-    //
-    // So the two directions are treated differently, which is the asymmetry that
-    // was missing rather than a new policy: growth is damped through the
-    // high-water, and a collapse is believed immediately. A steady live set has
-    // sample and high-water in the same place and is unaffected either way.
-    {
-        long sampleFloor;
-        if(liveBytes > bibopLiveHighWater) {
-            bibopLiveHighWater = liveBytes;
-        }
-        sampleFloor = liveBytes;
-        liveBytes = bibopLiveHighWater;
-        if(sampleCoversHeap && sampleFloor < liveBytes) {
-            // Believe the smaller CURRENT reading, with one MIN of slack so a
-            // sample that merely dipped does not slam the floor to the minimum.
-            //
-            // Only when the sweep actually LOOKED at the heap. liveBytes is not a
-            // live-set measurement, it is the part of the live set this sweep
-            // sampled: pages the major sweep splices out of a partial pool are
-            // withheld from the policy numbers, so a near-zero reading can equally
-            // mean "the objects are all on pages that were excluded". Believing
-            // that as a collapse would halve the trigger against a heap that never
-            // shrank and retrace it every cycle -- the exact cost the floor exists
-            // to avoid, and worse than the latch it replaces, because the latch at
-            // least erred toward collecting less. The caller decides coverage from
-            // how much the sweep withheld; when it withheld too much the
-            // high-water stands and the decay walks it down as before.
-            long relaxed = sampleFloor + CN1_BIBOP_GC_MIN_TRIGGER_BYTES;
-            if(relaxed < liveBytes) {
-                liveBytes = relaxed;
-            }
-        }
-    }
-    // The multiply is done in long long so a large live set cannot wrap the
-    // percentage before the clamp sees it.
-    {
-        long long scaled = ((long long)liveBytes
-                * (long long)(100 + CN1_BIBOP_HEAP_GROWTH_PERCENT)) / 100;
-        if(scaled > (long long)CN1_BIBOP_GC_MAX_TRIGGER_BYTES) {
-            scaled = (long long)CN1_BIBOP_GC_MAX_TRIGGER_BYTES;
-        }
-        floor = (long)scaled;
-    }
-    // Memory pressure bounds the live-set floor, because the floor is an argument
-    // about how OFTEN to retrace a live heap and says nothing about whether the
-    // heap it justifies will fit. Without this a 100MB live set asks for 192MB
-    // (growth is 100%, clamped by the max) no matter how little is left, and the
-    // high-survival branch below then RAISES its own free-memory ceiling to meet
-    // it -- deferring collection past the remaining headroom.
-    //
-    // lowMemoryMode does not cover this. It is set by iOS didReceiveMemoryWarning
-    // and by the CI simulation hook, and by nothing else -- so on Linux, which is
-    // where the server runs and where this floor was introduced to cut resident
-    // memory, it is never set at all and there is otherwise no memory bound here.
-    //
-    // The cap floors at the old constant rather than at freeMem/8 directly, and
-    // that is the load-bearing half: GcSteadyState pins the free-memory reading to
-    // 16MB, and a bare eighth of that is 2MB. A 2MB trigger is the collector
-    // running continuously, which is the failure this constant already caused
-    // twice. Bounded this way the pinned-memory case lands exactly on the value
-    // the trigger had before any of this, so the floor can be lowered by pressure
-    // but never below what was always safe.
-    {
-        long freeMem = atomic_load_explicit(&cn1CachedFreeMem, memory_order_relaxed);
-        if(freeMem > 0) {
-            long memCap = freeMem / 8;
-            if(memCap < CN1_BIBOP_GC_MIN_TRIGGER_BYTES) {
-                memCap = CN1_BIBOP_GC_MIN_TRIGGER_BYTES;
-            }
-            if(floor > memCap) {
-                floor = memCap;
-            }
-        }
-    }
-    if(floor < CN1_BIBOP_GC_MIN_TRIGGER_BYTES) {
-        floor = CN1_BIBOP_GC_MIN_TRIGGER_BYTES;
-    }
-    return floor;
-}
-
 static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
-                                    long reclaimedBytes, long excludedOccupiedBytes,
-                                    long excludedLiveBytes, int majorSweep,
+                                    long reclaimedBytes,
                                     long* classSlots, long* classLive) {
     bibopLastCycleOccupiedBytes = occupiedBytes;
     bibopLastCycleLiveBytes = liveBytes;
     bibopLastCycleReclaimedBytes = reclaimedBytes;
-
-    // Decay before this cycle's sample is folded in by cn1BibopTriggerFloor, so a
-    // live set that really has shrunk walks the floor down instead of pinning it
-    // at the largest value ever seen.
-    bibopLiveHighWater -= bibopLiveHighWater >> CN1_BIBOP_LIVE_DECAY_SHIFT;
 
     if(lowMemoryMode) {
         long oldTrigger = atomic_load_explicit(&bibopGcTriggerBytes,
@@ -6480,26 +6349,30 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
         long oldTrigger = atomic_load_explicit(&bibopGcTriggerBytes,
                                                memory_order_relaxed);
         long newTrigger = oldTrigger;
-        // Only a MAJOR sweep can say anything about the size of the live set, and
-        // when it does it must be asked for the WHOLE of it.
+        // NO LIVE-SET FLOOR. The trigger is not sized from the live set here,
+        // because this collector cannot measure the live set and a policy built on
+        // a number it cannot measure kept being wrong in a new way.
         //
-        // An ordinary sweep walks retired pages alone; every live object on a
-        // partial page is invisible to it, so its liveBytes is not a small live
-        // set, it is a small sample. A major sweep splices the partial pools in
-        // and walks them too -- but withholds their slots from the survival ratio,
-        // which is why liveBytes still understates even there. The complete figure
-        // is liveBytes plus what was withheld, and that number is already computed;
-        // it was simply being thrown away.
+        // liveBytes is what a sweep SAMPLED. An ordinary sweep walks retired pages
+        // only, so every live object on a partial page is invisible to it. A major
+        // sweep splices the partial pools in, but mutator-owned current pages are
+        // never swept at all -- that is an invariant, not an omission -- and the
+        // legacy heap above CN1_BIBOP_MAX_OBJECT is not in BiBOP pages and never
+        // reaches these counters. Three successive attempts to derive a floor from
+        // this number were each unsound in a different direction: it latched a
+        // dropped live set at 192MB and stopped the sweeps that return pages to
+        // the OS (BibopPageFloorIntegrationTest, 6% of pages returned against 91%
+        // on a luckier run of the same commit); then it believed a partial sample
+        // as a collapse; then it called an ordinary sweep complete precisely when
+        // it saw least.
         //
-        // An earlier revision of this gate tested the withheld BYTES instead, which
-        // is backwards in both directions: an ordinary sweep withholds nothing and
-        // was called complete precisely when it saw least, while a major sweep
-        // withholds exactly the pages it added and was called incomplete when it
-        // had in fact seen everything.
-        int sampleCoversHeap = majorSweep;
-        long completeLiveBytes = liveBytes + excludedLiveBytes;
-        long floorBytes = cn1BibopTriggerFloor(
-                sampleCoversHeap ? completeLiveBytes : liveBytes, sampleCoversHeap);
+        // What actually delivered the footprint win is the MINIMUM, which is a
+        // build-time constant and not an estimate: a deployment that knows its
+        // live set is small defines CN1_BIBOP_GC_MIN_TRIGGER_BYTES lower and the
+        // shrink path below walks the trigger down to it. That is the whole of the
+        // 98MB-to-38MB result, and it needs no live-set measurement to be correct.
+        // So the shrink target is that minimum rather than the fixed 24MB constant
+        // master uses, and nothing else about this policy differs from master.
         if(survival >= CN1_BIBOP_BYPASS_SURVIVAL_PERCENT) {
             bibopTriggerHighSurvivalStreak++;
             if(bibopTriggerHighSurvivalStreak >= 2) {
@@ -6507,8 +6380,8 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
                 long freeMem = atomic_load_explicit(&cn1CachedFreeMem,
                                                     memory_order_relaxed);
                 if(freeMem > 0 && freeMem / 8 < ceiling) ceiling = freeMem / 8;
-                if(ceiling < floorBytes) {
-                    ceiling = floorBytes;
+                if(ceiling < CN1_BIBOP_GC_MIN_TRIGGER_BYTES) {
+                    ceiling = CN1_BIBOP_GC_MIN_TRIGGER_BYTES;
                 }
                 newTrigger = oldTrigger * 2;
                 if(newTrigger > ceiling) newTrigger = ceiling;
@@ -6516,34 +6389,12 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
             }
         } else if(survival <= 20) {
             bibopTriggerHighSurvivalStreak = 0;
-            // Shrink towards what the LIVE set justifies. This used to stop at
-            // the 24MB constant, which is why a server holding nothing live
-            // still held a 24MB trigger and ~98MB of resident memory.
-            if(oldTrigger > floorBytes) {
+            if(oldTrigger > CN1_BIBOP_GC_MIN_TRIGGER_BYTES) {
                 newTrigger = oldTrigger / 2;
-                if(newTrigger < floorBytes) {
-                    newTrigger = floorBytes;
+                if(newTrigger < CN1_BIBOP_GC_MIN_TRIGGER_BYTES) {
+                    newTrigger = CN1_BIBOP_GC_MIN_TRIGGER_BYTES;
                 }
-            } else if(oldTrigger < floorBytes) {
-                // The floor is a bound in BOTH directions. Low survival on a big
-                // live set means the trigger should not stay under what that live
-                // set justifies: a 4MB trigger against 20MB live would retrace
-                // the whole live heap every 4MB of allocation. Raising it here is
-                // the only path that corrects a trigger which adapted down before
-                // the live set grew.
-                newTrigger = floorBytes;
             }
-        }
-        // The floor is a property of the live set, not of the survival rate, so
-        // it is enforced outside the branches that react to survival. Those cover
-        // >= 25% and <= 20% and nothing between: a trigger that adapted down
-        // before the live set grew sat in that dead band uncorrected for as long
-        // as survival stayed at 21-24%, retracing a live heap it no longer had
-        // the headroom for. Raising is the only direction taken here, and the
-        // <= 20% branch already does exactly this, so the dead band gets the
-        // behaviour the branches either side of it already had.
-        if(newTrigger < floorBytes) {
-            newTrigger = floorBytes;
         }
         if(newTrigger != oldTrigger) {
             atomic_store_explicit(&bibopGcTriggerBytes, newTrigger,
@@ -6601,8 +6452,6 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     // sees retired pages alone, so its liveBytes omits every live object sitting
     // on a partial page and is not a live-set measurement. Declared here because
     // the major-sweep decision below is made before the accumulators.
-    long excludedLiveBytes = 0;
-    int majorSweep = 0;
 #ifdef CN1_GC_VERIFY
     extern int cn1GcFaultEarlyFree;
     { extern void cn1GcFaultInitPublic(void); cn1GcFaultInitPublic(); }
@@ -6649,7 +6498,6 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 || quiet
                 || bibopCyclesSinceMajorSweep >= CN1_BIBOP_MAJOR_SWEEP_CYCLES;
         if(major) {
-            majorSweep = 1;
             bibopCyclesSinceMajorSweep = 0;
             int spliced = 0;
             pthread_mutex_lock(&bibopMutex);
@@ -6679,12 +6527,6 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     long occupiedBytes = 0;
     long liveBytes = 0;
     long reclaimedBytes = 0;
-    // Bytes on pages the major sweep spliced out of a partial pool, which are
-    // deliberately withheld from the policy numbers above. Kept so the policy can
-    // tell "the live set shrank" from "this sweep only looked at part of it" --
-    // the ratio is unaffected by the exclusion (both halves skip the same pages)
-    // but the ABSOLUTE liveBytes understates by exactly this much.
-    long excludedOccupiedBytes = 0;
     long classSlots[CN1_BIBOP_NUM_CLASSES] = {0};
     long classLive[CN1_BIBOP_NUM_CLASSES] = {0};
 #ifndef CN1_BIBOP_NO_FASTSWEEP
@@ -6936,10 +6778,6 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         if(policySurvivors < 0) {
             policySurvivors = 0;
         }
-        if(statsExcluded) {
-            excludedOccupiedBytes += (long)sampledSlots * page->slotSize;
-            excludedLiveBytes += (long)policySurvivors * page->slotSize;
-        }
         if(!statsExcluded) {
             occupiedBytes += (long)sampledSlots * page->slotSize;
             liveBytes += (long)policySurvivors * page->slotSize;
@@ -6973,7 +6811,6 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         pthread_mutex_unlock(&bibopMutex);
     }
     cn1BibopAdaptAfterSweep(occupiedBytes, liveBytes, reclaimedBytes,
-                            excludedOccupiedBytes, excludedLiveBytes, majorSweep,
                             classSlots, classLive);
     // Hand surplus empty pages back to the OS (issue 5537). Last, so it sees the
     // pool this sweep just refilled, and outside the per-page loop so the madvise
