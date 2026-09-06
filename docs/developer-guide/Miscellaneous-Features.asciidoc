@@ -18,9 +18,10 @@ composed, for the user to send. Neither sends in the background: the API keeps a
 seamless mode for platforms that allow it, and no port in the tree implements
 one today.
 
-That's why the samples pass `true` for the interactive argument. The
-two-argument overload asks for the seamless send, so on these platforms it does
-nothing at all.
+That's why the samples pass `true` for the interactive argument. On Android
+the two-argument overload does nothing at all -- it asks for the seamless
+send, and that branch isn't implemented. The iOS port ignores the flag and
+opens the composer either way, so passing `true` is what works everywhere.
 
 The `getSMSSupport` API returns one of the following options:
 

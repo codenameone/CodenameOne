@@ -89,15 +89,20 @@ class MiscellaneousFeaturesJava042Snippet {
         if (display.isLargerTextEnabled()) {
             float scale = display.getLargerTextScale();
             Font base = UIManager.getInstance().getComponentStyle("Label").getFont();
-            // derive() takes a requested pixel size; getHeight() is the rendered
-            // line height, which is larger. This is what the framework's own
-            // larger-text scaler does.
-            float baseSize = base.getPixelSize();
-            if (baseSize <= 0) {
-                baseSize = base.getHeight();
+            // derive() only works on TrueType/native fonts and throws on a
+            // legacy bitmap font, and it takes a requested pixel size rather
+            // than getHeight(), which is the rendered line height. Both checks
+            // mirror UIManager's own scaleFontForLargerText.
+            if (base != null && base.isTTFNativeFont()) {
+                float baseSize = base.getPixelSize();
+                if (baseSize <= 0) {
+                    baseSize = base.getHeight();
+                }
+                if (baseSize > 0) {
+                    Font scaled = base.derive(baseSize * scale, base.getStyle());
+                    someComponent.getUnselectedStyle().setFont(scaled);
+                }
             }
-            Font scaled = base.derive(baseSize * scale, base.getStyle());
-            someComponent.getUnselectedStyle().setFont(scaled);
         }
         // end::miscellaneous-features-java-042[]
     }
