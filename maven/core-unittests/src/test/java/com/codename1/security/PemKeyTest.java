@@ -215,6 +215,32 @@ class PemKeyTest extends UITestBase {
             + "//////////+85vqtpxeehPO5ysL8YyVRAgEBA0IABC68kFafKPfhM03YmRT9w2EC"
             + "6fCuG+eDYY/vkMzvDirgBYt2O1iBjLwr551oxztp9R5WDdqoyHLpqE3vlXNJS6M=";
 
+    /// A sect163k1 key with explicit parameters over a binary field.
+    private static final String EC_SEC1_CHAR2 = ""
+            + "MIHxAgEBBBUAvIxZ7TvRAWmSpV7IQs8hARRX3BWggaQwgaECAQEwJQYHKoZIzj0B"
+            + "AjAaAgIAowYJKoZIzj0BAgMDMAkCAQMCAQYCAQcwLgQVAAAAAAAAAAAAAAAAAAAA"
+            + "AAAAAAABBBUAAAAAAAAAAAAAAAAAAAAAAAAAAAEEKwQC/hPAU3u8EayqB9eT3k5t"
+            + "XlyU7ugCiQcPsF04/1gyHy6ABTbVOMzao9kCFQQAAAAAAAAAAAACAQii4MwNmfil"
+            + "7wIBAqEuAywABAJ+Rz+ymd544z3ErMw3R+GVTKOCvgeWwndbbpgwNrdgPeLFLwjQ"
+            + "6ygnlw==";
+
+    /// What "openssl pkcs8 -topk8" makes of it.
+    private static final String EC_PKCS8_CHAR2 = ""
+            + "MIIBAQIBADCBrQYHKoZIzj0CATCBoQIBATAlBgcqhkjOPQECMBoCAgCjBgkqhkjO"
+            + "PQECAwMwCQIBAwIBBgIBBzAuBBUAAAAAAAAAAAAAAAAAAAAAAAAAAAEEFQAAAAAA"
+            + "AAAAAAAAAAAAAAAAAAAAAQQrBAL+E8BTe7wRrKoH15PeTm1eXJTu6AKJBw+wXTj/"
+            + "WDIfLoAFNtU4zNqj2QIVBAAAAAAAAAAAAAIBCKLgzA2Z+KXvAgECBEwwSgIBAQQV"
+            + "ALyMWe070QFpkqVeyELPIQEUV9wVoS4DLAAEAn5HP7KZ3njjPcSszDdH4ZVMo4K+"
+            + "B5bCd1tumDA2t2A94sUvCNDrKCeX";
+
+    /// The same key with Characteristic-two replaced by "30 02 05 00".
+    private static final String EC_PKCS8_CHAR2_BAD = ""
+            + "MIHpAgEAMIGVBgcqhkjOPQIBMIGJAgEBMA0GByqGSM49AQIwAgUAMC4EFQAAAAAA"
+            + "AAAAAAAAAAAAAAAAAAAAAQQVAAAAAAAAAAAAAAAAAAAAAAAAAAABBCsEAv4TwFN7"
+            + "vBGsqgfXk95ObV5clO7oAokHD7BdOP9YMh8ugAU21TjM2qPZAhUEAAAAAAAAAAAA"
+            + "AgEIouDMDZn4pe8CAQIETDBKAgEBBBUAvIxZ7TvRAWmSpV7IQs8hARRX3BWhLgMs"
+            + "AAQCfkc/spneeOM9xKzMN0fhlUyjgr4HlsJ3W26YMDa3YD3ixS8I0OsoJ5c=";
+
     private static String pem(String label, String base64) {
         StringBuilder sb = new StringBuilder("-----BEGIN ").append(label).append("-----\n");
         for (int i = 0; i < base64.length(); i += 64) {
@@ -1306,6 +1332,23 @@ class PemKeyTest extends UITestBase {
         assertArrayEquals(der(RSA_SPKI),
                 PublicKey.fromPem(key + "then the -----END PUBLIC KEY----- line closes it\n")
                         .getEncoded());
+    }
+
+    @Test
+    void characteristicTwoFieldsAreParsed() {
+        // Characteristic-two is SEQUENCE { m INTEGER, basis OID, parameters ANY
+        // DEFINED BY basis }, and the basis decides again: gnBasis NULL,
+        // tpBasis a Trinomial INTEGER, ppBasis a Pentanomial of three INTEGERs.
+        // Taking any non-empty SEQUENCE for the lot let "30 02 05 00" describe a
+        // binary field, which OpenSSL refuses.
+        assertThrows(CryptoException.class, () -> PrivateKey.fromPem(
+                pem("PRIVATE KEY", EC_PKCS8_CHAR2_BAD)));
+
+        // a real sect163k1 explicit key converts, byte for byte, to what
+        // "openssl pkcs8 -topk8" makes of the same file -- this format had no
+        // coverage at all until now, only an assumption that it worked
+        assertArrayEquals(der(EC_PKCS8_CHAR2),
+                PrivateKey.fromPem(pem("EC PRIVATE KEY", EC_SEC1_CHAR2)).getEncoded());
     }
 
     @Test

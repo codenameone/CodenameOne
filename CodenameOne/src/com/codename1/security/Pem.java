@@ -78,6 +78,24 @@ final class Pem {
         (byte) 0x01, (byte) 0x02
     };
 
+    /// OID 1.2.840.10045.1.2.3.1 -- gnBasis, whose parameters are NULL.
+    private static final byte[] OID_GN_BASIS = {
+        (byte) 0x2A, (byte) 0x86, (byte) 0x48, (byte) 0xCE, (byte) 0x3D,
+        (byte) 0x01, (byte) 0x02, (byte) 0x03, (byte) 0x01
+    };
+
+    /// OID 1.2.840.10045.1.2.3.2 -- tpBasis, whose parameters are a Trinomial.
+    private static final byte[] OID_TP_BASIS = {
+        (byte) 0x2A, (byte) 0x86, (byte) 0x48, (byte) 0xCE, (byte) 0x3D,
+        (byte) 0x01, (byte) 0x02, (byte) 0x03, (byte) 0x02
+    };
+
+    /// OID 1.2.840.10045.1.2.3.3 -- ppBasis, whose parameters are a Pentanomial.
+    private static final byte[] OID_PP_BASIS = {
+        (byte) 0x2A, (byte) 0x86, (byte) 0x48, (byte) 0xCE, (byte) 0x3D,
+        (byte) 0x01, (byte) 0x02, (byte) 0x03, (byte) 0x03
+    };
+
     /// OID 1.2.840.10045.2.1 -- id-ecPublicKey.
     private static final byte[] OID_EC = {
         (byte) 0x2A, (byte) 0x86, (byte) 0x48, (byte) 0xCE, (byte) 0x3D,
@@ -620,6 +638,29 @@ final class Pem {
             c.skip();
         }
         if (c.hasMore() && c.peek() == 0x30) {
+            // hash is a HashAlgorithm, which is an AlgorithmIdentifier: an OID
+            // and at most one parameters element. Checked here rather than
+            // skipped so that every field of SpecifiedECDomain is walked to a
+            // leaf -- version, base, order and cofactor are INTEGERs and OCTET
+            // STRINGs, fieldID and curve are checked below, and this was the
+            // last one still being taken on trust.
+            if (!isHashAlgorithm(c.element())) {
+                return false;
+            }
+        }
+        return !c.hasMore();
+    }
+
+    /// `HashAlgorithm ::= AlgorithmIdentifier`: an OID, then at most one
+    /// parameters element, then nothing.
+    private static boolean isHashAlgorithm(byte[] element) {
+        Cursor c = new Cursor(element);
+        c.enter(0x30);
+        if (!c.hasMore() || c.peek() != 0x06) {
+            return false;
+        }
+        requireOid(c.read(0x06));
+        if (c.hasMore()) {
             c.skip();
         }
         return !c.hasMore();
@@ -644,18 +685,63 @@ final class Pem {
         // follows, so skipping whatever was there let an OCTET STRING stand
         // where a prime-field's prime belongs. X9.62 defines two field types
         // and no more, which is what makes this the bottom of the structure.
-        int expected;
         if (equal(fieldType, OID_PRIME_FIELD)) {
-            expected = 0x02;
+            if (!isPrimitive(c, 0x02)) {
+                return false;
+            }
         } else if (equal(fieldType, OID_CHARACTERISTIC_TWO_FIELD)) {
-            expected = 0x30;
+            if (!c.hasMore() || c.peek() != 0x30 || !isCharacteristicTwo(c.element())) {
+                return false;
+            }
         } else {
             return false;
         }
-        if (c.peek() != expected || c.consume(expected) == 0) {
+        return !c.hasMore();
+    }
+
+    /// `Characteristic-two ::= SEQUENCE { m INTEGER, basis OBJECT IDENTIFIER,
+    /// parameters ANY DEFINED BY basis }`, where the basis again decides the
+    /// type: gnBasis takes NULL, tpBasis a Trinomial INTEGER, ppBasis a
+    /// Pentanomial of three INTEGERs. Accepting any non-empty SEQUENCE for the
+    /// whole thing let "30 02 05 00" describe a binary field.
+    private static boolean isCharacteristicTwo(byte[] element) {
+        Cursor c = new Cursor(element);
+        c.enter(0x30);
+        if (!isPrimitive(c, 0x02)) {
+            return false;
+        }
+        if (!c.hasMore() || c.peek() != 0x06) {
+            return false;
+        }
+        byte[] basis = c.read(0x06);
+        requireOid(basis);
+        if (!c.hasMore()) {
+            return false;
+        }
+        if (equal(basis, OID_GN_BASIS)) {
+            if (c.peek() != 0x05 || c.consume(0x05) != 0) {
+                return false;
+            }
+        } else if (equal(basis, OID_TP_BASIS)) {
+            if (!isPrimitive(c, 0x02)) {
+                return false;
+            }
+        } else if (equal(basis, OID_PP_BASIS)) {
+            if (!c.hasMore() || c.peek() != 0x30 || !isPentanomial(c.element())) {
+                return false;
+            }
+        } else {
             return false;
         }
         return !c.hasMore();
+    }
+
+    /// `Pentanomial ::= SEQUENCE { k1 INTEGER, k2 INTEGER, k3 INTEGER }`.
+    private static boolean isPentanomial(byte[] element) {
+        Cursor c = new Cursor(element);
+        c.enter(0x30);
+        return isPrimitive(c, 0x02) && isPrimitive(c, 0x02) && isPrimitive(c, 0x02)
+                && !c.hasMore();
     }
 
     /// `Curve ::= SEQUENCE { a OCTET STRING, b OCTET STRING,
