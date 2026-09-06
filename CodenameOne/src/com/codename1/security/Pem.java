@@ -66,6 +66,18 @@ final class Pem {
         (byte) 0x0D, (byte) 0x01, (byte) 0x01, (byte) 0x01
     };
 
+    /// OID 1.2.840.10045.1.1 -- id-prime-field, whose parameters are the prime.
+    private static final byte[] OID_PRIME_FIELD = {
+        (byte) 0x2A, (byte) 0x86, (byte) 0x48, (byte) 0xCE, (byte) 0x3D,
+        (byte) 0x01, (byte) 0x01
+    };
+
+    /// OID 1.2.840.10045.1.2 -- id-characteristic-two-field.
+    private static final byte[] OID_CHARACTERISTIC_TWO_FIELD = {
+        (byte) 0x2A, (byte) 0x86, (byte) 0x48, (byte) 0xCE, (byte) 0x3D,
+        (byte) 0x01, (byte) 0x02
+    };
+
     /// OID 1.2.840.10045.2.1 -- id-ecPublicKey.
     private static final byte[] OID_EC = {
         (byte) 0x2A, (byte) 0x86, (byte) 0x48, (byte) 0xCE, (byte) 0x3D,
@@ -623,11 +635,26 @@ final class Pem {
         if (!c.hasMore() || c.peek() != 0x06) {
             return false;
         }
-        requireOid(c.read(0x06));
+        byte[] fieldType = c.read(0x06);
+        requireOid(fieldType);
         if (!c.hasMore()) {
             return false;
         }
-        c.skip();
+        // "ANY DEFINED BY fieldType" means the OID decides the type that
+        // follows, so skipping whatever was there let an OCTET STRING stand
+        // where a prime-field's prime belongs. X9.62 defines two field types
+        // and no more, which is what makes this the bottom of the structure.
+        int expected;
+        if (equal(fieldType, OID_PRIME_FIELD)) {
+            expected = 0x02;
+        } else if (equal(fieldType, OID_CHARACTERISTIC_TWO_FIELD)) {
+            expected = 0x30;
+        } else {
+            return false;
+        }
+        if (c.peek() != expected || c.consume(expected) == 0) {
+            return false;
+        }
         return !c.hasMore();
     }
 

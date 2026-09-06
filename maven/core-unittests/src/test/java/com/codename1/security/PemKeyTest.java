@@ -204,6 +204,17 @@ class PemKeyTest extends UITestBase {
             + "FP3DYQLp8K4b54Nhj++QzO8OKuAFi3Y7WIGMvCvnnWjHO2n1HlYN2qjIcumoTe+V"
             + "c0lLow==";
 
+    /// An explicit-parameters EC public key whose prime-field parameters are
+    /// an OCTET STRING where the prime INTEGER belongs.
+    private static final String EC_SPKI_BAD_PRIME = ""
+            + "MIIBSzCCAQMGByqGSM49AgEwgfcCAQEwLAYHKoZIzj0BAQQhAP////8AAAABAAAA"
+            + "AAAAAAAAAAAA////////////////MFsEIP////8AAAABAAAAAAAAAAAAAAAA////"
+            + "///////////8BCBaxjXYqjqT57PrvVV2mIa8ZR0GsMxTsPY7zjw+J9JgSwMVAMSd"
+            + "NgiG5wSTamZ44ROdJreBn36QBEEEaxfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5"
+            + "RdiYwpZP40Li/hp/m47n60p8D54WK84zV2sxXs7LtkBoN79R9QIhAP////8AAAAA"
+            + "//////////+85vqtpxeehPO5ysL8YyVRAgEBA0IABC68kFafKPfhM03YmRT9w2EC"
+            + "6fCuG+eDYY/vkMzvDirgBYt2O1iBjLwr551oxztp9R5WDdqoyHLpqE3vlXNJS6M=";
+
     private static String pem(String label, String base64) {
         StringBuilder sb = new StringBuilder("-----BEGIN ").append(label).append("-----\n");
         for (int i = 0; i < base64.length(); i += 64) {
@@ -1267,6 +1278,11 @@ class PemKeyTest extends UITestBase {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem(pem("PUBLIC KEY", EC_SPKI_EXPLICIT_BAD_FIELDID)));
         assertTrue(key.length > 0);
+
+        // "ANY DEFINED BY fieldType": the OID decides what follows it, so an
+        // OCTET STRING where a prime-field's prime belongs is not a field
+        assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem("PUBLIC KEY", EC_SPKI_BAD_PRIME)));
 
         // and the real explicit-parameters key still converts
         assertArrayEquals(der(EC_PKCS8_EXPLICIT),
