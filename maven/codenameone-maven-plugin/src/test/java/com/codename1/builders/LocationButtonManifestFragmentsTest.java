@@ -692,6 +692,73 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aSubclassSuppliedByALibraryResolvesAgainstTheApplication()
+            throws Exception {
+        // The two halves in different ROOTS. The application calls an
+        // inherited setLocationListener through a subclass a cn1lib supplies,
+        // so the application tree holds the deferred owner and the library jar
+        // holds the "extends LocationManager" that explains it. Each scan
+        // resolved its own root alone, neither could answer, and exclusivity
+        // was accepted over a lookup the application really makes.
+        File appRoot = tempDir("cn1-lb-cross-app");
+        writeClassBytes(new File(appRoot, "com/example/Caller.class"),
+                methodCallClass("com/mylib/Manager", "setLocationListener"));
+        File libRoot = tempDir("cn1-lb-cross-lib");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(libRoot, "mylib.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/mylib/Manager.class"));
+            zip.write(subclassCallClass("com/mylib/Manager",
+                    "com/codename1/location/LocationManager", "unrelated"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        LocationButtonManifestFragments.LocationUsage app =
+                LocationButtonManifestFragments.scanForLocationUsage(appRoot);
+        LocationButtonManifestFragments.LocationUsage lib =
+                LocationButtonManifestFragments.scanForLocationUsage(libRoot);
+        // The premise, checked rather than trusted: neither root can answer on
+        // its own, which is exactly why they have to be pooled.
+        assertFalse(app.usesPersistentLocation(),
+                "sanity: the application tree has the call and not the "
+                + "hierarchy");
+        assertFalse(lib.usesPersistentLocation(),
+                "sanity: the library has the hierarchy and not the call");
+        assertTrue(LocationButtonManifestFragments.resolvesAcross(app, lib),
+                "pooled, the call resolves to LocationManager");
+    }
+
+    @Test
+    void unrelatedScansDoNotResolveAcross() throws Exception {
+        // And pooling must not invent one. A library subclassing something
+        // else entirely leaves the application's call unexplained, and
+        // reporting persistent use there would refuse a build over a
+        // hierarchy that does not reach LocationManager.
+        File appRoot = tempDir("cn1-lb-cross-app-none");
+        writeClassBytes(new File(appRoot, "com/example/Caller.class"),
+                methodCallClass("com/mylib/Manager", "setLocationListener"));
+        File libRoot = tempDir("cn1-lb-cross-lib-none");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(libRoot, "mylib.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/mylib/Manager.class"));
+            zip.write(subclassCallClass("com/mylib/Manager",
+                    "java/lang/Object", "unrelated"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertFalse(LocationButtonManifestFragments.resolvesAcross(
+                        LocationButtonManifestFragments
+                                .scanForLocationUsage(appRoot),
+                        LocationButtonManifestFragments
+                                .scanForLocationUsage(libRoot)),
+                "a hierarchy that does not reach LocationManager resolves "
+                + "nothing");
+    }
+
+    @Test
     void aSubclassInOurNamespaceIsStillTheLibrarys() throws Exception {
         // The same library, having put its implementation in com.codename1.*,
         // which it is allowed to do -- a relocated copy lands there, and so
@@ -1733,6 +1800,34 @@ class LocationButtonManifestFragmentsTest {
                 "the staged-source scan must run BEFORE the Android port is "
                 + "unpacked into srcDir, or the port's own location calls are "
                 + "read as the application's");
+    }
+
+    @Test
+    void nativeSourcesUsingTheFrameworkWrappersCountToo() throws Exception {
+        // GeofenceManager and MapComponent make their LocationManager calls
+        // INSIDE the framework, so a native source that uses one names no
+        // marker method at all -- which is why the bytecode side counts a
+        // reference alone, and why this pass missing them accepted
+        // exclusivity over a geofence.
+        File fences = tempDir("cn1-lb-native-fences");
+        writeSource(new File(fences, "com/example/Fences.java"),
+                "package com.example;\n"
+                + "import com.codename1.location.GeofenceManager;\n"
+                + "public class Fences {\n"
+                + "  GeofenceManager manager;\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(fences),
+                "geofencing through the wrapper is persistent use");
+
+        File maps = tempDir("cn1-lb-native-maps");
+        writeSource(new File(maps, "com/example/Maps.kt"),
+                "package com.example\n"
+                + "import com.codename1.maps.MapComponent\n"
+                + "class Maps { val map = MapComponent() }\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(maps),
+                "a map centres itself on the last known location");
     }
 
     @Test

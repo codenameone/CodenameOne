@@ -228,13 +228,38 @@ public class AndroidLocationButtonBridge implements LocationButtonBridge {
     private View build(Activity activity, int textType, int backgroundColor,
             int textColor, final SuccessCallback<Boolean> onResult,
             final Runnable onUnavailable) {
-        LocationButton button = new LocationButton(activity);
+        final LocationButton button = new LocationButton(activity);
         // Not left to the context walk. The library resolves an activity by
         // unwrapping the view's context, and a peer built from a context that
         // is not an Activity wrapper leaves it with none -- at which point the
         // session it needs an activity to open is never opened and the button
         // renders nothing at all.
         button.setParentActivity(activity);
+        // And AGAIN whenever the view is attached, because the one above goes
+        // stale. AndroidImplementation re-inits existing native peers when it
+        // is initialized against a new activity -- it calls init() on each and
+        // re-attaches the SAME View rather than rebuilding it -- so after a
+        // configuration change this control is living in a successor activity
+        // while still pointing at the destroyed one. The library opens its
+        // session through that activity, so the visible button stops
+        // answering.
+        //
+        // An attach listener rather than a port hook: the peer is an ordinary
+        // PeerComponent and the bridge gets no callback when it is re-inited,
+        // but the framework re-adds the view to the new layout and that is
+        // exactly what this fires on.
+        button.addOnAttachStateChangeListener(
+                new View.OnAttachStateChangeListener() {
+            public void onViewAttachedToWindow(View attached) {
+                Activity current = AndroidImplementation.getActivity();
+                if (current != null) {
+                    button.setParentActivity(current);
+                }
+            }
+
+            public void onViewDetachedFromWindow(View detached) {
+            }
+        });
         // An id, because the library keys its permission-launcher registration
         // on one and a view with NO_ID silently gets no registration. That path
         // is not reachable from here today, since this bridge only builds the

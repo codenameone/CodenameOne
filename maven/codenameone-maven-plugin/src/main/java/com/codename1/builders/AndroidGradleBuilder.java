@@ -3130,6 +3130,10 @@ public class AndroidGradleBuilder extends Executor {
         // separate try blocks.
         boolean locationBlocked = request.getArg(
                 "android.blockLocationPermission", "false").equals("true");
+        // Declared out here because the LIBRARY scan below needs it too: the
+        // two roots hold half of a subclass hierarchy each, and resolving
+        // across them means having both results in hand at once.
+        LocationButtonManifestFragments.LocationUsage appLocation;
         try {
             // Not read at all when the feature is switched off, so not paid
             // for either. android.blockLocationPermission clears
@@ -3141,8 +3145,7 @@ public class AndroidGradleBuilder extends Executor {
             // archive through the scan budget, which REFUSES a tree over its
             // cap, so a large project that had deliberately turned location
             // off could be failed by a question nobody asked.
-            LocationButtonManifestFragments.LocationUsage appLocation =
-                    locationBlocked
+            appLocation = locationBlocked
                             ? new LocationButtonManifestFragments
                                     .LocationUsage()
                             : LocationButtonManifestFragments
@@ -3234,6 +3237,15 @@ public class AndroidGradleBuilder extends Executor {
             // also geofences would have passed the conflict check and then had
             // its background behaviour refused the grant on Android 17.
             usesPersistentLocation |= libraryLocation.usesPersistentLocation();
+            // And the hierarchy the two scans only hold HALF of each. The
+            // application may call an inherited setLocationListener through a
+            // subclass a cn1lib supplies: the call names that subclass as its
+            // owner and is deferred here, while the "extends LocationManager"
+            // that explains it sits in the library jar. Each scan resolved its
+            // own root alone and neither could answer, so exclusivity was
+            // accepted over a lookup the application really makes.
+            usesPersistentLocation |= LocationButtonManifestFragments
+                    .resolvesAcross(appLocation, libraryLocation);
             // Unless the application REMOVES it, exactly as the background
             // flag beside this one is discounted. An unscoped tools:node
             // ="remove" of fine location takes the library's request out of the

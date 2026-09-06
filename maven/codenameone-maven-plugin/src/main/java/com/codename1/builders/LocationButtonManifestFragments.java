@@ -2295,6 +2295,23 @@ final class LocationButtonManifestFragments {
             // documented deleting the thing had the build refused for it.
             String text = strippedSource(new String(raw, "ISO-8859-1"));
             boolean kotlin = name.endsWith(".kt");
+            // The framework WRAPPERS, which the bytecode paths count by a
+            // reference alone and this pass did not look for at all. A native
+            // implementation that geofences through GeofenceManager, or builds
+            // a centreless MapComponent, is asking for the same persistent
+            // location as a direct call -- their own calls into
+            // LocationManager are inside the framework, where this scan never
+            // looks. Naming one is the whole test here, exactly as
+            // referencesClass is on the bytecode side.
+            for (int wrapper = 0;
+                    wrapper < NON_BUTTON_LOCATION_CLASSES.length; wrapper++) {
+                if (sourceNames(text, NON_BUTTON_LOCATION_CLASSES[wrapper])) {
+                    return true;
+                }
+            }
+            if (sourceNames(text, MAP_COMPONENT_CLASS)) {
+                return true;
+            }
             for (int row = 0; row < SOURCE_LOCATION_OWNERS.length; row++) {
                 String[] owner = SOURCE_LOCATION_OWNERS[row];
                 if (!sourceNames(text, owner[0])
@@ -3131,16 +3148,58 @@ final class LocationButtonManifestFragments {
         if (found.persistent) {
             return;
         }
-        for (String owner : found.deferredOwners) {
+        found.persistent = resolves(found.deferredOwners, found.supers);
+    }
+
+    /**
+     * Whether a deferred owner reaches LocationManager across TWO scans.
+     *
+     * <p>The application tree and the submitted libraries are scanned
+     * separately, and each resolved its own hierarchy alone. That misses the
+     * case where the two halves of the fact are in different roots: the
+     * application CALLS an inherited setLocationListener through a subclass a
+     * cn1lib supplies, so the application contributes the deferred owner and
+     * the library contributes the {@code extends LocationManager} that
+     * explains it. Neither could answer by itself, so exclusivity was accepted
+     * over a lookup the application really makes.</p>
+     *
+     * <p>Pooling both sides is the whole fix -- the walk is the same one
+     * {@link #resolveDeferredOwners} does, and it is shared rather than
+     * copied so the two cannot drift.</p>
+     *
+     * @param first  one scan's result
+     * @param second the other's
+     * @return whether the combined hierarchy resolves an owner
+     */
+    public static boolean resolvesAcross(LocationUsage first,
+            LocationUsage second) {
+        if (first == null || second == null) {
+            return false;
+        }
+        java.util.Map<String, String> supers =
+                new java.util.HashMap<String, String>(first.supers);
+        supers.putAll(second.supers);
+        java.util.Set<String> owners =
+                new java.util.HashSet<String>(first.deferredOwners);
+        owners.addAll(second.deferredOwners);
+        return resolves(owners, supers);
+    }
+
+    /** Walks each owner up the hierarchy, bounded against a cyclic map. */
+    private static boolean resolves(java.util.Set<String> owners,
+            java.util.Map<String, String> supers) {
+        for (String owner : owners) {
             String at = owner;
+            // Bounded, because the map comes from files: a hand-made class can
+            // name itself as its own superclass.
             for (int step = 0; at != null && step < 32; step++) {
                 if (LOCATION_MANAGER.equals(at)) {
-                    found.persistent = true;
-                    return;
+                    return true;
                 }
-                at = found.supers.get(at);
+                at = supers.get(at);
             }
         }
+        return false;
     }
 
     /**
