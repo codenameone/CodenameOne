@@ -108,7 +108,9 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 You can also enable this behavior in the theme by setting the `useLargerTextScaleBool` theme constant to `true`.
 
-If you need to apply the scale manually for custom fonts or layout calculations, read the values directly:
+Component fonts are the theme's job -- don't scale them by hand. For anything
+the theme can't reach, a custom-painted row or an icon measured in code,
+read the values directly:
 
 [source,java]
 ----

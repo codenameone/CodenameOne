@@ -84,53 +84,27 @@ class MiscellaneousFeaturesJava042Snippet {
     Resources theme;
     
     // tag::miscellaneous-features-java-042[]
-    /// Every state's font as the theme installed it, so a second call scales
-    /// the original rather than the font the first call derived. Without this a
-    /// 1.3 preference applied twice gives 1.69, and turning larger text off
-    /// never restores the original size.
-    private final java.util.Map<Style, Font> originalFonts =
-            new java.util.HashMap<Style, Font>();
-
-    void applyLargerText(Component someComponent) {
+    void snippet() throws Exception {
         Display display = Display.getInstance();
-        // scale 1 means "no scaling", and the helper hands the original back,
-        // so this same path also undoes a previous scaling
+        // 1.0 when the user has not asked for larger text, so the same
+        // arithmetic works either way
         float scale = display.isLargerTextEnabled() ? display.getLargerTextScale() : 1f;
-        applyLargerText(someComponent.getUnselectedStyle(), scale);
-        applyLargerText(someComponent.getSelectedStyle(), scale);
-        applyLargerText(someComponent.getPressedStyle(), scale);
-        applyLargerText(someComponent.getDisabledStyle(), scale);
-    }
 
-    private void applyLargerText(Style style, float scale) {
-        Font original = originalFonts.get(style);
-        if (original == null) {
-            original = style.getFont();
-            originalFonts.put(style, original);
-        }
-        // each state keeps its own face: a bold selected font stays bold
-        style.setFont(scaleForLargerText(original, scale));
-    }
-
-    /// Mirrors UIManager's own scaler: derive() handles only TrueType and
-    /// native fonts, and takes a requested pixel size rather than the rendered
-    /// line height getHeight() reports. Anything it cannot scale comes back
-    /// unchanged rather than throwing.
-    private Font scaleForLargerText(Font font, float scale) {
-        if (font == null || !font.isTTFNativeFont() || scale <= 1f) {
-            return font;
-        }
-        float baseSize = font.getPixelSize();
-        if (baseSize <= 0) {
-            baseSize = font.getHeight();
-        }
-        if (baseSize <= 0) {
-            return font;
-        }
-        return font.derive(baseSize * scale, font.getStyle());
+        // a custom-painted row has no Style for the theme to scale, so give it
+        // the same preference the theme fonts get
+        int rowHeight = Math.round(baseRowHeight * scale);
+        int iconSize = Math.round(baseIconSize * scale);
+        drawingArea.setPreferredH(rowHeight);
+        g.drawRect(0, 0, iconSize, iconSize);
     }
     // end::miscellaneous-features-java-042[]
 
     Component someComponent = new Label();
+
+    int baseRowHeight = 40;
+
+    int baseIconSize = 24;
+
+    Component drawingArea = new Label();
 
 }
