@@ -289,6 +289,7 @@ Simulators rely on the fact that OSes are similar and so they leave the low-leve
 Emulators make sense for developers who want to build OS level services for example, screensavers or low-level services. Standard applications are better served by simulators.
 ****
 
+[[hello-world-source]]
 ==== The source code of the hello world app
 
 After clicking finish in the new project wizard you have a `HelloWorld` project with a few default settings. The following sections break the class down to small pieces and explain each piece starting with the enclosing class:
@@ -298,18 +299,28 @@ After clicking finish in the new project wizard you have a `HelloWorld` project 
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IndexJava001Snippet.java[tag=index-java-001,indent=0]
 ----
 
-<1> This is the main class, it's the entry point to the app, notice it doesn't have a `main` method but rather callback which this guide covers soon
+<1> This is the main class and the entry point to the app. It has no `main`
+method: the platform calls into `Lifecycle`, which calls you back.
 
-<2> Forms are the "`top level`" UI element in Codename One. Only one `Form` is shown at a time and everything you see on the screen is a child of that `Form`
+<2> `runApp()` is where the app builds its first screen. `Lifecycle` calls it
+from `start()`, so this is the one method a new project overrides.
 
-<3> Every app has a theme, it determines how everything within the application looks for example: colors, fonts etc.
+<3> `Form` is the "`top level`" UI element in Codename One. Only one is shown at
+a time and everything on the screen is a child of it. `BoxLayout.y()` stacks the
+children from the top down, and a theme decides how they look.
 
-Next consider the first lifecycle method `init(Object)`. The <<ApplicationLifecycle,Application Lifecycle Sidebar>> discusses the lifecycle in depth:
+The four platform callbacks the <<ApplicationLifecycle,Application Lifecycle
+Sidebar>> describes are already implemented for you by `Lifecycle`, which is why
+the generated class carries none of them:
 
-
-`init(Object)` works as a constructor to some degree. Recommend avoiding the constructor for the main class and placing logic in the init method instead. This isn't crucial but recommend it since the constructor might happen too early in the application lifecycle.
-
-In a cold start `init(Object)` is invoked followed by the `start()` method. For example, `start()` can be invoked more than once if an app is minimized and restored, see the sidebar <<ApplicationLifecycle,Application Lifecycle>>:
+* `init(Object)` installs the theme, turns on the global `Toolbar`, sets the
+  network thread count and registers a network error listener.
+* `start()` calls `runApp()` on a cold start. On a warm start it re-shows the
+  `Form` the user was looking at when the app was suspended, so returning to an app
+  lands the user back where they were.
+* `stop()` remembers that `Form`, disposing a `Dialog` first so the app doesn't
+  come back to a modal.
+* `destroy()` does nothing by default.
 
 
 [[TitleAndLabelImage]]
@@ -348,8 +359,19 @@ Codename One has four standard callback methods in the lifecycle API:
 IMPORTANT: `destroy()` is optional there is no guarantee that it will be invoked. It should be used only as a last resort
 ****
 
-Now that you have a general sense of the lifecycle lets look at the last two lifecycle methods:
+You only override one of them when you need to run code at that point, and each
+override has to call its `super`, or the setup above stops happening:
 
+[source,java,title='Overriding a lifecycle callback']
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IndexJava002Snippet.java[tag=index-java-002,indent=0]
+----
+
+<1> Without this the theme, the `Toolbar` and the network listener are never
+installed, and the app comes up unstyled.
+
+<2> Called as the app is suspended, which is the moment to persist anything the
+user would hate to lose.
 
 That's it. You should now have a general sense of the code. It's time to run on the device.
 
@@ -498,7 +520,9 @@ Please notice the following:
 
 Due to the way Kotlin works you can create a regular Java project and convert sources to Kotlin. You can mix Java and Kotlin code without a problem and Codename One would "work."
 
-The hello world Java source file looks like this (removed some comments and whitespace):
+The Java source it converts from is the class shown in
+<<hello-world-source,the walkthrough above>>: a `Lifecycle`
+subclass overriding `runApp()`.
 
 
 When you select that file and select the menu option #Code# -> #Convert Java file to Kotlin File# you should get a familiar structure. The problem is that there are two bugs in the automatic conversion... That's the code for Kotlin behaves differently from standard Java.

@@ -55,7 +55,8 @@ import com.codename1.system.Lifecycle;
 import java.util.*;
 
 
-class IndexJava001Snippet {
+class IndexJava002Snippet {
+
 
     Object context;
     Object url;
@@ -79,15 +80,27 @@ class IndexJava001Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::index-java-001[]
-    public class HelloWorld extends Lifecycle {                             // <1>
+    // tag::index-java-002[]
+    public class HelloWorld extends Lifecycle {
 
         @Override
-        public void runApp() {                                              // <2>
-            Form hi = new Form("Hi World", BoxLayout.y());                  // <3>
-            hi.add(new Label("Hi World"));
-            hi.show();
+        public void init(Object context) {
+            super.init(context);                                            // <1>
+            Log.p("app starting");
+        }
+
+        @Override
+        public void stop() {
+            saveDraft();                                                    // <2>
+            super.stop();
+        }
+
+        @Override
+        public void runApp() {
+            new Form("Hi World", BoxLayout.y()).show();
         }
     }
-    // end::index-java-001[]
+    // end::index-java-002[]
+
+    void saveDraft() { }
 }
