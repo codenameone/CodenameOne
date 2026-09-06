@@ -86,8 +86,13 @@ class MiscellaneousFeaturesJava056Snippet {
     
     void snippet() throws Exception {
         // tag::miscellaneous-features-java-056[]
-        // the port reads these through UIManager.localize(), so any bundle works
-        java.util.Map<String, String> bundle = new java.util.HashMap<String, String>();
+        // the port reads these through UIManager.localize(). There is only one
+        // bundle, so add to the installed one rather than replacing it -- a
+        // fresh map here would drop every other localized string in the app.
+        java.util.Map<String, String> bundle = UIManager.getInstance().getBundle();
+        if (bundle == null) {
+            bundle = new java.util.HashMap<String, String>();
+        }
         bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.title",
                 "Location needed");
         bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.explanation_body",

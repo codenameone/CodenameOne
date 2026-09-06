@@ -35,7 +35,7 @@ A typical use of this API would be something like this:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava040Snippet.java[tag=miscellaneous-features-java-040,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava055Snippet.java[tag=miscellaneous-features-java-055,indent=0]
 ----
 
 ==== Dialing
@@ -164,7 +164,7 @@ https://www.codenameone.com/javadoc/com/codename1/contacts/ContactPicker.html[Co
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava055Snippet.java[tag=miscellaneous-features-java-055,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava040Snippet.java[tag=miscellaneous-features-java-040,indent=0]
 ----
 
 IMPORTANT: From 2027-01-27 Google Play requires an app that targets Android 17 (API level 37) or later and requests `READ_CONTACTS` to pass a Play Console declaration explaining why the picker isn't enough. An app that only picks never requests that permission, so it never files that declaration. The build only adds `READ_CONTACTS` for the broad API, so mixing the two in one app puts the permission back.
