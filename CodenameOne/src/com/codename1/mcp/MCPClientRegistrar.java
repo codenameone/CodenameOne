@@ -32,8 +32,13 @@ import java.util.List;
 import java.util.Map;
 
 /// Detects installed MCP hosts and registers a Codename One application's stdio MCP
-/// server with them, so an end user can point Claude Desktop, Claude Code and similar
-/// tools at the application without editing config by hand.
+/// server with them, so an end user can point Claude Desktop, Claude Code, Codex and
+/// similar tools at the application without editing config by hand.
+///
+/// Two config shapes are written: the JSON `mcpServers` object the Claude hosts use, and
+/// the `[mcp_servers.<name>]` tables Codex keeps in `~/.codex/config.toml` (see
+/// [MCPToml]). Either way the user's other servers and settings are preserved, and a
+/// config that cannot be edited safely is reported and left alone.
 ///
 /// This is a plain reusable API. It is meant to be driven by Codename One tooling (the
 /// certificate wizard, Game Builder, Settings, the simulator) and by applications
@@ -46,25 +51,36 @@ import java.util.Map;
 public final class MCPClientRegistrar {
     private static final MCPClientRegistrar INSTANCE = new MCPClientRegistrar();
 
+    /// A host whose config this class cannot write. The caller surfaces it as a manual step.
+    private static final int FORMAT_MANUAL = 0;
+    /// A JSON config with an `mcpServers` object at the root.
+    private static final int FORMAT_JSON = 1;
+    /// A TOML config with one `[mcp_servers.<name>]` table per server.
+    private static final int FORMAT_TOML = 2;
+
     private final List<KnownClient> knownClients = new ArrayList<KnownClient>();
 
     private MCPClientRegistrar() {
-        // Table driven registry: adding a JSON, mcpServers style host is a data change.
+        // Table driven registry: adding a host whose config is one of the shapes below is
+        // a data change.
         knownClients.add(new KnownClient("claude-desktop", "Claude Desktop",
                 "Library/Application Support/Claude/claude_desktop_config.json",
                 "Claude/claude_desktop_config.json",
-                ".config/Claude/claude_desktop_config.json", true));
+                ".config/Claude/claude_desktop_config.json", FORMAT_JSON));
         knownClients.add(new KnownClient("claude-code", "Claude Code",
-                ".claude.json", ".claude.json", ".claude.json", true));
-        // Detect only for now: these hosts use non JSON or differently shaped configs
-        // (Codex config.toml, opencode opencode.json "mcp" block) that need dedicated
-        // writers. They are surfaced so the caller can guide the user manually.
-        knownClients.add(new KnownClient("codex", "Codex CLI",
-                ".codex/config.toml", ".codex/config.toml", ".codex/config.toml", false));
+                ".claude.json", ".claude.json", ".claude.json", FORMAT_JSON));
+        // Codex keeps its servers as [mcp_servers.<name>] tables in a TOML file that the
+        // ChatGPT desktop app, the Codex CLI and the Codex IDE extension all share, so one
+        // writer serves all three.
+        knownClients.add(new KnownClient("codex", "Codex",
+                ".codex/config.toml", ".codex/config.toml", ".codex/config.toml", FORMAT_TOML));
+        // Detect only for now: opencode nests its servers in an "mcp" block whose entries
+        // have a different shape, so it needs a writer of its own. It is surfaced so the
+        // caller can guide the user manually.
         knownClients.add(new KnownClient("opencode", "opencode",
                 ".config/opencode/opencode.json",
                 "opencode/opencode.json",
-                ".config/opencode/opencode.json", false));
+                ".config/opencode/opencode.json", FORMAT_MANUAL));
     }
 
     public static MCPClientRegistrar getInstance() {
@@ -103,7 +119,7 @@ public final class MCPClientRegistrar {
                 }
             }
             if (present) {
-                found.add(new MCPClient(known.id, known.displayName, path, known.writable));
+                found.add(new MCPClient(known.id, known.displayName, path, known.format));
             }
         }
         return found;
@@ -125,7 +141,7 @@ public final class MCPClientRegistrar {
             if (!client.isWritable()) {
                 continue;
             }
-            if (writeEntry(client, descriptor.getServerName(), descriptor.toServerEntry())) {
+            if (writeEntry(client, descriptor.getServerName(), descriptor)) {
                 updated.add(client);
             }
         }
@@ -148,7 +164,16 @@ public final class MCPClientRegistrar {
         return updated;
     }
 
-    private boolean writeEntry(MCPClient client, String serverName, Map<String, Object> entry) {
+    /// Writes or removes one server entry in a host config, in whichever format that host
+    /// uses. A null descriptor removes the entry.
+    private boolean writeEntry(MCPClient client, String serverName, MCPClientDescriptor descriptor) {
+        if (client.format == FORMAT_TOML) {
+            return writeTomlEntry(client, serverName, descriptor);
+        }
+        return writeJsonEntry(client, serverName, descriptor);
+    }
+
+    private boolean writeJsonEntry(MCPClient client, String serverName, MCPClientDescriptor descriptor) {
         try {
             FileSystemStorage fs = FileSystemStorage.getInstance();
             String path = client.getConfigPath();
@@ -165,7 +190,7 @@ public final class MCPClientRegistrar {
                     return false;
                 }
             } else {
-                if (entry == null) {
+                if (descriptor == null) {
                     // Nothing to remove from a config that does not exist.
                     return false;
                 }
@@ -178,13 +203,55 @@ public final class MCPClientRegistrar {
             } else {
                 servers = new LinkedHashMap<String, Object>();
             }
-            if (entry == null) {
+            if (descriptor == null) {
                 servers.remove(serverName);
             } else {
-                servers.put(serverName, entry);
+                servers.put(serverName, descriptor.toServerEntry());
             }
             root.put("mcpServers", servers);
-            return writeConfigAtomic(fs, path, storagePath, root);
+            // mapToJson preserves booleans, integers and null values, so the user's other
+            // settings survive the round trip; toJson would drop null-valued entries.
+            return writeConfigAtomic(fs, path, storagePath, MCPJson.toJson(root));
+        } catch (Throwable ex) {
+            Log.e(ex);
+            return false;
+        }
+    }
+
+    /// Edits a Codex style TOML config. The document is rewritten as text with only the
+    /// one `[mcp_servers.<name>]` table replaced, so the user's other servers, settings,
+    /// comments and formatting are left exactly as they were. A document the editor
+    /// cannot make sense of is reported and left untouched.
+    private boolean writeTomlEntry(MCPClient client, String serverName, MCPClientDescriptor descriptor) {
+        try {
+            FileSystemStorage fs = FileSystemStorage.getInstance();
+            String path = client.getConfigPath();
+            String storagePath = fsPath(path);
+            String existing;
+            if (safeExists(fs, storagePath)) {
+                existing = readExistingText(fs, storagePath);
+                if (existing == null) {
+                    Log.p("MCP: leaving " + path + " unchanged; it could not be read");
+                    return false;
+                }
+            } else {
+                if (descriptor == null) {
+                    // Nothing to remove from a config that does not exist.
+                    return false;
+                }
+                existing = "";
+            }
+            MCPToml.Result result = MCPToml.applyServerEntry(existing, serverName, descriptor);
+            if (!result.isApplied()) {
+                Log.p("MCP: leaving " + path + " unchanged; " + result.getProblem());
+                return false;
+            }
+            if (result.getText().equals(existing)) {
+                // Removing an entry the config never had. Report nothing was updated
+                // rather than rewriting the file to itself.
+                return false;
+            }
+            return writeConfigAtomic(fs, path, storagePath, result.getText());
         } catch (Throwable ex) {
             Log.e(ex);
             return false;
@@ -205,6 +272,17 @@ public final class MCPClientRegistrar {
             }
             // Parse faithfully so rewriting keeps booleans, integers and nulls intact.
             return MCPJson.parse(json);
+        } catch (Throwable ex) {
+            Log.e(ex);
+            return null;
+        }
+    }
+
+    /// Reads a host config as text, returning null when it cannot be read so the caller
+    /// refuses to overwrite it.
+    private String readExistingText(FileSystemStorage fs, String storagePath) {
+        try {
+            return Util.readToString(fs.openInputStream(storagePath), "UTF-8");
         } catch (Throwable ex) {
             Log.e(ex);
             return null;
@@ -252,7 +330,7 @@ public final class MCPClientRegistrar {
     /// Writes the config through a temporary file that is renamed into place, so an
     /// interrupted write can never truncate the user's existing config.
     private boolean writeConfigAtomic(FileSystemStorage fs, String path, String storagePath,
-                                      Map<String, Object> root) {
+                                      String content) {
         try {
             String parent = parentOf(path);
             if (parent != null) {
@@ -265,9 +343,7 @@ public final class MCPClientRegistrar {
             String fileName = fileNameOf(path);
             String tmpName = fileName + ".cn1mcp-tmp";
             String tmpPath = parent == null ? fsPath(tmpName) : fsPath(parent + "/" + tmpName);
-            // mapToJson preserves booleans, integers and null values, so the user's other
-            // settings survive the round trip; toJson would drop null-valued entries.
-            byte[] data = MCPJson.toJson(root).getBytes("UTF-8");
+            byte[] data = content.getBytes("UTF-8");
             OutputStream os = fs.openOutputStream(tmpPath);
             try {
                 os.write(data);
@@ -401,13 +477,15 @@ public final class MCPClientRegistrar {
         private final String id;
         private final String displayName;
         private final String configPath;
-        private final boolean writable;
+        /// One of the FORMAT_ constants. Kept package private: which writer a host needs
+        /// is the registrar's business, and callers only ever ask whether it is writable.
+        final int format;
 
-        MCPClient(String id, String displayName, String configPath, boolean writable) {
+        MCPClient(String id, String displayName, String configPath, int format) {
             this.id = id;
             this.displayName = displayName;
             this.configPath = configPath;
-            this.writable = writable;
+            this.format = format;
         }
 
         public String getId() {
@@ -426,7 +504,7 @@ public final class MCPClientRegistrar {
         /// for hosts whose config format is not yet supported, which the caller should
         /// surface as a manual step.
         public boolean isWritable() {
-            return writable;
+            return format != FORMAT_MANUAL;
         }
     }
 
@@ -436,16 +514,16 @@ public final class MCPClientRegistrar {
         private final String macRelative;
         private final String winRelative;
         private final String linuxRelative;
-        private final boolean writable;
+        private final int format;
 
         KnownClient(String id, String displayName, String macRelative, String winRelative,
-                    String linuxRelative, boolean writable) {
+                    String linuxRelative, int format) {
             this.id = id;
             this.displayName = displayName;
             this.macRelative = macRelative;
             this.winRelative = winRelative;
             this.linuxRelative = linuxRelative;
-            this.writable = writable;
+            this.format = format;
         }
 
         String absolutePath(String home) {
