@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/port-status-contract.yml'
       - '.github/workflows/port-status-publish.yml'
+      - '.github/workflows/parparvm-tests-windows.yml'
+      - 'scripts/lib/cn1ss.sh'
       - 'docs/website/data/port_status.json'
       - 'docs/website/data/port_status_supplement.json'
       - 'docs/website/data/port_status_support.json'
@@ -36,6 +38,8 @@ on:
     paths:
       - '.github/workflows/port-status-contract.yml'
       - '.github/workflows/port-status-publish.yml'
+      - '.github/workflows/parparvm-tests-windows.yml'
+      - 'scripts/lib/cn1ss.sh'
       - 'docs/website/data/port_status.json'
       - 'docs/website/data/port_status_supplement.json'
       - 'docs/website/data/port_status_support.json'
@@ -91,4 +95,4 @@ jobs:
           ./scripts/hellocodenameone/conformance/check_port_status_provenance.sh "${BASE_SHA:-HEAD^}"
       - name: Run normalizer tests
         working-directory: scripts/hellocodenameone/conformance
-        run: python3 -m unittest -v test_port_status.py
+        run: python3 -m unittest -v test_port_status.py test_publish_port_status.py test_ci_reporting.py
