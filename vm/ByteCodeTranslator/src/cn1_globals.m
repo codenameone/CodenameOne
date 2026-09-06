@@ -12211,6 +12211,17 @@ void cn1RecordAllocation(struct clazz* parent, int size) {
     atomic_fetch_add_explicit(&cn1AllocProfCount[id], 1, memory_order_relaxed);
 }
 
+// NOT comparable with the allocatedKb figure CN1_LOG_GC_OVERFLOW prints, and a
+// close agreement between the two is not evidence either is right. This profile
+// counts REQUESTED bytes at the moment of allocation; allocatedKb accumulates
+// BiBOP SLOT bytes (rounded up to the size class) and only at GC cycle
+// boundaries, so everything allocated after the last cycle is missing from it.
+// The two therefore differ by the rounding gap in one direction and the tail of
+// the run in the other. An earlier version of this profile double-counted every
+// fast-path allocation that fell back to codenameOneGcMalloc and still landed
+// within 2% of allocatedKb, because those errors happened to cancel -- which is
+// exactly how a broken instrument reads as a verified one.
+//
 // count|1 was meant to guard a divide by zero and silently changed the divisor
 // instead: two allocations reported bytes/3. Selecting on bytes>0 already implies
 // a nonzero count, so the guard only has to be honest about the degenerate case.
