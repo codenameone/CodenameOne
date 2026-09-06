@@ -1051,6 +1051,22 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void attributeValuesAreWalkedNotJustCounted() {
+        // hasMore() says a byte remains, not that the byte begins a whole
+        // element, so "31 01 05" looked like a populated values SET while
+        // holding a tag with no length behind it. OpenSSL refuses that key and
+        // accepts the complete "31 02 05 00" beside it, so both are checked.
+        byte[] canonical = der(RSA_PKCS8);
+        byte[] truncatedValue = hex("A010300E06092a864886f70d010907310105");
+        byte[] completeValue = hex("A011300F06092a864886f70d01090731020500");
+
+        assertThrows(CryptoException.class, () -> PrivateKey.fromPem(
+                pem("PRIVATE KEY", Base64.encodeNoNewline(withTrailer(canonical, truncatedValue)))));
+        assertNotNull(PrivateKey.fromPem(
+                pem("PRIVATE KEY", Base64.encodeNoNewline(withTrailer(canonical, completeValue)))));
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));

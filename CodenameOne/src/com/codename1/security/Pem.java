@@ -630,11 +630,17 @@ final class Pem {
             if (!attribute.hasMore() || attribute.peek() != 0x31) {
                 throw new CryptoException("malformed PKCS#8 key: an Attribute has no values SET");
             }
-            // AttributeValue ::= SET SIZE (1..MAX), so an empty set is not one
+            // AttributeValue ::= SET SIZE (1..MAX), so an empty set is not one.
+            // hasMore() only says a byte remains -- it does not say that byte
+            // begins a whole element, so "31 01 05" looked like a populated set
+            // while holding a tag with no length behind it. Walk the members.
             Cursor values = new Cursor(attribute.element());
             values.enter(0x31);
             if (!values.hasMore()) {
                 throw new CryptoException("malformed PKCS#8 key: an Attribute has an empty values SET");
+            }
+            while (values.hasMore()) {
+                values.skip();
             }
             if (attribute.hasMore()) {
                 throw new CryptoException("malformed PKCS#8 key: an Attribute has more than "
