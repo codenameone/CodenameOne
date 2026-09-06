@@ -101,6 +101,46 @@ final class IOSProvisioningPreflight {
          * not be parsed at all produces no Profile, which is where "cannot tell" still lives.</p>
          */
         List<String> appGroups = new ArrayList<String>();
+        /**
+         * True when the profile grants {@code com.apple.developer.ubiquity-kvstore-identifier},
+         * which is what an App ID with the iCloud capability enabled looks like.
+         *
+         * <p>Read the same way as {@link #appGroups}: false means the profile genuinely grants
+         * none, because a profile that could not be parsed at all produces no Profile.</p>
+         */
+        boolean ubiquityKeyValueStore;
+
+        /**
+         * The container that entitlement names, exactly as the profile spells it, or null.
+         *
+         * <p>Kept rather than reduced to the boolean above, because the boolean is what made the
+         * check unable to answer which container was granted -- a limitation the code then
+         * described as inherent when it was only self-inflicted. Codesigning rejects an app
+         * entitlement the profile's value does not cover, so a profile granting one container
+         * and a project naming another is a build that fails at signing.</p>
+         */
+        String ubiquityKeyValueStoreValue;
+    }
+
+    /**
+     * Whether a container name is something two sides can be compared on.
+     *
+     * <p>An Xcode variable expands at build time and a wildcard covers a set, so neither is a
+     * value this can hold against another one. Only a plain literal is.</p>
+     *
+     * <p>Any {@code $} at all, not the {@code $(} spelling alone. Xcode accepts
+     * {@code ${CFBundleIdentifier}} equally, this project's own Mac entitlement test writes the
+     * two forms in a single value -- {@code $(TeamIdentifierPrefix)${CFBundleIdentifier}} -- and
+     * replaceBuildSetting() substitutes both, with a comment recording that handling one and not
+     * the other was already a bug once. Missing a spelling here does not fail to warn, it warns
+     * WRONGLY: the profile holds the expanded identifier, so an override Xcode would expand
+     * correctly gets reported as a signing failure that will not happen. A container identifier is
+     * reverse-DNS and has no business containing a dollar sign, so treating every one of them as
+     * "not comparable" costs nothing and cannot invent a third spelling to miss.</p>
+     */
+    private static boolean isLiteralContainer(String container) {
+        return container != null && !container.isEmpty()
+                && container.indexOf('$') < 0 && container.indexOf('*') < 0;
     }
 
     /** A problem found before the build was sent: {@code message} is written for the user. */
@@ -219,6 +259,105 @@ final class IOSProvisioningPreflight {
             return problems;
         }
         collectFileProblems(problems, settings, release, now, path, settingKey, true);
+        return problems;
+    }
+
+    /**
+     * Whether the profile can sign an app that asks for the iCloud key-value store.
+     *
+     * <p>Asked only of a project that set {@code ios.continuity.sync=true}, which is how a
+     * project says it wants the store without this check having to read bytecode.</p>
+     *
+     * <p>A reference to {@code com.codename1.continuity.sync} makes the build declare
+     * {@code com.apple.developer.ubiquity-kvstore-identifier}, and Apple grants that entitlement
+     * only through an App ID with the iCloud capability enabled. A profile issued before that was
+     * switched on matches the bundle id perfectly and still authorizes none of it, so the build
+     * runs all the way to codesign and fails there -- talking about an entitlement rather than
+     * about the iCloud capability nobody enabled.</p>
+     *
+     * <p>Never fatal, and that is deliberate: unlike the App Group checks beside it, this
+     * entitlement has a documented opt-out. {@code ios.continuity.sync=false} drops it and leaves
+     * the app working with {@code SyncedStore.isSupported()} reporting false, so a warning that
+     * names the two ways out is more useful than a refusal.</p>
+     *
+     * @return one problem when the profile demonstrably lacks the entitlement, none when the
+     * project did not declare the synced store or nothing readable says either way
+     */
+    static List<Problem> checkContinuitySync(Properties settings, boolean release) {
+        List<Problem> problems = new ArrayList<Problem>();
+        if (settings == null) {
+            return problems;
+        }
+        // Keyed on the SYNC declaration alone. An earlier version keyed on a separate
+        // "continuity is in use" hint and warned the wrong projects: the builder asks for the
+        // entitlement only when it sees com.codename1.continuity.sync in the bytecode, so a
+        // project using continuity WITHOUT the synced store was told its profile could not sign
+        // an entitlement its build was never going to request. That hint had no other reader and
+        // is gone; this is the only declaration the question needs.
+        //
+        // An explicit true rather than a default, because this check has to be read as "the
+        // project says it wants a synced store". Absent means "the bytecode decides", which is
+        // exactly the thing nothing here can read; false means the entitlement is dropped. Only
+        // an explicit yes is a claim this can act on.
+        if (!"true".equals(trimmed(settings.getProperty(
+                "codename1.arg.ios.continuity.sync")))) {
+            return problems;
+        }
+        String override = trimmed(settings.getProperty("codename1.arg.ios.entitlements.com.apple"
+                + ".developer.ubiquity-kvstore-identifier"));
+        Profile appProfile = appProfile(settings, release);
+        if (appProfile == null || appProfile.applicationIdentifier == null) {
+            // No readable profile: check() reports that, and it is not something to warn about
+            // twice.
+            return problems;
+        }
+        if (appProfile.ubiquityKeyValueStore) {
+            // Granted -- and now WHICH container, when both sides say so literally.
+            //
+            // Only then. The value the build requests when the project names none is
+            // "$(TeamIdentifierPrefix)$(CFBundleIdentifier)", two Xcode variables this has no
+            // business expanding, and a profile may grant a wildcard. Comparing either of those
+            // would produce warnings on configurations that sign perfectly well, which is worse
+            // than staying quiet: a preflight that cries wolf is one people stop reading.
+            //
+            // Two literals that differ is the case that is certain, and it is the ordinary way to
+            // get this wrong -- an app sharing a sibling's store, which is exactly when a project
+            // names a container by hand.
+            if (isLiteralContainer(override) && isLiteralContainer(
+                    appProfile.ubiquityKeyValueStoreValue)
+                    && !override.equals(appProfile.ubiquityKeyValueStoreValue)) {
+                problems.add(new Problem("This project asks for the iCloud key-value store "
+                        + "container \"" + override + "\", and the provisioning profile \""
+                        + appProfile.name + "\" grants \""
+                        + appProfile.ubiquityKeyValueStoreValue + "\".\n"
+                        + "Codesigning rejects an app entitlement the profile does not cover, so "
+                        + "this build fails when it is signed rather than when it is sent.\n"
+                        + "Either point ios.entitlements.com.apple.developer"
+                        + ".ubiquity-kvstore-identifier at the container the profile grants, or "
+                        + "regenerate the profile from an App ID whose iCloud capability includes "
+                        + "the one you want.", false));
+            }
+            return problems;
+        }
+        // Not granted AT ALL, and an explicit container does not rescue that: the builder puts the
+        // entitlement into the app either way and codesigning rejects it. Returning early on the
+        // override, as this did, suppressed the one answer the preflight can give definitively --
+        // the unanswerable question is which container, and that is not the question here.
+        String named = override == null || override.isEmpty() ? ""
+                : "\nThe project names its own container (" + override + "). That does not change "
+                        + "this: the profile grants no key-value store at all, so there is no "
+                        + "container for it to share.";
+        problems.add(new Problem("This app uses com.codename1.continuity.sync, so the build asks "
+                + "for the iCloud key-value store entitlement "
+                + "(com.apple.developer.ubiquity-kvstore-identifier) -- and the provisioning "
+                + "profile \"" + appProfile.name + "\" does not grant it.\n"
+                + "Apple grants it only through an App ID with the iCloud capability enabled, so "
+                + "signing will fail on the entitlement rather than on the profile name.\n"
+                + "Either enable iCloud on the App ID at developer.apple.com and regenerate the "
+                + "profile, or set codename1.arg.ios.continuity.sync=false -- which drops the "
+                + "entitlement and leaves SyncedStore reporting itself unsupported at runtime. "
+                + "Handing work to a nearby device is unaffected either way; that half needs no "
+                + "entitlement." + named, false));
         return problems;
     }
 
@@ -1024,6 +1163,15 @@ final class IOSProvisioningPreflight {
                     profile.appGroups.add(value);
                 }
             }
+        }
+        // Same nesting again: this is what says whether the profile can sign a target that asks
+        // for the iCloud key-value store, which a reference to com.codename1.continuity.sync
+        // makes the build declare.
+        Element ubiquity = valueForKey(doc, "com.apple.developer.ubiquity-kvstore-identifier");
+        profile.ubiquityKeyValueStore = ubiquity != null;
+        if (ubiquity != null && "string".equals(ubiquity.getTagName())) {
+            String granted = ubiquity.getTextContent().trim();
+            profile.ubiquityKeyValueStoreValue = granted.isEmpty() ? null : granted;
         }
         profile.type = deriveType(doc);
         return profile;

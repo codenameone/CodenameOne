@@ -53,6 +53,7 @@
 #endif
 #import "CN1AudioUnit.h"
 #import "CN1AppleUI.h"
+#import "CN1DragAndDrop.h"
 
 #if TARGET_OS_OSX
 /*
@@ -1068,21 +1069,154 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardContent___java_lang_Str
 extern NSData* arrayToData(JAVA_OBJECT arr);
 extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 
-#if TARGET_OS_OSX
-/// The pasteboard type the bytes actually are, by magic number, or nil when
+/*
+ * Native drag and drop. The UIKit half lives in CN1DragAndDrop.m; everything here is the
+ * ParparVM boundary, kept in this file with the other bridges so all the thread-state handling
+ * stays in one place.
+ */
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isNativeDragAndDropSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return CN1DragAndDropSupported() ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isNativeDragOutsideAppSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return CN1DragOutsideAppSupported() ? JAVA_TRUE : JAVA_FALSE;
+}
+
+void com_codename1_impl_ios_IOSNative_prepareNativeDrag___java_lang_String_int_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeTypes, JAVA_INT allowedActions, JAVA_OBJECT dragImagePng, JAVA_INT touchX, JAVA_INT touchY) {
+    POOL_BEGIN();
+    NSString* mimes = mimeTypes == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG mimeTypes);
+    NSData* preview = dragImagePng == JAVA_NULL ? nil : arrayToData(dragImagePng);
+    // On the main thread: the interactions and the state they read live there, and this is
+    // called from the event dispatch thread as the press is dispatched.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CN1PrepareNativeDrag(mimes, (int)allowedActions, preview, (int)touchX, (int)touchY);
+    });
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_beginNativeDragPayload___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT sessionId) {
+    CN1BeginNativeDragPayload((int)sessionId);
+}
+
+void com_codename1_impl_ios_IOSNative_declareNativeDragPayload___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType) {
+    POOL_BEGIN();
+    // Synchronously, unlike prepare: these run inside the session-started callback on the main
+    // thread and the item providers are built from them the moment it returns.
+    CN1DeclareNativeDragPayload(mimeType == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG mimeType));
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_addNativeDragFiles___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
+    POOL_BEGIN();
+    // One file per call; see CN1AddNativeDragFiles for why there is no list here.
+    CN1AddNativeDragFiles(path == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG path));
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_addNativeDragUrl___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT url) {
+    POOL_BEGIN();
+    // One link per call, as the files are; see CN1AddNativeDragUrl.
+    CN1AddNativeDragUrl(url == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG url));
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_cancelNativeDrag__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CN1CancelNativeDrag();
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_enableNativeDragSource__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    CN1EnableNativeDragSource();
+}
+
+void com_codename1_impl_ios_IOSNative_enableNativeDropTarget__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    CN1EnableNativeDropTarget();
+}
+
+int CN1NativeDragDeliverOver(int x, int y, NSString* mimeTypes, int allowedActions, BOOL entering) {
+    return (int)com_codename1_impl_ios_IOSImplementation_nativeDragOverCallback___int_int_java_lang_String_int_boolean_R_int(
+            CN1_THREAD_GET_STATE_PASS_ARG x, y,
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeTypes),
+            allowedActions, entering ? JAVA_TRUE : JAVA_FALSE);
+}
+
+void CN1NativeDragDeliverExit(void) {
+    com_codename1_impl_ios_IOSImplementation_nativeDragExitCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void CN1NativeDragDeliverDropBegin(void) {
+    com_codename1_impl_ios_IOSImplementation_nativeDropBeginCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void CN1NativeDragDeliverDropAdd(NSString* mimeType, NSString* text, NSData* binary) {
+    com_codename1_impl_ios_IOSImplementation_nativeDropAddCallback___java_lang_String_java_lang_String_byte_1ARRAY(
+            CN1_THREAD_GET_STATE_PASS_ARG
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeType),
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG text),
+            binary == nil ? JAVA_NULL : nsDataToByteArr(binary));
+}
+
+void CN1NativeDragDeliverDropAddFile(NSString* mimeType, NSString* path, NSString* charset) {
+    com_codename1_impl_ios_IOSImplementation_nativeDropAddFileCallback___java_lang_String_java_lang_String_java_lang_String(
+            CN1_THREAD_GET_STATE_PASS_ARG
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeType),
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path),
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG charset));
+}
+
+NSData* CN1NativeDragDeliverResolve(NSString* mimeType, int sessionId) {
+    JAVA_OBJECT bytes = com_codename1_impl_ios_IOSImplementation_nativeDragResolveCallback___java_lang_String_int_R_byte_1ARRAY(
+            CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeType), sessionId);
+    return bytes == JAVA_NULL ? nil : arrayToData(bytes);
+}
+
+void CN1NativeDragDeliverPayloadReleased(int sessionId) {
+    com_codename1_impl_ios_IOSImplementation_nativeDragPayloadReleasedCallback___int(
+            CN1_THREAD_GET_STATE_PASS_ARG sessionId);
+}
+
+int CN1NativeDragDeliverDropCommit(int x, int y, int action, int allowedActions, BOOL local,
+                                   int hoverGeneration, int dropId) {
+    return (int)com_codename1_impl_ios_IOSImplementation_nativeDropCommitCallback___int_int_int_int_boolean_int_int_R_int(
+            CN1_THREAD_GET_STATE_PASS_ARG x, y, action, allowedActions,
+            local ? JAVA_TRUE : JAVA_FALSE, hoverGeneration, dropId);
+}
+
+void com_codename1_impl_ios_IOSNative_dropDeliveryFinished___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT dropId) {
+    CN1DropDeliveryFinished((int)dropId);
+}
+
+int CN1NativeDragDeliverHoverGeneration(void) {
+    return (int)com_codename1_impl_ios_IOSImplementation_nativeDragHoverGenerationCallback___R_int(
+            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+int CN1NativeDragDeliverSessionStarted(void) {
+    return (int)com_codename1_impl_ios_IOSImplementation_nativeDragSessionStartedCallback___R_int(
+            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void CN1NativeDragDeliverCompleted(int action) {
+    com_codename1_impl_ios_IOSImplementation_nativeDragCompletedCallback___int(
+            CN1_THREAD_GET_STATE_PASS_ARG action);
+}
+
+/// The uniform type identifier the bytes actually are, by magic number, or nil when
 /// they are none of the three the Java side can hand us.
 ///
 /// IOSImplementation.clipboardImageBytes() takes ClipboardContent's MIME_PNG
 /// representation if it has one, else MIME_JPEG, else MIME_GIF -- so the bytes
 /// arriving here are frequently not PNG, and declaring them PNG makes every
 /// other application decode JPEG or GIF data as PNG.
-static NSString* cn1MacPasteboardImageType(NSData* data) {
+static NSString* cn1PasteboardImageUti(NSData* data) {
     if (data.length < 4) {
         return nil;
     }
     const unsigned char* b = (const unsigned char*)data.bytes;
     if (b[0] == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G') {
-        return NSPasteboardTypePNG;
+        return @"public.png";
     }
     if (b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) {
         return @"public.jpeg";
@@ -1092,7 +1226,56 @@ static NSString* cn1MacPasteboardImageType(NSData* data) {
     }
     return nil;
 }
+
+/// The URL a MIME_FILE entry names, whichever way it was spelled.
+///
+/// ClipboardContent's file representation explicitly permits a raw local path, and
+/// URLWithString: turns one into a scheme-less relative URL whose isFileURL is NO. A
+/// receiver then gets no usable file reference, and neither UIPasteboard.URLs nor the
+/// Finder can see what was just published. An absolute path is obvious; a relative one --
+/// exports/report.pdf -- looks enough like a URL to be parsed as one, so anything that does
+/// not come back with a scheme is a path too.
+static NSURL* cn1PasteboardUrlFor(NSString* entry) {
+    if (entry.length == 0) {
+        return nil;
+    }
+    if ([entry hasPrefix:@"/"] || [entry hasPrefix:@"~"]) {
+        return [NSURL fileURLWithPath:[entry stringByExpandingTildeInPath]];
+    }
+    NSURL* url = [NSURL URLWithString:entry];
+    if (url == nil || url.scheme == nil) {
+        return [NSURL fileURLWithPath:entry];
+    }
+    return url;
+}
+
+#if TARGET_OS_OSX
+/// The same, as the pasteboard type name AppKit declares for it.
+static NSString* cn1MacPasteboardImageType(NSData* data) {
+    NSString* uti = cn1PasteboardImageUti(data);
+    return uti != nil && [uti isEqualToString:@"public.png"] ? NSPasteboardTypePNG : uti;
+}
 #endif
+
+/// The representations setClipboardContent has still to publish, keyed by uniform type
+/// identifier: whatever the fixed arguments of that call have no room for.
+static NSMutableDictionary* cn1PendingClipboardExtras = nil;
+
+void com_codename1_impl_ios_IOSNative_addClipboardRepresentation___java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType, JAVA_OBJECT value) {
+    POOL_BEGIN();
+    NSString* mime = mimeType == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG mimeType);
+    NSData* data = value == JAVA_NULL ? nil : arrayToData(value);
+    if (mime.length > 0 && data != nil) {
+        NSString* uti = CN1UtiForMime(mime);
+        if (uti != nil) {
+            if (cn1PendingClipboardExtras == nil) {
+                cn1PendingClipboardExtras = [[NSMutableDictionary alloc] init];
+            }
+            [cn1PendingClipboardExtras setObject:data forKey:uti];
+        }
+    }
+    POOL_END();
+}
 
 void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT plain, JAVA_OBJECT html, JAVA_OBJECT rtf, JAVA_OBJECT markdown, JAVA_OBJECT asciidoc, JAVA_OBJECT image, JAVA_OBJECT fileUris) {
 #if TARGET_OS_OSX
@@ -1130,6 +1313,13 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
             }
         }
     }
+    for (NSString* uti in cn1PendingClipboardExtras) {
+        // Whatever the fixed arguments had no room for -- an application's own format, a
+        // type the framework has no constant for. Published beside them rather than
+        // instead: a content offering only such a type used to reach the pasteboard as
+        // nothing at all.
+        [pb setData:[cn1PendingClipboardExtras objectForKey:uti] forType:uti];
+    }
     if (fileUris != JAVA_NULL) {
         NSString* joined = toNSString(CN1_THREAD_STATE_PASS_ARG fileUris);
         NSMutableArray* urls = [NSMutableArray array];
@@ -1145,20 +1335,10 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
             // means changing the bridge for both platforms rather than making
             // macOS disagree with iOS about what the separator means.
             //
-            // ClipboardContent.MIME_FILE's contract explicitly permits a raw
-            // local path, and URLWithString: turns one into a scheme-less
-            // relative URL whose isFileURL is NO. The Finder then gets no
-            // usable file reference, and getClipboardFileUris() -- which asks
-            // for file URLs only -- cannot read back what this just wrote.
-            NSURL* url;
-            if ([u hasPrefix:@"/"] || [u hasPrefix:@"~"]) {
-                url = [NSURL fileURLWithPath:[u stringByExpandingTildeInPath]];
-            } else {
-                url = [NSURL URLWithString:u];
-                if (url != nil && url.scheme == nil) {
-                    url = [NSURL fileURLWithPath:u];
-                }
-            }
+            // A raw local path is read as one rather than as a relative URL; see
+            // cn1PasteboardUrlFor, which is also what getClipboardFileUris() has to be
+            // able to read back, since it asks for file URLs only.
+            NSURL* url = cn1PasteboardUrlFor(u);
             if (url != nil) [urls addObject:url];
         }
         // Written as objects rather than as a type, which is what makes the
@@ -1166,6 +1346,7 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
         // paste -- a URL string on the pasteboard is only text.
         if (urls.count > 0) [pb writeObjects:urls];
     }
+    [cn1PendingClipboardExtras removeAllObjects];
     POOL_END();
 #else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
@@ -1182,22 +1363,103 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
     }
     if (image != JAVA_NULL) {
         NSData* imgData = arrayToData(image);
-        if (imgData != nil && imgData.length > 0) [item setObject:imgData forKey:@"public.png"];
+        if (imgData != nil && imgData.length > 0) {
+            // Under the type the bytes actually are. The Java side sends whichever of PNG,
+            // JPEG or GIF the content offered, and calling a JPEG public.png had every
+            // receiver -- this port's own reader included -- decode it as something it is
+            // not. Unrecognized bytes keep the old label, which is no worse than before.
+            NSString* imageUti = cn1PasteboardImageUti(imgData);
+            [item setObject:imgData forKey:imageUti == nil ? @"public.png" : imageUti];
+        }
+    }
+    for (NSString* uti in cn1PendingClipboardExtras) {
+        // As above: the types the fixed arguments cannot name travel on the same item as
+        // the rest, because they are alternative readings of one payload.
+        [item setObject:[cn1PendingClipboardExtras objectForKey:uti] forKey:uti];
     }
     NSMutableArray* items = [NSMutableArray array];
-    if ([item count] > 0) [items addObject:item];
     if (fileUris != JAVA_NULL) {
         NSString* joined = toNSString(CN1_THREAD_STATE_PASS_ARG fileUris);
         for (NSString* u in [joined componentsSeparatedByString:@"\n"]) {
-            if (u.length == 0) continue;
-            NSData* urlData = [u dataUsingEncoding:NSUTF8StringEncoding];
-            if (urlData != nil) [items addObject:[NSDictionary dictionaryWithObject:urlData forKey:@"public.url"]];
+            // As an NSURL, not as the bytes of a string: a raw path is not a URL
+            // representation at all, and UIPasteboard.URLs and every other URL reader look
+            // for the object. See cn1PasteboardUrlFor.
+            NSURL* url = cn1PasteboardUrlFor(u);
+            if (url == nil) {
+                continue;
+            }
+            NSMutableDictionary* urlItem =
+                    [NSMutableDictionary dictionaryWithObject:url forKey:@"public.url"];
+            if ([item count] > 0) {
+                // The text, markup and image ride on the first URL rather than becoming an
+                // item of their own. An item is a copied *object*, so a document beside its
+                // text fallback as two items is two things on the pasteboard, and a receiver
+                // importing everything took the document *and* a stray piece of text instead
+                // of choosing the best form of one thing. The drag path has always done it
+                // this way; see registerDeclared in CN1DragAndDrop.m.
+                [urlItem addEntriesFromDictionary:item];
+                [item removeAllObjects];
+            }
+            [items addObject:urlItem];
         }
     }
+    // Whatever the alternatives were not able to ride on, which is the whole payload when
+    // the content named no files at all.
+    if ([item count] > 0) [items addObject:item];
     [UIPasteboard generalPasteboard].items = items;
+    [cn1PendingClipboardExtras removeAllObjects];
     POOL_END();
 #endif
 #endif
+}
+
+/// The identifiers the system pasteboard is offering, in its own order.
+static NSArray* cn1ClipboardTypes(void) {
+#if TARGET_OS_OSX
+    return [[NSPasteboard generalPasteboard] types];
+#else
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+    return [UIPasteboard generalPasteboard].pasteboardTypes;
+#else
+    return nil;
+#endif
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getClipboardTypeCount___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    POOL_BEGIN();
+    JAVA_INT count = (JAVA_INT)cn1ClipboardTypes().count;
+    POOL_END();
+    return count;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardTypeAt___int_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT index) {
+    POOL_BEGIN();
+    NSArray* types = cn1ClipboardTypes();
+    NSString* mime = index >= 0 && index < (JAVA_INT)types.count
+            ? CN1MimeForUti([types objectAtIndex:index]) : nil;
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_STATE_PASS_ARG mime);
+    POOL_END();
+    return result;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardRepresentation___java_lang_String_R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType) {
+    POOL_BEGIN();
+    NSString* mime = mimeType == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG mimeType);
+    NSString* uti = mime == nil ? nil : CN1UtiForMime(mime);
+    NSData* data = nil;
+    if (uti != nil) {
+#if TARGET_OS_OSX
+        data = [[NSPasteboard generalPasteboard] dataForType:uti];
+#else
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+        data = [[UIPasteboard generalPasteboard] dataForPasteboardType:uti];
+#endif
+#endif
+    }
+    JAVA_OBJECT result = data == nil ? JAVA_NULL : nsDataToByteArr(data);
+    POOL_END();
+    return result;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardImage___R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
@@ -1254,8 +1516,14 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardFileUris___R_java_lang_
 #if TARGET_OS_OSX
     POOL_BEGIN();
     NSPasteboard* pb = [NSPasteboard generalPasteboard];
-    NSArray<NSURL *>* urls = [pb readObjectsForClasses:@[[NSURL class]]
-                                               options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}];
+    // Every URL, not only the ones naming files. A link is a URL the pasteboard is perfectly
+    // able to carry -- this port publishes them itself now -- and asking for file URLs only
+    // meant an https address written here could not be read back at all, so a paste after a
+    // restart, or of a link another application copied, reported nothing.
+    //
+    // Which of them are files is the Java side's question, and it asks it: the ones naming
+    // something on this device become MIME_FILE, and all of them the URI list.
+    NSArray<NSURL *>* urls = [pb readObjectsForClasses:@[[NSURL class]] options:@{}];
     NSString* joined = nil;
     if (urls.count > 0) {
         NSMutableArray* parts = [NSMutableArray array];
@@ -20543,6 +20811,462 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsAppIntentsSupported___R_boo
 }
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsIndexingSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return com_codename1_impl_ios_IOSNative_intentsIndexingSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
+
+// --- State restoration and continuity (com.codename1.continuity) -------------
+//
+// Two unrelated Apple mechanisms, gated together on CN1_USE_CONTINUITY but answered separately
+// to Java, because they cost different things. NSUserActivity with eligibleForHandoff carries
+// what the user is doing to a device they are holding and needs no entitlement at all; the
+// NSUbiquitousKeyValueStore below carries a few durable values to every device on the account
+// and needs one that has to be granted on the App ID. An app wanting only the first must not be
+// made to arrange the second, which is why com.codename1.continuity.sync is a separate package
+// and why the store reports its own availability rather than assuming it.
+//
+// What is NOT here: saving and restoring state on this device. That is pure Java over
+// com.codename1.io.Storage and works in every build, with or without this define.
+
+#ifdef CN1_USE_CONTINUITY
+
+/// The advertised activity, or nil. A single slot rather than the bounded ring the intent
+/// donations use: a donation is a historical fact the system may keep offering, while this is
+/// "what the user is doing right now" and there is only ever one of those. Publishing again
+/// replaces it.
+static NSUserActivity *cn1ContinuityActivity = nil;
+
+/// Retained so the observer can be reasoned about, though nothing ever removes it: the store's
+/// external-change notification is wanted for the entire life of the process.
+static id cn1ContinuityStoreObserver = nil;
+
+// The translated entry point the store observer below calls. Without this it is an implicit
+// declaration, which C99 and every clang that enforces it reject outright -- and where a
+// toolchain still accepts one, the invented prototype passes the thread state through whatever
+// registers the default promotions choose. Same reasoning, and the same fix, as the
+// IOSWearableCallbacks declarations further down this file.
+extern JAVA_VOID com_codename1_impl_ios_IOSContinuityCallbacks_nativeSyncedStoreChanged__(
+        CODENAME_ONE_THREAD_STATE);
+
+static NSDictionary *cn1ContinuityParseJson(NSString *json) {
+    if (json == nil) {
+        return nil;
+    }
+    NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
+    if (data == nil) {
+        return nil;
+    }
+    id parsed = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    return [parsed isKindOfClass:[NSDictionary class]] ? (NSDictionary *)parsed : nil;
+}
+
+/// Reduces a parsed JSON value to what a property list can hold, recursively.
+///
+/// The intent donation path beside this one flattens to strings and numbers, which is all a
+/// donation carries. A continuity payload is nested by construction -- an array of route paths
+/// and a map of the application's own values -- so flattening it would deliver an activity with
+/// the routes silently missing, which looks exactly like the feature not working.
+///
+/// Anything with no property-list representation, NSNull included, is dropped rather than
+/// substituted: the Java side validated the payload where the application produced it, so the
+/// only values that can reach here are ones JSON introduced on its own.
+static id cn1ContinuitySanitize(id value) {
+    if ([value isKindOfClass:[NSString class]] || [value isKindOfClass:[NSNumber class]]) {
+        return value;
+    }
+    if ([value isKindOfClass:[NSArray class]]) {
+        NSMutableArray *out = [NSMutableArray array];
+        for (id item in (NSArray *)value) {
+            id safe = cn1ContinuitySanitize(item);
+            if (safe != nil) {
+                [out addObject:safe];
+            }
+        }
+        return out;
+    }
+    if ([value isKindOfClass:[NSDictionary class]]) {
+        NSMutableDictionary *out = [NSMutableDictionary dictionary];
+        NSDictionary *dict = (NSDictionary *)value;
+        for (id key in dict) {
+            if (![key isKindOfClass:[NSString class]]) {
+                continue;
+            }
+            id safe = cn1ContinuitySanitize([dict objectForKey:key]);
+            if (safe != nil) {
+                [out setObject:safe forKey:key];
+            }
+        }
+        return out;
+    }
+    return nil;
+}
+
+/// The synced store, or nil when this process has no store object at all.
+///
+/// NOT gated on the synchronize probe, which answers a different question. A
+/// NSUbiquitousKeyValueStore is a LOCAL persistent store: reads and writes go to disk and iCloud
+/// propagation happens asynchronously afterwards, and -synchronize pushes the in-memory copy to
+/// that disk rather than to the network. Refusing to hand the store out because a synchronize
+/// answered NO therefore threw away work that would have persisted and propagated perfectly well
+/// -- get() ignored values already cached locally, and put() and remove() did nothing at all --
+/// for as long as the NO lasted.
+///
+/// Whether the store is USABLE and whether this build is ENTITLED are separate questions, and the
+/// probe belongs to the second one. See cn1ContinuitySyncEntitled.
+/// Whether a synchronize has ever succeeded, which is how a missing entitlement shows itself.
+///
+/// File scope rather than a function static so isSupported() can read it: what the application is
+/// told about support has to be this, and not "is there a store object", which is now yes for an
+/// unentitled build too.
+static BOOL cn1ContinuitySyncEntitled = NO;
+
+static NSUbiquitousKeyValueStore *cn1ContinuityStore(void) {
+    static NSUbiquitousKeyValueStore *store = nil;
+    static pthread_mutex_t cn1ContinuityStoreLock = PTHREAD_MUTEX_INITIALIZER;
+    // A mutex that latches SUCCESS only, not dispatch_once. Two things have to be true here and
+    // they pull in opposite directions.
+    //
+    // It must be serialized: an earlier version set a "resolved" flag BEFORE assigning the store,
+    // so a second thread arriving in that gap got nil back from a store that was perfectly
+    // available, and two threads passing together installed the external-change observer twice --
+    // every remote change delivered to the listener twice.
+    //
+    // But it must NOT latch failure. [s synchronize] is the probe for whether this build is
+    // ENTITLED -- Apple gives a missing entitlement as the example of what makes it answer NO --
+    // and a one-time initializer cached that NO for the life of the process. An app whose first
+    // probe failed for any other reason then reported the synced store unsupported forever, with
+    // no observer, however long the process ran. Probing again on a later call costs one
+    // synchronize; getting it permanently wrong costs the feature.
+    //
+    // The probe is deliberately not asked to decide more than that. It is a DISK sync, so its
+    // answer says nothing about whether the local store can hold a value.
+    pthread_mutex_lock(&cn1ContinuityStoreLock);
+    @try {
+        NSUbiquitousKeyValueStore *s = [NSUbiquitousKeyValueStore defaultStore];
+        // The observer goes on independently of the probe, and this is the half that used to be
+        // missing. Registering for a notification is local: it needs no connectivity and no
+        // successful synchronize, and the store object is the same singleton either way. Tying it
+        // to the probe meant an offline launch installed no observer at all -- and an application
+        // that only registers a SyncedStoreListener makes exactly ONE store call, from
+        // addChangeListener, so nothing ever asked again. Reconnecting produced no callback for
+        // the life of the process, which is the whole feature for that app.
+        //
+        // Latched separately from `store` for the reason the store is latched at all: two callers
+        // arriving together must not both register, or every remote change is delivered twice.
+        if (s != nil && cn1ContinuityStoreObserver == nil) {
+            cn1ContinuityStoreObserver = [[[NSNotificationCenter defaultCenter]
+                    addObserverForName:NSUbiquitousKeyValueStoreDidChangeExternallyNotification
+                                object:s
+                                 queue:nil
+                            usingBlock:^(NSNotification *note) {
+                com_codename1_impl_ios_IOSContinuityCallbacks_nativeSyncedStoreChanged__(
+                        CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+            }] retain];
+        }
+        if (store == nil && s != nil) {
+            // Retained on the strength of the store EXISTING. A store that is never entitled
+            // still holds values locally, and holding them beats discarding them: the entitled
+            // case recovers everything written meanwhile, and the unentitled case is no worse off
+            // than the nil this used to return.
+            store = [s retain];
+        }
+        if (!cn1ContinuitySyncEntitled && s != nil && [s synchronize]) {
+            // Latches SUCCESS only, like the store beside it. Once it has answered YES the
+            // question is settled -- an app cannot lose an entitlement while it runs -- and
+            // every later call skips the probe, so this is not a synchronize per store access.
+            cn1ContinuitySyncEntitled = YES;
+        }
+    } @catch (NSException *e) {
+        // Deliberately NOT "store = nil". The handler now covers calls that already resolved --
+        // it moved out of the store == nil guard when the observer stopped depending on the probe
+        // -- and this port is MRR, so nulling a retained store would both leak it and lose a
+        // working store because a later synchronize threw. A failed attempt simply leaves the
+        // state it found: still nil, so the next call tries again.
+    }
+    pthread_mutex_unlock(&cn1ContinuityStoreLock);
+    return store;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_TRUE;
+}
+
+void com_codename1_impl_ios_IOSNative_continuityPublish___java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityType, JAVA_OBJECT title, JAVA_OBJECT userInfoJson) {
+    if (activityType == JAVA_NULL) {
+        return;
+    }
+    POOL_BEGIN();
+    NSString *type = toNSString(CN1_THREAD_STATE_PASS_ARG activityType);
+    NSUserActivity *activity = [[NSUserActivity alloc] initWithActivityType:type];
+    // The one property that makes this a continuation rather than a donation. Without it the
+    // activity is only a Siri/Spotlight hint and no other device is ever offered it -- which is
+    // exactly the shape of the intents path beside this one, and the reason the two do not share
+    // a code path despite building the same class.
+    activity.eligibleForHandoff = YES;
+    if (title != JAVA_NULL) {
+        NSString *label = toNSString(CN1_THREAD_STATE_PASS_ARG title);
+        if ([label length] > 0) {
+            activity.title = label;
+        }
+    }
+    if (userInfoJson != JAVA_NULL) {
+        id safe = cn1ContinuitySanitize(cn1ContinuityParseJson(
+                toNSString(CN1_THREAD_STATE_PASS_ARG userInfoJson)));
+        if ([safe isKindOfClass:[NSDictionary class]]) {
+            activity.userInfo = (NSDictionary *)safe;
+        }
+    }
+    [activity becomeCurrent];
+    // Ownership of the alloc's reference moves into the slot; the previous occupant is
+    // invalidated so the system stops offering a state the app has moved on from, and then
+    // released, since this slot held the only reference to it in a manual-reference-counted
+    // target.
+    NSUserActivity *previous = cn1ContinuityActivity;
+    cn1ContinuityActivity = activity;
+    if (previous != nil) {
+        [previous invalidate];
+        [previous release];
+    }
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_continuityClear__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (cn1ContinuityActivity == nil) {
+        return;
+    }
+    POOL_BEGIN();
+    NSUserActivity *activity = cn1ContinuityActivity;
+    // Cleared before the messages, so a second call cannot resign and release the same activity
+    // twice -- which in a manual-reference-counted target is an over-release, not a no-op.
+    cn1ContinuityActivity = nil;
+    [activity resignCurrent];
+    [activity invalidate];
+    [activity release];
+    POOL_END();
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStoreSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    // Called for the side effect as much as the value: resolving is what runs the probe, and the
+    // flag it sets is the answer. Reporting "there is a store object" instead would tell an
+    // unentitled app the feature works, and its values would sit on that device for ever.
+    NSUbiquitousKeyValueStore *resolved = cn1ContinuityStore();
+    return (resolved != nil && cn1ContinuitySyncEntitled) ? JAVA_TRUE : JAVA_FALSE;
+}
+
+// The size of one value already in the store, whatever KIND of value it is.
+//
+// This class only ever writes strings, so the quota check used to count strings and skip
+// everything else -- which counts an NSData, an array or a dictionary as ZERO. The store is not
+// only ours: an application that used NSUbiquitousKeyValueStore before adopting this API, or a
+// container shared with an app extension, holds values of every plist kind. Skipping them made
+// the check pass on a store already over its limit, which is precisely the case it exists to
+// catch -- the write is kept locally, the readback says yes, and it never propagates.
+static NSUInteger cn1ContinuityValueBytes(id value) {
+    if (value == nil) {
+        return 0;
+    }
+    if ([value isKindOfClass:[NSString class]]) {
+        return [((NSString *)value) lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+    }
+    if ([value isKindOfClass:[NSData class]]) {
+        return [((NSData *)value) length];
+    }
+    if ([value isKindOfClass:[NSNumber class]] || [value isKindOfClass:[NSDate class]]) {
+        // A scalar, whose encoded size is a handful of bytes whatever it holds.
+        return 16;
+    }
+    // An array or a dictionary. Serializing is the only way to ask how big a nested plist is,
+    // and the alternative this replaces was to call it nothing. Wrapped in an array because a
+    // bare root is not a property list for every format.
+    NSData *encoded = [NSPropertyListSerialization
+            dataWithPropertyList:[NSArray arrayWithObject:value]
+                          format:NSPropertyListBinaryFormat_v1_0
+                         options:0
+                           error:NULL];
+    return encoded != nil ? [encoded length] : 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key, JAVA_OBJECT value) {
+    NSUbiquitousKeyValueStore *store = cn1ContinuityStore();
+    if (store == nil || key == JAVA_NULL || value == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    JAVA_BOOLEAN result = JAVA_FALSE;
+    POOL_BEGIN();
+    NSString *k = toNSString(CN1_THREAD_STATE_PASS_ARG key);
+    NSString *v = toNSString(CN1_THREAD_STATE_PASS_ARG value);
+    // The QUOTA first, because past it the store keeps the value locally and simply declines to
+    // upload it -- the readback below then says yes to a write that will never reach another
+    // device, and SyncedStore.put documents the opposite: false when "a key count or a size past
+    // what it allows". Apple's published maxima for NSUbiquitousKeyValueStore are 1 MB in total
+    // and 1024 keys.
+    //
+    // The measurement is an APPROXIMATION and is deliberately generous: UTF-8 bytes of the keys
+    // plus the size of every value the store already holds, of whatever plist kind. Apple does
+    // not publish how it counts, so the risk to avoid is refusing a write the platform would
+    // have taken -- the check only fires past the documented maximum, not near it.
+    NSDictionary *held = [store dictionaryRepresentation];
+    NSUInteger bytes = 0;
+    NSUInteger count = 0;
+    for (NSString *existing in held) {
+        if ([existing isEqualToString:k]) {
+            // Replaced, not added: its current size does not count towards the new total.
+            continue;
+        }
+        count++;
+        bytes += [existing lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+        bytes += cn1ContinuityValueBytes([held objectForKey:existing]);
+    }
+    count++;
+    NSUInteger keyBytes = [k lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+    bytes += keyBytes;
+    bytes += [v lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+    // The PER-KEY maximum as well as the totals. Apple publishes 64 UTF-8 bytes for a key
+    // alongside the 1 MB and 1024-key figures, and only the two totals were being checked -- so
+    // a long key sailed through a nearly empty store, went to setString:forKey:, and left put()
+    // reporting a cross-device write it cannot deliver. The local readback below cannot see the
+    // difference, which is precisely why this check exists.
+    if (count > 1024 || bytes > 1048576 || keyBytes > 64) {
+        // Refused rather than written. A value the store keeps and never propagates is the one
+        // outcome an application cannot detect for itself, and it is exactly when it needs its
+        // own fallback.
+        POOL_END();
+        return JAVA_FALSE;
+    }
+    [store setString:v forKey:k];
+    // Asked for, not waited on and NOT reported. The system syncs on its own schedule and this
+    // only moves it along; its answer is about the STORE -- whether this build is entitled to one
+    // that follows the user -- which continuitySyncedStoreSupported reports and which this call
+    // is not being asked. ANDing it into the result here was the last place the entitlement probe
+    // still decided the fate of a local write: a transient NO made put() report failure for a
+    // value the store was holding and would have propagated later.
+    [store synchronize];
+    // The READBACK is the answer, and it is exactly what SyncedStore.put documents -- "true when
+    // the store holds the value afterwards". It is also the only part that can be established
+    // from in here: a store at its key or size limit drops the write while reporting nothing, and
+    // whether iCloud goes on to propagate it is not knowable from inside this call.
+    //
+    // Nor is the ENTITLEMENT ANDed in here, which a review asked for on the grounds that a build
+    // with ios.continuity.sync=false keeps a local store and so reports a write that can never
+    // leave the device. Both halves of that are true and the conclusion does not follow.
+    //
+    // An application deciding whether to offer the feature asks isSyncedStoreSupported(), and that
+    // already answers NO for an unentitled build -- it returns `resolved != nil &&
+    // cn1ContinuitySyncEntitled` precisely so a build without the entitlement cannot mistake
+    // itself for one that has it. The fallback the review is worried about is selected by that
+    // call, not by this one.
+    //
+    // And put() documents its answer as "true when the store holds the value afterwards", which
+    // is the only thing establishable from in here: whether iCloud goes on to propagate is not.
+    // Gating this on the entitlement is the same mistake that was removed from three layers at
+    // once -- IOSNative.m, IOSContinuityBridge and SyncedStore -- where it made every call
+    // unreachable and a transient probe answer report failure for a value the store was holding
+    // and would have propagated. Putting it back in one of them restores a third of that bug.
+    NSString *back = [store stringForKey:k];
+    if (back != nil && [back isEqualToString:v]) {
+        result = JAVA_TRUE;
+    }
+    POOL_END();
+    return result;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_continuitySyncedStoreGet___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key) {
+    NSUbiquitousKeyValueStore *store = cn1ContinuityStore();
+    if (store == nil || key == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    JAVA_OBJECT result = JAVA_NULL;
+    POOL_BEGIN();
+    NSString *value = [store stringForKey:toNSString(CN1_THREAD_STATE_PASS_ARG key)];
+    if (value != nil) {
+        result = fromNSString(CN1_THREAD_STATE_PASS_ARG value);
+    }
+    POOL_END();
+    return result;
+}
+
+void com_codename1_impl_ios_IOSNative_continuitySyncedStoreRemove___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key) {
+    NSUbiquitousKeyValueStore *store = cn1ContinuityStore();
+    if (store == nil || key == JAVA_NULL) {
+        return;
+    }
+    POOL_BEGIN();
+    [store removeObjectForKey:toNSString(CN1_THREAD_STATE_PASS_ARG key)];
+    [store synchronize];
+    POOL_END();
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_continuitySyncedStoreKeys__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    NSUbiquitousKeyValueStore *store = cn1ContinuityStore();
+    if (store == nil) {
+        return JAVA_NULL;
+    }
+    JAVA_OBJECT result = JAVA_NULL;
+    POOL_BEGIN();
+    NSArray *keys = [[store dictionaryRepresentation] allKeys];
+    NSMutableArray *strings = [NSMutableArray array];
+    for (id key in keys) {
+        if ([key isKindOfClass:[NSString class]]) {
+            [strings addObject:key];
+        }
+    }
+    // Wrapped in an object because the Java side parses it with JSONParser, whose entry point
+    // reads a document whose root is an object. A bare array would parse to nothing.
+    NSDictionary *doc = [NSDictionary dictionaryWithObject:strings forKey:@"keys"];
+    NSData *data = [NSJSONSerialization isValidJSONObject:doc]
+            ? [NSJSONSerialization dataWithJSONObject:doc options:0 error:nil] : nil;
+    if (data != nil) {
+        NSString *json = [[[NSString alloc] initWithData:data
+                                                encoding:NSUTF8StringEncoding] autorelease];
+        result = fromNSString(CN1_THREAD_STATE_PASS_ARG json);
+    }
+    POOL_END();
+    return result;
+}
+
+#else // CN1_USE_CONTINUITY
+
+// Continuity not enabled: no NSUserActivity or iCloud references, everything unsupported. The
+// on-device half of the framework is unaffected, being pure Java.
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+void com_codename1_impl_ios_IOSNative_continuityPublish___java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityType, JAVA_OBJECT title, JAVA_OBJECT userInfoJson) {
+}
+void com_codename1_impl_ios_IOSNative_continuityClear__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStoreSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key, JAVA_OBJECT value) {
+    return JAVA_FALSE;
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_continuitySyncedStoreGet___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key) {
+    return JAVA_NULL;
+}
+void com_codename1_impl_ios_IOSNative_continuitySyncedStoreRemove___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key) {
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_continuitySyncedStoreKeys__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_NULL;
+}
+#endif // CN1_USE_CONTINUITY
+
+// New-VM (return-type-encoded) manglings for the value-returning continuity natives. Defined
+// after the implementations/stubs above so each call targets an already-declared function. The
+// void continuity* methods need no _R_ wrapper. Always defined regardless of CN1_USE_CONTINUITY.
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_continuitySupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStoreSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_continuitySyncedStoreSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT key, JAVA_OBJECT value) {
+    return com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_lang_String_java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, key, value);
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_continuitySyncedStoreGet___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT key) {
+    return com_codename1_impl_ios_IOSNative_continuitySyncedStoreGet___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, key);
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_continuitySyncedStoreKeys___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_continuitySyncedStoreKeys__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
 // --- Phone-to-watch link (com.codename1.wearable / WatchConnectivity) --------

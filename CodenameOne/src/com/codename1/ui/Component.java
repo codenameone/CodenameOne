@@ -420,6 +420,17 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean draggable;
     private boolean dragAndDropInitialized;
     private boolean dropTarget;
+    /// Native (operating system) drag and drop state. Kept beside the lightweight drag and drop
+    /// fields above because the two are alternatives for the same gesture: a component that is a
+    /// native drag source hands the press to the platform, and the lightweight drag never runs.
+    private boolean nativeDragSource;
+    private boolean nativeDropTarget;
+    private NativeDragOperation nativeDragOperation;
+    private String[] acceptedDropMimeTypes;
+    private int acceptedDropActions = NativeDragOperation.ACTION_COPY
+            | NativeDragOperation.ACTION_MOVE | NativeDragOperation.ACTION_LINK;
+    private EventDispatcher nativeDropListeners;
+    private EventDispatcher nativeDragOverListeners;
     private Image dragImage;
     private Component dropTargetComponent;
     private int dragCallbacks = 0;
@@ -5994,6 +6005,38 @@ public class Component implements Animation, StyleListener, Editable {
     void initDragAndDrop(int x, int y) {
         Component leadParent = LeadUtil.leadParentImpl(this);
         leadParent.dragAndDropInitialized = leadParent.isDragAndDropOperation(x, y);
+        // Native drag and drop is primed from the same place, so a native drag source is
+        // pressed, dragged and released through exactly the gesture a draggable component is.
+        NativeDragAndDrop.pressedOn(leadParent, x, y);
+    }
+
+    /// Abandons a lightweight drag that has already started, without running the drop
+    /// machinery. Used when a native drag takes the gesture over: the port stops delivering
+    /// pointer drags at that point, so the lightweight drag would otherwise stay activated with
+    /// its image stranded where the gesture began.
+    void cancelLightweightDrag() {
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        if (leadParent.dragActivated) {
+            if (leadParent.dragAndDropInitialized) {
+                // pointerDragged hides the source while the framework carries its image; the
+                // native session draws its own preview and never runs dragFinishedImpl, so
+                // without this the component the user dragged stays invisible for good.
+                leadParent.setVisible(true);
+            }
+            // The top level, not the form: pointerDragged records the dragged component
+            // on TopLevelSupport.rootOf(this), and a component dragged inside a window
+            // has no form at all -- so asking for one left that window still holding a
+            // component it would never be told had stopped being dragged.
+            Container p = TopLevelSupport.rootOf(leadParent);
+            if (p != null) {
+                p.setDraggedComponent(null);
+                p.repaint();
+            }
+        }
+        leadParent.dragActivated = false;
+        leadParent.dragAndDropInitialized = false;
+        leadParent.dragImage = null;
+        leadParent.dropTargetComponent = null;
     }
 
     /// If this Component is focused, the pointer released event
@@ -6476,6 +6519,350 @@ public class Component implements Animation, StyleListener, Editable {
         dragOverListener.removeListener(l);
         if (!dragOverListener.hasListeners()) {
             dragOverListener = null;
+        }
+    }
+
+    // ------------------------------------------------------------------------------------
+    // Native (operating system) drag and drop.
+    //
+    // The listeners and callbacks above move a component around inside one form. The ones
+    // below hand the drag to the platform, so it can end on the desktop, in a file manager or
+    // in another application -- and so a drag from any of those can end here. The payload is a
+    // ClipboardContent either way, which is the point: whatever the component can already copy
+    // it can already drag, and whatever it can already paste it can already accept.
+    //
+    // See NativeDragAndDrop for the platform support matrix and for starting a drag by hand.
+    // ------------------------------------------------------------------------------------
+
+    /// Returns true when a drag starting on this component is handed to the operating system.
+    public boolean isNativeDragSource() {
+        return nativeDragSource;
+    }
+
+    /// Makes a drag that starts on this component an operating system drag, which can be
+    /// dropped outside the application.
+    ///
+    /// Supply what is being dragged either by calling
+    /// `#setNativeDragOperation(com.codename1.ui.NativeDragOperation)`, or by overriding
+    /// `#createNativeDragOperation(int, int)` when the payload depends on where the press
+    /// landed -- which item of a list was grabbed, for instance.
+    ///
+    /// This is independent of `#setDraggable(boolean)`. Where the platform has no native drag
+    /// and drop this flag simply does nothing, so a component that should be draggable either
+    /// way sets both and the native session, when there is one, takes precedence.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeDragSource`: true to hand drags on this component to the operating system
+    public void setNativeDragSource(boolean nativeDragSource) {
+        this.nativeDragSource = nativeDragSource;
+        if (nativeDragSource) {
+            // Tells the port that this application wants to drag. Ports whose platform needs a
+            // gesture recognizer on the surface install it here rather than at startup, so an
+            // application that never drags keeps exactly the touch handling it has today.
+            Display.impl.nativeDragSourceRegistered();
+        }
+    }
+
+    /// Returns the operation this component drags, or null when it supplies one per press by
+    /// overriding `#createNativeDragOperation(int, int)`.
+    public NativeDragOperation getNativeDragOperation() {
+        return nativeDragOperation;
+    }
+
+    /// Sets what dragging this component puts on the operating system's drag, and makes the
+    /// component a native drag source. Passing null clears both.
+    ///
+    /// The operation is reusable: the same instance is offered for every drag of this
+    /// component, so it must not hold state from a previous session. Anything expensive in the
+    /// payload belongs behind
+    /// `ClipboardContent#setDataProvider(java.lang.String, com.codename1.ui.ClipboardDataProvider)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeDragOperation`: what to drag, or null to stop being a drag source
+    public void setNativeDragOperation(NativeDragOperation nativeDragOperation) {
+        this.nativeDragOperation = nativeDragOperation;
+        setNativeDragSource(nativeDragOperation != null);
+    }
+
+    /// Produces the operation for a drag starting at the given position, invoked on the event
+    /// dispatch thread as the press is dispatched. Override when the payload depends on where
+    /// the user grabbed the component; the default returns whatever
+    /// `#setNativeDragOperation(com.codename1.ui.NativeDragOperation)` was given.
+    ///
+    /// Returning null, or an operation allowing no actions, leaves the gesture alone -- which
+    /// is how a component refuses to be dragged from a particular spot.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the absolute x position of the press
+    ///
+    /// - `y`: the absolute y position of the press
+    ///
+    /// #### Returns
+    ///
+    /// the drag to start, or null for none
+    protected NativeDragOperation createNativeDragOperation(int x, int y) {
+        return nativeDragOperation;
+    }
+
+    /// Returns true when this component accepts drops coming from the operating system.
+    public boolean isNativeDropTarget() {
+        return nativeDropTarget;
+    }
+
+    /// Lets this component receive drops from the operating system: from another application,
+    /// from a file manager, from the desktop, or from elsewhere in this application.
+    ///
+    /// The deepest component under the pointer that is a native drop target and accepts the
+    /// content wins, so a target nested inside another target takes precedence -- and a target
+    /// that refuses a particular payload lets an ancestor have it.
+    ///
+    /// This is independent of `#setDropTarget(boolean)`, which governs the lightweight drag and
+    /// drop inside the form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeDropTarget`: true to accept operating system drops
+    public void setNativeDropTarget(boolean nativeDropTarget) {
+        this.nativeDropTarget = nativeDropTarget;
+        if (nativeDropTarget) {
+            // As with setNativeDragSource: the port attaches whatever the platform needs to
+            // receive drops only once an application says it wants them.
+            Display.impl.nativeDropTargetRegistered();
+        }
+    }
+
+    /// Returns the MIME types this component accepts, or null when it accepts anything.
+    public String[] getAcceptedDropMimeTypes() {
+        return acceptedDropMimeTypes == null ? null : acceptedDropMimeTypes.clone();
+    }
+
+    /// Restricts the drops this component accepts to drags offering at least one of these MIME
+    /// types, so a drag carrying anything else passes through to whatever is behind it.
+    ///
+    /// This filter is consulted on the platform's drag thread rather than the event dispatch
+    /// thread, which is what lets the answer be exact from the very first drag event; see
+    /// `NativeDragAndDrop#dragOver(int, int, int, com.codename1.ui.ClipboardContent, int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `acceptedDropMimeTypes`: the MIME types, for instance
+    ///   `ClipboardContent#MIME_FILE`, or null to accept anything
+    public void setAcceptedDropMimeTypes(String... acceptedDropMimeTypes) {
+        this.acceptedDropMimeTypes = acceptedDropMimeTypes == null || acceptedDropMimeTypes.length == 0
+                ? null : acceptedDropMimeTypes.clone();
+    }
+
+    /// Returns the bit set of actions this component is willing to perform on a drop.
+    public int getAcceptedDropActions() {
+        return acceptedDropActions;
+    }
+
+    /// Restricts what this component will do with a drop -- a target that can only copy should
+    /// not be offered a move, because the source deletes its data when a move completes.
+    ///
+    /// Settled before a drag begins. Narrowing this while one is already hovering is honoured
+    /// from whichever drag event next reaches the framework -- the hover answers the platform
+    /// on the platform's own thread -- so a target changing its mind mid-drag should reject
+    /// from its drag over callback, which is ordered against the drag rather than against the
+    /// component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `acceptedDropActions`: any combination of `NativeDragOperation#ACTION_COPY`,
+    ///   `NativeDragOperation#ACTION_MOVE` and `NativeDragOperation#ACTION_LINK`
+    public void setAcceptedDropActions(int acceptedDropActions) {
+        this.acceptedDropActions = acceptedDropActions;
+    }
+
+    /// Decides whether this component wants a drag carrying these representations at all.
+    ///
+    /// #### Threading
+    ///
+    /// Invoked on the platform's drag thread, not the event dispatch thread, because the
+    /// operating system needs the answer while the pointer is moving. Read the content and
+    /// this component's own configuration; do not touch the user interface, start animations
+    /// or block. Everything that needs the event dispatch thread belongs in
+    /// `#nativeDragEnter(com.codename1.ui.NativeDropEvent)` and its siblings.
+    ///
+    /// The default accepts anything unless
+    /// `#setAcceptedDropMimeTypes(java.lang.String...)` narrowed it.
+    ///
+    /// #### What the content holds here
+    ///
+    /// The MIME types the drag is offering, and not their values: decide on the types. A
+    /// drag in progress has not handed its data over yet, and on most platforms it cannot
+    /// be made to -- so `ClipboardContent#getData(java.lang.String)` answers null here even
+    /// for a representation the drop will produce. Reading it is not merely unhelpful
+    /// either: a representation a source can vend only once would be spent before the drop
+    /// could read it. `#nativeDrop(com.codename1.ui.NativeDropEvent)` is where the values
+    /// exist, and by then they are all there.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: the representations the drag is offering, by name
+    ///
+    /// #### Returns
+    ///
+    /// true to be considered as the target
+    protected boolean canAcceptNativeDrop(ClipboardContent content) {
+        if (acceptedDropMimeTypes == null) {
+            return true;
+        }
+        if (content == null) {
+            return false;
+        }
+        return content.findPreferredMimeType(acceptedDropMimeTypes) != null;
+    }
+
+    /// Callback invoked on the event dispatch thread when a native drag enters this component.
+    /// Use it to highlight the drop location, and `NativeDropEvent#accept(int)` or
+    /// `NativeDropEvent#reject()` to change what the cursor tells the user.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the drag
+    protected void nativeDragEnter(NativeDropEvent ev) {
+    }
+
+    /// Callback invoked on the event dispatch thread as a native drag moves over this
+    /// component. Delivered at most once at a time -- a new one is only queued after the
+    /// previous returned -- so a slow callback throttles itself instead of flooding the event
+    /// dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the drag
+    protected void nativeDragOver(NativeDropEvent ev) {
+    }
+
+    /// Callback invoked on the event dispatch thread when a native drag leaves this component
+    /// without dropping. Clear whatever `#nativeDragEnter(com.codename1.ui.NativeDropEvent)`
+    /// highlighted. The event carries no content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the drag
+    protected void nativeDragExit(NativeDropEvent ev) {
+    }
+
+    /// Callback invoked on the event dispatch thread when a native drag is dropped on this
+    /// component. `NativeDropEvent#getContent()` names everything the drop carries, and its
+    /// values are readable from here on.
+    ///
+    /// #### Reading it later
+    ///
+    /// Read what the drop is for while handling it. A representation may be backed by the
+    /// platform's own transfer rather than by bytes this application owns -- Android hands
+    /// over a content URI readable under a permission granted to the activity, and iOS
+    /// copies a dropped file into temporary storage -- so a value first asked for long
+    /// afterwards, and particularly after the activity that received the drop has gone,
+    /// may no longer be there.
+    ///
+    /// A value once read is kept, so reading here and holding the result is always safe.
+    /// Deliberately not read for you: a drop of a large document on a component that only
+    /// wants its path would otherwise pay for every byte of it, on the very thread the
+    /// platform is waiting on.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the drop
+    protected void nativeDrop(NativeDropEvent ev) {
+    }
+
+    /// Adds a listener invoked on the event dispatch thread when a native drag is dropped on
+    /// this component. The event is a `NativeDropEvent`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void addNativeDropListener(ActionListener l) {
+        if (nativeDropListeners == null) {
+            nativeDropListeners = new EventDispatcher();
+        }
+        nativeDropListeners.addListener(l);
+    }
+
+    /// Removes a listener added by
+    /// `#addNativeDropListener(com.codename1.ui.events.ActionListener)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void removeNativeDropListener(ActionListener l) {
+        if (nativeDropListeners != null) {
+            nativeDropListeners.removeListener(l);
+            if (!nativeDropListeners.hasListeners()) {
+                nativeDropListeners = null;
+            }
+        }
+    }
+
+    /// Adds a listener invoked on the event dispatch thread as a native drag enters, moves over
+    /// and leaves this component. The event is a `NativeDropEvent`; its
+    /// `com.codename1.ui.events.ActionEvent#getEventType()` says which of the three it is.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void addNativeDragOverListener(ActionListener l) {
+        if (nativeDragOverListeners == null) {
+            nativeDragOverListeners = new EventDispatcher();
+        }
+        nativeDragOverListeners.addListener(l);
+    }
+
+    /// Removes a listener added by
+    /// `#addNativeDragOverListener(com.codename1.ui.events.ActionListener)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void removeNativeDragOverListener(ActionListener l) {
+        if (nativeDragOverListeners != null) {
+            nativeDragOverListeners.removeListener(l);
+            if (!nativeDragOverListeners.hasListeners()) {
+                nativeDragOverListeners = null;
+            }
+        }
+    }
+
+    /// Routes one native drag callback to the override and then to the listeners. Invoked on
+    /// the event dispatch thread by `NativeDragAndDrop`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the event
+    void dispatchNativeDropEvent(NativeDropEvent ev) {
+        switch (ev.getEventType()) {
+            case NativeDragEnter:
+                nativeDragEnter(ev);
+                fireNativeDragOver(ev);
+                break;
+            case NativeDragOver:
+                nativeDragOver(ev);
+                fireNativeDragOver(ev);
+                break;
+            case NativeDragExit:
+                nativeDragExit(ev);
+                fireNativeDragOver(ev);
+                break;
+            case NativeDrop:
+                nativeDrop(ev);
+                if (nativeDropListeners != null && nativeDropListeners.hasListeners()) {
+                    nativeDropListeners.fireActionEvent(ev);
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void fireNativeDragOver(NativeDropEvent ev) {
+        if (nativeDragOverListeners != null && nativeDragOverListeners.hasListeners()) {
+            nativeDragOverListeners.fireActionEvent(ev);
         }
     }
 

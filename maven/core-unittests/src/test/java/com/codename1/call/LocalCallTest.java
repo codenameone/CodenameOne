@@ -734,8 +734,9 @@ public class LocalCallTest {
         // Thread.setName is in neither. So the window is narrowed instead of
         // eliminated -- from the whole test to the few milliseconds a deferral
         // takes -- which is an honest improvement rather than a proof.
-        assertTrue(stillAlive(candidates).isEmpty(),
-                "answering must leave no safety timer running");
+        java.util.Set<Thread> leaked = stillAlive(candidates);
+        assertTrue(leaked.isEmpty(),
+                "answering left a safety timer running: " + names(leaked));
     }
 
     /// The live java.util.Timer threads, by identity.
@@ -751,6 +752,18 @@ public class LocalCallTest {
             }
         }
         return out;
+    }
+
+    /// The names of a set of threads, for a failure message that says which.
+    private static String names(java.util.Set<Thread> threads) {
+        StringBuilder sb = new StringBuilder();
+        for (Thread t : threads) {
+            if (sb.length() > 0) {
+                sb.append(", ");
+            }
+            sb.append(t.getName());
+        }
+        return sb.toString();
     }
 
     /// Those of `candidates` that are still running.

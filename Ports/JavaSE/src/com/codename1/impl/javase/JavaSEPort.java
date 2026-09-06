@@ -635,6 +635,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static boolean fullScreen;
     public float screenshotActualZoomLevel;
     private InputEvent lastInputEvent;
+    /// The canvas the gesture currently in progress started on, so a native drag can be
+    /// exported from the window the user is actually dragging in rather than the main one.
+    C dndGestureCanvas;
+
+    /// The most recent mouse event, which is what `javax.swing.TransferHandler#exportAsDrag`
+    /// needs in order to seed a drag session.
+    InputEvent dndLastInputEvent() {
+        return lastInputEvent;
+    }
     public static double retinaScale = 1.0;
     
     static JMenuItem pause;
@@ -1881,18 +1890,56 @@ public class JavaSEPort extends CodenameOneImplementation {
         formChangeListener.addListener(al);
     }
 
+    // ------------------------------------------------------------------------------------
+    // Native drag and drop. The desktop is the one platform where a drag genuinely leaves the
+    // application -- onto another window, into a file manager, onto the desktop itself -- so
+    // this port implements the whole contract. See JavaSENativeDragAndDrop.
+    // ------------------------------------------------------------------------------------
+
+    @Override
+    public boolean isNativeDragAndDropSupported() {
+        return !java.awt.GraphicsEnvironment.isHeadless();
+    }
+
+    @Override
+    public boolean isNativeDragOutsideApplicationSupported() {
+        return isNativeDragAndDropSupported();
+    }
+
+    @Override
+    public boolean startNativeDrag(com.codename1.ui.NativeDragOperation op) {
+        return JavaSENativeDragAndDrop.startDrag(this, op);
+    }
+
+    @Override
+    public void cancelNativeDrag() {
+        JavaSENativeDragAndDrop.cancelDrag();
+    }
+
     @Override
     public void copyToClipboard(Object obj) {
-        if (obj instanceof String || obj instanceof ClipboardContent) {
-            final String text = obj instanceof ClipboardContent
-                    ? ((ClipboardContent) obj).getText(ClipboardContent.MIME_TEXT) : (String)obj;
-            final ClipboardContent rich = obj instanceof ClipboardContent
-                    ? (ClipboardContent)obj : null;
+        if (obj instanceof ClipboardContent) {
+            // Without reading anything out of it. The text was fetched here and then never used
+            // -- the branch it fed cannot be reached for a ClipboardContent -- so a representation
+            // registered through setDataProvider was built the moment something was copied, even
+            // when no consumer ever asked for text or the consumer chose another flavor
+            // altogether. Writing the file or encoding the image is exactly what a provider
+            // exists to put off. RichTransferable resolves it if a consumer reads it.
+            final ClipboardContent rich = (ClipboardContent) obj;
             EventQueue.invokeLater(new Runnable() {
                 public void run() {
                     Toolkit toolkit = Toolkit.getDefaultToolkit();
                     Clipboard clipboard = toolkit.getSystemClipboard();
-                    clipboard.setContents(rich == null ? new StringSelection(text) : new RichTransferable(rich), null);
+                    clipboard.setContents(new RichTransferable(rich), null);
+                }
+            });
+        } else if (obj instanceof String) {
+            final String text = (String) obj;
+            EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    Toolkit toolkit = Toolkit.getDefaultToolkit();
+                    Clipboard clipboard = toolkit.getSystemClipboard();
+                    clipboard.setContents(new StringSelection(text), null);
                 }
             });
         } else {
@@ -1909,57 +1956,186 @@ public class JavaSEPort extends CodenameOneImplementation {
         super.copyToClipboard(obj); //To change body of generated methods, choose Tools | Templates.
     }
 
-    private static final class RichTransferable implements Transferable {
+    /// Publishes a `ClipboardContent` to AWT, for a clipboard copy and for a native drag alike.
+    ///
+    /// The flavors are derived from the MIME types alone, never by reading the values. That is
+    /// deliberate: a drag may offer a representation registered through
+    /// `ClipboardContent#setDataProvider(java.lang.String, com.codename1.ui.ClipboardDataProvider)`
+    /// -- the file that is only written if the user actually drops on the desktop -- and reading
+    /// values here in order to decide what to advertise would build every one of them at the
+    /// moment the drag starts, which is exactly what the providers exist to avoid.
+    /// `CodenameOneImplementation#clipboardValue(com.codename1.ui.ClipboardContent,
+    /// java.lang.String)`, reachable from the transferable below.
+    ///
+    /// RichTransferable is a nested class rather than a subclass, so it cannot reach an
+    /// inherited protected member by name; the port hands it down.
+    static Object clipboardRepresentation(ClipboardContent content, String mimeType) {
+        return clipboardValue(content, mimeType);
+    }
+
+    /// The same, for a representation carried as bytes.
+    static byte[] clipboardRepresentationBytes(ClipboardContent content, String mimeType) {
+        return clipboardBytes(content, mimeType);
+    }
+
+    static final class RichTransferable implements Transferable {
         private final ClipboardContent data;
         private final DataFlavor[] flavors;
+        /// What this transferable has already produced, kept here rather than left to the
+        /// content's own memory.
+        ///
+        /// One ClipboardContent can be both what the clipboard holds and what a component
+        /// drags, and arming a drag deliberately forgets what its providers produced for the
+        /// drag before. Sharing that memory, a copy that was never replaced started answering
+        /// a later paste with a value produced for a drag -- a different temporary file, or
+        /// bytes generated afresh -- although nothing had touched the clipboard. What this
+        /// transferable answered once, it goes on answering for as long as it owns the
+        /// clipboard.
+        private final java.util.Map<String, Object> produced =
+                new java.util.HashMap<String, Object>();
 
         RichTransferable(ClipboardContent data) {
             this.data = data;
             ArrayList<DataFlavor> available = new ArrayList<DataFlavor>();
-            if (data.getText(ClipboardContent.MIME_TEXT) != null) {
+            String[] mimeTypes = data.getMimeTypes();
+            boolean hasFiles = data.hasMimeType(ClipboardContent.MIME_FILE);
+            if (data.hasMimeType(ClipboardContent.MIME_TEXT)) {
                 available.add(DataFlavor.stringFlavor);
             }
-            if (imageBytes(data) != null) {
-                available.add(DataFlavor.imageFlavor);
-            }
-            if (fileList(data) != null) {
+            if (hasFiles) {
                 available.add(DataFlavor.javaFileListFlavor);
+                // GTK and a good deal of the web offer files this way and nothing else, so a
+                // drag that names files advertises both spellings of "these are files".
+                addTextFlavor(available, ClipboardContent.MIME_URI_LIST);
             }
-            String[] mimeTypes = data.getMimeTypes();
             for (int i = 0; i < mimeTypes.length; i++) {
-                if (!ClipboardContent.MIME_TEXT.equals(mimeTypes[i])
-                        && !ClipboardContent.MIME_FILE.equals(mimeTypes[i])
-                        && data.getText(mimeTypes[i]) != null) {
-                    available.add(new DataFlavor(mimeTypes[i] + ";class=java.lang.String", mimeTypes[i]));
+                String mime = mimeTypes[i];
+                if (ClipboardContent.MIME_TEXT.equals(mime) || ClipboardContent.MIME_FILE.equals(mime)) {
+                    continue;
+                }
+                if (mime.startsWith("image/")) {
+                    // Only when something can actually decode this encoding. Desktop receivers
+                    // commonly pick the standard image flavor ahead of the MIME specific stream,
+                    // so advertising it for a WebP -- which ImageIO has no reader for -- lost the
+                    // whole drop to an UnsupportedFlavorException for a payload that was
+                    // perfectly readable as bytes.
+                    if (hasImageReader(mime) && !available.contains(DataFlavor.imageFlavor)) {
+                        available.add(DataFlavor.imageFlavor);
+                    }
+                    addBinaryFlavor(available, mime);
+                } else if (mime.startsWith("text/")) {
+                    addTextFlavor(available, mime);
+                } else {
+                    addBinaryFlavor(available, mime);
                 }
             }
             flavors = available.toArray(new DataFlavor[available.size()]);
         }
 
-        private static byte[] imageBytes(ClipboardContent data) {
-            byte[] b = data.getBytes(ClipboardContent.MIME_PNG);
-            if (b == null) {
-                b = data.getBytes(ClipboardContent.MIME_JPEG);
+        /// Adds a flavor whose representation class is `String`, which is how AWT carries text
+        /// of a specific MIME type -- `text/html` and `text/rtf` among them.
+        private static void addTextFlavor(ArrayList<DataFlavor> available, String mime) {
+            try {
+                DataFlavor flavor = new DataFlavor(mime + ";class=java.lang.String", mime);
+                if (!available.contains(flavor)) {
+                    available.add(flavor);
+                }
+            } catch (Exception ex) {
+                // A MIME type AWT will not parse simply is not advertised.
             }
-            if (b == null) {
-                b = data.getBytes(ClipboardContent.MIME_GIF);
+        }
+
+        /// Adds a flavor whose representation is a stream of bytes, which is the only way to
+        /// hand an arbitrary binary payload -- a PDF, an archive -- to another application.
+        private static void addBinaryFlavor(ArrayList<DataFlavor> available, String mime) {
+            try {
+                DataFlavor flavor = new DataFlavor(mime + ";class=java.io.InputStream", mime);
+                if (!available.contains(flavor)) {
+                    available.add(flavor);
+                }
+            } catch (Exception ex) {
+                // As above.
             }
-            return b;
+        }
+
+        /// True when this JVM has an `ImageIO` reader for the encoding, which is the question
+        /// `DataFlavor#imageFlavor` really asks. Asked by MIME type, so it reads no value and a
+        /// lazily provided representation is not built in order to answer it.
+        private static boolean hasImageReader(String mime) {
+            try {
+                return ImageIO.getImageReadersByMIMEType(mime).hasNext();
+            } catch (Throwable err) {
+                return false;
+            }
+        }
+
+        /// Decodes whichever image representation this content offers that `ImageIO` can read.
+        ///
+        /// The three encodings the framework names come first because they are what a Codename
+        /// One source publishes; anything else -- a BMP, a TIFF, whatever a reader plugin adds --
+        /// is tried afterwards, so the standard image flavor serves the same set of types
+        /// `#hasImageReader(java.lang.String)` advertised it for.
+        private java.awt.Image decodeImage(ClipboardContent data) {
+            java.awt.Image img = decodeImage(data, ClipboardContent.MIME_PNG);
+            if (img == null) {
+                img = decodeImage(data, ClipboardContent.MIME_JPEG);
+            }
+            if (img == null) {
+                img = decodeImage(data, ClipboardContent.MIME_GIF);
+            }
+            if (img != null) {
+                return img;
+            }
+            String[] mimeTypes = data.getMimeTypes();
+            for (int i = 0; i < mimeTypes.length; i++) {
+                String mime = mimeTypes[i];
+                if (!mime.startsWith("image/") || ClipboardContent.MIME_PNG.equals(mime)
+                        || ClipboardContent.MIME_JPEG.equals(mime)
+                        || ClipboardContent.MIME_GIF.equals(mime) || !hasImageReader(mime)) {
+                    continue;
+                }
+                img = decodeImage(data, mime);
+                if (img != null) {
+                    return img;
+                }
+            }
+            return null;
+        }
+
+        private java.awt.Image decodeImage(ClipboardContent data, String mime) {
+            // Resolving the representation goes through clipboardValue, which is where a
+            // provider is allowed to fail: one throwing on the PNG used to escape the whole
+            // flavor, so a payload whose JPEG was perfectly good answered the standard image
+            // flavor with an exception instead of the JPEG.
+            Object raw = resolve(mime);
+            byte[] bytes = raw instanceof byte[] ? (byte[]) raw : null;
+            if (bytes == null) {
+                return null;
+            }
+            try {
+                return ImageIO.read(new ByteArrayInputStream(bytes));
+            } catch (Throwable err) {
+                // A representation that will not resolve, or does not decode, is not the
+                // image flavor's answer; the next one, or the byte stream flavor, still is.
+                return null;
+            }
         }
 
         /// Resolves the `application/x-file-list` representation (a single path/URI `String` or a
         /// `String[]` of them) to AWT `File` objects for the native file-list clipboard flavor.
-        private static java.util.List<java.io.File> fileList(ClipboardContent data) {
-            Object value = data.getData(ClipboardContent.MIME_FILE);
-            if (value == null) {
-                return null;
-            }
-            String[] paths;
+        private java.util.List<java.io.File> fileList(ClipboardContent data) {
+            // As decodeImage: a provider is permitted to fail, and a failure means this
+            // flavor cannot be produced -- which getTransferData says with
+            // UnsupportedFlavorException. Letting it out instead put an arbitrary exception
+            // from application code into AWT's own drag machinery.
+            Object value = resolve(ClipboardContent.MIME_FILE);
+            String[] paths = null;
             if (value instanceof String[]) {
                 paths = (String[]) value;
             } else if (value instanceof String) {
                 paths = new String[] { (String) value };
-            } else {
+            }
+            if (paths == null) {
                 return null;
             }
             java.util.List<java.io.File> files = new java.util.ArrayList<java.io.File>();
@@ -1972,14 +2148,32 @@ public class JavaSEPort extends CodenameOneImplementation {
             return files.isEmpty() ? null : files;
         }
 
+        /// Adds one entry to a URI list, unless the same document is already in it.
+        ///
+        /// A file named both ways -- as a path under the file list and as a file: URI in the
+        /// list the source published -- is one document, and a receiver importing every line
+        /// would otherwise take it twice.
+        private static void appendUri(StringBuilder uris, java.util.List<String> seen,
+                String uri) {
+            java.io.File file = pathToFile(uri);
+            String key = file == null ? uri : file.getAbsolutePath();
+            if (seen.contains(key)) {
+                return;
+            }
+            seen.add(key);
+            uris.append(uri).append("\r\n");
+        }
+
         /// Accepts either a plain filesystem path or a `file:` URI and returns a `File`, or null.
         private static java.io.File pathToFile(String pathOrUri) {
             if (pathOrUri == null || pathOrUri.length() == 0) {
                 return null;
             }
-            if (pathOrUri.startsWith("file:")) {
+            if (JavaSENativeDragAndDrop.isFileUri(pathOrUri)) {
                 try {
-                    return new java.io.File(new java.net.URI(pathOrUri));
+                    // The canonical spelling of the scheme, because File(URI) is specified
+                    // for "file" and a source may perfectly well have written FILE:.
+                    return new java.io.File(new java.net.URI("file" + pathOrUri.substring(4)));
                 } catch (Exception ex) {
                     return null;
                 }
@@ -2000,21 +2194,56 @@ public class JavaSEPort extends CodenameOneImplementation {
             return false;
         }
 
-        public Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException {
+        /// Every read in getTransferData goes through this. A flavor whose value will not
+        /// resolve is a flavor this transferable cannot supply, which the method already has a
+        /// way of saying; throwing application code's own exception out of it instead handed
+        /// AWT something it does not expect from a Transferable, in the middle of a drag or a
+        /// clipboard read it was performing on this application's behalf.
+        private Object resolve(String mime) {
+            // The provider runs inside the lock. AWT asks a transferable for whatever it
+            // likes and promises nothing about threads -- the standard image flavor and the
+            // MIME specific stream behind it are one representation and can be asked for at
+            // once -- and two callers that both miss an empty memo would both run a
+            // provider promised at most once per transfer, writing the file twice and
+            // keeping one of them. The only thread this can block is one reading this same
+            // transferable, which is the one that has to wait.
+            //
+            // Produced for this transferable rather than read from the content's own
+            // memory. A drag sharing this content fills that memory and then forgets it,
+            // so a clipboard that had not yet resolved this type would have picked up the
+            // drag's value on its first read -- for a provider that writes a file per
+            // transfer, a path belonging to that drag, which its reclamation may since
+            // have deleted. What this transferable publishes is its own from the start.
+            synchronized (produced) {
+                if (produced.containsKey(mime)) {
+                    return produced.get(mime);
+                }
+                Object value;
+                try {
+                    value = com.codename1.ui.NativeDragAndDrop.produceTransferValue(data, mime);
+                } catch (Throwable err) {
+                    // A provider is permitted to fail; the flavor is simply unavailable,
+                    // and having failed once it has answered. See clipboardValue, whose
+                    // guard this mirrors.
+                    value = null;
+                }
+                produced.put(mime, value);
+                return value;
+            }
+        }
+
+        public Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException, IOException {
             if (DataFlavor.stringFlavor.equals(flavor)) {
-                return data.getText(ClipboardContent.MIME_TEXT);
+                Object text = resolve(ClipboardContent.MIME_TEXT);
+                if (text instanceof String) {
+                    return text;
+                }
+                throw new UnsupportedFlavorException(flavor);
             }
             if (DataFlavor.imageFlavor.equals(flavor)) {
-                byte[] bytes = imageBytes(data);
-                if (bytes != null) {
-                    try {
-                        java.awt.Image img = ImageIO.read(new ByteArrayInputStream(bytes));
-                        if (img != null) {
-                            return img;
-                        }
-                    } catch (IOException ex) {
-                        // fall through to unsupported
-                    }
+                java.awt.Image img = decodeImage(data);
+                if (img != null) {
+                    return img;
                 }
                 throw new UnsupportedFlavorException(flavor);
             }
@@ -2025,9 +2254,50 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 throw new UnsupportedFlavorException(flavor);
             }
-            String value = data.getText(flavor.getPrimaryType() + "/" + flavor.getSubType());
-            if (value != null) {
+            // Locale independent; see JavaSENativeDragAndDrop.asciiLower.
+            String mime = JavaSENativeDragAndDrop.asciiLower(
+                    flavor.getPrimaryType() + "/" + flavor.getSubType());
+            if (ClipboardContent.MIME_URI_LIST.equals(mime)) {
+                // The files and the list, not one or the other. The files are synthesized
+                // into it so a source only has to name them once -- and where the source
+                // also published a list of its own, both belong in the flavor a receiver
+                // asks for: choosing the explicit one wholesale handed a target that reads
+                // nothing but text/uri-list the links and none of the dragged files, though
+                // this very transferable advertises those files beside it.
+                StringBuilder uris = new StringBuilder();
+                java.util.List<String> seen = new java.util.ArrayList<String>();
+                java.util.List<java.io.File> files = fileList(data);
+                for (int iter = 0; files != null && iter < files.size(); iter++) {
+                    appendUri(uris, seen, files.get(iter).toURI().toString());
+                }
+                Object published = resolve(ClipboardContent.MIME_URI_LIST);
+                if (published instanceof String) {
+                    String[] lines = ((String) published).split("\n");
+                    for (int iter = 0; iter < lines.length; iter++) {
+                        String line = lines[iter].trim();
+                        // RFC 2483: a line opening with a hash is a comment, not a URI.
+                        if (line.length() > 0 && line.charAt(0) != '#') {
+                            appendUri(uris, seen, line);
+                        }
+                    }
+                }
+                if (uris.length() > 0) {
+                    return uris.toString();
+                }
+                throw new UnsupportedFlavorException(flavor);
+            }
+            Object value = resolve(mime);
+            if (value instanceof String) {
+                if (InputStream.class.equals(flavor.getRepresentationClass())) {
+                    return new ByteArrayInputStream(((String) value).getBytes("UTF-8"));
+                }
                 return value;
+            }
+            if (value instanceof byte[]) {
+                if (InputStream.class.equals(flavor.getRepresentationClass())) {
+                    return new ByteArrayInputStream((byte[]) value);
+                }
+                return new String((byte[]) value, "UTF-8");
             }
             throw new UnsupportedFlavorException(flavor);
         }
@@ -2065,6 +2335,50 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                     continue;
                 }
+                String mime = JavaSENativeDragAndDrop.asciiLower(
+                        flavor.getPrimaryType() + "/" + flavor.getSubType());
+                // application/rtf is rich text under another name, and the branch at the
+                // end of this loop is what files it under the framework's own MIME_RTF.
+                // Claiming it here as arbitrary bytes -- which it is, in AWT's typing --
+                // took it away from that branch, so a target asking for MIME_RTF got
+                // nothing from a clipboard that plainly held rich text.
+                boolean richTextAlias = flavor.isMimeTypeEqual("application/rtf");
+                if (!richTextAlias
+                        && !"text".equals(JavaSENativeDragAndDrop.asciiLower(flavor.getPrimaryType()))
+                        && out instanceof byte[]) {
+                    // The other spelling AWT uses for the same thing: a flavor whose
+                    // representation class is [B hands over the array itself. mimeFor()
+                    // accepts both on the drag side, and reading only the stream here left
+                    // a PDF another Java application published on the clipboard stored
+                    // under nothing at all.
+                    // Length is not a test of presence: a representation another
+                    // application deliberately published empty is still one it published,
+                    // and ClipboardContent treats it that way -- as do the drag readers.
+                    if (!content.hasMimeType(mime)) {
+                        content.setData(mime, out);
+                    }
+                    continue;
+                }
+                if (!richTextAlias
+                        && !"text".equals(JavaSENativeDragAndDrop.asciiLower(flavor.getPrimaryType()))
+                        && out instanceof InputStream) {
+                    // A binary representation another application owns -- a PDF, an
+                    // archive, an application's own format -- which AWT hands over as a
+                    // stream. Read as bytes and filed under its own type: passed through
+                    // the text path below it produced a string of mojibake at best, and
+                    // was stored under nothing at all, so a paste of a document the
+                    // clipboard plainly held answered with the text fallback or null.
+                    // Exporting one has been supported since this port learned to publish
+                    // arbitrary types; reading one had not caught up.
+                    if (!content.hasMimeType(mime)) {
+                        byte[] bytes = readClipboardStream((InputStream) out);
+                        if (bytes != null) {
+                            // Empty is present, as above. Null is the read that failed.
+                            content.setData(mime, bytes);
+                        }
+                    }
+                    continue;
+                }
                 String str = clipboardText(out);
                 if (str == null) {
                     continue;
@@ -2086,9 +2400,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
         if (content.getMimeTypes().length > (plain == null ? 0 : 1)) {
-            if (plain == null) {
-                content.setData(ClipboardContent.MIME_TEXT, "");
-            }
+            // Nothing is added for a clipboard that offered no text. Padding it with an
+            // empty text/plain told every reader the clipboard held text, and one that
+            // prefers text over an application's own type then chose the empty string and
+            // ignored the document beside it -- from a clipboard that never mentioned text.
             return content;
         }
         if (plain != null) {
@@ -2102,9 +2417,33 @@ public class JavaSEPort extends CodenameOneImplementation {
         return super.getPasteDataFromClipboard();
     }
 
+    /// Reads a clipboard flavor served as a stream, or null when it cannot be read.
+    ///
+    /// Bounded by nothing here on purpose: the clipboard is what the user put there, and a
+    /// paste that silently truncated a document would be worse than one that costs the
+    /// memory the document takes.
+    private static byte[] readClipboardStream(InputStream in) {
+        try {
+            try {
+                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = in.read(buffer)) > 0) {
+                    out.write(buffer, 0, read);
+                }
+                return out.toByteArray();
+            } finally {
+                in.close();
+            }
+        } catch (Throwable err) {
+            // One representation that would not read is not the whole clipboard.
+            return null;
+        }
+    }
+
     /// Encodes an AWT clipboard image as PNG bytes so it can travel through the CN1 clipboard as an
     /// {@code image/png} representation.
-    private static byte[] imageToPngBytes(java.awt.Image image) {
+    static byte[] imageToPngBytes(java.awt.Image image) {
         try {
             BufferedImage buffered;
             if (image instanceof BufferedImage) {
@@ -2127,7 +2466,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    private static String clipboardText(Object value) throws IOException {
+    static String clipboardText(Object value) throws IOException {
         if (value instanceof String) {
             return (String)value;
         }
@@ -3085,6 +3424,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             return retinaScale;
         }
 
+        /// Codename One pixels per AWT point for anything AWT lays over this canvas.
+        ///
+        /// The backing scale is only half of it. With a device skin the canvas also draws
+        /// at zoomLevel, which is why scaleCoordinateX/Y map a press back through
+        /// retinaScale / zoomLevel -- so this is the same factor the pointer is measured
+        /// with, read the other way round.
+        double awtOverlayScale() {
+            return JavaSENativeDragAndDrop.overlayScale(
+                    getScreenCoordinates() != null, canvasScale(), zoomLevel);
+        }
+
         int surfaceWidth() {
             if (windowId == 0) {
                 return getDisplayWidthImpl();
@@ -3109,6 +3459,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             addHierarchyBoundsListener(this);
             setFocusable(true);
             setOpaque(false);
+            // Native drag and drop, both directions: this canvas becomes an AWT drop target
+            // and gets a transfer handler that can export a Codename One drag to the desktop.
+            JavaSENativeDragAndDrop.install(this);
             installNativeMagnificationListeners();
             addHierarchyListener(new HierarchyListener() {
                 public void hierarchyChanged(HierarchyEvent e) {
@@ -4044,7 +4397,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             return true;
         }
 
-        private int scaleCoordinateX(int coordinate) {
+        int scaleCoordinateX(int coordinate) {
             if (getScreenCoordinates() != null) {
                 return (int) (retinaScale * coordinate / zoomLevel - (getScreenCoordinates().x + x));
             }
@@ -4053,7 +4406,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             return (int)(coordinate * canvasScale());
         }
 
-        private int scaleCoordinateY(int coordinate) {
+        int scaleCoordinateY(int coordinate) {
             if (getScreenCoordinates() != null) {
                 return (int) (retinaScale * coordinate / zoomLevel - (getScreenCoordinates().y + y));
             }
@@ -4071,6 +4424,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
             this.mouseDown = true;
+            JavaSEPort.this.dndGestureCanvas = this;
             com.codename1.ui.TopLevelContainer f = canvasTopLevel();
             if (f != null) {
                 int x = scaleCoordinateX(e.getX());
@@ -16590,6 +16944,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private static com.codename1.impl.nearby.LocalNearbyBridge nearbyBridge;
 
+    private static com.codename1.impl.continuity.LocalContinuityBridge continuityBridge;
+
     private static com.codename1.impl.call.LocalCallBridge callBridge;
 
     private static com.codename1.impl.vpn.LocalVpnBridge vpnBridge;
@@ -16666,6 +17022,55 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             return callBridge;
         }
+    }
+
+    /// The continuity bridge for the simulator and desktop builds.
+    ///
+    /// A simulated one rather than none, for the reason
+    /// [#getCallBridge()] carries one: an app's continuity work is deciding
+    /// what belongs in the payload, prompting before a jump and rebuilding a
+    /// screen from a route, none of which has anything to do with the
+    /// operating system that carries the state. A port that reported nothing
+    /// would make every bit of it testable only on a pair of phones.
+    ///
+    /// The simulated synced store is backed by `Preferences`, so it survives
+    /// a simulator restart the way the platform store survives a device one.
+    @Override
+    public com.codename1.continuity.spi.ContinuityBridge getContinuityBridge() {
+        return getSimulatedContinuity();
+    }
+
+    /// The simulated continuity platform, for the Simulate menu to script.
+    ///
+    /// Static and class-guarded for the reason the call bridge is: it holds
+    /// the advertised activity and the framework's callback, and two threads
+    /// racing this getter would each get their own -- an activity published
+    /// through one would be invisible to the menu item that hands it back.
+    public static com.codename1.impl.continuity.LocalContinuityBridge getSimulatedContinuity() {
+        synchronized (JavaSEPort.class) {
+            if (continuityBridge == null) {
+                continuityBridge = new com.codename1.impl.continuity.LocalContinuityBridge();
+            }
+            return continuityBridge;
+        }
+    }
+
+    /// Replaces the simulated continuity platform, so the Simulate menu can
+    /// swap in one that reports a capability as missing.
+    ///
+    /// The framework's inbound seam is re-installed on the replacement:
+    /// without that the new bridge would have no callback, and every menu
+    /// item that delivers a continuation would silently do nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the replacement, never null
+    public static void setSimulatedContinuity(
+            com.codename1.impl.continuity.LocalContinuityBridge b) {
+        synchronized (JavaSEPort.class) {
+            continuityBridge = b;
+        }
+        com.codename1.continuity.Continuity.refreshBridge();
     }
 
     /// The VPN bridge for the simulator and desktop builds: a simulated

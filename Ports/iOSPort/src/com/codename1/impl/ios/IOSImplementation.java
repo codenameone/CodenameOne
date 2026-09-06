@@ -23,6 +23,11 @@
 package com.codename1.impl.ios;
 
 import com.codename1.ui.Desktop;
+import com.codename1.ui.ClipboardContent;
+import com.codename1.ui.ClipboardDataProvider;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.NativeDragAndDrop;
+import com.codename1.ui.NativeDragOperation;
 import com.codename1.background.BackgroundFetch;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
@@ -492,6 +497,21 @@ public class IOSImplementation extends CodenameOneImplementation {
             documentProviderBridge = new IOSDocumentProviderBridge(nativeInstance);
         }
         return documentProviderBridge;
+    }
+
+    private IOSContinuityBridge continuityBridge;
+
+    @Override
+    public com.codename1.continuity.spi.ContinuityBridge getContinuityBridge() {
+        // Only meaningful in builds that linked the continuity natives (CN1_USE_CONTINUITY,
+        // flipped by the builder when the app references com.codename1.continuity). Always
+        // returned: the bridge asks the native side once and answers honestly, and the native
+        // stubs to unsupported when the define is off. Returning null instead would also disable
+        // the on-device half of the framework, which needs no native support at all.
+        if (continuityBridge == null) {
+            continuityBridge = new IOSContinuityBridge(nativeInstance);
+        }
+        return continuityBridge;
     }
 
     private IOSIntentBridge intentBridge;
@@ -9110,11 +9130,66 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(image != null && image.length > 0) {
             content.setData(com.codename1.ui.ClipboardContent.MIME_PNG, image);
         }
+        // Everything else the pasteboard is offering. The reads above name the types the
+        // framework has constants for; a copy -- this application's own or another's -- may
+        // put any type at all on it, and one of those could be published and never read back,
+        // so a paste of an application's own format answered with null once the lightweight
+        // clipboard behind it was gone.
+        int offered = nativeInstance.getClipboardTypeCount();
+        for(int iter = 0 ; iter < offered ; iter++) {
+            String mime = nativeInstance.getClipboardTypeAt(iter);
+            if(mime == null || mime.length() == 0 || content.hasMimeType(mime)) {
+                continue;
+            }
+            byte[] bytes = nativeInstance.getClipboardRepresentation(mime);
+            if(bytes != null) {
+                // Empty is present, as everywhere else here: a representation published
+                // deliberately empty is one the source published.
+                //
+                // A text type reads back as text. The pasteboard hands over bytes for
+                // everything, and copyToClipboard puts a custom String on it as UTF-8 -- so
+                // storing them as bytes broke this port's own round trip: getText on the
+                // type just pasted answered null, where a drop of the same type and every
+                // other port answer with the string. UTF-8 because that is what the copy
+                // above writes; a pasteboard type carries no charset to consult.
+                if(mime.startsWith("text/")) {
+                    try {
+                        content.setData(mime, new String(bytes, "UTF-8"));
+                    } catch(java.io.UnsupportedEncodingException err) {
+                        com.codename1.io.Log.e(err);
+                    }
+                } else {
+                    content.setData(mime, bytes);
+                }
+            }
+        }
         String files = nativeInstance.getClipboardFileUris();
         if(files != null && files.length() > 0) {
+            // The pasteboard's URLs, which are not all files: a link copied out of Safari is one
+            // of these too, and calling it a file handed a file-only target a web address
+            // through getFiles() as though it were a document on disk. Every one of them is the
+            // URI list; only the ones naming something on this device are the file list.
             String[] parts = splitClipboardFileUris(files);
-            content.setData(com.codename1.ui.ClipboardContent.MIME_FILE,
-                    parts.length == 1 ? parts[0] : parts);
+            java.util.List<String> local = new java.util.ArrayList<String>();
+            StringBuilder uris = new StringBuilder();
+            for(int iter = 0 ; iter < parts.length ; iter++) {
+                if(namesALocalFile(parts[iter])) {
+                    local.add(parts[iter]);
+                }
+                if(uris.length() > 0) {
+                    // RFC 2483, which is what every other port here writes and reads.
+                    uris.append("\r\n");
+                }
+                uris.append(parts[iter]);
+            }
+            if(!local.isEmpty()) {
+                content.setData(com.codename1.ui.ClipboardContent.MIME_FILE,
+                        local.size() == 1 ? local.get(0)
+                                : local.toArray(new String[local.size()]));
+            }
+            if(uris.length() > 0) {
+                content.setData(com.codename1.ui.ClipboardContent.MIME_URI_LIST, uris.toString());
+            }
         }
         int mimeCount = content.getMimeTypes().length;
         if(mimeCount > 1 || (s == null && mimeCount > 0)) {
@@ -9132,16 +9207,603 @@ public class IOSImplementation extends CodenameOneImplementation {
         return super.getPasteDataFromClipboard();
     }
     
+
+    // ------------------------------------------------------------------------------------
+    // Native drag and drop.
+    //
+    // UIKit owns the drag gesture: UIDragInteraction has its own recognizer and asks what is
+    // being dragged when it fires, so the framework cannot start a session on its own drag
+    // threshold the way the desktop port does. It stages the operation on the press instead,
+    // and CN1DragAndDrop.m calls nativeDragSessionStartedCallback below when UIKit decides a
+    // drag has begun. The payload is fetched at that moment rather than on the press, so a
+    // drag offering a file the application has not written yet does not write it every time
+    // the user merely touches the component.
+    // ------------------------------------------------------------------------------------
+
+    @Override
+    public boolean isNativeDragAndDropSupported() {
+        return nativeInstance.isNativeDragAndDropSupported();
+    }
+
+    @Override
+    public boolean isNativeDragOutsideApplicationSupported() {
+        return nativeInstance.isNativeDragOutsideAppSupported();
+    }
+
+    @Override
+    public boolean isNativeDragImageNeededOnPrepare() {
+        // UIKit asks for the lift preview at the instant its own recognizer fires, which is
+        // not a moment at which this port can render a component.
+        return true;
+    }
+
+    @Override
+    public void prepareNativeDrag(NativeDragOperation op) {
+        ClipboardContent content = op.getContent();
+        nativeInstance.prepareNativeDrag(join(content.getMimeTypes()), op.getAllowedActions(),
+                pngBytes(op.getDragImage()), op.getDragImageOffsetX(), op.getDragImageOffsetY());
+    }
+
+    @Override
+    public void cancelNativeDrag() {
+        nativeInstance.cancelNativeDrag();
+    }
+
+    @Override
+    public void nativeDragSourceRegistered() {
+        nativeInstance.enableNativeDragSource();
+    }
+
+    @Override
+    public void nativeDropTargetRegistered() {
+        nativeInstance.enableNativeDropTarget();
+    }
+
+    /// Encodes a drag preview as PNG, the one image format the whole bridge speaks.
+    private static byte[] pngBytes(Image image) {
+        if (image == null) {
+            return null;
+        }
+        try {
+            return EncodedImage.createFromImage(image, false).getImageData();
+        } catch (Throwable err) {
+            com.codename1.io.Log.e(err);
+            return null;
+        }
+    }
+
+    private static String join(String[] values) {
+        if (values == null || values.length == 0) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < values.length; iter++) {
+            if (iter > 0) {
+                out.append('\n');
+            }
+            out.append(values[iter]);
+        }
+        return out.toString();
+    }
+
+    private static String[] split(String value) {
+        if (value == null || value.length() == 0) {
+            return null;
+        }
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        int start = 0;
+        while (start <= value.length()) {
+            int next = value.indexOf('\n', start);
+            String entry = next < 0 ? value.substring(start) : value.substring(start, next);
+            if (entry.length() > 0) {
+                out.add(entry);
+            }
+            if (next < 0) {
+                break;
+            }
+            start = next + 1;
+        }
+        return out.isEmpty() ? null : out.toArray(new String[out.size()]);
+    }
+
+    /// Describes a drag in progress from its MIME types alone. UIKit hands over no data until
+    /// the drop, and a drop target only needs the names in order to say whether it wants the
+    /// drag; the providers registered here answer null until the real content arrives.
+    private static ClipboardContent describe(String mimeTypes) {
+        ClipboardContent content = new ClipboardContent();
+        String[] mimes = split(mimeTypes);
+        if (mimes == null) {
+            return content;
+        }
+        for (int iter = 0; iter < mimes.length; iter++) {
+            content.setDataProvider(mimes[iter], new ClipboardDataProvider() {
+                @Override
+                public Object getClipboardData(String mimeType) {
+                    return null;
+                }
+            });
+        }
+        return content;
+    }
+
+    /// Invoked from CN1DragAndDrop.m as a drag moves over the surface. Returns the action a
+    /// drop would perform right now, or zero.
+    public static int nativeDragOverCallback(int x, int y, String mimeTypes, int allowedActions,
+            boolean entering) {
+        ClipboardContent content = describe(mimeTypes);
+        if (entering) {
+            return NativeDragAndDrop.dragEnter(0, x, y, content, allowedActions);
+        }
+        return NativeDragAndDrop.dragOver(0, x, y, content, allowedActions);
+    }
+
+    /// Invoked from CN1DragAndDrop.m when a drag leaves the surface without dropping.
+    public static void nativeDragExitCallback() {
+        NativeDragAndDrop.dragExit(0);
+    }
+
+    /// Every exported drag whose payload something can still read, under the session id its
+    /// load handlers carry.
+    ///
+    /// Deliberately not the active drag: an item provider's load handler is asynchronous by
+    /// design, and a receiving application is free to defer reading a representation until
+    /// after the session has ended -- by which point the active drag has been cleared and the
+    /// lookup would answer with nothing at all.
+    ///
+    /// Matched by id, because a single slot answered a late read with *whatever was being
+    /// dragged by then*: a handler from the previous drag resolving after the next one began
+    /// produced that one's bytes. Nor is it a fixed number of recent drags -- a receiver may
+    /// keep an item provider and read it at any later point, and any bound expires payloads
+    /// that are still legitimately readable. The providers themselves say when they are done:
+    /// CN1DragAndDrop.m gives every load handler a token for its session and calls
+    /// #nativeDragPayloadReleasedCallback(int) when the last of them is released, so a payload
+    /// is held for exactly as long as something can ask for it and no longer.
+    private static final java.util.Map<Integer, ExportedDrag> exportedDrags =
+            new java.util.HashMap<Integer, ExportedDrag>();
+
+    /// One drag this application is exporting, and the values its receivers have read.
+    ///
+    /// The values are kept per session rather than on the operation. A source offers the same
+    /// operation for every drag of its component, and UIKit keeps a session readable for as
+    /// long as a receiver holds one of its item providers -- so an older session can be read
+    /// while a newer one is running, and reading through what the operation remembers would
+    /// hand that receiver the newer drag's file, or make the provider produce a second one for
+    /// a drag that had already ended. Each session answers from what it produced itself.
+    private static final class ExportedDrag {
+        private final NativeDragOperation op;
+        private final java.util.Map<String, Object> produced =
+                new java.util.HashMap<String, Object>();
+
+        ExportedDrag(NativeDragOperation op) {
+            this.op = op;
+        }
+
+        /// This session's value for a type, produced once and remembered for as long as the
+        /// session is readable -- a receiver that queries and then reads must not make the
+        /// provider write its file twice.
+        ///
+        /// Declared as throwing, rather than rethrowing the caught Throwable and letting the
+        /// compiler work out what it can be: this port is also built at source 1.6, which has
+        /// no precise rethrow, and there the bare rethrow does not compile at all. The one
+        /// caller catches Throwable either way.
+        Object produce(String mimeType) throws Throwable {
+            // The provider runs inside the lock, not beside it. At most once per transfer
+            // is what a provider is promised, and two readers that both miss an empty memo
+            // would both run it -- writing the promised file twice and keeping one, which
+            // is the contract broken in the way it most costs.
+            //
+            // Holding a lock across application code is worth saying out loud. The only
+            // thread it can block is one reading this same session, which is precisely the
+            // one that has to wait; and the resolutions arrive on the main queue anyway,
+            // dispatched there by the load handlers in CN1DragAndDrop.m, so they are
+            // already serialized and this is what keeps them so if that ever changes.
+            synchronized (produced) {
+                if (produced.containsKey(mimeType)) {
+                    return produced.get(mimeType);
+                }
+                Object value;
+                try {
+                    value = NativeDragAndDrop.produceDragValue(op, mimeType);
+                } catch (Throwable err) {
+                    // A provider that threw has answered: nothing, once. Leaving the
+                    // failure unrecorded had the next reader run it again.
+                    produced.put(mimeType, null);
+                    throw err;
+                }
+                produced.put(mimeType, value);
+                return value;
+            }
+        }
+    }
+    private static int nextDragSessionId;
+
+    /// The drop being assembled by CN1DragAndDrop.m, one representation at a time.
+    ///
+    /// Only ever touched from the three callbacks below, which UIKit runs in order on the main
+    /// thread, so it needs no guarding of its own.
+    private static ClipboardContent pendingDrop;
+
+    /// Invoked from CN1DragAndDrop.m as a drop begins, before its representations arrive.
+    public static void nativeDropBeginCallback() {
+        pendingDrop = new ClipboardContent();
+    }
+
+    /// Invoked from CN1DragAndDrop.m once per representation the drop carries.
+    ///
+    /// Every representation UIKit loaded is delivered here rather than a fixed list of the
+    /// framework's own: forwarding fewer meant a drag carrying markdown or an application's own
+    /// type was accepted while it hovered and then materialized without it, so the target that
+    /// agreed to take the drop was refused it.
+    public static void nativeDropAddCallback(String mimeType, String text, byte[] binary) {
+        if (pendingDrop == null || mimeType == null || mimeType.length() == 0) {
+            return;
+        }
+        if (ClipboardContent.MIME_FILE.equals(mimeType)) {
+            // One path per call, appended. Delivered as one joined string they were split
+            // apart again here, and a newline is legal in a filename on this platform --
+            // so a dropped file whose name contained one arrived as two paths naming
+            // nothing. The outgoing side stopped joining them for the same reason.
+            if (text == null || text.length() == 0) {
+                return;
+            }
+            String[] known = pendingDrop.getFiles();
+            String[] grown = new String[known == null ? 1 : known.length + 1];
+            for (int iter = 0; known != null && iter < known.length; iter++) {
+                grown[iter] = known[iter];
+            }
+            grown[grown.length - 1] = text;
+            pendingDrop.setFiles(grown);
+            return;
+        }
+        // Length is not a test of presence. A representation the drag advertised and that is
+        // legitimately empty -- an empty string, a zero byte payload -- was discarded here, so
+        // the materialized content lacked a type the hover had accepted and the drop was then
+        // refused by the very target that agreed to take it. Null is absent; empty is present.
+        if (binary != null) {
+            pendingDrop.setData(mimeType, binary);
+        } else if (text != null) {
+            pendingDrop.setData(mimeType, text);
+        }
+    }
+
+    /// Invoked from CN1DragAndDrop.m for a representation that is a file already on disk.
+    ///
+    /// A document provider advertises the document's own content type as well as a file URL,
+    /// and a target may filter on either. Promising the type against the copy rather than
+    /// loading it keeps the two in agreement without reading a large document into memory on
+    /// top of copying it -- the bytes are only read if something asks for that type.
+    public static void nativeDropAddFileCallback(String mimeType, final String path,
+            final String charset) {
+        if (pendingDrop == null || mimeType == null || mimeType.length() == 0
+                || path == null || path.length() == 0 || pendingDrop.hasMimeType(mimeType)) {
+            return;
+        }
+        pendingDrop.setDataProvider(mimeType, new ClipboardDataProvider() {
+            @Override
+            public Object getClipboardData(String requested) {
+                try {
+                    java.io.InputStream in = com.codename1.io.FileSystemStorage.getInstance()
+                            .openInputStream(path.startsWith("/") ? "file://" + path : path);
+                    if (in == null) {
+                        return null;
+                    }
+                    byte[] bytes;
+                    try {
+                        bytes = com.codename1.io.Util.readInputStream(in);
+                    } finally {
+                        in.close();
+                    }
+                    // A text type reads back as text. A document provider from Files commonly
+                    // offers a plain text representation beside its file URL, and answering
+                    // that with bytes made getText() and NativeDropEvent.getText() null for a
+                    // type the drop had just accepted.
+                    //
+                    // In the encoding the representation's own type identifier declared, when
+                    // it declared one. This side never sees that identifier -- it has a path
+                    // and a MIME type -- so assuming UTF-8 turned a UTF-16 alternative into
+                    // rubbish while the same representation read as data came through intact.
+                    if (bytes != null && requested != null && requested.startsWith("text/")) {
+                        return new String(bytes, charsetOrUtf8(charset));
+                    }
+                    return bytes;
+                } catch (Throwable err) {
+                    com.codename1.io.Log.e(err);
+                    return null;
+                }
+            }
+        });
+    }
+
+    /// The named charset when this platform has it, and UTF-8 otherwise -- which is what the
+    /// unnamed case means anyway.
+    private static String charsetOrUtf8(String charset) {
+        if (charset == null || charset.length() == 0) {
+            return "UTF-8";
+        }
+        return charset;
+    }
+
+    /// Invoked from CN1DragAndDrop.m once every representation has arrived. Returns the action
+    /// accepted, or zero when nothing under the pointer took it.
+    public static int nativeDropCommitCallback(int x, int y, int action, int allowedActions,
+            boolean local, int hoverGeneration, final int dropId) {
+        ClipboardContent content = pendingDrop == null ? new ClipboardContent() : pendingDrop;
+        pendingDrop = null;
+        // What *this* drop was offering and where it came from, both taken by the native side
+        // when the drop began. Asking now would ask about whichever drag is running by the time
+        // a slow item provider finished loading, and that can be a different one.
+        // deferredDrop, not drop: this assembly has been loading, so the component
+        // hovering by now may belong to a drop that arrived since -- and the action
+        // below was taken from this session when the user released it.
+        //
+        // The hover generation goes with it, taken by the native side at the same moment. The
+        // recovery for a target that moved reads the hover this drag left behind, and by now
+        // that hover can belong to a session which arrived while the providers were loading.
+        int accepted = NativeDragAndDrop.deferredDrop(0, x, y, content, action, allowedActions,
+                local, hoverGeneration);
+        // Queued behind the callback the line above queued, because callSerially is first in
+        // first out: what this drop copied out is owed to its target until that callback has
+        // read it, and the copies are reclaimable only afterwards. Queued whatever the answer
+        // was -- a drop nobody took has nothing left to read either, and an entry never
+        // released would hold its files for the life of the process.
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                nativeInstance.dropDeliveryFinished(dropId);
+            }
+        });
+        return accepted;
+    }
+
+    /// Invoked from CN1DragAndDrop.m as a drop begins loading, so the commit that follows can
+    /// say whether the hover state it wants to fall back on is still its own.
+    public static int nativeDragHoverGenerationCallback() {
+        return NativeDragAndDrop.hoverGeneration();
+    }
+
+    /// Invoked from CN1DragAndDrop.m when UIKit starts a drag session. Hands the payload down
+    /// -- which is where a promised representation is finally built -- and returns the actions
+    /// the operation allows, or zero when the framework has nothing staged and no drag should
+    /// begin.
+    public static int nativeDragSessionStartedCallback() {
+        NativeDragOperation op = NativeDragAndDrop.dragSessionStarted();
+        if (op == null) {
+            return 0;
+        }
+        int sessionId;
+        ExportedDrag exported = new ExportedDrag(op);
+        synchronized (exportedDrags) {
+            sessionId = ++nextDragSessionId;
+            exportedDrags.put(Integer.valueOf(sessionId), exported);
+        }
+        try {
+            ClipboardContent content = op.getContent();
+            nativeInstance.beginNativeDragPayload(sessionId);
+            // Names, not values. Reading a representation here would build every promised file
+            // and encode every promised image at the moment the drag begins -- including for a
+            // drag the user then abandons -- which is the opposite of what setDataProvider
+            // promises. The native side asks for one through nativeDragResolveCallback if a
+            // receiver reads it.
+            String[] mimeTypes = content.getMimeTypes();
+            for (int iter = 0; iter < mimeTypes.length; iter++) {
+                String mime = mimeTypes[iter];
+                if (ClipboardContent.MIME_FILE.equals(mime)) {
+                    // The exception, and it is UIKit's: the session needs its item count when
+                    // it begins, and for a file drag that count is the number of files. So this
+                    // one representation is resolved now -- and on its own, because a provider
+                    // is permitted to fail and a payload offering an image beside its file
+                    // still has the image to drag.
+                    String[] files;
+                    try {
+                        files = content.getFiles();
+                    } catch (Throwable err) {
+                        com.codename1.io.Log.e(err);
+                        continue;
+                    }
+                    if (files != null) {
+                        // One call per file. Joined into one string they were split apart
+                        // again on the other side, and a newline is legal in a filename
+                        // here -- so one such file arrived as two paths naming nothing,
+                        // and the drag carried neither it nor a complaint.
+                        for (int file = 0; file < files.length; file++) {
+                            if (files[file] != null && files[file].length() > 0) {
+                                nativeInstance.addNativeDragFiles(files[file]);
+                            }
+                        }
+                    }
+                    continue;
+                }
+                if (ClipboardContent.MIME_URI_LIST.equals(mime) && declareDraggedUrls(exported)) {
+                    // Handed over as items rather than declared as a type: see
+                    // declareDraggedUrls. Declaring it as well would publish the list twice,
+                    // once as items and once as a lump.
+                    continue;
+                }
+                nativeInstance.declareNativeDragPayload(mime);
+            }
+        } catch (Throwable err) {
+            // The session is already the framework's -- dragSessionStarted() made the
+            // operation active and it is in exportedDrags -- and returning zero tells UIKit to
+            // begin none, which means no completion and no payload release will ever arrive
+            // for it. So this is the one path that has to give it back by hand: without it the
+            // operation stayed active, every later drag was refused as one already running,
+            // and the payload was held for the life of the process.
+            com.codename1.io.Log.e(err);
+            abandonDragSession(sessionId);
+            return 0;
+        }
+        // A payload that declared nothing needs no such care: the answer is non-zero, UIKit
+        // asks for the items, finds none, and completes the session itself.
+        return op.getAllowedActions();
+    }
+
+    /// Hands each link of a text/uri-list to the session as an item of its own.
+    ///
+    /// Resolved here rather than promised, for the reason the file list is: UIKit fixes the
+    /// item count when the session begins, and a list of three links is three items. A
+    /// public.url representation is one URL, so registering the whole newline separated list
+    /// under that identifier gave every native receiver a single malformed address -- and
+    /// showed the user one item where there were three.
+    ///
+    /// #### Returns
+    ///
+    /// true when at least one link was handed over, in which case the type must not also be
+    /// declared as a representation of its own
+    private static boolean declareDraggedUrls(ExportedDrag exported) {
+        Object value;
+        try {
+            // Through this session's own memo, so the resolution counts as *the* one for this
+            // drag. Reading it off the content instead ran the provider here and again when a
+            // receiver asked for the type, which is twice in one transfer -- and a provider
+            // that generates its value, or writes something, is entitled to be asked once.
+            value = exported.produce(ClipboardContent.MIME_URI_LIST);
+        } catch (Throwable err) {
+            // A provider is permitted to fail, and the rest of the payload still travels. The
+            // failure is remembered by the memo above, so nothing asks it again either.
+            com.codename1.io.Log.e(err);
+            return false;
+        }
+        if (!(value instanceof String)) {
+            return false;
+        }
+        boolean any = false;
+        // Util.split, not String.split: ParparVM's java.lang.String has no split, so the
+        // translated call is an undeclared function and the app does not compile. The rest of
+        // this port splits with Util for the same reason.
+        String[] lines = Util.split((String) value, "\n");
+        for (int iter = 0; iter < lines.length; iter++) {
+            String line = lines[iter].trim();
+            // RFC 2483: a line opening with a hash is a comment rather than a URI.
+            if (line.length() == 0 || line.charAt(0) == '#') {
+                continue;
+            }
+            nativeInstance.addNativeDragUrl(line);
+            any = true;
+        }
+        return any;
+    }
+
+    /// Gives back a drag session the framework had already committed to and that UIKit is
+    /// about to be told not to start.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sessionId`: the session being abandoned
+    private static void abandonDragSession(int sessionId) {
+        synchronized (exportedDrags) {
+            exportedDrags.remove(Integer.valueOf(sessionId));
+        }
+        NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+    }
+
+    /// Invoked from CN1DragAndDrop.m when a receiver reads one of the drag's representations.
+    ///
+    /// This is where a promised value is finally produced -- the file written, the image
+    /// encoded -- so a drag that nobody reads costs nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mimeType`: the representation being read
+    ///
+    /// - `sessionId`: the drag the reading item provider belongs to
+    ///
+    /// #### Returns
+    ///
+    /// its bytes, or null when that drag can no longer supply it
+    public static byte[] nativeDragResolveCallback(String mimeType, int sessionId) {
+        // Matched by session id, not simply the latest: a handler from an earlier drag must
+        // answer for that drag or not at all. See the field.
+        ExportedDrag drag;
+        synchronized (exportedDrags) {
+            drag = exportedDrags.get(Integer.valueOf(sessionId));
+        }
+        if (drag == null || mimeType == null || mimeType.length() == 0) {
+            return null;
+        }
+        // Only the provider call is inside the broad catch: it runs application code, which may
+        // throw anything. The casts below sit outside it deliberately -- a cast reached through
+        // catch(Throwable) is exactly what ParparVM cannot report, since its CHECKCAST does not
+        // throw and the handler would never run on iOS.
+        //
+        // Through this session's own memo, not the operation's: see ExportedDrag.
+        Object value;
+        try {
+            value = drag.produce(mimeType);
+        } catch (Throwable err) {
+            com.codename1.io.Log.e(err);
+            return null;
+        }
+        if (value instanceof byte[]) {
+            return (byte[]) value;
+        }
+        if (value instanceof String) {
+            try {
+                return ((String) value).getBytes("UTF-8");
+            } catch (java.io.UnsupportedEncodingException err) {
+                com.codename1.io.Log.e(err);
+            }
+        }
+        return null;
+    }
+
+    /// Invoked from CN1DragAndDrop.m when a session this application started has ended.
+    public static void nativeDragCompletedCallback(int action) {
+        NativeDragAndDrop.dragCompleted(action);
+    }
+
+    /// Invoked from CN1DragAndDrop.m once the last item provider that could read a drag's
+    /// payload has been released, which is the only moment the payload is certainly unreadable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sessionId`: the drag whose payload may be dropped
+    public static void nativeDragPayloadReleasedCallback(int sessionId) {
+        synchronized (exportedDrags) {
+            exportedDrags.remove(Integer.valueOf(sessionId));
+        }
+    }
+
     @Override
     public void copyToClipboard(Object obj) {
         if(obj instanceof com.codename1.ui.ClipboardContent) {
             com.codename1.ui.ClipboardContent content = (com.codename1.ui.ClipboardContent)obj;
+            // Every representation, now, including any registered as a provider. The pasteboard
+            // is a system store that outlives this process, so what goes on it has to be the
+            // data and not a promise this application has to still be running to keep -- a lazily
+            // registered item pastes as nothing once the application is gone. The drag path is
+            // where the laziness pays off, and it keeps it; see ClipboardDataProvider.
+            // Every other type the content offers, before the call that publishes the clip.
+            // The arguments below name the types the framework has constants for, and a
+            // content may offer any type at all -- an application's own format reached the
+            // pasteboard nowhere else, so a copy of one published an empty pasteboard and
+            // its provider was never even asked.
+            String[] offered = content.getMimeTypes();
+            String published = firstImageMime(content);
+            for(int iter = 0 ; iter < offered.length ; iter++) {
+                if(isNamedClipboardType(offered[iter], published)) {
+                    continue;
+                }
+                Object value = clipboardValue(content, offered[iter]);
+                byte[] bytes = null;
+                if(value instanceof byte[]) {
+                    bytes = (byte[])value;
+                } else if(value instanceof String) {
+                    try {
+                        bytes = ((String)value).getBytes("UTF-8");
+                    } catch(java.io.UnsupportedEncodingException err) {
+                        com.codename1.io.Log.e(err);
+                    }
+                }
+                if(bytes != null) {
+                    nativeInstance.addClipboardRepresentation(offered[iter], bytes);
+                }
+            }
             nativeInstance.setClipboardContent(
-                    content.getText(com.codename1.ui.ClipboardContent.MIME_TEXT),
-                    content.getText(com.codename1.ui.ClipboardContent.MIME_HTML),
-                    content.getText(com.codename1.ui.ClipboardContent.MIME_RTF),
-                    content.getText(com.codename1.ui.ClipboardContent.MIME_MARKDOWN),
-                    content.getText(com.codename1.ui.ClipboardContent.MIME_ASCIIDOC),
+                    clipboardText(content, com.codename1.ui.ClipboardContent.MIME_TEXT),
+                    clipboardText(content, com.codename1.ui.ClipboardContent.MIME_HTML),
+                    clipboardText(content, com.codename1.ui.ClipboardContent.MIME_RTF),
+                    clipboardText(content, com.codename1.ui.ClipboardContent.MIME_MARKDOWN),
+                    clipboardText(content, com.codename1.ui.ClipboardContent.MIME_ASCIIDOC),
                     clipboardImageBytes(content),
                     clipboardFileUris(content));
             super.copyToClipboard(obj);
@@ -9156,39 +9818,158 @@ public class IOSImplementation extends CodenameOneImplementation {
         super.copyToClipboard(obj);
     }
 
+    /// True when setClipboardContent already has an argument for this type, so it must not be
+    /// published a second time beside itself.
+    private static boolean isNamedClipboardType(String mime, String publishedImage) {
+        // Only the *one* image encoding the image argument carries. A content offering a PNG
+        // and a JPEG sends one of them there, and excluding every image type from the loop
+        // beside it dropped the other -- so a receiver asking for the encoding that was left
+        // out could not paste an image the content plainly advertised.
+        return com.codename1.ui.ClipboardContent.MIME_TEXT.equals(mime)
+                || com.codename1.ui.ClipboardContent.MIME_HTML.equals(mime)
+                || com.codename1.ui.ClipboardContent.MIME_RTF.equals(mime)
+                || com.codename1.ui.ClipboardContent.MIME_MARKDOWN.equals(mime)
+                || com.codename1.ui.ClipboardContent.MIME_ASCIIDOC.equals(mime)
+                || (publishedImage != null && publishedImage.equals(mime))
+                || com.codename1.ui.ClipboardContent.MIME_FILE.equals(mime)
+                || com.codename1.ui.ClipboardContent.MIME_URI_LIST.equals(mime);
+    }
+
+    /// The image encoding clipboardImageBytes will send, or null when the content has none.
+    private static String firstImageMime(com.codename1.ui.ClipboardContent content) {
+        if(clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_PNG) != null) {
+            return com.codename1.ui.ClipboardContent.MIME_PNG;
+        }
+        if(clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_JPEG) != null) {
+            return com.codename1.ui.ClipboardContent.MIME_JPEG;
+        }
+        if(clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_GIF) != null) {
+            return com.codename1.ui.ClipboardContent.MIME_GIF;
+        }
+        return null;
+    }
+
     /// Preferred image representation (PNG, then JPEG, then GIF bytes) for the pasteboard, or null.
     private static byte[] clipboardImageBytes(com.codename1.ui.ClipboardContent content) {
-        byte[] b = content.getBytes(com.codename1.ui.ClipboardContent.MIME_PNG);
+        byte[] b = clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_PNG);
         if(b == null) {
-            b = content.getBytes(com.codename1.ui.ClipboardContent.MIME_JPEG);
+            b = clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_JPEG);
         }
         if(b == null) {
-            b = content.getBytes(com.codename1.ui.ClipboardContent.MIME_GIF);
+            b = clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_GIF);
         }
         return b;
     }
 
-    /// Newline-joined file URIs from the MIME_FILE representation (a String or String[]), or null.
+    /// Newline-joined URLs for the pasteboard: the files this content names, and the URIs it
+    /// publishes under `ClipboardContent#MIME_URI_LIST`. Null when it has neither.
+    ///
+    /// One argument, because the pasteboard has one notion of a URL and the native side already
+    /// writes each of these as `public.url` -- which is what a receiving application reads a link
+    /// off. Without the URI list here a content whose only representation was a link passed null
+    /// for every argument, and the copy published an empty pasteboard: nothing outside this
+    /// application saw the link at all.
     private static String clipboardFileUris(com.codename1.ui.ClipboardContent content) {
-        Object value = content.getData(com.codename1.ui.ClipboardContent.MIME_FILE);
-        if(value instanceof String) {
-            return (String)value;
+        java.util.List<String> urls = new java.util.ArrayList<String>();
+        appendClipboardUrls(urls, clipboardValue(content, com.codename1.ui.ClipboardContent.MIME_FILE));
+        String list = clipboardText(content, com.codename1.ui.ClipboardContent.MIME_URI_LIST);
+        if(list != null) {
+            // RFC 2483: CRLF separated, and a line opening with a hash is a comment.
+            // Util.split for the reason declareDraggedUrls gives: the VM's String has none.
+            String[] lines = Util.split(list, "\n");
+            for(int i = 0 ; i < lines.length ; i++) {
+                String line = lines[i].trim();
+                if(line.length() > 0 && line.charAt(0) != '#') {
+                    appendClipboardUrls(urls, line);
+                }
+            }
         }
+        StringBuilder sb = new StringBuilder();
+        for(int i = 0 ; i < urls.size() ; i++) {
+            if(sb.length() > 0) {
+                sb.append('\n');
+            }
+            sb.append(urls.get(i));
+        }
+        return sb.length() == 0 ? null : sb.toString();
+    }
+
+    /// Adds a `MIME_FILE` value -- a `String` or a `String[]` -- to the pasteboard's URL list,
+    /// skipping anything already there so a file named by both representations travels once.
+    private static void appendClipboardUrls(java.util.List<String> urls, Object value) {
         if(value instanceof String[]) {
             String[] arr = (String[])value;
-            StringBuilder sb = new StringBuilder();
             for(int i = 0 ; i < arr.length ; i++) {
-                if(arr[i] == null || arr[i].length() == 0) {
-                    continue;
-                }
-                if(sb.length() > 0) {
-                    sb.append('\n');
-                }
-                sb.append(arr[i]);
+                appendClipboardUrls(urls, arr[i]);
             }
-            return sb.length() == 0 ? null : sb.toString();
+            return;
         }
-        return null;
+        if(value instanceof String) {
+            String one = (String)value;
+            if(one.length() == 0) {
+                return;
+            }
+            String key = clipboardUrlKey(one);
+            for(int i = 0 ; i < urls.size() ; i++) {
+                if(clipboardUrlKey(urls.get(i)).equals(key)) {
+                    return;
+                }
+            }
+            urls.add(one);
+        }
+    }
+
+    /// What two spellings of one file have in common.
+    ///
+    /// The same document is commonly published both ways -- `/tmp/report.pdf` under MIME_FILE and
+    /// `file:///tmp/report.pdf` in the URI list -- and comparing the raw strings put both on the
+    /// pasteboard. The native writer turns each of them into the very same file URL, so a
+    /// receiver imported the document twice. Only the key is normalized; what is published stays
+    /// the spelling the source used.
+    private static String clipboardUrlKey(String url) {
+        // regionMatches(true, ...) rather than a lowercased substring: it compares
+        // character by character and is locale independent, which String.toLowerCase() is
+        // not -- a Turkish default folds the I of FILE: to a dotless i.
+        if(url.length() <= 5 || !url.regionMatches(true, 0, "file:", 0, 5)) {
+            return url;
+        }
+        String key = url.substring(5);
+        if(key.startsWith("///")) {
+            // The empty authority of a local file URL. A real one -- file://host/share -- is left
+            // alone, because that is not the same file as a path of its own.
+            key = key.substring(2);
+        }
+        try {
+            // Percent decoded, or file:///tmp/a%20b.pdf and /tmp/a b.pdf read as two documents.
+            return com.codename1.io.Util.decode(key, "UTF-8", false);
+        } catch(Throwable err) {
+            // Undecodable is not a reason to publish twice; the raw form still keys.
+            return key;
+        }
+    }
+
+    /// True when this URL names something on this device rather than somewhere on the web.
+    ///
+    /// A link copied out of a browser comes back off the pasteboard as an https URL, and calling
+    /// that a file handed a file-only target a web address through `getFiles()` as though it
+    /// were a document on disk. It is still reported, under `MIME_URI_LIST`, which is what it is.
+    private static boolean namesALocalFile(String url) {
+        if(url == null || url.length() == 0) {
+            return false;
+        }
+        if(url.charAt(0) == '/' || url.charAt(0) == '~') {
+            // An absolute path, which is a local file by construction. Tested before the scheme,
+            // because a path may perfectly well contain a colon and reading one as a scheme
+            // would call /tmp/a:b.txt a web address.
+            return true;
+        }
+        int colon = url.indexOf(':');
+        int slash = url.indexOf('/');
+        if(colon < 0 || (slash >= 0 && slash < colon)) {
+            // No scheme: a relative path, possibly one whose own name contains a colon.
+            return true;
+        }
+        return colon == 4 && url.regionMatches(true, 0, "file", 0, 4);
     }
 
     private static String[] splitClipboardFileUris(String joined) {

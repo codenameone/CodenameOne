@@ -403,6 +403,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         report(IOSProvisioningPreflight.checkAppExtensions(mergedSettings, release,
                 project.getBasedir()));
         report(IOSProvisioningPreflight.checkGeneratedExtensions(mergedSettings, release));
+        report(IOSProvisioningPreflight.checkContinuitySync(mergedSettings, release));
     }
 
     private void report(List<IOSProvisioningPreflight.Problem> problems) throws MojoFailureException {

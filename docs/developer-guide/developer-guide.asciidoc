@@ -151,6 +151,8 @@ include::Printing.asciidoc[]
 
 include::Deep-Links-Routing.asciidoc[]
 
+include::State-Restoration-And-Continuity.asciidoc[]
+
 include::App-Intents.asciidoc[]
 
 include::Document-Provider.asciidoc[]

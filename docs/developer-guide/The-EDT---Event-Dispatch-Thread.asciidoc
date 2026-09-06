@@ -110,7 +110,7 @@ Full output will include stack traces to the area in the code that's suspected i
 [[invoke-And-Block-section]]
 === Invoke And Block
 
-Invoke and block is the exact opposite of `callSeriallyAndWait()`, it blocks the EDT and opens a separate thread for the runnable call. This functionality is inspired by the http://foxtrot.sourceforge.net/[Foxtrot] API, which is
+Invoke and block is the exact opposite of `callSeriallyAndWait()`, it blocks the EDT and opens a separate thread for the runnable call. This functionality is inspired by the https://foxtrot.sourceforge.net/[Foxtrot] API, which is
 a remarkably powerful tool most Swing developers don't know about.
 
 This is best explained by an example. Typical Java code reads as a single sequence as such:

@@ -1896,6 +1896,52 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-04T00:01:37+00:00"
+      },
+      "devto": {
+        "id": 4576222,
+        "url": "https://dev.to/codenameone/one-app-more-than-one-native-window-3dm1",
+        "syndicated_at": "2026-09-04T16:51:47+00:00"
+      },
+      "foojay": {
+        "id": 125683,
+        "url": "https://foojay.io/wp-admin/post.php?post=125683&action=edit",
+        "preview_url": "https://foojay.io/?p=125683",
+        "featured_media_id": 125682,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-09-04T16:52:40+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/0de1ea9d9c6e/edit",
+        "syndicated_at": "2026-09-04T17:02:10+00:00"
+      }
+    },
+    "documents-in-system-file-browser": {
+      "hashnode": {
+        "url": "https://debugagent.com/put-app-documents-in-the-system-file-browser",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a9b5b904dbecb52d8a06440",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-05T00:01:13+00:00"
+      },
+      "devto": {
+        "id": 4583236,
+        "url": "https://dev.to/codenameone/put-app-documents-in-the-system-file-browser-2lo4",
+        "syndicated_at": "2026-09-05T16:02:40+00:00"
+      }
+    },
+    "uwb-nearby-devices": {
+      "hashnode": {
+        "url": "https://debugagent.com/uwb-and-nearby-devices-distance-direction-association-and-transport",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a9cad51363df24b1211a1eb",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-06T00:02:16+00:00"
       }
     }
   }

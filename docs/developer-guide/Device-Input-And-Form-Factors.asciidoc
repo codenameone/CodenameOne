@@ -24,12 +24,20 @@ snapshot. There are two ways to read it.
 
 Any pointer listener receives an `ActionEvent`; call `getPointerEvent()` on it:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DeviceInputAndFormFactorsJava001Snippet.java[tag=device-input-and-form-factors-java-001,indent=0]
+----
 
 ==== By polling
 
 When you're inside a pointer callback you can also poll the current values directly from `CN`
 (or `Display`), mirroring the existing `CN.isShiftKeyDown()` family:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DeviceInputAndFormFactorsJava002Snippet.java[tag=device-input-and-form-factors-java-002,indent=0]
+----
 
 TIP: Values have safe defaults. On a plain touch screen the button is `BUTTON_PRIMARY`, the pressure
 is `1.0` and the type is `TYPE_TOUCH` (or `TYPE_UNKNOWN` on ports that don't classify the device).
@@ -48,6 +56,10 @@ For the common case of a context menu, use the unified `addContextMenuListener`.
 secondary (right) mouse click, a stylus barrel button click and a long press, so the same code
 handles desktop and touch:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DeviceInputAndFormFactorsJava003Snippet.java[tag=device-input-and-form-factors-java-003,indent=0]
+----
 
 === Mouse wheel and trackpad scrolling
 
@@ -99,6 +111,10 @@ When a stylus is used (Apple Pencil, S-Pen, Surface Pen) the pointer type is `TY
 For drawing surfaces a dedicated `addStylusListener` fires on press, drag and release only when the
 pointer is a stylus or eraser:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DeviceInputAndFormFactorsJava004Snippet.java[tag=device-input-and-form-factors-java-004,indent=0]
+----
 
 Pen hover (the pen moving above the screen without touching, available on devices such as the S-Pen
 and the M2 iPad with Apple Pencil) flows through the existing `pointerHover` callbacks; the snapshot
@@ -115,6 +131,10 @@ Foldable and dual screen devices (Galaxy Fold, Galaxy Flip, Pixel Fold, Surface 
 at runtime. Query the live posture through
 https://www.codenameone.com/javadoc/com/codename1/ui/DevicePosture.html[`DevicePosture`]:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DeviceInputAndFormFactorsJava005Snippet.java[tag=device-input-and-form-factors-java-005,indent=0]
+----
 
 * `getPosture()` - `POSTURE_FLAT`, `POSTURE_HALF_OPENED`, `POSTURE_CLOSED` or `POSTURE_UNKNOWN`.
 * `getHingeAngle()` - hinge angle in degrees (`-1` when unknown).
@@ -125,6 +145,10 @@ https://www.codenameone.com/javadoc/com/codename1/ui/DevicePosture.html[`DeviceP
 
 React to fold changes with a posture listener:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DeviceInputAndFormFactorsJava006Snippet.java[tag=device-input-and-form-factors-java-006,indent=0]
+----
 
 To exercise this in the desktop simulator, use the *Simulate -> Foldable* menu: enable foldable
 mode, then pick a posture (flat, half-opened or closed), the fold orientation (vertical or

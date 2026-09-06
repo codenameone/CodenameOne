@@ -26,8 +26,8 @@ This document includes content from the following contributors and from earlier 
 - https://github.com/shai-almog[Shai Almog]
 - https://github.com/Isborg[Ismael Baum]
 - https://twitter.com/ericcoolmandev[Eric Coolman]
-- http://github.com/chen-fishbein/[Chen Fishbein]
-- http://github.com/shannah/[Steve Hannah]
+- https://github.com/chen-fishbein/[Chen Fishbein]
+- https://github.com/shannah/[Steve Hannah]
 - https://github.com/kheops37[Matt]
 
 <<<

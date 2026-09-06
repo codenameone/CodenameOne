@@ -87,7 +87,7 @@ Lightweight components date back to Smalltalk frameworks, this notion was popula
 
 ===== Why ParparVM
 
-On iOS, Codename One uses https://github.com/codenameone/CodenameOne/tree/master/vm[ParparVM] which translates Java bytecode to C code and boasts a non-blocking GC. This VM is fully open source in the https://github.com/codenameone/CodenameOne/[Codename One git repository]. In the past Codename One used http://www.xmlvm.org/[XMLVM] to generate native code similarly, but the XMLVM solution was too generic for the needs of Codename One. https://github.com/codenameone/CodenameOne/tree/master/vm[ParparVM] boasts a unique architecture of translating code to C (similarly to XMLVM), because of that Codename One is the only solution of its kind that can **guarantee** future iOS compatibility since the officially supported iOS toolchain is always used instead of undocumented behaviors.
+On iOS, Codename One uses https://github.com/codenameone/CodenameOne/tree/master/vm[ParparVM] which translates Java bytecode to C code and boasts a non-blocking GC. This VM is fully open source in the https://github.com/codenameone/CodenameOne/[Codename One git repository]. In the past Codename One used XMLVM to generate native code similarly, but the XMLVM solution was too generic for the needs of Codename One. https://github.com/codenameone/CodenameOne/tree/master/vm[ParparVM] boasts a unique architecture of translating code to C (similarly to XMLVM), because of that Codename One is the only solution of its kind that can **guarantee** future iOS compatibility since the officially supported iOS toolchain is always used instead of undocumented behaviors.
 
 NOTE: XMLVM could guarantee that as well, but it's no longer maintained and lacked the API layer support
 

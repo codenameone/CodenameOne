@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Drive the CN1 input-validation app through tap / drag / long-press on an
+# Drive the CN1 input-validation app through tap / drag / long-press / typing on an
 # iOS simulator and assert the expected CN1IV:EVENT log lines appear.
 #
 # Usage:
@@ -32,7 +32,23 @@ ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$APP_DIR}/artifacts/input-va
 mkdir -p "$ARTIFACTS_DIR"
 LOG_FILE="$ARTIFACTS_DIR/device.log"
 XCODEBUILD_LOG="$ARTIFACTS_DIR/xcodebuild-test.log"
-SYNC_DIR="${CN1IV_SYNC_DIR:-/tmp/cn1-input-validation-sync}"
+# Must stay in step with the fallback path in InputValidationUITests.swift.
+# The test process cannot be told this path: neither an env var on the
+# xcodebuild command line nor TEST_RUNNER_CN1IV_SYNC_DIR reaches it (measured --
+# ProcessInfo saw nothing), so the Swift side finds the directory by that
+# hard-coded path alone. Pointing this script somewhere else does not move the
+# handshake, it removes it: waitForGate returns immediately when it has no
+# directory, so every gesture fires on a fixed delay and the run still reports
+# a full set of gate releases. Checked below rather than left as a trap.
+CN1IV_SYNC_DIR_DEFAULT=/tmp/cn1-input-validation-sync
+SYNC_DIR="${CN1IV_SYNC_DIR:-$CN1IV_SYNC_DIR_DEFAULT}"
+
+if [ "$SYNC_DIR" != "$CN1IV_SYNC_DIR_DEFAULT" ]; then
+  iv_log "CN1IV_SYNC_DIR is $SYNC_DIR but the XCUITest process can only look in" >&2
+  iv_log "$CN1IV_SYNC_DIR_DEFAULT, so the gesture handshake would be silently skipped." >&2
+  iv_log "Change the fallback in ios-tests/Sources/InputValidationUITests.swift too." >&2
+  exit 3
+fi
 
 if ! command -v xcrun >/dev/null 2>&1; then iv_log "xcrun not on PATH" >&2; exit 3; fi
 if ! command -v xcodebuild >/dev/null 2>&1; then iv_log "xcodebuild not on PATH" >&2; exit 3; fi
@@ -152,7 +168,8 @@ fi
 XCRESULT_BUNDLE="$ARTIFACTS_DIR/test.xcresult"
 rm -rf "$XCRESULT_BUNDLE"
 mkdir -p "$SYNC_DIR"
-rm -f "$SYNC_DIR/tap.go" "$SYNC_DIR/drag.go" "$SYNC_DIR/longpress.go"
+rm -f "$SYNC_DIR/tap.go" "$SYNC_DIR/drag.go" "$SYNC_DIR/longpress.go" "$SYNC_DIR/keytype.go"
+rm -f "$SYNC_DIR/keytype.stop"
 XCB_RC_FILE="$ARTIFACTS_DIR/xcodebuild.rc"
 rm -f "$XCB_RC_FILE"
 
@@ -177,18 +194,20 @@ wait_for_log_marker() {
   local deadline=$((SECONDS + timeout_seconds))
   local spin=0
   while [ "$SECONDS" -lt "$deadline" ]; do
-    if grep -q "$needle" "$LOG_FILE"; then
+    if grep -qE "$needle" "$LOG_FILE"; then
       return 0
     fi
     # The live stream is not a channel this handshake can depend on. It attaches its
     # predicate a few seconds late -- which the archive pass further down already
     # compensates for -- and a CI run saw it deliver nothing whatsoever, so every
     # gesture stalled behind a marker the app had in fact printed a second after
-    # startup. Ask the app directly instead. Throttled to once a second because each
-    # attempt spawns simctl until the file exists.
+    # startup. Ask the app directly instead. Throttled to once a second only while
+    # the path is still unknown, because each of those attempts spawns simctl;
+    # once resolved the check is a local grep, and the extra second of latency
+    # was enough for the keytype stop signal to lose its race with app exit.
     spin=$((spin + 1))
-    if [ "$((spin % 5))" -eq 0 ] && resolve_app_events_file \
-        && grep -q "$needle" "$CN1IV_EVENTS_FILE"; then
+    if { [ -n "$CN1IV_EVENTS_FILE" ] || [ "$((spin % 5))" -eq 0 ]; } && resolve_app_events_file \
+        && grep -qE "$needle" "$CN1IV_EVENTS_FILE"; then
       return 0
     fi
     if [ -f "$XCB_RC_FILE" ]; then
@@ -239,6 +258,14 @@ fi
 release_xcui_step tap || SYNC_FAILED=1
 release_xcui_step drag || SYNC_FAILED=1
 release_xcui_step longpress || SYNC_FAILED=1
+release_xcui_step keytype || SYNC_FAILED=1
+# The keytype driver types in a retry loop, because CN1 needs a moment to bring
+# the native editor up after the tap and keys typed before then are dropped.
+# Stop it the moment the step resolves: the app exits a second and a half after
+# the suite finishes and typing into a process that has left fails the XCUITest
+# run even when every event landed.
+wait_for_log_marker 'CN1IV:(EVENT|TIMEOUT):keytype' 120 || true
+: > "$SYNC_DIR/keytype.stop"
 wait "$XCB_PIPE_PID" >/dev/null 2>&1 || true
 if [ -f "$XCB_RC_FILE" ]; then
   XCB_RC="$(cat "$XCB_RC_FILE")"
@@ -300,6 +327,8 @@ REQUIRED_EVENTS=(
   "CN1IV:EVENT:drag"
   "CN1IV:READY:longpress"
   "CN1IV:EVENT:longpress"
+  "CN1IV:READY:keytype"
+  "CN1IV:EVENT:keytype"
   "CN1IV:SUITE:FINISHED"
 )
 FAILED=0

@@ -1,0 +1,677 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.continuity;
+
+import com.codename1.io.Util;
+import org.junit.jupiter.api.Test;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * The two wire formats an {@link AppState} has to survive, and the payload rule that makes both
+ * possible.
+ *
+ * <p>A state is written to storage on this device, handed to an operating system that may deliver
+ * it to another one, and sent through a relay to a device that may not be running the same build.
+ * Every one of those is lossy for something, so what is admitted into a payload is deliberately
+ * narrow -- and the point of these tests is that the narrowness is enforced where the application
+ * can act on it rather than discovered as a value that stopped arriving.</p>
+ */
+// Extends UITestBase, as every other test in this package does, and not for the EDT: core code
+// logs, and Log.print() reaches Display.getInstance() the first time it runs -- so in a class
+// with no Display the FIRST test that makes the framework log dies with a NullPointerException
+// out of Util.cleanup(). Which test that is depends on the order they happen to run in, so the
+// class passed until an unrelated edit moved a different one to the front.
+public class AppStateWireTest extends com.codename1.junit.UITestBase {
+
+    @Test
+    public void jsonRoundTripPreservesEveryField() throws Exception {
+        AppState state = sample();
+
+        AppState back = StateCodec.fromJson(StateCodec.toJson(state));
+
+        assertNotNull(back);
+        assertEquals(Arrays.asList("/home", "/users/42"), back.getRoutes());
+        assertEquals("Ada", back.getPayload().get("name"));
+        assertEquals("device-a", back.getDeviceId());
+        assertEquals("Editing Ada", back.getTitle());
+        assertEquals(7L, back.getSequence());
+        assertEquals(1700000000123L, back.getTimestamp());
+    }
+
+    /**
+     * The reason the sequence and timestamp are encoded as strings.
+     *
+     * <p>JSON has one number type and {@code JSONParser} reads every one of them back as a
+     * {@code Double}. A millisecond timestamp is past the range a double represents exactly, so a
+     * numeric encoding would come back changed -- and only on the relay path, leaving a state that
+     * no longer compares equal to the one the same device published through a continuation.</p>
+     */
+    @Test
+    public void aMillisecondTimestampSurvivesJsonExactly() throws Exception {
+        AppState state = new AppState().setTimestamp(1763512345678L).setSequence(9007199254740993L);
+
+        AppState back = StateCodec.fromJson(StateCodec.toJson(state));
+
+        assertEquals(1763512345678L, back.getTimestamp());
+        assertEquals(9007199254740993L, back.getSequence());
+    }
+
+    @Test
+    public void externalizableRoundTripPreservesEveryField() throws Exception {
+        Util.register(AppState.OBJECT_ID, AppState.class);
+        AppState state = sample();
+
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytes);
+        Util.writeObject(state, out);
+        out.close();
+        Object read = Util.readObject(
+                new DataInputStream(new ByteArrayInputStream(bytes.toByteArray())));
+
+        assertTrue(read instanceof AppState);
+        AppState back = (AppState) read;
+        assertEquals(Arrays.asList("/home", "/users/42"), back.getRoutes());
+        assertEquals("Ada", back.getPayload().get("name"));
+        assertEquals("device-a", back.getDeviceId());
+        assertEquals("Editing Ada", back.getTitle());
+        assertEquals(7L, back.getSequence());
+        assertEquals(1700000000123L, back.getTimestamp());
+    }
+
+    /**
+     * The reason every scalar crosses as a tagged string.
+     *
+     * <p>{@code JSONParser} reads every JSON number back as a {@code Double} and reads
+     * {@code true} back as the <em>string</em> {@code "true"}. Without tagging, an application
+     * that stored an {@code Integer} and cast it back got a {@code ClassCastException} on Android
+     * and the desktop -- and on iOS something worse, because ParparVM does not throw for a failed
+     * cast and hands the wrong object to the next instruction.</p>
+     */
+    @Test
+    public void everyAdmittedScalarKeepsItsTypeThroughJson() throws Exception {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("i", Integer.valueOf(3));
+        payload.put("l", Long.valueOf(9007199254740993L));
+        payload.put("d", Double.valueOf(1.5));
+        payload.put("b", Boolean.TRUE);
+        payload.put("s", "text");
+
+        Map<String, Object> back = StateCodec.fromJson(
+                StateCodec.toJson(new AppState().setPayload(payload))).getPayload();
+
+        assertEquals(Integer.valueOf(3), back.get("i"));
+        assertEquals(Long.valueOf(9007199254740993L), back.get("l"),
+                "a long past 2^53 is a different number once it has been a double");
+        assertEquals(Double.valueOf(1.5), back.get("d"));
+        assertEquals(Boolean.TRUE, back.get("b"));
+        assertEquals("text", back.get("s"));
+    }
+
+    /** The same guarantee on the map form, which is what an Apple continuation carries. */
+    @Test
+    public void everyAdmittedScalarKeepsItsTypeThroughTheMapForm() {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("i", Integer.valueOf(42));
+        payload.put("b", Boolean.FALSE);
+        payload.put("l", Long.valueOf(-9007199254740993L));
+
+        Map<String, Object> back = StateCodec.fromMap(
+                StateCodec.toMap(new AppState().setPayload(payload))).getPayload();
+
+        assertEquals(Integer.valueOf(42), back.get("i"));
+        assertEquals(Boolean.FALSE, back.get("b"));
+        assertEquals(Long.valueOf(-9007199254740993L), back.get("l"));
+    }
+
+    /** Types survive inside a list and inside a nested map too. */
+    @Test
+    public void typesSurviveInsideListsAndNestedMaps() throws Exception {
+        Map<String, Object> inner = new HashMap<String, Object>();
+        inner.put("count", Integer.valueOf(9));
+        List<Object> list = new ArrayList<Object>();
+        list.add(Integer.valueOf(7));
+        list.add(Boolean.TRUE);
+        list.add("nine");
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("inner", inner);
+        payload.put("list", list);
+
+        Map<String, Object> back = StateCodec.fromJson(
+                StateCodec.toJson(new AppState().setPayload(payload))).getPayload();
+
+        assertEquals(Integer.valueOf(9), ((Map<?, ?>) back.get("inner")).get("count"));
+        List<?> readList = (List<?>) back.get("list");
+        assertEquals(Integer.valueOf(7), readList.get(0));
+        assertEquals(Boolean.TRUE, readList.get(1));
+        assertEquals("nine", readList.get(2));
+    }
+
+    /** An application's own tag-shaped string is not mistaken for a tagged value. */
+    @Test
+    public void aStringThatLooksLikeATagIsStillAString() throws Exception {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("looksLikeAnInt", "i:5");
+        payload.put("looksLikeABool", "b:true");
+
+        Map<String, Object> back = StateCodec.fromJson(
+                StateCodec.toJson(new AppState().setPayload(payload))).getPayload();
+
+        assertEquals("i:5", back.get("looksLikeAnInt"));
+        assertEquals("b:true", back.get("looksLikeABool"));
+    }
+
+    /**
+     * An untagged payload -- a hand-written endpoint, or a device on an older build -- is passed
+     * through rather than refused. Untyped beats absent.
+     */
+    @Test
+    public void anUntaggedValueFromElsewhereIsPassedThrough() throws Exception {
+        AppState back = StateCodec.fromJson(
+                "{\"device\":\"other\",\"payload\":{\"note\":\"plain\"}}");
+
+        assertEquals("plain", back.getPayload().get("note"));
+    }
+
+    /**
+     * Null is refused where the application can act on it.
+     *
+     * <p>A property list cannot carry one: the iOS sanitizer drops a null-valued entry, and drops
+     * a null LIST ELEMENT, which shifts every index after it -- so the payload arriving on the
+     * other device is a different shape from the one that was sent.
+     */
+    /**
+     * A NEGATIVE timestamp is refused rather than read as "this state carries no time".
+     *
+     * <p>Zero is the documented absent value and isTooOld() reads anything not positive that way,
+     * so a negative ts arriving from a custom relay or a compatibility sender produced a state
+     * that could never expire -- whatever maxAge the application had configured. An expired
+     * checkout or a released booking hold would go on being restorable for the life of the
+     * install, which is the one thing maxAge exists to stop.</p>
+     *
+     * <p>Refused at the wire boundary rather than clamped, for the reason the sequence check
+     * gives: a value this codec silently repaired would differ from what the sender believes it
+     * sent, and the two sides then disagree about a state neither can see.</p>
+     */
+    @Test
+    public void aNegativeTimestampIsRefused() {
+        String doc = "{\"routes\":[\"/a\"],\"device\":\"phone\",\"seq\":\"3\","
+                + "\"ts\":\"-1\"}";
+
+        assertThrows(IOException.class, new org.junit.jupiter.api.function.Executable() {
+            public void execute() throws Throwable {
+                StateCodec.fromJson(doc);
+            }
+        }, "a negative timestamp was accepted, so the state can never expire");
+    }
+
+    /**
+     * And the extreme of the same value, which is also where the arithmetic would go wrong.
+     *
+     * <p>Long.MIN_VALUE overflows the subtraction isTooOld() would make, and the only reason it
+     * does not today is the positive-guard that this same malformed value hides behind. Refusing
+     * it at the boundary is what keeps both true at once.</p>
+     */
+    @Test
+    public void theMostNegativeTimestampIsRefused() {
+        String doc = "{\"routes\":[\"/a\"],\"device\":\"phone\",\"seq\":\"3\","
+                + "\"ts\":\"" + Long.MIN_VALUE + "\"}";
+
+        assertThrows(IOException.class, new org.junit.jupiter.api.function.Executable() {
+            public void execute() throws Throwable {
+                StateCodec.fromJson(doc);
+            }
+        }, "Long.MIN_VALUE was accepted as a timestamp");
+    }
+
+    @Test
+    public void aNullPayloadValueIsRefusedWithItsKey() {
+        final Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("draft", null);
+
+        IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        new AppState().setPayload(payload);
+                    }
+                });
+
+        assertTrue(err.getMessage().contains("draft"), err.getMessage());
+        assertTrue(err.getMessage().contains("null"), err.getMessage());
+    }
+
+    @Test
+    public void aNullInsideAListIsRefusedWithItsIndex() {
+        List<Object> list = new ArrayList<Object>();
+        list.add("fine");
+        list.add(null);
+        final Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("items", list);
+
+        IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        new AppState().setPayload(payload);
+                    }
+                });
+
+        assertTrue(err.getMessage().contains("items[1]"), err.getMessage());
+    }
+
+    @Test
+    public void aNestedPayloadSurvivesTheMapForm() {
+        Map<String, Object> inner = new HashMap<String, Object>();
+        inner.put("street", "Sesame");
+        List<Object> list = new ArrayList<Object>();
+        list.add("a");
+        list.add(Integer.valueOf(2));
+        list.add(Boolean.TRUE);
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("address", inner);
+        payload.put("tags", list);
+
+        AppState back = StateCodec.fromMap(StateCodec.toMap(new AppState().setPayload(payload)));
+
+        assertNotNull(back);
+        Object address = back.getPayload().get("address");
+        assertTrue(address instanceof Map);
+        assertEquals("Sesame", ((Map<?, ?>) address).get("street"));
+        assertEquals(3, ((List<?>) back.getPayload().get("tags")).size());
+    }
+
+    @Test
+    public void anUnrepresentableValueIsRefusedWithItsKey() {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("when", new java.util.Date());
+
+        IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        new AppState().setPayload(payload);
+                    }
+                });
+
+        assertTrue(err.getMessage().contains("when"), err.getMessage());
+        assertTrue(err.getMessage().contains("java.util.Date"), err.getMessage());
+    }
+
+    @Test
+    public void anUnrepresentableValueNestedInsideAListNamesItsPath() {
+        List<Object> list = new ArrayList<Object>();
+        list.add("fine");
+        list.add(new Object());
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("items", list);
+
+        IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        new AppState().setPayload(payload);
+                    }
+                });
+
+        assertTrue(err.getMessage().contains("items[1]"), err.getMessage());
+    }
+
+    /**
+     * A cycle looks exactly like a very deep tree until the stack runs out, and neither
+     * destination format can represent one.
+     */
+    @Test
+    public void aCyclicPayloadIsRefusedRatherThanOverflowingTheStack() {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        List<Object> loop = new ArrayList<Object>();
+        loop.add(loop);
+        payload.put("loop", loop);
+
+        IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        new AppState().setPayload(payload);
+                    }
+                });
+
+        assertTrue(err.getMessage().contains("cycle"), err.getMessage());
+    }
+
+    @Test
+    public void aMapKeyThatIsNotAStringIsRefused() {
+        Map<Object, Object> inner = new HashMap<Object, Object>();
+        inner.put(Integer.valueOf(1), "one");
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("byNumber", inner);
+
+        IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        new AppState().setPayload(payload);
+                    }
+                });
+
+        assertTrue(err.getMessage().contains("byNumber"), err.getMessage());
+    }
+
+    /**
+     * A payload arriving from another device gets the SAME check a local one gets, and a failure
+     * is a failed read rather than an exception.
+     *
+     * <p>This test used to assert the opposite, on the reasoning that the payload was validated
+     * where it was produced and that refusing it here would turn a remote build's mistake into an
+     * exception on this device. The second half stopped being true when fromMap() began answering
+     * null for a bad field type: a refusal is a failed READ, so the document stays on the relay
+     * for a build that can use it and nothing is thrown at the user.</p>
+     *
+     * <p>The first half does not survive either. Accepting an unrepresentable value does not make
+     * it work -- it reaches the listeners and the provider, is acknowledged, and then throws out
+     * of externalize() when the checkpoint is written, which is the failure that leaves `dirty`
+     * set and retries for ever. A null nested in a list is worse than that: it survives to the
+     * iOS property-list sanitizer, which drops it and shifts every index after it, so the
+     * application's data quietly changes shape between one device and the next.</p>
+     */
+    @Test
+    public void anArrivingPayloadIsCheckedLikeALocalOne() {
+        Map<String, Object> wire = new HashMap<String, Object>();
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("odd", new Object());
+        wire.put("payload", payload);
+        wire.put("device", "other");
+
+        assertNull(StateCodec.fromMap(wire),
+                "an unrepresentable value arrived intact, so it reaches the application and then "
+                        + "breaks the checkpoint that tries to store it");
+
+        // A null nested in a LIST, which is the shape the iOS sanitizer silently reindexes.
+        Map<String, Object> nulled = new HashMap<String, Object>();
+        Map<String, Object> withList = new HashMap<String, Object>();
+        withList.put("items", Arrays.asList("a", null, "b"));
+        nulled.put("payload", withList);
+        nulled.put("device", "other");
+        assertNull(StateCodec.fromMap(nulled),
+                "a null list element arrived intact, so the list is one shorter on an iPad than "
+                        + "on the device that sent it");
+
+        // What a conforming sender writes still goes through, or this guard would refuse every
+        // arrival there is.
+        Map<String, Object> fine = new HashMap<String, Object>();
+        Map<String, Object> goodPayload = new HashMap<String, Object>();
+        goodPayload.put("items", Arrays.asList("a", "b"));
+        goodPayload.put("n", Integer.valueOf(3));
+        fine.put("payload", goodPayload);
+        fine.put("device", "other");
+        AppState back = StateCodec.fromMap(fine);
+        assertNotNull(back, "a conforming payload was refused");
+        assertEquals("other", back.getDeviceId());
+        assertEquals(Integer.valueOf(3), back.getPayload().get("n"));
+    }
+
+    @Test
+    public void anUnknownFieldFromANewerBuildIsIgnoredRatherThanFailing() throws Exception {
+        AppState back = StateCodec.fromJson(
+                "{\"routes\":[\"/home\"],\"device\":\"x\",\"somethingNew\":{\"a\":1}}");
+
+        assertNotNull(back);
+        assertEquals(Arrays.asList("/home"), back.getRoutes());
+    }
+
+    @Test
+    public void emptyAndNullDocumentsProduceNoState() throws Exception {
+        assertNull(StateCodec.fromJson(null));
+        assertNull(StateCodec.fromJson("   "));
+        assertNull(StateCodec.fromMap(null));
+    }
+
+    /**
+     * A relay answering {@code {}}, or an activity arriving with no usable userInfo, is not a
+     * state. Returning a default one meant the continuation callback CLAIMED it and delivered it:
+     * the application's listeners ran, and an app that prompts before moving the user put a
+     * "continue what you were doing?" dialog in front of them over nothing at all.
+     *
+     * <p>That harm is about FABRICATING a state and it is still asserted below, on the path where
+     * it happens: fromMap answers null, so the continuation callback declines rather than
+     * claiming. What has changed is the RELAY's reading of a document that carries fields none of
+     * which are ours -- null there means "the relay holds nothing", which releases the publisher
+     * and overwrites a document this device never read. An empty object stays null, because that
+     * is a plausible way for an endpoint to say it holds nothing.</p>
+     */
+    @Test
+    public void aDocumentWithNoStateFieldsIsNotAState() throws Exception {
+        assertNull(StateCodec.fromJson("{}"));
+        assertNull(StateCodec.fromMap(new HashMap<String, Object>()));
+
+        // No state is FABRICATED for an unrecognised document -- the guarantee this test was
+        // written for, on the path it applies to.
+        Map<String, Object> unrelated = new HashMap<String, Object>();
+        unrelated.put("somethingElse", Integer.valueOf(1));
+        unrelated.put("unrelated", "x");
+        assertNull(StateCodec.fromMap(unrelated),
+                "an unrecognised activity produced a state, so the callback claims it and the "
+                        + "application is prompted over nothing at all");
+
+        // And on the relay wire the same document is a failed READ, not an empty relay: null
+        // there means "the relay holds nothing", which releases the publisher and overwrites a
+        // document this device never read.
+        Exception unreadable = assertThrows(Exception.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() throws Throwable {
+                        StateCodec.fromJson("{\"somethingElse\":1,\"unrelated\":\"x\"}");
+                    }
+                });
+        assertTrue(unreadable.getMessage().length() > 0, "the refusal explained nothing");
+    }
+
+    /** One recognized field is enough -- a state with only routes is a real state. */
+    @Test
+    public void aDocumentWithAnyKnownFieldIsAState() throws Exception {
+        assertNotNull(StateCodec.fromJson("{\"routes\":[\"/home\"]}"));
+        assertNotNull(StateCodec.fromJson("{\"device\":\"other\"}"));
+        assertNotNull(StateCodec.fromJson("{\"ts\":\"1\"}"));
+    }
+
+    @Test
+    public void blankRoutePathsAreDropped() {
+        AppState state = new AppState().setRoutes(Arrays.asList("/a", null, "", "/b"));
+
+        assertEquals(Arrays.asList("/a", "/b"), state.getRoutes());
+    }
+
+    @Test
+    public void aStateWithNoRoutesAndNoPayloadIsEmpty() {
+        assertTrue(new AppState().isEmpty());
+        assertFalse(new AppState().setRoutes(Arrays.asList("/a")).isEmpty());
+    }
+
+    private static AppState sample() {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("name", "Ada");
+        return new AppState()
+                .setRoutes(Arrays.asList("/home", "/users/42"))
+                .setPayload(payload)
+                .setDeviceId("device-a")
+                .setTitle("Editing Ada")
+                .setSequence(7L)
+                .setTimestamp(1700000000123L);
+    }
+
+    /**
+     * Util.writeObject writes every String with DataOutputStream.writeUTF, which cannot encode
+     * more than 65535 bytes and throws when asked to. Continuity.persist() logs that and carries
+     * on, so an oversized payload produced a checkpoint that LOOKED successful and simply was not
+     * there after the process died -- state restoration failing silently at exactly the moment it
+     * exists for. Refused up front instead, naming the key.
+     */
+    @Test
+    void anOversizedPayloadStringIsRefusedNamingTheKey() {
+        StringBuilder huge = new StringBuilder();
+        for (int i = 0; i < 70000; i++) {
+            huge.append('x');
+        }
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("draft", huge.toString());
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        StateCodec.requireRepresentable(payload);
+                    }
+                });
+
+        assertTrue(e.getMessage().contains("draft"), e.getMessage());
+        assertTrue(e.getMessage().contains("65535"), e.getMessage());
+    }
+
+    /** The limit is on BYTES: a CJK string reaches it at a third of the character count. */
+    @Test
+    void theLimitCountsBytesNotCharacters() {
+        StringBuilder cjk = new StringBuilder();
+        for (int i = 0; i < 30000; i++) {
+            cjk.append('\u4e2d');
+        }
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("note", cjk.toString());
+
+        assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        StateCodec.requireRepresentable(payload);
+                    }
+                });
+    }
+
+    /**
+     * Every string this class writes goes through Util.writeUTF, not just the payload. A route
+     * carrying a long query value, or a long title, made externalize() throw -- which
+     * Continuity.persist() logs and carries on from, so the checkpoint reached the other device
+     * and was silently absent from local storage.
+     */
+    @Test
+    void everyStringSurfaceIsLengthChecked() {
+        StringBuilder huge = new StringBuilder();
+        for (int i = 0; i < 70000; i++) {
+            huge.append('x');
+        }
+        final String big = huge.toString();
+
+        assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        new AppState().setRoutes(java.util.Arrays.asList("/ok", "/x?q=" + big));
+                    }
+                });
+        assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        new AppState().setTitle(big);
+                    }
+                });
+        assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        new AppState().setDeviceId(big);
+                    }
+                });
+    }
+
+    /**
+     * A nested map key reaches the same writeUTF as a top-level one. Validating only the top level
+     * left a deep key able to throw inside externalize(), which persist() logs and carries on
+     * from -- so the checkpoint went to the other device and was silently absent locally.
+     */
+    @Test
+    void anOversizedNestedMapKeyIsRefused() {
+        StringBuilder huge = new StringBuilder();
+        for (int i = 0; i < 70000; i++) {
+            huge.append('k');
+        }
+        Map<String, Object> inner = new HashMap<String, Object>();
+        inner.put(huge.toString(), "value");
+        final Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("outer", inner);
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        StateCodec.requireRepresentable(payload);
+                    }
+                });
+
+        assertTrue(e.getMessage().contains("65535"), e.getMessage());
+        // The key itself is the oversized thing; the message names it without reproducing it.
+        assertTrue(e.getMessage().length() < 2000,
+                "the message reproduced the whole key: " + e.getMessage().length() + " chars");
+    }
+
+    /**
+     * An untagged payload is read exactly as it arrived. decode() used to ask of every string
+     * whether it looked tagged, so a hand-written endpoint or an older build sending the ordinary
+     * string "i:5" had it turned into an Integer, and "s:note" silently lost its prefix. No
+     * per-string rule can separate those, because "i:5" is a perfectly good string -- the
+     * document says once whether its values are tagged.
+     */
+    @Test
+    public void anUntaggedPayloadKeepsStringsThatLookLikeTags() {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("looksLikeAnInt", "i:5");
+        payload.put("looksLikeAString", "s:note");
+        Map<String, Object> doc = new HashMap<String, Object>();
+        doc.put("device", "some-other-device");
+        doc.put("seq", "3");
+        doc.put("payload", payload);
+        // No "enc" marker: this is what a hand-written endpoint produces.
+
+        AppState state = StateCodec.fromMap(doc);
+
+        assertNotNull(state);
+        assertEquals("i:5", state.getPayload().get("looksLikeAnInt"));
+        assertEquals("s:note", state.getPayload().get("looksLikeAString"));
+    }
+
+    /** And a document this codec wrote still round-trips its types. */
+    @Test
+    public void aTaggedDocumentStillRoundTripsItsTypes() {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("count", Integer.valueOf(5));
+        payload.put("note", "i:5");
+        AppState state = new AppState().setPayload(payload).setDeviceId("d").setSequence(1L);
+
+        AppState back = StateCodec.fromMap(StateCodec.toMap(state));
+
+        assertEquals(Integer.valueOf(5), back.getPayload().get("count"));
+        assertEquals("i:5", back.getPayload().get("note"));
+    }
+}

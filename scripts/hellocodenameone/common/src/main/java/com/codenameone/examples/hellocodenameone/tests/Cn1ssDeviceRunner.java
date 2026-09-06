@@ -535,6 +535,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // at all is also what makes the iOS extension target and the Android <provider> get
             // generated and compiled in the first place.
             new DocumentProviderPublishTest(),
+            // State restoration and continuity on the device VM: the codec both wire formats
+            // share, the payload rule, the checkpoint and the restore. Referencing
+            // com.codename1.continuity at all is also what makes the iOS build compile the
+            // NSUserActivity natives and declare this app's activity type in the plist.
+            new ContinuityStateTest(),
+
             // App intents on the device VM: the generated registry, the coercion it wraps
             // every parameter in, and entity resolution behind an id. The declarations it
             // exercises are also what make the iOS Swift and the Android shortcut resources

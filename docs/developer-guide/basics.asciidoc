@@ -203,7 +203,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 <1> Most layouts have a version of enclose to encapsulate components within (((Encapsulate)))
 
-<2> `FlowLayout` has variants that support aligning the components on various axis
+<2> `FlowLayout` has variants that support aligning the components on various axes
 
 To sum this up, you can use layout managers and nesting to create elaborate UI's that implicitly adapt to different screen sizes and device orientation.
 
@@ -708,7 +708,7 @@ https://www.codenameone.com/javadoc/com/codename1/ui/layouts/mig/MigLayout.html[
 WARNING: MiG is still considered experimental so proceed with caution! +
 The API was deprecated to serve as a warning of its experimental status.
 
-The best reference for MiG would probably be its http://www.miglayout.com/QuickStart.pdf[quick start guide (PDF link)]. The sample below is one of that guide's examples, ported to Codename One:
+The best reference for MiG would probably be its https://www.miglayout.com/QuickStart.pdf[quick start guide (PDF link)]. The sample below is one of that guide's examples, ported to Codename One:
 
 [source,java]
 ----
@@ -837,7 +837,8 @@ include::../demos/common/src/main/snippets/developer-guide/basics.sh[tag=basics-
 
 Projects generated from the archetype also carry a ready-made shortcut for this: a *CN1 GUI Builder* run configuration in IntelliJ IDEA, an *Open in GUI Builder* action in NetBeans, a *GUI Builder* launch configuration in Eclipse, and a *Tools > GUI Builder* entry in the Visual Studio Code Maven favorites. They all run the same goal.
 
-The full goal reference, including every parameter, lives in <<create-gui-form>> and <<guibuilder>> in the Maven goals appendix.
+The full goal reference, including every parameter, lives in <<create-gui-form,the `cn1:create-gui-form` goal>> and
+<<guibuilder,the `cn1:guibuilder` goal>> in the Maven goals appendix.
 
 TIP: The GUI builder is a Java 8 artifact, so it runs on whichever JDK already builds your project.
 

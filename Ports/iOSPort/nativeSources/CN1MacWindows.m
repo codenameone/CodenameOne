@@ -53,6 +53,10 @@ extern void cn1CapturePointerMetadata(UITouch* touch);
 
 /* The main view controller's UIKey mapping, shared so the two cannot drift. */
 extern int cn1MapUIKeyToKeyCode(UIKey* key) API_AVAILABLE(ios(13.4));
+/* Identity of the physical control behind a press, shared for the same reason:
+ * the CN1 keycode is many-to-one, so ownership cannot be keyed on it. */
+extern long long cn1PressIdentity(UIPress* press, int code) API_AVAILABLE(ios(13.4));
+extern CN1View *editingComponent;
 
 #define CN1_MAC_MAX_WINDOWS 32
 
@@ -130,6 +134,11 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
 @interface CN1MacWindowController : UIViewController
 @property (nonatomic, assign) int windowId;
 @property (nonatomic, assign) CN1MacWindowView* content;
+/* Presses this window handed to the framework from pressesBegan:, keyed by
+ * physical control (cn1PressIdentity), so the end and the cancellation of a
+ * press follow the decision made when it started rather than whatever the
+ * editor is doing by then. See the presses overrides. */
+@property (nonatomic, retain) NSMutableSet* cn1FrameworkOwnedPresses;
 @end
 
 @implementation CN1MacWindowController
@@ -286,18 +295,135 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
     }
 }
 
+/*
+ * A native text editor owns the keyboard while it is up, so a press that starts
+ * while one is open is forwarded untouched. UIKit inserts typed text only after
+ * every responder has declined the press, so claiming one here would swallow it
+ * before the focused CN1UITextField could ever see it -- the defect issue #5709
+ * reports against the main controller, which deliverPresses: was copied from.
+ *
+ * Ownership is decided ONCE, when the press begins, and recorded per key code.
+ * The end and the cancellation follow that record rather than re-reading the
+ * editor's state, because the two can disagree: Display.keyPressedImpl arms the
+ * key-repeat and long-press timers and only keyReleased cancels them, so a
+ * release diverted to UIKit because an editor opened mid-press would leave the
+ * framework repeating a key the user has let go of. Keyed by physical control
+ * rather than by CN1 keycode, which is many-to-one, and everything here is on
+ * the main thread, so the set needs no synchronization.
+ *
+ * The guard sits in each override rather than in deliverPresses: because that
+ * helper flattens the three phases into a BOOL, which is right for the
+ * framework delivery -- CN1MacWindowDeliverKey deliberately treats a
+ * cancellation as a release so a key cannot stay latched down -- and wrong for
+ * UIKit, where a cancellation forwarded as pressesEnded: tells the text-input
+ * chain a key completed when it was aborted. Each phase is forwarded as itself.
+ *
+ * editingComponent is global rather than per-window, so an editor open in a
+ * sibling Codename One window also stops this window claiming a NEW press. That
+ * is deliberate: scoping it with [editingComponent isDescendantOfView:self.view]
+ * reads as more precise and is worse, because the editor host is re-parented
+ * across scene grants -- editStringAtImpl puts the field on the MAIN view when
+ * CN1MacWindowEditingHostView() has no content view yet and
+ * CN1MacWindowReattachEditor moves it later -- so the scoped test would swallow
+ * the keys of the very editor it is meant to protect. A key lost to a window
+ * whose sibling has an editor open is the smaller failure.
+ */
+/* Split a terminal set by who owns each press, because one UIPressesEvent can
+ * carry both -- a key held from before an editor opened ends in the same event
+ * as one pressed after it. Routing the whole batch by an aggregate answer gives
+ * the framework a release for a key it never saw pressed and costs UIKit the
+ * key-up for one it did. Each press leaves by the door its beginning chose,
+ * exactly as CodenameOne_GLViewController does it.
+ *
+ * A press whose key does not map -- a bare modifier, or anything at all before
+ * iOS 13.4, where nothing could have been claimed in the first place -- was
+ * never owned and passes through. Both sets are left nil when empty so the
+ * common single-press case allocates nothing. */
+- (void)cn1PartitionTerminal:(NSSet<UIPress*>*)presses
+                       owned:(NSMutableSet**)owned
+                 passthrough:(NSMutableSet**)passthrough {
+    *owned = nil;
+    *passthrough = nil;
+    for (UIPress* press in presses) {
+        NSNumber* boxed = nil;
+        if (@available(iOS 13.4, *)) {
+            UIKey* key = press.key;
+            int code = key != nil ? cn1MapUIKeyToKeyCode(key) : 0;
+            if (code != 0) {
+                boxed = [NSNumber numberWithLongLong:cn1PressIdentity(press, code)];
+            }
+        }
+        if (boxed != nil && [self.cn1FrameworkOwnedPresses containsObject:boxed]) {
+            [self.cn1FrameworkOwnedPresses removeObject:boxed];
+            if (*owned == nil) {
+                *owned = [NSMutableSet set];
+            }
+            [*owned addObject:press];
+        } else {
+            if (*passthrough == nil) {
+                *passthrough = [NSMutableSet set];
+            }
+            [*passthrough addObject:press];
+        }
+    }
+}
+
+- (void)cn1NoteOwnedPressesFrom:(NSSet<UIPress*>*)presses {
+    if (@available(iOS 13.4, *)) {
+        for (UIPress* press in presses) {
+            UIKey* key = press.key;
+            int code = key != nil ? cn1MapUIKeyToKeyCode(key) : 0;
+            if (code == 0) {
+                continue;
+            }
+            if (self.cn1FrameworkOwnedPresses == nil) {
+                self.cn1FrameworkOwnedPresses = [NSMutableSet set];
+            }
+            [self.cn1FrameworkOwnedPresses addObject:
+                    [NSNumber numberWithLongLong:cn1PressIdentity(press, code)]];
+        }
+    }
+}
+
+/* The port builds without ARC, so the retained set is ours to give back. */
+- (void)dealloc {
+    [_cn1FrameworkOwnedPresses release];
+    [super dealloc];
+}
+
 - (void)pressesBegan:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
+    if (editingComponent != nil) {
+        [super pressesBegan:presses withEvent:event];
+        return;
+    }
+    [self cn1NoteOwnedPressesFrom:presses];
     [self deliverPresses:presses pressed:YES event:event];
 }
 
 - (void)pressesEnded:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
-    [self deliverPresses:presses pressed:NO event:event];
+    NSMutableSet* owned = nil;
+    NSMutableSet* passthrough = nil;
+    [self cn1PartitionTerminal:presses owned:&owned passthrough:&passthrough];
+    if (owned.count > 0) {
+        [self deliverPresses:owned pressed:NO event:event];
+    }
+    if (passthrough.count > 0) {
+        [super pressesEnded:passthrough withEvent:event];
+    }
 }
 
 - (void)pressesCancelled:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
-    /* Treated as a release: leaving a key latched down in the framework is worse
-     * than an extra release the focused component ignores. */
-    [self deliverPresses:presses pressed:NO event:event];
+    NSMutableSet* owned = nil;
+    NSMutableSet* passthrough = nil;
+    [self cn1PartitionTerminal:presses owned:&owned passthrough:&passthrough];
+    if (owned.count > 0) {
+        /* Treated as a release: leaving a key latched down in the framework is
+         * worse than an extra release the focused component ignores. */
+        [self deliverPresses:owned pressed:NO event:event];
+    }
+    if (passthrough.count > 0) {
+        [super pressesCancelled:passthrough withEvent:event];
+    }
 }
 
 - (void)viewDidLayoutSubviews {
