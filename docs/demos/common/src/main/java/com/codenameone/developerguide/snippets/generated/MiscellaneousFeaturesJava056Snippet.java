@@ -57,7 +57,8 @@ import com.codename1.ui.table.TableLayout;
 import java.util.*;
 
 
-class MiscellaneousFeaturesJava047Snippet {
+class MiscellaneousFeaturesJava056Snippet {
+
 
 
     Object context;
@@ -83,28 +84,17 @@ class MiscellaneousFeaturesJava047Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     
-    // tag::miscellaneous-features-java-047[]
-    public class GeofenceListenerImpl implements GeofenceListener {
-        @Override
-        public void onExit(String id) {
-        }
-
-        @Override
-        public void onEntered(String id) {
-            if(Display.getInstance().isMinimized()) {
-                // backgrounded, so there is no form to show a dialog on
-                LocalNotification ln = new LocalNotification();
-                ln.setId("geofence-welcome");
-                ln.setAlertTitle("Welcome");
-                ln.setAlertBody("Thanks for arriving!");
-                Display.getInstance().scheduleLocalNotification(ln,
-                        System.currentTimeMillis() + 10, LocalNotification.REPEAT_NONE);
-            } else {
-                Display.getInstance().callSerially(() -> {
-                    Dialog.show("Welcome", "Thanks for arriving", "OK", null);
-                });
-            }
-        }
+    void snippet() throws Exception {
+        // tag::miscellaneous-features-java-056[]
+        // the port reads these through UIManager.localize(), so any bundle works
+        java.util.Map<String, String> bundle = new java.util.HashMap<String, String>();
+        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.title",
+                "Location needed");
+        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.explanation_body",
+                "Choose \"Allow all the time\" so reminders still arrive when the app is closed.");
+        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.settings", "Open settings");
+        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.cancel", "Not now");
+        UIManager.getInstance().setBundle(bundle);
+        // end::miscellaneous-features-java-056[]
     }
-    // end::miscellaneous-features-java-047[]
 }

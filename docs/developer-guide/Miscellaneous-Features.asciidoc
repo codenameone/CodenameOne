@@ -164,7 +164,7 @@ https://www.codenameone.com/javadoc/com/codename1/contacts/ContactPicker.html[Co
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava040Snippet.java[tag=miscellaneous-features-java-040,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava055Snippet.java[tag=miscellaneous-features-java-055,indent=0]
 ----
 
 IMPORTANT: From 2027-01-27 Google Play requires an app that targets Android 17 (API level 37) or later and requests `READ_CONTACTS` to pass a Play Console declaration explaining why the picker isn't enough. An app that only picks never requests that permission, so it never files that declaration. The build only adds `READ_CONTACTS` for the broad API, so mixing the two in one app puts the permission back.
@@ -449,16 +449,26 @@ The following code demonstrates usage of the GeoFence API:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava046Snippet.java[tag=miscellaneous-features-java-046,indent=0]
 ----
 
+The listener it registers looks like this:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava047Snippet.java[tag=miscellaneous-features-java-047,indent=0]
+----
+
 
 ===== Android background location permissions (API 30+)
 
 On Android 11 (API level 30) and higher, requesting background location permission requires a two-step process. First, foreground location permissions must be granted. Then, the app must request background location access, which will direct the user to the system settings to select `Allow all the time`. Codename One handles this flow automatically when you use `LocationManager`.
 
-For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize the permission prompt message using the localization key `android.permission.ACCESS_BACKGROUND_LOCATION`:
+For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize the prompt through localization keys prefixed with
+`android.permission.ACCESS_BACKGROUND_LOCATION` -- the port looks up `.title`,
+`.explanation_title`, `.explanation_body`, `.settings`, `.ok` and `.cancel`
+beneath it:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava047Snippet.java[tag=miscellaneous-features-java-047,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava056Snippet.java[tag=miscellaneous-features-java-056,indent=0]
 ----
 
 === Background music playback

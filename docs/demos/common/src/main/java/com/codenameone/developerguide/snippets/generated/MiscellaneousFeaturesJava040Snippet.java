@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
+ * by Codename One in the LICENSE file that accompanied this code.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -20,94 +20,26 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-
 package com.codenameone.developerguide.snippets.generated;
 
-import com.codename1.gpu.*;
+import com.codename1.contacts.*;
 import com.codename1.ui.*;
-import com.codename1.ui.animations.*;
 import com.codename1.ui.events.*;
-import com.codename1.ui.geom.*;
-import com.codename1.ui.layouts.*;
-import com.codename1.ui.list.*;
-import com.codename1.ui.plaf.*;
-import com.codename1.ui.util.*;
-import com.codename1.components.*;
-import com.codename1.charts.models.*;
-import com.codename1.charts.renderers.*;
-import com.codename1.charts.views.*;
-import com.codename1.capture.*;
-import com.codename1.io.*;
-import com.codename1.l10n.*;
-import com.codename1.location.*;
-import com.codename1.maps.*;
-import com.codename1.media.*;
-import com.codename1.messaging.*;
-import com.codename1.payment.*;
-import com.codename1.processing.*;
-import com.codename1.properties.*;
-import com.codename1.push.*;
-import com.codename1.security.*;
-import com.codename1.social.*;
-import com.codename1.ui.spinner.*;
-import java.io.*;
-import com.codename1.util.EasyThread;
-import com.codename1.notifications.LocalNotification;
-import com.codename1.ui.table.TableLayout;
-import java.util.*;
-
 
 class MiscellaneousFeaturesJava040Snippet {
 
+    TextField numberField;
 
-    Object context;
-    Object url;
-    Object value;
-    Object body;
-    Object event;
-    String apiKey = "test-key";
-    String myHttpsURL = "https://example.com";
-    java.util.List<String> validKeysList = new java.util.ArrayList<>();
-    Image myImage;
-    Graphics graphics;
-    Graphics g;
-    GraphicsDevice device;
-    Form form;
-    Form hi;
-    Container cnt;
-    Container myForm;
-    Component component;
-    Button button;
-    MultiButton myMultiButton;
-    Label label;
-    BrowserComponent browserComponent;
-    Resources theme;
-    
     void snippet() throws Exception {
         // tag::miscellaneous-features-java-040[]
-        try {
-            switch(Display.getInstance().getSMSSupport()) {
-                case Display.SMS_NOT_SUPPORTED:
-                    return;
-                case Display.SMS_SEAMLESS:
-                    showUIDialogToEditMessageData();
-                    Display.getInstance().sendSMS(phone, data);
-                    return;
-                default:
-                    Display.getInstance().sendSMS(phone, data);
-                    return;
+        ContactPicker picker = new ContactPicker();
+        picker.setRequestedFields(ContactPicker.NAME | ContactPicker.PHONE);
+        picker.pick(ev -> {
+            Contact[] picked = ContactPicker.getPickedContacts(ev);
+            if(picked.length > 0) {
+                numberField.setText(picked[0].getPrimaryPhoneNumber());
             }
-        } catch(IOException err) {
-            Log.e(err);
-            Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
-        }
+        });
         // end::miscellaneous-features-java-040[]
     }
-
-    String data = "message body";
-
-
-    void showUIDialogToEditMessageData() { }
-    String phone = "555-0100";
-
 }

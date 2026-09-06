@@ -57,7 +57,7 @@ import com.codename1.ui.table.TableLayout;
 import java.util.*;
 
 
-class MiscellaneousFeaturesJava047Snippet {
+class MiscellaneousFeaturesJava055Snippet {
 
 
     Object context;
@@ -83,28 +83,31 @@ class MiscellaneousFeaturesJava047Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     
-    // tag::miscellaneous-features-java-047[]
-    public class GeofenceListenerImpl implements GeofenceListener {
-        @Override
-        public void onExit(String id) {
-        }
-
-        @Override
-        public void onEntered(String id) {
-            if(Display.getInstance().isMinimized()) {
-                // backgrounded, so there is no form to show a dialog on
-                LocalNotification ln = new LocalNotification();
-                ln.setId("geofence-welcome");
-                ln.setAlertTitle("Welcome");
-                ln.setAlertBody("Thanks for arriving!");
-                Display.getInstance().scheduleLocalNotification(ln,
-                        System.currentTimeMillis() + 10, LocalNotification.REPEAT_NONE);
-            } else {
-                Display.getInstance().callSerially(() -> {
-                    Dialog.show("Welcome", "Thanks for arriving", "OK", null);
-                });
+    void snippet() throws Exception {
+        // tag::miscellaneous-features-java-055[]
+        try {
+            switch(Display.getInstance().getSMSSupport()) {
+                case Display.SMS_NOT_SUPPORTED:
+                    return;
+                case Display.SMS_SEAMLESS:
+                    showUIDialogToEditMessageData();
+                    Display.getInstance().sendSMS(phone, data);
+                    return;
+                default:
+                    Display.getInstance().sendSMS(phone, data);
+                    return;
             }
+        } catch(IOException err) {
+            Log.e(err);
+            Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
         }
+        // end::miscellaneous-features-java-055[]
     }
-    // end::miscellaneous-features-java-047[]
+
+    String data = "message body";
+
+
+    void showUIDialogToEditMessageData() { }
+    String phone = "555-0100";
+
 }
