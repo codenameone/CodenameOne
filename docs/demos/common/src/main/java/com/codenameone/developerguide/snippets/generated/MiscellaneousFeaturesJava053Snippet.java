@@ -85,7 +85,10 @@ class MiscellaneousFeaturesJava053Snippet {
     
     void snippet() throws Exception {
         // tag::miscellaneous-features-java-053[]
-        e.run((success) -> success.onSucess(doThisOnTheThread()), (myResult) -> onEDTGotResult(myResult));
+        // the result callback runs on the EasyThread, not the EDT, so anything
+        // that touches the UI has to be marshalled back explicitly
+        e.run((success) -> success.onSucess(doThisOnTheThread()),
+              (myResult) -> Display.getInstance().callSerially(() -> onEDTGotResult(myResult)));
         // end::miscellaneous-features-java-053[]
     }
 

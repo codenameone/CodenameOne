@@ -461,10 +461,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 On Android 11 (API level 30) and higher, requesting background location permission requires a two-step process. First, foreground location permissions must be granted. Then, the app must request background location access, which will direct the user to the system settings to select `Allow all the time`. Codename One handles this flow automatically when you use `LocationManager`.
 
-For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize the prompt through localization keys prefixed with
-`android.permission.ACCESS_BACKGROUND_LOCATION` -- the port looks up `.title`,
-`.explanation_title`, `.explanation_body`, `.settings`, `.ok` and `.cancel`
-beneath it:
+For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize the prompt through localization keys. The bare
+`android.permission.ACCESS_BACKGROUND_LOCATION` key is the body of the first
+prompt, and the port looks up `.title`, `.explanation_title`,
+`.explanation_body`, `.settings`, `.ok` and `.cancel` beneath it for the
+follow-up dialog that sends the user to the settings screen:
 
 [source,java]
 ----
@@ -798,7 +799,7 @@ However, it gets better, say you want to return a value:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava053Snippet.java[tag=miscellaneous-features-java-053,indent=0]
 ----
 
-Lets break that down... You ran the thread with the success callback on the new thread then the callback got invoked on the EDT as a result. This code `(success) -> success.onSucess(doThisOnTheThread())` ran off the EDT in the thread and when you invoked the `onSuccess` callback it sent it asynchronously to the EDT here: `(myResult) -> onEDTGotResult(myResult)`.
+Lets break that down. `(success) -> success.onSucess(doThisOnTheThread())` runs on the `EasyThread`, off the EDT, and the result callback runs there too: `EasyThread` hands your `SuccessCallback` straight to the worker and never marshals it. Anything that touches the UI has to be sent back with `callSerially`, which is what the second lambda does.
 
 These asynchronous calls make things a bit painful to wade through, so the API wraps them in a simplified synchronous version:
 

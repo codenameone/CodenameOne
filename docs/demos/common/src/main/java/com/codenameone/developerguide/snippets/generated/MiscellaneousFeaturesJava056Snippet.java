@@ -93,6 +93,10 @@ class MiscellaneousFeaturesJava056Snippet {
         if (bundle == null) {
             bundle = new java.util.HashMap<String, String>();
         }
+        // the bare key is the body of the first prompt; the suffixed ones
+        // dress the follow-up dialog that sends the user to settings
+        bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION",
+                "Reminders need your location while the app is closed.");
         bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.title",
                 "Location needed");
         bundle.put("android.permission.ACCESS_BACKGROUND_LOCATION.explanation_body",
