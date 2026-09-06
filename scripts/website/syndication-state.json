@@ -1931,6 +1931,18 @@
         "url": "https://dev.to/codenameone/put-app-documents-in-the-system-file-browser-2lo4",
         "syndicated_at": "2026-09-05T16:02:40+00:00"
       }
+    },
+    "uwb-nearby-devices": {
+      "hashnode": {
+        "url": "https://debugagent.com/uwb-and-nearby-devices-distance-direction-association-and-transport",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a9cad51363df24b1211a1eb",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-06T00:02:16+00:00"
+      }
     }
   }
 }
