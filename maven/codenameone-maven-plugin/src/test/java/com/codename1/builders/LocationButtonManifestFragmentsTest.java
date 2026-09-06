@@ -524,6 +524,53 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aFusedLocationClientIsAPreciseRequestToo() throws Exception {
+        // The platform's own manager is not the only provider. Most Android
+        // apps that ask for location ask Play services, whose client is an
+        // ordinary class in an ordinary jar -- so a library using it names
+        // nothing of Android's, and a plain jar has no manifest to declare a
+        // permission with either. It was invisible, and exclusivity was
+        // accepted over a request the library really makes.
+        File root = tempDir("cn1-lb-fused");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "sdk.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/Fused.class"));
+            zip.write(methodCallClass(
+                    "com/google/android/gms/location/"
+                    + "FusedLocationProviderClient",
+                    "getLastLocation"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresPreciseLocation(),
+                "a fused-location call is the library wanting precise "
+                + "location of its own");
+    }
+
+    @Test
+    void aLibrarysOwnMethodOfThatNameIsNotAFusedCall() throws Exception {
+        // Attributed by OWNER, like every other marker here. A library with a
+        // method of its own called getLastLocation is not calling Play
+        // services, and reading it that way refuses a build over a name.
+        File root = tempDir("cn1-lb-fused-name");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "own.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/Own.class"));
+            zip.write(methodCallClass("com/example/Own", "getLastLocation"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .declaresPreciseLocation(),
+                "a method of the library's own name is not a fused call");
+    }
+
+    @Test
     void aCachedPlatformLookupCountsAsPreciseUseToo() throws Exception {
         // getLastKnownLocation returns what the permission allows, so under the
         // hint it comes back approximate and the library's answer quietly loses
@@ -1041,6 +1088,24 @@ class LocationButtonManifestFragmentsTest {
         assertTrue(LocationButtonManifestFragments
                         .sourcesCallPlatformLocation(root),
                 "Kotlin native sources are read too");
+    }
+
+    @Test
+    void nativeSourcesUsingTheFusedClientCountToo() throws Exception {
+        // Same provider, same reasoning, in the half no bytecode scan reaches.
+        File root = tempDir("cn1-lb-native-fused");
+        writeSource(new File(root, "com/example/Fused.java"),
+                "package com.example;\n"
+                + "import com.google.android.gms.location"
+                + ".FusedLocationProviderClient;\n"
+                + "public class Fused {\n"
+                + "  void go(FusedLocationProviderClient c) {\n"
+                + "    c.getLastLocation();\n"
+                + "  }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "native sources using the fused client are location use");
     }
 
     @Test

@@ -88,27 +88,49 @@ final class LocationButtonManifestFragments {
     static final String USE_LOCATION_BUTTON =
             "android.permission.USE_LOCATION_BUTTON";
 
-    /** Android's own location manager, which a native SDK calls directly. */
-    private static final String PLATFORM_LOCATION_MANAGER =
-            "android/location/LocationManager";
-
     /**
-     * The platform calls that need a location permission to return anything.
+     * The location providers a native SDK calls directly, each followed by the
+     * calls on it that need a location permission to return anything.
      *
-     * <p>Requesting updates, in any of its shapes. A library doing this wants
-     * precise location for itself and cannot have it under the hint.</p>
+     * <p>Requesting updates, in any of its shapes, and the cached lookups for
+     * the reason PERSISTENT_MARKERS lists the Codename One equivalent: what
+     * they return is as precise as the permission allows, so under the hint
+     * the answer comes back approximate and quietly loses its accuracy.</p>
+     *
+     * <p>The platform's own manager is not the only one. Most Android apps
+     * that ask for location ask Play services, and its client is an ordinary
+     * class in an ordinary jar, so a library using it names nothing of
+     * Android's and contributes no manifest to read either. It went unseen,
+     * and exclusivity was accepted over a request that really is made.</p>
+     *
+     * <p>Owners are matched EXACTLY and by owner, so a library's own method
+     * called {@code getLastLocation} is not this. A row is a class followed by
+     * its calls; adding a provider means adding a row, and adding its markers
+     * to LocationButtonMarkerCoverageTest so the framework's own users of it
+     * stay filtered.</p>
      */
-    private static final String[] PLATFORM_LOCATION_MARKERS = {
-        "requestLocationUpdates",
-        "requestSingleUpdate",
-        "getCurrentLocation",
-        // The CACHED lookup too, for the reason PERSISTENT_MARKERS lists the
-        // Codename One equivalent: what getLastKnownLocation returns is as
-        // precise as the permission allows, so under the hint it comes back
-        // approximate and the library's answer quietly loses its accuracy.
-        // Leaving it out made the platform list disagree with ours about the
-        // same call.
-        "getLastKnownLocation",
+    private static final String[][] PLATFORM_LOCATION_OWNERS = {
+        {
+            "android/location/LocationManager",
+            "requestLocationUpdates",
+            "requestSingleUpdate",
+            "getCurrentLocation",
+            "getLastKnownLocation",
+        },
+        {
+            "com/google/android/gms/location/FusedLocationProviderClient",
+            "requestLocationUpdates",
+            "getCurrentLocation",
+            "getLastLocation",
+        },
+        {
+            // The deprecated shape of the same thing, which plenty of shipped
+            // libraries still carry.
+            "com/google/android/gms/location/FusedLocationProviderApi",
+            "requestLocationUpdates",
+            "getCurrentLocation",
+            "getLastLocation",
+        },
     };
 
     static final String FINE_LOCATION =
@@ -1909,12 +1931,15 @@ final class LocationButtonManifestFragments {
             // all ASCII -- are found wherever they sit. A UTF-8 decode would
             // fail on a source file saved in some other encoding.
             String text = new String(raw, "ISO-8859-1");
-            if (text.indexOf("android.location.LocationManager") < 0) {
-                continue;
-            }
-            for (int m = 0; m < PLATFORM_LOCATION_MARKERS.length; m++) {
-                if (text.indexOf(PLATFORM_LOCATION_MARKERS[m]) >= 0) {
-                    return true;
+            for (int row = 0; row < PLATFORM_LOCATION_OWNERS.length; row++) {
+                String[] owner = PLATFORM_LOCATION_OWNERS[row];
+                if (text.indexOf(owner[0].replace('/', '.')) < 0) {
+                    continue;
+                }
+                for (int m = 1; m < owner.length; m++) {
+                    if (text.indexOf(owner[m]) >= 0) {
+                        return true;
+                    }
                 }
             }
         }
@@ -2444,9 +2469,14 @@ final class LocationButtonManifestFragments {
         // manifest check reads -- but a plain jar has no manifest to say it
         // with, and the application supplies the permission on its behalf. Its
         // bytecode is the only evidence, and it is right here.
-        if (callsMethodOn(pool, PLATFORM_LOCATION_MANAGER,
-                PLATFORM_LOCATION_MARKERS)) {
-            found.libraryPrecise = true;
+        for (int row = 0; row < PLATFORM_LOCATION_OWNERS.length; row++) {
+            String[] owner = PLATFORM_LOCATION_OWNERS[row];
+            String[] markers = new String[owner.length - 1];
+            System.arraycopy(owner, 1, markers, 0, markers.length);
+            if (callsMethodOn(pool, owner[0], markers)) {
+                found.libraryPrecise = true;
+                break;
+            }
         }
         // The hierarchy this class contributes, and any owner that might turn
         // out to be a LocationManager once the rest of it is known.
