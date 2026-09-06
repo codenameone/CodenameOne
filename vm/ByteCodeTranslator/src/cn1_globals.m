@@ -11092,7 +11092,16 @@ static int cn1GcMutatorAssist(CODENAME_ONE_THREAD_STATE) {
 
     pthread_mutex_lock(&gcMarkWorklistMutex);
     gcMarkActiveWorkers--;
-    if(gcMarkActiveWorkers == 0) {
+    // BOTH conditions, and the worklist half is the one that matters here.
+    //
+    // gcMarkFlushLocal ran just above and may have pushed children this batch
+    // discovered. A worker only decrements after re-checking the list at the top
+    // of its loop, so it never declares done with work outstanding; this function
+    // decrements straight after flushing, so testing the worker count alone could
+    // end the mark with reachable subtrees unscanned and let the sweep reclaim
+    // them. The flush already broadcasts when it appends, so an idle worker wakes
+    // and picks the work up.
+    if(gcMarkActiveWorkers == 0 && gcMarkWorklistTop == 0) {
         gcMarkDone = JAVA_TRUE;
         pthread_cond_broadcast(&gcMarkWorklistCond);
     }
@@ -11219,7 +11228,11 @@ JAVA_OBJECT cn1AllocFused(CODENAME_ONE_THREAD_STATE, int totalSize, struct clazz
        && !threadStateData->nativeAllocationMode
 #endif
        ) {
-        return cn1BibopAlloc(threadStateData, totalSize, cls);
+        JAVA_OBJECT fused = cn1BibopAlloc(threadStateData, totalSize, cls);
+#ifdef CN1_GC_CONFORM
+        if(fused != JAVA_NULL) { cn1RecordAllocation(cls, totalSize); }
+#endif
+        return fused;
     }
 #endif
     return JAVA_NULL;
@@ -11621,6 +11634,14 @@ JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_B
                 JAVA_OBJECT arr = cn1FusedInstallPrimArray(so, off, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), len);
                 ((struct obj__java_lang_String*)so)->java_lang_String_value = arr; // count stays 0 until End
                 *dst = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)arr)->data;
+#ifdef CN1_GC_CONFORM
+                // Attribute the two halves separately: the fused block is one
+                // allocation but the profile is read to find out WHAT is being
+                // allocated, and "String" alone would hide the byte[] payload
+                // that dominates the block for long strings.
+                cn1RecordAllocation(&class__java_lang_String, off);
+                cn1RecordAllocation(&class_array1__JAVA_BYTE, total - off);
+#endif
                 return so;
             }
         }
@@ -12190,6 +12211,13 @@ void cn1RecordAllocation(struct clazz* parent, int size) {
     atomic_fetch_add_explicit(&cn1AllocProfCount[id], 1, memory_order_relaxed);
 }
 
+// count|1 was meant to guard a divide by zero and silently changed the divisor
+// instead: two allocations reported bytes/3. Selecting on bytes>0 already implies
+// a nonzero count, so the guard only has to be honest about the degenerate case.
+static long long cn1AllocProfAvg(long long bytes, long count) {
+    return count > 0 ? bytes / count : 0;
+}
+
 static void cn1ReportAllocProfile(void) {
     long long total = 0;
     int i;
@@ -12218,7 +12246,8 @@ static void cn1ReportAllocProfile(void) {
                         ? cn1AllocProfClass[best]->clsName : "?",
                 bestBytes,
                 atomic_load_explicit(&cn1AllocProfCount[best], memory_order_relaxed),
-                bestBytes / (atomic_load_explicit(&cn1AllocProfCount[best], memory_order_relaxed) | 1));
+                cn1AllocProfAvg(bestBytes,
+                        atomic_load_explicit(&cn1AllocProfCount[best], memory_order_relaxed)));
         atomic_store_explicit(&cn1AllocProfBytes[best], 0, memory_order_relaxed);
         printed++;
     }

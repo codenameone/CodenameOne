@@ -1797,6 +1797,22 @@ extern long long totalAllocations;
 #define CN1_BIBOP_FLUSH_BYTES(ts) do {} while(0)
 #endif
 
+#ifdef CN1_GC_CONFORM
+// Defined in cn1_globals.m. Declared here because the BiBOP fast paths are inline
+// in this header and are the route MOST small objects take -- profiling only
+// codenameOneGcMalloc would miss them and blame whatever little reaches it.
+//
+// There are FOUR entry points, and the profile is only honest if every one of
+// them records exactly once: codenameOneGcMalloc, cn1BibopFastAlloc (what
+// CN1_FAST_NEW calls), cn1BibopFastAllocNoZero, cn1AllocFused and
+// cn1FusedLatin1Begin. cn1BibopAlloc is deliberately NOT hooked -- it is an
+// internal callee of three of those and hooking it would double-count.
+// Each hook sits on the SUCCESS return rather than at function entry: a fast
+// path that returns 0 falls back to __NEW_X -> codenameOneGcMalloc, so an
+// entry-side hook counts that allocation twice.
+void cn1RecordAllocation(struct clazz* parent, int size);
+#endif
+
 // Inlined bump fast path. Returns 0 (slow path: page full / free-list present /
 // ineligible / oversized) -> caller falls back to __NEW_X / codenameOneGcMalloc.
 static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
@@ -1878,6 +1894,9 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
             // allocationsSinceLastGC / totalAllocations (the isHighFrequencyGC heuristic)
             // are now bumped in bulk by CN1_BIBOP_FLUSH_BYTES once per page-acquire, not
             // per object -- removing two global-counter stores from the hot path.
+#ifdef CN1_GC_CONFORM
+            cn1RecordAllocation(parent, size);
+#endif
             return o;
         }
     }
@@ -1902,6 +1921,7 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 // memset" note in cn1BibopFastAlloc and OVERFLOW RESCAN in cn1_globals.m). The
 // header (parentCls / mark / heapPosition) is still initialized here; ONLY the
 // body zero is elided.
+
 static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
     if(__builtin_expect(threadStateData->bibopBypassRemaining[ci] > 0, 0)) {
@@ -1956,6 +1976,9 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
             __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
 #endif
             CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
+#ifdef CN1_GC_CONFORM
+            cn1RecordAllocation(parent, size);
+#endif
             return o;
         }
     }
