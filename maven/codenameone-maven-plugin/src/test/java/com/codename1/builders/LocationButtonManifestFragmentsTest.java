@@ -1880,6 +1880,28 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aReflectiveLookupInNativeSourceIsUse() throws Exception {
+        // Where two of my own changes met. The button's name lives in a string
+        // literal here, and masking literal text -- added so prose about an
+        // API would stop refusing builds -- took the real lookup with it, so
+        // the bridge package was deleted from an app that builds the
+        // component reflectively.
+        File root = tempDir("cn1-lb-native-reflect");
+        writeSource(new File(root, "com/example/Reflect.java"),
+                "package com.example;\n"
+                + "public class Reflect {\n"
+                + "  Object make() throws Exception {\n"
+                + "    return Class.forName("
+                + "\"com.codename1.location.LocationButton\")"
+                + ".newInstance();\n"
+                + "  }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesNameTheButton(root),
+                "a reflective lookup in a native source builds the button");
+    }
+
+    @Test
     void aButtonNamedOnlyInProseIsNotUse() throws Exception {
         // Same stripping as the provider pass: a comment or a string naming
         // the component is not constructing it, and this flag drives a

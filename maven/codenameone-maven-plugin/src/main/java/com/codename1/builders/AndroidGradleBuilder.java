@@ -3206,6 +3206,14 @@ public class AndroidGradleBuilder extends Executor {
                     .sourcesNameTheButton(srcDir)) {
                 debug("Location button found in the staged native sources");
                 usesLocationButton = true;
+                // The feature declarations too, exactly as the two bytecode
+                // branches fold them in. They are emitted only when this is
+                // set, and their ABSENCE is what lets Play infer GPS hardware
+                // as REQUIRED and filter the app off devices without it -- so
+                // a button found only here would have cost the developer
+                // reach they never gave up. The block hint is already excluded
+                // by the guard above.
+                gpsPermission = true;
             }
             if (appLocation.usesButton() && !usesLocationButton) {
                 debug("Location button found in the application by the "

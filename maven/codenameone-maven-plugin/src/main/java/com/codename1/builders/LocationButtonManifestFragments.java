@@ -2088,8 +2088,21 @@ final class LocationButtonManifestFragments {
             if (raw == null) {
                 continue;
             }
-            if (sourceNames(strippedSource(new String(raw, "ISO-8859-1")),
-                    BUTTON_MARKER)) {
+            String source = new String(raw, "ISO-8859-1");
+            String stripped = strippedSource(source);
+            if (sourceNames(stripped, BUTTON_MARKER)) {
+                return true;
+            }
+            // And the REFLECTIVE spelling, whose name lives in exactly the
+            // place stripping removes. Class.forName("com.codename1.location
+            // .LocationButton") puts it in a string literal, and masking
+            // literals -- added so prose about an API would stop refusing
+            // builds -- takes it with them. Two changes of mine met here.
+            //
+            // Paired with a loader call, like the bytecode side: the literal
+            // alone is prose, and the check just above keeps it that way.
+            if (namesLoaderCall(stripped)
+                    && source.indexOf(BUTTON_MARKER.replace('/', '.')) >= 0) {
                 return true;
             }
         }
@@ -2326,6 +2339,29 @@ final class LocationButtonManifestFragments {
             }
             for (int iter = 1; iter < PROVIDER_FACTORIES[row].length; iter++) {
                 if (sourceNames(text, PROVIDER_FACTORIES[row][iter])) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a source calls a reflective class loader.
+     *
+     * <p>By method name, on the STRIPPED source, so a loader named in a
+     * comment does not count. Pairing it with the class name is what separates
+     * a lookup from prose -- the same rule
+     * {@link #namesReflectively(Pool, String)} applies to bytecode.</p>
+     *
+     * @param stripped the source with comments and literal text removed
+     * @return whether it looks up a class by name
+     */
+    private static boolean namesLoaderCall(String stripped) {
+        for (int row = 0; row < CLASS_LOADERS.length; row++) {
+            String[] loader = CLASS_LOADERS[row];
+            for (int iter = 1; iter < loader.length; iter++) {
+                if (stripped.indexOf(loader[iter]) >= 0) {
                     return true;
                 }
             }
