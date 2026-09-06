@@ -3175,19 +3175,6 @@ public class AndroidGradleBuilder extends Executor {
             // unpacked into the same srcDir further down: the port's own
             // sources call the platform manager, and reading them would refuse
             // every application that sets the hint.
-            // Only when the hint is actually set. This walks every staged
-            // .java and .kt through the scan budget, which REFUSES a tree
-            // over its cap -- so an app with large generated native
-            // sources and no interest in the location button was failed
-            // by a check whose answer nothing would have read.
-            // exclusiveConflict returns null unless exclusive is set, so
-            // this result is unused in every other build.
-            if (LocationButtonManifestFragments.isExclusive(
-                    request.getArg("android.locationButton.exclusive",
-                            "false"))) {
-                usesPersistentLocation |= LocationButtonManifestFragments
-                        .sourcesCallPlatformLocation(srcDir);
-            }
             if (appLocation.usesButton() && !usesLocationButton) {
                 debug("Location button found in the application by the "
                         + "byte-level scan, which reads annotation class "
@@ -3780,6 +3767,39 @@ public class AndroidGradleBuilder extends Executor {
                     LocationButtonManifestFragments.isExclusive(
                             request.getArg("android.locationButton.exclusive",
                                     "false"));
+            // The application's own ANDROID sources, read HERE and not at the
+            // scan above.
+            //
+            // No bytecode scan can reach them: a native interface implemented
+            // in .java or .kt is compiled by Gradle out of the staged tree, so
+            // code there calling a location provider is in no jar and no class
+            // directory. But this walks every staged source through the scan
+            // budget, which REFUSES a tree over its cap -- so running it any
+            // earlier failed builds that were never going to read the answer.
+            // Everything that can turn the question off has happened by now:
+            // the button may be unused, android.blockLocationPermission may
+            // have cleared it, and the hint may be absent from a configuration
+            // that is shared with projects which do use it.
+            //
+            // Still before the Codename One Android port is unpacked into the
+            // same srcDir further down, which is the constraint that decides
+            // how late this can go: the port's own sources call the platform
+            // manager, and reading them would refuse every application that
+            // sets the hint.
+            if (locationButtonExclusive) {
+                try {
+                    usesPersistentLocation |= LocationButtonManifestFragments
+                            .sourcesCallPlatformLocation(srcDir);
+                } catch (IOException budgetOrIo) {
+                    // Upwards, like the scans above: a tree we only partly
+                    // read cannot answer whether the application asks for
+                    // location outside the button, and accepting the hint on
+                    // an unknown is the downgrade this check exists to stop.
+                    throw new BuildException("Failed to scan the staged"
+                            + " Android sources for location API usage.",
+                            budgetOrIo);
+                }
+            }
             String conflict =
                     LocationButtonManifestFragments.exclusiveConflict(
                             locationButtonExclusive,

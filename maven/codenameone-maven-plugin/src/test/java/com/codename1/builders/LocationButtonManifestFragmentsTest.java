@@ -1585,6 +1585,37 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void theSourceScanStaysAheadOfThePortStaging() throws Exception {
+        // A constraint that lives in two files and is enforced by nothing.
+        //
+        // sourcesCallPlatformLocation reads whatever is staged in srcDir, and
+        // the Codename One Android port is unpacked into that same directory
+        // later in the build. The port's own sources call the platform's
+        // location manager, so a scan that runs after they arrive reports
+        // every application as a persistent-location user and refuses every
+        // build that sets the hint.
+        //
+        // The scan has already moved once, to run as late as possible so it
+        // does not fail builds that never read its answer. This holds the
+        // other end of that range: it may move down, but not past the port.
+        File builder = new File("src/main/java/com/codename1/builders/"
+                + "AndroidGradleBuilder.java");
+        assertTrue(builder.isFile(),
+                "the builder source must be readable from the module dir: "
+                + builder.getAbsolutePath());
+        String text = new String(Files.readAllBytes(builder.toPath()),
+                StandardCharsets.ISO_8859_1);
+        int scan = text.indexOf(".sourcesCallPlatformLocation(");
+        int port = text.indexOf("unzip(androidPortSrcJar");
+        assertTrue(scan > 0, "the source scan call must be present");
+        assertTrue(port > 0, "the port staging must be present");
+        assertTrue(scan < port,
+                "the staged-source scan must run BEFORE the Android port is "
+                + "unpacked into srcDir, or the port's own location calls are "
+                + "read as the application's");
+    }
+
+    @Test
     void namingThePlatformManagerWithoutCallingItIsNotUse() throws Exception {
         // The narrow half. This scan refuses builds, and a source file is
         // prose as much as code: an import left behind by a deleted feature,
