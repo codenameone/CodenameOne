@@ -940,6 +940,13 @@ final class Pem {
         private int tag() {
             int first = peek();
             pos++;
+            if (first == 0x00) {
+                // Universal tag 0 is reserved, and the "00 00" it opens is BER's
+                // end-of-contents marker for indefinite-length encodings, which
+                // DER does not have. Reading it as a zero-length element let it
+                // stand in for a value anywhere one was allowed.
+                throw new CryptoException("malformed key: DER has no end-of-contents element");
+            }
             if ((first & 0x1F) != 0x1F) {
                 return first;
             }

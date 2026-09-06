@@ -1164,6 +1164,17 @@ class PemKeyTest extends UITestBase {
     }
 
     @Test
+    void theEndOfContentsElementIsNotDer() {
+        // "00 00" is BER's end-of-contents marker for indefinite-length
+        // encodings, which DER does not have, and universal tag 0 is reserved.
+        // Reading it as a zero-length element let it stand in for a value
+        // wherever one was allowed; OpenSSL refuses the resulting key.
+        assertThrows(CryptoException.class, () -> PrivateKey.fromPem(pem("PRIVATE KEY",
+                Base64.encodeNoNewline(withTrailer(der(RSA_PKCS8),
+                        hex("A011300F06092a864886f70d01090731020000"))))));
+    }
+
+    @Test
     void unterminatedArmorIsRejected() {
         assertThrows(CryptoException.class,
                 () -> PublicKey.fromPem("-----BEGIN PUBLIC KEY" + RSA_SPKI));
