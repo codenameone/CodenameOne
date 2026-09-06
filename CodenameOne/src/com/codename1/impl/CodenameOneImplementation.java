@@ -6620,6 +6620,20 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the platform bridge used by the `com.codename1.continuity` API to advertise the
+    /// user's current activity to their other devices and to reach the platform's synced key/value
+    /// store. Ports supporting either capability override this; the base implementation returns
+    /// null, which leaves saving and restoring state on this device working -- that half is pure
+    /// `com.codename1.io.Storage` -- and makes every cross-device capability report itself
+    /// unsupported.
+    ///
+    /// #### Returns
+    ///
+    /// the continuity bridge, or null when unsupported
+    public com.codename1.continuity.spi.ContinuityBridge getContinuityBridge() {
+        return null;
+    }
+
     /// Returns the platform bridge used by the `com.codename1.intents` API to expose the
     /// application's capabilities to the system -- assistant intents, app shortcuts and device
     /// search. Ports supporting intents override this; the base implementation returns null, which

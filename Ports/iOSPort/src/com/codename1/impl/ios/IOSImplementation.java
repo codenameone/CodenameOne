@@ -499,6 +499,21 @@ public class IOSImplementation extends CodenameOneImplementation {
         return documentProviderBridge;
     }
 
+    private IOSContinuityBridge continuityBridge;
+
+    @Override
+    public com.codename1.continuity.spi.ContinuityBridge getContinuityBridge() {
+        // Only meaningful in builds that linked the continuity natives (CN1_USE_CONTINUITY,
+        // flipped by the builder when the app references com.codename1.continuity). Always
+        // returned: the bridge asks the native side once and answers honestly, and the native
+        // stubs to unsupported when the define is off. Returning null instead would also disable
+        // the on-device half of the framework, which needs no native support at all.
+        if (continuityBridge == null) {
+            continuityBridge = new IOSContinuityBridge(nativeInstance);
+        }
+        return continuityBridge;
+    }
+
     private IOSIntentBridge intentBridge;
 
     @Override

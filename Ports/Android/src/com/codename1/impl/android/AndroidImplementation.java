@@ -6508,6 +6508,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return documentProviderBridge;
     }
 
+    private com.codename1.continuity.spi.ContinuityBridge continuityBridge;
+
+    /// Returns the continuity bridge, which on Android exists for one job:
+    /// flushing the state checkpoint when the platform says the process may
+    /// be killed. Neither cross-device capability exists here and both report
+    /// themselves unsupported.
+    ///
+    /// Synchronized for the reason the intent bridge is: two callers arriving
+    /// together would each construct one, and each construction registers a
+    /// lifecycle listener -- so the loser's listener would stay registered and
+    /// the app would checkpoint twice on every save.
+    @Override
+    public synchronized com.codename1.continuity.spi.ContinuityBridge getContinuityBridge() {
+        if (continuityBridge == null) {
+            continuityBridge =
+                    new com.codename1.impl.android.continuity.AndroidContinuityBridge();
+        }
+        return continuityBridge;
+    }
+
     private com.codename1.intents.spi.IntentBridge intentBridge;
 
     @Override
