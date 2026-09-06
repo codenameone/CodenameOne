@@ -84,23 +84,32 @@ class MiscellaneousFeaturesJava042Snippet {
     Resources theme;
     
     // tag::miscellaneous-features-java-042[]
+    /// Every state's font as the theme installed it, so a second call scales
+    /// the original rather than the font the first call derived. Without this a
+    /// 1.3 preference applied twice gives 1.69, and turning larger text off
+    /// never restores the original size.
+    private final java.util.Map<Style, Font> originalFonts =
+            new java.util.HashMap<Style, Font>();
+
     void applyLargerText(Component someComponent) {
         Display display = Display.getInstance();
-        if (!display.isLargerTextEnabled()) {
-            return;
+        // scale 1 means "no scaling", and the helper hands the original back,
+        // so this same path also undoes a previous scaling
+        float scale = display.isLargerTextEnabled() ? display.getLargerTextScale() : 1f;
+        applyLargerText(someComponent.getUnselectedStyle(), scale);
+        applyLargerText(someComponent.getSelectedStyle(), scale);
+        applyLargerText(someComponent.getPressedStyle(), scale);
+        applyLargerText(someComponent.getDisabledStyle(), scale);
+    }
+
+    private void applyLargerText(Style style, float scale) {
+        Font original = originalFonts.get(style);
+        if (original == null) {
+            original = style.getFont();
+            originalFonts.put(style, original);
         }
-        float scale = display.getLargerTextScale();
-        // each state can carry its own face -- a bold selected font, say -- so
-        // derive from the font that state already has instead of broadcasting
-        // one scaled font to all four
-        Style unselected = someComponent.getUnselectedStyle();
-        unselected.setFont(scaleForLargerText(unselected.getFont(), scale));
-        Style selected = someComponent.getSelectedStyle();
-        selected.setFont(scaleForLargerText(selected.getFont(), scale));
-        Style pressed = someComponent.getPressedStyle();
-        pressed.setFont(scaleForLargerText(pressed.getFont(), scale));
-        Style disabled = someComponent.getDisabledStyle();
-        disabled.setFont(scaleForLargerText(disabled.getFont(), scale));
+        // each state keeps its own face: a bold selected font stays bold
+        style.setFont(scaleForLargerText(original, scale));
     }
 
     /// Mirrors UIManager's own scaler: derive() handles only TrueType and
