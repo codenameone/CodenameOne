@@ -2375,11 +2375,21 @@ final class LocationButtonManifestFragments {
         boolean complete = false;
         StringBuilder literal = null;
         StringBuilder tail = new StringBuilder();
+        // The same import rule the buffered pass applies: an import is not
+        // use. Kept in one pass because both languages put imports above the
+        // code that uses them, so a name bound here is seen before the code
+        // that spells it.
+        StringBuilder word = new StringBuilder();
+        StringBuilder statement = null;
+        java.util.List<String> bound = new java.util.ArrayList<String>();
         while (true) {
             int read = in.read(buffer, 0, buffer.length);
             if (read < 0) {
-                // End of file is a clean right boundary.
-                return complete;
+                // End of file is a clean right boundary, for the name and for
+                // a word the last line did not terminate.
+                return complete
+                        || (word.length() > 0 && bound.contains(
+                                word.toString()));
             }
             for (int at = 0; at < read; at++) {
                 char c = buffer[at];
@@ -2421,6 +2431,26 @@ final class LocationButtonManifestFragments {
                         } else {
                             literal.append(c);
                         }
+                    }
+                    continue;
+                }
+                if (state == IMPORT) {
+                    if (c == ';' || c == '\n' || c == '\r') {
+                        String name = importBinds(statement.toString(), target);
+                        if (name == null && statement.indexOf(target) >= 0) {
+                            // Binds a name nothing here can predict, so the
+                            // file counts -- the static-wildcard case.
+                            return true;
+                        }
+                        if (name != null) {
+                            bound.add(name);
+                        }
+                        statement = null;
+                        state = CODE;
+                        before = ' ';
+                        matched = 0;
+                    } else if (statement.length() < IMPORT_LIMIT) {
+                        statement.append(c);
                     }
                     continue;
                 }
@@ -2474,6 +2504,21 @@ final class LocationButtonManifestFragments {
                     complete = true;
                     matched = 0;
                 }
+                if (Character.isJavaIdentifierPart(c)) {
+                    word.append(c);
+                } else if (word.length() > 0) {
+                    String finished = word.toString();
+                    word.setLength(0);
+                    if ("import".equals(finished)) {
+                        statement = new StringBuilder();
+                        state = IMPORT;
+                        matched = 0;
+                        continue;
+                    }
+                    if (bound.contains(finished)) {
+                        return true;
+                    }
+                }
                 before = c;
                 remember(tail, c);
             }
@@ -2491,8 +2536,34 @@ final class LocationButtonManifestFragments {
 
     private static final int CHAR = 4;
 
+    private static final int IMPORT = 5;
+
+    /** How much of an import statement the streaming scan will hold. */
+    private static final int IMPORT_LIMIT = 512;
+
     /** How much code the streaming scan keeps behind it. */
     private static final int TAIL_LENGTH = 64;
+
+    /**
+     * The name an import statement binds for {@code target}, or null.
+     *
+     * <p>Null means one of two things and the caller tells them apart by
+     * whether the statement names the target at all: an import of something
+     * else entirely, or one that binds a name nothing can predict -- a static
+     * wildcard, which names no member.</p>
+     *
+     * @param statement the statement, keyword excluded
+     * @param target    the dotted class name
+     * @return the bound name, or null
+     */
+    private static String importBinds(String statement, String target) {
+        if (statement.indexOf(target) < 0) {
+            return null;
+        }
+        int lastDot = target.lastIndexOf('.');
+        String simple = lastDot < 0 ? target : target.substring(lastDot + 1);
+        return boundName("import " + statement, simple);
+    }
 
     /** Appends to a bounded tail of the code seen so far. */
     private static void remember(StringBuilder tail, char c) {
@@ -3196,6 +3267,55 @@ final class LocationButtonManifestFragments {
 
 
 
+    /**
+     * Whether the source CONSTRUCTS {@code owner}, rather than merely naming
+     * it.
+     *
+     * <p>The source-side twin of {@code constructs}, and it exists for the
+     * same reason that one does: some classes are only location use when one
+     * is built. {@code MapComponent} centres itself in its constructor, so a
+     * field of that type or a parameter of it asks the platform for
+     * nothing.</p>
+     *
+     * <p>The test is the name followed by an open parenthesis, which is
+     * {@code new MapComponent(...)} in Java and {@code MapComponent(...)} in
+     * Kotlin, and is neither a declaration nor a reference to the type.</p>
+     *
+     * @param text  the source, comments gone and literals masked
+     * @param owner the class, in internal form
+     * @return whether one is built here
+     */
+    private static boolean sourceConstructs(String text, String owner) {
+        if (!sourceNames(text, owner)) {
+            return false;
+        }
+        String dotted = owner.replace('/', '.');
+        int lastDot = dotted.lastIndexOf('.');
+        String simple = lastDot < 0 ? dotted : dotted.substring(lastDot + 1);
+        return followedByCall(text, dotted) || followedByCall(text, simple);
+    }
+
+    /** Whether {@code name} appears as a token with a call after it. */
+    private static boolean followedByCall(String text, String name) {
+        int at = text.indexOf(name);
+        while (at >= 0) {
+            int after = at + name.length();
+            boolean startsClean = at == 0
+                    || (!Character.isJavaIdentifierPart(text.charAt(at - 1))
+                            && text.charAt(at - 1) != '.');
+            boolean endsClean = after >= text.length()
+                    || !Character.isJavaIdentifierPart(text.charAt(after));
+            if (startsClean && endsClean) {
+                int walk = skipSpace(text, after);
+                if (walk < text.length() && text.charAt(walk) == '(') {
+                    return true;
+                }
+            }
+            at = text.indexOf(name, at + 1);
+        }
+        return false;
+    }
+
     private static boolean sourceNames(String text, String owner) {
         String dotted = owner.replace('/', '.');
         if (namesToken(text, dotted)) {
@@ -3397,21 +3517,27 @@ final class LocationButtonManifestFragments {
             // documented deleting the thing had the build refused for it.
             String text = strippedSource(new String(raw, "ISO-8859-1"));
             boolean kotlin = name.endsWith(".kt");
-            // The framework WRAPPERS, which the bytecode paths count by a
-            // reference alone and this pass did not look for at all. A native
-            // implementation that geofences through GeofenceManager, or builds
-            // a centreless MapComponent, is asking for the same persistent
-            // location as a direct call -- their own calls into
-            // LocationManager are inside the framework, where this scan never
-            // looks. Naming one is the whole test here, exactly as
-            // referencesClass is on the bytecode side.
+            // The framework WRAPPERS, which this pass did not look for at
+            // all. A native implementation that geofences through
+            // GeofenceManager is asking for the same persistent location as a
+            // direct call -- its own calls into LocationManager are inside the
+            // framework, where this scan never looks. Naming one is the whole
+            // test, exactly as referencesClass is on the bytecode side.
             for (int wrapper = 0;
                     wrapper < NON_BUTTON_LOCATION_CLASSES.length; wrapper++) {
                 if (sourceNames(text, NON_BUTTON_LOCATION_CLASSES[wrapper])) {
                     return true;
                 }
             }
-            if (sourceNames(text, MAP_COMPONENT_CLASS)) {
+            // MapComponent is NOT one of those, and treating it as one was
+            // wrong. The bytecode side asks whether the class is CONSTRUCTED,
+            // deliberately: the lookup that makes it persistent location use
+            // is the one its constructor makes to centre itself, so a field of
+            // that type, a parameter, or an import does none of it. Naming it
+            // here refused an exclusive build over a declaration that asks the
+            // platform for nothing -- and the comment above used to claim this
+            // line mirrored the bytecode rule, which it did not.
+            if (sourceConstructs(text, MAP_COMPONENT_CLASS)) {
                 return true;
             }
             for (int row = 0; row < SOURCE_LOCATION_OWNERS.length; row++) {

@@ -2069,6 +2069,74 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aMapComponentFieldIsNotPersistentLocationUse() throws Exception {
+        // The bytecode side asks whether one is CONSTRUCTED, because the
+        // lookup that makes it persistent use is the one its constructor
+        // makes to centre itself. A field of that type asks the platform for
+        // nothing, and refusing an exclusive build over it is a refusal the
+        // developer can do nothing about.
+        File root = tempDir("cn1-lb-map-field");
+        writeSource(new File(root, "com/example/Holder.java"),
+                "package com.example;\n"
+                + "import com.codename1.maps.MapComponent;\n"
+                + "public class Holder {\n"
+                + "  MapComponent map;\n"
+                + "  void f(MapComponent other) { }\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "declaring the type builds nothing and locates nothing");
+    }
+
+    @Test
+    void aConstructedMapComponentIsPersistentLocationUse() throws Exception {
+        File root = tempDir("cn1-lb-map-new");
+        writeSource(new File(root, "com/example/Builder.java"),
+                "package com.example;\n"
+                + "import com.codename1.maps.MapComponent;\n"
+                + "public class Builder {\n"
+                + "  Object f() { return new MapComponent(); }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "building one centres it, which is a location lookup");
+    }
+
+    @Test
+    void aKotlinConstructedMapComponentIsPersistentLocationUse()
+            throws Exception {
+        // Kotlin builds without "new", so the test cannot look for it.
+        File root = tempDir("cn1-lb-map-kt");
+        writeSource(new File(root, "com/example/KtBuilder.kt"),
+                "package com.example\n"
+                + "import com.codename1.maps.MapComponent\n"
+                + "class KtBuilder {\n"
+                + "  fun f(): Any = MapComponent()\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "Kotlin construction counts as much as Java's");
+    }
+
+    @Test
+    void aGeofenceManagerReferenceIsStillPersistentLocationUse()
+            throws Exception {
+        // The other wrappers keep the naming test, because the bytecode side
+        // counts THEM by a reference alone -- their calls into LocationManager
+        // are inside the framework where this scan never looks.
+        File root = tempDir("cn1-lb-geofence-ref");
+        writeSource(new File(root, "com/example/Fencer.java"),
+                "package com.example;\n"
+                + "import com.codename1.location.GeofenceManager;\n"
+                + "public class Fencer {\n"
+                + "  GeofenceManager fences;\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "naming the geofencing wrapper is the whole test for it");
+    }
+
+    @Test
     void aKotlinRawStringReflectiveLoadIsButtonUse() throws Exception {
         // Kotlin's triple-quoted string is a legal spelling of the argument,
         // and a parser that reads the second quote as the end of an empty
@@ -2083,6 +2151,46 @@ class LocationButtonManifestFragmentsTest {
                 + "}\n");
         assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
                 "a raw-string class name is still the class name");
+    }
+
+    @Test
+    void aStreamedUnusedImportIsNotButtonUse() throws Exception {
+        // The same rule the buffered pass applies. An import the compiler
+        // emits nothing for is not use, and on the fallback toolchain
+        // counting it puts fine and coarse location into an app that asks for
+        // location nowhere.
+        String source = "import com.codename1.location.LocationButton;\n"
+                + "class Big { int f() { return 1; } }\n";
+        assertFalse(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "an import nothing uses is not use, streamed or not");
+    }
+
+    @Test
+    void aStreamedImportTheCodeUsesIsButtonUse() throws Exception {
+        String source = "import com.codename1.location.LocationButton;\n"
+                + "class Big { Object f() { return new LocationButton(); } }\n";
+        assertTrue(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "an import the code uses is use");
+    }
+
+    @Test
+    void aStreamedKotlinAliasImportIsButtonUse() throws Exception {
+        String source = "import com.codename1.location.LocationButton as Btn\n"
+                + "class Big { fun f(): Any = Btn() }\n";
+        assertTrue(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "an alias the code uses is use");
+    }
+
+    @Test
+    void aStreamedUnusedAliasImportIsNotButtonUse() throws Exception {
+        String source = "import com.codename1.location.LocationButton as Btn\n"
+                + "class Big { fun f(): Int = 1 }\n";
+        assertFalse(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "an alias nothing uses is not use");
     }
 
     @Test
