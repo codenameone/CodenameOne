@@ -197,35 +197,40 @@ jobs:
       # Only on the default leg. What this compares is the platform jar, not the
       # JDK, so running it three times would answer the same question three
       # times.
-      - name: Install Android platform 37
+      - name: Install Android platforms 36 and 37
         if: matrix.id == 'default'
         run: |
           # SDK-root copy first: a sdkmanager on PATH can belong to a
           # different SDK root and install where the build never looks.
           SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           [ -x "$SDKMANAGER" ] || SDKMANAGER="$(command -v sdkmanager)"
-          # No unsuffixed package exists at this level: sdkmanager offers
-          # android-37.0, android-37.1 and android-37.2 and nothing called
-          # android-37, so "platforms;android-37" installs nothing and exits 0.
+          # Both ends of the comparison, rather than trusting the runner image
+          # to carry the baseline: with only a 37 platform installed the check
+          # has nothing older to compare against and fails as "did not run".
+          #
+          # No unsuffixed package exists at 37: sdkmanager offers android-37.0,
+          # android-37.1 and android-37.2 and nothing called android-37, so
+          # "platforms;android-37" installs nothing and exits 0.
+          #
           # `yes` dies of SIGPIPE once sdkmanager stops reading prompts, so its
-          # status says nothing; assert on the jar that had to appear instead.
-          yes | "$SDKMANAGER" "platforms;android-37.0" > /dev/null || true
+          # status says nothing; assert on the jars that had to appear instead.
+          yes | "$SDKMANAGER" "platforms;android-36" "platforms;android-37.0" > /dev/null || true
+          test -f "$ANDROID_SDK_ROOT/platforms/android-36/android.jar"
           test -f "$ANDROID_SDK_ROOT/platforms/android-37.0/android.jar"
       - name: Check the Android port against API 37
         if: matrix.id == 'default'
         run: |
           set -euo pipefail
+          # For JAVA17_HOME, which setup-workspace.sh writes here rather than
+          # exporting into the job.
           source "${RUNNER_TEMP}/codenameone-tools/tools/env.sh"
-          # The port's real compile classpath, so the raw error counts either
-          # side of the comparison stay small enough to read. The check does not
-          # depend on it being complete -- anything unresolved fails against
-          # both platforms and cancels out.
-          (cd maven && "$MAVEN_HOME/bin/mvn" -B -q -Pcompile-android -pl android \
-             dependency:build-classpath -DincludeScope=compile \
-             -Dmdep.outputFile="${RUNNER_TEMP}/android-port-classpath.txt")
-          python3 scripts/check-android-api-removals.py \
-            --classpath "$(cat "${RUNNER_TEMP}/android-port-classpath.txt")" \
-            --require-all
+          # No classpath is passed: the script finds the cn1-binaries jars and
+          # the built core itself, and the comparison does not need more than
+          # that -- anything unresolved fails against both platforms and
+          # cancels out. Resolving the port's real classpath through Maven was
+          # tried and is wrong here, because -Pcompile-android reads its jars
+          # from maven/target/cn1-binaries, which this job never stages.
+          python3 scripts/check-android-api-removals.py --require-all
       - name: Build Hello Codename One Android app
         id: build-android-app
         run: |

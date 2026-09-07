@@ -334,6 +334,10 @@ def main():
           % (len(source_files), ', '.join(roots)))
     print('  baseline API %d: %s' % (baseline_api, baseline))
     print('  target   API %d: %s' % (target_api, target))
+    # Printed because an empty classpath is survivable but not silent: it
+    # raises the error counts on both sides, and a reader comparing two runs
+    # needs to know which of them was resolving dependencies.
+    print('  classpath entries: %d' % len(without_platform_stubs(classpath)))
 
     with tempfile.TemporaryDirectory(prefix='cn1-api-removals-') as workdir:
         baseline_errors = compile_against(
