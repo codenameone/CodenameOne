@@ -2398,6 +2398,86 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aLeftoverImportOfTheButtonIsNotUseOfIt() throws Exception {
+        // An import the compiler emits nothing for. Charging the application
+        // for it is not a refused build -- it is the fine and coarse location
+        // permissions going into an app that asks for location nowhere, and a
+        // Play data-safety declaration to answer for them.
+        File root = tempDir("cn1-lb-unused-import");
+        writeSource(new File(root, "com/example/Leftover.java"),
+                "package com.example;\n"
+                + "import com.codename1.location.LocationButton;\n"
+                + "public class Leftover {\n"
+                + "  int f() { return 1; }\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "an import nothing uses is not use of the button");
+    }
+
+    @Test
+    void anImportTheCodeGoesOnToUseIsStillTheButton() throws Exception {
+        File root = tempDir("cn1-lb-used-import");
+        writeSource(new File(root, "com/example/Used.java"),
+                "package com.example;\n"
+                + "import com.codename1.location.LocationButton;\n"
+                + "public class Used {\n"
+                + "  Object f() { return new LocationButton(); }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "an import the code uses is use of the button");
+    }
+
+    @Test
+    void aFullyQualifiedUseWithNoImportIsStillTheButton() throws Exception {
+        File root = tempDir("cn1-lb-qualified");
+        writeSource(new File(root, "com/example/Qualified.java"),
+                "package com.example;\n"
+                + "public class Qualified {\n"
+                + "  Object f() {\n"
+                + "    return new com.codename1.location.LocationButton();\n"
+                + "  }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "a qualified reference in code is use of the button");
+    }
+
+    @Test
+    void aKotlinAliasImportIsStillTheButton() throws Exception {
+        // The simple name appears NOWHERE else, by design: the alias replaced
+        // it. Requiring the simple name in code without this would lose the
+        // button from a file that plainly builds one.
+        File root = tempDir("cn1-lb-alias");
+        writeSource(new File(root, "com/example/Aliased.kt"),
+                "package com.example\n"
+                + "import com.codename1.location.LocationButton as Btn\n"
+                + "class Aliased {\n"
+                + "  fun f(): Any = Btn()\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "an alias import is use of the button under another name");
+    }
+
+    @Test
+    void anUnusedImportStillCountsTowardTheEXCLUSIVITYScan() throws Exception {
+        // The other scan keeps its own direction. A provider named but perhaps
+        // not called is evidence toward REFUSING an exclusivity request, and
+        // over-reporting there costs a sentence rather than a permission.
+        File root = tempDir("cn1-lb-excl-import");
+        writeSource(new File(root, "com/example/Tracker.java"),
+                "package com.example;\n"
+                + "import android.location.LocationManager;\n"
+                + "public class Tracker {\n"
+                + "  void f(Object o) { requestLocationUpdates(); }\n"
+                + "  void requestLocationUpdates() { }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "the exclusivity scan still over-reports, which is its "
+                + "direction: a refused build names the conflict, a missed "
+                + "one downgrades a real request in silence");
+    }
+
+    @Test
     void aConcatenatedReflectiveNameStillLoadsTheButton() throws Exception {
         // Literals joined by + are one constant to the compiler, so this
         // loads the button as surely as the whole name written out -- and

@@ -2289,7 +2289,7 @@ final class LocationButtonManifestFragments {
             // string as code, and keeping template-bearing literals turned a
             // log line that interpolates into a refused build.
             String stripped = strippedSource(source, LITERAL_MASKED);
-            if (sourceNames(stripped, BUTTON_MARKER)) {
+            if (sourceNamesInCode(stripped, BUTTON_MARKER)) {
                 return true;
             }
             // And the REFLECTIVE spelling, whose name lives in exactly the
@@ -2796,6 +2796,76 @@ final class LocationButtonManifestFragments {
      * @param owner the provider's internal name
      * @return whether this file names that class
      */
+    /**
+     * Whether the source names {@code owner} somewhere a compiler would emit a
+     * reference from, rather than only importing it.
+     *
+     * <p>The button's question, and NOT the one {@link #sourceNames} asks for
+     * the location providers. The two want opposite things from an ambiguous
+     * file. A provider named but perhaps not called is evidence toward
+     * REFUSING an exclusivity request, and over-reporting there costs a build
+     * a sentence naming the conflict. Naming the button costs the application
+     * the feature's whole manifest contribution: the fine and coarse location
+     * permissions go in, and on the fallback toolchain that is the only thing
+     * that goes in -- so a location-free application that still carries a
+     * leftover {@code import com.codename1.location.LocationButton} ships
+     * asking for precise location, and answers for it in a Play data-safety
+     * declaration, over a line its compiler emits nothing for.</p>
+     *
+     * <p>So an import on its own is not use. Anything else still is: a
+     * fully-qualified reference in code, an import the simple name goes on to
+     * use, a wildcard import of the package, or the file that declares it.</p>
+     *
+     * <p>Two imports ARE use by themselves, because nothing else in the file
+     * has to spell the name for them. A Kotlin alias import renames it
+     * ({@code import ...LocationButton as Btn}), and a static import takes a
+     * member off it -- neither leaves the simple name anywhere to find.</p>
+     *
+     * @param text  the source, comments gone and literals masked
+     * @param owner the class, in internal form
+     * @return whether the file uses it rather than merely importing it
+     */
+    private static boolean sourceNamesInCode(String text, String owner) {
+        String dotted = owner.replace('/', '.');
+        int lastDot = dotted.lastIndexOf('.');
+        String simple = lastDot < 0 ? dotted : dotted.substring(lastDot + 1);
+        String[] lines = text.split("\n");
+        boolean importedOnly = false;
+        for (int line = 0; line < lines.length; line++) {
+            if (!namesToken(lines[line], dotted)) {
+                continue;
+            }
+            String trimmed = lines[line].trim();
+            if (!isImportLine(trimmed)) {
+                // Named where code runs, which is the plain case.
+                return true;
+            }
+            if (trimmed.startsWith("import static ")
+                    || trimmed.indexOf(" as ") >= 0) {
+                return true;
+            }
+            importedOnly = true;
+        }
+        if (importedOnly) {
+            for (int line = 0; line < lines.length; line++) {
+                if (isImportLine(lines[line].trim())) {
+                    continue;
+                }
+                if (namesToken(lines[line], simple)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        // No qualified mention at all: the package may still be in scope.
+        return sourceNames(text, owner);
+    }
+
+    /** Whether a trimmed line is an import statement. */
+    private static boolean isImportLine(String trimmed) {
+        return trimmed.startsWith("import ") || trimmed.startsWith("import\t");
+    }
+
     private static boolean sourceNames(String text, String owner) {
         String dotted = owner.replace('/', '.');
         if (namesToken(text, dotted)) {
