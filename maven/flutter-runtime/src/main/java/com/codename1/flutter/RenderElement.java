@@ -510,6 +510,20 @@ public abstract class RenderElement extends Element {
         return drySize;
     }
 
+    /**
+     * Drops this element's cached layout result, so the next {@code layout} call
+     * runs {@link #performLayout} again even if the constraints have not changed.
+     *
+     * <p>For a pass that deliberately did not compute the real answer. The dry
+     * path above does this for itself; {@code LayoutBuilder} needs it when it
+     * sits out a speculative unbounded measurement, because the pass that
+     * follows can arrive with those same constraints and must not be handed the
+     * placeholder the sat-out pass returned.</p>
+     */
+    protected final void invalidateLayoutCache() {
+        lastConstraints = null;
+    }
+
     public final Size layout(BoxConstraints constraints) {
         if (dryPass) {
             return dryLayout(constraints);

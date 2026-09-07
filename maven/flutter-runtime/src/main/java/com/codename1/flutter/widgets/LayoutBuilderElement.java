@@ -1,41 +1,168 @@
 package com.codename1.flutter.widgets;
 
-import com.codename1.flutter.ComposedElement;
+import com.codename1.flutter.SingleChildRenderElement;
+import com.codename1.flutter.RenderElement;
 import com.codename1.flutter.Widget;
 import com.codename1.flutter.rendering.BoxConstraints;
 import com.codename1.flutter.rendering.Dp;
-
-import com.codename1.ui.Display;
+import com.codename1.flutter.rendering.Size;
 
 /**
- * Element for {@link LayoutBuilder}: builds with the viewport constraints
- * (logical pixels), approximating Flutter's layout-time callback with a
- * build-time one. See {@link LayoutBuilder}.
+ * Element for {@link LayoutBuilder}: runs the builder DURING layout, with the
+ * constraints the parent actually handed down.
+ *
+ * <p>It used to run once at build time against the whole display, which is a
+ * plausible-looking approximation and wrong wherever the widget is not the
+ * whole screen. The 2D-transformations demo centres its board on the viewport
+ * the builder reports, and was handed the screen instead — so the board was
+ * offset by exactly the app bar plus the footer and hung off the bottom.
+ *
+ * <p>Two details make a layout-time build safe here. The builder's result is
+ * cached against the constraints that produced it, so a second layout pass with
+ * the same box does not rebuild — without that, building inside layout is an
+ * easy way to loop. And the constraints are converted to LOGICAL pixels first:
+ * layout runs in device pixels, and a builder written against Flutter's
+ * coordinate system would otherwise see numbers a factor of the device pixel
+ * ratio too large.
  */
-public class LayoutBuilderElement extends ComposedElement {
+public class LayoutBuilderElement extends SingleChildRenderElement {
 
-    private static final double FALLBACK_W_LP = 400;
-    private static final double FALLBACK_H_LP = 800;
+    private BoxConstraints builtFor;
+    private Widget built;
+
+    /// Whether one unbounded pass has already been sat out; see performLayout.
+    private boolean skippedUnbounded;
+
+    /// Whether either axis is unbounded, which is what a measurement looks like
+    /// and what a builder must not be allowed to latch onto.
+    private static boolean isUnbounded(BoxConstraints c) {
+        return Double.isInfinite(c.maxWidth()) || Double.isInfinite(c.maxHeight());
+    }
+
+    private static long builderMs;
+    private static long syncMs;
+    private static long layoutMs;
+
+    /** Where the time inside layout-time building actually goes. */
+    public static String cost() {
+        return "builder=" + builderMs + "ms mount=" + syncMs + "ms childLayout=" + layoutMs + "ms";
+    }
 
     public LayoutBuilderElement(LayoutBuilder widget) {
         super(widget);
     }
 
     @Override
-    protected Widget build() {
-        return ((LayoutBuilder) widget()).getBuilder().call(this, viewportConstraints());
+    protected Widget childWidget() {
+        return built;
     }
 
-    private static BoxConstraints viewportConstraints() {
-        double wLp = FALLBACK_W_LP;
-        double hLp = FALLBACK_H_LP;
-        if (Display.isInitialized()) {
-            double scale = Dp.scale();
-            if (scale > 0) {
-                wLp = Display.getInstance().getDisplayWidth() / scale;
-                hLp = Display.getInstance().getDisplayHeight() / scale;
-            }
+    @Override
+    public void update(Widget newWidget) {
+        // A new configuration means a new builder; the cached result is stale.
+        builtFor = null;
+        super.update(newWidget);
+    }
+
+    @Override
+    protected Size performLayout(BoxConstraints constraints) {
+        BoxConstraints logical = toLogical(constraints);
+        // A DRY pass must never run the builder. Codename One measures a
+        // container far more often than it lays one out, and it measures with
+        // loose, unbounded constraints -- so the builder would be handed a
+        // viewport of infinity. Flutter does not support dry layout for
+        // LayoutBuilder at all, for exactly this reason. It matters beyond the
+        // measurement itself because a builder is allowed to latch: the
+        // 2D-transformations demo computes its home matrix from the FIRST
+        // viewport it is shown and keeps it forever, so one speculative call
+        // with the wrong box mis-centres the board for the life of the screen.
+        if (isDryPass() && builtFor == null) {
+            return constraints.smallest();
         }
-        return new BoxConstraints(0, wLp, 0, hLp);
+        // Same hazard, reached by a pass that is not dry. Codename One asks a box
+        // how wide it would like to be -- a real layout call, with the width
+        // unbounded -- before it asks again with the box the child will actually
+        // occupy. A builder that latches keeps whatever it was shown FIRST, so
+        // that speculative call decides the screen: the 2D-transformations demo
+        // centres its board against `constraints.maxWidth` and never recomputes,
+        // and an infinite width left the board drawn in the corner for the life
+        // of the route. Sit out one unbounded pass. If the next one is unbounded
+        // too then this really is an unbounded layout -- a viewport's child, say
+        // -- and the builder runs against it as Flutter would.
+        if (builtFor == null && !skippedUnbounded && isUnbounded(logical)) {
+            skippedUnbounded = true;
+            // The next pass can carry these same constraints, and the layout
+            // cache would hand it this placeholder instead of running the
+            // builder at all -- which is how sitting out once turned into never
+            // building for a viewport's child.
+            invalidateLayoutCache();
+            return constraints.smallest();
+        }
+        if (!isDryPass() && (builtFor == null || !same(builtFor, logical))) {
+            LayoutBuilder w = (LayoutBuilder) widget();
+            long t0 = System.currentTimeMillis();
+            // The builder runs Dart code, but not from performRebuild -- so
+            // without this a `!` failure inside it named no location at all,
+            // which is exactly how a startup crash here read as an anonymous
+            // TypeError seven frames deep in the layout recursion.
+            Object previous = dart.runtime.DartRuntime.diagnosticContextValue();
+            dart.runtime.DartRuntime.diagnosticContext(
+                    "running the LayoutBuilder in " + describeParentWidget());
+            try {
+                built = w.getBuilder() == null ? null : w.getBuilder().call(this, logical);
+            } finally {
+                dart.runtime.DartRuntime.diagnosticContext(previous);
+            }
+            long t1 = System.currentTimeMillis();
+            builtFor = logical;
+            syncChildren();
+            long t2 = System.currentTimeMillis();
+            // Split so the cost can be attributed instead of described: calling
+            // the transpiled builder is Dart-side widget construction, while
+            // syncChildren is element mounting plus Codename One component
+            // creation. They are different problems with different fixes.
+            builderMs += t1 - t0;
+            syncMs += t2 - t1;
+        }
+        RenderElement child = renderChild();
+        if (child == null) {
+            return constraints.smallest();
+        }
+        long lt = System.currentTimeMillis();
+        Size cs = child.layout(constraints);
+        layoutMs += System.currentTimeMillis() - lt;
+        setChildOffset(child, 0, 0);
+        return constraints.constrain(cs);
+    }
+
+    /** The nearest enclosing application widget, for the diagnostic above. */
+    private String describeParentWidget() {
+        com.codename1.flutter.Element e = this;
+        for (int depth = 0; e != null && depth < 12; depth++) {
+            Widget w = e.widget();
+            if (w != null && !w.getClass().getName().startsWith("com.codename1.flutter.")) {
+                return w.getClass().getName();
+            }
+            e = e.parent();
+        }
+        return "an unnamed subtree";
+    }
+
+    private static BoxConstraints toLogical(BoxConstraints c) {
+        double scale = Dp.scale();
+        if (scale <= 0) {
+            scale = 1;
+        }
+        return new BoxConstraints(div(c.minWidth(), scale), div(c.maxWidth(), scale),
+                div(c.minHeight(), scale), div(c.maxHeight(), scale));
+    }
+
+    private static double div(double v, double scale) {
+        return Double.isInfinite(v) ? v : v / scale;
+    }
+
+    private static boolean same(BoxConstraints a, BoxConstraints b) {
+        return a.minWidth() == b.minWidth() && a.maxWidth() == b.maxWidth()
+                && a.minHeight() == b.minHeight() && a.maxHeight() == b.maxHeight();
     }
 }
