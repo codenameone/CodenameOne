@@ -4112,45 +4112,27 @@ BOOL isAppSuspended = 0;
 // 24MB -> 98MB. Throughput and p99 across that same sweep were flat inside the
 // run-to-run noise, so the 24MB floor was buying footprint and no speed.
 //
-// Every modern collector sizes the next heap against the LIVE set rather than
-// against a constant -- Go's GOGC=100 means "collect when the heap reaches twice
-// what survived" -- which is why a Go server holding almost nothing live sits at
-// 6-17MB where we sat at 98MB. This is that rule: the floor is the live set plus
-// CN1_BIBOP_HEAP_GROWTH_PERCENT of it, never below CN1_BIBOP_GC_MIN_TRIGGER_BYTES.
+// So this is a floor a deployment CHOOSES, not one the collector infers. It
+// defaults to the old constant, which is why a stock build collects exactly
+// where it always did, and an application that knows its live set is small sets
+// it lower -- the backend uses 4MB and its resident memory fell from 98MB to
+// 38MB.
 //
-// It is not merely smaller. An application with a real live set gets a LARGER
-// floor than the old constant (20MB live at 100% growth asks for 40MB, where the
-// constant gave 24MB), so this is more generous exactly where the old rule was
-// stingy and tighter only where it was wasteful.
-// The floor never drops BELOW the old constant by default, and that default is
-// the conservative one on purpose.
-//
-// Sizing the floor from the live set is right in principle, but liveBytes is a
-// per-sweep sample that systematically understates: the sweep walks the retired
-// list, and pages the major sweep splices out of a partial pool are withheld
-// from policy statistics (see statsExcluded). A decaying high-water delays the
-// consequence rather than removing it -- roughly twenty low-survival cycles and
-// a stable 20MB live set is estimated at the minimum, after which the collector
-// retraces that heap every few megabytes.
-//
-// Measured rather than argued: with the minimum at 4MB,
-// GcSteadyStateIntegrationTest fails itself in CI with "pinning the free-memory
-// reading to 16MB did not make the per-thread pending table fill, so this
-// scenario and its twin measure nothing" -- cyclesOnDemand=5598 and 22331 volume
-// parks, which is the collector running continuously because the trigger sat at
-// the floor. ProcessBudgetPacingIntegrationTest's 72MB static cap floor
-// (3 x 24MB) is derived from this constant too.
-//
-// So the proportional rule now only ever RAISES the floor: an application with a
-// real live set gets more headroom than the constant gave it, and nothing gets
-// less. A deployment that knows its live set is tiny -- the backend, whose
-// resident memory fell from 98MB to 38MB on this -- opts in by defining
-// CN1_BIBOP_GC_MIN_TRIGGER_BYTES lower at build time.
+// It is deliberately not sized from the live set. Every modern collector does
+// size the next heap against what survived -- Go's GOGC=100 collects when the
+// heap reaches twice the live set -- and this collector tried that and could not
+// make it sound, because it cannot measure a live set. What a sweep reports is
+// what that sweep SAMPLED: an ordinary sweep walks retired pages only and never
+// sees a live object on a partial page, a major sweep splices the partial pools
+// in but withholds their slots from the policy numbers, mutator-owned current
+// pages are never swept at all, and the legacy heap above CN1_BIBOP_MAX_OBJECT
+// is not in BiBOP pages and reaches none of these counters. Three attempts to
+// build a proportional floor on that number each failed differently, the first
+// of them by latching a departed live set high enough to starve the sweeps that
+// return pages to the OS. A constant a deployment sets from what it knows about
+// its own workload needs no such measurement to be correct.
 #ifndef CN1_BIBOP_GC_MIN_TRIGGER_BYTES
 #define CN1_BIBOP_GC_MIN_TRIGGER_BYTES CN1_BIBOP_GC_TRIGGER_BYTES
-#endif
-#ifndef CN1_BIBOP_HEAP_GROWTH_PERCENT
-#define CN1_BIBOP_HEAP_GROWTH_PERCENT 100
 #endif
 #ifndef CN1_BIBOP_HIGH_THROUGHPUT_BYTES
 #define CN1_BIBOP_HIGH_THROUGHPUT_BYTES (8*1024*1024)
@@ -5503,6 +5485,26 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             }
         }
         threadStateData->threadActive = JAVA_TRUE;
+        // This is CN1_RESUME_THREAD's handshake, deliberately, and NOT a stronger
+        // one. A review asked for an atomic block-check-and-reactivate here on the
+        // grounds that the collector can set threadBlockedByGC after this loop's
+        // last read but before the store above, observe threadActive already
+        // false, and scan a stack that is about to start moving. The window is
+        // real and the description is accurate.
+        //
+        // It is also not this function's window. CN1_RESUME_THREAD is exactly
+        // `while(threadBlockedByGC) wait; threadActive = TRUE;`, the collector
+        // stops threads by setting the flag and then waiting for threadActive to
+        // clear with no re-validation afterwards, and that pair is the protocol at
+        // every native boundary in the VM. Making this one site atomic would close
+        // nothing -- the same window stays open at thousands of others -- while
+        // leaving one function speaking a different protocol from the collector it
+        // has to agree with, which is how the last few defects here happened.
+        //
+        // So it is left matching the protocol on purpose. If the window is worth
+        // closing it needs a collector-side acknowledgement applied to every
+        // resume site at once, which is a change to the VM's thread protocol and
+        // not something to smuggle in through a pacing fix.
         CN1_STALL_ADD(__stallVol, CN1_STALL_PACING_VOLUME, threadStateData);
         return;
     }
@@ -12334,31 +12336,52 @@ static long long cn1AllocProfAvg(long long bytes, long count) {
     return count > 0 ? bytes / count : 0;
 }
 
+// Report-local copies. atexit handlers do not stop the other threads, so a
+// mutator can still be allocating while this runs: ranking the live counters
+// destructively meant a class could be printed, keep allocating, and be selected
+// again for a second row, while its bytes and count were read at different
+// instants and need not describe the same set of allocations. Everything is
+// copied once here and the ranking then consumes the copy, so the report is a
+// snapshot of one moment and the live counters are left alone.
+static long long cn1AllocProfSnapBytes[CN1_ALLOC_PROFILE_SLOTS];
+static long cn1AllocProfSnapCount[CN1_ALLOC_PROFILE_SLOTS];
+static struct clazz* cn1AllocProfSnapClass[CN1_ALLOC_PROFILE_SLOTS];
+
 static void cn1ReportAllocProfile(void) {
     long long total = 0;
     int i;
     int printed = 0;
     for(i = 0 ; i < CN1_ALLOC_PROFILE_SLOTS ; i++) {
-        total += atomic_load_explicit(&cn1AllocProfBytes[i], memory_order_relaxed);
+        cn1AllocProfSnapBytes[i] =
+                atomic_load_explicit(&cn1AllocProfBytes[i], memory_order_relaxed);
+        cn1AllocProfSnapCount[i] =
+                atomic_load_explicit(&cn1AllocProfCount[i], memory_order_relaxed);
+        cn1AllocProfSnapClass[i] =
+                atomic_load_explicit(&cn1AllocProfClass[i], memory_order_relaxed);
+        total += cn1AllocProfSnapBytes[i];
     }
     if(cn1AllocSizeClassName != 0) {
         int i;
-        // Descending by count, selection-style: the table is 48 entries and this
-        // runs once at exit, so the quadratic scan costs nothing and keeps the
-        // hot recorder free of any ordering work.
+        // Snapshot first, for the same reason as the per-class table above; 48
+        // entries fit on the stack. Descending by count, selection-style: this
+        // runs once at exit, so the quadratic scan costs nothing and keeps the hot
+        // recorder free of any ordering work.
+        long long snapCount[CN1_ALLOC_SIZE_BUCKETS];
+        int snapKey[CN1_ALLOC_SIZE_BUCKETS];
+        for(i = 0 ; i < CN1_ALLOC_SIZE_BUCKETS ; i++) {
+            snapCount[i] = atomic_load_explicit(&cn1AllocSizeCount[i], memory_order_relaxed);
+            snapKey[i] = atomic_load_explicit(&cn1AllocSizeKey[i], memory_order_relaxed);
+        }
         for(;;) {
             int bestIdx = -1;
             long long bestCount = 0;
             for(i = 0 ; i < CN1_ALLOC_SIZE_BUCKETS ; i++) {
-                long long c = atomic_load_explicit(&cn1AllocSizeCount[i], memory_order_relaxed);
-                if(c > bestCount) { bestCount = c; bestIdx = i; }
+                if(snapCount[i] > bestCount) { bestCount = snapCount[i]; bestIdx = i; }
             }
             if(bestIdx < 0) { break; }
             fprintf(stderr, "[ALLOCSIZE] %-28s bytes=%-8d count=%lld\n",
-                    cn1AllocSizeClassName,
-                    atomic_load_explicit(&cn1AllocSizeKey[bestIdx], memory_order_relaxed),
-                    bestCount);
-            atomic_store_explicit(&cn1AllocSizeCount[bestIdx], 0, memory_order_relaxed);
+                    cn1AllocSizeClassName, snapKey[bestIdx], bestCount);
+            snapCount[bestIdx] = 0;
         }
         fprintf(stderr, "[ALLOCSIZE] %-28s overflow=%lld\n", cn1AllocSizeClassName,
                 atomic_load_explicit(&cn1AllocSizeOverflow, memory_order_relaxed));
@@ -12385,25 +12408,22 @@ static void cn1ReportAllocProfile(void) {
         int best = -1;
         long long bestBytes = 0;
         for(i = 0 ; i < CN1_ALLOC_PROFILE_SLOTS ; i++) {
-            long long b = atomic_load_explicit(&cn1AllocProfBytes[i], memory_order_relaxed);
-            if(b > bestBytes) {
-                bestBytes = b;
+            if(cn1AllocProfSnapBytes[i] > bestBytes) {
+                bestBytes = cn1AllocProfSnapBytes[i];
                 best = i;
             }
         }
         if(best < 0) {
             break;
         }
-        struct clazz* cn1AllocProfBest =
-                atomic_load_explicit(&cn1AllocProfClass[best], memory_order_relaxed);
-        fprintf(stderr, "[ALLOCPROF] %-44s bytes=%-12lld count=%-10ld avg=%lld\n",
-                (cn1AllocProfBest != 0 && cn1AllocProfBest->clsName != 0)
-                        ? cn1AllocProfBest->clsName : "?",
-                bestBytes,
-                atomic_load_explicit(&cn1AllocProfCount[best], memory_order_relaxed),
-                cn1AllocProfAvg(bestBytes,
-                        atomic_load_explicit(&cn1AllocProfCount[best], memory_order_relaxed)));
-        atomic_store_explicit(&cn1AllocProfBytes[best], 0, memory_order_relaxed);
+        {
+            struct clazz* cls = cn1AllocProfSnapClass[best];
+            long count = cn1AllocProfSnapCount[best];
+            fprintf(stderr, "[ALLOCPROF] %-44s bytes=%-12lld count=%-10ld avg=%lld\n",
+                    (cls != 0 && cls->clsName != 0) ? cls->clsName : "?",
+                    bestBytes, count, cn1AllocProfAvg(bestBytes, count));
+        }
+        cn1AllocProfSnapBytes[best] = 0;   // consume the COPY, not the counter
         printed++;
     }
     fflush(stderr);
