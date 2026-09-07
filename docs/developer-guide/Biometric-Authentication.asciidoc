@@ -25,7 +25,7 @@ Entries are bound to the current set of enrolled biometrics. If the user enrols 
 | Platform         | Implementation                                                              | Notes
 | iOS              | `LocalAuthentication.framework` (`LAContext`) + `Security.framework` keychain | Add the `ios.NSFaceIDUsageDescription` build hint when targeting Face ID hardware.
 | Android API 29+  | `BiometricPrompt`                                                            | Face / iris / fingerprint per `PackageManager` features.
-| Android API 23-28| `FingerprintManager`                                                         | Fingerprint only.
+| Android API 23-28| `FingerprintManagerCompat`                                                   | Fingerprint only. Goes through the support library rather than `android.hardware.fingerprint` directly, which Android removed in API 37, so an app compiled against any platform still authenticates on these devices.
 | JavaSE simulator | `Simulate -> Biometric Simulation` submenu                                   | Toggle hardware availability, per-modality enrolment, and the next-call outcome.
 | All other ports  | Non-supporting fallback                                                      | `canAuthenticate()` returns `false`; `authenticate()` completes with `BiometricError.NOT_AVAILABLE`.
 |===

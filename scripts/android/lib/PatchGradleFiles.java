@@ -59,9 +59,9 @@ public class PatchGradleFiles {
         }
         // Every application module, not only app/. A companion Wear build adds wear/, which is a
         // second application module with its own compileSdkVersion -- left unpinned it takes the
-        // newest platform installed on the runner, and a platform that has dropped an API the
-        // Codename One port still compiles against (FingerprintManager went in API 37) fails only
-        // that module, in a file nobody edited.
+        // newest platform installed on the runner, so the two modules can end up compiling and
+        // targeting different API levels in the same run, and a difference shows up only in that
+        // module, in a file nobody edited.
         boolean modifiedAny = modifiedRoot;
         for (Path module : arguments.apps) {
             if (!Files.isRegularFile(module)) {
