@@ -2398,6 +2398,121 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void anUnusedAliasImportIsNotUseOfTheButton() throws Exception {
+        // The carve-out for alias imports was unconditional at first, which
+        // put the permissions back for exactly the unused import the check
+        // exists to ignore. The alias has to be used.
+        File root = tempDir("cn1-lb-alias-unused");
+        writeSource(new File(root, "com/example/Idle.kt"),
+                "package com.example\n"
+                + "import com.codename1.location.LocationButton as Btn\n"
+                + "class Idle {\n"
+                + "  fun f(): Int = 1\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "an alias nothing uses is not use of the button");
+    }
+
+    @Test
+    void anUnusedStaticImportIsNotUseOfTheButton() throws Exception {
+        File root = tempDir("cn1-lb-static-unused");
+        writeSource(new File(root, "com/example/IdleStatic.java"),
+                "package com.example;\n"
+                + "import static com.codename1.location.LocationButton"
+                + ".TEXT_NONE;\n"
+                + "public class IdleStatic {\n"
+                + "  int f() { return 1; }\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "a static import nothing uses is not use of the button");
+    }
+
+    @Test
+    void aUsedStaticImportIsStillTheButton() throws Exception {
+        File root = tempDir("cn1-lb-static-used");
+        writeSource(new File(root, "com/example/UsedStatic.java"),
+                "package com.example;\n"
+                + "import static com.codename1.location.LocationButton"
+                + ".TEXT_NONE;\n"
+                + "public class UsedStatic {\n"
+                + "  int f() { return TEXT_NONE; }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "a static import the code uses is use of the button");
+    }
+
+    @Test
+    void aWildcardImportSeparatedByATabIsStillInScope() throws Exception {
+        // Java separates a keyword from its operand with whatever whitespace
+        // it likes. A literal "import " missed a tab, and the cost is a miss:
+        // the button is deleted from an application that builds one.
+        File root = tempDir("cn1-lb-tab-import");
+        writeSource(new File(root, "com/example/Tabbed.java"),
+                "package com.example;\n"
+                + "import\tcom.codename1.location.*;\n"
+                + "public class Tabbed {\n"
+                + "  Object f() { return new LocationButton(); }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "a tab is legal whitespace after import");
+    }
+
+    @Test
+    void aPackageDeclarationSeparatedByANewlineIsStillInScope()
+            throws Exception {
+        File root = tempDir("cn1-lb-nl-package");
+        writeSource(new File(root, "com/codename1/location/Sibling.java"),
+                "package\n"
+                + "com.codename1.location;\n"
+                + "public class Sibling {\n"
+                + "  Object f() { return new LocationButton(); }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "a newline is legal whitespace after package");
+    }
+
+    @Test
+    void aClassOnlyUnderMetaInfVersionsIsNotCharged() throws Exception {
+        // Android drops META-INF/versions entirely, so a reference that lives
+        // only there runs nowhere on the device. Charging for it puts fine and
+        // coarse location into an app for a class the packaging step threw
+        // away.
+        File root = tempDir("cn1-lb-mrjar");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "mr.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry(
+                    "META-INF/versions/9/com/example/Modern.class"));
+            zip.write(buttonReferencingClass());
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertFalse(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "a versioned entry Android never loads is not use");
+    }
+
+    @Test
+    void theSameClassInTheBaseTreeIsStillCharged() throws Exception {
+        // The other direction, so the exclusion cannot quietly swallow a real
+        // reference: the identical class outside META-INF/versions counts.
+        File root = tempDir("cn1-lb-mrjar-base");
+        ZipOutputStream zip = new ZipOutputStream(
+                new FileOutputStream(new File(root, "base.jar")));
+        try {
+            zip.putNextEntry(new ZipEntry("com/example/Modern.class"));
+            zip.write(buttonReferencingClass());
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        assertTrue(LocationButtonManifestFragments.scanForLocationUsage(root)
+                        .usesButton(),
+                "the same class in the base tree is real use");
+    }
+
+    @Test
     void aLeftoverImportOfTheButtonIsNotUseOfIt() throws Exception {
         // An import the compiler emits nothing for. Charging the application
         // for it is not a refused build -- it is the fine and coarse location
@@ -4427,6 +4542,16 @@ class LocationButtonManifestFragmentsTest {
     }
 
     /** A jar holding one class that references the button by CONSTANT_Class. */
+    /** A class file whose constant pool names the button. */
+    private static byte[] buttonReferencingClass() throws Exception {
+        File tmp = File.createTempFile("cn1-mr", ".class");
+        writePoolClass(tmp, cpUtf8("com/codename1/location/LocationButton"),
+                cpOne(7, 1));
+        byte[] cls = Files.readAllBytes(tmp.toPath());
+        tmp.delete();
+        return cls;
+    }
+
     private static byte[] buttonReferencingJar() throws Exception {
         File tmp = File.createTempFile("cn1-inner", ".class");
         writePoolClass(tmp, cpUtf8("com/codename1/location/LocationButton"),

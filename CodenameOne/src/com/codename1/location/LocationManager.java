@@ -230,6 +230,17 @@ public abstract class LocationManager {
         // the source now -- see AndroidLocationPlayServiceManager
         // .getLastKnownLocation -- so a client that never connects ends as no
         // fix rather than as a tap that is never answered.
+        //
+        // The residual, stated exactly rather than left to be discovered: the
+        // port's cap is its own and knows nothing of the caller's deadline, so
+        // a read already in progress can overrun by up to that cap. A caller
+        // asking for one second can therefore wait about ten. Closing that gap
+        // means either handing the port a budget -- API on LocationManager for
+        // a single caller -- or running the read on a thread this can abandon,
+        // which is cross-thread state in a framework that is single threaded
+        // by design. Neither is worth a slow answer in a state where Play
+        // Services is not connecting at all; what matters is that the answer
+        // arrives, and it does.
         Display.getInstance().invokeAndBlock(new Runnable() {
             @Override
             public void run() {
@@ -444,9 +455,26 @@ public abstract class LocationManager {
     /// field orphans the subscription for good.
     ///
     /// Marking does both: the retry's `setLocationListener` sees a listener,
-    /// clears it and binds within that ONE port call, which is the ordering
-    /// the port controls. Starting a clear here instead would be a separate
-    /// asynchronous one on Android, free to arrive after the retry's bind.
+    /// so it clears and binds rather than binding over an orphan.
+    ///
+    /// It does NOT make those two ordered, and an earlier version of this note
+    /// claimed it did -- "within that ONE port call, which is the ordering the
+    /// port controls". That is wrong on Android with Play Services, where
+    /// `clearListener` and `bindListener` each spawn a thread that waits for
+    /// the API client to connect before posting, so a clear starting while the
+    /// client is down can land after the bind that followed it and remove the
+    /// retry's subscription. The port documents that as a known hazard at
+    /// `AndroidLocationPlayServiceManager.clearListener`, along with the two
+    /// patches for it that were written and withdrawn, and the real fix --
+    /// one worker per manager, so the calls run in the order they were made.
+    ///
+    /// So this is a trade rather than a cure, and the direction is the one
+    /// that fails smaller. Forgetting the field orphans the platform
+    /// subscription CERTAINLY and for good: nothing ever calls `clearListener`
+    /// again, the device keeps a live GPS subscription nobody can reach, and
+    /// on the JavaSE stub a non-daemon Timer goes on delivering to an expired
+    /// request. Keeping it risks ONE retry timing out, transiently, and only
+    /// when the client happens to be down at the moment the clear starts.
     private void markTimedOut(LocationListener l) {
         synchronized (LISTENER_LOCK) {
             // Reference identity, for the reason clearListenerIfStill says.

@@ -2840,25 +2840,85 @@ final class LocationButtonManifestFragments {
                 // Named where code runs, which is the plain case.
                 return true;
             }
-            if (trimmed.startsWith("import static ")
-                    || trimmed.indexOf(" as ") >= 0) {
+            // An alias or a static member renames what the code will spell,
+            // so the simple name is not what to look for -- but SOMETHING
+            // still has to be. Counting these forms unconditionally, which is
+            // what this did first, put the permissions back for exactly the
+            // unused import the rest of this method exists to ignore.
+            String renamed = importedAs(trimmed);
+            if (renamed != null && usedOutsideImports(lines, renamed)) {
                 return true;
             }
+            // Still a qualified mention that turned out to be an import, so
+            // it must be recorded as one. Falling out of the loop without
+            // saying so sent the method to its package-in-scope fallback,
+            // which found this very import line and reported use again.
             importedOnly = true;
         }
         if (importedOnly) {
-            for (int line = 0; line < lines.length; line++) {
-                if (isImportLine(lines[line].trim())) {
-                    continue;
-                }
-                if (namesToken(lines[line], simple)) {
-                    return true;
-                }
-            }
-            return false;
+            return usedOutsideImports(lines, simple);
         }
         // No qualified mention at all: the package may still be in scope.
         return sourceNames(text, owner);
+    }
+
+    /**
+     * The name an import line binds, when it binds one other than the class's
+     * own simple name.
+     *
+     * <p>Two forms do that. Kotlin's {@code import a.b.C as Btn} binds
+     * {@code Btn}, and a static import {@code import static a.b.C.MEMBER}
+     * binds {@code MEMBER} -- in both the class's simple name appears nowhere
+     * else, so looking for it finds nothing and the file reads as unused.</p>
+     *
+     * @param trimmed a trimmed import line known to name the class
+     * @return the bound name, or null when the import binds the simple name
+     */
+    private static String importedAs(String trimmed) {
+        int as = trimmed.indexOf(" as ");
+        if (as >= 0) {
+            String tail = trimmed.substring(as + " as ".length()).trim();
+            return identifierHead(tail);
+        }
+        if (trimmed.startsWith("import static ")) {
+            String tail = trimmed.substring("import static ".length()).trim();
+            int semi = tail.indexOf(';');
+            if (semi >= 0) {
+                tail = tail.substring(0, semi);
+            }
+            tail = tail.trim();
+            // A static wildcard binds every member, so nothing here can say
+            // which name the code will use.
+            if (tail.endsWith(".*")) {
+                return null;
+            }
+            int dot = tail.lastIndexOf('.');
+            return identifierHead(dot < 0 ? tail : tail.substring(dot + 1));
+        }
+        return null;
+    }
+
+    /** The leading identifier of {@code text}, or null if it has none. */
+    private static String identifierHead(String text) {
+        int end = 0;
+        while (end < text.length()
+                && Character.isJavaIdentifierPart(text.charAt(end))) {
+            end++;
+        }
+        return end == 0 ? null : text.substring(0, end);
+    }
+
+    /** Whether {@code name} is named on a line that is not an import. */
+    private static boolean usedOutsideImports(String[] lines, String name) {
+        for (int line = 0; line < lines.length; line++) {
+            if (isImportLine(lines[line].trim())) {
+                continue;
+            }
+            if (namesToken(lines[line], name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether a trimmed line is an import statement. */
@@ -2882,8 +2942,8 @@ final class LocationButtonManifestFragments {
         // "package com.codename1.location;" may write LocationButton with no
         // import at all, and requiring one lost the button from a file that
         // plainly builds it.
-        boolean inScope = text.indexOf("import " + pkg + ".*") >= 0
-                || namesToken(text, "package " + pkg);
+        boolean inScope = keywordNames(text, "import", pkg + ".*")
+                || keywordNames(text, "package", pkg);
         return inScope && namesToken(text, simple);
     }
 
@@ -2902,6 +2962,102 @@ final class LocationButtonManifestFragments {
      * @param token the name to find
      * @return whether it appears bounded on both sides
      */
+    /**
+     * Whether {@code target} appears as the operand of {@code keyword}.
+     *
+     * <p>Written with a scanner rather than as {@code indexOf("import " + x)},
+     * which is what this replaced. Java separates a keyword from its operand
+     * with any whitespace it likes -- a tab, several spaces, a newline -- and
+     * a literal single space missed every one of them. The cost is not
+     * symmetric with the rest of this file: a missed wildcard import loses the
+     * simple name, so the button is deleted from an application that builds
+     * one, and a provider call goes unseen by the exclusivity scan, which then
+     * accepts the hint over a request the application really makes.</p>
+     *
+     * @param text    the source, comments gone
+     * @param keyword {@code import} or {@code package}
+     * @param target  what has to follow it
+     * @return whether the source says so
+     */
+    private static boolean keywordNames(String text, String keyword,
+            String target) {
+        int at = text.indexOf(target);
+        while (at >= 0) {
+            int after = at + target.length();
+            boolean endsClean = after >= text.length()
+                    || !Character.isJavaIdentifierPart(text.charAt(after));
+            if (endsClean && precededByKeyword(text, at, keyword)) {
+                return true;
+            }
+            at = text.indexOf(target, at + 1);
+        }
+        return false;
+    }
+
+    /**
+     * Whether the word before {@code at} is {@code keyword}, whitespace aside.
+     *
+     * <p>At least one whitespace character, because {@code importcom.foo} is
+     * not an import, and the keyword itself on an identifier boundary, because
+     * {@code reimport} is not one either.</p>
+     */
+    private static boolean precededByKeyword(String text, int at,
+            String keyword) {
+        int walk = at;
+        while (walk > 0 && isSourceSpace(text.charAt(walk - 1))) {
+            walk--;
+        }
+        if (walk == at) {
+            return false;
+        }
+        int start = walk - keyword.length();
+        if (start < 0 || !text.startsWith(keyword, start)) {
+            return false;
+        }
+        return start == 0
+                || !Character.isJavaIdentifierPart(text.charAt(start - 1));
+    }
+
+    /** The whitespace a compiler accepts between a keyword and its operand. */
+    private static boolean isSourceSpace(char c) {
+        return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f';
+    }
+
+    /**
+     * Whether an archive entry is one Android never loads.
+     *
+     * <p>A multi-release jar keeps per-version copies under
+     * {@code META-INF/versions/<n>/}, and Android loads none of them: the
+     * packaging step drops the whole tree, so a class that exists only there
+     * runs nowhere on the device. {@code module-info.class} is the same kind of
+     * thing -- a module descriptor no Android class loader reads.</p>
+     *
+     * <p>Skipping them is not the usual narrowing this file argues against.
+     * The rule elsewhere is that ambiguity resolves toward reporting, because
+     * a miss is silent; this is the documented exception, where the code
+     * provably does not run. Counting it charges an application for a
+     * reference its device can never reach -- the fine and coarse location
+     * permissions, for a class Android threw away -- and, on the exclusivity
+     * side, refuses a build over a call that is never made.</p>
+     *
+     * <p>The same exclusion the extractor already applies when it stages an
+     * archive, so this reads what the build consumes rather than what the zip
+     * happens to contain -- which is the rule the entry filters around it
+     * state for assets and nested jars.</p>
+     *
+     * @param name the entry name
+     * @return whether to skip it
+     */
+    private static boolean skippedByAndroid(String name) {
+        String normalized = name.replace('\\', '/');
+        while (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+        return normalized.startsWith("META-INF/versions/")
+                || "module-info.class".equals(normalized)
+                || normalized.endsWith("/module-info.class");
+    }
+
     private static boolean namesToken(String text, String token) {
         int at = text.indexOf(token);
         while (at >= 0) {
@@ -3193,6 +3349,7 @@ final class LocationButtonManifestFragments {
                 // consumes, not what the zip happens to contain. In a plain
                 // jar, by contrast, the .class entries ARE the classpath.
                 boolean classEntry = !isAar && name.endsWith(".class")
+                        && !skippedByAndroid(name)
                         && !isFrameworkClass(name);
                 if (!nested && !manifest && !classEntry) {
                     continue;
@@ -3492,6 +3649,7 @@ final class LocationButtonManifestFragments {
                 // name and never finds Sample.CLASS.
                 if (!entry.isDirectory()
                         && name.endsWith(".class")
+                        && !skippedByAndroid(name)
                         && !isFrameworkClass(name)) {
                     inspect(budget.readEntry(in, name, entry.getSize()), found);
                 } else {
