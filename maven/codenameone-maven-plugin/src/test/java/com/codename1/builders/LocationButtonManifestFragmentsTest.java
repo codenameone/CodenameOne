@@ -63,6 +63,37 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class LocationButtonManifestFragmentsTest {
 
+    /**
+     * The permission block with the {@code uses-permission-sdk-23} shape
+     * taken out.
+     *
+     * <p>For assertions that are about the ORDINARY element. Exclusivity
+     * declares the sdk-23 shape as well, so that a library contributing it
+     * later has an attribute set of ours to be unioned into -- which means a
+     * count of the permission NAME across the whole block is no longer a count
+     * of declarations of one element type, and that is what these tests
+     * mean.</p>
+     *
+     * @param xml the permission block
+     * @return it, without that element
+     */
+    private static String withoutSdk23(String xml) {
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int open = xml.indexOf("<uses-permission-sdk-23", at);
+            if (open < 0) {
+                return out.append(xml.substring(at)).toString();
+            }
+            int close = xml.indexOf('>', open);
+            if (close < 0) {
+                return out.append(xml.substring(at)).toString();
+            }
+            out.append(xml, at, open);
+            at = close + 1;
+        }
+    }
+
     private static int count(String haystack, String needle) {
         int count = 0;
         int idx = haystack.indexOf(needle);
@@ -122,6 +153,33 @@ class LocationButtonManifestFragmentsTest {
         assertEquals(1, count(out, "android.permission.ACCESS_FINE_LOCATION"),
                 out);
         assertFalse(out.contains("android:maxSdkVersion=\""), out);
+    }
+
+    @Test
+    void exclusiveDeclaresTheSdk23ShapeSoAMergeCannotArriveUnflagged() {
+        // The merger keys uses-permission and uses-permission-sdk-23
+        // separately and unions attributes WITHIN a key. A Gradle-resolved aar
+        // contributing the sdk-23 shape merges after this runs and is never
+        // scanned here, so with nothing of ours under that key its declaration
+        // arrives unflagged and the build ships ordinary precise-location
+        // access while calling itself exclusive.
+        String out = LocationButtonManifestFragments.inject("", true);
+        int at = out.indexOf("uses-permission-sdk-23");
+        assertTrue(at >= 0, "the sdk-23 shape is declared under the hint:\n"
+                + out);
+        int close = out.indexOf('>', at);
+        String element = out.substring(at, close);
+        assertTrue(element.contains("ACCESS_FINE_LOCATION"), element);
+        assertTrue(element.contains("onlyForLocationButton"), element);
+    }
+
+    @Test
+    void theSdk23ShapeIsNotDeclaredWithoutTheHint() {
+        // Only under exclusivity, so no build that does not ask for it
+        // changes shape.
+        String out = LocationButtonManifestFragments.inject("", false);
+        assertFalse(out.contains("uses-permission-sdk-23"),
+                "no hint, no extra element:\n" + out);
     }
 
     @Test
@@ -2154,6 +2212,28 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aStreamedConcatenatedReflectiveNameIsButtonUse() throws Exception {
+        // PARITY AUDIT, not a review finding: the buffered pass folds a
+        // loader argument across '+', so the streamed one has to as well or a
+        // file too large to hold in memory loses a load the small one keeps.
+        String source = "class Big { Object f() throws Exception { return "
+                + "Class.forName(\"com.codename1.location.\" + "
+                + "\"LocationButton\"); } }\n";
+        assertTrue(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "a concatenated loader argument is still the class name");
+    }
+
+    @Test
+    void aStreamedRawStringReflectiveNameIsButtonUse() throws Exception {
+        String source = "class Big { fun f(): Any = Class.forName("
+                + "\"\"\"com.codename1.location.LocationButton\"\"\") }\n";
+        assertTrue(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "a raw-string loader argument is still the class name");
+    }
+
+    @Test
     void aStreamedWildcardImportPutsTheSimpleNameInScope() throws Exception {
         // The statement never contains the full dotted name, so the matcher
         // looking for that name cannot see it -- and the code then spells the
@@ -2711,6 +2791,55 @@ class LocationButtonManifestFragmentsTest {
                 + "}\n");
         assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
                 "a static import the code uses is use of the button");
+    }
+
+    @Test
+    void anExplicitImportOfAnotherLocationButtonShadowsTheWildcard()
+            throws Exception {
+        // Java resolves the bare name to the explicit import, so this file
+        // never touches our component -- and charging it puts fine and coarse
+        // location into an application that asks for location nowhere.
+        File root = tempDir("cn1-lb-shadow-import");
+        writeSource(new File(root, "com/example/Shadowed.java"),
+                "package com.example;\n"
+                + "import com.codename1.location.*;\n"
+                + "import com.acme.widgets.LocationButton;\n"
+                + "public class Shadowed {\n"
+                + "  Object f() { return new LocationButton(); }\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "the explicit import owns the simple name");
+    }
+
+    @Test
+    void aLocalClassOfTheSameNameShadowsThePackageScope() throws Exception {
+        // A sibling in the package that declares its OWN LocationButton binds
+        // the bare name to itself.
+        File root = tempDir("cn1-lb-shadow-local");
+        writeSource(new File(root, "com/codename1/location/Local.java"),
+                "package com.codename1.location;\n"
+                + "public class Local {\n"
+                + "  static class LocationButton { }\n"
+                + "  Object f() { return new LocationButton(); }\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "a type declared here owns the simple name");
+    }
+
+    @Test
+    void anUnrelatedImportDoesNotShadowTheWildcard() throws Exception {
+        // And the shadowing has to be of THIS name, or every wildcard import
+        // beside any other import would stop counting.
+        File root = tempDir("cn1-lb-shadow-none");
+        writeSource(new File(root, "com/example/Fine.java"),
+                "package com.example;\n"
+                + "import com.codename1.location.*;\n"
+                + "import com.acme.widgets.SomethingElse;\n"
+                + "public class Fine {\n"
+                + "  Object f() { return new LocationButton(); }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "an unrelated import shadows nothing");
     }
 
     @Test
@@ -3387,14 +3516,14 @@ class LocationButtonManifestFragmentsTest {
                 + "android.com/apk/res/android\" a:name=\"android.permission."
                 + "ACCESS_FINE_LOCATION\" a:maxSdkVersion=\"30\" />\n";
         String out = LocationButtonManifestFragments.inject(aliased, true);
-        assertEquals(1, count(out, "android.permission.ACCESS_FINE_LOCATION"),
+        assertEquals(1, count(withoutSdk23(out), "android.permission.ACCESS_FINE_LOCATION"),
                 out);
         assertFalse(out.contains("maxSdkVersion=\""),
                 "the aliased cap must be removed, not left in place: " + out);
         assertTrue(out.contains("onlyForLocationButton"),
                 "and the aliased declaration is the one that gets flagged: "
                 + out);
-        assertEquals(1, count(out, "onlyForLocationButton"),
+        assertEquals(1, count(withoutSdk23(out), "onlyForLocationButton"),
                 "flagged once, not once per spelling: " + out);
     }
 
@@ -3404,7 +3533,7 @@ class LocationButtonManifestFragmentsTest {
                 + "android.permission.ACCESS_FINE_LOCATION\""
                 + " android:maxSdkVersion=\"32\" />\n";
         String out = LocationButtonManifestFragments.inject(wifi, true);
-        assertEquals(1, count(out, "android.permission.ACCESS_FINE_LOCATION"),
+        assertEquals(1, count(withoutSdk23(out), "android.permission.ACCESS_FINE_LOCATION"),
                 out);
         assertFalse(out.contains("android:maxSdkVersion=\""), out);
         assertTrue(out.contains("onlyForLocationButton"), out);
@@ -3414,11 +3543,11 @@ class LocationButtonManifestFragmentsTest {
     void nothingIsDeclaredTwiceWhenTheFragmentIsInjectedAgain() {
         String once = LocationButtonManifestFragments.inject("", true);
         String twice = LocationButtonManifestFragments.inject(once, true);
-        assertEquals(1, count(twice, "android.permission.USE_LOCATION_BUTTON"),
+        assertEquals(1, count(withoutSdk23(twice), "android.permission.USE_LOCATION_BUTTON"),
                 twice);
-        assertEquals(1, count(twice, "android.permission.ACCESS_FINE_LOCATION"),
+        assertEquals(1, count(withoutSdk23(twice), "android.permission.ACCESS_FINE_LOCATION"),
                 twice);
-        assertEquals(1, count(twice, "onlyForLocationButton"), twice);
+        assertEquals(1, count(withoutSdk23(twice), "onlyForLocationButton"), twice);
     }
 
     @Test
@@ -4571,12 +4700,17 @@ class LocationButtonManifestFragmentsTest {
                 + ".ACCESS_FINE_LOCATION\" /> -->\n"
                 + "<uses-permission android:name=\"android.permission"
                 + ".ACCESS_FINE_LOCATION\" />\n", true);
-        int comment = out.indexOf("<!--");
-        int commentEnd = out.indexOf("-->");
-        int flag = out.indexOf("onlyForLocationButton");
-        assertTrue(flag >= 0, "the flag must be written: " + out);
+        // The ORDINARY element, which is what this is about. Exclusivity also
+        // declares the sdk-23 shape, and it is written at the front -- so
+        // looking for the first flag in the whole block finds that one and
+        // says nothing about where this one landed.
+        String ordinary = withoutSdk23(out);
+        int comment = ordinary.indexOf("<!--");
+        int commentEnd = ordinary.indexOf("-->");
+        int flag = ordinary.indexOf("onlyForLocationButton");
+        assertTrue(flag >= 0, "the flag must be written: " + ordinary);
         assertTrue(comment < 0 || flag > commentEnd,
-                "the flag must land outside the comment: " + out);
+                "the flag must land outside the comment: " + ordinary);
     }
     /**
      * A library's own TOP-LEVEL class whose name contains a dollar is not the

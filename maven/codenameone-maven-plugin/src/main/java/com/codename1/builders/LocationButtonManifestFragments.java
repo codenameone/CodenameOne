@@ -976,6 +976,27 @@ final class LocationButtonManifestFragments {
         if (exclusive) {
             out = addPermissionFlag(out, FINE_LOCATION,
                     ONLY_FOR_LOCATION_BUTTON);
+            // The OTHER element shape as well, flagged, even when nothing here
+            // uses it.
+            //
+            // uses-permission and uses-permission-sdk-23 are distinct keys to
+            // the manifest merger -- this file relies on that in several
+            // places already -- so the flag written above reaches only the
+            // first of them. A Gradle-resolved aar contributing
+            // <uses-permission-sdk-23 android:name="ACCESS_FINE_LOCATION"/>
+            // merges after this runs and is never scanned here, and the merger
+            // unions attributes WITHIN a key: with nothing of ours under that
+            // key there is nothing for its declaration to union with, so it
+            // arrives unflagged and the build ships ordinary precise-location
+            // access while reporting itself exclusive.
+            //
+            // Declaring our own flagged one gives the union something to meet.
+            // It costs nothing that is not already asked for -- the ordinary
+            // uses-permission above requests the same permission on every API
+            // -- and it is written only under the hint, so no build that does
+            // not ask for exclusivity changes shape.
+            out = declareFlagged(out, SDK_23_PERMISSION, FINE_LOCATION,
+                    ONLY_FOR_LOCATION_BUTTON);
         }
         return out;
     }
@@ -1117,6 +1138,43 @@ final class LocationButtonManifestFragments {
      * @param flag         the flag to add
      * @return the fragment with the flag present on that permission
      */
+    /** The element that requests a permission on API 23 and later only. */
+    private static final String SDK_23_PERMISSION = "uses-permission-sdk-23";
+
+    /**
+     * Declares {@code name} under {@code element} carrying {@code flag}.
+     *
+     * <p>For the element shapes nothing local uses but the MERGE can bring in.
+     * An existing declaration of that shape is left to
+     * {@link #addPermissionFlag}, which flags every live one; this only adds
+     * the shape when it is absent, so that a library's later contribution has
+     * an attribute set of ours to be unioned into.</p>
+     *
+     * @param xPermissions the permissions accumulated so far
+     * @param element      the element name
+     * @param name         the permission
+     * @param flag         the flag it must carry
+     * @return them, with the declaration present and flagged
+     */
+    private static String declareFlagged(String xPermissions, String element,
+            String name, String flag) {
+        String out = xPermissions == null ? "" : xPermissions;
+        int at = out.indexOf(name);
+        while (at >= 0) {
+            int open = out.lastIndexOf('<', at);
+            int close = out.indexOf('>', at);
+            if (open >= 0 && close >= 0 && !isInsideComment(out, at)
+                    && out.substring(open + 1, close).trim()
+                            .startsWith(element)) {
+                // Already there, and addPermissionFlag has flagged it.
+                return out;
+            }
+            at = out.indexOf(name, at + 1);
+        }
+        return "    <" + element + " android:name=\"" + name
+                + "\" android:usesPermissionFlags=\"" + flag + "\" />\n" + out;
+    }
+
     static String addPermissionFlag(String xPermissions, String name,
             String flag) {
         // EVERY active element, not the first one. A permission can be declared
@@ -2375,6 +2433,15 @@ final class LocationButtonManifestFragments {
         boolean complete = false;
         StringBuilder literal = null;
         StringBuilder tail = new StringBuilder();
+        // Literals JOINED by '+', which the buffered pass folds before it
+        // compares. Without the same here, a loader argument written as
+        // "com.codename1.location." + "LocationButton" is two literals, and
+        // neither is the name -- so an oversized file loses a load the small
+        // one keeps.
+        StringBuilder joined = null;
+        String joinTail = null;
+        boolean afterLiteral = false;
+        boolean expectPiece = false;
         // The same import rule the buffered pass applies: an import is not
         // use. Kept in one pass because both languages put imports above the
         // code that uses them, so a name bound here is seen before the code
@@ -2426,7 +2493,26 @@ final class LocationButtonManifestFragments {
                                 && loaderCallEndsAt(tail)) {
                             return true;
                         }
+                        if (literal == null) {
+                            // A piece too long to hold is a join nothing can
+                            // complete.
+                            joined = null;
+                        } else {
+                            if (joined == null) {
+                                joined = new StringBuilder();
+                                joinTail = tail.toString();
+                            }
+                            joined.append(literal);
+                            if (joined.length() > target.length()) {
+                                joined = null;
+                            } else if (target.contentEquals(joined)
+                                    && loaderCallEndsAt(
+                                            new StringBuilder(joinTail))) {
+                                return true;
+                            }
+                        }
                         literal = null;
+                        afterLiteral = true;
                         state = CODE;
                         before = c;
                     } else if (literal != null) {
@@ -2505,6 +2591,22 @@ final class LocationButtonManifestFragments {
                     }
                     complete = false;
                     matched = 0;
+                }
+                if ((afterLiteral || expectPiece) && !isSourceSpace(c)) {
+                    // Only a '+' continues a join, and only a quote after it
+                    // opens the next piece. The quote used to end the join
+                    // here, which meant a join of two pieces never survived
+                    // its own second piece.
+                    if (afterLiteral && c == '+') {
+                        afterLiteral = false;
+                        expectPiece = true;
+                    } else if (expectPiece && (c == '"' || c == '\'')) {
+                        expectPiece = false;
+                    } else {
+                        joined = null;
+                        afterLiteral = false;
+                        expectPiece = false;
+                    }
                 }
                 if (c == '"' || c == '\'') {
                     state = c == '"' ? STRING : CHAR;
@@ -3132,8 +3234,78 @@ final class LocationButtonManifestFragments {
         if (imported) {
             return false;
         }
-        // No qualified mention at all: the package may still be in scope.
-        return sourceNames(text, owner);
+        // No qualified mention at all: the package may still be in scope --
+        // unless something nearer has taken the simple name. An explicit
+        // import of another package's LocationButton, or a class of that name
+        // declared here, is what Java resolves the bare name to, so treating
+        // every such token as ours charged an application that never touches
+        // the component.
+        return !shadowsSimpleName(text, dotted, simple, imports)
+                && sourceNames(text, owner);
+    }
+
+    /**
+     * Whether something nearer than the wildcard has taken the simple name.
+     *
+     * <p>A wildcard import and a package declaration both put a simple name in
+     * scope, and both lose to anything more specific: an explicit
+     * single-type import binds that name to its own class, and a type declared
+     * in the file binds it to that. Java resolves the bare token to those, so
+     * this scan must not read it as the button.</p>
+     *
+     * <p>Only asked when nothing names the class outright. A file that spells
+     * the qualified name, or imports it directly, has already answered.</p>
+     *
+     * @param text    the source, comments gone
+     * @param dotted  the class's qualified name
+     * @param simple  its simple name
+     * @param imports the import statement ranges
+     * @return whether the bare name means something else here
+     */
+    private static boolean shadowsSimpleName(String text, String dotted,
+            String simple, int[][] imports) {
+        for (int range = 0; range < imports.length; range++) {
+            String statement = text.substring(imports[range][0],
+                    imports[range][1]);
+            if (namesToken(statement, dotted)) {
+                continue;
+            }
+            String bound = boundName(statement, null);
+            if (simple.equals(bound)) {
+                return true;
+            }
+        }
+        return declaresType(text, simple, imports);
+    }
+
+    /** Whether the source declares a type called {@code simple}. */
+    private static boolean declaresType(String text, String simple,
+            int[][] imports) {
+        String[] keywords = {"class", "interface", "enum", "object", "record"};
+        for (int word = 0; word < keywords.length; word++) {
+            int at = text.indexOf(keywords[word]);
+            while (at >= 0) {
+                int after = at + keywords[word].length();
+                boolean startsClean = at == 0
+                        || !Character.isJavaIdentifierPart(
+                                text.charAt(at - 1));
+                if (startsClean && after < text.length()
+                        && isSourceSpace(text.charAt(after))
+                        && !within(at, imports)) {
+                    int walk = skipSpace(text, after);
+                    if (text.startsWith(simple, walk)) {
+                        int end = walk + simple.length();
+                        if (end >= text.length()
+                                || !Character.isJavaIdentifierPart(
+                                        text.charAt(end))) {
+                            return true;
+                        }
+                    }
+                }
+                at = text.indexOf(keywords[word], at + 1);
+            }
+        }
+        return false;
     }
 
     /**
@@ -3247,7 +3419,23 @@ final class LocationButtonManifestFragments {
         }
         boolean isStatic = tokens.length > 1 && "static".equals(tokens[1]);
         if (!isStatic) {
-            return simple;
+            // Null asks for whatever the statement binds, rather than for a
+            // known class's own name -- which is what the shadowing check
+            // wants: the last segment of the imported name.
+            if (simple != null) {
+                return simple;
+            }
+            String imported = tokens.length > 1 ? tokens[1] : "";
+            int semi = imported.indexOf(';');
+            if (semi >= 0) {
+                imported = imported.substring(0, semi);
+            }
+            if (imported.endsWith(".*")) {
+                return null;
+            }
+            int dot = imported.lastIndexOf('.');
+            return identifierHead(dot < 0 ? imported
+                    : imported.substring(dot + 1));
         }
         String qualified = tokens.length > 2 ? tokens[2] : "";
         if (qualified.endsWith(".*")) {
