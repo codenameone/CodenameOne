@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.initializr.model;
 
 import com.codename1.io.Util;
@@ -32,22 +54,33 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
         Path java8Or11 = findJava8Or11Home();
         Path java17 = findJavaHomeForMajor(17);
 
+        Path buildClient = findBuildClientJar();
+        if (buildClient == null) {
+            // Every goal in the generated project's compile runs out of this jar, so
+            // without it there is nothing to test. Skip rather than fail: it is installed
+            // by setup-workspace.sh, not by this repository's build.
+            System.out.println("[WARN] Skipping integration build checks. No "
+                    + ".codenameone/CodeNameOneBuildClient.jar found under the user home.");
+            return true;
+        }
+
         if (java8Or11 == null) {
             System.out.println("[WARN] Skipping Java 8/11 integration build check. No JDK 8 or 11 found.");
         } else {
-            buildGeneratedProject(ProjectOptions.JavaVersion.JAVA_8, java8Or11, "java8-or-11");
+            buildGeneratedProject(ProjectOptions.JavaVersion.JAVA_8, java8Or11, buildClient, "java8-or-11");
         }
 
         if (java17 == null) {
             System.out.println("[WARN] Skipping Java 17 integration build check. No JDK 17 found.");
         } else {
-            buildGeneratedProject(ProjectOptions.JavaVersion.JAVA_17, java17, "java17");
+            buildGeneratedProject(ProjectOptions.JavaVersion.JAVA_17, java17, buildClient, "java17");
         }
 
         return true;
     }
 
-    private void buildGeneratedProject(ProjectOptions.JavaVersion version, Path javaHome, String suffix) throws Exception {
+    private void buildGeneratedProject(ProjectOptions.JavaVersion version, Path javaHome,
+                                       Path buildClient, String suffix) throws Exception {
         String appName = "Integration" + suffix.replace("-", "") + "App";
         String packageName = "com.acme.initializr." + suffix.replace("-", "");
 
@@ -63,11 +96,11 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
         byte[] zip = createProjectZip(options, appName, packageName);
         Path projectDir = Files.createTempDirectory("initializr-integration-" + suffix + "-");
         Path homeDir = Files.createTempDirectory("initializr-home-" + suffix + "-");
-        ensureCodenameOneHome(homeDir);
+        ensureCodenameOneHome(homeDir, buildClient);
         unzipProject(zip, projectDir);
 
         int exitCode = runMavenCompile(projectDir, homeDir, javaHome);
-        assertTrue(exitCode == 0, "Generated project should compile with selected JDK. Version=" + version.label + " | exitCode=" + exitCode);
+        assertTrue(exitCode == 0, "Generated project should build with selected JDK. Version=" + version.label + " | exitCode=" + exitCode);
 
         // Localization bundles were requested -- they must end up baked into theme.res so
         // that Resources.getGlobalResources().getL10N("messages", lang) resolves at runtime.
@@ -79,7 +112,7 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
     private void assertLocalizationBakedIntoThemeRes(Path projectDir, ProjectOptions.JavaVersion version) throws Exception {
         Path themeRes = projectDir.resolve("common/target/classes/theme.res");
         assertTrue(Files.isRegularFile(themeRes),
-                "theme.res should exist after compile. Version=" + version.label + " | path=" + themeRes);
+                "theme.res should exist after the build. Version=" + version.label + " | path=" + themeRes);
 
         Resources res;
         try (FileInputStream in = new FileInputStream(themeRes.toFile())) {
@@ -115,7 +148,11 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
                 "-DskipTests=true",
                 "-Dcodename1.platform=javase",
                 "-Duser.home=" + homeDir.toString(),
-                "compile"
+                // process-classes, not compile: the generated pom binds the cn1 css goal
+                // (theme.css -> theme.res, localization bundles and all) to that phase, so
+                // stopping at compile leaves nothing for assertLocalizationBakedIntoThemeRes
+                // to read.
+                "process-classes"
         );
         pb.directory(projectDir.toFile());
         pb.redirectErrorStream(true);
@@ -148,11 +185,27 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
         return exit;
     }
 
-    private void ensureCodenameOneHome(Path homeDir) throws IOException {
+    /// Populates the throwaway home the generated build runs against. Both jars belong in
+    /// `.codenameone/`: that is where the generated pom's systemPath points and where
+    /// `generate-gui-sources` looks. The build client has to be the real one - the mojo
+    /// loads `com.codename1.build.client.GenerateGuiSources` out of it, so an empty
+    /// placeholder fails the build before it compiles a line.
+    private void ensureCodenameOneHome(Path homeDir, Path buildClient) throws IOException {
         Path cn1Dir = homeDir.resolve(".codenameone");
         Files.createDirectories(cn1Dir);
         Files.write(cn1Dir.resolve("guibuilder.jar"), new byte[0]);
-        Files.write(homeDir.resolve("CodeNameOneBuildClient.jar"), new byte[0]);
+        Files.copy(buildClient, cn1Dir.resolve("CodeNameOneBuildClient.jar"));
+    }
+
+    /// The build client installed on this machine, or null when there is none. The test
+    /// overrides `user.home` for the child build only, so the real home still holds it.
+    private Path findBuildClientJar() {
+        String home = System.getProperty("user.home");
+        if (home == null || home.length() == 0) {
+            return null;
+        }
+        Path jar = Paths.get(home, ".codenameone", "CodeNameOneBuildClient.jar");
+        return Files.isRegularFile(jar) ? jar : null;
     }
 
     private void unzipProject(byte[] zipData, Path destination) throws IOException {

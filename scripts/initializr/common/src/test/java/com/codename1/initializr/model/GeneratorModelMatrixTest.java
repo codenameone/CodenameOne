@@ -169,6 +169,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 ".agent-skills/codename-one/references/cn1libs.md",
                 ".agent-skills/codename-one/references/snapshot-builds.md",
                 ".agent-skills/codename-one/references/debugging.md",
+                ".agent-skills/codename-one/references/mcp-agent-control.md",
                 ".agent-skills/codename-one/references/ai-and-speech.md",
                 ".agent-skills/codename-one/tools/README.md",
                 ".agent-skills/codename-one/tools/IsApiSupported.java",
@@ -195,6 +196,10 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String agentsMd = getText(entries, "AGENTS.md");
         assertContains(agentsMd, ".agent-skills/codename-one/SKILL.md",
                 "AGENTS.md should point agents at the canonical skill location");
+        // An agent that never learns the running app is drivable will only ever look at
+        // screenshots, so the pointer to the MCP loop belongs in the root file too.
+        assertContains(agentsMd, "references/mcp-agent-control.md",
+                "AGENTS.md should point agents at the MCP control loop");
 
         String claudeStub = getText(entries, ".claude/skills/codename-one/SKILL.md");
         assertContains(claudeStub, "name: codename-one", "Claude stub must keep the skill frontmatter");
