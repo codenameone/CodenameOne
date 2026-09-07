@@ -2265,6 +2265,35 @@ static pthread_mutex_t cn1RefMutex = PTHREAD_MUTEX_INITIALIZER;
 // would be harmless anyway -- the budget only decides retention, never safety.
 static _Atomic int cn1SoftRetainCycles = CN1_REF_SOFT_RETAIN_MAX;
 
+// Raised when an allocation has actually FAILED, and consumed by the next cycle.
+//
+// The retention ladder is driven by cn1ProcessHeadroom(), which answers -1 wherever there
+// is no per-process budget to probe -- every desktop build, and the simulator. There the
+// ladder can only ever say "plenty", so a soft referent read at least once every
+// CN1_REF_SOFT_RETAIN_MAX cycles is never dropped however tight memory actually is. That
+// is a hole rather than a conservative default, because the one guarantee SoftReference
+// makes is precisely about this case: every soft reference is cleared before the VM gives
+// up. codenameOneGcMalloc's failure path only asks for a collection and retries, so a heap
+// held entirely through live soft references would have turned recoverable pressure into an
+// allocation loop that collects nothing.
+//
+// A LATCH rather than a direct write of the budget, because cn1RefBeginCycle recomputes
+// that budget from scratch at the top of every cycle and would erase a direct write before
+// a single reference was reached.
+static _Atomic int cn1RefEmergencyDrop = 0;
+
+// currentGcMarkValue of the cycle whose clear pass has already aged the discovered set.
+// GC thread only. The pass can run more than once in a cycle -- every SATB reopen runs it
+// again -- and ageing on each of those would count one collection as several and evict a
+// cache by however many times the mutator happened to storm the reference log.
+static int cn1RefAgedCycle = 0;
+
+// Called from the allocation-failure path. Idempotent, allocation-free and safe from a
+// thread that is about to park -- a relaxed store and nothing else.
+void cn1RefDropAllSoftReferents(void) {
+    atomic_store_explicit(&cn1RefEmergencyDrop, 1, memory_order_relaxed);
+}
+
 #ifdef CN1_GC_CONFORM
 _Atomic long cn1RefDiscoveries = 0;   // references the mark reached (deduped)
 _Atomic long cn1RefWeak = 0;          // of those, weak
@@ -2291,6 +2320,14 @@ static void cn1RefBeginCycle(void) {
     cn1RefPhaseNs = 0;
     cn1RefPasses = 0;
 #endif
+    // THE EMERGENCY LATCH OUTRANKS EVERY POLICY, including "never clear" -- an arm that
+    // exists to bound the measurement, not to promise a soft reference outlives an
+    // out-of-memory. Exchange rather than load-then-clear so a failure raised while this
+    // runs is either honoured now or survives to the next cycle, never dropped between.
+    if(atomic_exchange_explicit(&cn1RefEmergencyDrop, 0, memory_order_relaxed)) {
+        atomic_store_explicit(&cn1SoftRetainCycles, -1, memory_order_relaxed);
+        return;
+    }
 #if CN1_REF_POLICY == 1
     atomic_store_explicit(&cn1SoftRetainCycles, 0x7fffffff, memory_order_relaxed);
 #else
@@ -2382,16 +2419,22 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
     }
     *agedCycleField = currentGcMarkValue;
     {
-        // AGE IT. CN1_REF_TOUCHED means get() ran since the last cycle aged this
-        // reference, so the age resets; anything else is one collection older. Saturating,
-        // because an age that wraps to negative would read as freshly touched and make a
-        // cold entry immortal.
+        // READ the age; do NOT consume it. The ageing write lives at the end of the clear
+        // pass instead, and that placement is a safety property rather than tidiness.
+        //
+        // Consuming CN1_REF_TOUCHED here would erase every get() that happened between the
+        // start of the cycle and this moment, so the clear pass's "was it read?" fallback
+        // would only ever have covered reads that landed AFTER discovery. It would also
+        // lose the touch outright under a race -- read 5, a mutator stamps TOUCHED, write 6
+        // -- leaving a just-used referent looking cold with no record that it was used at
+        // all. Deferring the write means any read anywhere in the cycle is still visible to
+        // sub-pass A.
+        //
+        // CN1_REF_TOUCHED is negative, so it compares as hotter than any real age and a
+        // reference read this cycle is retained by the test below without a special case.
         JAVA_INT age = __atomic_load_n(touchAgeField, __ATOMIC_RELAXED);
-        JAVA_INT aged = (age == CN1_REF_TOUCHED) ? 0
-                      : (age < 0x7ffffffe ? age + 1 : age);
-        __atomic_store_n(touchAgeField, aged, __ATOMIC_RELAXED);
         int budget = atomic_load_explicit(&cn1SoftRetainCycles, memory_order_relaxed);
-        retain = (strength == CN1_REF_SOFT && budget >= 0 && aged <= budget)
+        retain = (strength == CN1_REF_SOFT && budget >= 0 && age <= budget)
                  ? JAVA_TRUE : JAVA_FALSE;
     }
     if(cn1RefDiscoveredTop >= cn1RefDiscoveredCap
@@ -2502,11 +2545,21 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
         if(r == JAVA_NULL || CN1_IS_TAGGED(r)) {
             continue;
         }
-        if(__atomic_load_n(e->touchAgeField, __ATOMIC_RELAXED) == CN1_REF_TOUCHED) {
-            gcMarkObject(threadStateData, r, JAVA_FALSE);
-            marked = JAVA_TRUE;
-            gcMarkDrain(threadStateData);
-            continue;
+        {
+            // Ages inline, as the single-loop form did. Discovery no longer ages, so
+            // without this the arm would never age anything, every reference would read as
+            // permanently touched, and the arm would silently become "retain everything"
+            // rather than the shape it exists to reproduce.
+            JAVA_INT age = __atomic_load_n(e->touchAgeField, __ATOMIC_RELAXED);
+            JAVA_INT aged = (age == CN1_REF_TOUCHED) ? 0
+                          : (age < 0x7ffffffe ? age + 1 : age);
+            __atomic_store_n(e->touchAgeField, aged, __ATOMIC_RELAXED);
+            if(age == CN1_REF_TOUCHED) {
+                gcMarkObject(threadStateData, r, JAVA_FALSE);
+                marked = JAVA_TRUE;
+                gcMarkDrain(threadStateData);
+                continue;
+            }
         }
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
         if(cn1ConservativeResolve((void*)r) != r && !cn1GcImmortalObjContains(r)) {
@@ -2551,7 +2604,12 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
         gcMarkDrain(threadStateData);
     }
 
-    // SUB-PASS B: clear on the referent's liveness alone.
+    // SUB-PASS B: clear on the referent's liveness alone, then age.
+    //
+    // The ageing happens HERE, once per cycle, rather than at discovery -- see the comment
+    // there. It runs after the clear decision for the same reason: sub-pass A's reading of
+    // the stamp must not be undone by this pass before the decision that depends on it.
+    JAVA_BOOLEAN doAge = (cn1RefAgedCycle != currentGcMarkValue) ? JAVA_TRUE : JAVA_FALSE;
     for(long i = 0 ; i < n ; i++) {
         struct CN1RefEntry* e = &cn1RefDiscovered[i];
         JAVA_OBJECT r = __atomic_load_n(e->referentField, __ATOMIC_RELAXED);
@@ -2584,6 +2642,30 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
 #ifdef CN1_GC_CONFORM
         atomic_fetch_add_explicit(&cn1RefCleared, 1, memory_order_relaxed);
 #endif
+    }
+
+    // AGE, by compare-exchange, so a get() racing this cannot be erased. A plain
+    // read-modify-write here would reintroduce exactly what deferring the write was meant
+    // to remove: read 5, a mutator stamps TOUCHED, write 6, and the read has vanished with
+    // the age not even reset. On a failed exchange the reload sees the mutator's
+    // CN1_REF_TOUCHED and resets the age to 0, which is what the touch means.
+    if(doAge) {
+        for(long i = 0 ; i < n ; i++) {
+            JAVA_INT* f = cn1RefDiscovered[i].touchAgeField;
+            JAVA_INT age = __atomic_load_n(f, __ATOMIC_RELAXED);
+            for(;;) {
+                // Saturating: an age that wrapped to negative would compare as hotter than
+                // anything real and make a cold entry immortal.
+                JAVA_INT aged = (age == CN1_REF_TOUCHED) ? 0
+                              : (age < 0x7ffffffe ? age + 1 : age);
+                if(__atomic_compare_exchange_n(f, &age, aged, 0,
+                                               __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+                    break;
+                }
+                // age now holds what the mutator wrote; recompute against it.
+            }
+        }
+        cn1RefAgedCycle = currentGcMarkValue;
     }
 #ifdef CN1_GC_CONFORM
     cn1RefPhaseNs += cn1GcNowNs() - __r0;
@@ -4220,8 +4302,8 @@ static _Atomic int cn1GcNativeGcRequest = 0;
 // Something that CHANGES when a collection starts, for callers that need to wait for the
 // one they just asked for rather than for a handshake that may never reach them.
 #ifdef CN1_GC_CONFORM
-// TEST HOOK. CN1_SIMULATE_ALLOC_FAILURES=<n> makes the next n legacy allocations return
-// NULL. The out-of-memory retry path is the one place in this allocator that cannot be
+// TEST HOOK. CN1_SIMULATE_ALLOC_FAILURES=<n>[:<skip>] makes n legacy allocations return
+// NULL, after letting the first <skip> through. The out-of-memory retry path is the one place in this allocator that cannot be
 // reached on a developer machine -- macOS ignores `ulimit -v`, so there is no way to make
 // calloc fail on demand -- and it has now been the subject of two review findings that
 // could only be reasoned about. Gated on CN1_GC_CONFORM, like the rest of the QA
@@ -4235,14 +4317,45 @@ static pthread_once_t cn1AllocFailOnce = PTHREAD_ONCE_INIT;
 static _Atomic long cn1SimulatedAllocFailures = 0;
 _Atomic long cn1AllocRetries = 0;   // times the OOM path went round again
 
+// Allocations still to be let through before the failures start. "<n>:<skip>" fails n
+// allocations AFTER the first skip have succeeded.
+//
+// Without a skip the hook can only ever fail the FIRST allocations a program makes, which
+// is startup -- and a state that exists only at startup cannot exercise anything the
+// program builds later. Reaching cn1RefDropAllSoftReferents' effect needs a failure while
+// soft referents are actually live, and every attempt without this knob spent its whole
+// budget before the first SoftReference existed: the emergency cycles were real and
+// visible, and every one of them reported discovered=0.
+static _Atomic long cn1SimulatedAllocSkip = 0;
+
 static void cn1AllocFailInit(void) {
     const char* e = getenv("CN1_SIMULATE_ALLOC_FAILURES");
-    long n = e ? atol(e) : 0;
+    long n = 0, skip = 0;
+    if(e != 0) {
+        n = atol(e);
+        const char* colon = strchr(e, ':');
+        if(colon != 0) {
+            skip = atol(colon + 1);
+        }
+    }
     atomic_store_explicit(&cn1SimulatedAllocFailures, n < 0 ? 0 : n, memory_order_relaxed);
+    atomic_store_explicit(&cn1SimulatedAllocSkip, skip < 0 ? 0 : skip, memory_order_relaxed);
 }
 
 static JAVA_BOOLEAN cn1ShouldFailAllocation(void) {
     pthread_once(&cn1AllocFailOnce, cn1AllocFailInit);
+    // Burn the skip budget first, with the same decrement-only-while-positive discipline
+    // the failure budget uses and for the same reason.
+    {
+        long sk = atomic_load_explicit(&cn1SimulatedAllocSkip, memory_order_relaxed);
+        while(sk > 0) {
+            if(atomic_compare_exchange_weak_explicit(&cn1SimulatedAllocSkip, &sk, sk - 1,
+                                                     memory_order_relaxed,
+                                                     memory_order_relaxed)) {
+                return JAVA_FALSE;
+            }
+        }
+    }
     // Decrement only while positive, so the count cannot go below zero however many
     // threads race here.
     long v = atomic_load_explicit(&cn1SimulatedAllocFailures, memory_order_relaxed);
@@ -9741,6 +9854,14 @@ cn1GcMallocRetry:
             goto cn1GcMallocRetry;
         }
         invokedGC = YES;
+        // An allocation has genuinely failed, so every soft referent goes at the next
+        // cycle regardless of what the retention ladder thinks. SoftReference's one hard
+        // guarantee is that all of them are cleared before the VM gives up, and the ladder
+        // cannot anticipate this on a platform whose headroom probe answers -1 -- it would
+        // keep re-arming a comfortable budget while this loop collected nothing and
+        // retried. Raised BEFORE the collection is asked for, so the cycle that request
+        // starts is the one that honours it.
+        cn1RefDropAllSoftReferents();
         java_lang_System_gc__(getThreadLocalData());
         CN1_GC_PARK_CAPTURE(threadStateData);   // this park can now last seconds; be scannable
         threadStateData->threadActive = JAVA_FALSE;

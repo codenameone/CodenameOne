@@ -3093,6 +3093,11 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
 
 extern int currentGcMarkValue;
 extern void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);
+// Drop every soft referent at the next collection, whatever the retention policy would
+// otherwise have decided. Called when an allocation has actually failed: SoftReference's
+// one hard guarantee is that all of them are cleared before the VM gives up, and the
+// retention ladder cannot see that coming on a platform with no per-process budget probe.
+extern void cn1RefDropAllSoftReferents(void);
 extern void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOOLEAN force,
                                    JAVA_OBJECT* referentField, JAVA_INT* touchAgeField,
                                    JAVA_INT* agedCycleField, JAVA_INT strength);

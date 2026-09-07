@@ -71,7 +71,13 @@ public abstract class Reference{
      * reference at all while mutators run: see the discussion of
      * {@code cn1GcProcessReferences}.</p>
      */
-    int cn1TouchAge = TOUCHED;
+    // Starts at 0 -- "read this cycle", not TOUCHED. TOUCHED means "read since the
+    // collector last aged this", and a reference nothing has called get() on yet has not
+    // been; starting there would make the clear pass treat every newly discovered
+    // reference as freshly used and mark its referent for a cycle, weak ones included.
+    // Zero already reads as maximally hot to the soft-retention test, which is what a new
+    // cache entry should be.
+    int cn1TouchAge;
 
     /**
      * {@link #STRENGTH_WEAK} or {@link #STRENGTH_SOFT}, set by the subclass
