@@ -45,8 +45,8 @@ input of the next step -- that's what makes a chain a pipeline. `onSuccess`,
 nothing, so they suit the end of a chain where there is no value to pass on.
 Attach both outcomes with `ready(success, failure)` rather than chaining
 `onSuccess(...).onFail(...)`: the second form hangs the failure handler off the
-promise `onSuccess` returns, behind the default rejection functor described
-below:
+promise `onSuccess` returns, one link further down the chain than the promise
+whose failure you meant to catch:
 
 [source,java]
 ----
@@ -56,11 +56,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 `getState()` reports `Pending`, `Fulfilled` or `Rejected`, and `getValue()`
 returns the resolved value once there is one.
 
-WARNING: Give the first `then` in a chain a rejection functor, as above. A
-`then` called with only a success functor installs a default one that does
-`throw (RuntimeException) reason`, so a rejection carrying a checked exception --
-an `IOException` from a network call, say -- fails that cast and reaches your
-`except` as a `ClassCastException` with the real cause gone.
+A `then` given only a success functor passes a rejection straight through to the
+promise it returns, carrying the original reason, so an `IOException` from a
+network call arrives at your `except` as that `IOException`. The success functor
+is skipped for a rejected promise, which is why a chain can end in a single
+`except` rather than handling failure at every link.
 
 === Combining several
 
