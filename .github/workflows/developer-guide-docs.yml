@@ -22,6 +22,16 @@ on:
       - 'maven/build-hint-catalog/**'
       - 'maven/build-hint-tools/**'
       - 'scripts/gen-build-hint-table.sh'
+      # The themed figures are rendered against the compiled native themes, so
+      # what those themes look like is an input to this guide exactly the way the
+      # build hint sources above are. build-native-themes.sh compiles
+      # native-themes/<name>/theme.css with maven/css-compiler, so a change to
+      # any of the three changes the pictures without touching docs/ at all --
+      # and the committed figures would then go stale silently until some later
+      # run failed against them.
+      - 'native-themes/**'
+      - 'maven/css-compiler/**'
+      - 'scripts/build-native-themes.sh'
   release:
     types: [published]
   workflow_dispatch:
@@ -67,6 +77,12 @@ jobs:
               - 'maven/build-hint-catalog/**'
               - 'maven/build-hint-tools/**'
               - 'scripts/gen-build-hint-table.sh'
+              # Same two-copies-of-one-list problem as the build hint inputs:
+              # triggering the workflow is not enough, because the figure
+              # comparison step is gated on this filter too.
+              - 'native-themes/**'
+              - 'maven/css-compiler/**'
+              - 'scripts/build-native-themes.sh'
             workflow:
               - '.github/workflows/developer-guide-docs.yml'
 
