@@ -44,9 +44,11 @@ public class AppBarRenderElement extends RenderElement {
 
     private List<Element> children = new ArrayList<Element>();
     /** Index into {@link #children} of each slot, or -1 when absent. */
+    private int flexibleSpaceIndex = -1;
     private int leadingIndex = -1;
     private int titleIndex = -1;
     private int firstActionIndex = -1;
+    private int bottomIndex = -1;
 
     public AppBarRenderElement(AppBar widget) {
         super(widget);
@@ -67,18 +69,27 @@ public class AppBarRenderElement extends RenderElement {
     @Override
     protected void syncChildren() {
         List<Widget> slots = new ArrayList<Widget>();
+        flexibleSpaceIndex = -1;
         leadingIndex = -1;
         titleIndex = -1;
         firstActionIndex = -1;
+        bottomIndex = -1;
+
+        // First, so it mounts and paints underneath the row: flexibleSpace is
+        // Flutter's background layer for the bar, not a fourth slot in it.
+        if (appBar().getFlexibleSpace() != null) {
+            flexibleSpaceIndex = slots.size();
+            slots.add(appBar().getFlexibleSpace());
+        }
 
         Widget leading = effectiveLeading();
         if (leading != null) {
             leadingIndex = slots.size();
-            slots.add(leading);
+            slots.add(styled(leading, false));
         }
         if (appBar().getTitle() != null) {
             titleIndex = slots.size();
-            slots.add(appBar().getTitle());
+            slots.add(styled(appBar().getTitle(), true));
         }
         if (appBar().getActions() != null) {
             for (Widget a : appBar().getActions()) {
@@ -88,10 +99,154 @@ public class AppBarRenderElement extends RenderElement {
                 if (firstActionIndex < 0) {
                     firstActionIndex = slots.size();
                 }
-                slots.add(a);
+                slots.add(styled(a, false));
             }
         }
+        // Last, and below the row: Flutter's AppBar.bottom is a band under the
+        // toolbar, not a slot in it. It was read into the widget and dropped,
+        // which is how the colors demo lost its whole palette tab bar and the
+        // tabs demo lost its tabs.
+        if (appBar().getBottom() != null) {
+            bottomIndex = slots.size();
+            slots.add(appBar().getBottom());
+        }
         children = updateChildren(children, slots);
+    }
+
+    /**
+     * Wraps a toolbar slot in the bar's ambient icon theme and text style.
+     *
+     * <p>This is how Flutter tints an app bar's contents, and why it works
+     * without every {@code Text} and {@code Icon} naming a colour: the bar
+     * publishes one {@code IconTheme} and one {@code DefaultTextStyle} and the
+     * subtree reads them. Setting a foreground on the strip container instead
+     * does nothing, because a Codename One style does not inherit its ink from
+     * an ancestor — which is why themed bars rendered black glyphs on purple.</p>
+     *
+     * <p>Deliberately NOT applied to {@code flexibleSpace}: in Flutter the
+     * flexible space sits in a Stack beneath the toolbar, outside these two
+     * wrappers, so it keeps whatever style its own subtree establishes. Crane's
+     * bar depends on that — its tab labels are white by its own theme.</p>
+     */
+    private Widget styled(Widget slot, boolean isTitle) {
+        Widget out = slot;
+        com.codename1.flutter.TextStyle text = isTitle ? titleTextStyle() : toolbarTextStyle();
+        if (text != null) {
+            out = com.codename1.flutter.widgets.DefaultTextStyle.wrap(text, out);
+        }
+        if (!isTitle) {
+            IconThemeData icons = effectiveIconTheme();
+            if (icons != null) {
+                IconTheme t = new IconTheme();
+                t.data(icons);
+                t.child(out);
+                out = t;
+            }
+        }
+        return out;
+    }
+
+    /**
+     * The icon styling for the bar's glyphs: {@code AppBar.iconTheme}, then the
+     * ambient {@code AppBarTheme}'s, then the bar's foreground colour.
+     *
+     * <p>One-directional on purpose. An {@code AppBarTheme.iconTheme} colours
+     * the ICONS and nothing else — reading it as the bar's foreground turns the
+     * title white too, which is wrong wherever a theme tints its glyphs against
+     * a bar whose title is meant to stay default ink. The gallery's demo pages
+     * are exactly that case: white icons, black title, on purple.</p>
+     */
+    private IconThemeData effectiveIconTheme() {
+        if (appBar().getIconTheme() != null) {
+            return appBar().getIconTheme();
+        }
+        try {
+            AppBarTheme bar = Theme.of(this).appBarTheme();
+            if (bar != null && bar.iconTheme() != null) {
+                return bar.iconTheme();
+            }
+        } catch (Throwable t) {
+            // no ambient theme
+        }
+        com.codename1.flutter.Color fg = effectiveForeground();
+        if (fg == null) {
+            return null;
+        }
+        IconThemeData d = new IconThemeData();
+        d.color(fg);
+        return d;
+    }
+
+    /** The style for the title: {@code AppBarTheme.titleTextStyle}, tinted with the foreground. */
+    private com.codename1.flutter.TextStyle titleTextStyle() {
+        if (appBar().getTitleTextStyle() != null) {
+            return tinted(appBar().getTitleTextStyle());
+        }
+        com.codename1.flutter.TextStyle fromBarTheme = null;
+        TextTheme textTheme = null;
+        try {
+            ThemeData theme = Theme.of(this);
+            AppBarTheme bar = theme.appBarTheme();
+            if (bar != null) {
+                fromBarTheme = bar.titleTextStyle();
+            }
+            textTheme = theme.textTheme();
+        } catch (Throwable t) {
+            // no ambient theme
+        }
+        return tinted(chooseTitleStyle(fromBarTheme, textTheme));
+    }
+
+    /**
+     * Flutter's chain for the title style:
+     * {@code AppBar.titleTextStyle ?? AppBarTheme.titleTextStyle ??
+     * textTheme.titleLarge}. The bar's own style is handled by the caller,
+     * which returns before reaching here.
+     *
+     * <p>The last link was missing, so a bar whose theme names no title style
+     * -- which is most of them -- fell through to whatever size a bare
+     * {@code Text} picks. That is about 16 logical pixels against titleLarge's
+     * 22, and every title in the gallery rendered at roughly seven tenths of
+     * its size.</p>
+     */
+    static com.codename1.flutter.TextStyle chooseTitleStyle(
+            com.codename1.flutter.TextStyle fromBarTheme, TextTheme textTheme) {
+        if (fromBarTheme != null) {
+            return fromBarTheme;
+        }
+        return textTheme == null ? null : textTheme.titleLarge();
+    }
+
+    /** The style for everything else on the bar (Flutter's toolbarTextStyle). */
+    private com.codename1.flutter.TextStyle toolbarTextStyle() {
+        com.codename1.flutter.TextStyle themed = null;
+        try {
+            AppBarTheme bar = Theme.of(this).appBarTheme();
+            if (bar != null) {
+                themed = bar.toolbarTextStyle();
+            }
+        } catch (Throwable t) {
+            // no ambient theme
+        }
+        return tinted(themed);
+    }
+
+    /** {@code base} with the bar's foreground applied when it names no colour of its own. */
+    private com.codename1.flutter.TextStyle tinted(com.codename1.flutter.TextStyle base) {
+        com.codename1.flutter.Color fg = effectiveForeground();
+        if (base == null) {
+            if (fg == null) {
+                return null;
+            }
+            com.codename1.flutter.TextStyle t = new com.codename1.flutter.TextStyle();
+            t.color(fg);
+            return t;
+        }
+        if (base.getColor() != null || fg == null) {
+            return base;
+        }
+        return base.copyWith(null, fg, null, null, null, null, null, null,
+                null, null, null, null, null);
     }
 
     /**
@@ -210,13 +365,13 @@ public class AppBarRenderElement extends RenderElement {
         }
         try {
             AppBarTheme bar = Theme.of(this).appBarTheme();
-            if (bar != null && bar.iconTheme() != null) {
-                return bar.iconTheme().color();
+            if (bar != null && bar.foregroundColor() != null) {
+                return bar.foregroundColor();
             }
+            return Theme.of(this).colorScheme().onSurface();
         } catch (Throwable t) {
-            // no ambient theme
+            return null;
         }
-        return null;
     }
 
     private void applyStripStyle(Component strip) {
@@ -229,7 +384,7 @@ public class AppBarRenderElement extends RenderElement {
         // that is exactly what the demo pages' AppBarTheme asks for.
         com.codename1.flutter.Color fg = effectiveForeground();
         if (fg != null) {
-            strip.getAllStyles().setFgColor(fg.value() & 0xFFFFFF);
+            strip.getAllStyles().setFgColor((int) (fg.value() & 0xFFFFFFL));
         }
     }
 
@@ -269,9 +424,35 @@ public class AppBarRenderElement extends RenderElement {
     // Layout - Flutter's NavigationToolbar
     // ------------------------------------------------------------------
 
+    /**
+     * The status-bar strip this bar has to clear, in pixels.
+     *
+     * <p>Flutter's app bar is {@code toolbarHeight + MediaQuery.padding.top}
+     * tall and puts its row below the inset, while the flexible space fills the
+     * whole thing. Ours was just {@code toolbarHeight}, so a bar at the top of
+     * the screen came out a notch short and any safe area inside its flexible
+     * space pushed that content clean out of the bar — which is why Crane's
+     * logo and tab bar rendered below their own app bar.</p>
+     */
+    private double topInset() {
+        if (!appBar().isPrimary() || toolbarMode()) {
+            return 0;
+        }
+        try {
+            return Dp.px(com.codename1.flutter.MediaQuery.of(this).padding().top());
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
     @Override
     protected Size performLayout(BoxConstraints constraints) {
-        double barHeight = barHeight(constraints);
+        double totalHeight = barHeight(constraints);
+        double topInset = Math.min(topInset(), totalHeight);
+        // The row occupies the toolbar band; `bottom` takes the rest.
+        RenderElement bottom = renderAt(bottomIndex);
+        double bottomHeight = bottomHeight(constraints, bottom);
+        double barHeight = Math.max(0, totalHeight - bottomHeight - topInset);
         double spacing = Dp.px(titleSpacing());
 
         // Leading first: it fixes where the title may start.
@@ -290,7 +471,8 @@ public class AppBarRenderElement extends RenderElement {
         List<Size> actionSizes = new ArrayList<Size>();
         double actionsWidth = 0;
         if (firstActionIndex >= 0) {
-            for (int i = firstActionIndex; i < children.size(); i++) {
+            int lastAction = bottomIndex >= 0 ? bottomIndex : children.size();
+            for (int i = firstActionIndex; i < lastAction; i++) {
                 RenderElement a = renderAt(i);
                 if (a == null) {
                     continue;
@@ -322,21 +504,43 @@ public class AppBarRenderElement extends RenderElement {
             }
             width = leadingWidth + actionsWidth
                     + (titleSize == null ? 0 : titleSize.width() + spacing * 2);
+            // A bar whose only content is its background layer still has a width.
+            // Crane's bar has no title, leading or actions at all, so summing the
+            // row alone would measure it as zero and collapse the strip.
+            RenderElement flexDry = renderAt(flexibleSpaceIndex);
+            if (flexDry != null) {
+                width = Math.max(width, flexDry.layout(
+                        BoxConstraints.loose(Double.POSITIVE_INFINITY, barHeight)).width());
+            }
+        }
+
+        // The background layer last, once the bar's width is settled: it fills the
+        // whole bar rather than taking a share of it, so it must not contribute to
+        // the width the row was measured against (that is what makes it a
+        // background and not a fourth slot).
+        RenderElement flexible = renderAt(flexibleSpaceIndex);
+        if (flexible != null) {
+            flexible.layout(BoxConstraints.tight(width, totalHeight));
+            setChildOffset(flexible, 0, 0);
+        }
+        if (bottom != null) {
+            bottom.layout(BoxConstraints.tight(width, bottomHeight));
+            setChildOffset(bottom, 0, topInset + barHeight);
         }
 
         // Place: leading at the start, actions flush to the end, title between.
         if (leading != null) {
-            setChildOffset(leading, 0, centreY(leadingSize, barHeight));
+            setChildOffset(leading, 0, topInset + centreY(leadingSize, barHeight));
         }
         double actionX = width - actionsWidth;
         for (int i = 0; i < actions.size(); i++) {
             Size as = actionSizes.get(i);
-            setChildOffset(actions.get(i), actionX, centreY(as, barHeight));
+            setChildOffset(actions.get(i), actionX, topInset + centreY(as, barHeight));
             actionX += as.width();
         }
         if (title != null) {
             double tx;
-            if (appBar().getCenterTitle()) {
+            if (centerTitle()) {
                 tx = (width - titleSize.width()) / 2;
                 // A centred title still may not slide under the leading or the actions.
                 tx = Math.max(leadingWidth + spacing,
@@ -345,10 +549,10 @@ public class AppBarRenderElement extends RenderElement {
             } else {
                 tx = leadingWidth + spacing;
             }
-            setChildOffset(title, tx, centreY(titleSize, barHeight));
+            setChildOffset(title, tx, topInset + centreY(titleSize, barHeight));
         }
 
-        return constraints.constrain(new Size(width, barHeight));
+        return constraints.constrain(new Size(width, totalHeight));
     }
 
     /** Vertical centring of one slot within the bar. */
@@ -368,13 +572,63 @@ public class AppBarRenderElement extends RenderElement {
      * been given a height, so the row fills whatever box it was handed rather than forcing
      * a second 56lp on top of it.
      */
+    /**
+     * The height {@code bottom} wants, measured against an UNBOUNDED height.
+     *
+     * <p>Offering it the bar's height instead invites a greedy child to take
+     * all of it — a scrollable tab strip does exactly that — which leaves the
+     * toolbar row nothing and stacks the two on top of each other. It also has
+     * to be the same number {@link #barHeight} used, or the two passes disagree
+     * about where the row ends.</p>
+     */
+    private double bottomHeight(BoxConstraints constraints, RenderElement bottom) {
+        if (bottom == null) {
+            return 0;
+        }
+        double w = constraints.hasBoundedWidth() ? constraints.maxWidth()
+                : Double.POSITIVE_INFINITY;
+        return bottom.layout(BoxConstraints.loose(w, Double.POSITIVE_INFINITY)).height();
+    }
+
     private double barHeight(BoxConstraints constraints) {
         double preferred = Dp.px(appBar().getToolbarHeight() == null
-                ? TOOLBAR_HEIGHT_LP : appBar().getToolbarHeight().doubleValue());
+                ? TOOLBAR_HEIGHT_LP : appBar().getToolbarHeight().doubleValue())
+                + topInset();
+        RenderElement bottom = renderAt(bottomIndex);
+        if (bottom != null && !(toolbarMode() && constraints.hasBoundedHeight()
+                && constraints.maxHeight() > 0)) {
+            preferred += bottomHeight(constraints, bottom);
+        }
         if (toolbarMode() && constraints.hasBoundedHeight() && constraints.maxHeight() > 0) {
             return constraints.maxHeight();
         }
         return constraints.constrainHeight(preferred);
+    }
+
+    /**
+     * Whether the title is centred — {@code AppBar.centerTitle}, then the
+     * ambient theme's, then the platform default.
+     *
+     * <p>Flutter centres app bar titles on iOS and macOS and left-aligns them
+     * everywhere else. Defaulting to left on every platform puts the title in
+     * the wrong place on every iOS screen in the app.</p>
+     */
+    private boolean centerTitle() {
+        if (appBar().isCenterTitleSet()) {
+            return appBar().getCenterTitle();
+        }
+        try {
+            AppBarTheme bar = Theme.of(this).appBarTheme();
+            if (bar != null && bar.centerTitle() != null) {
+                return bar.centerTitle().booleanValue();
+            }
+        } catch (Throwable t) {
+            // no ambient theme
+        }
+        com.codename1.flutter.TargetPlatform p =
+                com.codename1.flutter.foundation.FoundationLib.defaultTargetPlatform;
+        return p == com.codename1.flutter.TargetPlatform.iOS
+                || p == com.codename1.flutter.TargetPlatform.macOS;
     }
 
     private double titleSpacing() {
