@@ -27,10 +27,12 @@ import com.codename1.ui.Form;
 
 /// One picture in the developer guide, expressed as the code that produces it.
 ///
-/// A figure is a pure factory: it builds a [Form] and returns it, and never
-/// calls `show()`. The renderer owns the window size, the theme and the
-/// appearance, so one figure renders on several devices and in both
-/// appearances without knowing it is being rendered at all.
+/// A figure builds a [Form] and returns it. It may show the form -- several
+/// figures carry the chapter's own sample verbatim, and those samples end in
+/// `show()` because that is what a reader would write -- but it must not depend
+/// on having shown it. The renderer owns the window size, the theme and the
+/// appearance, and prepares the returned form at the target geometry either
+/// way, so one figure renders on several devices and in both appearances.
 public interface GuideFigure {
     /// Stable identity used to name the output file. Lower case with dashes,
     /// matching the image naming already used under `docs/developer-guide/img`.

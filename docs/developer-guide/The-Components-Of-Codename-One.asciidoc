@@ -700,11 +700,11 @@ Notice in the sample below that you associate all the radio buttons with a group
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava155Snippet.java[tag=the-components-of-codename-one-java-155,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/CheckBoxFigure.java[tag=the-components-of-codename-one-java-155,indent=0]
 ----
 
 .RadioButton & CheckBox usage
-image::img/components-radiobutton-checkbox.png[RadioButton & CheckBox usage,scaledwidth=20%]
+image::img/generated/components-radiobutton-checkbox.png[RadioButton & CheckBox usage,scaledwidth=20%]
 
 Both of these components can be displayed as toggle buttons (see the toggle button section below), or use the default check mark/filled circle appearance based on the type/OS.
 
@@ -787,11 +787,11 @@ A common source of confusion in the `MultiButton` is the difference between the 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava158Snippet.java[tag=the-components-of-codename-one-java-158,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/MultiButtonFigure.java[tag=the-components-of-codename-one-java-158,indent=0]
 ----
 
 .Multiple usage scenarios for the MultiButton
-image::img/components-multibutton.png[Multiple usage scenarios for the MultiButton,scaledwidth=20%]
+image::img/generated/components-multibutton.png[Multiple usage scenarios for the MultiButton,scaledwidth=20%]
 
 ==== Styling the MultiButton
 
@@ -831,11 +831,11 @@ One of the features of label that moved into `SpanLabel` to some extent is the a
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava160Snippet.java[tag=the-components-of-codename-one-java-160,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/SpanLabelFigure.java[tag=the-components-of-codename-one-java-160,indent=0]
 ----
 
 .The SpanLabel Component
-image::img/components-spanlabel.png[The SpanLabel Component,scaledwidth=20%]
+image::img/generated/components-spanlabel.png[The SpanLabel Component,scaledwidth=20%]
 
 TIP: `SpanLabel` is slower than `Label`. Recommend using it when there is a genuine need for its functionality.
 

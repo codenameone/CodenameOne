@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
@@ -20,76 +20,30 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.developerguide.snippets.generated;
 
-import com.codename1.gpu.*;
-import com.codename1.ui.*;
-import com.codename1.ui.animations.*;
-import com.codename1.ui.events.*;
-import com.codename1.ui.geom.*;
-import com.codename1.ui.layouts.*;
-import com.codename1.ui.list.*;
-import com.codename1.ui.plaf.*;
-import com.codename1.ui.util.*;
-import com.codename1.components.*;
-import com.codename1.charts.models.*;
-import com.codename1.charts.renderers.*;
-import com.codename1.charts.views.*;
-import com.codename1.capture.*;
-import com.codename1.io.*;
-import com.codename1.l10n.*;
-import com.codename1.location.*;
-import com.codename1.maps.*;
-import com.codename1.media.*;
-import com.codename1.messaging.*;
-import com.codename1.payment.*;
-import com.codename1.processing.*;
-import com.codename1.properties.*;
-import com.codename1.push.*;
-import com.codename1.security.*;
-import com.codename1.social.*;
-import com.codename1.ui.spinner.*;
-import java.io.*;
-import com.codename1.components.ToastBar.Status;
-import com.codename1.maps.layers.*;
-import com.codename1.charts.*;
-import com.codename1.ui.validation.*;
-import com.codename1.xml.*;
-import com.codename1.charts.util.*;
-import com.codename1.javascript.*;
-import com.codename1.ui.tree.*;
-import com.codename1.ui.table.*;
-import com.codename1.contacts.*;
-import java.util.*;
+package com.codenameone.developerguide.screenshots;
 
+import com.codename1.components.SpanLabel;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 
-class TheComponentsOfCodenameOneJava160Snippet {
+/// The SpanLabel figure for the Components chapter.
+///
+/// The tagged region below is what the chapter includes, so the listing beside
+/// the picture is the code that drew it. That is the point of moving these out
+/// of the compile-only snippet fixtures: a fixture and a screenshot are two
+/// sources for one example and drift apart silently.
+public final class SpanLabelFigure implements GuideFigure {
+    @Override
+    public String id() {
+        return "components-spanlabel";
+    }
 
-
-    Object context;
-    Object url;
-    Object value;
-    Object body;
-    Object event;
-    String apiKey = "test-key";
-    String myHttpsURL = "https://example.com";
-    java.util.List<String> validKeysList = new java.util.ArrayList<>();
-    Image myImage;
-    Graphics graphics;
-    Graphics g;
-    GraphicsDevice device;
-    Form form;
-    Form hi;
-    Container cnt;
-    Container myForm;
-    Component component;
-    Button button;
-    MultiButton myMultiButton;
-    Label label;
-    BrowserComponent browserComponent;
-    Resources theme;
-    
-    void snippet() throws Exception {
+    @Override
+    public Form build() {
         // tag::the-components-of-codename-one-java-160[]
         Form hi = new Form("SpanLabel", new BoxLayout(BoxLayout.Y_AXIS));
         Image icon = FontImage.createMaterial(FontImage.MATERIAL_INFO, "Label", 3.0f);
@@ -107,7 +61,6 @@ class TheComponentsOfCodenameOneJava160Snippet {
         hi.add(d).add(l).add(r).add(c);
         hi.show();
         // end::the-components-of-codename-one-java-160[]
+        return hi;
     }
-
-
 }

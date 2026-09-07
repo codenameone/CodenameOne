@@ -43,6 +43,18 @@ public final class GuideFigures {
             // The native themes chapter shows one platform in both appearances.
             new FigureVariant(appearance, FigureDevice.ANDROID, false, "native-themes-appearance-light.png"),
             new FigureVariant(appearance, FigureDevice.ANDROID, true, "native-themes-appearance-dark.png"),
+            // One canonical variant where the component, not the platform, is
+            // the subject -- and Android Material for it, because these render
+            // through the port's bundled Roboto, which is what Material 3
+            // actually specifies. An iOS Modern render is typographically wrong
+            // for the same reason: it comes out in Roboto rather than SF, so it
+            // is worth having only where the platform difference is the point.
+            new FigureVariant(new CheckBoxFigure(), FigureDevice.ANDROID, false,
+                    "components-radiobutton-checkbox.png"),
+            new FigureVariant(new MultiButtonFigure(), FigureDevice.ANDROID, false,
+                    "components-multibutton.png"),
+            new FigureVariant(new SpanLabelFigure(), FigureDevice.ANDROID, false,
+                    "components-spanlabel.png"),
         };
     }
 }
