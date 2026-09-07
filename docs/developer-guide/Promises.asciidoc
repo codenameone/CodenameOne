@@ -14,8 +14,11 @@ chain instead of keeping it rejected, and returning `null` after a success
 replaces the value. Returning the incoming value keeps a
 successful chain unchanged, but it doesn't preserve a rejection: any non-promise
 return is treated as a result, so returning the `Throwable` fulfils the chain
-with it. To stay rejected, throw it: `processThens` catches
-whatever a functor throws and rejects the next promise with it.
+with it. To stay rejected you have to throw, because `processThens`
+catches what a functor throws and rejects with it -- but `Functor.call` declares
+no checked exceptions, so a checked reason can't simply be rethrown. Wrap it, as
+`throw new RuntimeException(err)`, or return a promise you rejected with the
+original reason, whose state the chain adopts.
 
 === Creating and consuming one
 
@@ -48,6 +51,12 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 `getState()` reports `Pending`, `Fulfilled` or `Rejected`, and `getValue()`
 returns the resolved value once there is one.
+
+WARNING: Give the first `then` in a chain a rejection functor, as above. A
+`then` called with only a success functor installs a default one that does
+`throw (RuntimeException) reason`, so a rejection carrying a checked exception --
+an `IOException` from a network call, say -- fails that cast and reaches your
+`except` as a `ClassCastException` with the real cause gone.
 
 === Combining several
 
@@ -84,7 +93,9 @@ on the EDT doesn't freeze the UI, and it throws
 `AsyncResource.AsyncExecutionException` when the promise rejected.
 
 WARNING: A promise from `promisify` never settles if the underlying
-`AsyncResource` is cancelled. `AsyncResource.cancel` records the cancellation and
-notifies its observers without running the result callback `promisify`
-registered, so the promise stays `Pending` and an `await()` on it waits forever.
+`AsyncResource` is cancelled *after* `promisify` registered on it.
+`AsyncResource.cancel` records the cancellation and notifies its observers
+without running that callback, so the promise stays `Pending` and an `await()`
+waits forever. A resource already cancelled beforehand is fine: registering on a
+resource that has finished with an error fires the callback straight away.
 Don't await a promise wrapping a resource something else can cancel.

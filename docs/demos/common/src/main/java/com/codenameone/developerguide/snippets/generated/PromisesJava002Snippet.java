@@ -86,10 +86,15 @@ class PromisesJava002Snippet {
         // then() pipes the return value of one step into the next, so each
         // Functor has to return something
         Promise<String> name = Promise.resolve("ada");
-        name.then(n -> ((String)n).toUpperCase())
+        name.then(
+                n -> ((String)n).toUpperCase(),
+                // handle the failure at the first step: a then() given no
+                // rejection functor installs one that casts to
+                // RuntimeException, which turns a checked reason into a
+                // ClassCastException further down
+                err -> { Log.e((Throwable)err); return null; })
             .then(upper -> "Hello " + upper)
-            .onSuccess(msg -> Log.p((String)msg))
-            .except(err -> { Log.e((Throwable)err); return null; });
+            .onSuccess(msg -> Log.p((String)msg));
         // end::promises-java-002[]
     }
 
