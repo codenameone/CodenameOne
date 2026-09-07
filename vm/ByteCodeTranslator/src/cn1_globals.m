@@ -12197,8 +12197,19 @@ static long long cn1StallPercentileUs(int cause, double q) {
 // Class ids are numbered scalar classes first and array classes after them
 // (cn1_array_start_offset), one contiguous range, so the bound has to cover
 // BOTH -- an app well under the limit in scalar classes can still put its array
-// classes past it. The table is CONFORM-only and costs 24 bytes an entry, so it
-// is sized past any plausible translated app rather than tuned.
+// classes past it.
+//
+// 8192, and DO NOT RAISE IT. Sizing this "past any plausible app" was tried at
+// 65536 and broke the profile outright: four tables of that many 8-byte entries
+// is 2MB of BSS, and in the static musl binary the report then faulted partway
+// through its first scan, with the VM's SEGV handler swallowing it so the
+// handler returned having printed NOTHING. Measured by bisection -- 8192 prints,
+// 65536 prints nothing, everything else held equal.
+//
+// The bound is not what makes this safe anyway. The overflow row below is: it
+// counts what fell outside, adds it to the total and names the highest id seen,
+// so a table that is too small SAYS SO instead of quietly omitting the hottest
+// class. Raise this only together with evidence that the larger BSS still runs.
 //
 // Whatever still lands outside is counted and REPORTED rather than dropped. A
 // profile that silently omits the hottest class reads exactly like a profile
@@ -12206,7 +12217,7 @@ static long long cn1StallPercentileUs(int cause, double q) {
 // by omission (see the entry-point note on cn1RecordAllocation). The overflow
 // row is how a reader learns the bound was reached instead of trusting a total
 // that quietly excludes it.
-#define CN1_ALLOC_PROFILE_SLOTS 65536
+#define CN1_ALLOC_PROFILE_SLOTS 8192
 static _Atomic long long cn1AllocProfBytes[CN1_ALLOC_PROFILE_SLOTS];
 static _Atomic long cn1AllocProfCount[CN1_ALLOC_PROFILE_SLOTS];
 // Atomic like the counters beside it. Several mutators allocating the same class
@@ -12336,29 +12347,26 @@ static long long cn1AllocProfAvg(long long bytes, long count) {
     return count > 0 ? bytes / count : 0;
 }
 
-// Report-local copies. atexit handlers do not stop the other threads, so a
-// mutator can still be allocating while this runs: ranking the live counters
-// destructively meant a class could be printed, keep allocating, and be selected
-// again for a second row, while its bytes and count were read at different
-// instants and need not describe the same set of allocations. Everything is
-// copied once here and the ranking then consumes the copy, so the report is a
-// snapshot of one moment and the live counters are left alone.
-static long long cn1AllocProfSnapBytes[CN1_ALLOC_PROFILE_SLOTS];
-static long cn1AllocProfSnapCount[CN1_ALLOC_PROFILE_SLOTS];
-static struct clazz* cn1AllocProfSnapClass[CN1_ALLOC_PROFILE_SLOTS];
-
 static void cn1ReportAllocProfile(void) {
     long long total = 0;
     int i;
     int printed = 0;
+    // KNOWN AND ACCEPTED: a mutator still allocating while this runs can have its
+    // bytes and count read at different instants, and a class that keeps
+    // allocating can take a second row. A review asked for a consistent snapshot
+    // and the attempt is worth recording, because it was strictly worse: copying
+    // the tables aside meant three more arrays of CN1_ALLOC_PROFILE_SLOTS -- 3MB
+    // of BSS all told -- and the copy loop then faulted partway, with ParparVM's
+    // SEGV handler swallowing it so the report simply returned having printed
+    // NOTHING. Quiescing the recorders first needed a usleep in an atexit handler,
+    // which is not async-signal-safe and blocked the handler outright on the
+    // SIGTERM path this is always reached by.
+    //
+    // A report that is a few allocations stale is a working instrument. A report
+    // that is exactly consistent and silent is not one, and this profile is what
+    // localised the keep-alive buffer copy. So the skew stays, documented.
     for(i = 0 ; i < CN1_ALLOC_PROFILE_SLOTS ; i++) {
-        cn1AllocProfSnapBytes[i] =
-                atomic_load_explicit(&cn1AllocProfBytes[i], memory_order_relaxed);
-        cn1AllocProfSnapCount[i] =
-                atomic_load_explicit(&cn1AllocProfCount[i], memory_order_relaxed);
-        cn1AllocProfSnapClass[i] =
-                atomic_load_explicit(&cn1AllocProfClass[i], memory_order_relaxed);
-        total += cn1AllocProfSnapBytes[i];
+        total += atomic_load_explicit(&cn1AllocProfBytes[i], memory_order_relaxed);
     }
     if(cn1AllocSizeClassName != 0) {
         int i;
@@ -12408,8 +12416,9 @@ static void cn1ReportAllocProfile(void) {
         int best = -1;
         long long bestBytes = 0;
         for(i = 0 ; i < CN1_ALLOC_PROFILE_SLOTS ; i++) {
-            if(cn1AllocProfSnapBytes[i] > bestBytes) {
-                bestBytes = cn1AllocProfSnapBytes[i];
+            long long b = atomic_load_explicit(&cn1AllocProfBytes[i], memory_order_relaxed);
+            if(b > bestBytes) {
+                bestBytes = b;
                 best = i;
             }
         }
@@ -12417,13 +12426,14 @@ static void cn1ReportAllocProfile(void) {
             break;
         }
         {
-            struct clazz* cls = cn1AllocProfSnapClass[best];
-            long count = cn1AllocProfSnapCount[best];
+            struct clazz* cls =
+                    atomic_load_explicit(&cn1AllocProfClass[best], memory_order_relaxed);
+            long count = atomic_load_explicit(&cn1AllocProfCount[best], memory_order_relaxed);
             fprintf(stderr, "[ALLOCPROF] %-44s bytes=%-12lld count=%-10ld avg=%lld\n",
                     (cls != 0 && cls->clsName != 0) ? cls->clsName : "?",
                     bestBytes, count, cn1AllocProfAvg(bestBytes, count));
         }
-        cn1AllocProfSnapBytes[best] = 0;   // consume the COPY, not the counter
+        atomic_store_explicit(&cn1AllocProfBytes[best], 0, memory_order_relaxed);
         printed++;
     }
     fflush(stderr);
