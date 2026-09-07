@@ -164,6 +164,28 @@ public class Bench {
                     // Recovers most of the gap -> the fix is a struct-shaped API in
                     // plain Java. Recovers little -> the cost really is in the byte
                     // writer, and porting that to C is justified.
+                    //
+                    // ANSWERED, and it is the container. Two pinned cores, 64
+                    // connections, interleaved with rotating arm order, n=2:
+                    //
+                    //     generated DTO (2)   595158 rps   2.619 us/req
+                    //     fasthttp            585906 rps   2.525 us/req
+                    //     hoisted map (1)     547423 rps   2.849 us/req
+                    //     map per request (0) 338167 rps   4.512 us/req
+                    //
+                    // Building the map costs 1.9 us of the 2.0 us that separated
+                    // this route from Go -- hoisting it alone recovers most of that,
+                    // and the struct-shaped writer recovers the rest and passes
+                    // fasthttp. So the byte writer does NOT need porting to C: at
+                    // mode 2 it is already serialising this object for less cpu than
+                    // Go spends on the equivalent, and what looked like a serialiser
+                    // gap was a LinkedHashMap allocated, hashed, inserted into and
+                    // walked once per request.
+                    //
+                    // Mode 0 stays the default because it is the honest cost of a
+                    // handler that hands back a Map, which is what an unannotated
+                    // one does. An annotated DTO gets mode 2's shape from the
+                    // processor without the author writing any of it.
                     if(JSON_MODE == 1) {
                         return HttpServer.Response.jsonValue(200, HOISTED);
                     }
