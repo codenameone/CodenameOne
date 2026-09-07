@@ -693,12 +693,22 @@ public final class HttpServer {
      * virtual thread is already running. ONESHOT was guarding against a hazard
      * that only exists when several threads share a poller.
      *
-     * What it costs to keep it is an epoll_ctl on every park, which is the exact
-     * syscall Go does not pay: it registers each descriptor once, edge-triggered,
-     * and never touches epoll again for the life of the connection.
+     * What it cost to keep it was an epoll_ctl on every park, which is the exact
+     * syscall Go does not pay: it registers each descriptor once and never
+     * touches epoll again for the life of the connection. A profile of the
+     * plaintext benchmark put epoll_ctl at 4.65% of in-binary self time, so the
+     * re-arm is now gone and a descriptor stays armed for the whole connection.
+     *
+     * ONESHOT was doing one more thing than the hazard above, and dropping it
+     * without replacing that is a use-after-free. The kernel DISARMS on delivery,
+     * so a descriptor whose virtual thread returned RUNNABLE -- queued in the
+     * ring, neither running nor parked -- could not be reported again while it
+     * sat there. Left armed it can be, and advance() would resume a handle the
+     * ring is also about to resume. That invariant is now explicit: the RUNNABLE
+     * path disarms with a remove() and VtHost.armedByFd remembers it, which costs
+     * a syscall on the yield path instead of on every request.
      */
-    private static final int CONN_EVENTS =
-            VIRTUAL_THREADS ? (Reactor.READ | Reactor.ONESHOT) : Reactor.READ;
+    private static final int CONN_EVENTS = Reactor.READ;
 
     /**
      * Ready descriptors handed to the pool and not yet picked up.
@@ -1101,6 +1111,15 @@ public final class HttpServer {
         long[] vtByFd = new long[1024];
 
         /**
+         * Whether each descriptor is currently registered with this host's poller.
+         *
+         * Without ONESHOT the kernel no longer disarms on delivery, so this is the
+         * only record of it. Only the owning host reads or writes it, which is the
+         * same single-writer rule the tables beside it follow.
+         */
+        boolean[] armedByFd = new boolean[1024];
+
+        /**
          * When each parked connection stops being worth waiting for, or 0.
          *
          * A parked virtual thread is resumed only when its descriptor becomes
@@ -1133,16 +1152,34 @@ public final class HttpServer {
                 long[] grownDeadlines = new long[size];
                 System.arraycopy(deadlineByFd, 0, grownDeadlines, 0, deadlineByFd.length);
                 deadlineByFd = grownDeadlines;
+                boolean[] grownArmed = new boolean[size];
+                System.arraycopy(armedByFd, 0, grownArmed, 0, armedByFd.length);
+                armedByFd = grownArmed;
             }
             vtByFd[fd] = handle;
             if(handle == 0) {
                 deadlineByFd[fd] = 0;
+                // The descriptor is being closed, and close() takes it out of the
+                // epoll set on its own. Clearing here keeps the flag from claiming
+                // a registration that the next connection to reuse this number
+                // would not have.
+                armedByFd[fd] = false;
             }
         }
 
         void setDeadline(int fd, long at) {
             if(fd < deadlineByFd.length) {
                 deadlineByFd[fd] = at;
+            }
+        }
+
+        boolean isArmed(int fd) {
+            return fd >= 0 && fd < armedByFd.length && armedByFd[fd];
+        }
+
+        void setArmed(int fd, boolean armed) {
+            if(fd >= 0 && fd < armedByFd.length) {
+                armedByFd[fd] = armed;
             }
         }
     }
@@ -1289,6 +1326,14 @@ public final class HttpServer {
             return;
         }
         if(state == VirtualThread.RUNNABLE) {
+            // Take it out of the poller for as long as it sits in the ring. It is
+            // neither running nor parked, so a readable descriptor would otherwise
+            // be reported and resumed here while the ring is about to resume it
+            // too -- and the second resume of a handle the first one finished and
+            // freed is a use-after-free. ONESHOT used to make this impossible by
+            // disarming as it delivered.
+            me.poller.remove(fd);
+            me.setArmed(fd, false);
             me.ringAdd(handle);
             return;
         }
@@ -1296,7 +1341,15 @@ public final class HttpServer {
         // half-sent request parks a virtual thread for ever.
         me.setDeadline(fd, System.currentTimeMillis() + SOCKET_TIMEOUT_MILLIS);
         try {
-            me.poller.modify(fd, CONN_EVENTS);
+            // Normally already armed and this is no syscall at all, which is the
+            // point: a keep-alive connection is registered once at accept and
+            // parks for every later request without touching epoll again. Only a
+            // descriptor the RUNNABLE path disarmed has to come back, and it comes
+            // back as an ADD because remove() really deregistered it.
+            if(!me.isArmed(fd)) {
+                me.poller.add(fd, CONN_EVENTS);
+                me.setArmed(fd, true);
+            }
         } catch (IOException err) {
             me.setHandle(fd, 0);
             VirtualThread.free(handle);
@@ -1367,6 +1420,7 @@ public final class HttpServer {
             nextVtHost = host + 1 >= vtHosts.length ? 0 : host + 1;
             setVtOwner(fd, host);
             vtHosts[host].poller.add(fd, CONN_EVENTS);
+            vtHosts[host].setArmed(fd, true);
             return;
         }
         // Re-arm has to name the SAME poller: an epoll set that does not hold
