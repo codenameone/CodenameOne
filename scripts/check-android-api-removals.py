@@ -62,6 +62,9 @@ ERROR_LINE = re.compile(r'^(.*?):(\d+): error: (.*)$')
 # last diagnostic always looked new. Note the capital N: javac writes
 # "Note: Some input files ..." at column 0, which a lowercase-only pattern
 # missed.
+# javac's closing tally, which every run that reported an error prints.
+ERROR_SUMMARY = re.compile(r'^(\d+)\s+errors?$')
+
 STOP_LINE = re.compile(
     r'^(?:\d+\s+(?:error|warning)s?\s*$'
     r'|[Nn]ote:\s'
@@ -300,11 +303,42 @@ def compile_against(compiler, android_jar, classpath, source_files, workdir):
     result = subprocess.run(command, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, universal_newlines=True)
     diagnostics = parse_diagnostics(result.stdout)
+    # A negative status is death by signal -- the OOM killer, most plausibly,
+    # on a run that holds two compiles of the whole port. Fatal however many
+    # diagnostics preceded it: a truncated target run reports a SUBSET of the
+    # baseline's errors, the multiset difference of a subset is empty, and the
+    # gate would print OK precisely because the compile was cut short.
+    if result.returncode < 0:
+        raise CompilerFailure(
+            'javac was killed by signal %d against %s after %d diagnostic(s), '
+            'so its output is a fragment of the compile'
+            % (-result.returncode, android_jar, len(diagnostics)))
     if result.returncode != 0 and not diagnostics:
         raise CompilerFailure(
             'javac exited %d against %s without reporting a single source '
             'diagnostic, so it never compiled anything:\n%s'
             % (result.returncode, android_jar, result.stdout.strip()[:4000]))
+    # javac's own tally, against ours. It closes the same hole for a truncation
+    # that somehow arrives as a normal exit status, and it double-entries the
+    # parser above: if grouping continuation lines ever merges two errors or
+    # splits one, the counts stop matching and this says so instead of quietly
+    # comparing the wrong things. Measured equal (608 and 608) over the port.
+    reported = None
+    for line in result.stdout.splitlines():
+        match = ERROR_SUMMARY.match(line.strip())
+        if match:
+            reported = int(match.group(1))
+    if diagnostics and reported is None:
+        raise CompilerFailure(
+            'javac reported %d diagnostic(s) against %s but never printed its '
+            'error summary, so it did not run to completion'
+            % (len(diagnostics), android_jar))
+    if reported is not None and reported != len(diagnostics):
+        raise CompilerFailure(
+            'javac counted %d error(s) against %s and %d were parsed out of '
+            'its output; one of the two is wrong, and comparing runs on this '
+            'is not safe'
+            % (reported, android_jar, len(diagnostics)))
     return diagnostics
 
 
