@@ -1292,7 +1292,21 @@ public class AndroidGradleBuilder extends Executor {
                     }
 
                     installedPlatforms.add(platform);
-                    installedPlatformNames.add(platform);
+                    // Only genuinely installed rows here. sdkmanager --list
+                    // prints the installed packages with a fourth column
+                    // holding their location and the available ones with
+                    // three, and the branch above accepts either -- so
+                    // installedPlatforms has always carried platforms nobody
+                    // has. That is survivable where the answer is only a
+                    // number, because AGP downloads a level it is asked for.
+                    // It is not survivable here: this list is used to name an
+                    // exact platform, and naming one that was merely on offer
+                    // turns a working build into a download, or into a
+                    // failure with no network. The build-tools branch above
+                    // already requires the fourth column for the same reason.
+                    if (columns.length >= 4) {
+                        installedPlatformNames.add(platform);
+                    }
                 }
             }
         }
@@ -10633,13 +10647,22 @@ public class AndroidGradleBuilder extends Executor {
     /**
      * The value to write after {@code compileSdkVersion} in build.gradle.
      *
-     * <p>The bare number wherever the unsuffixed platform exists, which keeps
-     * every build that works today byte-identical. Only when the level is
-     * installed solely as a minor revision does this switch to the quoted hash
-     * string -- {@code 'android-37.2'} -- which AGP 8.13.2 accepts and
+     * <p>The bare number wherever the unsuffixed platform exists, which is
+     * every level up to 36 and keeps those builds byte-identical. Where the
+     * level is installed only as a minor revision this switches to the quoted
+     * hash string -- {@code 'android-37.2'} -- which AGP 8.13.2 accepts and
      * resolves to that exact platform. The int property has no way to say
      * "37.2" (compileSdkMinor is AGP 9), so the hash string is the only
      * spelling available.</p>
+     *
+     * <p>Worth being blunt about the reach of that: from API 37 there is no
+     * unsuffixed platform at all, so the quoted form is what an API 37 build
+     * gets, not a rare fallback. Anything that reads the generated
+     * {@code compileSdkVersion} back has to cope with it -- {@code
+     * PatchGradleFiles}, which the build scripts use to re-pin a generated
+     * project, matched only digits and so inserted a second declaration
+     * instead of replacing this one, leaving the original later in the block
+     * where Groovy let it win.</p>
      *
      * @param compileSdkVersion the compile SDK settled on, as a string
      * @param installed         the platform names the SDK reports

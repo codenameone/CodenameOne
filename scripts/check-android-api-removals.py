@@ -367,10 +367,19 @@ def main():
 
     baseline_api = arguments.baseline
     if baseline_api is None:
-        below = [level for level, _ in platforms if level < target_api]
+        # Below MIN_TARGET_API, not merely below the target. Once a runner
+        # carries API 38 the newest-below-target rule would pick 37 as the
+        # baseline, and every removal API 37 made would then fail identically
+        # in both compilations and cancel out -- the gate would go on passing
+        # while quietly no longer checking the level it was built for. The
+        # baseline has to sit under the whole range of removals being watched,
+        # so it is pinned below the first of them and only the target floats.
+        bound = min(target_api, MIN_TARGET_API)
+        below = [level for level, _ in platforms if level < bound]
         if not below:
-            return cannot_run('nothing older than API %d to compare against'
-                              % target_api)
+            return cannot_run('nothing older than API %d to compare against; '
+                              'install a baseline platform below the first '
+                              'API level this gate watches' % bound)
         baseline_api = max(below)
 
     baseline = pick(platforms, baseline_api)

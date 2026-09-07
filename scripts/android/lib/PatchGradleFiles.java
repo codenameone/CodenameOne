@@ -40,7 +40,16 @@ public class PatchGradleFiles {
     private static final Pattern ANDROID_BLOCK_PATTERN = Pattern.compile("(?m)^\\s*android\\s*\\{");
     private static final Pattern DEFAULT_CONFIG_PATTERN = Pattern.compile("(?ms)^\\s*defaultConfig\\s*\\{.*?^\\s*\\}");
     private static final Pattern DEFAULT_CONFIG_HEADER_PATTERN = Pattern.compile("(?ms)^\\s*defaultConfig\\s*\\{");
-    private static final Pattern COMPILE_SDK_PATTERN = Pattern.compile("(?m)^\\s*compileSdkVersion\\s+\\d+");
+    // The value is not always a number. Where an API level ships only as minor
+    // revisions -- which is every level from 37, whose platforms are
+    // android-37.0/.1/.2 and never android-37 -- the builder names the exact
+    // platform instead: compileSdkVersion 'android-37.0'. Matching only digits
+    // meant no match, and the no-match branch below INSERTS a declaration
+    // rather than replacing one, leaving the original later in the same
+    // android block where Groovy lets it win. The pin then silently did
+    // nothing.
+    private static final Pattern COMPILE_SDK_PATTERN = Pattern.compile(
+            "(?m)^\\s*compileSdkVersion\\s+(?:\\d+|'[^']*'|\"[^\"]*\")");
     private static final Pattern TARGET_SDK_PATTERN = Pattern.compile("(?m)^\\s*targetSdkVersion\\s+\\d+");
     private static final Pattern TEST_INSTRUMENTATION_PATTERN = Pattern.compile("(?m)^\\s*testInstrumentationRunner\\s*\".*?\"\\s*$");
     private static final Pattern USE_LIBRARY_PATTERN = Pattern.compile("(?m)^\\s*useLibrary\\s+'android\\.test\\.(?:base|mock|runner)'\\s*$");
