@@ -120,6 +120,50 @@ public final class BoxConstraints {
         return new Size(constrainWidth(size.width()), constrainHeight(size.height()));
     }
 
+    /**
+     * Constrains a size while keeping its aspect ratio, as Flutter's
+     * {@code constrainSizeAndAttemptToPreserveAspectRatio} does.
+     *
+     * <p>{@link #constrain} clamps the two axes independently, which throws the
+     * ratio away: a picture whose natural size is wider than the box comes back
+     * with the box's width and its own height. That is how an image laid out
+     * under a width-driven fit ended up in a box taller than its content, with
+     * the artwork centred in the slack and everything below it pushed down.</p>
+     *
+     * <p>Each clamp here carries the other axis with it, and the order matters:
+     * width, then height, then the minimums, so a later clamp corrects an
+     * earlier one rather than being overwritten by it. A tight box has only one
+     * answer and keeps no ratio.</p>
+     */
+    public Size constrainSizeAndAttemptToPreserveAspectRatio(Size size) {
+        if (isTight()) {
+            return smallest();
+        }
+        double width = size.width();
+        double height = size.height();
+        if (width <= 0 || height <= 0) {
+            return constrain(size);
+        }
+        double aspectRatio = width / height;
+        if (width > maxWidth()) {
+            width = maxWidth();
+            height = width / aspectRatio;
+        }
+        if (height > maxHeight()) {
+            height = maxHeight();
+            width = height * aspectRatio;
+        }
+        if (width < minWidth()) {
+            width = minWidth();
+            height = width / aspectRatio;
+        }
+        if (height < minHeight()) {
+            height = minHeight();
+            width = height * aspectRatio;
+        }
+        return new Size(constrainWidth(width), constrainHeight(height));
+    }
+
     public Size smallest() {
         return new Size(constrainWidth(0), constrainHeight(0));
     }

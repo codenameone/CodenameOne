@@ -245,10 +245,81 @@ public class ImageRenderElement extends RenderElement {
         // from that density to the screen's — a 3.0x file on a 3x screen is
         // 1:1, the same file on a 2x screen is two thirds the size.
         double naturalScale = assetRatio > 0 ? Dp.scale() / assetRatio : 1;
+        // cacheWidth/cacheHeight bound the DECODED bitmap, so they apply in
+        // decoded pixels -- before the density rescale above, not after it.
+        double[] decoded = decodeHinted(naturalW, naturalH,
+                image().cacheWidth, image().cacheHeight);
         Size natural = img == null
                 ? new Size(wPx == null ? 0 : wPx, hPx == null ? 0 : hPx)
-                : new Size(naturalW * naturalScale, naturalH * naturalScale);
-        return inner.constrain(natural);
+                : new Size(decoded[0] * naturalScale, decoded[1] * naturalScale);
+        // Aspect-preserving, which is what RenderImage does. Clamping the axes
+        // independently gives a box with the constraint's width and the
+        // picture's own height: an asset laid out under a width-driven fit then
+        // sat in a box taller than its content, the artwork centred in the
+        // slack, and everything below it pushed down by half the difference.
+        // The gallery's lead photo was 46px low that way, and every element
+        // under it with it.
+        return inner.constrainSizeAndAttemptToPreserveAspectRatio(natural);
+    }
+
+    /**
+     * Applies {@code cacheWidth}/{@code cacheHeight}, Flutter's decode-size
+     * hints, to the picture's intrinsic size.
+     *
+     * <p>They decode the asset at that many DEVICE pixels, so they bound what
+     * the image is intrinsically: an attachment asking for a 200px decode is
+     * 200 device pixels wide however large the file on disk is, and a box
+     * roomier than that leaves it at its own size rather than blowing it up.
+     * Ignoring them made every such image lay out at the full asset's size --
+     * the mail study's attachment strip drew three photographs across the
+     * screen where the design has small thumbnails.</p>
+     *
+     * <p>One hint given alone carries the other axis with it, which is what
+     * decoding does: the ratio is a property of the picture, not of the box.</p>
+     */
+    /**
+     * The size a decoded picture presents once {@code cacheWidth} and
+     * {@code cacheHeight} are taken into account, in the same units as the
+     * size passed in.
+     *
+     * <p>{@code Image.asset} wraps its provider in a {@code ResizeImage}, so the
+     * hints bound the decoded bitmap and therefore everything downstream of it:
+     * the intrinsic size layout constrains, and the size the picture is painted
+     * at. They never enlarge -- {@code ResizeImage} passes
+     * {@code allowUpscaling: false} -- and when BOTH are given dart:ui decodes to
+     * exactly those dimensions, so the aspect ratio is preserved only while one
+     * of them is left open.</p>
+     */
+    static double[] decodeHinted(double w, double h, Long cacheWidth, Long cacheHeight) {
+        if (w <= 0 || h <= 0) {
+            return new double[] {w, h};
+        }
+        double tw = cacheWidth != null && cacheWidth.longValue() > 0
+                ? Math.min(cacheWidth.doubleValue(), w) : -1;
+        double th = cacheHeight != null && cacheHeight.longValue() > 0
+                ? Math.min(cacheHeight.doubleValue(), h) : -1;
+        if (tw > 0 && th > 0) {
+            return new double[] {tw, th};
+        }
+        if (tw > 0) {
+            return new double[] {tw, h * (tw / w)};
+        }
+        if (th > 0) {
+            return new double[] {w * (th / h), th};
+        }
+        return new double[] {w, h};
+    }
+
+    /**
+     * The picture's on-screen size in device pixels: the decoded bitmap after
+     * its decode hints and its density variant. This is what Flutter measures
+     * against the box, and so the largest size {@code scaleDown} draws it at.
+     */
+    private double[] sourceSizeForFit(com.codename1.ui.Image src) {
+        double scale = assetRatio > 0 ? Dp.scale() / assetRatio : 1;
+        double[] d = decodeHinted(src.getWidth(), src.getHeight(),
+                image().cacheWidth, image().cacheHeight);
+        return new double[] {d[0] * scale, d[1] * scale};
     }
 
     @Override
@@ -335,7 +406,7 @@ public class ImageRenderElement extends RenderElement {
         if (bw <= 0 || bh <= 0) {
             return false;
         }
-        BoxFit fit = image().getFit() == null ? BoxFit.contain : image().getFit();
+        BoxFit fit = image().getFit() == null ? BoxFit.scaleDown : image().getFit();
         return !(img == fittedFrom && bw == fittedW && bh == fittedH && fit == fittedFit
                 && enclosingCornerRadius(bw, bh) == fittedRadius);
     }
@@ -347,12 +418,13 @@ public class ImageRenderElement extends RenderElement {
         }
         int bw = (int) Math.round(size().width());
         int bh = (int) Math.round(size().height());
-        int iw = img.getWidth();
-        int ih = img.getHeight();
+        double[] src = sourceSizeForFit(img);
+        int iw = (int) Math.round(src[0]);
+        int ih = (int) Math.round(src[1]);
         if (bw <= 0 || bh <= 0 || iw <= 0 || ih <= 0) {
             return;
         }
-        BoxFit fit = image().getFit() == null ? BoxFit.contain : image().getFit();
+        BoxFit fit = image().getFit() == null ? BoxFit.scaleDown : image().getFit();
         int radius = enclosingCornerRadius(bw, bh);
         if (img == fittedFrom && bw == fittedW && bh == fittedH && fit == fittedFit
                 && radius == fittedRadius) {
@@ -381,6 +453,8 @@ public class ImageRenderElement extends RenderElement {
             // rather than a stencil test, which is what the reference does too.
             FittedImage f = (FittedImage) l;
             f.setSource(img);
+            f.srcW = iw;
+            f.srcH = ih;
             f.fit = fit;
             l.repaint();
             return;
@@ -455,6 +529,12 @@ public class ImageRenderElement extends RenderElement {
             case none:
                 scaled = img;
                 break;
+            case scaleDown: {
+                double sr = Math.min(Math.min((double) bw / iw, (double) bh / ih), 1.0);
+                scaled = img.scaled(Math.max(1, (int) Math.round(iw * sr)),
+                        Math.max(1, (int) Math.round(ih * sr)));
+                break;
+            }
             case contain:
             default:
                 double r = Math.min((double) bw / iw, (double) bh / ih);
@@ -520,7 +600,11 @@ public class ImageRenderElement extends RenderElement {
 
         private com.codename1.ui.Image source;
         private final ImageLock lock = new ImageLock();
-        BoxFit fit = BoxFit.contain;
+        BoxFit fit = BoxFit.scaleDown;
+        /// The source's on-screen size in device pixels once its decode hints and
+        /// density variant are applied; 0 means "ask the bitmap".
+        int srcW;
+        int srcH;
         FittedImage() {
             super("", "FlutterImage");
         }
@@ -583,8 +667,8 @@ public class ImageRenderElement extends RenderElement {
             }
             int bw = getWidth();
             int bh = getHeight();
-            int iw = s.getWidth();
-            int ih = s.getHeight();
+            int iw = srcW > 0 ? srcW : s.getWidth();
+            int ih = srcH > 0 ? srcH : s.getHeight();
             if (bw <= 0 || bh <= 0 || iw <= 0 || ih <= 0) {
                 return;
             }
@@ -607,7 +691,7 @@ public class ImageRenderElement extends RenderElement {
      *         size LARGER than the box, which the component's own clip crops.
      */
     static double[] fittedSize(BoxFit fit, double bw, double bh, double iw, double ih) {
-        switch (fit == null ? BoxFit.contain : fit) {
+        switch (fit == null ? BoxFit.scaleDown : fit) {
             case fill:
                 return new double[] {bw, bh};
             case cover: {
@@ -620,6 +704,16 @@ public class ImageRenderElement extends RenderElement {
                 return new double[] {iw * (bh / ih), bh};
             case none:
                 return new double[] {iw, ih};
+            case scaleDown: {
+                // Flutter's paintImage defaults to scaleDown when the widget
+                // names no fit, and scaleDown is `contain` that never ENLARGES:
+                // a picture smaller than its box is drawn at its own size,
+                // centred in the slack. Treating the default as `contain` blew
+                // every under-sized picture up to fill its box -- the reply
+                // study's attachment strip drew its 200px thumbnails at 432px.
+                double r = Math.min(Math.min(bw / iw, bh / ih), 1.0);
+                return new double[] {iw * r, ih * r};
+            }
             case contain:
             default: {
                 double r = Math.min(bw / iw, bh / ih);

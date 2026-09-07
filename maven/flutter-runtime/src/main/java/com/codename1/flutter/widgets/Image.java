@@ -20,6 +20,16 @@ public class Image extends Widget {
     private String assetName;
     private String url;
     private Double width;
+    /// Flutter's decode-size hints. cacheWidth/cacheHeight decode the asset at
+    /// that many DEVICE pixels, so they bound the picture's intrinsic size --
+    /// a 200px decode is 200 device pixels wide however large the file is.
+    ///
+    /// They were accepted and dropped, so an image asking to be decoded small
+    /// took its full intrinsic size instead and laid out several times too
+    /// large wherever the box did not pin it.
+    Long cacheWidth;
+    Long cacheHeight;
+
     private Double height;
     private BoxFit fit;
     private ImageProvider imageProvider;
@@ -87,6 +97,8 @@ public class Image extends Widget {
         i.width = width;
         i.height = height;
         i.fit = fit;
+        i.cacheWidth = cacheWidth;
+        i.cacheHeight = cacheHeight;
         return i;
     }
 
