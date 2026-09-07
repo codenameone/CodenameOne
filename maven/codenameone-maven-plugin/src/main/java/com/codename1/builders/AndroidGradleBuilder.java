@@ -1003,6 +1003,57 @@ public class AndroidGradleBuilder extends Executor {
             return false;
         }
     }
+    /**
+     * The value that actually suppresses AGP's untested-compileSdk warning.
+     *
+     * <p>AGP matches this property against the platform's api string, and from
+     * API 37 that string carries the minor version -- {@code "37.0"}, not
+     * {@code "37"} -- because Google publishes those levels as minor-versioned
+     * platforms. The bare major therefore suppressed nothing and the warning
+     * printed on every API 37 build, which reads like a fault in a customer's log.
+     * AGP names the exact string it wants in the warning itself.</p>
+     *
+     * <p>Below 37 the value is inert either way: AGP's maximum recommended compile
+     * SDK is 36.1, so nothing warns there at all. Only the levels that can warn are
+     * spelled with the minor, which keeps a working path untouched.</p>
+     *
+     * @param compileSdkInt the compile SDK the project will use
+     * @return the {@code android.suppressUnsupportedCompileSdk} value
+     */
+    static String suppressUnsupportedCompileSdkValue(int compileSdkInt) {
+        return compileSdkInt >= 37 ? compileSdkInt + ".0" : String.valueOf(compileSdkInt);
+    }
+
+    /**
+     * The API level of the newest installed platform, or 0 when none parses.
+     *
+     * <p>The MAJOR, deliberately, and not the directory name the scan produced.
+     * From API 36 Google publishes MINOR-versioned platforms -- {@code android-36.1},
+     * {@code android-37.0} -- so the scan hands this method strings like
+     * {@code "36.1"} and {@code "37.0"}. The value it returns becomes
+     * {@code maxPlatformVersion}, which becomes {@code defaultVersion}, which
+     * becomes the target SDK; and every consumer of that wants an integer. The
+     * target-SDK parse is not guarded, so returning {@code "37.0"} threw a
+     * {@link NumberFormatException} naming none of this, and the compile-SDK and
+     * support-library ladders would have compared it as a string. Only the
+     * {@code useGradle8} branch overwrote it with the int, which is the sole reason
+     * the modern path survived a developer installing one of those platforms.</p>
+     *
+     * @param installedPlatforms platform names with the {@code android-} prefix
+     *                           already stripped
+     * @return the highest API level found, or 0 for an empty or unparseable list
+     */
+    int newestInstalledPlatformApi(List<String> installedPlatforms) {
+        int newest = 0;
+        for (String ver : installedPlatforms) {
+            int verInt = parseVersionStringAsInt(ver);
+            if (verInt > newest) {
+                newest = verInt;
+            }
+        }
+        return newest;
+    }
+
     private int parseVersionStringAsInt(String versionString) {
         if (versionString.indexOf(".") > 0) {
             try {
@@ -1298,15 +1349,8 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
-        int maxPlatformVersionInt = 0;
-        String maxPlatformVersion = "0";
-        for (String ver : installedPlatforms) {
-            int verInt = parseVersionStringAsInt(ver);
-            if (verInt > maxPlatformVersionInt) {
-                maxPlatformVersionInt = verInt;
-                maxPlatformVersion = ver;
-            }
-        }
+        int maxPlatformVersionInt = newestInstalledPlatformApi(installedPlatforms);
+        String maxPlatformVersion = String.valueOf(maxPlatformVersionInt);
 
         if (maxPlatformVersionInt == 0) {
             maxPlatformVersionInt = 31;
@@ -7551,7 +7595,8 @@ public class AndroidGradleBuilder extends Executor {
         }
         Integer compileSdkInt = parseSdkInt(compileSdkVersion);
         if (compileSdkInt != null && compileSdkInt >= 35) {
-            gradlePropertiesObject.setProperty("android.suppressUnsupportedCompileSdk", String.valueOf(compileSdkInt));
+            gradlePropertiesObject.setProperty("android.suppressUnsupportedCompileSdk",
+                    suppressUnsupportedCompileSdkValue(compileSdkInt));
         }
 
         // Configure R8 optimization mode to prevent reflection issues

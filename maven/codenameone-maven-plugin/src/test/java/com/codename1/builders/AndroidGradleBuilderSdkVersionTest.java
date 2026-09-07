@@ -22,11 +22,44 @@
  */
 package com.codename1.builders;
 
+import java.util.Arrays;
+import java.util.Collections;
+
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class AndroidGradleBuilderSdkVersionTest {
+
+    @Test
+    void newestInstalledPlatformIsReportedAsItsMajorApiLevel() {
+        AndroidGradleBuilder b = new AndroidGradleBuilder();
+        assertEquals(36, b.newestInstalledPlatformApi(Arrays.asList("30", "33", "36")));
+        // The regression this exists for. From API 36 Google publishes
+        // MINOR-versioned platforms, so the SDK scan yields "37.0" -- and this
+        // value becomes the target SDK, which is parsed as an int without a
+        // guard. Returning the major is what keeps that parse alive.
+        assertEquals(37, b.newestInstalledPlatformApi(Arrays.asList("36", "37.0")));
+        assertEquals(36, b.newestInstalledPlatformApi(Arrays.asList("36.1")));
+        // Extension platforms do not parse and must not win; a developer who has
+        // one alongside a real platform still gets the real one.
+        assertEquals(36, b.newestInstalledPlatformApi(Arrays.asList("36", "36-ext18")));
+        assertEquals(0, b.newestInstalledPlatformApi(Arrays.asList("36-ext18")));
+        assertEquals(0, b.newestInstalledPlatformApi(Collections.<String>emptyList()));
+    }
+
+    @Test
+    void compileSdkSuppressionValueCarriesTheMinorFromApi37() {
+        // AGP matches this against the platform's api string and names the exact
+        // string it wants in the warning: "37.0". The bare major suppresses
+        // nothing.
+        assertEquals("37.0", AndroidGradleBuilder.suppressUnsupportedCompileSdkValue(37));
+        assertEquals("38.0", AndroidGradleBuilder.suppressUnsupportedCompileSdkValue(38));
+        // Below 37 nothing warns -- AGP's maximum recommended compile SDK is 36.1 --
+        // so these keep the spelling they already had.
+        assertEquals("36", AndroidGradleBuilder.suppressUnsupportedCompileSdkValue(36));
+        assertEquals("35", AndroidGradleBuilder.suppressUnsupportedCompileSdkValue(35));
+    }
 
     @Test
     void raisesCompileSdkToTargetSdk() {
