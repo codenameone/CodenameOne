@@ -14,9 +14,8 @@ chain instead of keeping it rejected, and returning `null` after a success
 replaces the value. Returning the incoming value keeps a
 successful chain unchanged, but it doesn't preserve a rejection: any non-promise
 return is treated as a result, so returning the `Throwable` fulfils the chain
-with it. To stay rejected, throw it, or return `Promise.reject(...)` -- a
-returned promise has its state adopted, and a thrown exception is caught and
-becomes the rejection.
+with it. To stay rejected, throw it: `processThens` catches
+whatever a functor throws and rejects the next promise with it.
 
 === Creating and consuming one
 
@@ -83,3 +82,9 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 `await()` is the blocking form. It waits through `invokeAndBlock`, so calling it
 on the EDT doesn't freeze the UI, and it throws
 `AsyncResource.AsyncExecutionException` when the promise rejected.
+
+WARNING: A promise from `promisify` never settles if the underlying
+`AsyncResource` is cancelled. `AsyncResource.cancel` records the cancellation and
+notifies its observers without running the result callback `promisify`
+registered, so the promise stays `Pending` and an `await()` on it waits forever.
+Don't await a promise wrapping a resource something else can cancel.
