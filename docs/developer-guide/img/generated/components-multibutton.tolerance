@@ -1,0 +1,19 @@
+# This figure contains FontImage material glyphs: one column of info icons plus the star emblems.
+#
+# Java2D rasterizes the same glyph from the same bundled font at the same size
+# slightly differently on macOS and Linux. Measured against the CI runner's own
+# output: 460 differing pixels of 208181, 0.2210% of the image, worst channel
+# delta 134. The differing pixels fall in narrow column runs the width of an
+# icon, at the icon positions; every text column is byte-identical, so this is
+# edge coverage on the glyphs and nothing else. Layout is untouched -- both
+# renders are exactly the same size.
+#
+# The committed image is the CI runner's output, so the gate that actually runs
+# compares byte-for-byte and this budget is what lets a developer regenerate the
+# figure on a Mac. Both bounds bind independently. maxMismatchPercent limits how
+# much of the image may change AT ALL -- every differing pixel counts, not only
+# those past the delta -- so a wholesale recolour cannot creep through in small
+# steps. maxChannelDelta then caps how far one pixel may move; 160 clears the
+# measured worst with room while a solid overwrite still fails it.
+maxChannelDelta=160
+maxMismatchPercent=0.35
