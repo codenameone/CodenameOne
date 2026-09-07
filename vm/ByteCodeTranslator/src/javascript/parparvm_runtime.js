@@ -39,9 +39,6 @@ const CN1_DATEFORMAT_DATE_STYLE = "cn1_java_text_DateFormat_dateStyle";
 const CN1_DATEFORMAT_TIME_STYLE = "cn1_java_text_DateFormat_timeStyle";
 const CN1_STRINGBUFFER_INTERNAL = "cn1_java_lang_StringBuffer_internal";
 const CN1_ENUM_NAME = "cn1_java_lang_Enum_name";
-const CN1_HASHMAP_ELEMENT_DATA = "cn1_java_util_HashMap_elementData";
-const CN1_HASHMAP_ENTRY_NEXT = "cn1_java_util_HashMap_Entry_next";
-const CN1_HASHMAP_ENTRY_KEY = "cn1_java_util_MapEntry_key";
 // Shared dispatch id for ``Object.clone()`` post the dispatch-id refactor.
 // The mangler rewrites the literal in lockstep with every call site so
 // equality against ``methodId`` keeps matching after mangling — the

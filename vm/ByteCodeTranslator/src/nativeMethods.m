@@ -3418,7 +3418,9 @@ JAVA_BOOLEAN java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_
 }
 
 // the occupied-slot marker: mixed hash with the sign bit forced on (must match
-// HashMap.cn1Marker exactly)
+// HashMap.cn1Marker exactly). The spread is deliberately weak so Integer keys
+// stay at slot == value and a dense range keeps its sequential-store locality;
+// what makes that safe is the probe sequence below, not the spread.
 static inline JAVA_INT cn1HmMarker(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT key) {
     if(key == JAVA_NULL) {
         return (JAVA_INT)0x80000000;
@@ -3426,6 +3428,19 @@ static inline JAVA_INT cn1HmMarker(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT key) {
     JAVA_INT h = virtual_java_lang_Object_hashCode___R_int(threadStateData, key);
     h ^= (JAVA_INT)(((uint32_t)h) >> 16);
     return h | (JAVA_INT)0x80000000;
+}
+
+// The next slot on a probe path -- CPython's dict recurrence, and the C twin of
+// HashMap.cn1NextSlot. NOT i + 1: linear probing walks a run of occupied slots
+// end to end, and the weak spread above puts every dense Integer key range in
+// exactly one such run, so a MISS inside it was O(n) -- 2547 probes at 20k
+// keys, 222721 at 1M. The first probe is still marker & mask, so sequential
+// placement and its locality are untouched; every probe after it jumps
+// pseudo-randomly and leaves the run at once. perturb decays to 0 within seven
+// steps, after which 5 * i + 1 is a full-period permutation of a power-of-two
+// table, so the walk always reaches the terminating empty slot.
+static inline int cn1HmNextSlot(int i, uint32_t perturb, int mask) {
+    return (int)((((uint32_t)i << 2) + (uint32_t)i + 1u + perturb) & (uint32_t)mask);
 }
 
 // probe; >=0 found slot, else -(insertionPoint+1) (first tombstone on the path
@@ -3436,6 +3451,7 @@ static JAVA_INT cn1HmFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_H
     JAVA_ARRAY_OBJECT* keys = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Keys)->data;
     int mask = metaArr->length - 1;
     int i = marker & mask;
+    uint32_t perturb = (uint32_t)marker;
     int firstTomb = -1;
     while(1) {
         JAVA_INT m = meta[i];
@@ -3451,7 +3467,8 @@ static JAVA_INT cn1HmFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_H
         } else if(m == 1 && firstTomb < 0) { // META_TOMB
             firstTomb = i;
         }
-        i = (i + 1) & mask;
+        perturb >>= 5;
+        i = cn1HmNextSlot(i, perturb, mask);
     }
 }
 
