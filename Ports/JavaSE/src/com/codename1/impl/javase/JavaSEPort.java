@@ -971,7 +971,31 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// port draws with. Changing only this accessor would just split the two.
     @Override
     public float getDevicePixelRatio() {
-        return retinaScale > 0 ? (float) retinaScale : super.getDevicePixelRatio();
+        return devicePixelRatioFor(isDesktop(), retinaScale, super.getDevicePixelRatio());
+    }
+
+    /// Decides the reported ratio from the three things that determine it.
+    ///
+    /// Separated from the accessor so it can be exercised without constructing a
+    /// port: the constructor initialises a look and feel, which needs a native
+    /// library that is not present on every machine the tests run on.
+    ///
+    /// The host display's backing scale is reported ONLY when no skin is loaded.
+    /// A skin means this process is standing in for another device, and the
+    /// host's scale is not that device's -- a 2x machine showing a 3x phone skin
+    /// would report 2, and everything laid out in the platform's logical units
+    /// comes out two thirds of its size.
+    ///
+    /// With a skin the answer is the "not reported" value, which the documented
+    /// contract already defines: the caller derives the ratio from the density
+    /// bucket, which describes the device being simulated rather than the
+    /// machine simulating it, and is what this call resolved to before the
+    /// platform reported a scale at all.
+    static float devicePixelRatioFor(boolean desktop, double hostScale, float notReported) {
+        if (!desktop) {
+            return notReported;
+        }
+        return hostScale > 0 ? (float) hostScale : notReported;
     }
 
     public int getDeviceDensity() {
