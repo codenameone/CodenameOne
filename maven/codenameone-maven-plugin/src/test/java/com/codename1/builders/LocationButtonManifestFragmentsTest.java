@@ -2271,13 +2271,30 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
-    void aStreamedTypeParameterShadowsTheWildcard() throws Exception {
-        // PARITY AUDIT against the buffered pass, which refuses this.
+    void aStreamedMemberTypeDoesNotShadowASiblingClass() throws Exception {
+        // The streamed pass follows the buffered one: a member type is scoped
+        // to its own class, and claiming otherwise deletes the bridge from a
+        // sibling that builds the button.
         String source = "import com.codename1.location.*;\n"
-                + "class Box<LocationButton> { LocationButton value; }\n";
-        assertFalse(LocationButtonManifestFragments.namesButtonInStream(
+                + "class A { static class LocationButton { } }\n"
+                + "class B { Object f() { return new LocationButton(); } }\n";
+        assertTrue(LocationButtonManifestFragments.namesButtonInStream(
                         new java.io.StringReader(source), 16),
-                "a type parameter owns the name, streamed too");
+                "a member type does not reach its sibling, streamed");
+    }
+
+    @Test
+    void aStreamedImportBrokenAcrossLinesIsStillOneImport() throws Exception {
+        // PARITY AUDIT: the buffered pass continues an import across a line
+        // it plainly has not finished. If the stream stops at the newline the
+        // statement is half a name, the simple name below belongs to no
+        // import, and an oversized file loses the button.
+        String source = "import com.codename1.location.\n"
+                + "        LocationButton;\n"
+                + "class Big { Object f() { return new LocationButton(); } }\n";
+        assertTrue(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "a broken import is still one import, streamed");
     }
 
     @Test
@@ -2292,13 +2309,13 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
-    void aStreamedLocalTypeShadowsThePackageScope() throws Exception {
+    void aStreamedTopLevelTypeShadowsThePackageScope() throws Exception {
         String source = "package com.codename1.location;\n"
-                + "class Big { static class LocationButton { } "
-                + "Object f() { return new LocationButton(); } }\n";
+                + "class LocationButton { }\n"
+                + "class Big { Object f() { return new LocationButton(); } }\n";
         assertFalse(LocationButtonManifestFragments.namesButtonInStream(
                         new java.io.StringReader(source), 16),
-                "a type declared here owns the simple name, streamed too");
+                "a top-level type owns the name for the whole file, streamed");
     }
 
     @Test
@@ -2922,9 +2939,12 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
-    void aTypeParameterOfThatNameShadowsTheWildcard() throws Exception {
-        // class Box<LocationButton> binds the name to the parameter for the
-        // whole body, so the field is the parameter and not this component.
+    void aTypeParameterIsNoLongerReadAsAShadow() throws Exception {
+        // class Box<LocationButton> does bind the name inside Box, and a
+        // generic METHOD's own parameter binds it inside that method -- but
+        // both are scoped, and this scan cannot tell where a reference sits
+        // without parsing the language. It over-reports instead, which is the
+        // direction that fails visibly rather than silently.
         File root = tempDir("cn1-lb-typeparam");
         writeSource(new File(root, "com/example/Box.java"),
                 "package com.example;\n"
@@ -2932,8 +2952,8 @@ class LocationButtonManifestFragmentsTest {
                 + "public class Box<LocationButton> {\n"
                 + "  LocationButton value;\n"
                 + "}\n");
-        assertFalse(LocationButtonManifestFragments.sourcesNameTheButton(root),
-                "a type parameter owns the name inside its own type");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "a scoped shadow is not claimed, so this over-reports");
     }
 
     @Test
@@ -2972,18 +2992,41 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
-    void aLocalClassOfTheSameNameShadowsThePackageScope() throws Exception {
-        // A sibling in the package that declares its OWN LocationButton binds
-        // the bare name to itself.
-        File root = tempDir("cn1-lb-shadow-local");
+    void aTopLevelClassOfThatNameShadowsThePackageScope() throws Exception {
+        // A TOP-LEVEL type takes the name for the whole compilation unit, and
+        // that needs no scope analysis to know -- so it is the one declaration
+        // shape still read as a shadow.
+        File root = tempDir("cn1-lb-shadow-toplevel");
         writeSource(new File(root, "com/codename1/location/Local.java"),
                 "package com.codename1.location;\n"
+                + "class LocationButton { }\n"
                 + "public class Local {\n"
-                + "  static class LocationButton { }\n"
                 + "  Object f() { return new LocationButton(); }\n"
                 + "}\n");
         assertFalse(LocationButtonManifestFragments.sourcesNameTheButton(root),
-                "a type declared here owns the simple name");
+                "a top-level type owns the name for the whole file");
+    }
+
+    @Test
+    void aMemberTypeDoesNotShadowASiblingClass() throws Exception {
+        // class A { static class LocationButton {} } takes the name inside A
+        // and nowhere else, so class B in the same file means the real
+        // component. Treating the member as file-wide lost the button from B
+        // and deleted the bridge from an application that builds one.
+        //
+        // Answering it properly means knowing which enclosing type each
+        // reference sits in, which is a parser. So this over-reports where it
+        // cannot tell, which is the safe direction: a wrong shadow breaks the
+        // feature in silence, a missing one adds a permission the manifest
+        // shows.
+        File root = tempDir("cn1-lb-member-shadow");
+        writeSource(new File(root, "com/example/Two.java"),
+                "package com.example;\n"
+                + "import com.codename1.location.*;\n"
+                + "class A { static class LocationButton { } }\n"
+                + "class B { Object f() { return new LocationButton(); } }\n");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "a member type does not reach its sibling");
     }
 
     @Test

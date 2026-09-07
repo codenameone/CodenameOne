@@ -1553,4 +1553,63 @@ class LocationButtonRebuildTest extends UITestBase {
                 "the throttle must wake itself: no further layout is coming, "
                 + "and without one the peer stays retired for good");
     }
+    @Test
+    void aFallbackTapUsesTheOrdinaryLookupRatherThanWaiting() {
+        // The fresh-fix wait is for a system-button grant: the tap just earned
+        // precise location and the cache predates it. A fallback tap earns
+        // nothing -- the application's permission is whatever it already was
+        // -- so waiting for a newer fix costs every such tap its full timeout
+        // before handing back the cache it could have had at once.
+        RecordingBridge bridge = install();
+        CachingManager manager = new CachingManager();
+        implementation.setLocationManager(manager);
+
+        Location cached = new Location();
+        cached.setTimeStamp(1000L);
+        Location later = new Location();
+        later.setTimeStamp(2000L);
+        manager.cached = cached;
+        manager.arriving = later;
+
+        LocationListener appListener = new LocationListener() {
+            public void locationUpdated(Location location) {
+            }
+
+            public void providerStateChanged(int newState) {
+            }
+        };
+        manager.setLocationListener(appListener);
+        try {
+            // No control, so the component carries the ordinary fallback.
+            bridge.building = false;
+            LocationButton button = new LocationButton();
+            Button tapTarget = (Button) button.getComponentAt(0);
+            final Location[] seen = new Location[1];
+            final int[] answers = new int[1];
+            button.addLocationSharedListener(new LocationSharedListener() {
+                public void locationShared(Location location) {
+                    answers[0]++;
+                    seen[0] = location;
+                }
+            });
+
+            tapTarget.pressed();
+            tapTarget.released();
+            drain();
+            waitUntil("the fallback tap was answered", new Settled() {
+                public boolean isSo() {
+                    return answers[0] > 0;
+                }
+            });
+
+            assertEquals(1, answers[0], "the tap is answered once");
+            assertNotNull(seen[0], "and with a location");
+            assertEquals(1000L, seen[0].getTimeStamp(),
+                    "a fallback tap gets the ordinary answer -- the cache --"
+                    + " rather than waiting out its timeout for a fix it has"
+                    + " earned no right to");
+        } finally {
+            manager.setLocationListener(null);
+        }
+    }
 }

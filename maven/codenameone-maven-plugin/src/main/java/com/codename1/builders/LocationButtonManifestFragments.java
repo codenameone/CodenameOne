@@ -2451,10 +2451,9 @@ final class LocationButtonManifestFragments {
         String keyword = null;
         String previousWord = "";
         boolean shadowed = false;
+        boolean pendingBreak = false;
         int braceDepth = 0;
-        boolean sawTypeKeyword = false;
-        boolean expectAngle = false;
-        boolean inTypeParams = false;
+
         java.util.List<String> bound = new java.util.ArrayList<String>();
         int lastDot = target.lastIndexOf('.');
         String pkg = lastDot < 0 ? "" : target.substring(0, lastDot);
@@ -2531,57 +2530,59 @@ final class LocationButtonManifestFragments {
                     continue;
                 }
                 if (state == IMPORT) {
-                    if (c == ';' || c == '\n' || c == '\r') {
-                        String text = statement.toString();
-                        if ("package".equals(keyword)) {
-                            // The file DECLARES the package, so the simple
-                            // name needs no import at all -- the same rule the
-                            // buffered pass applies, and without it a sibling
-                            // of the button read as not using it.
-                            if (namesToken(text, pkg) && !shadowed) {
-                                bound.add(simple);
+                    // A newline does NOT end one while it is plainly
+                    // unfinished -- a dot on either side of the break says so,
+                    // and Java lets the qualified name be broken there. Ending
+                    // at the newline left half a name, so the simple name
+                    // below belonged to no import and an oversized file lost
+                    // the button. Same rule as the buffered pass's
+                    // statementEnd.
+                    boolean finish = c == ';';
+                    if (!finish && (c == '\n' || c == '\r')) {
+                        String far = statement.toString().trim();
+                        if (far.endsWith(".")) {
+                            continue;
+                        }
+                        pendingBreak = true;
+                        continue;
+                    }
+                    if (pendingBreak && !isSourceSpace(c)) {
+                        if (c == '.') {
+                            pendingBreak = false;
+                            if (statement.length() < IMPORT_LIMIT) {
+                                statement.append(c);
                             }
-                        } else if (namesToken(text, pkg + ".*")) {
-                            // A wildcard import puts the package in scope, and
-                            // the code then spells the simple name. The
-                            // statement never contains the full dotted name,
-                            // so the check below cannot see it.
-                            if (!shadowed) {
-                                bound.add(simple);
-                            }
-                        } else if (text.indexOf(target) >= 0) {
-                            // OURS, and this has to be asked before the
-                            // shadowing test below: our own import binds the
-                            // simple name too, so a test that only compares
-                            // bound names reads it as something else taking
-                            // the token.
-                            String name = importBinds(text, target);
-                            if (name == null) {
-                                // Binds a name nothing here can predict, so
-                                // the file counts -- the static-wildcard case.
-                                return true;
-                            }
-                            bound.add(name);
-                        } else if (simple.equals(
-                                boundName("import " + text, null))) {
-                            // An explicit import of ANOTHER package's class of
-                            // this name takes the bare token, so a wildcard or
-                            // the package declaration cannot lend it to us --
-                            // the rule the buffered pass applies, and without
-                            // it an oversized file is charged for a component
-                            // it never touches.
-                            shadowed = true;
-                            bound.remove(simple);
+                            continue;
+                        }
+                        // The statement really did end at that break, and this
+                        // character belongs to the code after it.
+                        finish = true;
+                    }
+                    if (finish) {
+                        boolean[] shadowOut = {shadowed};
+                        int verdict = applyStatement(statement.toString(),
+                                keyword, target, pkg, simple, bound,
+                                shadowOut);
+                        shadowed = shadowOut[0];
+                        if (verdict > 0) {
+                            return true;
                         }
                         statement = null;
                         keyword = null;
+                        pendingBreak = false;
                         state = CODE;
                         before = ' ';
                         matched = 0;
+                        if (c == ';') {
+                            continue;
+                        }
+                        // Fall through: this character is code.
                     } else if (statement.length() < IMPORT_LIMIT) {
                         statement.append(c);
+                        continue;
+                    } else {
+                        continue;
                     }
-                    continue;
                 }
                 // CODE from here.
                 if (pendingSlash == '/') {
@@ -2663,9 +2664,6 @@ final class LocationButtonManifestFragments {
                     complete = true;
                     matched = 0;
                 }
-                if (inTypeParams && c == '>' && word.length() == 0) {
-                    inTypeParams = false;
-                }
                 if (Character.isJavaIdentifierPart(c)) {
                     word.append(c);
                 } else if (word.length() > 0) {
@@ -2681,44 +2679,17 @@ final class LocationButtonManifestFragments {
                     }
                     if (simple.equals(finished)
                             && isTypeKeyword(previousWord)
-                            && braceDepth <= 1) {
-                        // A type of that name declared HERE owns it too --
-                        // but only one whose name reaches the file. A class
-                        // declared inside a method reaches its own block, and
-                        // reading that as a shadow loses the button from a
-                        // file that builds one elsewhere.
+                            && braceDepth == 0) {
+                        // A TOP-LEVEL type of that name owns it for the whole
+                        // compilation unit, which needs no scope analysis to
+                        // know. A member or a method-local one does not, and
+                        // treating those as file-wide lost the button from a
+                        // sibling that builds one -- see shadowsWholeFile for
+                        // why that direction is the one to avoid.
                         shadowed = true;
                         bound.remove(simple);
                         previousWord = finished;
                         continue;
-                    }
-                    // And a type PARAMETER owns it for the body of the type
-                    // that declares it: class Box<LocationButton> binds the
-                    // name to the parameter, so a field of it is not this
-                    // component. Only the list that follows a type's own name
-                    // counts -- List<LocationButton> elsewhere is a real use.
-                    if (isTypeKeyword(finished)) {
-                        sawTypeKeyword = true;
-                    } else if (sawTypeKeyword) {
-                        sawTypeKeyword = false;
-                        expectAngle = true;
-                    }
-                    if (expectAngle) {
-                        if (c == '<') {
-                            inTypeParams = true;
-                            expectAngle = false;
-                        } else if (!isSourceSpace(c)) {
-                            expectAngle = false;
-                        }
-                    }
-                    if (inTypeParams) {
-                        if (simple.equals(finished) && braceDepth <= 1) {
-                            shadowed = true;
-                            bound.remove(simple);
-                        }
-                        if (c == '>') {
-                            inTypeParams = false;
-                        }
                     }
                     if (bound.contains(finished)) {
                         return true;
@@ -2774,6 +2745,71 @@ final class LocationButtonManifestFragments {
         int lastDot = target.lastIndexOf('.');
         String simple = lastDot < 0 ? target : target.substring(lastDot + 1);
         return boundName("import " + statement, simple);
+    }
+
+    /**
+     * Applies a finished {@code import} or {@code package} statement.
+     *
+     * <p>Extracted so the streamed reader can finish one in two places: at its
+     * semicolon, and at the first code character after a line break that
+     * turned out to end it after all.</p>
+     *
+     * @param text      the statement, keyword excluded
+     * @param keyword   {@code import} or {@code package}
+     * @param target    the dotted class name
+     * @param pkg       its package
+     * @param simple    its simple name
+     * @param bound     names the code may spell for it, added to
+     * @param shadowed  one-element in/out flag for the shadowing state
+     * @return 1 when the file counts outright, 0 otherwise
+     */
+    private static int applyStatement(String raw, String keyword,
+            String target, String pkg, String simple,
+            java.util.List<String> bound, boolean[] shadowed) {
+        // Joined first, for the reason the buffered pass joins: a statement
+        // gathered across a line break carries the next line's indentation
+        // between the dot and the rest of the name, so the name is there but
+        // not as one run of characters.
+        String text = joinBrokenNames(raw);
+        if ("package".equals(keyword)) {
+            // The file DECLARES the package, so the simple name needs no
+            // import at all -- the rule the buffered pass applies, and without
+            // it a sibling of the button read as not using it.
+            if (namesToken(text, pkg) && !shadowed[0]) {
+                bound.add(simple);
+            }
+            return 0;
+        }
+        if (namesToken(text, pkg + ".*")) {
+            // A wildcard import puts the package in scope and the code then
+            // spells the simple name. The statement never contains the full
+            // dotted name, so the check below cannot see it.
+            if (!shadowed[0]) {
+                bound.add(simple);
+            }
+            return 0;
+        }
+        if (text.indexOf(target) >= 0) {
+            // OURS, asked before the shadowing test below: our own import
+            // binds the simple name too, so a test that only compares bound
+            // names reads it as something else taking the token.
+            String name = importBinds(text, target);
+            if (name == null) {
+                // Binds a name nothing here can predict -- the static-wildcard
+                // case -- so the file counts.
+                return 1;
+            }
+            bound.add(name);
+            return 0;
+        }
+        if (simple.equals(boundName("import " + text, null))) {
+            // An explicit import of ANOTHER package's class of this name takes
+            // the bare token, so a wildcard or the package declaration cannot
+            // lend it to us.
+            shadowed[0] = true;
+            bound.remove(simple);
+        }
+        return 0;
     }
 
     /** Whether a word introduces a type declaration. */
@@ -3374,61 +3410,9 @@ final class LocationButtonManifestFragments {
                 return true;
             }
         }
-        return declaresType(text, simple, imports)
-                || declaresTypeParameter(text, simple, imports);
+        return declaresType(text, simple, imports);
     }
 
-    /**
-     * Whether a declared type takes {@code simple} as a type PARAMETER.
-     *
-     * <p>{@code class Box<LocationButton>} binds that name to the parameter
-     * for the whole body, so a field of it is the parameter and not this
-     * component. Only a parameter LIST counts, which is the {@code <...>} that
-     * follows a type's own name -- {@code List<LocationButton>} elsewhere is a
-     * use of the class, and reading that as a shadow would lose every file
-     * that holds the button in a collection.</p>
-     *
-     * @param text     the source, comments gone
-     * @param simple   the simple name
-     * @param imports  the import ranges, which declare nothing
-     * @return whether a type parameter owns the name
-     */
-    private static boolean declaresTypeParameter(String text, String simple,
-            int[][] imports) {
-        String[] keywords = {"class", "interface", "enum", "record"};
-        for (int word = 0; word < keywords.length; word++) {
-            int at = text.indexOf(keywords[word]);
-            while (at >= 0) {
-                int after = at + keywords[word].length();
-                boolean startsClean = at == 0
-                        || !Character.isJavaIdentifierPart(
-                                text.charAt(at - 1));
-                if (startsClean && after < text.length()
-                        && isSourceSpace(text.charAt(after))
-                        && !within(at, imports)
-                        && shadowsWholeFile(text, at)) {
-                    // Past the type's own name, to the parameter list that
-                    // opens immediately after it if there is one.
-                    int walk = skipSpace(text, after);
-                    while (walk < text.length()
-                            && Character.isJavaIdentifierPart(
-                                    text.charAt(walk))) {
-                        walk++;
-                    }
-                    walk = skipSpace(text, walk);
-                    if (walk < text.length() && text.charAt(walk) == '<') {
-                        int close = text.indexOf('>', walk);
-                        if (close > walk && namesToken(
-                                text.substring(walk + 1, close), simple)) {
-                            return true;
-                        }
-                    }
-                }
-                at = text.indexOf(keywords[word], at + 1);
-            }
-        }
-        return false;
-    }
 
     /** Whether the source declares a type called {@code simple}. */
     private static boolean declaresType(String text, String simple,
@@ -3763,24 +3747,30 @@ final class LocationButtonManifestFragments {
     /**
      * Whether a declaration at {@code at} reaches the whole compilation unit.
      *
-     * <p>A top-level type does, and so does a member of one -- its name is
-     * visible throughout the enclosing type, which in a source file of the
-     * kind this scans is effectively everywhere. A declaration deeper than
-     * that is inside a method or an initialiser and reaches only its own
-     * block, so it must not silence a reference in a different one.</p>
+     * <p>Only a TOP-LEVEL one does, and that is deliberately narrower than it
+     * once was. A type declared at the top level of a compilation unit takes
+     * the name for the whole of it, which needs no scope analysis to know. A
+     * MEMBER type does not: {@code class A { static class LocationButton {} }}
+     * takes the name inside A and nowhere else, so a sibling class in the same
+     * file still means the real component -- and treating the member as
+     * file-wide lost the button from that sibling and deleted the bridge from
+     * an application that builds one.</p>
      *
-     * <p>The distinction matters in the direction that fails silently: reading
-     * a method-local class as a file-wide shadow loses the button from a file
-     * that builds one somewhere else, and the bridge then goes from an
-     * application that uses it. Brace depth is what separates the two without
-     * parsing the language.</p>
+     * <p>Answering that properly means knowing which enclosing type each
+     * reference sits in, which is scope analysis, which is a parser. So the
+     * rule is narrowed to what can be decided without one, and everything else
+     * is left to over-report. That is the safe direction here and the reason
+     * this was pulled back rather than pushed further: a shadow that is wrong
+     * DELETES the bridge, silently, from an application that uses the button,
+     * while a shadow that is missing only adds a permission the manifest shows
+     * and the developer can see.</p>
      *
      * @param text the source
      * @param at   where the declaration's keyword starts
      * @return whether it shadows the file
      */
     private static boolean shadowsWholeFile(String text, int at) {
-        return braceDepthAt(text, at) <= 1;
+        return braceDepthAt(text, at) == 0;
     }
 
     /**

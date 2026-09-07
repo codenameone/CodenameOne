@@ -56,6 +56,29 @@ class MIDPLocationManager extends  LocationManager implements javax.microedition
         return super.getStatus();
     }
         
+    /**
+     * The current fix, waited for with a BOUND.
+     *
+     * <p>This used to pass -1, which hands the wait to the implementation's
+     * own default and leaves the caller with no say in it at all. The caller
+     * is on the EDT: LocationButton's tap goes through here, and a provider
+     * that cannot get a fix meant the tap's listener was never called and the
+     * timeout the application had set could never fire, because there is no
+     * deadline on a wait that has not ended.</p>
+     *
+     * <p>The timeout is in SECONDS in this API. On expiry the provider throws,
+     * the catch below turns that into an IOException, and the caller reads
+     * that as having no fix -- which is what it is.</p>
+     */
+    /**
+     * How long {@link #getCurrentLocation()} waits for a fix, in seconds.
+     *
+     * <p>Generous, because a provider that is working answers quickly and this
+     * is only reached when one is not. Short enough that a caller which set no
+     * deadline of its own still returns.</p>
+     */
+    private static final int FIX_WAIT_SECONDS = 10;
+
     public Location getCurrentLocation() throws IOException {
 
         try {
@@ -63,7 +86,7 @@ class MIDPLocationManager extends  LocationManager implements javax.microedition
             c.setSpeedAndCourseRequired(true);
             c.setAltitudeRequired(true);
             LocationProvider provider = LocationProvider.getInstance(c);
-            return convert(provider.getLocation(-1));
+            return convert(provider.getLocation(FIX_WAIT_SECONDS));
         } catch (Exception ex) {
             ex.printStackTrace();
             throw new IOException(ex.getMessage());

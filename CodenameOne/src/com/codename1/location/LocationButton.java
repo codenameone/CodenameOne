@@ -1031,7 +1031,18 @@ public class LocationButton extends Container {
                 // silently end the application's tracking. It falls back to
                 // the cached fix, so this is never worse than the call it
                 // replaces.
-                result = manager.freshLocationSync(timeout);
+                // ONLY for a system-button session. freshLocationSync waits
+                // for a fix taken after the grant, and it is worth waiting for
+                // because the tap just earned precise location and the cache
+                // predates it. A FALLBACK tap earns nothing: the application's
+                // permission is whatever it already was, so there is no newer
+                // fix to be entitled to, and waiting for one costs every such
+                // tap its full timeout before handing back the cache it could
+                // have had at once. Those taps get the ordinary semantics,
+                // which is what the same code would do without this component.
+                result = generation == NO_SESSION
+                        ? manager.getCurrentLocationSync(timeout)
+                        : manager.freshLocationSync(timeout);
             }
         } catch (Throwable err) {
             Log.e(err);

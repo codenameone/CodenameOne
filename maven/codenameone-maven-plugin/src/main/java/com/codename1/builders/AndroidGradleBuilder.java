@@ -3356,11 +3356,39 @@ public class AndroidGradleBuilder extends Executor {
                             "false").equals("true");
         } catch (IOException budgetOrIo) {
             // The scan refuses an archive that blows its budget rather than
-            // reading on, and unknown has to resolve upwards: carrying on would
-            // decide the manifest and the deletable package from a tree we only
-            // partly read.
-            throw new BuildException("Failed to scan the submitted libraries for"
-                    + " location API usage.", budgetOrIo);
+            // reading on, so the answer here is genuinely unknown.
+            //
+            // What that is worth depends entirely on who is asking. Under
+            // android.locationButton.exclusive the answer decides whether the
+            // application's other location requests are about to be restricted
+            // to a control, and there is no safe guess: refusing names the
+            // reason, and accepting downgrades a request that is really made
+            // and says nothing. So exclusivity still fails here.
+            //
+            // Without the hint, nothing about this build turns on the
+            // libraries' answer being complete -- and refusing anyway is a
+            // feature nobody asked for breaking projects that never mention
+            // the button. A large enough set of submitted libraries could
+            // exhaust the shared budget on its own, and those builds worked
+            // before this scan existed. So it degrades: what the application's
+            // own classes said still stands, the libraries' contribution is
+            // dropped, and the log says which.
+            if (LocationButtonManifestFragments.isExclusive(
+                    request.getArg("android.locationButton.exclusive",
+                            "false"))) {
+                throw new BuildException("Failed to scan the submitted"
+                        + " libraries for location API usage, and"
+                        + " android.locationButton.exclusive needs a complete"
+                        + " answer: it restricts precise location to the"
+                        + " button, so a library asking for it separately has"
+                        + " to be found before the build, not after.",
+                        budgetOrIo);
+            }
+            log("Could not finish scanning the submitted libraries for"
+                    + " location API usage (" + budgetOrIo.getMessage()
+                    + "). Continuing with what the application's own classes"
+                    + " report; a library's own use of the location button is"
+                    + " not counted for this build.");
         }
 
         // android.blockLocationPermission turns the WHOLE feature off, here,
