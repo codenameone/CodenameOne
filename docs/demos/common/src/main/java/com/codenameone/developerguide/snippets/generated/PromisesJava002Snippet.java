@@ -88,13 +88,16 @@ class PromisesJava002Snippet {
         Promise<String> name = Promise.resolve("ada");
         name.then(
                 n -> ((String)n).toUpperCase(),
-                // handle the failure at the first step: a then() given no
-                // rejection functor installs one that casts to
-                // RuntimeException, which turns a checked reason into a
-                // ClassCastException further down
-                err -> { Log.e((Throwable)err); return null; })
+                // a then() given no rejection functor installs one that casts
+                // to RuntimeException, turning a checked reason into a
+                // ClassCastException, so supply one. Rethrow wrapped rather
+                // than returning a value: anything returned here RESOLVES the
+                // rest of the chain, so returning null would run the steps
+                // below on a failure
+                err -> { throw new RuntimeException((Throwable)err); })
             .then(upper -> "Hello " + upper)
-            .onSuccess(msg -> Log.p((String)msg));
+            .onSuccess(msg -> Log.p((String)msg))
+            .onFail(err -> Log.e((Throwable)err));
         // end::promises-java-002[]
     }
 
