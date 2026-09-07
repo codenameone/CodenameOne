@@ -183,6 +183,14 @@ they cannot compile here at all -- but they fail identically against both jars
 and cancel out. Error lines are compared whole, line numbers included, which is
 exact because both runs see byte-identical source.
 
+The platform goes on the **boot** class path, not the class path. Through
+`-cp` it supplies `android.*` and nothing else -- `java.*` keeps resolving from
+the host JDK's system modules, because the class path cannot override the core
+library -- so the gate was blind to Android's `java.*`. Measured with
+`java.lang.ProcessHandle`, which Android has never shipped: 0 errors through
+`-cp`, 1 through `-bootclasspath`. That forces `-source/-target 8`, which javac
+requires before it honours `-bootclasspath` at all.
+
 One trap it has to defend against: **a second `android.jar` on the classpath
 silently defeats it.** The port's Maven compile classpath carries the
 cn1-binaries stub, javac resolves the platform jar first, misses the removed

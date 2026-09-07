@@ -277,9 +277,25 @@ def compile_against(compiler, android_jar, classpath, source_files, workdir):
     argfile = os.path.join(workdir, 'sources.txt')
     with open(argfile, 'w', encoding='utf-8') as handle:
         handle.write('\n'.join(source_files))
-    entries = [android_jar] + without_platform_stubs(
-        [item for item in classpath if item])
+    entries = without_platform_stubs([item for item in classpath if item])
+    # The platform goes on the BOOT class path, not the class path. Handed to
+    # -cp it supplies android.* and nothing else: java.* keeps resolving from
+    # the host JDK's own system modules, because the class path cannot override
+    # the platform's core library. The gate would then be blind to Android's
+    # java.* -- an API Android has never had compiles clean here, and a
+    # java.* removal would fail in neither run and cancel out. Demonstrated
+    # with java.lang.ProcessHandle, which Android has no version of: 0 errors
+    # through -cp, 1 through -bootclasspath.
+    #
+    # -source/-target 8 because javac only honours -bootclasspath at 8 or
+    # below, which costs nothing here: this is the Android port, and the
+    # generated app compiles it at 8 unless the project asks for more. On a
+    # JDK new enough to have dropped source 8 javac refuses the option outright
+    # rather than ignoring it, and that lands in the non-diagnostic failure
+    # path below instead of passing quietly.
     command = [compiler, '-nowarn', '-proc:none', '-Xmaxerrs', '100000',
+               '-source', '8', '-target', '8',
+               '-bootclasspath', android_jar,
                '-d', output, '-cp', os.pathsep.join(entries), '@' + argfile]
     result = subprocess.run(command, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, universal_newlines=True)
