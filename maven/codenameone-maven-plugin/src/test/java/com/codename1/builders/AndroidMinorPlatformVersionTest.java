@@ -24,7 +24,12 @@ package com.codename1.builders;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -107,9 +112,76 @@ class AndroidMinorPlatformVersionTest {
      */
     @Test
     void theSuppressionKeyCarriesBothSpellings() {
-        String value = AndroidGradleBuilder.suppressUnsupportedCompileSdkValue(37);
+        String value = AndroidGradleBuilder.suppressUnsupportedCompileSdkValue(
+                37, "37.0");
         assertEquals("37,37.0", value);
         assertTrue(value.contains("37.0"),
                 "AGP 8.13.2 asks for the resolved platform name, which is 37.0");
+    }
+
+    /**
+     * Compiling against a later revision, AGP asks for that revision by name.
+     */
+    @Test
+    void theSuppressionKeyCoversTheResolvedRevision() {
+        assertEquals("37,37.0,37.2",
+                AndroidGradleBuilder.suppressUnsupportedCompileSdkValue(37, "37.2"));
+    }
+
+    /**
+     * The unsuffixed platform is what a build asks for when it is installed.
+     *
+     * <p>Which is every level up to 36, and any SDK that took android-37.0.
+     * Emitting the hash string there would be a gratuitous change to a build
+     * that already works.</p>
+     */
+    @Test
+    void theBarePlatformIsPreferredWhenInstalled() {
+        List<String> installed = Arrays.asList("34", "36", "37", "37.2");
+        assertEquals("37", AndroidGradleBuilder.compileSdkPlatformName(37, installed));
+        assertEquals("37", AndroidGradleBuilder.compileSdkGradleValue("37", installed));
+        assertEquals("36", AndroidGradleBuilder.compileSdkGradleValue("36", installed));
+    }
+
+    /**
+     * With only a minor revision installed, name it -- or nothing builds.
+     *
+     * <p>`compileSdkVersion 37` is a request for the platform whose hash
+     * string is `android-37`, and AGP does not fall back to another revision
+     * of the level. Measured against AGP 8.13.2: with only android-37.2
+     * installed it fails with "Failed to find target with hash string
+     * 'android-37'", and `compileSdkVersion 'android-37.2'` builds. Since API
+     * 37 ships only as 37.0/37.1/37.2, running `sdkmanager
+     * "platforms;android-37.2"` is enough to reach this.</p>
+     */
+    @Test
+    void aMinorOnlyInstallIsNamedExactly() {
+        List<String> installed = Arrays.asList("35", "36", "37.2");
+        assertEquals("37.2", AndroidGradleBuilder.compileSdkPlatformName(37, installed));
+        assertEquals("'android-37.2'",
+                AndroidGradleBuilder.compileSdkGradleValue("37", installed));
+    }
+
+    /**
+     * The newest installed revision wins, and "37.10" is newer than "37.2".
+     */
+    @Test
+    void theNewestRevisionWinsNumerically() {
+        assertEquals("37.10", AndroidGradleBuilder.compileSdkPlatformName(
+                37, Arrays.asList("37.2", "37.10", "37.1")));
+    }
+
+    /**
+     * A level nothing is installed for keeps the bare number.
+     *
+     * <p>So AGP can fetch it, which is what it does today. Inventing a name
+     * for a platform that is not there would turn a download into a failure.
+     * </p>
+     */
+    @Test
+    void anAbsentLevelKeepsTheBareNumber() {
+        List<String> installed = Collections.singletonList("36");
+        assertNull(AndroidGradleBuilder.compileSdkPlatformName(37, installed));
+        assertEquals("37", AndroidGradleBuilder.compileSdkGradleValue("37", installed));
     }
 }

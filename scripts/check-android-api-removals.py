@@ -35,6 +35,7 @@ by having nothing to check is not a check.
 """
 
 import argparse
+import collections
 import os
 import re
 import subprocess
@@ -52,6 +53,20 @@ MIN_TARGET_API = 37
 DEFAULT_SOURCE_ROOTS = [os.path.join('Ports', 'Android', 'src')]
 
 ERROR_LINE = re.compile(r'^(.*?):(\d+): error: (.*)$')
+
+# Everything that ends an error's continuation lines. javac follows a header
+# with the source line, a caret, and indented "symbol:"/"location:" detail --
+# but it also emits notes and a trailing count, and those belong to nobody.
+# Left attached they ride on whichever error happened to be last, and the
+# count ("576 errors") differs between the two runs by construction, so the
+# last diagnostic always looked new. Note the capital N: javac writes
+# "Note: Some input files ..." at column 0, which a lowercase-only pattern
+# missed.
+STOP_LINE = re.compile(
+    r'^(?:\d+\s+(?:error|warning)s?\s*$'
+    r'|[Nn]ote:\s'
+    r'|[Ww]arning:\s'
+    r'|(?:.*?):\d+:\s(?:warning|note):\s)')
 
 
 def sdk_root():
@@ -207,12 +222,55 @@ def without_platform_stubs(entries):
             if os.path.basename(entry) != 'android.jar']
 
 
+class CompilerFailure(Exception):
+    """javac did not run far enough to have an opinion about the source."""
+
+
+def parse_diagnostics(output):
+    """Every error javac reported, each as one whole multi-line string.
+
+    The header line alone is not enough to tell two errors apart. javac writes
+    "cannot find symbol" and then, on following lines, the symbol and the
+    location that could not be found -- and those detail lines are the only
+    thing distinguishing one missing symbol from another on the same source
+    line. Comparing headers, a line that already fails against the baseline
+    (an optional package whose dependency is absent) would absorb a NEW
+    removal on that same line and the gate would report nothing.
+
+    Returned as a list rather than a set for the same reason at a smaller
+    scale: one source line can carry two missing symbols, and collapsing them
+    hides the second.
+    """
+    diagnostics = []
+    current = None
+    for line in output.splitlines():
+        if ERROR_LINE.match(line):
+            if current is not None:
+                diagnostics.append('\n'.join(current))
+            current = [line.rstrip()]
+        elif current is not None:
+            if STOP_LINE.match(line):
+                diagnostics.append('\n'.join(current))
+                current = None
+            else:
+                current.append(line.rstrip())
+    if current is not None:
+        diagnostics.append('\n'.join(current))
+    return diagnostics
+
+
 def compile_against(compiler, android_jar, classpath, source_files, workdir):
-    """Compile everything and return the set of error lines javac printed.
+    """Compile everything and return every error javac reported.
 
     -Xmaxerrs is raised because the default of 100 truncates, and a truncated
     run against one jar and not the other invents a difference that is really
     just where javac stopped counting.
+
+    A javac that exits non-zero having reported nothing did not compile the
+    source -- it rejected an option, could not read the platform jar, or was
+    killed. That is not "no errors", and silently reading it as one is how a
+    broken toolchain satisfies this gate: both sides come back empty, the
+    difference is empty, and the check reports OK.
     """
     output = os.path.join(workdir, 'classes')
     os.makedirs(output, exist_ok=True)
@@ -225,11 +283,13 @@ def compile_against(compiler, android_jar, classpath, source_files, workdir):
                '-d', output, '-cp', os.pathsep.join(entries), '@' + argfile]
     result = subprocess.run(command, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, universal_newlines=True)
-    errors = set()
-    for line in result.stdout.splitlines():
-        if ERROR_LINE.match(line):
-            errors.add(line.strip())
-    return errors
+    diagnostics = parse_diagnostics(result.stdout)
+    if result.returncode != 0 and not diagnostics:
+        raise CompilerFailure(
+            'javac exited %d against %s without reporting a single source '
+            'diagnostic, so it never compiled anything:\n%s'
+            % (result.returncode, android_jar, result.stdout.strip()[:4000]))
+    return diagnostics
 
 
 def auto_classpath():
@@ -339,15 +399,27 @@ def main():
     # needs to know which of them was resolving dependencies.
     print('  classpath entries: %d' % len(without_platform_stubs(classpath)))
 
-    with tempfile.TemporaryDirectory(prefix='cn1-api-removals-') as workdir:
-        baseline_errors = compile_against(
-            compiler, os.path.join(baseline, 'android.jar'), classpath,
-            source_files, os.path.join(workdir, 'baseline'))
-        target_errors = compile_against(
-            compiler, os.path.join(target, 'android.jar'), classpath,
-            source_files, os.path.join(workdir, 'target'))
+    try:
+        with tempfile.TemporaryDirectory(prefix='cn1-api-removals-') as workdir:
+            baseline_errors = compile_against(
+                compiler, os.path.join(baseline, 'android.jar'), classpath,
+                source_files, os.path.join(workdir, 'baseline'))
+            target_errors = compile_against(
+                compiler, os.path.join(target, 'android.jar'), classpath,
+                source_files, os.path.join(workdir, 'target'))
+    except CompilerFailure as broken:
+        return cannot_run(str(broken))
 
-    new_errors = sorted(target_errors - baseline_errors)
+    # A multiset difference, not a set one: two identical diagnostics are two
+    # errors, and an error that appears twice against the target and once
+    # against the baseline is a new one.
+    remaining = collections.Counter(baseline_errors)
+    new_errors = []
+    for diagnostic in target_errors:
+        if remaining[diagnostic] > 0:
+            remaining[diagnostic] -= 1
+        else:
+            new_errors.append(diagnostic)
     print('  errors at baseline: %d, at target: %d, new at target: %d'
           % (len(baseline_errors), len(target_errors), len(new_errors)))
 
@@ -359,8 +431,9 @@ def main():
     print('')
     print('FAIL: %d error(s) appear against API %d and not against API %d.'
           % (len(new_errors), target_api, baseline_api))
-    for line in new_errors:
-        print('  %s' % line.replace(REPO + os.sep, ''))
+    for diagnostic in new_errors:
+        for line in diagnostic.replace(REPO + os.sep, '').splitlines():
+            print('  %s' % line)
 
     removals = removed_at(target, target_api)
     if removals:
