@@ -89,8 +89,13 @@ class PromisesJava001Snippet {
             resolve.call("hello");
         });
 
-        greeting.onSuccess(value -> Log.p(value))
-                .onFail(err -> Log.e((Throwable)err));
+        // ready() attaches both callbacks to this promise. Chaining
+        // onSuccess().onFail() instead would attach the failure handler to the
+        // promise onSuccess returns, which has already put the default casting
+        // rejection functor in the way
+        greeting.ready(
+                value -> Log.p(value),
+                err -> Log.e(err));
         // end::promises-java-001[]
     }
 

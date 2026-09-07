@@ -42,7 +42,11 @@ There are two families of callback and the difference is what they return.
 `then`, `except` and `always` take a `Functor`, whose return value becomes the
 input of the next step -- that's what makes a chain a pipeline. `onSuccess`,
 `onFail` and `onComplete` take a `SuccessCallback` instead, which returns
-nothing, so they suit the end of a chain where there is no value to pass on:
+nothing, so they suit the end of a chain where there is no value to pass on.
+Attach both outcomes with `ready(success, failure)` rather than chaining
+`onSuccess(...).onFail(...)`: the second form hangs the failure handler off the
+promise `onSuccess` returns, behind the default rejection functor described
+below:
 
 [source,java]
 ----

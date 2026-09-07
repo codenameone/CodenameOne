@@ -96,8 +96,9 @@ class PromisesJava002Snippet {
                 // below on a failure
                 err -> { throw new RuntimeException((Throwable)err); })
             .then(upper -> "Hello " + upper)
-            .onSuccess(msg -> Log.p((String)msg))
-            .onFail(err -> Log.e((Throwable)err));
+            .ready(
+                msg -> Log.p((String)msg),
+                err -> Log.e((Throwable)err));
         // end::promises-java-002[]
     }
 
