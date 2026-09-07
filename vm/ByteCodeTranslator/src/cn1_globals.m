@@ -2516,44 +2516,23 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
     // fixpoint before the caller reaches this, so the prefix walked here is stable. A
     // re-run after a SATB reopen walks the list again from the start, which is what picks
     // up anything discovered by the re-opened fixpoint.
-    long n = cn1RefDiscoveredTop;
-
-    // TWO SUB-PASSES, AND THE SPLIT IS THE POINT.
-    //
-    // Two reachable references can share one referent, and the contract says all
-    // references to a weakly reachable object are cleared ATOMICALLY -- not one at a
-    // time. A single loop that re-read the touch stamp per ENTRY could not honour that:
-    // clear alias A, then a mutator's get() on alias B stamps it TOUCHED before the loop
-    // reaches B, and B is kept. One alias reads null and the other answers the object.
-    //
-    // For a cache that is only a spurious miss. For the callers that use a reference as a
-    // LIFETIME ORACLE -- read a null get() as proof the referent died, and then release
-    // something on that basis -- it is a false death report on one alias while the object
-    // is demonstrably alive through the other, which is the failure mode that made the
-    // iOS soft-reference table dangerous in the first place.
-    //
-    // Splitting the loop removes the possibility rather than narrowing the window,
-    // because after sub-pass A the decision depends only on the REFERENT's mark word,
-    // which every alias reads identically. Nothing marks between A's drain and B, so all
-    // aliases of one referent are cleared together or kept together, whatever a mutator
-    // does meanwhile. A get() racing sub-pass B still gets a non-null referent and still
-    // enqueues it, so the object survives -- it is a spurious clear of every alias at
-    // once, which the contract permits (the referent was weakly reachable when the
-    // decision was taken) and which is exactly what "atomically" is asking for.
+    long n;
 
 #ifdef CN1_REF_NO_ALIAS_ATOMICITY
-    // ABLATION ARM: the single-loop form this replaced, which re-read the touch stamp per
-    // ENTRY and could therefore clear one alias of a referent and keep another.
+    // ABLATION ARM: the single-loop form the two sub-passes replaced, which re-read the
+    // touch stamp per ENTRY and could therefore clear one alias of a referent and keep
+    // another.
     //
     // IT HAS NEVER BEEN SEEN TO FAIL, and that is recorded rather than hidden. The split
     // needs a get() to land between the pass reaching one alias and reaching another, and
     // that window is microseconds; RefPolicy's alias phase with a burst reader reported
     // ALIAS_SPLIT=0/256 built THIS way, identical to the fixed build, while both collected
-    // 255 of 256 groups. The defect is real by inspection -- the loop plainly re-reads a
+    // the same groups. The defect is real by inspection -- the loop plainly re-reads a
     // stamp a mutator can change mid-pass -- and the two-sub-pass form removes the
     // possibility rather than narrowing the window, which is why it is the shipped one.
     // The arm stays so a future attempt at a reproducer has something to aim at, on the
     // same footing as CN1_NO_BULK_INSERTION_BARRIER. Not a supported configuration.
+    n = cn1RefDiscoveredTop;
     for(long i = 0 ; i < n ; i++) {
         struct CN1RefEntry* e = &cn1RefDiscovered[i];
         JAVA_OBJECT r = __atomic_load_n(e->referentField, __ATOMIC_RELAXED);
@@ -2562,9 +2541,8 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
         }
         {
             // Ages inline, as the single-loop form did. Discovery no longer ages, so
-            // without this the arm would never age anything, every reference would read as
-            // permanently touched, and the arm would silently become "retain everything"
-            // rather than the shape it exists to reproduce.
+            // without this the arm would never age anything and would silently become
+            // "retain everything" rather than the shape it exists to reproduce.
             JAVA_INT age = __atomic_load_n(e->touchAgeField, __ATOMIC_RELAXED);
             JAVA_INT aged = (age == CN1_REF_TOUCHED) ? 0
                           : (age < 0x7ffffffe ? age + 1 : age);
@@ -2581,9 +2559,11 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
             continue;
         }
 #endif
-        int mark = __atomic_load_n(&r->__codenameOneGcMark, __ATOMIC_ACQUIRE);
-        if(mark == -1 || mark >= currentGcMarkValue - 1) {
-            continue;
+        {
+            int mark = __atomic_load_n(&r->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+            if(mark == -1 || mark >= currentGcMarkValue - 1) {
+                continue;
+            }
         }
         __atomic_store_n(e->referentField, JAVA_NULL, __ATOMIC_RELAXED);
     }
@@ -2599,24 +2579,39 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
     // walked past. It backs up the SATB load barrier in the accessor rather than
     // duplicating it -- the barrier's log can be dropped on an allocation failure, this
     // cannot.
-    for(long i = 0 ; i < n ; i++) {
-        struct CN1RefEntry* e = &cn1RefDiscovered[i];
-        JAVA_OBJECT r = __atomic_load_n(e->referentField, __ATOMIC_RELAXED);
-        if(r == JAVA_NULL || CN1_IS_TAGGED(r)) {
-            continue;
-        }
-        if(__atomic_load_n(e->touchAgeField, __ATOMIC_RELAXED) == CN1_REF_TOUCHED) {
-            gcMarkObject(threadStateData, r, JAVA_FALSE);
-            marked = JAVA_TRUE;
+    // TO A FIXPOINT, because the drain below can DISCOVER references. Marking a touched
+    // referent traces it, and anything it reaches runs its own mark function -- so an
+    // object kept alive only by a touched reference can carry further references that were
+    // not in the list when this pass started. Snapshotting the length once and clearing
+    // against that snapshot left those unprocessed: reachable, never cleared, and holding
+    // a referent the sweep went on to free. The loop ends when a drain adds nothing new,
+    // which it must, since the set only grows and is bounded by the live set.
+    for(;;) {
+        n = cn1RefDiscoveredTop;
+        JAVA_BOOLEAN markedThisRound = JAVA_FALSE;
+        for(long i = 0 ; i < n ; i++) {
+            struct CN1RefEntry* e = &cn1RefDiscovered[i];
+            JAVA_OBJECT r = __atomic_load_n(e->referentField, __ATOMIC_RELAXED);
+            if(r == JAVA_NULL || CN1_IS_TAGGED(r)) {
+                continue;
+            }
+            if(__atomic_load_n(e->touchAgeField, __ATOMIC_RELAXED) == CN1_REF_TOUCHED) {
+                gcMarkObject(threadStateData, r, JAVA_FALSE);
+                markedThisRound = JAVA_TRUE;
 #ifdef CN1_GC_CONFORM
-            atomic_fetch_add_explicit(&cn1RefKeptTouched, 1, memory_order_relaxed);
+                atomic_fetch_add_explicit(&cn1RefKeptTouched, 1, memory_order_relaxed);
 #endif
+            }
         }
-    }
-    // Close sub-pass A before deciding anything, so sub-pass B reads settled mark words.
-    // Without this the entries marked above would still look dead to the loop below.
-    if(marked) {
-        gcMarkDrain(threadStateData);
+        // Close the round before deciding anything, so sub-pass B reads settled mark
+        // words. Without this the entries marked above would still look dead to it.
+        if(markedThisRound) {
+            marked = JAVA_TRUE;
+            gcMarkDrain(threadStateData);
+        }
+        if(cn1RefDiscoveredTop == n) {
+            break;                  // the drain found no further references
+        }
     }
 
     // SUB-PASS B: clear on the referent's liveness alone, then age.

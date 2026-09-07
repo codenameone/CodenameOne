@@ -3144,12 +3144,37 @@ extern void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, J
 #if defined(CN1_DISABLE_SATB)
 #define CN1_SATB_REF_KEEP(refVal) do { (void)(refVal); } while(0)
 #else
+// REGISTERS BEFORE IT LOGS, via the same handshake the bulk copies use.
+//
+// Checking gcSatbActive and then enqueuing is not enough on this path, and the reason it
+// is enough for the per-store barrier does not carry over. cn1SatbEnqueue takes a mutex,
+// so a thread can pass the flag check and then be delayed acquiring it long enough for the
+// collector to clear the flag, take an empty final batch and finish termination -- after
+// which the entry lands in a log nothing will ever drain. The per-store barrier tolerates
+// exactly that window because a reference STORED after the fixpoint is already marked or
+// FRESH and the sweep keeps both; a weak REFERENT handed out by get() is neither, which is
+// the whole reason this barrier exists.
+//
+// cn1SatbBulkBegin registers unconditionally and only then reports whether logging is
+// needed, so cn1SatbBulkQuiesce cannot complete while this is in flight, and the collector
+// cannot finish its final take underneath it. gcSatbTerminating stays raised across the
+// whole termination loop -- including reference processing -- so the registration covers
+// the window that matters.
+//
+// The fast path is unchanged off-GC: two predicted-not-taken flag loads. With both flags
+// down the mark is over, every reference is either cleared or holds a marked referent, and
+// a cycle starting afterwards will scan this thread with the value already in a register.
 #define CN1_SATB_REF_KEEP(refVal) \
     do { JAVA_OBJECT cn1__r = (refVal); \
-         if(__builtin_expect(gcSatbActive, 0) && cn1__r != JAVA_NULL && !CN1_IS_TAGGED(cn1__r)) { \
-             int cn1__m = __atomic_load_n(&cn1__r->__codenameOneGcMark, __ATOMIC_RELAXED); \
-             int cn1__e = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed); \
-             if(cn1__m != -1 && cn1__m != cn1__e) cn1SatbEnqueue(cn1__r); \
+         if(cn1__r != JAVA_NULL && !CN1_IS_TAGGED(cn1__r) \
+            && (__builtin_expect(gcSatbActive, 0) \
+                || __builtin_expect(gcSatbTerminating, 0))) { \
+             if(cn1SatbBulkBegin()) { \
+                 int cn1__m = __atomic_load_n(&cn1__r->__codenameOneGcMark, __ATOMIC_RELAXED); \
+                 int cn1__e = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed); \
+                 if(cn1__m != -1 && cn1__m != cn1__e) cn1SatbEnqueue(cn1__r); \
+             } \
+             cn1SatbBulkEnd(); \
          } } while(0)
 #endif
 
