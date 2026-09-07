@@ -186,6 +186,11 @@ public abstract class LocationManager {
     /// listener is untouched -- the constraint that makes the obvious fix
     /// (bind a fresh LL) unsafe.
     ///
+    /// Every read happens inside the bounded wait, the baseline included: on
+    /// Android with Play Services the "cached" read spins until the Google API
+    /// client connects, with no bound, and doing that on the EDT freezes the
+    /// application before the caller's timeout has begun to apply.
+    ///
     /// Falls back to the cached fix rather than to null when none arrives in
     /// time. A listener registered at a slow interval may have nothing newer
     /// for minutes, and a slightly imprecise answer beats the empty one the
@@ -200,44 +205,64 @@ public abstract class LocationManager {
     /// @return a fix taken under the caller's new grant where one arrives, the
     ///         cached fix otherwise, or null if there is none at all
     Location freshLocationSync(long timeout) {
-        try {
-            // No listener of the application's to protect, so the ordinary
-            // path already starts a fresh acquisition and this adds nothing.
-            if (listener == null || listener == timedOut) { //NOPMD CompareObjectsWithEquals
-                return getCurrentLocationSync(timeout);
-            }
-            final Location cached = getCurrentLocation();
-            final long was = cached == null ? 0 : cached.getTimeStamp();
-            final long wait = timeout > -1 ? timeout : FRESH_FIX_DEFAULT_MS;
-            final Location[] fresh = new Location[1];
-            // Off the EDT, like every other wait here: the caller is on it and
-            // the listener's callback has to be able to run.
-            Display.getInstance().invokeAndBlock(new Runnable() {
-                @Override
-                public void run() {
-                    long start = System.currentTimeMillis();
-                    while (System.currentTimeMillis() - start < wait) {
-                        try {
-                            Thread.sleep(20);
-                        } catch (InterruptedException interrupted) {
-                        }
-                        Location now;
-                        try {
-                            now = getCurrentLocation();
-                        } catch (IOException err) {
-                            // The cache is all there is, then.
-                            return;
-                        }
-                        if (now != null && now.getTimeStamp() > was) {
-                            fresh[0] = now;
-                            return;
-                        }
+        // No listener of the application's to protect, so the ordinary path
+        // already starts a fresh acquisition and this adds nothing.
+        if (listener == null || listener == timedOut) { //NOPMD CompareObjectsWithEquals
+            return getCurrentLocationSync(timeout);
+        }
+        final long wait = timeout > -1 ? timeout : FRESH_FIX_DEFAULT_MS;
+        // [0] the fix taken after the grant, [1] the cache to fall back on.
+        final Location[] answer = new Location[2];
+        // EVERYTHING inside the block, the baseline read included.
+        //
+        // getCurrentLocation is not the cheap accessor its name suggests. On
+        // Android with Play Services it reaches getLastKnownLocation, which
+        // spins `while (!client.isConnected()) sleep(300)` with no bound at
+        // all -- so reading the baseline on the EDT, which is where this is
+        // called from, freezes the whole application for as long as that
+        // client takes to connect, and the caller's timeout cannot be applied
+        // to a wait that has not started yet. It also THROWS when there is no
+        // cached fix, and taking that as the answer reported null to a caller
+        // whose next update was moments away.
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                long start = System.currentTimeMillis();
+                Location baseline = cachedFix();
+                answer[1] = baseline;
+                // No cache at all means the application has no fix yet, so
+                // the first one to arrive was taken after the grant and is the
+                // answer rather than a baseline to improve on.
+                boolean compare = baseline != null;
+                long was = compare ? baseline.getTimeStamp() : 0;
+                while (System.currentTimeMillis() - start < wait) {
+                    try {
+                        Thread.sleep(20);
+                    } catch (InterruptedException interrupted) {
+                    }
+                    Location now = cachedFix();
+                    if (now == null) {
+                        continue;
+                    }
+                    if (!compare || now.getTimeStamp() > was) {
+                        answer[0] = now;
+                        return;
                     }
                 }
-            });
-            return fresh[0] != null ? fresh[0] : cached;
-        } catch (IOException err) {
-            Log.e(err);
+            }
+        });
+        return answer[0] != null ? answer[0] : answer[1];
+    }
+
+    /// The cached fix, or null where there is none.
+    ///
+    /// A port throws when it has nothing cached, which is a legitimate state
+    /// and not a failure to report: the caller is waiting for the next fix and
+    /// an empty cache simply means every fix from here is a new one.
+    private Location cachedFix() {
+        try {
+            return getCurrentLocation();
+        } catch (IOException noneYet) {
             return null;
         }
     }

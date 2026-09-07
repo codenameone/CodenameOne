@@ -1340,9 +1340,27 @@ class LocationButtonRebuildTest extends UITestBase {
         private Location arriving;
         private int reads;
 
+        /** When true the first reads THROW, as a port with no cache does. */
+        private boolean emptyUntilArrival;
+
+        /** Whether the FIRST read happened on the EDT, which it must not. */
+        private Boolean firstReadOnEdt;
+
         @Override
-        public Location getCurrentLocation() {
+        public Location getCurrentLocation() throws java.io.IOException {
+            if (firstReadOnEdt == null) {
+                firstReadOnEdt =
+                        Boolean.valueOf(Display.getInstance().isEdt());
+            }
             reads++;
+            if (emptyUntilArrival) {
+                if (reads > 2 && arriving != null) {
+                    return arriving;
+                }
+                // What AndroidLocationPlayServiceManager does with no fix.
+                throw new java.io.IOException(
+                        "cannot retrieve location try later");
+            }
             return reads > 2 && arriving != null ? arriving : cached;
         }
 
@@ -1428,6 +1446,65 @@ class LocationButtonRebuildTest extends UITestBase {
             assertEquals(2000L, seen[0].getTimeStamp(),
                     "the fix reported is the one taken AFTER the grant, not "
                     + "the cache the tap was meant to improve on");
+            // And not one read of it on the EDT, the baseline included. On
+            // Android with Play Services the cached read spins until the
+            // Google API client connects, with no bound; on the EDT that
+            // freezes the application before the caller's timeout has begun
+            // to apply, which is what setTimeout is supposed to bound.
+            assertEquals(Boolean.FALSE, manager.firstReadOnEdt,
+                    "every read, the baseline included, belongs inside the "
+                    + "bounded wait rather than on the EDT");
+        } finally {
+            manager.setLocationListener(null);
+        }
+    }
+    @Test
+    void aGrantedTapWaitsWhenThereIsNoCacheYetInsteadOfReportingNothing() {
+        // A port with nothing cached THROWS -- that is what
+        // AndroidLocationPlayServiceManager does -- and taking the throw as
+        // the answer reported null to a caller whose next update was moments
+        // away. An empty cache is not a failure: it means every fix from here
+        // is one taken after the grant.
+        RecordingBridge bridge = install();
+        CachingManager manager = new CachingManager();
+        manager.emptyUntilArrival = true;
+        bridge.granted = manager;
+
+        Location precise = new Location();
+        precise.setAccuracy(5f);
+        precise.setTimeStamp(2000L);
+        manager.arriving = precise;
+
+        LocationListener appListener = new LocationListener() {
+            public void locationUpdated(Location location) {
+            }
+
+            public void providerStateChanged(int newState) {
+            }
+        };
+        manager.setLocationListener(appListener);
+        try {
+            LocationButton button = new LocationButton();
+            final Location[] seen = new Location[1];
+            final int[] answers = new int[1];
+            button.addLocationSharedListener(new LocationSharedListener() {
+                public void locationShared(Location location) {
+                    answers[0]++;
+                    seen[0] = location;
+                }
+            });
+            bridge.sessions.get(0).onResult.onSucess(Boolean.TRUE);
+            drain();
+            waitUntil("the tap was answered", new Settled() {
+                public boolean isSo() {
+                    return answers[0] > 0;
+                }
+            });
+            assertNotNull(seen[0],
+                    "an empty cache is a reason to wait, not to report "
+                    + "nothing at all");
+            assertEquals(2000L, seen[0].getTimeStamp(),
+                    "and the fix that arrives is the answer");
         } finally {
             manager.setLocationListener(null);
         }
