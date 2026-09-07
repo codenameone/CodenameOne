@@ -1314,6 +1314,24 @@ int currentSizeOfAllObjectsInHeap = 0;
 // list are invisible to the sweep (only table entries are swept), so the
 // deferral can never free them early.
 static struct ThreadLocalData* cn1DeadPendingThreads = 0;  // guarded by criticalSection
+// How many TLDs are waiting on that queue, and the request that gets them drained.
+//
+// The queue is drained only at mark start, and a thread's TLD -- callStack arrays
+// ~50KB, pendingHeapAllocations ~27KB, the try-block array ~15KB -- is freed only
+// by that drain. A server whose connections churn while it allocates almost
+// nothing therefore has no reason to collect and no other way to reclaim: measured
+// as a sawtooth to 165MB over 2800 closed connections, dropping to 100MB the one
+// time a cycle happened to run.
+//
+// Allocation volume cannot express this: none of that memory was allocated by the
+// mutator, so the byte counters the trigger watches never move. Raising the
+// request makes the collector's next wake collect instead of idling again.
+static _Atomic int cn1DeadPendingCount = 0;
+#ifndef CN1_GC_DEAD_THREAD_DEMAND
+// ~1.6MB of queued thread state at the measured per-thread cost. Low enough to
+// bound the sawtooth, high enough that churn does not buy a cycle every few closes.
+#define CN1_GC_DEAD_THREAD_DEMAND 24
+#endif
 extern void cn1ReleaseThreadLocalData(struct ThreadLocalData* head);
 
 // ---- Immortal roots ------------------------------------------------------
@@ -1597,6 +1615,11 @@ void collectThreadResources(struct ThreadLocalData *current)
     current->gcQueuedForDrain = JAVA_TRUE;
     current->gcDeadNext = cn1DeadPendingThreads;
     cn1DeadPendingThreads = current;
+    if(atomic_fetch_add_explicit(&cn1DeadPendingCount, 1, memory_order_relaxed) + 1
+            >= CN1_GC_DEAD_THREAD_DEMAND) {
+        extern _Atomic int cn1GcNativeGcRequest;
+        atomic_store_explicit(&cn1GcNativeGcRequest, 1, memory_order_release);
+    }
 }
 
 // Drain the dead-thread queue on the GC thread at mark start: migrate each queued
@@ -1607,6 +1630,9 @@ static void cn1DrainDeadThreadPending() {
     lockCriticalSection();
     struct ThreadLocalData* head = cn1DeadPendingThreads;
     cn1DeadPendingThreads = 0;
+    // Under the same lock the pushes take, so a thread queued between the take and
+    // here counts toward the NEXT cycle rather than being lost.
+    atomic_store_explicit(&cn1DeadPendingCount, 0, memory_order_relaxed);
     while(head != 0) {
         struct ThreadLocalData* next = head->gcDeadNext;
         for(int heapTrav = 0 ; heapTrav < head->heapAllocationSize ; heapTrav++) {
@@ -3777,7 +3803,7 @@ static _Atomic int cn1BibopGcScheduled = 0;
 // field under synchronized(LOCK) -- which is exactly the monitor a parked thread must not
 // enter. So the parked path gets its own release/acquire flag, and gcIdleWaitMillis
 // consumes it alongside forceGc.
-static _Atomic int cn1GcNativeGcRequest = 0;
+_Atomic int cn1GcNativeGcRequest = 0;
 
 // Something that CHANGES when a collection starts, for callers that need to wait for the
 // one they just asked for rather than for a handshake that may never reach them.

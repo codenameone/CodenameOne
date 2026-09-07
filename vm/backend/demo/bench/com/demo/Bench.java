@@ -49,6 +49,7 @@ import com.codename1.backend.Signals;
  */
 public class Bench {
     private static final byte[] PLAINTEXT = bytes("Hello, World!");
+    private static final boolean POOL_RESPONSE = envInt("BENCH_REUSE_RESPONSE", 1) != 0;
 
     /**
      * 0 = build a LinkedHashMap per request (what a hand-written handler does),
@@ -117,6 +118,20 @@ public class Bench {
                 // in 5.1s with 758,381 write errors. Prefix matching keeps the
                 // adversarial case on the same code path as the normal one.
                 if(target.startsWith("/plaintext")) {
+                    // BENCH_REUSE_RESPONSE=1: hand back one shared Response
+                    // instead of building one per request.
+                    //
+                    // Not a shippable handler -- it measures a CEILING. Response
+                    // is the only per-request allocation left on this route (88
+                    // bytes), and the server only ever READS it, so sharing one
+                    // is safe here and answers what pooling would be worth before
+                    // any public API is changed to allow it.
+                    // No per-request Response: the connection's own is re-pointed.
+                    // BENCH_REUSE_RESPONSE=0 restores the allocating path, which is
+                    // what the comparison measures against.
+                    if(POOL_RESPONSE) {
+                        return request.respond(200, "text/plain", PLAINTEXT);
+                    }
                     return new HttpServer.Response(200, "text/plain", PLAINTEXT);
                 }
                 if("/json".equals(target)) {

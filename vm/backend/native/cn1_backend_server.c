@@ -907,6 +907,32 @@ JAVA_VOID com_codename1_backend_VirtualThread_freeImpl___long(CODENAME_ONE_THREA
     if(victim != 0) {
         cn1VirtualThreadSetState(vt, 0);
         markDeadThread(victim);
+        /*
+         * ASK FOR THE RELEASE. markDeadThread only QUEUES the state: it sets
+         * gcQueuedForDrain and hands the TLD to cn1DrainDeadThreadPending, which
+         * migrates the pending allocations and then frees the TLD only if
+         * gcReleaseRequested is set. Nothing else sets it for a virtual thread --
+         * an OS thread gets it from the Thread object's finalizer, and
+         * cn1RetireVirtualThread (the VM's own retirement path, which this native
+         * duplicates) sets it right here for exactly this reason.
+         *
+         * Without it the drain runs, clears gcQueuedForDrain, and walks away
+         * leaving the TLD allocated for ever. That is ~68KB per connection --
+         * callStack arrays ~50KB, pendingHeapAllocations ~27KB, the try-block
+         * array ~15KB, all malloc'd -- and it never comes back: 900 closed
+         * connections took resident memory from 3MB to 65MB, and 249 collections
+         * returned none of it, because every one of those drains found the flag
+         * clear.
+         *
+         * Deferred rather than freed here, and that is deliberate: codenameOneGCMark
+         * copies each ThreadLocalData* out of allThreads under the critical section
+         * and dereferences it outside, so a mark already past that copy still holds
+         * this pointer. The drain runs at the start of the next mark, which is the
+         * one point where no collector iteration can.
+         */
+        lockCriticalSection();
+        victim->gcReleaseRequested = JAVA_TRUE;
+        unlockCriticalSection();
     }
     /* The argument block outlives the body, so it is freed here rather than at
      * the end of the body: the body's stack frame is gone by then. */
