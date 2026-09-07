@@ -3130,7 +3130,7 @@ extern void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, J
 #else
 #define CN1_SATB_REF_LOAD(fieldAddr) \
     do { if(__builtin_expect(gcSatbActive, 0)) { \
-             JAVA_OBJECT cn1__r = *(JAVA_OBJECT volatile*)(fieldAddr); \
+             JAVA_OBJECT cn1__r = __atomic_load_n((JAVA_OBJECT*)(fieldAddr), __ATOMIC_RELAXED); \
              if(cn1__r != JAVA_NULL && !CN1_IS_TAGGED(cn1__r)) { \
                  int cn1__m = __atomic_load_n(&cn1__r->__codenameOneGcMark, __ATOMIC_RELAXED); \
                  int cn1__e = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed); \

@@ -107,6 +107,9 @@ public class RefPolicy {
     static long misses;
     static long checksum;
 
+    /** Aliases per referent in the alias phase. */
+    static final int ALIASES = 4;
+
     public static void main(String[] args) throws Exception {
         if (args != null) {
             if (args.length > 0) { keys = Integer.parseInt(args[0]); }
@@ -119,6 +122,7 @@ public class RefPolicy {
                 + " accesses=" + accesses + " churnPerAccess=" + churnPerAccess
                 + " cacheBytes=" + ((long) keys * payload));
         weakPhase();
+        aliasPhase();
         cachePhase();
         System.out.println("RESULT=" + checksum);
     }
@@ -176,6 +180,113 @@ public class RefPolicy {
 
         System.out.println("WEAK_LIVE_KEPT=" + liveKept + "/" + WEAK_SAMPLES);
         System.out.println("WEAK_DEAD_CLEARED=" + deadCleared + "/" + WEAK_SAMPLES);
+    }
+
+    /** Set by the racing reader so the collector's clear pass sees fresh touch stamps. */
+    static volatile boolean aliasRacing;
+    static volatile Object aliasSink;
+    static Object[] aliasRefs;
+
+    /**
+     * Several references over ONE referent must agree, INCLUDING while a mutator is
+     * reading them.
+     *
+     * <p>The contract is that all references to a weakly reachable object are cleared
+     * atomically -- not one at a time -- and a collector that clears them entry by entry
+     * cannot honour it: clear the first alias, let a mutator's {@code get()} on the second
+     * stamp it as recently read before the loop arrives there, and the second is kept. One
+     * alias then answers null while another answers the object.</p>
+     *
+     * <p>For a cache that is a spurious miss. For the callers that use a reference as a
+     * LIFETIME ORACLE -- reading a null {@code get()} as proof the referent died, and
+     * releasing something on that basis -- it is a false death report on one alias while
+     * the object is demonstrably alive through another.</p>
+     *
+     * <p><b>This is NOT a self-test for the split, and the distinction matters.</b> The
+     * split needs a {@code get()} to land between the clear pass reaching one alias of a
+     * group and reaching another, and that window is microseconds wide. Measured here:
+     * with {@code -DCN1_REF_NO_ALIAS_ATOMICITY} restoring the single-loop form that has
+     * the bug, three runs reported {@code ALIAS_SPLIT=0/256} -- the same as the fixed
+     * build -- while both collected 255 of 256 groups. So the phase exercises the path
+     * with real concurrent readers and asserts a real invariant, but it cannot be cited
+     * as evidence that the invariant holds: it has never been seen to fail. Do not read
+     * a green {@code ALIAS_SPLIT} as proof.</p>
+     *
+     * <p>Two earlier versions were worse and are worth not rebuilding. Reading the
+     * aliases only after quiescing asserted something that could not fail at all, since
+     * with no {@code get()} in flight every alias carries the same stamp. Hammering the
+     * FIRST alias without pausing was hollow in the other direction: it kept every
+     * referent marked, so nothing was ever condemned and {@code ALIAS_CLEARED_GROUPS} was
+     * 0/256 -- a test in which the thing being tested never happens. Check that number
+     * before trusting the one above it.</p>
+     *
+     * <p>The assertion is about AGREEMENT, not about collection: all cleared and all kept
+     * both pass, split does not. Whether a group is collected at all depends on the
+     * conservative root scan and on whether the reader happened to be holding it.</p>
+     */
+    private static void aliasPhase() throws Exception {
+        final int groups = 256;
+        aliasRefs = new Object[groups * ALIASES];
+        for (int g = 0; g < groups; g++) {
+            byte[] doomed = build(g + 4096);
+            for (int a = 0; a < ALIASES; a++) {
+                aliasRefs[g * ALIASES + a] = new WeakReference(doomed);
+            }
+            // `doomed` dies with this iteration; only the aliases above refer to it.
+        }
+
+        aliasRacing = true;
+        Thread reader = new Thread(new Runnable() {
+            public void run() {
+                // The LAST alias of each group, and only in bursts.
+                //
+                // Last, because the split needs the read to land after the pass has
+                // already cleared the group's earlier aliases -- a read that lands on the
+                // first entry finds the group not yet condemned and changes nothing.
+                //
+                // In bursts, because a reader that never pauses keeps every referent
+                // marked, so nothing is ever condemned and no split is possible. The pause
+                // lets a group become collectable between bursts.
+                while (aliasRacing) {
+                    for (int g = 0; g < groups; g++) {
+                        aliasSink = ((Reference) aliasRefs[g * ALIASES + ALIASES - 1]).get();
+                    }
+                    aliasSink = null;
+                    try {
+                        Thread.sleep(1);
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                }
+            }
+        });
+        reader.start();
+
+        for (int i = 0; i < 12; i++) {
+            quiesce();
+        }
+
+        aliasRacing = false;
+        reader.join();
+        scrub(SCRUB_DEPTH);
+
+        int split = 0;
+        int clearedGroups = 0;
+        for (int g = 0; g < groups; g++) {
+            int cleared = 0;
+            for (int a = 0; a < ALIASES; a++) {
+                if (((Reference) aliasRefs[g * ALIASES + a]).get() == null) {
+                    cleared++;
+                }
+            }
+            if (cleared == ALIASES) {
+                clearedGroups++;
+            } else if (cleared != 0) {
+                split++;
+            }
+        }
+        System.out.println("ALIAS_SPLIT=" + split + "/" + groups);
+        System.out.println("ALIAS_CLEARED_GROUPS=" + clearedGroups + "/" + groups);
     }
 
     // ---------------------------------------------------------------- phase B

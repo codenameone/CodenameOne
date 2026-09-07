@@ -1065,10 +1065,20 @@ public class ByteCodeClass {
                 // references by use: a store of an immediate. Unconditional rather than
                 // guarded by a "did it change" test, because the branch would cost more
                 // than the store it saves.
-                b.append("((struct obj__").append(clsName).append("*)__cn1T)->")
-                 .append(REFERENCE_CLASS).append("_cn1TouchAge = CN1_REF_TOUCHED;\n    ");
-            }
-            if (fld.isVolatile()) {
+                b.append("__atomic_store_n(&((struct obj__").append(clsName).append("*)__cn1T)->")
+                 .append(REFERENCE_CLASS).append("_cn1TouchAge, CN1_REF_TOUCHED, __ATOMIC_RELAXED);\n    ");
+                // RELAXED ATOMIC, not a plain load, and the same everywhere this field is
+                // touched -- cn1GcProcessReferences clears it from the collector thread
+                // while mutators are running, which is the whole point of the design, so a
+                // plain access on either side is a data race and undefined in C however
+                // benign the generated instruction looks. Relaxed is the same instruction
+                // on every target built here; what it buys is that the write is one the
+                // reader is allowed to observe. Note the mark word two lines down in
+                // gcMarkObject is already handled this way for exactly this reason.
+                b.append("return __atomic_load_n(&((struct obj__").append(clsName).append("*)__cn1T)->")
+                 .append(fld.getClsName()).append("_").append(fld.getFieldName())
+                 .append(", __ATOMIC_RELAXED);\n}\n\n");
+            } else if (fld.isVolatile()) {
                 b.append("return atomic_load_explicit(&((struct obj__");
                 b.append(clsName);
                 b.append("*)__cn1T)->");
@@ -1106,7 +1116,14 @@ public class ByteCodeClass {
             } else {
                 b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n  ").append(nullCheck).append("  ");
             }
-            if (fld.isVolatile()) {
+            if(isReferenceReferent(clsName, fld)) {
+                // Reference.clear() and the constructor both land here, and the collector
+                // stores JAVA_NULL into the same word concurrently. Atomic for the reason
+                // spelled out on the getter above.
+                b.append("__atomic_store_n(&((struct obj__").append(clsName).append("*)__cn1T)->")
+                 .append(fld.getClsName()).append("_").append(fld.getFieldName())
+                 .append(", __cn1Val, __ATOMIC_RELAXED);\n}\n\n");
+            } else if (fld.isVolatile()) {
                 b.append("atomic_store_explicit(&((struct obj__");
                 b.append(clsName);
                 b.append("*)__cn1T)->");

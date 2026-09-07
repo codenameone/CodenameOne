@@ -2351,7 +2351,13 @@ static void cn1RefBeginCycle(void) {
 void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOOLEAN force,
                             JAVA_OBJECT* referentField, JAVA_INT* touchAgeField,
                             JAVA_INT* agedCycleField, JAVA_INT strength) {
-    if(referentField == 0 || *referentField == JAVA_NULL) {
+    // RELAXED ATOMIC on referentField and touchAgeField everywhere they are touched.
+    // Both are written by the generated accessors on mutator threads while this runs on
+    // the collector, which is the concurrency this design exists to support -- so a plain
+    // access on either side is a data race and undefined in C, however benign the emitted
+    // instruction is on the targets built here. Same treatment the mark word already gets.
+    if(referentField == 0
+       || __atomic_load_n(referentField, __ATOMIC_RELAXED) == JAVA_NULL) {
         return;                                    // already cleared: nothing to decide
     }
 #ifdef CN1_NO_WEAK_REFS
@@ -2359,7 +2365,7 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
     // exactly what this VM did before references were implemented. It exists so the
     // gate can prove it is not inert -- a test that asserts referents get collected
     // must FAIL when built this way, or it is asserting something else.
-    gcMarkObject(threadStateData, *referentField, force);
+    gcMarkObject(threadStateData, __atomic_load_n(referentField, __ATOMIC_RELAXED), force);
     (void)touchAgeField; (void)agedCycleField; (void)strength; (void)ref;
     return;
 #else
@@ -2380,10 +2386,10 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
         // reference, so the age resets; anything else is one collection older. Saturating,
         // because an age that wraps to negative would read as freshly touched and make a
         // cold entry immortal.
-        JAVA_INT age = *touchAgeField;
+        JAVA_INT age = __atomic_load_n(touchAgeField, __ATOMIC_RELAXED);
         JAVA_INT aged = (age == CN1_REF_TOUCHED) ? 0
                       : (age < 0x7ffffffe ? age + 1 : age);
-        *touchAgeField = aged;
+        __atomic_store_n(touchAgeField, aged, __ATOMIC_RELAXED);
         int budget = atomic_load_explicit(&cn1SoftRetainCycles, memory_order_relaxed);
         retain = (strength == CN1_REF_SOFT && budget >= 0 && aged <= budget)
                  ? JAVA_TRUE : JAVA_FALSE;
@@ -2434,14 +2440,14 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
         // A retained soft reference is an ordinary strong edge for the rest of this
         // cycle, traced with whatever `force` the caller had -- a reference held by a
         // static is force-marked like anything else it points at.
-        gcMarkObject(threadStateData, *referentField, force);
+        gcMarkObject(threadStateData, __atomic_load_n(referentField, __ATOMIC_RELAXED), force);
     }
 #endif
 }
 
 // Clear every discovered reference whose referent this cycle's sweep is about to free.
 // Runs on the GC thread only, inside the SATB termination loop, barrier armed.
-// Returns JAVA_TRUE if it marked anything, so the caller knows to drain.
+// Returns JAVA_TRUE if it marked anything; it has already drained by then.
 static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
     JAVA_BOOLEAN marked = JAVA_FALSE;
 #ifdef CN1_GC_CONFORM
@@ -2453,23 +2459,103 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
     // re-run after a SATB reopen walks the list again from the start, which is what picks
     // up anything discovered by the re-opened fixpoint.
     long n = cn1RefDiscoveredTop;
+
+    // TWO SUB-PASSES, AND THE SPLIT IS THE POINT.
+    //
+    // Two reachable references can share one referent, and the contract says all
+    // references to a weakly reachable object are cleared ATOMICALLY -- not one at a
+    // time. A single loop that re-read the touch stamp per ENTRY could not honour that:
+    // clear alias A, then a mutator's get() on alias B stamps it TOUCHED before the loop
+    // reaches B, and B is kept. One alias reads null and the other answers the object.
+    //
+    // For a cache that is only a spurious miss. For the callers that use a reference as a
+    // LIFETIME ORACLE -- read a null get() as proof the referent died, and then release
+    // something on that basis -- it is a false death report on one alias while the object
+    // is demonstrably alive through the other, which is the failure mode that made the
+    // iOS soft-reference table dangerous in the first place.
+    //
+    // Splitting the loop removes the possibility rather than narrowing the window,
+    // because after sub-pass A the decision depends only on the REFERENT's mark word,
+    // which every alias reads identically. Nothing marks between A's drain and B, so all
+    // aliases of one referent are cleared together or kept together, whatever a mutator
+    // does meanwhile. A get() racing sub-pass B still gets a non-null referent and still
+    // enqueues it, so the object survives -- it is a spurious clear of every alias at
+    // once, which the contract permits (the referent was weakly reachable when the
+    // decision was taken) and which is exactly what "atomically" is asking for.
+
+#ifdef CN1_REF_NO_ALIAS_ATOMICITY
+    // ABLATION ARM: the single-loop form this replaced, which re-read the touch stamp per
+    // ENTRY and could therefore clear one alias of a referent and keep another.
+    //
+    // IT HAS NEVER BEEN SEEN TO FAIL, and that is recorded rather than hidden. The split
+    // needs a get() to land between the pass reaching one alias and reaching another, and
+    // that window is microseconds; RefPolicy's alias phase with a burst reader reported
+    // ALIAS_SPLIT=0/256 built THIS way, identical to the fixed build, while both collected
+    // 255 of 256 groups. The defect is real by inspection -- the loop plainly re-reads a
+    // stamp a mutator can change mid-pass -- and the two-sub-pass form removes the
+    // possibility rather than narrowing the window, which is why it is the shipped one.
+    // The arm stays so a future attempt at a reproducer has something to aim at, on the
+    // same footing as CN1_NO_BULK_INSERTION_BARRIER. Not a supported configuration.
     for(long i = 0 ; i < n ; i++) {
         struct CN1RefEntry* e = &cn1RefDiscovered[i];
-        JAVA_OBJECT r = *e->referentField;
+        JAVA_OBJECT r = __atomic_load_n(e->referentField, __ATOMIC_RELAXED);
         if(r == JAVA_NULL || CN1_IS_TAGGED(r)) {
             continue;
         }
-        if(*e->touchAgeField == CN1_REF_TOUCHED) {
-            // A get() landed AFTER this cycle aged this reference, so a mutator may be
-            // holding the referent in a local the collector has already walked past.
-            // Keeping it is not an optimization, it is the reason this pass is allowed
-            // to clear anything at all. Cheaper than trusting the SATB enqueue alone,
-            // and correct even if the log overflowed.
+        if(__atomic_load_n(e->touchAgeField, __ATOMIC_RELAXED) == CN1_REF_TOUCHED) {
+            gcMarkObject(threadStateData, r, JAVA_FALSE);
+            marked = JAVA_TRUE;
+            gcMarkDrain(threadStateData);
+            continue;
+        }
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+        if(cn1ConservativeResolve((void*)r) != r && !cn1GcImmortalObjContains(r)) {
+            continue;
+        }
+#endif
+        int mark = __atomic_load_n(&r->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+        if(mark == -1 || mark >= currentGcMarkValue - 1) {
+            continue;
+        }
+        __atomic_store_n(e->referentField, JAVA_NULL, __ATOMIC_RELAXED);
+    }
+#ifdef CN1_GC_CONFORM
+    cn1RefPhaseNs += cn1GcNowNs() - __r0;
+#endif
+    return marked;
+#endif
+
+    // SUB-PASS A: anything read since this cycle aged it is kept, and its referent
+    // marked. This is not an optimization, it is the reason the pass may clear anything
+    // at all: a mutator may be holding that referent in a local the collector has already
+    // walked past. It backs up the SATB load barrier in the accessor rather than
+    // duplicating it -- the barrier's log can be dropped on an allocation failure, this
+    // cannot.
+    for(long i = 0 ; i < n ; i++) {
+        struct CN1RefEntry* e = &cn1RefDiscovered[i];
+        JAVA_OBJECT r = __atomic_load_n(e->referentField, __ATOMIC_RELAXED);
+        if(r == JAVA_NULL || CN1_IS_TAGGED(r)) {
+            continue;
+        }
+        if(__atomic_load_n(e->touchAgeField, __ATOMIC_RELAXED) == CN1_REF_TOUCHED) {
             gcMarkObject(threadStateData, r, JAVA_FALSE);
             marked = JAVA_TRUE;
 #ifdef CN1_GC_CONFORM
             atomic_fetch_add_explicit(&cn1RefKeptTouched, 1, memory_order_relaxed);
 #endif
+        }
+    }
+    // Close sub-pass A before deciding anything, so sub-pass B reads settled mark words.
+    // Without this the entries marked above would still look dead to the loop below.
+    if(marked) {
+        gcMarkDrain(threadStateData);
+    }
+
+    // SUB-PASS B: clear on the referent's liveness alone.
+    for(long i = 0 ; i < n ; i++) {
+        struct CN1RefEntry* e = &cn1RefDiscovered[i];
+        JAVA_OBJECT r = __atomic_load_n(e->referentField, __ATOMIC_RELAXED);
+        if(r == JAVA_NULL || CN1_IS_TAGGED(r)) {
             continue;
         }
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
@@ -2494,7 +2580,7 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
         if(mark == -1 || mark >= currentGcMarkValue - 1) {
             continue;
         }
-        *e->referentField = JAVA_NULL;
+        __atomic_store_n(e->referentField, JAVA_NULL, __ATOMIC_RELAXED);
 #ifdef CN1_GC_CONFORM
         atomic_fetch_add_explicit(&cn1RefCleared, 1, memory_order_relaxed);
 #endif
@@ -3448,9 +3534,9 @@ void codenameOneGCMark() {
         // below to find a non-empty log, which re-arms and runs the whole fixpoint (and
         // this pass) again. Moving it after the barrier goes down would remove exactly
         // that protection and let the sweep free an object a mutator is holding.
-        if(cn1GcProcessReferences(d)) {
-            gcMarkDrain(d);
-        }
+        // Drains internally between its two sub-passes, which it must -- sub-pass B
+        // reads the mark words sub-pass A settled -- so there is nothing to drain here.
+        cn1GcProcessReferences(d);
         // Trial clear. A store racing it either logged already (caught just below) or
         // adds an already-marked or fresh reference, which the sweep keeps either way.
         __atomic_store_n(&gcSatbActive, 0, __ATOMIC_SEQ_CST);
