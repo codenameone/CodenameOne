@@ -2829,74 +2829,182 @@ final class LocationButtonManifestFragments {
         String dotted = owner.replace('/', '.');
         int lastDot = dotted.lastIndexOf('.');
         String simple = lastDot < 0 ? dotted : dotted.substring(lastDot + 1);
-        String[] lines = text.split("\n");
-        boolean importedOnly = false;
-        for (int line = 0; line < lines.length; line++) {
-            if (!namesToken(lines[line], dotted)) {
+        // STATEMENTS, not lines. This read the source a line at a time and
+        // both ways of getting that wrong are misses, which delete the button
+        // from an application that builds one: an import and the code that
+        // uses it can share a physical line -- "import a.b.C; class D { C f()
+        // ... }" is one line and legal -- and an import can span several.
+        int[][] imports = importRanges(text);
+        // Named where code runs, which is the plain case.
+        if (namesTokenOutside(text, dotted, imports)) {
+            return true;
+        }
+        boolean imported = false;
+        for (int range = 0; range < imports.length; range++) {
+            String statement = text.substring(imports[range][0],
+                    imports[range][1]);
+            if (!namesToken(statement, dotted)) {
                 continue;
             }
-            String trimmed = lines[line].trim();
-            if (!isImportLine(trimmed)) {
-                // Named where code runs, which is the plain case.
+            imported = true;
+            // What the code will SPELL, which an alias or a static member
+            // changes. Counting those forms unconditionally, which is what
+            // this did first, put the permissions back for exactly the unused
+            // import the rest of this method exists to ignore.
+            String bound = boundName(statement, simple);
+            if (bound == null || namesTokenOutside(text, bound, imports)) {
                 return true;
             }
-            // An alias or a static member renames what the code will spell,
-            // so the simple name is not what to look for -- but SOMETHING
-            // still has to be. Counting these forms unconditionally, which is
-            // what this did first, put the permissions back for exactly the
-            // unused import the rest of this method exists to ignore.
-            String renamed = importedAs(trimmed);
-            if (renamed != null && usedOutsideImports(lines, renamed)) {
-                return true;
-            }
-            // Still a qualified mention that turned out to be an import, so
-            // it must be recorded as one. Falling out of the loop without
-            // saying so sent the method to its package-in-scope fallback,
-            // which found this very import line and reported use again.
-            importedOnly = true;
         }
-        if (importedOnly) {
-            return usedOutsideImports(lines, simple);
+        if (imported) {
+            return false;
         }
         // No qualified mention at all: the package may still be in scope.
         return sourceNames(text, owner);
     }
 
     /**
-     * The name an import line binds, when it binds one other than the class's
-     * own simple name.
+     * The half-open ranges of the source that are import statements.
      *
-     * <p>Two forms do that. Kotlin's {@code import a.b.C as Btn} binds
-     * {@code Btn}, and a static import {@code import static a.b.C.MEMBER}
-     * binds {@code MEMBER} -- in both the class's simple name appears nowhere
-     * else, so looking for it finds nothing and the file reads as unused.</p>
+     * <p>An import runs from its keyword to the first {@code ;} or the end of
+     * its line, whichever comes first: Java ends one with a semicolon and
+     * Kotlin ends it with the line. That pair covers every real formatting of
+     * either, including the two this replaced a line-based reader for -- code
+     * after the semicolon on the same line, and whitespace of any kind inside
+     * the statement.</p>
      *
-     * @param trimmed a trimmed import line known to name the class
-     * @return the bound name, or null when the import binds the simple name
+     * <p>A Java import split ACROSS lines before its semicolon is read as
+     * ending at the newline, so the tail counts as code and the file is
+     * reported as using the class. That over-reports rather than missing,
+     * which is the safer direction of the two, and no formatter writes one.</p>
+     *
+     * @param text the source, comments gone
+     * @return the ranges, in order
      */
-    private static String importedAs(String trimmed) {
-        int as = trimmed.indexOf(" as ");
-        if (as >= 0) {
-            String tail = trimmed.substring(as + " as ".length()).trim();
-            return identifierHead(tail);
-        }
-        if (trimmed.startsWith("import static ")) {
-            String tail = trimmed.substring("import static ".length()).trim();
-            int semi = tail.indexOf(';');
-            if (semi >= 0) {
-                tail = tail.substring(0, semi);
+    private static int[][] importRanges(String text) {
+        java.util.List<int[]> found = new java.util.ArrayList<int[]>();
+        int at = text.indexOf("import");
+        while (at >= 0) {
+            boolean startsClean = at == 0
+                    || !Character.isJavaIdentifierPart(text.charAt(at - 1));
+            int after = at + "import".length();
+            boolean endsClean = after < text.length()
+                    && isSourceSpace(text.charAt(after));
+            if (startsClean && endsClean) {
+                int semi = text.indexOf(';', after);
+                int line = text.indexOf('\n', after);
+                int end;
+                if (semi < 0 && line < 0) {
+                    end = text.length();
+                } else if (semi < 0) {
+                    end = line;
+                } else if (line < 0) {
+                    end = semi;
+                } else {
+                    end = Math.min(semi, line);
+                }
+                found.add(new int[] {at, end});
+                at = text.indexOf("import", end);
+                continue;
             }
-            tail = tail.trim();
-            // A static wildcard binds every member, so nothing here can say
-            // which name the code will use.
-            if (tail.endsWith(".*")) {
-                return null;
-            }
-            int dot = tail.lastIndexOf('.');
-            return identifierHead(dot < 0 ? tail : tail.substring(dot + 1));
+            at = text.indexOf("import", at + 1);
         }
-        return null;
+        return found.toArray(new int[found.size()][]);
     }
+
+    /**
+     * Whether {@code token} is named somewhere that is not an import.
+     *
+     * @param text    the source
+     * @param token   what to look for
+     * @param imports the ranges to ignore, in order
+     * @return whether the code names it
+     */
+    private static boolean namesTokenOutside(String text, String token,
+            int[][] imports) {
+        int at = text.indexOf(token);
+        while (at >= 0) {
+            int after = at + token.length();
+            boolean startsClean = at == 0
+                    || (!Character.isJavaIdentifierPart(text.charAt(at - 1))
+                            && text.charAt(at - 1) != '.');
+            boolean endsClean = after >= text.length()
+                    || !Character.isJavaIdentifierPart(text.charAt(after));
+            if (startsClean && endsClean && !within(at, imports)) {
+                return true;
+            }
+            at = text.indexOf(token, at + 1);
+        }
+        return false;
+    }
+
+    /** Whether {@code at} falls inside one of the ranges. */
+    private static boolean within(int at, int[][] ranges) {
+        for (int range = 0; range < ranges.length; range++) {
+            if (at >= ranges[range][0] && at < ranges[range][1]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The name an import statement binds, or null when nothing can say.
+     *
+     * <p>Tokenised rather than searched for {@code " as "}, which is what this
+     * did first: Kotlin separates the alias from its {@code as} with any
+     * whitespace, so a tab left the alias unfound and the file -- whose code
+     * spells only the alias -- read as not using the class at all.</p>
+     *
+     * <p>Null means "assume it is used", and a static wildcard is the case
+     * for it: {@code import static a.b.C.*} binds every member of C and names
+     * none of them, so there is nothing to look for. Guessing wrong there
+     * deletes the bridge from an application that builds a button.</p>
+     *
+     * @param statement the import statement, keyword included
+     * @param simple    the class's own simple name
+     * @return the bound name, or null when it cannot be told
+     */
+    private static String boundName(String statement, String simple) {
+        String[] tokens = tokenize(statement);
+        for (int token = 0; token < tokens.length - 1; token++) {
+            if ("as".equals(tokens[token])) {
+                return identifierHead(tokens[token + 1]);
+            }
+        }
+        boolean isStatic = tokens.length > 1 && "static".equals(tokens[1]);
+        if (!isStatic) {
+            return simple;
+        }
+        String qualified = tokens.length > 2 ? tokens[2] : "";
+        if (qualified.endsWith(".*")) {
+            return null;
+        }
+        int dot = qualified.lastIndexOf('.');
+        return identifierHead(dot < 0 ? qualified : qualified.substring(dot + 1));
+    }
+
+    /** The whitespace-separated words of a statement. */
+    private static String[] tokenize(String statement) {
+        java.util.List<String> words = new java.util.ArrayList<String>();
+        int at = 0;
+        while (at < statement.length()) {
+            while (at < statement.length()
+                    && isSourceSpace(statement.charAt(at))) {
+                at++;
+            }
+            int start = at;
+            while (at < statement.length()
+                    && !isSourceSpace(statement.charAt(at))) {
+                at++;
+            }
+            if (at > start) {
+                words.add(statement.substring(start, at));
+            }
+        }
+        return words.toArray(new String[words.size()]);
+    }
+
 
     /** The leading identifier of {@code text}, or null if it has none. */
     private static String identifierHead(String text) {
@@ -2908,23 +3016,7 @@ final class LocationButtonManifestFragments {
         return end == 0 ? null : text.substring(0, end);
     }
 
-    /** Whether {@code name} is named on a line that is not an import. */
-    private static boolean usedOutsideImports(String[] lines, String name) {
-        for (int line = 0; line < lines.length; line++) {
-            if (isImportLine(lines[line].trim())) {
-                continue;
-            }
-            if (namesToken(lines[line], name)) {
-                return true;
-            }
-        }
-        return false;
-    }
 
-    /** Whether a trimmed line is an import statement. */
-    private static boolean isImportLine(String trimmed) {
-        return trimmed.startsWith("import ") || trimmed.startsWith("import\t");
-    }
 
     private static boolean sourceNames(String text, String owner) {
         String dotted = owner.replace('/', '.');

@@ -2398,6 +2398,55 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void codeAfterAnImportSemicolonIsStillCode() throws Exception {
+        // An import and the code that uses it can share a physical line, and
+        // that is legal Java. Skipping the whole LINE as an import made every
+        // reference after the semicolon invisible, so a native source that is
+        // the only button reference read as unused -- and the builder then
+        // deletes the bridge and omits the permissions.
+        File root = tempDir("cn1-lb-same-line");
+        writeSource(new File(root, "com/example/OneLine.java"),
+                "package com.example;\n"
+                + "import com.codename1.location.LocationButton; "
+                + "class OneLine { LocationButton f() { "
+                + "return new LocationButton(); } }\n");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "code after the semicolon is code, not part of the import");
+    }
+
+    @Test
+    void aKotlinAliasSeparatedByATabIsStillFound() throws Exception {
+        // Kotlin separates the alias from its "as" with any whitespace. A
+        // literal " as " left the alias unfound, and the file spells only the
+        // alias -- so it read as not using the class at all.
+        File root = tempDir("cn1-lb-alias-tab");
+        writeSource(new File(root, "com/example/TabAlias.kt"),
+                "package com.example\n"
+                + "import com.codename1.location.LocationButton as\tBtn\n"
+                + "class TabAlias {\n"
+                + "  fun f(): Any = Btn()\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "a tab around the alias is legal Kotlin whitespace");
+    }
+
+    @Test
+    void aStaticWildcardImportIsTreatedAsUse() throws Exception {
+        // It binds every member of the class and names none of them, so there
+        // is nothing to look for. Guessing that it is unused deletes the
+        // bridge from an application that builds a button.
+        File root = tempDir("cn1-lb-static-star");
+        writeSource(new File(root, "com/example/StarStatic.java"),
+                "package com.example;\n"
+                + "import static com.codename1.location.LocationButton.*;\n"
+                + "public class StarStatic {\n"
+                + "  int f() { return 1; }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "a static wildcard names no member, so it counts");
+    }
+
+    @Test
     void anUnusedAliasImportIsNotUseOfTheButton() throws Exception {
         // The carve-out for alias imports was unconditional at first, which
         // put the permissions back for exactly the unused import the check
