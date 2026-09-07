@@ -67,20 +67,50 @@ fi
 # pipefail` that killed the script here -- before the explicit "offers no
 # platform" check below could say so. The failure was silent: exit 1, no
 # message, which is the shape of bug this whole script exists to refuse.
-BEST=$(echo "$LIST" \
+#
+# The trailing character class is what keeps neighbours out: it rejects the
+# "-" of android-36-ext18 and of the 37.2-beta1 previews, while accepting the
+# space or end-of-line that follows a real package id.
+MATCHES=$(echo "$LIST" \
   | grep -oE "platforms;android-${API}(\.[0-9]+)?([^0-9a-zA-Z.-]|$)" \
   | grep -oE "platforms;android-${API}(\.[0-9]+)?" \
-  | sort -u \
-  | sed "s/^platforms;android-${API}//" \
-  | sed 's/^\.//' \
-  | sort -n \
-  | tail -1 || true)
+  | sort -u || true)
 
-if [ -z "$BEST" ]; then
+if [ -z "$MATCHES" ]; then
   echo "$0: sdkmanager offers no platform for API $API" >&2
   exit 1
-elif [ "$BEST" = "$API" ]; then
-  echo "platforms;android-$API"
-else
-  echo "platforms;android-$API.$BEST"
 fi
+
+# Pick the newest revision and print THAT LINE, rather than reconstructing an
+# id from a stripped suffix. Stripping lost the unsuffixed package: for
+# "platforms;android-36" the suffix is the empty string, which is
+# indistinguishable from "nothing matched" -- so a level offered only without a
+# minor, which is every level up to 36, was reported as unavailable.
+#
+# An unsuffixed package is the level's original release and older than any
+# explicit minor, so it sorts as -1 and any real minor beats it.
+BEST_PACKAGE=""
+BEST_MINOR=-2
+while IFS= read -r PKG; do
+  [ -n "$PKG" ] || continue
+  SUFFIX="${PKG#platforms;android-${API}}"
+  if [ -z "$SUFFIX" ]; then
+    MINOR=-1
+  else
+    MINOR="${SUFFIX#.}"
+  fi
+  if [ "$MINOR" -gt "$BEST_MINOR" ]; then
+    BEST_MINOR="$MINOR"
+    BEST_PACKAGE="$PKG"
+  fi
+done <<MATCHED_PACKAGES
+$MATCHES
+MATCHED_PACKAGES
+
+if [ -z "$BEST_PACKAGE" ]; then
+  echo "$0: could not pick a platform for API $API from:" >&2
+  echo "$MATCHES" >&2
+  exit 1
+fi
+
+echo "$BEST_PACKAGE"
