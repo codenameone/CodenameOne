@@ -38,6 +38,43 @@ import java.util.TreeSet;
 public class ByteCodeClass {
 
     /**
+     * The one class whose reference field the collector owns rather than traces.
+     *
+     * <p>{@code java.lang.ref.Reference.objReference} is the referent of every
+     * WeakReference and SoftReference in the program. Emitting the ordinary
+     * {@code gcMarkObject} for it would make it a STRONG edge -- which is exactly
+     * what ParparVM did until this opt-out existed, so that a "weak" reference
+     * pinned its referent for the life of the process and every cache built on
+     * {@code Display.createSoftWeakRef} was unbounded. The two emission sites
+     * below replace that with a weak edge and the load barrier that makes reading
+     * one safe while a concurrent mark is running.</p>
+     *
+     * <p>Matched by name rather than by any annotation because the class is part
+     * of the VM's own {@code java.lang} surface: there is nowhere to hang an
+     * annotation that {@code vm/JavaAPI} and {@code Ports/CLDC11} would both
+     * accept, and a marker interface would be one more thing to keep in step.
+     * {@code Reference} is final in practice -- its constructor is package
+     * private -- so the set of classes this can apply to is closed.</p>
+     */
+    static final String REFERENCE_CLASS = "java_lang_ref_Reference";
+
+    /** The referent field within {@link #REFERENCE_CLASS}. */
+    static final String REFERENCE_REFERENT_FIELD = "objReference";
+
+    /**
+     * True for the one field whose GC treatment and read accessor are special
+     * cased below. Both call sites must agree, hence the shared predicate:
+     * suppressing the mark without adding the barrier produces a collector that
+     * frees a referent a mutator is holding, and adding the barrier without
+     * suppressing the mark produces a weak reference that is still strong.
+     */
+    private static boolean isReferenceReferent(String owningClass, ByteCodeField fld) {
+        return REFERENCE_CLASS.equals(owningClass)
+                && REFERENCE_REFERENT_FIELD.equals(fld.getFieldName())
+                && REFERENCE_CLASS.equals(fld.getClsName());
+    }
+
+    /**
      * @param isAnonymous the isAnonymous to set
      */
     public void setIsAnonymous(boolean isAnonymous) {
@@ -1000,6 +1037,37 @@ public class ByteCodeClass {
             b.append("_");
             b.append(fld.getFieldName());
             b.append("(JAVA_OBJECT __cn1T) {\n ").append(nullCheck).append("    ");
+            if(isReferenceReferent(clsName, fld)) {
+                // Reference.get() compiles into this accessor, and reading a weak
+                // referent while a concurrent mark is running needs a barrier that an
+                // ordinary field read does not.
+                //
+                // The collector clears a reference only after the strong mark has
+                // reached its fixpoint, but it does so with the mutators still running
+                // and with the SATB barrier still armed. Without the enqueue below, a
+                // thread whose stack was scanned and released early could take the
+                // referent out of here, hold it in a local the collector has already
+                // walked past, and watch the same cycle's sweep free it -- the object
+                // is by then neither marked nor fresh, which is the one case the
+                // "already marked or FRESH" invariant the sweep relies on does not
+                // cover. Enqueuing makes the referent part of the snapshot, so the
+                // fixpoint loop marks it and the clear pass then sees it live and
+                // leaves the reference alone.
+                //
+                // CN1_SATB_REF_LOAD rather than the plain CN1_SATB_DELETE next door: a
+                // referent that is already marked this epoch, or fresh, is one the clear
+                // pass would refuse to clear, so logging it is pure cost -- and on a hot
+                // cache that cost is enough to stop the SATB termination loop converging.
+                // Off-mark both are one predicted-not-taken load of gcSatbActive.
+                b.append("CN1_SATB_REF_LOAD(&((struct obj__").append(clsName).append("*)__cn1T)->")
+                 .append(fld.getClsName()).append("_").append(fld.getFieldName()).append(");\n    ");
+                // The touch stamp, and the entire per-read cost of ranking soft
+                // references by use: a store of an immediate. Unconditional rather than
+                // guarded by a "did it change" test, because the branch would cost more
+                // than the store it saves.
+                b.append("((struct obj__").append(clsName).append("*)__cn1T)->")
+                 .append(REFERENCE_CLASS).append("_cn1TouchAge = CN1_REF_TOUCHED;\n    ");
+            }
             if (fld.isVolatile()) {
                 b.append("return atomic_load_explicit(&((struct obj__");
                 b.append(clsName);
@@ -1086,6 +1154,27 @@ public class ByteCodeClass {
         b.append("*)objToMark;\n");
         for(ByteCodeField fld : fullFieldList) {
             if(!fld.isStaticField() && fld.isObjectType() && fld.getClsName().equals(clsName)) {
+                if(isReferenceReferent(clsName, fld)) {
+                    // THE REFERENT IS NOT TRACED. Handing it to gcMarkObject here is
+                    // what made every WeakReference strong; instead the collector is
+                    // told the reference exists and is given the addresses it needs to
+                    // decide, once the strong mark has closed, whether to keep the
+                    // referent or clear the field.
+                    //
+                    // Addresses rather than the object, deliberately: cn1_globals.m is a
+                    // fixed template compiled beside whatever the translator emitted, and
+                    // it cannot name `struct obj__java_lang_ref_Reference` -- the class is
+                    // absent from any program that never uses a reference, and including
+                    // its generated header would make the runtime fail to build for those.
+                    // Passing field pointers keeps the layout knowledge on this side,
+                    // where it is generated from the layout itself.
+                    b.append("    cn1GcDiscoverReference(threadStateData, objToMark, force, &objInstance->");
+                    b.append(fld.getClsName()).append("_").append(fld.getFieldName());
+                    b.append(", &objInstance->").append(REFERENCE_CLASS).append("_cn1TouchAge");
+                    b.append(", &objInstance->").append(REFERENCE_CLASS).append("_cn1AgedCycle");
+                    b.append(", objInstance->").append(REFERENCE_CLASS).append("_cn1Strength);\n");
+                    continue;
+                }
                 b.append("    gcMarkObject(threadStateData, ");
                 if (fld.isVolatile()) {
                     b.append("atomic_load_explicit(&objInstance->");

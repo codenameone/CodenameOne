@@ -2166,8 +2166,351 @@ JAVA_LONG GcVerifyApp_gcMarkState___R_long(CODENAME_ONE_THREAD_STATE) {
 }
 #endif
 
+// ---- java.lang.ref: discovery, ranking and clearing -------------------------
+//
+// The generated mark function for java.lang.ref.Reference does NOT trace its
+// referent (see ByteCodeClass.isReferenceReferent); it calls
+// cn1GcDiscoverReference below instead. That is the whole reason a WeakReference
+// here is weak: until this existed the referent was an ordinary field, traced
+// like any other, so a "weak" reference pinned its referent for the life of the
+// process and every cache built on Display.createSoftWeakRef was unbounded.
+//
+// THE ORDER OF EVENTS IN A CYCLE, because the safety argument is entirely about
+// order and every step below depends on the one before it:
+//
+//   1. cn1RefBeginCycle       - empties last cycle's list, recomputes the soft budget
+//   2. cn1GcDiscoverReference - called from mark functions as the mark reaches each
+//                               reference. AGES it, decides soft retention, and for a
+//                               retained soft marks the referent so it is an ordinary
+//                               strong edge for the rest of the cycle.
+//   3. cn1GcProcessReferences - runs inside the SATB termination loop, after the strong
+//                               mark has reached its fixpoint and while the barrier is
+//                               STILL ARMED. Clears every reference whose referent the
+//                               sweep is about to free.
+//
+// Step 2 is where ranking costs the mark nothing beyond the walk it was already
+// doing. Deciding retention in step 3 instead -- which is what a textbook
+// soft-reference implementation does, and what HotSpot does -- would mean computing
+// a SECOND reachability closure over the retained set, on a mark that already
+// spends most of its time in the grace pass. The price of deciding early is that
+// the decision uses the age as of the previous cycle. That is self-correcting: a
+// soft reference demoted at the start of a cycle and then read during it is caught
+// by the touch test in step 3 and comes back hot on the next one.
+//
+// WHY STEP 3 MUST RUN WITH THE BARRIER ARMED. This collector scans a thread's stack
+// and RELEASES the thread before the others are scanned. A thread released early can
+// call get() and park the referent in a local the collector has already walked past
+// -- and that referent is by then neither marked nor fresh, which is the one case
+// the "a reference stored after the fixpoint is already marked or FRESH" invariant
+// the sweep relies on does not cover. So get() carries a SATB load barrier (emitted
+// into get_field_java_lang_ref_Reference_objReference), and this pass sits INSIDE the
+// termination loop: an enqueue from a racing get() makes the trial clear of
+// gcSatbActive find a non-empty log, which re-arms the barrier, marks the referent
+// and runs the whole fixpoint again. A reference cleared in the losing half of that
+// race is cleared while its referent was genuinely unreachable, which the contract
+// permits -- and the referent itself survives, because the enqueue marked it.
+//
+// TWO PROPERTIES THAT FOLLOW, both legal ("may be cleared" is not "must be cleared"),
+// and both worth knowing before writing a test that asserts prompt collection:
+//   - The sweep's grace rule keeps any object allocated since the last sweep, so a
+//     referent is never cleared in the cycle it dies.
+//   - Native C stacks are scanned conservatively, so a stale machine word that looks
+//     like the referent keeps it marked and get() keeps answering it.
+
+// Ablation arms for the retention policy. The ranked default is arm 2; the other two
+// are the baselines it has to beat, kept compilable so the comparison can be re-run
+// rather than remembered. See vm/benchmarks/ab-refs.sh.
+//   0 - pressure only: soft referents are retained until headroom drops into the
+//       pacing reserve, then all of them are dropped at once. This is what the iOS
+//       port's didReceiveMemoryWarning -> flushSoftRefMap did, moved into the
+//       collector and without the shared-table lifetime bug.
+//   1 - never: a soft reference is as strong as a field. The upper bound on hit rate
+//       and the upper bound on footprint.
+//   2 - ranked by use (default).
+#ifndef CN1_REF_POLICY
+#define CN1_REF_POLICY 2
+#endif
+
+// How many collections a soft referent may go untouched and still be kept, when there
+// is memory to spare. A budget in CYCLES rather than milliseconds because the
+// collector is the only clock that matters here: it is what ages the reference, and a
+// busy app collects more often, which is exactly when a cache should be trimmed harder.
+#ifndef CN1_REF_SOFT_RETAIN_MAX
+#define CN1_REF_SOFT_RETAIN_MAX 8
+#endif
+
+struct CN1RefEntry {
+    JAVA_OBJECT ref;              // the reference object itself; diagnostics only
+    JAVA_OBJECT* referentField;
+    JAVA_INT* touchAgeField;
+    JAVA_INT strength;
+};
+static struct CN1RefEntry* cn1RefDiscovered = 0;
+static long cn1RefDiscoveredTop = 0;
+static long cn1RefDiscoveredCap = 0;
+// Discovery runs from generated mark functions, which gcMarkDrainParallel may fan out
+// across a worker pool, so the append is locked. It is a cold lock by construction:
+// it is taken once per REFERENCE per cycle, where the SATB mutex next door is taken
+// per logged store.
+static pthread_mutex_t cn1RefMutex = PTHREAD_MUTEX_INITIALIZER;
+// Ages, in collections, that a soft referent may reach before it is dropped.
+// Recomputed once per cycle by cn1RefBeginCycle. Negative means "drop every soft
+// referent, however hot".
+//
+// ATOMIC because the writer and the readers are different threads: cn1RefBeginCycle
+// runs on the GC thread and cn1GcDiscoverReference reads it from however many mark
+// workers gcMarkDrainParallel is using. Relaxed is the same instruction on every target
+// built here; what it buys is that the pair is not a mixed atomic/non-atomic access,
+// which is undefined in C however benign the race looks. Reading a value one cycle stale
+// would be harmless anyway -- the budget only decides retention, never safety.
+static _Atomic int cn1SoftRetainCycles = CN1_REF_SOFT_RETAIN_MAX;
+
+#ifdef CN1_GC_CONFORM
+_Atomic long cn1RefDiscoveries = 0;   // references the mark reached (deduped)
+_Atomic long cn1RefWeak = 0;          // of those, weak
+_Atomic long cn1RefRetained = 0;      // soft referents kept by the policy
+_Atomic long cn1RefKeptTouched = 0;   // kept by the racing-get() rule in the clear pass
+_Atomic long cn1RefCleared = 0;       // referents handed to the sweep
+long long cn1RefPhaseNs = 0;          // GC thread only: time in cn1GcProcessReferences
+long cn1RefPasses = 0;                // clear passes run this cycle (>1 == SATB reopen)
+#endif
+
+// Recompute the soft budget and drop the previous cycle's discoveries. Called from
+// codenameOneGCMark before anything can mark.
+static void cn1RefBeginCycle(void) {
+    cn1RefDiscoveredTop = 0;
+#ifdef CN1_GC_CONFORM
+    // PER CYCLE, like every other figure in [GCPROBE]. A running total cannot show
+    // whether the budget is tracking memory pressure, which is the whole question the
+    // ranking has to answer.
+    atomic_store_explicit(&cn1RefDiscoveries, 0, memory_order_relaxed);
+    atomic_store_explicit(&cn1RefWeak, 0, memory_order_relaxed);
+    atomic_store_explicit(&cn1RefRetained, 0, memory_order_relaxed);
+    atomic_store_explicit(&cn1RefKeptTouched, 0, memory_order_relaxed);
+    atomic_store_explicit(&cn1RefCleared, 0, memory_order_relaxed);
+    cn1RefPhaseNs = 0;
+    cn1RefPasses = 0;
+#endif
+#if CN1_REF_POLICY == 1
+    atomic_store_explicit(&cn1SoftRetainCycles, 0x7fffffff, memory_order_relaxed);
+#else
+    {
+        long headroom = cn1ProcessHeadroom();
+        if(headroom < 0) {
+            // No per-process limit on this platform -- desktop, CI, the simulator. Age
+            // soft referents out at the full budget anyway rather than keeping them
+            // forever: an unbounded cache is the defect this replaces, and a host with
+            // plenty of RAM is precisely where it went unnoticed for years.
+            atomic_store_explicit(&cn1SoftRetainCycles, CN1_REF_SOFT_RETAIN_MAX,
+                                  memory_order_relaxed);
+        } else {
+            // Against the BUDGET, never the device's free RAM, and the budget is what is
+            // already spent plus what is left. Sizing this from the device is the defect
+            // #5563 fixed for the pacing cap, and it is the same defect whichever
+            // consumer reads the number.
+            long long footprint = (long long)cn1ProcFootprintBytes();
+            long long budget = (footprint > 0 ? footprint : 0) + (long long)headroom;
+            //
+            // BANDS AS EXPLICIT FRACTIONS OF THE BUDGET. An earlier version wrote them as
+            // multiples of the pacing reserve (budget >> 2) and got both ends wrong in a
+            // way that reads as correct: `reserve * 4` IS the whole budget, so the top band
+            // required headroom to equal the budget and could never be entered, while the
+            // bottom band required headroom below a quarter -- which the pacing loop
+            // actively prevents, since defending that reserve is its job. Written as
+            // fractions the reachability of each band is obvious on inspection.
+#if CN1_REF_POLICY == 0
+            // Pressure only, no ranking: everything, until nothing. This is what the iOS
+            // port's didReceiveMemoryWarning -> flushSoftRefMap does, and it is the arm
+            // ranking has to beat. It switches at the SAME point the ranked ladder starts
+            // trimming, so the two differ in one thing only -- what they drop once they
+            // have decided to drop something.
+            atomic_store_explicit(&cn1SoftRetainCycles,
+                                  (headroom * 2 >= budget) ? 0x7fffffff : -1,
+                                  memory_order_relaxed);
+#else
+            if(headroom <= 0) {
+                atomic_store_explicit(&cn1SoftRetainCycles, -1, memory_order_relaxed);
+            } else if(headroom * 2 >= budget) {
+                // Over half the budget still free: nothing to trim for.
+                atomic_store_explicit(&cn1SoftRetainCycles, CN1_REF_SOFT_RETAIN_MAX,
+                                      memory_order_relaxed);
+            } else if(headroom * 4 >= budget) {
+                atomic_store_explicit(&cn1SoftRetainCycles, CN1_REF_SOFT_RETAIN_MAX / 2,
+                                      memory_order_relaxed);
+            } else {
+                // Inside the quarter the pacing loop defends: keep only what was read
+                // since the last collection.
+                atomic_store_explicit(&cn1SoftRetainCycles, 0, memory_order_relaxed);
+            }
+#endif
+        }
+    }
+#endif
+}
+
+void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOOLEAN force,
+                            JAVA_OBJECT* referentField, JAVA_INT* touchAgeField,
+                            JAVA_INT* agedCycleField, JAVA_INT strength) {
+    if(referentField == 0 || *referentField == JAVA_NULL) {
+        return;                                    // already cleared: nothing to decide
+    }
+#ifdef CN1_NO_WEAK_REFS
+    // ABLATION ARM: trace the referent strongly and never clear anything, which is
+    // exactly what this VM did before references were implemented. It exists so the
+    // gate can prove it is not inert -- a test that asserts referents get collected
+    // must FAIL when built this way, or it is asserting something else.
+    gcMarkObject(threadStateData, *referentField, force);
+    (void)touchAgeField; (void)agedCycleField; (void)strength; (void)ref;
+    return;
+#else
+    JAVA_BOOLEAN retain;
+    pthread_mutex_lock(&cn1RefMutex);
+    // DEDUPE, and it is not an optimization. Being reached more than once in a cycle is
+    // the normal case, not a rare one: force-marking re-runs mark functions over
+    // already-marked objects once per statics pass and again for the constant pool. Left
+    // undeduped, a popular reference would age several times a cycle and its soft
+    // referent would be dropped that many times sooner.
+    if(*agedCycleField == currentGcMarkValue) {
+        pthread_mutex_unlock(&cn1RefMutex);
+        return;
+    }
+    *agedCycleField = currentGcMarkValue;
+    {
+        // AGE IT. CN1_REF_TOUCHED means get() ran since the last cycle aged this
+        // reference, so the age resets; anything else is one collection older. Saturating,
+        // because an age that wraps to negative would read as freshly touched and make a
+        // cold entry immortal.
+        JAVA_INT age = *touchAgeField;
+        JAVA_INT aged = (age == CN1_REF_TOUCHED) ? 0
+                      : (age < 0x7ffffffe ? age + 1 : age);
+        *touchAgeField = aged;
+        int budget = atomic_load_explicit(&cn1SoftRetainCycles, memory_order_relaxed);
+        retain = (strength == CN1_REF_SOFT && budget >= 0 && aged <= budget)
+                 ? JAVA_TRUE : JAVA_FALSE;
+    }
+    if(cn1RefDiscoveredTop >= cn1RefDiscoveredCap
+       && atomic_load_explicit(&cn1GcFreezeHeld, memory_order_relaxed) == 0) {
+        // NEVER GROW WHILE A THREAD IS SIGNAL-FROZEN -- the same rule cn1MatureObject's
+        // adoption buffer follows, and the reason cn1GcFreezeHeld exists. A frozen thread
+        // halts at an arbitrary instruction and can own the libc allocator lock, so a
+        // realloc here would block the collector until a thread that only resumes when the
+        // collector lets it. Declining costs a deferred reclaim (see below) and nothing else.
+        //
+        // This is belt and braces rather than a live hazard: discovery runs from mark
+        // functions, which run in the drain, which runs after every freeze is released.
+        // Belt and braces is right for a rule whose violation is a whole-process hang that
+        // reproduces on one thread in one interleaving.
+        long nc = cn1RefDiscoveredCap == 0 ? 256 : cn1RefDiscoveredCap * 2;
+        struct CN1RefEntry* grown =
+            (struct CN1RefEntry*)realloc(cn1RefDiscovered, (size_t)nc * sizeof(struct CN1RefEntry));
+        if(grown != 0) {
+            cn1RefDiscovered = grown;
+            cn1RefDiscoveredCap = nc;
+        }
+    }
+    if(cn1RefDiscoveredTop < cn1RefDiscoveredCap) {
+        struct CN1RefEntry* e = &cn1RefDiscovered[cn1RefDiscoveredTop++];
+        e->ref = ref;
+        e->referentField = referentField;
+        e->touchAgeField = touchAgeField;
+        e->strength = strength;
+    }
+    // A DROPPED ENTRY IS SAFE, and safe in the direction that matters -- whether it was
+    // dropped because realloc failed or because the growth above was declined. The clear
+    // pass never sees this reference, so the referent stays reachable through a field
+    // nothing cleared: a missed reclaim, never a freed object under a live pointer. Note
+    // the reference was still AGED above, so a dropped cycle does not make it immortal;
+    // the next cycle discovers it again and the list has usually grown by then.
+    pthread_mutex_unlock(&cn1RefMutex);
+#ifdef CN1_GC_CONFORM
+    atomic_fetch_add_explicit(&cn1RefDiscoveries, 1, memory_order_relaxed);
+    if(strength != CN1_REF_SOFT) {
+        atomic_fetch_add_explicit(&cn1RefWeak, 1, memory_order_relaxed);
+    } else if(retain) {
+        atomic_fetch_add_explicit(&cn1RefRetained, 1, memory_order_relaxed);
+    }
+#endif
+    if(retain) {
+        // A retained soft reference is an ordinary strong edge for the rest of this
+        // cycle, traced with whatever `force` the caller had -- a reference held by a
+        // static is force-marked like anything else it points at.
+        gcMarkObject(threadStateData, *referentField, force);
+    }
+#endif
+}
+
+// Clear every discovered reference whose referent this cycle's sweep is about to free.
+// Runs on the GC thread only, inside the SATB termination loop, barrier armed.
+// Returns JAVA_TRUE if it marked anything, so the caller knows to drain.
+static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
+    JAVA_BOOLEAN marked = JAVA_FALSE;
+#ifdef CN1_GC_CONFORM
+    long long __r0 = cn1GcNowNs();
+    cn1RefPasses++;
+#endif
+    // No lock. Discovery only ever appends, and every mark thread has been drained to a
+    // fixpoint before the caller reaches this, so the prefix walked here is stable. A
+    // re-run after a SATB reopen walks the list again from the start, which is what picks
+    // up anything discovered by the re-opened fixpoint.
+    long n = cn1RefDiscoveredTop;
+    for(long i = 0 ; i < n ; i++) {
+        struct CN1RefEntry* e = &cn1RefDiscovered[i];
+        JAVA_OBJECT r = *e->referentField;
+        if(r == JAVA_NULL || CN1_IS_TAGGED(r)) {
+            continue;
+        }
+        if(*e->touchAgeField == CN1_REF_TOUCHED) {
+            // A get() landed AFTER this cycle aged this reference, so a mutator may be
+            // holding the referent in a local the collector has already walked past.
+            // Keeping it is not an optimization, it is the reason this pass is allowed
+            // to clear anything at all. Cheaper than trusting the SATB enqueue alone,
+            // and correct even if the log overflowed.
+            gcMarkObject(threadStateData, r, JAVA_FALSE);
+            marked = JAVA_TRUE;
+#ifdef CN1_GC_CONFORM
+            atomic_fetch_add_explicit(&cn1RefKeptTouched, 1, memory_order_relaxed);
+#endif
+            continue;
+        }
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+        // The SAME guard gcMarkObject applies, and for the same reason: a reference
+        // object kept alive by a stale native-stack word can be dead with a referent
+        // field that dangles into memory unmapped in an earlier cycle, and reading even
+        // the mark word of that faults. A pointer that does not resolve is either such
+        // garbage or an object allocated after this cycle's extent snapshot -- which is
+        // FRESH, so the grace rule keeps it and there is nothing to clear either way.
+        if(cn1ConservativeResolve((void*)r) != r && !cn1GcImmortalObjContains(r)) {
+            continue;
+        }
+#endif
+        // EXACTLY THE SWEEP'S OWN LIVENESS TEST, and it has to be: clearing a reference
+        // the sweep then keeps only wastes a cache entry, but FAILING to clear one the
+        // sweep frees hands get() a dangling pointer, and a dangling read on ParparVM is
+        // a native crash no Java catch can see. Both halves of the sweep -- the BiBOP
+        // per-slot walk and the legacy table scan -- free on `mark != -1 && mark <
+        // currentGcMarkValue - 1`; -1 is the one-cycle grace and currentGcMarkValue - 1
+        // is last cycle's slack, and both mean the object survives.
+        int mark = __atomic_load_n(&r->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+        if(mark == -1 || mark >= currentGcMarkValue - 1) {
+            continue;
+        }
+        *e->referentField = JAVA_NULL;
+#ifdef CN1_GC_CONFORM
+        atomic_fetch_add_explicit(&cn1RefCleared, 1, memory_order_relaxed);
+#endif
+    }
+#ifdef CN1_GC_CONFORM
+    cn1RefPhaseNs += cn1GcNowNs() - __r0;
+#endif
+    return marked;
+}
+
 void codenameOneGCMark() {
     currentGcMarkValue++;
+    // Drop the previous cycle's reference list and recompute the soft-retention budget
+    // from the memory still available. Must precede anything that can mark, because
+    // cn1GcDiscoverReference reads the budget to decide retention as it goes.
+    cn1RefBeginCycle();
 #ifdef CN1_GC_VERIFY
     atomic_store_explicit(&cn1GcVerifyMarkActive, 1, memory_order_release);
 #endif
@@ -3098,6 +3441,15 @@ void codenameOneGCMark() {
             }
             gcMarkDrain(d);
             if(gcMarkNewObjectCount == before) break; // marked nothing new -> closed
+        }
+        // REFERENCES, here and nowhere else. The strong mark has reached its fixpoint, so
+        // "unmarked" now means what the sweep will mean by it -- and the barrier is still
+        // armed, so a get() racing this pass logs its referent and forces the trial clear
+        // below to find a non-empty log, which re-arms and runs the whole fixpoint (and
+        // this pass) again. Moving it after the barrier goes down would remove exactly
+        // that protection and let the sweep free an object a mutator is holding.
+        if(cn1GcProcessReferences(d)) {
+            gcMarkDrain(d);
         }
         // Trial clear. A store racing it either logged already (caught just below) or
         // adds an already-marked or fresh reference, which the sweep keeps either way.
@@ -12066,6 +12418,31 @@ void cn1GcProbeCycle(double markMs, double sweepMs, int threw) {
         atomic_load_explicit(&cn1MonitorEntries, memory_order_relaxed),
         cn1ImmortalRootsN, cn1FVLive,
         sideBytes / 1024, residKb);
+    // java.lang.ref, on its own line so it can be grepped and joined on cyc without
+    // parsing the wall of fields above.
+    //
+    // refMs against graceMs and drainMs is the answer to "does ranking cost more than it
+    // is worth" on the COLLECTOR side; hit rate against fpKb (which the workload prints)
+    // answers it on the mutator side. Neither means anything alone.
+    //
+    // softBudget is the age, in collections, a soft referent may reach untouched: it is
+    // CN1_REF_SOFT_RETAIN_MAX with memory to spare, 0 inside the reserve, -1 out of
+    // budget, and 0x7fffffff means the policy is not trimming at all. Read it FIRST when
+    // a hit rate looks wrong -- a budget pinned at 0x7fffffff on a host with no
+    // per-process limit is a measurement of nothing, and is the shape a desktop A/B
+    // silently takes.
+    fprintf(stderr,
+        "[GCREF] v=1 cyc=%d tMs=%lld discovered=%ld weak=%ld retained=%ld"
+        " keptTouched=%ld cleared=%ld passes=%ld refMs=%.3f softBudget=%d listCap=%ld\n",
+        currentGcMarkValue, cn1GcProbeElapsedMs(),
+        atomic_load_explicit(&cn1RefDiscoveries, memory_order_relaxed),
+        atomic_load_explicit(&cn1RefWeak, memory_order_relaxed),
+        atomic_load_explicit(&cn1RefRetained, memory_order_relaxed),
+        atomic_load_explicit(&cn1RefKeptTouched, memory_order_relaxed),
+        atomic_load_explicit(&cn1RefCleared, memory_order_relaxed),
+        cn1RefPasses, cn1RefPhaseNs / 1e6,
+        atomic_load_explicit(&cn1SoftRetainCycles, memory_order_relaxed),
+        cn1RefDiscoveredCap);
     fflush(stderr);
     // Per-CYCLE, so reset after reporting. A running total cannot show a trend.
     cn1GcProbeResetPhases();

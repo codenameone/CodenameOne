@@ -1414,6 +1414,26 @@ extern void cn1SatbEnqueue(JAVA_OBJECT old);
          } } while(0)
 #endif
 
+// ---- java.lang.ref support -------------------------------------------------
+// A WeakReference's referent is NOT traced by the generated mark function. That
+// function calls cn1GcDiscoverReference instead (see ByteCodeClass), handing over
+// the addresses of the reference's fields, and the collector decides for itself
+// whether the referent lives.
+//
+// Field pointers rather than the object, because this file is a fixed template
+// compiled beside whatever the translator emitted: `struct obj__java_lang_ref_Reference`
+// does not exist in a program that never uses a reference, so naming it here would
+// break the build for those. The layout stays on the generated side.
+//
+// `strength` is CN1_REF_WEAK or CN1_REF_SOFT, taken from a field the subclass
+// constructor sets. Deliberately not a class-pointer comparison: the dead-code pass
+// is entitled to remove a class symbol this file would then fail to link against,
+// and a user-written subclass of either would compare unequal to both.
+#define CN1_REF_WEAK 0
+#define CN1_REF_SOFT 1
+// cn1TouchAge value written by get_field_java_lang_ref_Reference_objReference on
+// every read. The collector turns it back into an age in cycles.
+#define CN1_REF_TOUCHED (-1)
 extern const char* volatile cn1LastNamSetter; // diagnosis: last bracket toucher
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
 // The bracket's purpose was to suppress GC interaction while native C code
@@ -3073,6 +3093,52 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
 
 extern int currentGcMarkValue;
 extern void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);
+extern void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOOLEAN force,
+                                   JAVA_OBJECT* referentField, JAVA_INT* touchAgeField,
+                                   JAVA_INT* agedCycleField, JAVA_INT strength);
+
+
+// ---- the Reference.get() load barrier --------------------------------------
+// Emitted into get_field_java_lang_ref_Reference_objReference, and the reason the
+// clear pass is allowed to run with mutators still going.
+//
+// A thread whose stack was scanned and released early can pull the referent out of a
+// reference and hold it in a local the collector has already walked past. That referent
+// is then neither marked nor fresh, which is the one case the sweep's "already marked or
+// FRESH" invariant does not cover, so without this it is freed under a live pointer.
+// Enqueuing puts it in the snapshot: the trial clear of gcSatbActive finds a non-empty
+// log, re-arms, marks it, and the reference is left alone.
+//
+// THE FILTER IS NOT AN OPTIMIZATION, it is what makes this affordable. cn1SatbEnqueue
+// takes a mutex per accepted reference, and get() on a hot cache is called far more often
+// than anything the per-store barrier sees -- measured on RefPolicy before this filter
+// existed, a 400,000-access run put over 10,000 entries into the log per cycle and drove
+// the SATB termination loop into its CN1_SATB_MAX_REOPENS cap on every single cycle,
+// which is the collector failing to converge rather than a cost.
+//
+// It skips exactly the referents the clear pass would refuse to clear anyway: already
+// marked this epoch, or fresh and therefore kept by the sweep's grace rule. Deliberately
+// STRICTER than the clear pass's own test, which also spares mark == epoch - 1 (last
+// cycle's slack): bibopGcEpoch is only exactly equal to currentGcMarkValue once
+// cn1BibopBeginGcCycle has published it, and a barrier must not depend on a mirror being
+// current. Skipping less is always safe; skipping more is not.
+//
+// A retained soft reference costs nothing here at all, because its referent is marked as
+// an ordinary strong edge by cn1GcDiscoverReference before any get() can reach it.
+#if defined(CN1_DISABLE_SATB)
+#define CN1_SATB_REF_LOAD(fieldAddr) do { } while(0)
+#else
+#define CN1_SATB_REF_LOAD(fieldAddr) \
+    do { if(__builtin_expect(gcSatbActive, 0)) { \
+             JAVA_OBJECT cn1__r = *(JAVA_OBJECT volatile*)(fieldAddr); \
+             if(cn1__r != JAVA_NULL && !CN1_IS_TAGGED(cn1__r)) { \
+                 int cn1__m = __atomic_load_n(&cn1__r->__codenameOneGcMark, __ATOMIC_RELAXED); \
+                 int cn1__e = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed); \
+                 if(cn1__m != -1 && cn1__m != cn1__e) cn1SatbEnqueue(cn1__r); \
+             } \
+         } } while(0)
+#endif
+
 extern void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);
 extern JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
 
