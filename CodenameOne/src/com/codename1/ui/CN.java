@@ -1208,7 +1208,14 @@ public class CN extends CN1Constants {
     ///
     /// - `RuntimeException`: if this feature failed or unsupported on the platform
     public static void openGallery(ActionListener response, int type) {
-        Display.impl.openGallery(response, type);
+        // Not Display.impl, which is what most of the shortcuts in this class use.
+        // Display.openGallery fires an OpenGalleryEvent that a registered Plugin can
+        // consume in order to answer instead of the platform, and going straight to
+        // the implementation would skip that dispatch -- so a plugin would work or
+        // not depending on whether the app said CN or Display, and fail silently in
+        // the CN case. Only the methods where Display is a pure passthrough may be
+        // shortcut through Display.impl.
+        Display.getInstance().openGallery(response, type);
     }
 
     /// Opens a file chooser for arbitrary user-selected files.

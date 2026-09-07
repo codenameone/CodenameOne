@@ -1,0 +1,53 @@
+== Plugins
+
+A plugin lets a library take over a framework call before the platform sees it.
+`com.codename1.plugin.Plugin` is the hook, `PluginSupport` is the registry, and
+the calls that can be intercepted announce themselves by firing a `PluginEvent`.
+
+=== Writing one
+
+`Plugin` extends `ActionListener<PluginEvent>` and adds nothing, so a plugin is
+one `actionPerformed` method that receives every event fired while it's
+registered. Check the event type, answer through
+`setPluginEventResponse`, and call `consume()` to say the framework should use
+your answer:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PluginsJava001Snippet.java[tag=plugins-java-001,indent=0]
+----
+
+Consuming is what makes the interception happen. `Display.isGalleryTypeSupported`
+fires the event, and when it comes back consumed it returns
+`getPluginEventResponse()` rather than asking the platform. Leave the event
+alone and the platform answers as usual, so a plugin that recognizes nothing
+costs only the call.
+
+=== Registering
+
+The registry is a single instance reachable from `CN`:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PluginsJava002Snippet.java[tag=plugins-java-002,indent=0]
+----
+
+`firePluginEvent` copies the plugin list under a lock and walks the copy,
+checking `isConsumed()` before each plugin. The first consumer therefore ends
+the dispatch, and plugins registered after it never see that event. Registering
+and deregistering during dispatch is safe, because the copy is what's being
+walked.
+
+=== What can be intercepted
+
+Two events exist today, both fired by `Display` around the gallery:
+
+* `IsGalleryTypeSupportedEvent` is a `PluginEvent<Boolean>` carrying the gallery
+  type. Answer it to claim support for a type the platform doesn't offer.
+* `OpenGalleryEvent` is a `PluginEvent<Void>` carrying the type and the
+  `ActionListener` waiting for the result. Consume it to open your own picker
+  and call that listener yourself.
+
+The mechanism is general -- `PluginEvent` is public and `firePluginEvent` takes
+any subclass -- so the set of interception points grows as the framework fires
+more of them.
