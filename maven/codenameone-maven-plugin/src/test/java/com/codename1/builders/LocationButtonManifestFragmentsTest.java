@@ -2127,6 +2127,36 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aSubclassOfMapComponentIsPersistentLocationUse() throws Exception {
+        // The subclass carries its parent's constructor: new MyMap() runs
+        // MapComponent's own, and with it the last-known-location lookup.
+        // Staged sources are compiled later by Gradle, so no bytecode scan
+        // covers the call either -- the exclusive build was accepted and the
+        // map's lookup came back approximate.
+        File root = tempDir("cn1-lb-map-subclass");
+        writeSource(new File(root, "com/example/MyMap.java"),
+                "package com.example;\n"
+                + "import com.codename1.maps.MapComponent;\n"
+                + "public class MyMap extends MapComponent {\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "extending it inherits the lookup its constructor makes");
+    }
+
+    @Test
+    void extendingSomethingElseIsNotMapUse() throws Exception {
+        File root = tempDir("cn1-lb-other-subclass");
+        writeSource(new File(root, "com/example/Other.java"),
+                "package com.example;\n"
+                + "public class Other extends javax.swing.JPanel {\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments
+                        .sourcesCallPlatformLocation(root),
+                "extending an unrelated class is not map use");
+    }
+
+    @Test
     void aMapComponentFieldIsNotPersistentLocationUse() throws Exception {
         // The bytecode side asks whether one is CONSTRUCTED, because the
         // lookup that makes it persistent use is the one its constructor
@@ -2223,6 +2253,42 @@ class LocationButtonManifestFragmentsTest {
         assertFalse(LocationButtonManifestFragments.namesButtonInStream(
                         new java.io.StringReader(source), 16),
                 "the explicit import owns the simple name, streamed too");
+    }
+
+    @Test
+    void aStreamedMethodLocalClassDoesNotShadowAnotherMethod()
+            throws Exception {
+        // PARITY AUDIT with the buffered pass, which scopes this by depth.
+        // The shadow comes FIRST, deliberately. With the use first the stream
+        // matches and returns before the declaration is ever read, so the test
+        // passes whatever the guard does -- which is what it did.
+        String source = "import com.codename1.location.*;\n"
+                + "class Two { void other() { class LocationButton { } } "
+                + "LocationButton make() { return new LocationButton(); } }\n";
+        assertTrue(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "a method-local class shadows only its own method, streamed");
+    }
+
+    @Test
+    void aStreamedTypeParameterShadowsTheWildcard() throws Exception {
+        // PARITY AUDIT against the buffered pass, which refuses this.
+        String source = "import com.codename1.location.*;\n"
+                + "class Box<LocationButton> { LocationButton value; }\n";
+        assertFalse(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "a type parameter owns the name, streamed too");
+    }
+
+    @Test
+    void aStreamedNameBrokenAtANewlineIsStillFound() throws Exception {
+        // PARITY AUDIT: the buffered pass joins a qualified name broken at a
+        // newline, so the streamed one must or an oversized file loses it.
+        String source = "class Big { Object f() { return new "
+                + "com.codename1.location.\n        LocationButton(); } }\n";
+        assertTrue(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "a broken qualified name is still the class name, streamed");
     }
 
     @Test
@@ -2834,6 +2900,25 @@ class LocationButtonManifestFragmentsTest {
                 + "}\n");
         assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
                 "a broken qualified name is still the class name");
+    }
+
+    @Test
+    void aMethodLocalClassDoesNotShadowAnotherMethod() throws Exception {
+        // A class declared inside a method reaches only that method, so a
+        // reference in a different one is still the real component. Reading
+        // it as a file-wide shadow loses the button from a file that builds
+        // one, and the bridge then goes from an app that uses it -- the
+        // direction that fails in silence.
+        File root = tempDir("cn1-lb-scoped-shadow");
+        writeSource(new File(root, "com/example/Two.java"),
+                "package com.example;\n"
+                + "import com.codename1.location.*;\n"
+                + "public class Two {\n"
+                + "  LocationButton make() { return new LocationButton(); }\n"
+                + "  void other() { class LocationButton { } }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "a method-local class shadows only its own method");
     }
 
     @Test

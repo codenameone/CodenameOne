@@ -1107,12 +1107,21 @@ public class AndroidGradleBuilder extends Executor {
 
     /// Owners of a non-button location call that were not LocationManager
     /// itself, waiting to be tested against the hierarchy.
-    /// A submitted archive asks for precise location in its own manifest.
+    /// Precise location asked for by something that is NOT the button, and
+    /// not through anything of ours.
+    ///
+    /// Two sources, and the name predates the second. A submitted archive
+    /// asking in its own manifest, which is where the name comes from: nothing
+    /// of ours is called, so no bytecode marker exists and the declaration is
+    /// the whole evidence. And a direct call to a provider, from a library or
+    /// from the APPLICATION's own classes -- that second one was computed and
+    /// then dropped, so an application whose classes call
+    /// android.location.LocationManager passed the exclusivity test and had
+    /// its call silently downgraded, which is the outcome the test exists to
+    /// prevent.
     ///
     /// Kept separate from usesPersistentLocation because it is a different
-    /// fact with a different message: nothing of ours is called, so no bytecode
-    /// marker exists, and the permission the library declares is the whole
-    /// evidence.
+    /// fact with a different message.
     private boolean libraryPreciseLocation;
 
     private final java.util.Set<String> deferredLocationOwners =
@@ -3184,6 +3193,17 @@ public class AndroidGradleBuilder extends Executor {
             // only come from a manifest inside a staged archive, and archives
             // the developer submitted are what libsDir covers below.
             usesPersistentLocation |= appLocation.usesPersistentLocation();
+            // The application's OWN direct call to a provider, which was
+            // computed here and then dropped: only the library scan's copy of
+            // this flag reached the conflict check. An application whose own
+            // classes call android.location.LocationManager or the fused
+            // provider -- a native jar merged into them, which is the shape
+            // that reaches this directory -- therefore passed the exclusivity
+            // test, inject() restricted fine location to the button, and that
+            // call came back approximate with nothing in the build to say so.
+            // That silent downgrade is the whole thing the check exists to
+            // prevent, so the flag has to feed it from both sides.
+            libraryPreciseLocation |= appLocation.callsPreciseLocation();
             // And the application's own ANDROID sources, which no bytecode
             // scan can reach: a native interface implemented in .java or .kt
             // is compiled by Gradle from the staged tree, so it is in no jar

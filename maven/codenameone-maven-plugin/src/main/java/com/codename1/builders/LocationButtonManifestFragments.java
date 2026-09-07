@@ -2451,6 +2451,10 @@ final class LocationButtonManifestFragments {
         String keyword = null;
         String previousWord = "";
         boolean shadowed = false;
+        int braceDepth = 0;
+        boolean sawTypeKeyword = false;
+        boolean expectAngle = false;
+        boolean inTypeParams = false;
         java.util.List<String> bound = new java.util.ArrayList<String>();
         int lastDot = target.lastIndexOf('.');
         String pkg = lastDot < 0 ? "" : target.substring(0, lastDot);
@@ -2631,19 +2635,36 @@ final class LocationButtonManifestFragments {
                     matched = 0;
                     continue;
                 }
-                if (matched > 0 && c == target.charAt(matched)) {
-                    matched++;
-                } else {
-                    matched = 0;
-                    if (c == target.charAt(0)
-                            && !Character.isJavaIdentifierPart(before)
-                            && before != '.') {
-                        matched = 1;
+                // Whitespace INSIDE a qualified name does not end the match.
+                // Java lets the name be broken at a newline, and the buffered
+                // pass joins it before looking; here the match simply steps
+                // over the break, but only where a dot is on one side of it,
+                // so ordinary whitespace still ends an ordinary token.
+                boolean insideName = matched > 0 && isSourceSpace(c)
+                        && (target.charAt(matched - 1) == '.'
+                            || (matched < target.length()
+                                && target.charAt(matched) == '.'));
+                // Inverted rather than given a do-nothing branch: leaving the
+                // match alone is the whole action, and writing that as
+                // "matched = matched" is a self-assignment SpotBugs reports.
+                if (!insideName) {
+                    if (matched > 0 && c == target.charAt(matched)) {
+                        matched++;
+                    } else {
+                        matched = 0;
+                        if (c == target.charAt(0)
+                                && !Character.isJavaIdentifierPart(before)
+                                && before != '.') {
+                            matched = 1;
+                        }
                     }
                 }
                 if (matched == target.length()) {
                     complete = true;
                     matched = 0;
+                }
+                if (inTypeParams && c == '>' && word.length() == 0) {
+                    inTypeParams = false;
                 }
                 if (Character.isJavaIdentifierPart(c)) {
                     word.append(c);
@@ -2659,17 +2680,55 @@ final class LocationButtonManifestFragments {
                         continue;
                     }
                     if (simple.equals(finished)
-                            && isTypeKeyword(previousWord)) {
-                        // A type of that name declared HERE owns it too.
+                            && isTypeKeyword(previousWord)
+                            && braceDepth <= 1) {
+                        // A type of that name declared HERE owns it too --
+                        // but only one whose name reaches the file. A class
+                        // declared inside a method reaches its own block, and
+                        // reading that as a shadow loses the button from a
+                        // file that builds one elsewhere.
                         shadowed = true;
                         bound.remove(simple);
                         previousWord = finished;
                         continue;
                     }
+                    // And a type PARAMETER owns it for the body of the type
+                    // that declares it: class Box<LocationButton> binds the
+                    // name to the parameter, so a field of it is not this
+                    // component. Only the list that follows a type's own name
+                    // counts -- List<LocationButton> elsewhere is a real use.
+                    if (isTypeKeyword(finished)) {
+                        sawTypeKeyword = true;
+                    } else if (sawTypeKeyword) {
+                        sawTypeKeyword = false;
+                        expectAngle = true;
+                    }
+                    if (expectAngle) {
+                        if (c == '<') {
+                            inTypeParams = true;
+                            expectAngle = false;
+                        } else if (!isSourceSpace(c)) {
+                            expectAngle = false;
+                        }
+                    }
+                    if (inTypeParams) {
+                        if (simple.equals(finished) && braceDepth <= 1) {
+                            shadowed = true;
+                            bound.remove(simple);
+                        }
+                        if (c == '>') {
+                            inTypeParams = false;
+                        }
+                    }
                     if (bound.contains(finished)) {
                         return true;
                     }
                     previousWord = finished;
+                }
+                if (c == '{') {
+                    braceDepth++;
+                } else if (c == '}') {
+                    braceDepth--;
                 }
                 before = c;
                 remember(tail, c);
@@ -3346,7 +3405,8 @@ final class LocationButtonManifestFragments {
                                 text.charAt(at - 1));
                 if (startsClean && after < text.length()
                         && isSourceSpace(text.charAt(after))
-                        && !within(at, imports)) {
+                        && !within(at, imports)
+                        && shadowsWholeFile(text, at)) {
                     // Past the type's own name, to the parameter list that
                     // opens immediately after it if there is one.
                     int walk = skipSpace(text, after);
@@ -3383,7 +3443,8 @@ final class LocationButtonManifestFragments {
                                 text.charAt(at - 1));
                 if (startsClean && after < text.length()
                         && isSourceSpace(text.charAt(after))
-                        && !within(at, imports)) {
+                        && !within(at, imports)
+                        && shadowsWholeFile(text, at)) {
                     int walk = skipSpace(text, after);
                     if (text.startsWith(simple, walk)) {
                         int end = walk + simple.length();
@@ -3676,6 +3737,104 @@ final class LocationButtonManifestFragments {
         return followedByCall(text, dotted) || followedByCall(text, simple);
     }
 
+    /**
+     * How deeply nested in braces {@code at} is.
+     *
+     * <p>Comments are gone and literal text is masked before this runs, so a
+     * brace can only be a real one.</p>
+     *
+     * @param text the source
+     * @param at   the index to measure
+     * @return the number of unclosed braces before it
+     */
+    private static int braceDepthAt(String text, int at) {
+        int depth = 0;
+        for (int walk = 0; walk < at && walk < text.length(); walk++) {
+            char c = text.charAt(walk);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+            }
+        }
+        return depth;
+    }
+
+    /**
+     * Whether a declaration at {@code at} reaches the whole compilation unit.
+     *
+     * <p>A top-level type does, and so does a member of one -- its name is
+     * visible throughout the enclosing type, which in a source file of the
+     * kind this scans is effectively everywhere. A declaration deeper than
+     * that is inside a method or an initialiser and reaches only its own
+     * block, so it must not silence a reference in a different one.</p>
+     *
+     * <p>The distinction matters in the direction that fails silently: reading
+     * a method-local class as a file-wide shadow loses the button from a file
+     * that builds one somewhere else, and the bridge then goes from an
+     * application that uses it. Brace depth is what separates the two without
+     * parsing the language.</p>
+     *
+     * @param text the source
+     * @param at   where the declaration's keyword starts
+     * @return whether it shadows the file
+     */
+    private static boolean shadowsWholeFile(String text, int at) {
+        return braceDepthAt(text, at) <= 1;
+    }
+
+    /**
+     * Whether the source declares a type that EXTENDS {@code owner}.
+     *
+     * <p>A subclass carries its parent's constructor: {@code new MyMap()} runs
+     * {@code MapComponent}'s own, and with it the last-known-location lookup
+     * that makes the component persistent location use. Looking only for the
+     * parent's name constructed by hand missed every one of those, and staged
+     * sources are compiled later by Gradle so no bytecode scan covers them
+     * either -- an exclusive build was accepted and the map's lookup came back
+     * approximate.</p>
+     *
+     * <p>The DECLARATION is taken as the evidence rather than an instantiation
+     * of the subclass, which would have to be found in some other file of the
+     * tree. That over-reports for a subclass nobody builds, and over-reporting
+     * is this scan's documented direction: it refuses a build with a reason,
+     * where a miss downgrades a request that is really made and says
+     * nothing.</p>
+     *
+     * @param text  the source, comments gone and literals masked
+     * @param owner the parent class, in internal form
+     * @return whether something here extends it
+     */
+    private static boolean declaresSubclassOf(String text, String owner) {
+        String dotted = owner.replace('/', '.');
+        int lastDot = dotted.lastIndexOf('.');
+        String simple = lastDot < 0 ? dotted : dotted.substring(lastDot + 1);
+        // Java says "extends Parent"; Kotlin says ": Parent(" on the class
+        // header, which is a call and so already reads as construction.
+        int at = text.indexOf("extends");
+        while (at >= 0) {
+            int after = at + "extends".length();
+            boolean startsClean = at == 0
+                    || !Character.isJavaIdentifierPart(text.charAt(at - 1));
+            if (startsClean && after < text.length()
+                    && isSourceSpace(text.charAt(after))) {
+                int walk = skipSpace(text, after);
+                if (text.startsWith(dotted, walk)
+                        || text.startsWith(simple, walk)) {
+                    int end = walk + (text.startsWith(dotted, walk)
+                            ? dotted.length() : simple.length());
+                    if (end >= text.length()
+                            || !Character.isJavaIdentifierPart(
+                                    text.charAt(end))) {
+                        return true;
+                    }
+                }
+            }
+            at = text.indexOf("extends", at + 1);
+        }
+        return false;
+    }
+
     /** Whether {@code name} appears as a token with a call after it. */
     private static boolean followedByCall(String text, String name) {
         int at = text.indexOf(name);
@@ -3918,7 +4077,8 @@ final class LocationButtonManifestFragments {
             // here refused an exclusive build over a declaration that asks the
             // platform for nothing -- and the comment above used to claim this
             // line mirrored the bytecode rule, which it did not.
-            if (sourceConstructs(text, MAP_COMPONENT_CLASS)) {
+            if (sourceConstructs(text, MAP_COMPONENT_CLASS)
+                    || declaresSubclassOf(text, MAP_COMPONENT_CLASS)) {
                 return true;
             }
             for (int row = 0; row < SOURCE_LOCATION_OWNERS.length; row++) {
