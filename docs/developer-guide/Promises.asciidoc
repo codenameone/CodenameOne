@@ -6,8 +6,13 @@ nesting a callback inside a callback inside a callback: each step is a value you
 can hand around, chain onto and combine with others.
 
 Two method names differ from the JavaScript originals, because `catch` and
-`finally` are Java keywords. `except` takes the place of `catch`, and `always` takes the place of
-`finally`.
+`finally` are Java keywords. `except` takes the place of `catch`. `always` runs
+for either outcome, but it isn't a `finally`: it's implemented as
+`then(f, f)`, so whatever the functor returns becomes the value of the promise
+`always` hands back. Returning `null` after a rejection resolves the rest of the
+chain instead of keeping it rejected, and returning `null` after a success
+replaces the value. Return the incoming value through it if the chain should
+carry on unchanged.
 
 === Creating and consuming one
 
@@ -53,11 +58,13 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 `all` rejects as soon as any input rejects, so it fits work where one failure
 makes the rest pointless. Don't depend on which error you get when several
-inputs fail: a rejection overwrites the aggregate's stored error whatever state
-it's already in, so the one delivered is the last processed rather than the
-first. `allSettled` waits for every
-input whatever happens to each, which fits independent tasks you want a full
-report on.
+inputs fail. A handler attached before the rejections arrive is drained by the
+first one, while a handler attached afterward reads the stored error, which
+each later rejection overwrites. `allSettled` waits for every input whatever happens to
+each, which fits independent tasks. It resolves with the original array of
+promises rather than a list of outcome descriptors, so inspect each one with
+`getState()` and `getValue()`. There's no getter for a rejected promise's error,
+so attach a failure handler to an input if you need to see why it failed.
 
 === Working with AsyncResource
 
