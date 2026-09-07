@@ -234,7 +234,11 @@ public class Promise<T> {
         return new Promise(new ExecutorFunction() {
             @Override
             public void call(Functor resolve, Functor reject) {
-                reject(err);
+                // reject.call(err), NOT reject(err): the latter is a method
+                // invocation, so it binds to this very method rather than to the
+                // Functor parameter of the same name and recurses until the stack
+                // overflows. Compare resolve(V) above, which calls the functor.
+                reject.call(err);
             }
         });
     }
@@ -280,6 +284,20 @@ public class Promise<T> {
         }
         while (!then.isEmpty()) {
             PromiseHandler p = then.remove(0);
+            if (!resolved && p.reject == null) {
+                // then() was given no rejection handler, so the rejection passes
+                // through to the promise it returned -- carrying the ORIGINAL
+                // Throwable. This used to be done by defaulting rejectionFunc to a
+                // functor that rethrew, which the catch below turned back into a
+                // rejection; but Functor.call declares no checked exception, so that
+                // default had to write `throw (RuntimeException) o`. For a checked
+                // error the cast fails and the chain rejects with a
+                // ClassCastException instead of the real cause -- and because
+                // ParparVM does not check casts, iOS propagated the true error while
+                // the other ports did not. Propagating here needs no cast at all.
+                p.promise.reject.call(o);
+                continue;
+            }
             try {
                 Object result = resolved ? p.resolve.call(o) : p.reject.call(o);
                 if (result instanceof Promise) {
@@ -376,7 +394,7 @@ public class Promise<T> {
     ///
     /// - `resolutionFunc`: A Function called if the Promise is fulfilled. This function has one argument, the fulfillment value. If it is null, it is internally replaced with an "Identity" function (it returns the received argument).
     ///
-    /// - `rejectionFunc`: A Function called if the Promise is rejected. This function has one argument, the rejection reason. If it is null, it is internally replaced with a "Thrower" function (it throws an error it received as argument).
+    /// - `rejectionFunc`: A Function called if the Promise is rejected. This function has one argument, the rejection reason. If it is null, the rejection passes through unhandled to the promise this method returns, carrying the original reason.
     ///
     /// #### Returns
     ///
@@ -412,15 +430,6 @@ public class Promise<T> {
                 }
             };
         }
-        if (rejectionFunc == null) {
-            rejectionFunc = new Functor<Throwable, Object>() {
-                @Override
-                public Object call(Throwable o) {
-                    throw (RuntimeException) o;
-                }
-            };
-        }
-
         PromiseHandler handler = new PromiseHandler();
         handler.promise = new Promise(null);
         handler.resolve = resolutionFunc;
