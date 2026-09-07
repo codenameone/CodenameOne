@@ -2089,10 +2089,26 @@ static long cn1SatbTake(JAVA_OBJECT** out) {
     static JAVA_OBJECT* scratch = 0; static long scratchCap = 0;
     if(n > scratchCap) {
         long nc = n < 8192 ? 8192 : n;
-        scratch = (JAVA_OBJECT*)realloc(scratch, (size_t)nc * sizeof(JAVA_OBJECT));
-        scratchCap = nc;
+        // Through a TEMPORARY. Assigning realloc's result straight back loses the existing
+        // buffer on failure, and advancing scratchCap alongside it made that permanent:
+        // every later take saw n <= scratchCap, skipped the realloc, found scratch NULL and
+        // returned 0, so the barrier kept logging into a stack nothing ever drained again.
+        JAVA_OBJECT* grown = (JAVA_OBJECT*)realloc(scratch, (size_t)nc * sizeof(JAVA_OBJECT));
+        if(grown != 0) {
+            scratch = grown;
+            scratchCap = nc;
+        }
     }
     if(n > 0 && scratch != 0) memcpy(scratch, gcSatbStack, (size_t)n * sizeof(JAVA_OBJECT));
+    // TAKE-SIDE LOSS COUNTS AS A DROP TOO. gcSatbTop is reset either way, so entries that
+    // were successfully logged are discarded here when the scratch buffer could not be
+    // grown -- and the caller is told the batch was empty, which reads as "termination can
+    // finish". For a referent Reference.get() has handed out that is the same hazard as a
+    // failed enqueue and has to invalidate reference clearing the same way; a lost enqueue
+    // and a lost batch are indistinguishable to the object that gets swept.
+    if(n > 0 && scratch == 0) {
+        atomic_fetch_add_explicit(&cn1SatbDrops, 1, memory_order_relaxed);
+    }
     gcSatbTop = 0;
     pthread_mutex_unlock(&gcSatbMutex);
     *out = scratch;
@@ -2240,6 +2256,21 @@ JAVA_LONG GcVerifyApp_gcMarkState___R_long(CODENAME_ONE_THREAD_STATE) {
 //   1 - never: a soft reference is as strong as a field. The upper bound on hit rate
 //       and the upper bound on footprint.
 //   2 - ranked by use (default).
+// WITHOUT THE SATB BARRIER THERE IS NO SAFE WAY TO CLEAR, so this configuration does not.
+//
+// -DCN1_DISABLE_SATB is the documented escape hatch for A/B-ing the barrier's cost or
+// falling back if it regresses. It compiles out the load barrier that makes handing a weak
+// referent to a mutator safe -- but the clear pass is not part of SATB and would keep
+// running, so a thread released after its stack scan could load a referent, have the field
+// cleared underneath it and the object swept before it could use the pointer. Reference
+// processing therefore turns itself off with the barrier, degrading to the behaviour that
+// preceded this feature: referents traced strongly and never cleared. That is the right
+// fallback for an escape hatch, and it keeps the arm measuring barrier cost rather than
+// measuring a different collector.
+#if defined(CN1_DISABLE_SATB) && !defined(CN1_NO_WEAK_REFS)
+#define CN1_NO_WEAK_REFS 1
+#endif
+
 #ifndef CN1_REF_POLICY
 #define CN1_REF_POLICY 2
 #endif
