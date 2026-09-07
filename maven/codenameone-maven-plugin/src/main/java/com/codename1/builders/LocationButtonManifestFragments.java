@@ -2449,6 +2449,8 @@ final class LocationButtonManifestFragments {
         StringBuilder word = new StringBuilder();
         StringBuilder statement = null;
         String keyword = null;
+        String previousWord = "";
+        boolean shadowed = false;
         java.util.List<String> bound = new java.util.ArrayList<String>();
         int lastDot = target.lastIndexOf('.');
         String pkg = lastDot < 0 ? "" : target.substring(0, lastDot);
@@ -2532,7 +2534,7 @@ final class LocationButtonManifestFragments {
                             // name needs no import at all -- the same rule the
                             // buffered pass applies, and without it a sibling
                             // of the button read as not using it.
-                            if (namesToken(text, pkg)) {
+                            if (namesToken(text, pkg) && !shadowed) {
                                 bound.add(simple);
                             }
                         } else if (namesToken(text, pkg + ".*")) {
@@ -2540,17 +2542,32 @@ final class LocationButtonManifestFragments {
                             // the code then spells the simple name. The
                             // statement never contains the full dotted name,
                             // so the check below cannot see it.
-                            bound.add(simple);
-                        } else {
+                            if (!shadowed) {
+                                bound.add(simple);
+                            }
+                        } else if (text.indexOf(target) >= 0) {
+                            // OURS, and this has to be asked before the
+                            // shadowing test below: our own import binds the
+                            // simple name too, so a test that only compares
+                            // bound names reads it as something else taking
+                            // the token.
                             String name = importBinds(text, target);
-                            if (name == null && text.indexOf(target) >= 0) {
+                            if (name == null) {
                                 // Binds a name nothing here can predict, so
                                 // the file counts -- the static-wildcard case.
                                 return true;
                             }
-                            if (name != null) {
-                                bound.add(name);
-                            }
+                            bound.add(name);
+                        } else if (simple.equals(
+                                boundName("import " + text, null))) {
+                            // An explicit import of ANOTHER package's class of
+                            // this name takes the bare token, so a wildcard or
+                            // the package declaration cannot lend it to us --
+                            // the rule the buffered pass applies, and without
+                            // it an oversized file is charged for a component
+                            // it never touches.
+                            shadowed = true;
+                            bound.remove(simple);
                         }
                         statement = null;
                         keyword = null;
@@ -2641,9 +2658,18 @@ final class LocationButtonManifestFragments {
                         matched = 0;
                         continue;
                     }
+                    if (simple.equals(finished)
+                            && isTypeKeyword(previousWord)) {
+                        // A type of that name declared HERE owns it too.
+                        shadowed = true;
+                        bound.remove(simple);
+                        previousWord = finished;
+                        continue;
+                    }
                     if (bound.contains(finished)) {
                         return true;
                     }
+                    previousWord = finished;
                 }
                 before = c;
                 remember(tail, c);
@@ -2689,6 +2715,13 @@ final class LocationButtonManifestFragments {
         int lastDot = target.lastIndexOf('.');
         String simple = lastDot < 0 ? target : target.substring(lastDot + 1);
         return boundName("import " + statement, simple);
+    }
+
+    /** Whether a word introduces a type declaration. */
+    private static boolean isTypeKeyword(String word) {
+        return "class".equals(word) || "interface".equals(word)
+                || "enum".equals(word) || "object".equals(word)
+                || "record".equals(word);
     }
 
     /** Appends to a bounded tail of the code seen so far. */
@@ -3200,7 +3233,14 @@ final class LocationButtonManifestFragments {
      * @param owner the class, in internal form
      * @return whether the file uses it rather than merely importing it
      */
-    private static boolean sourceNamesInCode(String text, String owner) {
+    private static boolean sourceNamesInCode(String raw, String owner) {
+        // Qualified names JOINED first. Java lets one be broken at a newline,
+        // in an import and in code alike, and every check below looks for the
+        // name as one run of characters -- so a break made the name invisible
+        // and the file read as not using the button at all. Removing only the
+        // whitespace that touches a dot cannot join two separate names: it is
+        // the same expression either way.
+        String text = joinBrokenNames(raw);
         String dotted = owner.replace('/', '.');
         int lastDot = dotted.lastIndexOf('.');
         String simple = lastDot < 0 ? dotted : dotted.substring(lastDot + 1);
@@ -3275,7 +3315,59 @@ final class LocationButtonManifestFragments {
                 return true;
             }
         }
-        return declaresType(text, simple, imports);
+        return declaresType(text, simple, imports)
+                || declaresTypeParameter(text, simple, imports);
+    }
+
+    /**
+     * Whether a declared type takes {@code simple} as a type PARAMETER.
+     *
+     * <p>{@code class Box<LocationButton>} binds that name to the parameter
+     * for the whole body, so a field of it is the parameter and not this
+     * component. Only a parameter LIST counts, which is the {@code <...>} that
+     * follows a type's own name -- {@code List<LocationButton>} elsewhere is a
+     * use of the class, and reading that as a shadow would lose every file
+     * that holds the button in a collection.</p>
+     *
+     * @param text     the source, comments gone
+     * @param simple   the simple name
+     * @param imports  the import ranges, which declare nothing
+     * @return whether a type parameter owns the name
+     */
+    private static boolean declaresTypeParameter(String text, String simple,
+            int[][] imports) {
+        String[] keywords = {"class", "interface", "enum", "record"};
+        for (int word = 0; word < keywords.length; word++) {
+            int at = text.indexOf(keywords[word]);
+            while (at >= 0) {
+                int after = at + keywords[word].length();
+                boolean startsClean = at == 0
+                        || !Character.isJavaIdentifierPart(
+                                text.charAt(at - 1));
+                if (startsClean && after < text.length()
+                        && isSourceSpace(text.charAt(after))
+                        && !within(at, imports)) {
+                    // Past the type's own name, to the parameter list that
+                    // opens immediately after it if there is one.
+                    int walk = skipSpace(text, after);
+                    while (walk < text.length()
+                            && Character.isJavaIdentifierPart(
+                                    text.charAt(walk))) {
+                        walk++;
+                    }
+                    walk = skipSpace(text, walk);
+                    if (walk < text.length() && text.charAt(walk) == '<') {
+                        int close = text.indexOf('>', walk);
+                        if (close > walk && namesToken(
+                                text.substring(walk + 1, close), simple)) {
+                            return true;
+                        }
+                    }
+                }
+                at = text.indexOf(keywords[word], at + 1);
+            }
+        }
+        return false;
     }
 
     /** Whether the source declares a type called {@code simple}. */
@@ -3318,10 +3410,13 @@ final class LocationButtonManifestFragments {
      * after the semicolon on the same line, and whitespace of any kind inside
      * the statement.</p>
      *
-     * <p>A Java import split ACROSS lines before its semicolon is read as
-     * ending at the newline, so the tail counts as code and the file is
-     * reported as using the class. That over-reports rather than missing,
-     * which is the safer direction of the two, and no formatter writes one.</p>
+     * <p>A newline does NOT end one while the statement is plainly unfinished
+     * -- the text so far ending in a dot, or the next thing being one. Java
+     * allows the qualified name to be broken across lines, and stopping at the
+     * newline split it: neither half is the class, the simple name below then
+     * has no import to belong to, and the file read as not using the button at
+     * all. An earlier note here called that an over-report, which was the
+     * wrong way round and is why it went unnoticed.</p>
      *
      * @param text the source, comments gone
      * @return the ranges, in order
@@ -3336,18 +3431,7 @@ final class LocationButtonManifestFragments {
             boolean endsClean = after < text.length()
                     && isSourceSpace(text.charAt(after));
             if (startsClean && endsClean) {
-                int semi = text.indexOf(';', after);
-                int line = text.indexOf('\n', after);
-                int end;
-                if (semi < 0 && line < 0) {
-                    end = text.length();
-                } else if (semi < 0) {
-                    end = line;
-                } else if (line < 0) {
-                    end = semi;
-                } else {
-                    end = Math.min(semi, line);
-                }
+                int end = statementEnd(text, after);
                 found.add(new int[] {at, end});
                 at = text.indexOf("import", end);
                 continue;
@@ -3355,6 +3439,91 @@ final class LocationButtonManifestFragments {
             at = text.indexOf("import", at + 1);
         }
         return found.toArray(new int[found.size()][]);
+    }
+
+    /**
+     * The source with whitespace that touches a dot removed.
+     *
+     * <p>{@code com.codename1.location.\n    LocationButton} is one qualified
+     * name written across two lines, and every search here looks for the name
+     * as a single run -- so the break hid it entirely. Only whitespace beside
+     * a dot goes, which changes no expression's meaning and cannot join names
+     * that were separate.</p>
+     *
+     * @param text the source, comments gone
+     * @return it, with broken qualified names made whole
+     */
+    private static String joinBrokenNames(String text) {
+        if (text.indexOf('.') < 0) {
+            return text;
+        }
+        StringBuilder out = new StringBuilder(text.length());
+        int at = 0;
+        while (at < text.length()) {
+            char c = text.charAt(at);
+            if (isSourceSpace(c)) {
+                int walk = at;
+                while (walk < text.length()
+                        && isSourceSpace(text.charAt(walk))) {
+                    walk++;
+                }
+                boolean beforeDot = walk < text.length()
+                        && text.charAt(walk) == '.';
+                boolean afterDot = out.length() > 0
+                        && out.charAt(out.length() - 1) == '.';
+                if (beforeDot || afterDot) {
+                    at = walk;
+                    continue;
+                }
+                out.append(text, at, walk);
+                at = walk;
+                continue;
+            }
+            out.append(c);
+            at++;
+        }
+        return out.toString();
+    }
+
+    /**
+     * Where the statement starting at {@code after} ends.
+     *
+     * <p>At its semicolon or at the end of its line, whichever comes first --
+     * Java ends one with a semicolon, Kotlin ends it with the line. A newline
+     * is NOT the end while the statement is unfinished, which a trailing dot
+     * or a leading dot on the next line says plainly; Java permits the
+     * qualified name to be broken there, and treating that newline as the end
+     * loses the name entirely.</p>
+     *
+     * @param text  the source
+     * @param after the index just past the keyword
+     * @return the index one past the statement's last character
+     */
+    private static int statementEnd(String text, int after) {
+        int at = after;
+        while (true) {
+            int semi = text.indexOf(';', at);
+            int line = text.indexOf('\n', at);
+            if (semi >= 0 && (line < 0 || semi < line)) {
+                return semi;
+            }
+            if (line < 0) {
+                return text.length();
+            }
+            // Unfinished? A dot on either side of the break says so.
+            int back = line;
+            while (back > after && isSourceSpace(text.charAt(back - 1))) {
+                back--;
+            }
+            boolean trailingDot = back > after && text.charAt(back - 1) == '.';
+            int forward = skipSpace(text, line + 1);
+            boolean leadingDot = forward < text.length()
+                    && text.charAt(forward) == '.';
+            if (!trailingDot && !leadingDot) {
+                return line;
+            }
+            at = line + 1;
+        }
     }
 
     /**

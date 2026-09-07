@@ -2212,6 +2212,30 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aStreamedExplicitImportShadowsTheWildcard() throws Exception {
+        // PARITY AUDIT: the buffered pass now refuses a simple name that an
+        // explicit import of another package has taken, and the streamed one
+        // has to agree or an oversized file is charged for a component it
+        // never touches.
+        String source = "import com.codename1.location.*;\n"
+                + "import com.acme.widgets.LocationButton;\n"
+                + "class Big { Object f() { return new LocationButton(); } }\n";
+        assertFalse(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "the explicit import owns the simple name, streamed too");
+    }
+
+    @Test
+    void aStreamedLocalTypeShadowsThePackageScope() throws Exception {
+        String source = "package com.codename1.location;\n"
+                + "class Big { static class LocationButton { } "
+                + "Object f() { return new LocationButton(); } }\n";
+        assertFalse(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "a type declared here owns the simple name, streamed too");
+    }
+
+    @Test
     void aStreamedConcatenatedReflectiveNameIsButtonUse() throws Exception {
         // PARITY AUDIT, not a review finding: the buffered pass folds a
         // loader argument across '+', so the streamed one has to as well or a
@@ -2791,6 +2815,57 @@ class LocationButtonManifestFragmentsTest {
                 + "}\n");
         assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
                 "a static import the code uses is use of the button");
+    }
+
+    @Test
+    void anImportBrokenAcrossLinesIsStillOneImport() throws Exception {
+        // Java lets the qualified name be broken at a newline. Ending the
+        // statement there split it in half: neither half is the class, the
+        // simple name below then belonged to no import, and the file read as
+        // not using the button -- so the bridge went from an app that builds
+        // one. A note here called that an over-report, which was backwards.
+        File root = tempDir("cn1-lb-multiline-import");
+        writeSource(new File(root, "com/example/Broken.java"),
+                "package com.example;\n"
+                + "import com.codename1.location.\n"
+                + "        LocationButton;\n"
+                + "public class Broken {\n"
+                + "  Object f() { return new LocationButton(); }\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "a broken qualified name is still the class name");
+    }
+
+    @Test
+    void aTypeParameterOfThatNameShadowsTheWildcard() throws Exception {
+        // class Box<LocationButton> binds the name to the parameter for the
+        // whole body, so the field is the parameter and not this component.
+        File root = tempDir("cn1-lb-typeparam");
+        writeSource(new File(root, "com/example/Box.java"),
+                "package com.example;\n"
+                + "import com.codename1.location.*;\n"
+                + "public class Box<LocationButton> {\n"
+                + "  LocationButton value;\n"
+                + "}\n");
+        assertFalse(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "a type parameter owns the name inside its own type");
+    }
+
+    @Test
+    void holdingTheButtonInACollectionIsStillUse() throws Exception {
+        // And a parameter LIST is not any pair of angle brackets:
+        // List<LocationButton> is a use of the class, and reading it as a
+        // shadow would lose every file that holds the button in a collection.
+        File root = tempDir("cn1-lb-collection");
+        writeSource(new File(root, "com/example/Holder.java"),
+                "package com.example;\n"
+                + "import com.codename1.location.*;\n"
+                + "import java.util.List;\n"
+                + "public class Holder {\n"
+                + "  List<LocationButton> all;\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "holding one in a collection is using it");
     }
 
     @Test
