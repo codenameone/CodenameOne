@@ -135,6 +135,15 @@ public final class HttpServer {
         }
 
         /**
+         * DIAGNOSTIC: the connection's Response exactly as the last request left
+         * it, or null the first time. Separates the allocation pooling saves from
+         * the field writes it adds -- see the bench demo's RESPONSE_MODE.
+         */
+        public Response presetResponse() {
+            return conn == null ? null : conn.pooledResponse;
+        }
+
+        /**
          * Re-points this Request at a freshly parsed request. Every field is
          * assigned, with no "unchanged" case: a field left behind describes the
          * PREVIOUS request on this connection, and headers is the one that would
@@ -614,6 +623,32 @@ public final class HttpServer {
             new java.util.concurrent.atomic.AtomicInteger();
     private final java.util.concurrent.atomic.AtomicInteger activeRequests =
             new java.util.concurrent.atomic.AtomicInteger();
+    /**
+     * Requests answered, striped one slot per host thread.
+     *
+     * A profile put AtomicLong.incrementAndGet among the hottest symbols in this
+     * server: requestsServed was one CONTENDED atomic per request, and with the
+     * host threads pinned to two cores every increment moved a cache line between
+     * them. Each slot here has a single writer -- the host thread that owns the
+     * connection -- so the increment is a plain add, and the health endpoint sums
+     * the stripes. Slots are 8 longs apart so two hosts never share a cache line,
+     * which is the whole point of striping and easy to leave out by accident.
+     *
+     * Kept alongside requestsServed rather than replacing it: the reactor mode has
+     * no hosts to stripe by, and still uses the atomic.
+     */
+    private static final int SERVED_STRIPE_STRIDE = 8;
+    private long[] servedStripes = new long[0];
+
+    private long servedTotal() {
+        long total = requestsServed.get();
+        long[] st = servedStripes;
+        for(int i = 0 ; i < st.length ; i += SERVED_STRIPE_STRIDE) {
+            total += st[i];
+        }
+        return total;
+    }
+
     private final java.util.concurrent.atomic.AtomicLong requestsServed =
             new java.util.concurrent.atomic.AtomicLong();
     private final java.util.concurrent.atomic.AtomicLong connectionsAccepted =
@@ -754,6 +789,8 @@ public final class HttpServer {
                 hostCount = 1;
             }
             server.vtHosts = new VtHost[hostCount];
+            // One cache line per host, so the stripes never share one.
+            server.servedStripes = new long[hostCount * SERVED_STRIPE_STRIDE];
             for(int iter = 0 ; iter < hostCount ; iter++) {
                 server.vtHosts[iter] = new VtHost(iter == 0 ? reactor : Reactor.create());
             }
@@ -803,7 +840,7 @@ public final class HttpServer {
         out.put("uptimeSeconds", new Long((System.currentTimeMillis() - startedAt) / 1000L));
         out.put("openConnections", new Integer(openConnections.get()));
         out.put("activeRequests", new Integer(activeRequests.get()));
-        out.put("requestsServed", new Long(requestsServed.get()));
+        out.put("requestsServed", new Long(servedTotal()));
         out.put("connectionsAccepted", new Long(connectionsAccepted.get()));
         out.put("connectionsRefused", new Long(connectionsRefused.get()));
         out.put("tls", tls == null ? "off" : "on");
@@ -1773,6 +1810,16 @@ public final class HttpServer {
         Response pooledResponse;
 
         /**
+         * Requests answered on this connection since the last fold into the
+         * server's striped counter. Plain: one virtual thread owns a connection
+         * for its whole life, so this field has a single writer.
+         */
+        long servedPending;
+
+        /** Index into servedStripes for the host that owns this connection, or -1. */
+        int stripe = -1;
+
+        /**
          * The one Request served on this connection, re-pointed per request rather
          * than reallocated. Response and Request were the whole of what /plaintext
          * still allocated once the borrowed-buffer copy went: 88 and 80 bytes, one
@@ -1958,6 +2005,14 @@ public final class HttpServer {
         }
 
         Conn conn = new Conn(fd, session);
+        // Which stripe this connection's requests count into. Resolved once here
+        // rather than per request: the owner cannot change for a live descriptor.
+        if(VIRTUAL_THREADS && fd >= 0 && fd < vtOwnerByFd.length && servedStripes.length > 0) {
+            int host = vtOwnerByFd[fd];
+            if(host >= 0 && host * SERVED_STRIPE_STRIDE < servedStripes.length) {
+                conn.stripe = host * SERVED_STRIPE_STRIDE;
+            }
+        }
         byte[] scratch = new byte[8192];
         int served = 0;
 
@@ -2030,7 +2085,11 @@ public final class HttpServer {
             }
             try {
                 writeResponse(conn, fd, session, response, keepAlive, headOnly);
-                requestsServed.incrementAndGet();
+                if(conn.stripe >= 0) {
+                    servedStripes[conn.stripe]++;      // single writer: this host
+                } else {
+                    requestsServed.incrementAndGet();  // reactor mode, no stripes
+                }
             } catch (Exception err) {
                 trace("fd=" + fd + " write failed: " + err);
                 drop(fd);

@@ -49,7 +49,7 @@ import com.codename1.backend.Signals;
  */
 public class Bench {
     private static final byte[] PLAINTEXT = bytes("Hello, World!");
-    private static final boolean POOL_RESPONSE = envInt("BENCH_REUSE_RESPONSE", 1) != 0;
+    private static final int RESPONSE_MODE = envInt("BENCH_REUSE_RESPONSE", 1);
 
     /**
      * 0 = build a LinkedHashMap per request (what a hand-written handler does),
@@ -129,7 +129,22 @@ public class Bench {
                     // No per-request Response: the connection's own is re-pointed.
                     // BENCH_REUSE_RESPONSE=0 restores the allocating path, which is
                     // what the comparison measures against.
-                    if(POOL_RESPONSE) {
+                    // 0 = allocate per request
+                    // 1 = pooled, re-pointed via respond() (nine field writes)
+                    // 2 = pooled but PRE-SET, returned untouched
+                    //
+                    // Mode 2 exists to separate two things mode 1 conflates: the
+                    // saved allocation, and the cost of writing the fields into a
+                    // connection-cold object instead of a bump-allocated one that
+                    // is still warm in cache. Only valid because this route always
+                    // answers with the same status, type and body.
+                    if(RESPONSE_MODE == 2) {
+                        HttpServer.Response r = request.presetResponse();
+                        if(r != null) {
+                            return r;
+                        }
+                    }
+                    if(RESPONSE_MODE == 1) {
                         return request.respond(200, "text/plain", PLAINTEXT);
                     }
                     return new HttpServer.Response(200, "text/plain", PLAINTEXT);
