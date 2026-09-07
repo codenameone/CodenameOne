@@ -51,8 +51,11 @@ promise, and they differ in how they treat a failure:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PromisesJava003Snippet.java[tag=promises-java-003,indent=0]
 ----
 
-`all` rejects the moment any input rejects, with that first error, so it fits
-work where one failure makes the rest pointless. `allSettled` waits for every
+`all` rejects as soon as any input rejects, so it fits work where one failure
+makes the rest pointless. Don't depend on which error you get when several
+inputs fail: a rejection overwrites the aggregate's stored error whatever state
+it's already in, so the one delivered is the last processed rather than the
+first. `allSettled` waits for every
 input whatever happens to each, which fits independent tasks you want a full
 report on.
 
