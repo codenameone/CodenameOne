@@ -217,13 +217,19 @@ public abstract class LocationManager {
         //
         // getCurrentLocation is not the cheap accessor its name suggests. On
         // Android with Play Services it reaches getLastKnownLocation, which
-        // spins `while (!client.isConnected()) sleep(300)` with no bound at
-        // all -- so reading the baseline on the EDT, which is where this is
-        // called from, freezes the whole application for as long as that
-        // client takes to connect, and the caller's timeout cannot be applied
-        // to a wait that has not started yet. It also THROWS when there is no
-        // cached fix, and taking that as the answer reported null to a caller
-        // whose next update was moments away.
+        // waits for the Google API client to connect -- so reading the
+        // baseline on the EDT, which is where this is called from, freezes the
+        // whole application for as long as that takes, and the caller's
+        // timeout cannot be applied to a wait that has not started yet. It
+        // also THROWS when there is no cached fix, and taking that as the
+        // answer reported null to a caller whose next update was moments away.
+        //
+        // That port wait used to be unbounded, which put a ceiling on what
+        // this loop could promise: the deadline governs the POLLING, and
+        // nothing in core can interrupt a port that sleeps. It is bounded at
+        // the source now -- see AndroidLocationPlayServiceManager
+        // .getLastKnownLocation -- so a client that never connects ends as no
+        // fix rather than as a tap that is never answered.
         Display.getInstance().invokeAndBlock(new Runnable() {
             @Override
             public void run() {
