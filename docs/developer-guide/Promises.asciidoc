@@ -1,0 +1,71 @@
+== Promises
+
+`com.codename1.util.promise.Promise` is an implementation of the JavaScript
+promise for Codename One. It exists to compose asynchronous work without
+nesting a callback inside a callback inside a callback: each step is a value you
+can hand around, chain onto and combine with others.
+
+Two method names differ from the JavaScript originals, because `catch` and
+`finally` are Java keywords. `except` takes the place of `catch`, and `always` takes the place of
+`finally`.
+
+=== Creating and consuming one
+
+The constructor takes an `ExecutorFunction`, which receives the two functions
+that settle the promise. It runs immediately, on the calling thread:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PromisesJava001Snippet.java[tag=promises-java-001,indent=0]
+----
+
+Resolution is marshalled for you. `resolve` and `reject` check whether they're
+on the EDT and hand themselves to `callSerially` when they aren't, so the
+callbacks you attach always run on the EDT and can touch the UI directly. That
+is worth contrasting with `EasyThread`, whose result callback stays on the
+worker thread.
+
+=== Chaining
+
+There are two families of callback and the difference is what they return.
+`then`, `except` and `always` take a `Functor`, whose return value becomes the
+input of the next step -- that's what makes a chain a pipeline. `onSuccess`,
+`onFail` and `onComplete` take a `SuccessCallback` instead, which returns
+nothing, so they suit the end of a chain where there is no value to pass on:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PromisesJava002Snippet.java[tag=promises-java-002,indent=0]
+----
+
+`getState()` reports `Pending`, `Fulfilled` or `Rejected`, and `getValue()`
+returns the resolved value once there is one.
+
+=== Combining several
+
+`all` and `allSettled` both take a varargs list of promises and return one
+promise, and they differ in how they treat a failure:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PromisesJava003Snippet.java[tag=promises-java-003,indent=0]
+----
+
+`all` rejects the moment any input rejects, with that first error, so it fits
+work where one failure makes the rest pointless. `allSettled` waits for every
+input whatever happens to each, which fits independent tasks you want a full
+report on.
+
+=== Working with AsyncResource
+
+Much of the framework returns `AsyncResource` rather than a promise, and the
+conversion goes both ways:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PromisesJava004Snippet.java[tag=promises-java-004,indent=0]
+----
+
+`await()` is the blocking form. It waits through `invokeAndBlock`, so calling it
+on the EDT doesn't freeze the UI, and it throws
+`AsyncResource.AsyncExecutionException` when the promise rejected.
