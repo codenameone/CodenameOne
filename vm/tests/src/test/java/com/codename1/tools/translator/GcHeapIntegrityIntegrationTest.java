@@ -152,8 +152,8 @@ class GcHeapIntegrityIntegrationTest {
                 "-DCMAKE_BUILD_TYPE=Release",
                 "-DCMAKE_C_COMPILER=clang",
                 "-DCMAKE_OBJC_COMPILER=clang",
-                "-DCMAKE_C_FLAGS=-DCN1_GC_VERIFY",
-                "-DCMAKE_OBJC_FLAGS=-DCN1_GC_VERIFY"
+                CompilerHelper.cFlagsArg("-DCN1_GC_VERIFY"),
+                CompilerHelper.objcFlagsArg("-DCN1_GC_VERIFY")
         ), distDir);
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
@@ -346,4 +346,6 @@ class GcHeapIntegrityIntegrationTest {
                     + root + " (first failure: " + firstFailure[0] + ")");
         }
     }
+
+
 }

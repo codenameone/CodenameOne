@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codename1.tools.translator;
 
 import java.io.ByteArrayOutputStream;
@@ -159,13 +182,77 @@ public class CompilerHelper {
      * {@code LANGUAGES C CXX} project (its COM layer is C++), so cmake needs a
      * CXX compiler even when the particular app contributes no .cpp itself.
      */
-    public static List<String> cmakeToolchainArgs() {
-        if (isWindows()) {
-            return Arrays.asList("-G", "Ninja",
-                    "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl");
+    /**
+     * Extra C flags for the generated project, from {@code CN1_TEST_EXTRA_CFLAGS}.
+     *
+     * Padded on BOTH sides. CMAKE_C_FLAGS is a command-line fragment whose options
+     * must be space separated, and a caller appending its own flag to this would
+     * otherwise produce {@code -DCN1_GC_MARK_THREADS=4-DCN1_GC_NO_FORCE_STOP} --
+     * one undeclared macro instead of two, which clang accepts and which silently
+     * builds the wrong thing.
+     *
+     * Empty unless the variable is set, so every build is byte-identical to before
+     * by default.
+     */
+    public static String extraCFlags() {
+        String v = System.getenv("CN1_TEST_EXTRA_CFLAGS");
+        if (v == null || v.trim().isEmpty()) {
+            return "";
         }
-        return Arrays.asList("-DCMAKE_C_COMPILER=clang", "-DCMAKE_CXX_COMPILER=clang++",
-                "-DCMAKE_OBJC_COMPILER=clang");
+        return " " + v.trim() + " ";
+    }
+
+    /** {@code -DCMAKE_C_FLAGS=} with the test's own flags and the injected ones merged. */
+    public static String cFlagsArg(String own) {
+        return "-DCMAKE_C_FLAGS=" + (own == null ? "" : own) + extraCFlags();
+    }
+
+    /** {@code -DCMAKE_OBJC_FLAGS=} with the test's own flags and the injected ones merged. */
+    public static String objcFlagsArg(String own) {
+        return "-DCMAKE_OBJC_FLAGS=" + (own == null ? "" : own) + extraCFlags();
+    }
+
+    /**
+     * The injected flags as cmake arguments, empty when nothing is injected.
+     *
+     * Several GC tests build their cmake command inline with hardcoded compilers
+     * rather than going through cmakeToolchainArgs, so the hook has to be
+     * available in list form for them too. Only two of the six tests in the
+     * parallel-mark matrix call cmakeToolchainArgs; adding it there alone left
+     * three still compiling the default collector, which an invalid-flag probe
+     * caught (the build should have failed and did not).
+     */
+    public static List<String> extraCFlagArgs() {
+        if (extraCFlags().isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return Arrays.asList(cFlagsArg(""), objcFlagsArg(""));
+    }
+
+    /**
+     * Toolchain arguments every integration test passes.
+     *
+     * The injected flags are added HERE rather than per test, because most GC tests
+     * pass no CMAKE_C_FLAGS of their own: hooking only the ones that do left four of
+     * the six tests in the parallel-mark matrix compiling the default single-marker
+     * collector, so a green matrix would not have validated what it claimed.
+     * A test that passes its own flags must use cFlagsArg/objcFlagsArg, since a
+     * later -DCMAKE_C_FLAGS on the command line overrides this one.
+     */
+    public static List<String> cmakeToolchainArgs() {
+        List<String> args = new ArrayList<>();
+        if (isWindows()) {
+            args.addAll(Arrays.asList("-G", "Ninja",
+                    "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"));
+        } else {
+            args.addAll(Arrays.asList("-DCMAKE_C_COMPILER=clang", "-DCMAKE_CXX_COMPILER=clang++",
+                    "-DCMAKE_OBJC_COMPILER=clang"));
+        }
+        if (!extraCFlags().isEmpty()) {
+            args.add(cFlagsArg(""));
+            args.add(objcFlagsArg(""));
+        }
+        return args;
     }
 
     public static List<CompilerConfig> getAvailableCompilers(String targetVersion) {
