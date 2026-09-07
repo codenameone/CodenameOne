@@ -2483,7 +2483,39 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
     // Marking is the conservative direction: the referent survives one more cycle, the
     // reference is rediscovered next time, and by then the list has usually grown.
     if(!recorded) {
-        gcMarkObject(threadStateData, __atomic_load_n(referentField, __ATOMIC_RELAXED), force);
+        // THE EMERGENCY MUST NOT BE DEFEATED BY THE FALLBACK. Marking unconditionally here
+        // is right for a weak reference and wrong for a soft one at the exact moment it
+        // matters: the emergency budget is raised by an allocation FAILURE, and an
+        // allocation failure is also the most likely reason the list could not grow. So
+        // the two mechanisms met and the conservative one won -- soft referents past the
+        // list's capacity were marked and kept, the collection freed nothing, and
+        // codenameOneGcMalloc's retry loop had nothing to make progress against.
+        //
+        // A soft reference the emergency has condemned needs no list: the decision is
+        // already final, so the field can be cleared here and now, which is exactly the
+        // allocation-free path this situation calls for. It is safe for the same reason
+        // the ordinary clear is -- a get() that already loaded the referent enqueued it
+        // through the armed barrier and keeps it alive for this cycle, and a get() after
+        // this store reads null.
+        //
+        // Everything else still takes the conservative branch: weak references, and
+        // anything read since the last ageing, where a mutator may be holding the referent
+        // in a local the collector has walked past. That leaves the possibility of two
+        // aliases of one soft referent disagreeing when only some were recorded -- accepted
+        // deliberately, because it is confined to soft references, which are caches by
+        // definition, and the alternative is an allocator that cannot make progress. The
+        // lifetime-oracle callers use weak references, which take the marking branch.
+        JAVA_OBJECT r = __atomic_load_n(referentField, __ATOMIC_RELAXED);
+        if(strength == CN1_REF_SOFT
+           && atomic_load_explicit(&cn1SoftRetainCycles, memory_order_relaxed) < 0
+           && __atomic_load_n(touchAgeField, __ATOMIC_RELAXED) != CN1_REF_TOUCHED) {
+            __atomic_store_n(referentField, JAVA_NULL, __ATOMIC_RELAXED);
+#ifdef CN1_GC_CONFORM
+            atomic_fetch_add_explicit(&cn1RefCleared, 1, memory_order_relaxed);
+#endif
+        } else {
+            gcMarkObject(threadStateData, r, force);
+        }
         return;
     }
 #ifdef CN1_GC_CONFORM
