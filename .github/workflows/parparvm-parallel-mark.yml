@@ -123,6 +123,29 @@ jobs:
       - name: GC suite
         env:
           CN1_TEST_EXTRA_CFLAGS: ${{ matrix.cflags }}
+          # Page-release tracing, for BibopPageFloorIntegrationTest.
+          #
+          # That test fails here intermittently -- twice in six runs at the time
+          # of writing, on the 1-marker arm once and the 4-marker arm once, on
+          # arm64 only and never on x64 -- and the failure is bimodal rather than
+          # marginal: 6-7% of the dropped live set's pages handed back on a bad
+          # run against 91% on a good one. Bimodal is a major sweep happening or
+          # not happening, because cn1BibopTrimFreePool runs only at the end of
+          # one, so the question the next failure has to answer is whether any
+          # major sweep ran after the live set was dropped and how many pages it
+          # spliced. [MAJOR-SWEEP] and [PAGE-RELEASE] say exactly that.
+          #
+          # Two reasons this is safe to leave on. The tracer is read-only: it is
+          # gated behind getenv and only prints, so no collection decision
+          # changes. And it writes to STDERR, which runVm deliberately routes to
+          # the console rather than merging into stdout -- a merged tracer line
+          # can land in the middle of a phase marker and silently drop a row from
+          # the table the assertions read, which is a failure mode that file
+          # already carries a comment about. The parsed output is untouched.
+          #
+          # Costs one line per major sweep, which is cadence-limited, not one per
+          # page. Remove it once the flake is understood.
+          CN1_LOG_PAGE_RELEASE: 1
         run: |
           mvn -B test -pl tests -am \
             -Dsurefire.failIfNoSpecifiedTests=false \
