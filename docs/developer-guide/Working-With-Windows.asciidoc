@@ -84,7 +84,7 @@ above. Trigger it like any other cloud target:
 include::../demos/common/src/main/snippets/developer-guide/working-with-windows.sh[tag=working-with-windows-bash-001,indent=0]
 ----
 
-The convenience goal `mvn -pl common cn1:buildWin32` does the same thing. A regular
+The convenience goal `mvn cn1:buildWin32`, run from the project root, does the same thing. A regular
 (release) build returns **two** binaries -- x64 and arm64, both stripped release exes. Setting the
 `windows.debug` build hint instead returns a **single** x64 exe with symbols, for
 diagnosis. (To build locally on a Windows box, use

@@ -106,6 +106,12 @@ class TvNativeBuilder {
             // ARKit is iOS-only; it is linked on the iOS slice when the app references
             // com.codename1.ar, so weak-link it for the tvOS slice.
             + "ARKit.framework;"
+            // Neither Contacts nor ContactsUI exists on tvOS -- measured against AppleTVOS26.2,
+            // where neither .framework directory is present -- and the iOS slice links both when
+            // the app references com.codename1.contacts.ContactPicker. IOSNative.m compiles the
+            // picker out for the TV slice (CN1_USE_CONTACT_PICKER is only honoured under
+            // TARGET_OS_IOS), so nothing there calls into either one.
+            + "Contacts.framework;ContactsUI.framework;"
             // HealthKit does not exist on tvOS at all. The iOS slice links it when the app
             // references com.codename1.health, so weak-link it here or the tvOS slice fails
             // to link. CN1Health.m additionally compiles itself out via TARGET_OS_TV.

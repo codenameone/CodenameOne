@@ -722,3 +722,24 @@ dp
 # One of the SMS services an application's own server might send the code
 # through, named alongside Twilio and AWS SNS.
 Vonage
+
+# -----------------------------------------------------------------------------
+# ComponentSelector (component-selector.asciidoc).
+# -----------------------------------------------------------------------------
+# The author of jQuery, named where the chapter explains where the API's ideas
+# came from.
+Resig
+# A method that changes an object's state, as opposed to an accessor. Standard
+# API-design vocabulary, and the word the chapter needs when it contrasts the
+# two.
+mutator
+
+# -----------------------------------------------------------------------------
+# Vector and animation images (SVG-Transcoder.asciidoc).
+# -----------------------------------------------------------------------------
+# The After Effects plugin whose JSON export the Lottie format is defined by;
+# the transcoder reads files it produces.
+Bodymovin
+# A point in an animation where a property's value is pinned, with the values in
+# between interpolated. The universal term across every animation toolchain.
+keyframes?

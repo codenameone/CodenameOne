@@ -23,6 +23,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 Or annotate a static factory method:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DeepLinksRoutingJava002Snippet.java[tag=deep-links-routing-java-002,indent=0]
+----
 
 Both forms are supported and a project can mix them. Path variables in
 the pattern (`:id`, `*`, `**`) are matched by name against parameters
@@ -134,6 +138,10 @@ the simulator's URL-injection helper.
 Independent of deep linking, individual forms can intercept back / pop
 attempts so they can confirm before discarding unsaved work:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DeepLinksRoutingJava005Snippet.java[tag=deep-links-routing-java-005,indent=0]
+----
 
 The guard fires for the toolbar back button, the Android hardware back
 key, the iOS edge-swipe gesture, and any programmatic back navigation.

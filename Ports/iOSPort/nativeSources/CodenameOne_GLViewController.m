@@ -43,6 +43,7 @@
 #import "METALView.h"
 #import "CN1Metalcompat.h"
 #endif
+#import "CN1DragAndDrop.h"
 #import "ExecutableOp.h"
 #import "FillRect.h"
 #import "ClipRect.h"
@@ -762,6 +763,43 @@ int cn1MapUIKeyToKeyCode(UIKey *key) API_AVAILABLE(ios(13.4)) {
 #endif
 #endif
 
+/* Identity of the physical control behind a press, deliberately NOT its CN1
+ * keycode. cn1MapUIKeyToKeyCode is many-to-one -- Return and keypad Enter both
+ * become CN1_IOS_KEY_ENTER, and a keypad digit produces the same codepoint as
+ * its top-row twin -- so ownership keyed by the CN1 code cannot tell two such
+ * presses apart, and one key's release would be handed to the other key's
+ * owner. The HID usage is per physical key.
+ *
+ * The three sources are namespaced so they can share one set without ever
+ * colliding: a HID usage, a tvOS remote button (which carries no UIKey at all),
+ * and, only when neither exists, the mapped CN1 code -- tracked imprecisely
+ * beats untracked, an untracked press being the stuck repeat timer this whole
+ * mechanism exists to prevent. Every value involved is far below the namespace
+ * stride.
+ *
+ * Not static: the Mac Catalyst window controller keys its own ownership set the
+ * same way, and two copies of this rule would drift. */
+#if !TARGET_OS_WATCH
+#if !TARGET_OS_OSX
+#define CN1_PRESS_ID_HID_KEY        0x1000000LL
+#define CN1_PRESS_ID_REMOTE_BUTTON  0x2000000LL
+#define CN1_PRESS_ID_MAPPED_CODE    0x3000000LL
+
+long long cn1PressIdentity(UIPress *press, int code) API_AVAILABLE(ios(13.4)) {
+    UIKey *key = press.key;
+    if (key != nil && key.keyCode != 0) {
+        return CN1_PRESS_ID_HID_KEY + (long long) key.keyCode;
+    }
+#if TARGET_OS_TV
+    if (key == nil) {
+        return CN1_PRESS_ID_REMOTE_BUTTON + (long long) press.type;
+    }
+#endif
+    return CN1_PRESS_ID_MAPPED_CODE + (long long) code;
+}
+#endif
+#endif
+
 void pointerPressedC(int* x, int* y, int length) {
     //CN1Log(@"pointerPressedC started");
     pointerPressed(x, y, length);
@@ -1476,89 +1514,115 @@ BOOL isIOS7() {
 }
 
 
+/// Frees the premultiplied buffer handed to CGImageCreate once CoreGraphics is
+/// finished with it. Must be a C function pointer, so it lives at file scope.
+static void cn1ArgbImageFreeData(void * __unused info, const void *data, size_t __unused size) {
+    free((void *)data);
+}
+
 void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
 (int* buffer, int width, int height) {
-    size_t bufferLength = width * height * 4;
-    size_t bitsPerComponent = 8;
-    size_t bitsPerPixel = 32;
-    size_t bytesPerRow = 4 * width;
-    
-    
-    CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, buffer, bufferLength, NULL);
-    
+    size_t bufferLength = (size_t)width * (size_t)height * 4;
+    size_t bytesPerRow = 4 * (size_t)width;
+
     CGColorSpaceRef colorSpaceRef = CGColorSpaceCreateDeviceRGB();
-    
     if(colorSpaceRef == NULL) {
         CN1Log(@"Error allocating color space");
-        CGDataProviderRelease(provider);
         return nil;
     }
-    
-    CGBitmapInfo bitmapInfo = kCGBitmapByteOrder32Little | kCGImageAlphaFirst;
-    CGColorRenderingIntent renderingIntent = kCGRenderingIntentDefault;
-    
-    CGImageRef iref = CGImageCreate(width,
-                                    height,
-                                    bitsPerComponent,
-                                    bitsPerPixel,
-                                    bytesPerRow,
-                                    colorSpaceRef,
-                                    bitmapInfo,
-                                    provider,	// data provider
-                                    NULL,	// decode
-                                    NO,	// should interpolate
-                                    renderingIntent);
-    
-    uint32_t* pixels = (uint32_t*)malloc(bufferLength);
-    
+
+    // PREMULTIPLY IN ONE PASS. Codename One hands over straight (un-premultiplied)
+    // ARGB and CoreGraphics wants it premultiplied, and the way that conversion
+    // used to happen was: wrap the caller's array in a CGImage, malloc a second
+    // full-size buffer, memset it, wrap THAT in a bitmap context, draw the first
+    // image into the second through the whole CoreGraphics pixel pipeline, then
+    // make a third CGImage out of the result. All of it to multiply three bytes
+    // by a fourth. Image.createImage(int[], w, h) is on the start-up path -- it
+    // is how the runtime rounds the corners of every card image -- so this ran
+    // once per picture during the first frame.
+    uint32_t *pixels = (uint32_t *)malloc(bufferLength);
     if(pixels == NULL) {
         CN1Log(@"Error: Memory not allocated for bitmap");
-        CGDataProviderRelease(provider);
         CGColorSpaceRelease(colorSpaceRef);
-        CGImageRelease(iref);
         return nil;
     }
-    memset(pixels, 0, bufferLength);
-    
-    CGContextRef context = CGBitmapContextCreate(pixels,
-                                                 width,
-                                                 height,
-                                                 bitsPerComponent,
-                                                 bytesPerRow,
-                                                 colorSpaceRef,
-                                                 kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
-    
-    if(context == NULL) {
-        CN1Log(@"Error context not created");
-        free(pixels);
-        return NULL;
+    const uint32_t *src = (const uint32_t *)buffer;
+    size_t count = (size_t)width * (size_t)height;
+    for(size_t i = 0 ; i < count ; i++) {
+        uint32_t p = src[i];
+        uint32_t a = (p >> 24) & 0xff;
+        if(a == 0xff) {
+            pixels[i] = p;
+            continue;
+        }
+        if(a == 0) {
+            pixels[i] = 0;
+            continue;
+        }
+        uint32_t r = (p >> 16) & 0xff;
+        uint32_t g = (p >> 8) & 0xff;
+        uint32_t b = p & 0xff;
+        // Rounded, not truncated: CoreGraphics rounds, and a truncating
+        // premultiply drifts one level darker on every semi-transparent pixel.
+        r = (r * a + 127) / 255;
+        g = (g * a + 127) / 255;
+        b = (b * a + 127) / 255;
+        pixels[i] = (a << 24) | (r << 16) | (g << 8) | b;
     }
-    
+
+    CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, pixels, bufferLength,
+                                                              cn1ArgbImageFreeData);
+    if(provider == NULL) {
+        free(pixels);
+        CGColorSpaceRelease(colorSpaceRef);
+        return nil;
+    }
+
+    CGImageRef imageRef = CGImageCreate(width,
+                                        height,
+                                        8,
+                                        32,
+                                        bytesPerRow,
+                                        colorSpaceRef,
+                                        kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst,
+                                        provider,
+                                        NULL,
+                                        // shouldInterpolate: YES, matching what
+                                        // this used to produce. The path this
+                                        // replaced ended in
+                                        // CGBitmapContextCreateImage, and an
+                                        // image from a bitmap context carries
+                                        // shouldInterpolate YES; building it
+                                        // directly defaults to whatever is
+                                        // passed here, and NO turns every scaled
+                                        // draw of an ARGB-built image into
+                                        // nearest-neighbour sampling.
+                                        //
+                                        // Invisible at 1:1, which is why it
+                                        // survived: it only shows when the image
+                                        // is drawn at a size other than its own,
+                                        // and then it shows as the whole picture
+                                        // -- a smooth gradient turns blocky.
+                                        YES,
+                                        kCGRenderingIntentDefault);
+
     CN1Image *image = nil;
-    if(context) {
-        
-        CGContextDrawImage(context, CGRectMake(0.0f, 0.0f, width, height), iref);
-        
-        CGImageRef imageRef = CGBitmapContextCreateImage(context);
-        
+    if(imageRef != NULL) {
 #if TARGET_OS_OSX
         image = CN1AppleImageWithCGImage(imageRef);
 #else
         image = [CN1Image imageWithCGImage:imageRef];
 #endif
-        
         CGImageRelease(imageRef);
-        CGContextRelease(context);
     }
-    
+
     CGColorSpaceRelease(colorSpaceRef);
-    CGImageRelease(iref);
+    // The provider owns `pixels` now and frees it through the callback.
     CGDataProviderRelease(provider);
-    
-    if(pixels) {
-        free(pixels);
+
+    if(image == nil) {
+        return nil;
     }
-    
     return (BRIDGE_CAST void*) [[GLUIImage alloc] initWithImage:image];
 }
 
@@ -2935,6 +2999,9 @@ void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
     return (BRIDGE_CAST void*)gl;
 }
 
+void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayCGImpl
+(void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
+
 void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 (void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight) {
 #ifdef CN1_USE_METAL
@@ -2982,6 +3049,14 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
         }
     }
 #endif
+    Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayCGImpl(
+        peer, arr, x, y, width, height, imgWidth, imgHeight);
+}
+
+/// The CoreGraphics reader: rasterises the picture into the caller's array. Kept
+/// separate so the Metal fast path above can be checked against it.
+void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayCGImpl
+(void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight) {
     BOOL currentlyDrawing = NO;
     BOOL oldCurrentMutableTransformSet = currentMutableTransformSet;
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {
@@ -3018,6 +3093,53 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 }
 
 
+
+/// Whether this build can round a picture's corners as it draws it. Only the
+/// Metal renderer has the shader; the GL and CoreGraphics paths do not, and the
+/// caller keeps its own fallback for them.
+JAVA_BOOLEAN Java_com_codename1_impl_ios_IOSImplementation_isRoundedImageDrawSupportedImpl(void) {
+#if defined(CN1_USE_METAL) && !TARGET_OS_WATCH
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalImpl
+(void* peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius) {
+#ifdef CN1_USE_METAL
+    if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {
+        Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
+    }
+    DrawImage* f = [[DrawImage alloc] initWithArgs:alpha xpos:x ypos:y i:(BRIDGE_CAST GLUIImage*)peer w:width h:height];
+    [f setRenderingHints:renderingHints];
+    [f setCornerRadius:cornerRadius];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+#else
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl(peer, alpha, x, y, width, height, renderingHints);
+#endif
+}
+
+void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedMutableImpl
+(void* peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius) {
+#ifdef CN1_USE_METAL
+    GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+    if (target == nil) return;
+    DrawImage *f = [[DrawImage alloc] initWithArgs:alpha xpos:x ypos:y i:(BRIDGE_CAST GLUIImage*)peer w:width h:height];
+    [f setRenderingHints:renderingHints];
+    [f setCornerRadius:cornerRadius];
+    [f setTarget:target];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+#else
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl(peer, alpha, x, y, width, height, renderingHints);
+#endif
+}
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl
 (void* peer, int alpha, int x, int y, int width, int height, int renderingHints) {
@@ -3262,6 +3384,8 @@ static CodenameOne_GLViewController *sharedSingleton;
     [self cn1InstallHoverRecognizer];
     [self cn1InstallScrollRecognizer];
     [self cn1InstallPinchRecognizer];
+    // Native drag and drop, both directions. Inert where the platform has no drag interaction.
+    CN1InstallDragAndDrop(self.view);
     [self cn1InstallRotationRecognizer];
     //replaceViewDidLoad
     [self initGoogleConnect];
@@ -3283,6 +3407,8 @@ static CodenameOne_GLViewController *sharedSingleton;
     [self cn1InstallHoverRecognizer];
     [self cn1InstallScrollRecognizer];
     [self cn1InstallPinchRecognizer];
+    // Native drag and drop, both directions. Inert where the platform has no drag interaction.
+    CN1InstallDragAndDrop(self.view);
     [self cn1InstallRotationRecognizer];
     //replaceViewDidLoad
     [self initGoogleConnect];
@@ -3577,10 +3703,77 @@ bool lockDrawing;
 }
 #endif
 
+// Key codes this controller handed to the framework from pressesBegan:. A press
+// the framework owns has to be completed with the framework whatever the editor
+// does in between -- Display.keyPressedImpl arms the key-repeat and long-press
+// timers and only keyReleased cancels them, so a release diverted to UIKit
+// instead would leave CN1 repeating a key the user has already let go of. The
+// converse pairs up too: a press that went to UIKit while an editor was open
+// has its release forwarded there even if the editor closed meanwhile.
+//
+// Keyed by cn1PressIdentity, the physical control rather than the CN1 code the
+// framework was handed, so two keys that share a code cannot take each other's
+// entry. The same physical key cannot be down twice, so the identity is
+// unambiguous. Main thread only, like every other UIKit callback in this file,
+// so it needs no synchronization.
+//
+// A press whose terminal phase never arrives (the app suspended mid-key) leaves
+// its code behind. The cost is one later release of that same key routed to the
+// framework instead of UIKit; the repeat-timer wedge this prevents is the
+// larger failure, and before this the release was misrouted unconditionally.
+#if !TARGET_OS_OSX
+static NSMutableSet *cn1FrameworkOwnedPresses = nil;
+
+static void cn1NoteFrameworkOwnsPress(long long identity) {
+    if (cn1FrameworkOwnedPresses == nil) {
+        cn1FrameworkOwnedPresses = [[NSMutableSet alloc] init];
+    }
+    [cn1FrameworkOwnedPresses addObject:[NSNumber numberWithLongLong:identity]];
+}
+
+/* YES exactly once per recorded press, so the release reaches the framework and
+ * nothing is left armed for the next press of the same key. */
+static BOOL cn1TakeFrameworkOwnedPress(long long identity) {
+    NSNumber *boxed = [NSNumber numberWithLongLong:identity];
+    if (![cn1FrameworkOwnedPresses containsObject:boxed]) {
+        return NO;
+    }
+    [cn1FrameworkOwnedPresses removeObject:boxed];
+    return YES;
+}
+#endif
+
 // Hardware keyboard support (BT keyboard on iPad/iPhone, Magic Keyboard,
 // Mac Catalyst host keyboard, hardware keyboard in the iOS simulator via
 // Cmd-Shift-K). UIKey arrived in iOS 13.4 -- on older versions the
 // responder chain falls back to the existing UITextField editing path.
+//
+// Whether a press belongs to the framework is decided ONCE, in pressesBegan:,
+// and the end and cancellation follow that decision through
+// cn1TakeFrameworkOwnedKey above rather than re-reading the editor's state.
+//
+// While a native text editor is up (editingComponent != nil) the press is
+// forwarded untouched and never recorded. UIKit inserts typed text at the END
+// of the responder chain, after every responder has declined the press, so
+// consuming one here is what stops it reaching the focused CN1UITextField /
+// CN1UITextView -- and cn1MapUIKeyToKeyCode maps a printable character to its
+// unicode codepoint, which is never zero, so "handled" swallowed every key. A
+// hardware keyboard then typed nothing at all while the on-screen keyboard,
+// which raises no UIPress, kept working: issue #5709.
+//
+// Forwarding rather than returning early is deliberate. [super pressesBegan:]
+// is exactly what an app that does not override this method does, and it is
+// the only way the press reaches UIKit's text-input pipeline; returning here
+// swallows it just as effectively as claiming it did.
+//
+// CN1 key listeners not firing during text editing is the intended outcome:
+// arrow keys and backspace belong to the caret while a field is focused.
+//
+// The test is the port's existing "editing is live" sentinel, the same one
+// CN1TapGestureRecognizer and the touch path below use. Narrowing it to
+// [editingComponent isFirstResponder] would put the swallow back for the
+// window between the editor being created and UIKit granting it focus,
+// which is exactly when the first keystroke of a fast typist arrives.
 // UIKit-only declaration: the type in its signature does not exist on macOS,
 // so the whole declaration is dropped rather than just its body. Guarding
 // only the body would leave a signature naming an unknown type.
@@ -3590,6 +3783,10 @@ bool lockDrawing;
 // renamed one, so this is inert on the native macOS port until it is ported.
 #if TARGET_OS_OSX
 #else
+    if (editingComponent != nil) {
+        [super pressesBegan:presses withEvent:event];
+        return;
+    }
     if (@available(iOS 13.4, *)) {
         BOOL handled = NO;
         NSMutableSet *passthrough = nil;
@@ -3606,6 +3803,7 @@ bool lockDrawing;
             }
             if (code != 0) {
                 keyPressedNative(code);
+                cn1NoteFrameworkOwnsPress(cn1PressIdentity(press, code));
                 handled = YES;
             } else {
                 if (passthrough == nil) {
@@ -3649,7 +3847,7 @@ bool lockDrawing;
             if (code == 0 && key == nil) {
                 continue;
             }
-            if (code != 0) {
+            if (code != 0 && cn1TakeFrameworkOwnedPress(cn1PressIdentity(press, code))) {
                 keyReleasedNative(code);
                 handled = YES;
             } else {
@@ -3692,7 +3890,7 @@ bool lockDrawing;
             if (code == 0 && key == nil) {
                 continue;
             }
-            if (code != 0) {
+            if (code != 0 && cn1TakeFrameworkOwnedPress(cn1PressIdentity(press, code))) {
                 keyReleasedNative(code);
             }
         }

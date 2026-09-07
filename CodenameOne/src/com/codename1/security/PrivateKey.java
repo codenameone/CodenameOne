@@ -22,11 +22,14 @@
  */
 package com.codename1.security;
 
+import com.codename1.util.StringUtil;
+
 /// A private key -- paired with a [PublicKey] to form a key pair. Carries the
 /// algorithm name ("RSA" or "EC") and the encoded key bytes.
 ///
-/// For interop with PEM files (`-----BEGIN PRIVATE KEY-----`) feed the
-/// PKCS#8 DER bytes to [#fromPkcs8].
+/// PEM files (`-----BEGIN PRIVATE KEY-----`) go through [#fromPem], which
+/// strips the armor and decodes the base64 for you; [#fromPkcs8] is the lower
+/// level entry point for callers that already hold the DER bytes.
 public final class PrivateKey extends Key {
 
     PrivateKey(String algorithm, byte[] encoded, String format) {
@@ -42,5 +45,59 @@ public final class PrivateKey extends Key {
     /// Convenience: build an RSA [PrivateKey] from a [#fromPkcs8] PKCS#8 blob.
     public static PrivateKey rsa(byte[] pkcs8Der) {
         return fromPkcs8(PublicKey.RSA, pkcs8Der);
+    }
+
+    /// Parses a PEM-encoded private key, determining the algorithm from the key
+    /// itself:
+    ///
+    /// ```java
+    /// InputStream is = Display.getInstance().getResourceAsStream(MyApp.class, "/private.pem");
+    /// PrivateKey key = PrivateKey.fromPem(Util.readInputStream(is));
+    /// ```
+    ///
+    /// Accepts a `PRIVATE KEY` (PKCS#8) block and also the older
+    /// `RSA PRIVATE KEY` (PKCS#1) and `EC PRIVATE KEY` (SEC1) blocks, which are
+    /// rewrapped as PKCS#8 here -- so a key straight out of `ssh-keygen -m PEM`
+    /// or `openssl ecparam -genkey` works without a conversion step, including
+    /// the `EC PARAMETERS` block that command writes ahead of the key: the
+    /// first block that actually is a private key is the one used. Bare base64
+    /// with no `-----BEGIN-----` armor is accepted too.
+    ///
+    /// A passphrase-encrypted key (`ENCRYPTED PRIVATE KEY`) is rejected with a
+    /// [CryptoException] naming the command that decrypts it; so is a key that
+    /// is neither RSA nor EC.
+    ///
+    /// The bytes behind a private key are sensitive -- do not log the result of
+    /// `getEncoded()`.
+    public static PrivateKey fromPem(String pem) {
+        byte[] der = Pem.toPkcs8(pem);
+        return fromPkcs8(Pem.algorithm(der), der);
+    }
+
+    /// [#fromPem] over the raw bytes of a `.pem` file, so a stream read with
+    /// `Util.readInputStream` can be passed straight in. The bytes are decoded
+    /// as UTF-8.
+    public static PrivateKey fromPem(byte[] pem) {
+        if (pem == null) {
+            throw new CryptoException("pem must not be null");
+        }
+        return fromPem(StringUtil.newString(pem));
+    }
+
+    /// [#fromPem] with the algorithm supplied by the caller rather than read
+    /// from the key. Use this only for a key whose algorithm OID this class
+    /// does not recognize but the platform does.
+    public static PrivateKey fromPem(String algorithm, String pem) {
+        byte[] der = Pem.toPkcs8(pem);
+        Pem.requireAlgorithmIdentifier(der);
+        return fromPkcs8(algorithm, der);
+    }
+
+    /// [#fromPem(String,String)] over the raw bytes of a `.pem` file.
+    public static PrivateKey fromPem(String algorithm, byte[] pem) {
+        if (pem == null) {
+            throw new CryptoException("pem must not be null");
+        }
+        return fromPem(algorithm, StringUtil.newString(pem));
     }
 }

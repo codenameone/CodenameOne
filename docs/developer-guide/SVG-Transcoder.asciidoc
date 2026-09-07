@@ -1,5 +1,4 @@
-= Build-Time Vector & Animation Images
-:source-highlighter: highlight.js
+== Build-Time Vector & Animation Images
 
 The build-time vector transcoder lets you author UI icons and
 illustrations as SVG or Lottie / Bodymovin JSON and have them rendered
@@ -15,7 +14,7 @@ the SVG transcoder's model, the same `JavaCodeGenerator` emits a
 covers SVG in detail; Lottie gets its own section at the end that only
 calls out the parts that differ.
 
-== Motivation
+=== Motivation
 
 Codename One's older `Image.createSVG()` API depends on a per-platform
 native SVG renderer that ships only on a couple of backends (J2ME and
@@ -34,7 +33,7 @@ emitted as a Java class that subclasses `com.codename1.ui.GeneratedSVGImage`,
 and rendered through the standard `Graphics` shape API. The same vector
 source produces pixel-perfect output at any size on every port.
 
-== Quick start
+=== Quick start
 
 . Drop your SVG next to `theme.css` in `src/main/css/`:
 +
@@ -69,7 +68,7 @@ present, and the per-port build wiring (`IPhoneBuilder`,
 returns the transcoded image; CSS rules that reference the SVG by URL
 pick it up via the same registry.
 
-== Why millimeters
+=== Why millimeters
 
 `cn1-svg-width` / `cn1-svg-height` are the sizing knob you should
 reach for first.
@@ -104,7 +103,7 @@ treated as design pixels at `DENSITY_MEDIUM`.
 If both keys appear on the same rule, `cn1-svg-width` /
 `cn1-svg-height` wins.
 
-== How the build flow works
+=== How the build flow works
 
 The `cn1app` archetype binds the `transcode-svg` goal to the
 `generate-sources` phase:
@@ -139,7 +138,7 @@ in the user's compile output and weave `installGlobal()` into the
 generated `Stub` right before the first `init(Object)`; a project with
 no SVGs gets no weaving.
 
-== Calling the registry yourself
+=== Calling the registry yourself
 
 If you don't use `theme.css` but still want a transcoded SVG, construct
 the generated class directly:
@@ -154,7 +153,7 @@ the one to prefer for the reasons in the previous section.
 requested dimensions from `getWidth()` / `getHeight()` and shares the
 animation clock with its source.
 
-== SVG feature coverage
+=== SVG feature coverage
 
 The transcoder targets the SVG 1.1 static-shape vocabulary plus the
 SMIL animation subset:
@@ -187,7 +186,7 @@ with `Timeline`, you must register the image with a `Form`'s animation
 manager (or set it as a `Component.setIcon` with `isAnimation()` true)
 for the repaint loop to tick the SMIL clock.
 
-== Lottie animations
+=== Lottie animations
 
 Lottie / Bodymovin JSON files are picked up by the same `transcode-svg`
 goal. Drop them next to your CSS (or under `src/main/lottie/`) and the
@@ -216,7 +215,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 forward compatibility, but the archive container isn't yet extracted
 -- export your animation as a plain Bodymovin JSON for now.
 
-=== Lottie feature coverage
+==== Lottie feature coverage
 
 The parser targets the subset of Bodymovin a "spinner" or "pulse"
 animation typically uses. Anything outside the subset is dropped
@@ -243,12 +242,12 @@ For animations that need higher fidelity than the subset above, export
 the relevant frame as an SVG and use the SVG transcoder path directly
 -- the runtime classes are identical.
 
-== Troubleshooting
+=== Troubleshooting
 
 `Resources.getImage("name.svg")` returns null or a 1×1 transparent PNG::
   The transcoder didn't run, or it ran with zero source files. Confirm
   the asset lives under `src/main/css/` (or `src/main/svg/` /
-  `src/main/lottie/` for the dedicated dirs) and that the
+  `src/main/lottie/` for the dedicated directories) and that the
   `transcode-svg` goal is bound in the project POM. The same goal
   handles `.svg`, `.json`, and `.lottie` -- one goal, both formats.
   For arbitrary Resources bundles loaded outside the global slot, call

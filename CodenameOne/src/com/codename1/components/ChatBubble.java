@@ -39,14 +39,29 @@ import com.codename1.ui.layouts.BorderLayout;
 /// rendering (markdown, code blocks) can subclass and override
 /// [#renderBody] without rewriting the wrapper.
 public class ChatBubble extends Container {
+    /// The view this bubble belongs to, set when it is added. Package private:
+    /// this is bookkeeping between ChatView and its bubbles, not API.
+    ChatView owner;
+
+    /// The part of the rendered body that is conversation. Annotations are
+    /// shown in the bubble but never recorded here.
+    private String conversation = "";
+
     private final TextArea body;
-    private final ChatMessage message;
+    /// Not final: when the bubble's conversational text changes, the owning
+    /// view replaces this so getMessage() and ChatView#getHistory agree.
+    private ChatMessage message;
 
     public ChatBubble(ChatMessage message) {
         super(new BorderLayout());
         this.message = message;
         setUIID(defaultUiidFor(message.getRole()));
         this.body = new TextArea(message.getText());
+        // The bubble starts out showing the message's text, so that text is
+        // already conversation. Leaving this empty would make the first append
+        // record only the delta and drop everything the message came with.
+        // getText() concatenates the text parts and never answers null.
+        this.conversation = message.getText();
         body.setEditable(false);
         body.setUIID("ChatBubbleText");
         body.setGrowByContent(true);
@@ -72,30 +87,90 @@ public class ChatBubble extends Container {
     }
 
     private void applyText(String text) {
+        // A full replace makes everything shown conversational again: whatever
+        // annotation was on the bubble is gone from the body too.
+        conversation = text == null ? "" : text;
+        applyText(text, true);
+    }
+
+    /// Sets the body text, and tells the owning view about it when the text is
+    /// part of the conversation.
+    ///
+    /// `sync` travels with the work rather than living in a field: appendText
+    /// hops to the EDT when called from another thread, and a field cleared by
+    /// the caller as soon as it returns is already back to its old value by the
+    /// time the queued update runs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the new body text
+    /// - `sync`: true to record it in the view's history
+    private void applyText(String text, boolean sync) {
         body.setText(text == null ? "" : text);
+        // Keep the view's history in step with what the bubble shows. A streamed
+        // reply is otherwise only ever painted: the ChatMessage the view stored
+        // when this bubble was created stays empty, and anything building a
+        // request from getHistory() sends a blank assistant turn.
+        if (sync && owner != null) {
+            // The conversation, not the body: the body may also carry
+            // annotations, and those are not something the model said.
+            owner.bubbleTextChanged(this, conversation);
+        }
         revalidateLater();
+    }
+
+    /// Appends text that is shown but is not part of the conversation -- a
+    /// stream error, say. It reaches the bubble like `#appendText` and is
+    /// deliberately kept out of the owning view's history, so a later turn does
+    /// not replay a network failure back to the model as if the assistant had
+    /// written it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `note`: the annotation to show
+    public void appendAnnotation(final String note) {
+        append(note, false);
     }
 
     /// Append a token-sized delta to the bubble's body. Used by
     /// [ChatView#appendToLastMessage] during LLM streaming.
     public void appendText(final String delta) {
+        append(delta, true);
+    }
+
+    private void append(final String delta, final boolean sync) {
         if (delta == null || delta.length() == 0) {
             return;
         }
-        if (Display.getInstance().isEdt()) {
-            applyText(body.getText() + delta);
-            return;
-        }
-        Display.getInstance().callSerially(new Runnable() {
+        Runnable r = new Runnable() {
             @Override
             public void run() {
-                applyText(body.getText() + delta);
+                // Track the conversation separately from what is rendered. An
+                // annotation already on the bubble is part of the body, so
+                // deriving the conversation from the body would fold it in on
+                // the next delta -- and the note would reach history after all,
+                // one append later than the case this guards.
+                if (sync) {
+                    conversation = conversation + delta;
+                }
+                applyText(body.getText() + delta, sync);
             }
-        });
+        };
+        if (Display.getInstance().isEdt()) {
+            r.run();
+            return;
+        }
+        Display.getInstance().callSerially(r);
     }
 
     public ChatMessage getMessage() {
         return message;
+    }
+
+    /// Called by [ChatView] when it rebuilds this bubble's message after the
+    /// text changed, so the accessor never answers a stale one.
+    void setMessage(ChatMessage message) {
+        this.message = message;
     }
 
     public String getBubbleText() {

@@ -200,6 +200,15 @@
       ]
     },
     {
+      "id": "system-back-navigation",
+      "category": "Input and lifecycle",
+      "name": "System back navigation",
+      "description": "Checks that the platform's system back action reaches the current form's back command.",
+      "tests": [
+        "SystemBackNavigationTest"
+      ]
+    },
+    {
       "id": "status-bar-events",
       "category": "Input and lifecycle",
       "name": "Status-bar tap events",
@@ -456,6 +465,15 @@
       ]
     },
     {
+      "id": "state-restoration-continuity",
+      "category": "System surfaces",
+      "name": "State restoration and continuity",
+      "description": "Saves and restores what the user was doing, and checks the parts that have to behave identically on every port: the codec both wire formats share, the payload rule that lets a state cross to another device, the checkpoint, and the routeless restore that hands its payload back and shows nothing.",
+      "tests": [
+        "ContinuityStateTest"
+      ]
+    },
+    {
       "id": "document-provider",
       "category": "System surfaces",
       "name": "Document provider",
@@ -599,6 +617,15 @@
       "description": "Checks that text, HTML, image and file representations survive a copy/paste round trip through the system clipboard.",
       "tests": [
         "ClipboardRoundTripTest"
+      ]
+    },
+    {
+      "id": "contact-picker",
+      "category": "Device APIs",
+      "name": "Contact picker",
+      "description": "Checks the request contract of the privacy-minimized contact picker: the fields and selection limits it accepts and rejects, and that a result carrying no selection is an empty array rather than a null.",
+      "tests": [
+        "ContactPickerApiTest"
       ]
     },
     {
@@ -800,6 +827,9 @@
     }
   ],
   "test_scopes": {
+    "SystemBackNavigationTest": [
+      "android"
+    ],
     "WindowLayoutTest": [
       "linux-x64",
       "linux-arm64",

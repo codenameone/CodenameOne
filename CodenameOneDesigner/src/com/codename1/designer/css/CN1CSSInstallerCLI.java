@@ -37,6 +37,16 @@ import java.util.logging.Logger;
 import javax.swing.JFrame;
 
 /**
+ * Installs CSS on top of an existing Designer theme by setting the theme's
+ * {@code @OverlayThemes} constant to the stylesheet's name, so the CSS styles
+ * override the ones already in the .res file.
+ *
+ * <p>This is a standalone migration tool, invoked by hand. Nothing in the build
+ * calls it: a Maven project's CSS is compiled by
+ * {@code CompileCSSMojo}, which runs the CSS CLI with {@code -output} pointed
+ * straight at the build's theme.res and merges dependency CSS into that same
+ * output. That path produces one resource and never sets an overlay constant,
+ * so do not describe overlays as how compiled CSS normally reaches a theme.
  *
  * @author shannah
  */

@@ -25,11 +25,13 @@ package com.codename1.nfc;
 /// FeliCa (JIS X 6319-4) technology view -- the contactless protocol used
 /// by Suica, PASMO, ICOCA and other Japanese transit / payment cards.
 ///
-/// On iOS the app must declare its target system codes in the plist
-/// `com.apple.developer.nfc.readersession.felica.systemcodes` and ship the
-/// matching NFC entitlement -- the Codename One Maven plugin and build
-/// daemon do this automatically when they see [Nfc] / [NfcF] in the
-/// classpath.
+/// On iOS the app must declare its target system codes in the `Info.plist` key
+/// `com.apple.developer.nfc.readersession.felica.systemcodes`. Seeing [Nfc] /
+/// [NfcF] on the classpath gets the builders to add CoreNFC, a default
+/// `NFCReaderUsageDescription` and the reader-session formats entitlement, but
+/// not this key: the codes are an argument to `setFelicaSystemCodes` at
+/// runtime, which no build-time scan can see. Inject it yourself with the
+/// `ios.plistInject` build hint.
 public class NfcF extends TagTechnology {
 
     /// IDm (Manufacturer Identifier). 8 bytes on a normal FeliCa tag; empty

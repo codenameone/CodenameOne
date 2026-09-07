@@ -34,7 +34,7 @@ The UDID is the Universal Device Identifier. It identifies mobile devices unique
 You need the iOS device UDID value during development to add the device into the list of allowed devices.
 
 IMPORTANT: Don't use an app to get the UDID! +
-Most return the wrong value. Use the Finder device summary (macOS), Apple Configurator, or a trusted service such as http://get.udid.io/ which seems to work rather well
+Most return the wrong value. Use the Finder device summary on macOS, or Apple Configurator.
 
 ==== Should you reuse the same certificate for all apps
 
@@ -186,7 +186,7 @@ The same decision need to be made twice: Once for the development certificate, a
 TIP: Each Apple Developer account can have three active iOS Development certificates and three active iOS Distribution certificates at a time. Reuse existing certificates whenever possible to avoid hitting this limit.
 
 TIP: You can revoke a certificate when you have an application in the store shipping with said certificate! +
-This won't affect the shipping app see http://stackoverflow.com/questions/6320255/if-i-revoke-an-existing-distribution-certificate-will-it-mess-up-anything-with[this].
+This won't affect the shipping app see https://stackoverflow.com/questions/6320255/if-i-revoke-an-existing-distribution-certificate-will-it-mess-up-anything-with[this].
 
 .Why Two Certificates?
 ****
@@ -252,7 +252,7 @@ You need two versions of each file (4 total files) one pair is for development a
 
 IMPORTANT: You need to use a Mac to create a certificate file for iOS
 
-The first step you need to do is signing up as a developer to http://developer.apple.com/[Apple's iOS development program], even for testing on a device this is required! +
+The first step you need to do is signing up as a developer to https://developer.apple.com/[Apple's iOS development program], even for testing on a device this is required! +
 This step requires that you pay Apple on an annual basis.
 
 The Apple website will guide you through the process of applying for a certificate at the end of this process you should have a distribution and development certificate pair. After that point you can log in to the https://developer.apple.com/ios/manage/overview/index.action[iOS provisioning portal] where there are plenty of videos and tutorials to guide you through the process. Within the iOS provisioning portal you need to create an application ID and register your development devices.
@@ -264,74 +264,25 @@ You can then create a provisioning profile which comes in two flavors:
 
 You can then configure the 4 files in the IDE and start sending builds to the Codename One cloud.
 
-=== Provisioning profile & certificates visual guide
+==== Preparing the certificates and profiles
 
-One of the hardest parts in developing for iOS is the certificate & provisioning process. In this step-by-step guide you walk over the manual certificate generation process. Notice that the UI for the Apple website changes occasionally but the basic process remains the same...
+The layout of Apple's portal changes, so what follows are the constraints that
+hold whatever the current screens look like, rather than a tour of them.
 
-Start by logging in to the iOS-provisioning portal
+The application ID you register has to match your project's package identifier
+exactly. Nothing checks this while you're filling the forms in: the mismatch
+surfaces later, as a build that can't match a profile to the application.
 
-[[login-ios-provisioning]]
-.Login for the iOS provisioning portal
-image::img/login-ios-provisioning.png[Log into IOS provisioning portal,scaledwidth=30%]
+The development profile has to name every device you intend to install on. A
+device registered after the profile was generated isn't covered by it, so the
+profile has to be regenerated and downloaded again. An `Ad Hoc` distribution
+profile works the same way. The profiles that name no devices are the ones where
+you aren't the one doing the installing: App Store, and enterprise in-house.
 
-In the certificates section you can download your development and distribution certificates.
-
-[[download-dev-provisioning-profile]]
-.Download development provisioning profile
-image::img/download-dev-provisioning-profile.png[Download development provisioning profile,scaledwidth=30%]
-
-[[download-dist-provisioning-profile]]
-.Download distribution provisioning profile
-image::img/download-dist-provisioning-profile.png[Download distribution provisioning profile,scaledwidth=30%]
-
-In the devices section add device ids for the development devices you want to support. Notice no more than 100 devices are supported!
-
-[[ios-add-devices]]
-.Add devices
-image::img/ios-add-devices.png[Add devices,scaledwidth=30%]
-
-Create an application ID; it must match the package identifier of your application exactly!
-
-.Create application ID
-image::img/ios-create-app-id.png[Create application ID,scaledwidth=30%]
-
-Create a provisioning profile for development, make sure to select the right app and make sure to add the devices you want to use during debug.
-
-.Create provisioning profile step 1
-image::img/ios-create-prov-profile-1.png[Create provisioning profile step 1,scaledwidth=30%]
-
-.Create provisioning profile step 2
-image::img/ios-create-prov-profile-2.png[Create provisioning profile step 2,scaledwidth=30%]
-
-Refresh the screen to see the profile you created and press the download button to download your development provisioning profile.
-
-.Create provisioning profile step 3
-image::img/ios-create-prov-profile-3.png[Create provisioning profile step 3,scaledwidth=30%]
-
-Create a distribution provisioning profile; it will be used when uploading to the App Store. No need to specify devices here.
-
-.Create distribution provisioning profile
-image::img/ios-create-dist-prov-profile.png[Create distribution provisioning profile,scaledwidth=30%]
-
-Download the distribution provisioning profile.
-
-.Download distribution provisioning profile
-image::img/ios-download-dist-prov-profile.png[Download distribution provisioning profile,scaledwidth=30%]
-
-You can now import the cer files into the Keychain tool on a Mac by double clicking the file, on Windows the process is slightly more elaborate
-
-.Import cer files
-image::img/ios-import-cer-files.png[Import cer files,scaledwidth=30%]
-
-You can export the p12 files for the distribution and development profiles through the keychain tool
-
-.Export p12 files
-image::img/ios-export-p12.png[Export p12 files,scaledwidth=30%]
-
-In the IDE you enter the project settings, configure your provisioning profile, the password you typed when exporting and the p12 certificates. It's now possible to send the build to the server.
-
-.IOS Project Settings
-image::img/ios-project-settings.png[IOS Project Settings,scaledwidth=30%]
+Apple issues certificates as `.cer` files, and the build servers need `.p12`
+files. On a Mac, double-clicking a `.cer` imports it into Keychain Access, and
+you export the development and distribution certificates from there as `.p12`,
+choosing a password for each. Those are the passwords the next section asks for.
 
 ==== Configuring `codenameone_settings.properties` for manual signing
 
@@ -392,17 +343,10 @@ image::img/include-push-build-hint.png[Include push build hint,scaledwidth=30%]
 
 Signing Android applications is trivial when compared to the pain of iOS signing.
 
-The NetBeans and Eclipse plugins have a simple wizard to generate the certificate that you can launch by pressing this button:
-
-.Android keystore generation wizard
-image::img/android-certificate-wizard.png[Android keystore generation wizard,scaledwidth=50%]
-
-Then fill out your details and password in the form:
-
-.UI for Android certificate details
-image::img/android-certificate-wizard2.png[UI for Android certificate details,scaledwidth=30%]
-
-This will seamlessly generate a certificate for your project, you can reuse it for other projects as well.
+The <<certificate-wizard,Certificate Wizard>> generates a keystore for you. One
+keystore can sign every application you ship, though some developers prefer one
+per application, so that an application can be handed over to someone else later
+without also handing over the key to all the others.
 
 ==== Generating an Android certificate manually
 
@@ -427,4 +371,4 @@ Password: [password] (we expect both passwords to be identical)
 
 Executing the command produces a `Keystore.ks` file in that directory. Keep it safe: if you lose it, you can no longer publish upgrades signed with the same identity. Enter its path, alias, and passwords in `common/codenameone_settings.properties`, or use the *Android* page in the standalone Certificate Wizard (`mvn cn1:certificatewizard`) to generate and install a keystore.
 
-For more details see http://developer.android.com/guide/publishing/app-signing.html
+For more details see https://developer.android.com/studio/publish/app-signing

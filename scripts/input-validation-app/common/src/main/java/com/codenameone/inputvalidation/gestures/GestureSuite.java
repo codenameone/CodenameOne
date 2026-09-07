@@ -34,14 +34,23 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.util.UITimer;
 
-/// Drives a fixed sequence of input-event tests on a single Form. Each step waits
-/// for its expected gesture (tap, drag, long-press) and logs structured CN1IV:*
-/// markers that the platform driver script asserts against. The state machine
-/// auto-advances on either success or timeout so a broken gesture fails fast
-/// without blocking the rest of the suite.
+/// Drives a fixed sequence of input-event tests on a single Form. Each step
+/// waits for its expected gesture (tap, drag, long-press, keyboard) and logs
+/// structured CN1IV:* markers that the platform driver script asserts against.
+/// The state machine auto-advances on either success or timeout so a broken
+/// gesture fails fast without blocking the rest of the suite.
 public final class GestureSuite {
-    private static final long DEFAULT_STEP_TIMEOUT_MS = 15000L;
-    private static final long SUITE_EXIT_DELAY_MS = 1500L;
+    /// Budget for a single step. Generous because the keytype step has to
+    /// wait for CN1 to bring up the native iOS text editor after the driver's
+    /// tap before it can type anything, which took three and a half seconds
+    /// on a simulator busy serving XCUITest accessibility snapshots.
+    private static final long DEFAULT_STEP_TIMEOUT_MS = 30000L;
+    /// Grace period between the last event and exitApplication(). It has to
+    /// outlast the platform driver noticing that the final step resolved and
+    /// telling its input loop to stop: the keytype driver types in a retry loop,
+    /// and a key synthesised into a process that has already left fails the
+    /// XCUITest run even though every event landed.
+    private static final long SUITE_EXIT_DELAY_MS = 8000L;
 
     private final GestureStep[] steps;
     private final Form form;
@@ -55,7 +64,8 @@ public final class GestureSuite {
         this.steps = new GestureStep[] {
                 new TapStep(),
                 new DragStep(),
-                new LongPressStep()
+                new LongPressStep(),
+                new KeyTypeStep()
         };
         this.form = new Form("Input Validation", new BorderLayout());
         this.statusLabel = new Label("Initializing");

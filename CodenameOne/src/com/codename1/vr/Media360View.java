@@ -33,6 +33,7 @@ import com.codename1.gpu.Renderer;
 import com.codename1.gpu.Texture;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.events.WheelEvent;
 import com.codename1.ui.Image;
 import com.codename1.ui.layouts.BorderLayout;
 
@@ -270,6 +271,37 @@ public class Media360View extends Container {
         super.pointerReleased(x, y);
         lastDragX = -1;
         lastDragY = -1;
+    }
+
+    /// The wheel looks around, the way dragging does. This used to come for free: the
+    /// desktop ports turned a wheel into synthetic drag events, so a panorama followed the
+    /// trackpad without knowing the wheel existed. Those synthetic events are gone -- they
+    /// pressed and released on whatever was under the cursor -- so the gesture is handled
+    /// here directly, at the scale and in the directions the drag above uses.
+    @Override
+    protected boolean mouseWheel(WheelEvent ev) {
+        int w = Math.max(1, getWidth());
+        int h = Math.max(1, getHeight());
+        boolean moved;
+        synchronized (stateLock) {
+            float wasYaw = yaw;
+            float wasPitch = pitch;
+            // Same signs as the drag: a positive delta reveals the content above or to the
+            // left of what is on screen, and grabbing the world to reveal it turns the view
+            // the other way.
+            yaw -= ev.getDeltaX() * 180f / w;
+            pitch = clampPitch(pitch + ev.getDeltaY() * 180f / h);
+            // Compared under the lock the fields are written under: the render thread reads
+            // them every frame, so reading them outside it to decide this is a race.
+            moved = Float.compare(wasYaw, yaw) != 0 || Float.compare(wasPitch, pitch) != 0;
+        }
+        if (!moved) {
+            // Nothing moved -- pitch already against its stop and no sideways delta. Let the
+            // event go to whatever is scrollable behind this view instead of eating it.
+            return false;
+        }
+        renderView.requestRender();
+        return true;
     }
 
     /// The internal renderer: an inside-out UV sphere carrying the panorama

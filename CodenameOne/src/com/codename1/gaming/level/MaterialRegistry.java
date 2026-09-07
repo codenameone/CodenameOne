@@ -43,14 +43,21 @@ public final class MaterialRegistry {
 
     private static final Map<String, Material> MATERIALS = new LinkedHashMap<String, Material>();
     private static final Material UNKNOWN = new Material("unknown", "Unknown", 0x808080);
+    private static boolean defaultsInstalled;
 
     private MaterialRegistry() {
     }
 
     private static void ensureDefaults() {
-        if (!MATERIALS.isEmpty()) {
+        if (defaultsInstalled) {
             return;
         }
+        // Set first: register() calls back into here. The previous guard asked
+        // whether the map was empty, which meant an application registering its
+        // own material before any lookup left the map non-empty and every
+        // built-in was silently skipped -- exactly the order the class
+        // documentation invites.
+        defaultsInstalled = true;
         register(new Material(GRASS, "Grass", 0x3f7d3a));
         register(new Material(ROAD, "Road", 0x3b3e46));
         register(new Material(STONE, "Stone", 0x6f6a62));
@@ -61,6 +68,7 @@ public final class MaterialRegistry {
 
     /// Registers (or replaces) a material by its id.
     public static void register(Material m) {
+        ensureDefaults();
         if (m != null && m.getId() != null) {
             MATERIALS.put(m.getId(), m);
         }

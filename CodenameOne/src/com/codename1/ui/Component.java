@@ -363,6 +363,15 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean hideInPortrait;
     /// Indicates that this component and all its children should be hidden when the device is switched to landscape mode
     private boolean hideInLandscape;
+    /// Wheel movement a snapping component could not show yet, because it was smaller than
+    /// the distance to the next row. Carried to the following wheel event instead of being
+    /// dropped: without it a trackpad's small deltas each snap back to the row they started
+    /// on and the component never moves, and with it the visible position is always ON a
+    /// row -- which matters because Spinner3D reads its selected index straight off the
+    /// scroll position, so a component resting between rows reports a value nobody chose.
+    int wheelSnapRemainderY;
+    int wheelSnapRemainderX;
+
     private int scrollOpacity = 0xff;
     private boolean ignorePointerEvents;
     /// Indicates the decrement units for the scroll opacity
@@ -411,6 +420,17 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean draggable;
     private boolean dragAndDropInitialized;
     private boolean dropTarget;
+    /// Native (operating system) drag and drop state. Kept beside the lightweight drag and drop
+    /// fields above because the two are alternatives for the same gesture: a component that is a
+    /// native drag source hands the press to the platform, and the lightweight drag never runs.
+    private boolean nativeDragSource;
+    private boolean nativeDropTarget;
+    private NativeDragOperation nativeDragOperation;
+    private String[] acceptedDropMimeTypes;
+    private int acceptedDropActions = NativeDragOperation.ACTION_COPY
+            | NativeDragOperation.ACTION_MOVE | NativeDragOperation.ACTION_LINK;
+    private EventDispatcher nativeDropListeners;
+    private EventDispatcher nativeDragOverListeners;
     private Image dragImage;
     private Component dropTargetComponent;
     private int dragCallbacks = 0;
@@ -825,6 +845,26 @@ public class Component implements Animation, StyleListener, Editable {
         }
     }
 
+    /// Bits recording which scroll-behaviour defaults the caller has set explicitly, so
+    /// [#initLaf] leaves those alone.
+    ///
+    /// initLaf runs from the constructor, from refreshTheme and - the one that used to
+    /// bite - from `Form#show`, which walks the whole hierarchy. Anything set between
+    /// building a component and showing its Form was therefore reverted to the look and
+    /// feel's default without a word: `setScrollVisible(false)` in particular came back
+    /// as true and painted a scrollbar the caller had explicitly turned off.
+    private byte lafOverrides;
+
+    private static final byte LAF_SCROLL_VISIBLE = 1;
+    private static final byte LAF_TENSILE_DRAG = 2;
+    private static final byte LAF_SNAP_TO_GRID = 4;
+    private static final byte LAF_ALWAYS_TENSILE = 8;
+    private static final byte LAF_TENSILE_LENGTH = 16;
+
+    private boolean lafOverridden(byte bit) {
+        return (lafOverrides & bit) != 0;
+    }
+
     /// This method initializes the Component defaults constants
     protected void initLaf(UIManager uim) {
         if (uim == getUIManager() && isInitialized()) { //NOPMD CompareObjectsWithEquals
@@ -835,17 +875,27 @@ public class Component implements Animation, StyleListener, Editable {
         animationSpeed = laf.getDefaultSmoothScrollingSpeed();
         rtl = laf.isRTL();
         tactileTouch = isFocusable();
-        tensileDragEnabled = laf.isDefaultTensileDrag();
-        snapToGrid = laf.isDefaultSnapToGrid();
-        alwaysTensile = laf.isDefaultAlwaysTensile();
+        if (!lafOverridden(LAF_TENSILE_DRAG)) {
+            tensileDragEnabled = laf.isDefaultTensileDrag();
+        }
+        if (!lafOverridden(LAF_SNAP_TO_GRID)) {
+            snapToGrid = laf.isDefaultSnapToGrid();
+        }
+        if (!lafOverridden(LAF_ALWAYS_TENSILE)) {
+            alwaysTensile = laf.isDefaultAlwaysTensile();
+        }
         tensileHighlightEnabled = laf.isDefaultTensileHighlight();
         scrollOpacityChangeSpeed = laf.getFadeScrollBarSpeed();
-        isScrollVisible = laf.isScrollVisible();
+        if (!lafOverridden(LAF_SCROLL_VISIBLE)) {
+            isScrollVisible = laf.isScrollVisible();
+        }
 
-        if (tensileHighlightEnabled) {
-            tensileLength = 3;
-        } else {
-            tensileLength = -1;
+        if (!lafOverridden(LAF_TENSILE_LENGTH)) {
+            if (tensileHighlightEnabled) {
+                tensileLength = 3;
+            } else {
+                tensileLength = -1;
+            }
         }
     }
 
@@ -3144,6 +3194,13 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `g`: the component graphics
     protected void paintScrollbars(Graphics g) {
+        // isScrollVisible is what getBottomGap/getSideGap consult to decide whether to
+        // reserve room for a scrollbar, so painting one regardless left a component that
+        // had asked for no scrollbar with a scrollbar drawn OVER its content, in the
+        // space it was told it could use. A caller that turns the flag off means it.
+        if (!isScrollVisible()) {
+            return;
+        }
         if (isScrollableX()) {
             paintScrollbarX(g);
         }
@@ -3375,7 +3432,14 @@ public class Component implements Animation, StyleListener, Editable {
     /// #### Returns
     ///
     /// The height of the area under the virtual keyboard in pixels
-    private int getInvisibleAreaUnderVKB() {
+    /// The part of this component the virtual keyboard is covering, which the scroll range
+    /// has to include or whatever is under the keyboard can never be brought into view.
+    ///
+    /// Package private rather than private because the wheel scroll in `Display` needs the
+    /// same number the drag path uses: a wheel clamps the position itself, and clamping to
+    /// a range that stops at the keyboard is how a field hidden behind it becomes
+    /// unreachable with a trackpad.
+    int getInvisibleAreaUnderVKB() {
         TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             int invisibleAreaUnderVKB = f.getInvisibleAreaUnderVKB();
@@ -3637,6 +3701,9 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `scrollX`: the X position of the scrolling
     protected void setScrollX(int scrollX) {
+        if (Display.getInstance().wheelScrollTarget != this) { //NOPMD CompareObjectsWithEquals
+            wheelSnapRemainderX = 0;
+        }
         // the setter must always update the value regardless...
         int scrollXtmp = scrollX;
         if (!isSmoothScrolling() || !isTensileDragEnabled()) {
@@ -3682,6 +3749,16 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `scrollY`: the Y position of the scrolling
     protected void setScrollY(int scrollY) {
+        if (Display.getInstance().wheelScrollTarget != this) { //NOPMD CompareObjectsWithEquals
+            // Anything that is not the wheel moving THIS component invalidates what it was
+            // carrying: the remainder describes a distance from a position this component
+            // is no longer at, so adding it to the next notch would move further than the
+            // notch asked for. A drag, a selection change and a programmatic scroll all
+            // land here -- including one made by a listener while the wheel is dispatching,
+            // which is why the test is the component being moved rather than whether a
+            // wheel is in flight at all.
+            wheelSnapRemainderY = 0;
+        }
         int oldAccessibilityScrollY = this.scrollY;
         if (this.scrollY != scrollY) {
             CodenameOneImplementation ci = Display.impl;
@@ -5088,6 +5165,26 @@ public class Component implements Animation, StyleListener, Editable {
     public void pointerHover(int[] x, int[] y) {
     }
 
+    /// Stops any momentum or tensile scroll animation currently running on this component,
+    /// leaving the scroll position exactly where it is.
+    ///
+    /// This is for a component that wants to take over after the finger lifts and drive the
+    /// scroll itself - a paging/snapping container being the usual case. Codename One starts
+    /// its own decay from `#pointerReleased(int, int)`, so without this the component's own
+    /// animation and the built-in momentum both run, and the result is the scroll coasting
+    /// to a halt and then visibly moving a second time.
+    ///
+    /// Unlike `#clearDrag()` this affects only this component: an ancestor that is
+    /// legitimately scrolling on the other axis keeps its momentum.
+    ///
+    /// #### See also
+    ///
+    /// - #pointerReleased(int, int)
+    public void stopScrollMomentum() {
+        draggedMotionX = null;
+        draggedMotionY = null;
+    }
+
     void clearDrag() {
         Component leadParent = LeadUtil.leadParentImpl(this);
         if (leadParent != null && leadParent != this) { //NOPMD CompareObjectsWithEquals
@@ -5965,6 +6062,38 @@ public class Component implements Animation, StyleListener, Editable {
     void initDragAndDrop(int x, int y) {
         Component leadParent = LeadUtil.leadParentImpl(this);
         leadParent.dragAndDropInitialized = leadParent.isDragAndDropOperation(x, y);
+        // Native drag and drop is primed from the same place, so a native drag source is
+        // pressed, dragged and released through exactly the gesture a draggable component is.
+        NativeDragAndDrop.pressedOn(leadParent, x, y);
+    }
+
+    /// Abandons a lightweight drag that has already started, without running the drop
+    /// machinery. Used when a native drag takes the gesture over: the port stops delivering
+    /// pointer drags at that point, so the lightweight drag would otherwise stay activated with
+    /// its image stranded where the gesture began.
+    void cancelLightweightDrag() {
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        if (leadParent.dragActivated) {
+            if (leadParent.dragAndDropInitialized) {
+                // pointerDragged hides the source while the framework carries its image; the
+                // native session draws its own preview and never runs dragFinishedImpl, so
+                // without this the component the user dragged stays invisible for good.
+                leadParent.setVisible(true);
+            }
+            // The top level, not the form: pointerDragged records the dragged component
+            // on TopLevelSupport.rootOf(this), and a component dragged inside a window
+            // has no form at all -- so asking for one left that window still holding a
+            // component it would never be told had stopped being dragged.
+            Container p = TopLevelSupport.rootOf(leadParent);
+            if (p != null) {
+                p.setDraggedComponent(null);
+                p.repaint();
+            }
+        }
+        leadParent.dragActivated = false;
+        leadParent.dragAndDropInitialized = false;
+        leadParent.dragImage = null;
+        leadParent.dropTargetComponent = null;
     }
 
     /// If this Component is focused, the pointer released event
@@ -6316,6 +6445,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `tensileDragEnabled`: true to enable tensile drag
     public void setTensileDragEnabled(boolean tensileDragEnabled) {
         this.tensileDragEnabled = tensileDragEnabled;
+        lafOverrides |= LAF_TENSILE_DRAG;
     }
 
     /// Returns text selection support object for this component.  Only used by
@@ -6447,6 +6577,350 @@ public class Component implements Animation, StyleListener, Editable {
         dragOverListener.removeListener(l);
         if (!dragOverListener.hasListeners()) {
             dragOverListener = null;
+        }
+    }
+
+    // ------------------------------------------------------------------------------------
+    // Native (operating system) drag and drop.
+    //
+    // The listeners and callbacks above move a component around inside one form. The ones
+    // below hand the drag to the platform, so it can end on the desktop, in a file manager or
+    // in another application -- and so a drag from any of those can end here. The payload is a
+    // ClipboardContent either way, which is the point: whatever the component can already copy
+    // it can already drag, and whatever it can already paste it can already accept.
+    //
+    // See NativeDragAndDrop for the platform support matrix and for starting a drag by hand.
+    // ------------------------------------------------------------------------------------
+
+    /// Returns true when a drag starting on this component is handed to the operating system.
+    public boolean isNativeDragSource() {
+        return nativeDragSource;
+    }
+
+    /// Makes a drag that starts on this component an operating system drag, which can be
+    /// dropped outside the application.
+    ///
+    /// Supply what is being dragged either by calling
+    /// `#setNativeDragOperation(com.codename1.ui.NativeDragOperation)`, or by overriding
+    /// `#createNativeDragOperation(int, int)` when the payload depends on where the press
+    /// landed -- which item of a list was grabbed, for instance.
+    ///
+    /// This is independent of `#setDraggable(boolean)`. Where the platform has no native drag
+    /// and drop this flag simply does nothing, so a component that should be draggable either
+    /// way sets both and the native session, when there is one, takes precedence.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeDragSource`: true to hand drags on this component to the operating system
+    public void setNativeDragSource(boolean nativeDragSource) {
+        this.nativeDragSource = nativeDragSource;
+        if (nativeDragSource) {
+            // Tells the port that this application wants to drag. Ports whose platform needs a
+            // gesture recognizer on the surface install it here rather than at startup, so an
+            // application that never drags keeps exactly the touch handling it has today.
+            Display.impl.nativeDragSourceRegistered();
+        }
+    }
+
+    /// Returns the operation this component drags, or null when it supplies one per press by
+    /// overriding `#createNativeDragOperation(int, int)`.
+    public NativeDragOperation getNativeDragOperation() {
+        return nativeDragOperation;
+    }
+
+    /// Sets what dragging this component puts on the operating system's drag, and makes the
+    /// component a native drag source. Passing null clears both.
+    ///
+    /// The operation is reusable: the same instance is offered for every drag of this
+    /// component, so it must not hold state from a previous session. Anything expensive in the
+    /// payload belongs behind
+    /// `ClipboardContent#setDataProvider(java.lang.String, com.codename1.ui.ClipboardDataProvider)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeDragOperation`: what to drag, or null to stop being a drag source
+    public void setNativeDragOperation(NativeDragOperation nativeDragOperation) {
+        this.nativeDragOperation = nativeDragOperation;
+        setNativeDragSource(nativeDragOperation != null);
+    }
+
+    /// Produces the operation for a drag starting at the given position, invoked on the event
+    /// dispatch thread as the press is dispatched. Override when the payload depends on where
+    /// the user grabbed the component; the default returns whatever
+    /// `#setNativeDragOperation(com.codename1.ui.NativeDragOperation)` was given.
+    ///
+    /// Returning null, or an operation allowing no actions, leaves the gesture alone -- which
+    /// is how a component refuses to be dragged from a particular spot.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the absolute x position of the press
+    ///
+    /// - `y`: the absolute y position of the press
+    ///
+    /// #### Returns
+    ///
+    /// the drag to start, or null for none
+    protected NativeDragOperation createNativeDragOperation(int x, int y) {
+        return nativeDragOperation;
+    }
+
+    /// Returns true when this component accepts drops coming from the operating system.
+    public boolean isNativeDropTarget() {
+        return nativeDropTarget;
+    }
+
+    /// Lets this component receive drops from the operating system: from another application,
+    /// from a file manager, from the desktop, or from elsewhere in this application.
+    ///
+    /// The deepest component under the pointer that is a native drop target and accepts the
+    /// content wins, so a target nested inside another target takes precedence -- and a target
+    /// that refuses a particular payload lets an ancestor have it.
+    ///
+    /// This is independent of `#setDropTarget(boolean)`, which governs the lightweight drag and
+    /// drop inside the form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeDropTarget`: true to accept operating system drops
+    public void setNativeDropTarget(boolean nativeDropTarget) {
+        this.nativeDropTarget = nativeDropTarget;
+        if (nativeDropTarget) {
+            // As with setNativeDragSource: the port attaches whatever the platform needs to
+            // receive drops only once an application says it wants them.
+            Display.impl.nativeDropTargetRegistered();
+        }
+    }
+
+    /// Returns the MIME types this component accepts, or null when it accepts anything.
+    public String[] getAcceptedDropMimeTypes() {
+        return acceptedDropMimeTypes == null ? null : acceptedDropMimeTypes.clone();
+    }
+
+    /// Restricts the drops this component accepts to drags offering at least one of these MIME
+    /// types, so a drag carrying anything else passes through to whatever is behind it.
+    ///
+    /// This filter is consulted on the platform's drag thread rather than the event dispatch
+    /// thread, which is what lets the answer be exact from the very first drag event; see
+    /// `NativeDragAndDrop#dragOver(int, int, int, com.codename1.ui.ClipboardContent, int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `acceptedDropMimeTypes`: the MIME types, for instance
+    ///   `ClipboardContent#MIME_FILE`, or null to accept anything
+    public void setAcceptedDropMimeTypes(String... acceptedDropMimeTypes) {
+        this.acceptedDropMimeTypes = acceptedDropMimeTypes == null || acceptedDropMimeTypes.length == 0
+                ? null : acceptedDropMimeTypes.clone();
+    }
+
+    /// Returns the bit set of actions this component is willing to perform on a drop.
+    public int getAcceptedDropActions() {
+        return acceptedDropActions;
+    }
+
+    /// Restricts what this component will do with a drop -- a target that can only copy should
+    /// not be offered a move, because the source deletes its data when a move completes.
+    ///
+    /// Settled before a drag begins. Narrowing this while one is already hovering is honoured
+    /// from whichever drag event next reaches the framework -- the hover answers the platform
+    /// on the platform's own thread -- so a target changing its mind mid-drag should reject
+    /// from its drag over callback, which is ordered against the drag rather than against the
+    /// component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `acceptedDropActions`: any combination of `NativeDragOperation#ACTION_COPY`,
+    ///   `NativeDragOperation#ACTION_MOVE` and `NativeDragOperation#ACTION_LINK`
+    public void setAcceptedDropActions(int acceptedDropActions) {
+        this.acceptedDropActions = acceptedDropActions;
+    }
+
+    /// Decides whether this component wants a drag carrying these representations at all.
+    ///
+    /// #### Threading
+    ///
+    /// Invoked on the platform's drag thread, not the event dispatch thread, because the
+    /// operating system needs the answer while the pointer is moving. Read the content and
+    /// this component's own configuration; do not touch the user interface, start animations
+    /// or block. Everything that needs the event dispatch thread belongs in
+    /// `#nativeDragEnter(com.codename1.ui.NativeDropEvent)` and its siblings.
+    ///
+    /// The default accepts anything unless
+    /// `#setAcceptedDropMimeTypes(java.lang.String...)` narrowed it.
+    ///
+    /// #### What the content holds here
+    ///
+    /// The MIME types the drag is offering, and not their values: decide on the types. A
+    /// drag in progress has not handed its data over yet, and on most platforms it cannot
+    /// be made to -- so `ClipboardContent#getData(java.lang.String)` answers null here even
+    /// for a representation the drop will produce. Reading it is not merely unhelpful
+    /// either: a representation a source can vend only once would be spent before the drop
+    /// could read it. `#nativeDrop(com.codename1.ui.NativeDropEvent)` is where the values
+    /// exist, and by then they are all there.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: the representations the drag is offering, by name
+    ///
+    /// #### Returns
+    ///
+    /// true to be considered as the target
+    protected boolean canAcceptNativeDrop(ClipboardContent content) {
+        if (acceptedDropMimeTypes == null) {
+            return true;
+        }
+        if (content == null) {
+            return false;
+        }
+        return content.findPreferredMimeType(acceptedDropMimeTypes) != null;
+    }
+
+    /// Callback invoked on the event dispatch thread when a native drag enters this component.
+    /// Use it to highlight the drop location, and `NativeDropEvent#accept(int)` or
+    /// `NativeDropEvent#reject()` to change what the cursor tells the user.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the drag
+    protected void nativeDragEnter(NativeDropEvent ev) {
+    }
+
+    /// Callback invoked on the event dispatch thread as a native drag moves over this
+    /// component. Delivered at most once at a time -- a new one is only queued after the
+    /// previous returned -- so a slow callback throttles itself instead of flooding the event
+    /// dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the drag
+    protected void nativeDragOver(NativeDropEvent ev) {
+    }
+
+    /// Callback invoked on the event dispatch thread when a native drag leaves this component
+    /// without dropping. Clear whatever `#nativeDragEnter(com.codename1.ui.NativeDropEvent)`
+    /// highlighted. The event carries no content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the drag
+    protected void nativeDragExit(NativeDropEvent ev) {
+    }
+
+    /// Callback invoked on the event dispatch thread when a native drag is dropped on this
+    /// component. `NativeDropEvent#getContent()` names everything the drop carries, and its
+    /// values are readable from here on.
+    ///
+    /// #### Reading it later
+    ///
+    /// Read what the drop is for while handling it. A representation may be backed by the
+    /// platform's own transfer rather than by bytes this application owns -- Android hands
+    /// over a content URI readable under a permission granted to the activity, and iOS
+    /// copies a dropped file into temporary storage -- so a value first asked for long
+    /// afterwards, and particularly after the activity that received the drop has gone,
+    /// may no longer be there.
+    ///
+    /// A value once read is kept, so reading here and holding the result is always safe.
+    /// Deliberately not read for you: a drop of a large document on a component that only
+    /// wants its path would otherwise pay for every byte of it, on the very thread the
+    /// platform is waiting on.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the drop
+    protected void nativeDrop(NativeDropEvent ev) {
+    }
+
+    /// Adds a listener invoked on the event dispatch thread when a native drag is dropped on
+    /// this component. The event is a `NativeDropEvent`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void addNativeDropListener(ActionListener l) {
+        if (nativeDropListeners == null) {
+            nativeDropListeners = new EventDispatcher();
+        }
+        nativeDropListeners.addListener(l);
+    }
+
+    /// Removes a listener added by
+    /// `#addNativeDropListener(com.codename1.ui.events.ActionListener)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void removeNativeDropListener(ActionListener l) {
+        if (nativeDropListeners != null) {
+            nativeDropListeners.removeListener(l);
+            if (!nativeDropListeners.hasListeners()) {
+                nativeDropListeners = null;
+            }
+        }
+    }
+
+    /// Adds a listener invoked on the event dispatch thread as a native drag enters, moves over
+    /// and leaves this component. The event is a `NativeDropEvent`; its
+    /// `com.codename1.ui.events.ActionEvent#getEventType()` says which of the three it is.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void addNativeDragOverListener(ActionListener l) {
+        if (nativeDragOverListeners == null) {
+            nativeDragOverListeners = new EventDispatcher();
+        }
+        nativeDragOverListeners.addListener(l);
+    }
+
+    /// Removes a listener added by
+    /// `#addNativeDragOverListener(com.codename1.ui.events.ActionListener)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void removeNativeDragOverListener(ActionListener l) {
+        if (nativeDragOverListeners != null) {
+            nativeDragOverListeners.removeListener(l);
+            if (!nativeDragOverListeners.hasListeners()) {
+                nativeDragOverListeners = null;
+            }
+        }
+    }
+
+    /// Routes one native drag callback to the override and then to the listeners. Invoked on
+    /// the event dispatch thread by `NativeDragAndDrop`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the event
+    void dispatchNativeDropEvent(NativeDropEvent ev) {
+        switch (ev.getEventType()) {
+            case NativeDragEnter:
+                nativeDragEnter(ev);
+                fireNativeDragOver(ev);
+                break;
+            case NativeDragOver:
+                nativeDragOver(ev);
+                fireNativeDragOver(ev);
+                break;
+            case NativeDragExit:
+                nativeDragExit(ev);
+                fireNativeDragOver(ev);
+                break;
+            case NativeDrop:
+                nativeDrop(ev);
+                if (nativeDropListeners != null && nativeDropListeners.hasListeners()) {
+                    nativeDropListeners.fireActionEvent(ev);
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void fireNativeDragOver(NativeDropEvent ev) {
+        if (nativeDragOverListeners != null && nativeDragOverListeners.hasListeners()) {
+            nativeDragOverListeners.fireActionEvent(ev);
         }
     }
 
@@ -6712,6 +7186,21 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// true if a listener consumed the wheel event
     boolean fireMouseWheelEvent(com.codename1.ui.events.WheelEvent ev) {
+        return fireMouseWheelListeners(ev) || fireMouseWheelHandlers(ev);
+    }
+
+    /// The listener half of a wheel dispatch, walking up from this component.
+    ///
+    /// Separate from the handlers below because a listener can change the UI out from
+    /// under the gesture -- show a form, dispose a window, remove this component -- and
+    /// whoever called this has to be able to look again before anything else acts on a
+    /// tree that may no longer be on screen.
+    boolean fireMouseWheelListeners(com.codename1.ui.events.WheelEvent ev) {
+        // The whole chain, and before any built-in handling. Consuming is documented to
+        // prevent the DEFAULT behaviour, and a component that pans itself on a wheel is
+        // exactly that, so a listener anywhere above it has to be able to stop it: an
+        // application that binds control plus wheel to its own zoom on the form cannot be
+        // pre-empted by a viewer inside it.
         Component c = this;
         while (c != null) {
             if (c.mouseWheelListeners != null && c.mouseWheelListeners.hasListeners()) {
@@ -6722,6 +7211,46 @@ public class Component implements Animation, StyleListener, Editable {
             }
             c = c.getParent();
         }
+        return false;
+    }
+
+    /// The built-in half: the components that move content of their own.
+    boolean fireMouseWheelHandlers(com.codename1.ui.events.WheelEvent ev) {
+        Component c = this;
+        while (c != null) {
+            // Disabled components handle nothing, which is what the synthetic drag this
+            // replaced amounted to: Form.pointerDragged gated on isEnabled, so disabling a
+            // viewer or a map stopped the wheel panning it. The walk continues past it so
+            // an enabled ancestor still gets its turn.
+            if (c.isEnabled() && (c.mouseWheel(ev) || ev.isConsumed())) {
+                return true;
+            }
+            c = c.getParent();
+        }
+        return false;
+    }
+
+    /// Handles a scroll wheel or trackpad scroll over this component, before its listeners
+    /// and before anything above it in the hierarchy.
+    ///
+    /// A component that moves its own content -- an editor that scrolls itself, a viewer
+    /// that pans -- implements this. Everything else leaves it alone and the wheel scrolls
+    /// the nearest scrollable ancestor, which is what a wheel means.
+    ///
+    /// This exists because a wheel used to arrive as a synthetic press, drag and release
+    /// played into the component tree: a component that wanted the wheel got it by handling
+    /// pointer events, and so did every component that did not want it. The events are gone
+    /// and this is what replaces them, for the few components that have something of their
+    /// own to move.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the wheel event, carrying the scroll deltas in display pixels
+    ///
+    /// #### Returns
+    ///
+    /// true when this component handled the wheel and nothing else should act on it
+    protected boolean mouseWheel(com.codename1.ui.events.WheelEvent ev) {
         return false;
     }
 
@@ -7420,6 +7949,24 @@ public class Component implements Animation, StyleListener, Editable {
         this.dragActivated = dragActivated;
     }
 
+    /// Brings a faded scrollbar back and restarts the fade, for a scroll that did not come
+    /// from a pointer.
+    ///
+    /// pointerPressed and pointerReleased both do this, which is how the wheel used to get
+    /// it: the gesture it was emulated with went through them. Scrolling with a wheel now
+    /// touches neither, so once the scrollbar had faded out the content moved with nothing
+    /// on screen to say where in it the reader was.
+    void restoreFadingScrollbar() {
+        // Registered again, not only made opaque. The fade deregisters itself: animate()
+        // returns true while the opacity is coming down and the tick after it reaches zero
+        // falls through to tryDeregisterAnimated. So a scrollbar that has finished fading
+        // has no animation left, and restoring the opacity alone would light it up for
+        // good. A press or a release gets away with setting the field because the pointer
+        // paths around them re-register through checkAnimation.
+        scrollOpacity = 0xff;
+        checkAnimation();
+    }
+
     void checkAnimation() {
         Image bgImage = getStyle().getBgImage();
         if (bgImage != null && bgImage.isAnimation()) {
@@ -7468,6 +8015,39 @@ public class Component implements Animation, StyleListener, Editable {
     /// a valid Y position in the grid
     protected int getGridPosX() {
         return getScrollX();
+    }
+
+    /// Where this component would settle on its grid if it were scrolled to `position`,
+    /// answered without it ever being at that position.
+    ///
+    /// getGridPosY reads getScrollY, so asking where a wheel notch settles used to mean
+    /// scrolling there and snapping back from it. Everything watching saw both positions,
+    /// and the raw one is off the grid: Spinner3D mirrors the scroll into SpinnerNode,
+    /// which derives its selected index from it by rounding down, so a notch far too small
+    /// to change the selection still fired a selection change to the previous row and a
+    /// second one back to where it started -- twice into application listeners and twice
+    /// into the list model.
+    ///
+    /// The field is set and restored directly rather than through setScrollY, so nothing is
+    /// notified of a position the component is never left at. What getGridPos* reads is the
+    /// scroll position and the children's own coordinates, and those do not move with it.
+    int gridPositionFor(boolean vertical, int position) {
+        if (vertical) {
+            int was = scrollY;
+            scrollY = position;
+            try {
+                return getGridPosY();
+            } finally {
+                scrollY = was;
+            }
+        }
+        int was = scrollX;
+        scrollX = position;
+        try {
+            return getGridPosX();
+        } finally {
+            scrollX = was;
+        }
     }
 
     boolean isTensileMotionInProgress() {
@@ -7864,6 +8444,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `isScrollVisible`: Indicate whether this component scroll is visible
     public void setScrollVisible(boolean isScrollVisible) {
         this.isScrollVisible = isScrollVisible;
+        lafOverrides |= LAF_SCROLL_VISIBLE;
     }
 
     /// Set whether this component scroll is visible
@@ -7876,7 +8457,12 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// replaced by setScrollVisible to match the JavaBeans spec
     public void setIsScrollVisible(boolean isScrollVisible) {
-        this.isScrollVisible = isScrollVisible;
+        // Straight through, so this stays a true alias. Setting the field alone
+        // left no override bit, and initLaf() then restored the look-and-feel
+        // default over it the next time the component was shown -- the two
+        // methods stopped behaving the same, which is the one thing a deprecated
+        // alias must not do.
+        setScrollVisible(isScrollVisible);
     }
 
     void lockStyleImages(Style stl) {
@@ -8585,6 +9171,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// [#1947](https://github.com/codenameone/CodenameOne/issues/1947).
     public void setSnapToGrid(boolean snapToGrid) {
         this.snapToGrid = snapToGrid;
+        lafOverrides |= LAF_SNAP_TO_GRID;
     }
 
     /// A component that might need side swipe such as the slider
@@ -8654,6 +9241,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `tensileLength`: length for tensile drag
     public void setTensileLength(int tensileLength) {
         this.tensileLength = tensileLength;
+        lafOverrides |= LAF_TENSILE_LENGTH;
     }
 
     Label getHintLabelImpl() {
@@ -8819,6 +9407,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `alwaysTensile`: the alwaysTensile to set
     public void setAlwaysTensile(boolean alwaysTensile) {
         this.alwaysTensile = alwaysTensile;
+        lafOverrides |= LAF_ALWAYS_TENSILE;
     }
 
     /// Indicates whether this component can be dragged in a drag and drop operation rather than scroll the parent

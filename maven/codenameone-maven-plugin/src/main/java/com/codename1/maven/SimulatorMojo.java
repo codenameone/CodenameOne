@@ -103,6 +103,7 @@ private static final String GROUP_ID="com.codenameone";
         Properties props = nestedBuildProperties(
                 getSession() == null ? null : getSession().getUserProperties());
         
+        forwardLocalRepository(props);
         request.setProperties(props);
         request.setProfiles(Collections.singletonList("simulator"));
         

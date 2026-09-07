@@ -278,7 +278,7 @@ Any dependencies that are only required for native implementations on the Java S
 Additionally, this module handles the build toolchain for the Java SE platform. This includes Mac and Windows Desktop builds, as well as Java SE desktop builds. If you want to customize the build workflow for any of these targets, you would do so by adding plugin executions in this pom.xml file.
 
 android, ios, win, and JavaScript::
-These modules don't use Maven for their dependencies (Android may deserve a small asterisk here, but that's complicated), so the primary thing you'd want to *change* in these pom.xml files are the build toolchain for those targets. For example, You might add plugin executions for your CI workflow on builds targeting these particular platforms.
+These modules don't use Maven for their dependencies (Android may deserve a small asterisk here, but that's complicated), so the primary thing you'd want to *change* in these pom.xml files are the build toolchain for those targets. For example, you might add plugin executions for your CI workflow on builds targeting these particular platforms.
 
 ****
 

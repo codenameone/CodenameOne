@@ -174,5 +174,5 @@ The UI driving (`TestUtils.*`) is identical -- `TestUtils` is independent of the
 
 === Cross-reference
 
-* For the `AbstractTest` framework's full API surface (`TestUtils` helpers, `screenshotTest` tolerance algorithm, baseline management), see <<screenshot-testing,Screenshot Testing>> in the performance chapter.
+* For the `AbstractTest` framework's full API surface -- the https://www.codenameone.com/javadoc/com/codename1/testing/TestUtils.html[TestUtils] helpers, the `screenshotTest` tolerance algorithm and baseline management -- see the https://www.codenameone.com/javadoc/com/codename1/testing/package-summary.html[com.codename1.testing Javadoc].
 * For the `cn1:test` Maven goal, see <<appendix-goal-test,the test goal appendix>>.

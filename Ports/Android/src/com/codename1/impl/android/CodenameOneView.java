@@ -586,6 +586,16 @@ public class CodenameOneView {
                     && Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE) {
                 return false;
             }
+            if (keyCode == AndroidImplementation.DROID_IMPL_KEY_BACK) {
+                // Claim the gesture so the activity's OnBackInvokedCallback
+                // stands down; on Android 16 the platform can deliver both for
+                // one press. See PredictiveBackBridge.
+                if (down) {
+                    PredictiveBackBridge.keyEventBackStarted();
+                } else {
+                    PredictiveBackBridge.keyEventBackFinished();
+                }
+            }
             if (down) {
                 Display.getInstance().keyPressed(keyCode);
             } else {
@@ -827,6 +837,11 @@ public class CodenameOneView {
                 cn1GrabbedPointer = false;
                 break;
             case MotionEvent.ACTION_CANCEL:
+                // A cancelled touch delivers no release, so nothing else tells the framework
+                // this gesture is over. An operation a press had staged for a native drag
+                // would otherwise outlive it, and the port would still be holding the drag it
+                // was asked to prepare.
+                com.codename1.ui.NativeDragAndDrop.gestureCancelled();
                 cn1GrabbedPointer = false;
                 break;
             case MotionEvent.ACTION_MOVE:

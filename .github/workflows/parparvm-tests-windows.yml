@@ -445,6 +445,8 @@ jobs:
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
           CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
+          CN1_REQUIRE_SUITE: ${{ github.event_name != 'pull_request' }}
+          CN1_REQUIRE_PERFORMANCE: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
         run: |
           # Both retried the way the clean-target job does. The package is a
           # download-and-build, so a blanket loop is safe; the test is restricted
@@ -542,7 +544,18 @@ jobs:
 
       # Temurin publishes Windows/aarch64 from JDK 21; that JDK drives the
       # translator harness and builds the JavaAPI. Core + port come pre-compiled.
+      # setup-java's archive extraction can crash PowerShell on ARM64.
+      # Retry only setup; the final attempt and every build/test stay blocking.
       - name: Set up JDK 21
+        id: jdk21
+        continue-on-error: true
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+      - name: Retry JDK 21 setup
+        if: steps.jdk21.outcome == 'failure'
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
@@ -670,7 +683,11 @@ jobs:
   windows-port-screenshot-comment-x64:
     name: screenshot-comment (x64)
     needs: windows-port-screenshot
-    if: github.event_name == 'pull_request'
+    if: >-
+      always() &&
+      needs.windows-port-screenshot.result != 'cancelled' &&
+      needs.windows-port-screenshot.result != 'skipped' &&
+      (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -709,7 +726,8 @@ jobs:
               entries+=("$(basename "$f" .png)=$f")
             done
           fi
-          if [ ${#entries[@]} -eq 0 ]; then echo "No x64 screenshots; skipping comment."; exit 0; fi
+          # Empty captures must produce not-run evidence and fail the gate.
+          mkdir -p "$ART"
           echo "Posting ${#entries[@]} x64 screenshot(s)"
           mkdir -p "$ART/previews"
           cp -f "$ART"/raw/windows-benchmark-stats.txt "$ART/" 2>/dev/null || true
@@ -722,6 +740,14 @@ jobs:
           # through green CI (the picker case-conversion refresh was missed here).
           export CN1SS_FAIL_ON_MISMATCH=1
           export CN1SS_ALLOWED_MISSING=0
+          # PR capture may stop after the visual set; durable reports require the full suite.
+          if [ "${{ github.event_name }}" != "pull_request" ] || [ ${#entries[@]} -eq 0 ]; then
+            export CN1SS_FAIL_ON_TEST_PROBLEMS=1
+          fi
+          export CN1SS_PORT_ID=windows-x64
+          export CN1SS_BINARY_PATH="$ART/raw/benchmark-app.exe"
+          export CN1SS_SUITE_LOG="$ART/raw/app-output.log"
+          if [ "${{ github.event_name }}" != "pull_request" ]; then export CN1SS_SKIP_COMMENT=1; fi
           set +e
           cn1ss_process_and_report \
             "Native Windows port (x64)" \
@@ -739,6 +765,18 @@ jobs:
             echo "[windows-native-port x64] FATAL: $me screenshot(s) streamed with no stored golden (missing_expected) -- add them to $REF_DIR."; fail=1
           fi
           if [ "$fail" -ne 0 ]; then echo "Windows x64 screenshot gate failed."; exit 1; fi
+
+      # windows-cross-build-run.yml owns the public windows-x64 report. Keep
+      # native-build diagnostics out of the publisher/backfill port-status-*
+      # selection so a green native run cannot hide a shipping-pipeline failure.
+      - name: Upload Windows native x64 diagnostics
+        if: always()
+        uses: ./.github/actions/upload-artifact-with-retry
+        with:
+          name: windows-native-x64-diagnostics
+          path: artifacts/windows-port/port-status-windows-x64.json
+          if-no-files-found: error
+          retention-days: 14
 
   windows-port-screenshot-comment-arm64:
     name: screenshot-comment (arm64)
@@ -789,7 +827,8 @@ jobs:
               entries+=("$(basename "$f" .png)=$f")
             done
           fi
-          if [ ${#entries[@]} -eq 0 ]; then echo "No arm64 screenshots; skipping comment."; exit 0; fi
+          # Empty captures must produce not-run evidence and fail the gate.
+          mkdir -p "$ART"
           echo "Posting ${#entries[@]} arm64 screenshot(s)"
           mkdir -p "$ART/previews"
           cp -f "$ART"/raw/windows-benchmark-stats.txt "$ART/" 2>/dev/null || true
@@ -799,6 +838,10 @@ jobs:
           # Same blocking gate as the x64 leg.
           export CN1SS_FAIL_ON_MISMATCH=1
           export CN1SS_ALLOWED_MISSING=0
+          # PR capture may stop after the visual set; durable reports require the full suite.
+          if [ "${{ github.event_name }}" != "pull_request" ] || [ ${#entries[@]} -eq 0 ]; then
+            export CN1SS_FAIL_ON_TEST_PROBLEMS=1
+          fi
           export CN1SS_PORT_ID=windows-arm64
           export CN1SS_BINARY_PATH="$ART/raw/benchmark-app.exe"
           export CN1SS_SUITE_LOG="$ART/raw/app-output.log"
@@ -827,7 +870,7 @@ jobs:
         with:
           name: port-status-windows-arm64
           path: artifacts/windows-port/port-status-windows-arm64.json
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
 
   # Widgets Board provider compile check: compiles the one nativeSources TU no

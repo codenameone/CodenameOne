@@ -59,11 +59,17 @@ import java.util.List;
 /// // ...add view to a Form and that's it.
 /// ```
 ///
+/// The base request's messages are a **fixed prefix**: they lead every request,
+/// ahead of the conversation held by the view. That is what makes it the place
+/// for a system prompt, and it means anything else put there -- a seed user or
+/// assistant turn -- is repeated on every turn too, so put those in the view
+/// instead.
+///
 /// The view's accumulated history is replayed on every turn so the
 /// model has full conversation context. The original `baseRequest`
 /// is treated as a template -- its model, tools, temperature, etc.
-/// are preserved across turns; its messages are used only when the
-/// view's own history is empty (e.g. to seed a system prompt).
+/// are preserved across turns, and its messages lead every request as
+/// described above.
 public final class LlmChatBinding {
 
     private LlmChatBinding() {
@@ -113,7 +119,7 @@ public final class LlmChatBinding {
 
                             @Override
                             public void onError(Throwable t) {
-                                assistant.appendText("\n\n[error: " + t.getMessage() + "]");
+                                assistant.appendAnnotation("\n\n[error: " + t.getMessage() + "]");
                             }
                         });
                 result.ready(new SuccessCallback<ChatResponse>() {
@@ -127,10 +133,27 @@ public final class LlmChatBinding {
     }
 
     private static List<ChatMessage> buildOutgoingMessages(ChatView view, ChatRequest baseRequest) {
-        List<ChatMessage> history = view.getHistory();
-        if (history.isEmpty()) {
-            return baseRequest.getMessages();
+        return mergeOutgoing(view.getHistory(), baseRequest);
+    }
+
+    /// Combines the base request's messages with the conversation so far, base
+    /// first. The base is a fixed prefix, sent on every request rather than
+    /// only on the first: it carries the application's framing -- typically a
+    /// system prompt -- and dropping it after the opening turn would change the
+    /// model's instructions midway through a conversation.
+    ///
+    /// Package private so it can be tested without a `ChatView`.
+    static List<ChatMessage> mergeOutgoing(List<ChatMessage> history, ChatRequest baseRequest) {
+        List<ChatMessage> base = baseRequest == null ? null : baseRequest.getMessages();
+        if (history == null || history.isEmpty()) {
+            return base;
         }
-        return new ArrayList<ChatMessage>(history);
+        if (base == null || base.isEmpty()) {
+            return new ArrayList<ChatMessage>(history);
+        }
+        List<ChatMessage> out = new ArrayList<ChatMessage>(base.size() + history.size());
+        out.addAll(base);
+        out.addAll(history);
+        return out;
     }
 }

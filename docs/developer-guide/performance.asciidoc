@@ -27,7 +27,7 @@ If you have a large image that's opaque you might want to consider converting it
 .Convert a MultiImage to use JPEGs instead of PNGs
 image::img/performance-image-to-jpen.png[Convert a MultiImage to use JPEGs instead of PNGs]
 
-You can use the excellent http://optipng.sourceforge.net/[OptiPng] tool to optimize image files right from the Codename One designer. To use this feature you need to install OptiPng then select #Images# -> #Launch OptiPng# from the menu. Once you do that the tool will automatically optimize all your PNG's.
+You can use the excellent https://optipng.sourceforge.net/[OptiPng] tool to optimize image files right from the Codename One designer. To use this feature you need to install OptiPng then select #Images# -> #Launch OptiPng# from the menu. Once you do that the tool will automatically optimize all your PNG's.
 
 When faced with size issues make sure to check the size of your res file, if your JAR file is large open it with a tool such as 7-zip and sort elements by size. Start reviewing which element justifies the size overhead.
 
@@ -70,11 +70,16 @@ For native ParparVM output (C/Objective-C), you can also provide a class-level h
 * `@Concrete(name="fully.qualified.ConcreteClassName")` +
  Allows the translator to bypass virtual table lookup for `invokevirtual` calls on the annotated base class.
  The translator first attempts a direct call on the concrete class; if the method isn't implemented there, it falls back to the annotated base class implementation.
+ `name` is the mapping for iOS and the default target. The native Windows, Linux and macOS builds read `win`, `linux` and `mac` instead, and a target whose attribute is absent keeps ordinary virtual dispatch, so supply every target you ship.
 
 This is useful for platform abstraction classes where one implementation is guaranteed in the native pipeline.
 
 For example, Codename One annotates:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava011Snippet.java[tag=performance-java-011,indent=0]
+----
 
 NOTE: This hint is intended for ParparVM native translation and doesn't apply to the JavaScript back end.
 
@@ -227,6 +232,10 @@ speedup.
 
 `Simd` is accessed as a singleton:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava012Snippet.java[tag=performance-java-012,indent=0]
+----
 
 The returned object is safe to cache in a field as long as the cache is
 refreshed across simulator restarts (the simulator may swap the backing
@@ -246,6 +255,10 @@ arbitrary `new`-allocated arrays to `Simd` primitives.
 Every buffer used with a `Simd` primitive must so come from one of
 the allocation helpers on `Simd`:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava013Snippet.java[tag=performance-java-013,indent=0]
+----
 
 // vale-skip: write-good.TooWordy — 'minimum size' is a precise lower bound; 'least size' would be wrong.
 All three methods enforce a minimum size of 16 elements and throw
@@ -282,6 +295,10 @@ solution is to let the compiler place these buffers on the call stack
 where they cost nothing to create and are reclaimed automatically when the
 method returns. This is what the `alloca*` family exposes:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava014Snippet.java[tag=performance-java-014,indent=0]
+----
 
 On the simulator (and on Android) these behave like heap allocations with
 registration. On ParparVM the translator intercepts each `alloca*` call
@@ -449,20 +466,8 @@ For this purpose the Codename One simulator allows you to slow down networking o
 
 When you debug your app with your source code you can place breakpoints deep within Codename One and gain unique insight. You can also use the profilers and profile into Codename One to gain similar performance specific insight.
 
-When you run into a bug or a missing feature you can push that feature/fix back to https://www.codenameone.com/[Codename One] using a pull request. GitHub makes that process trivial and in this new video and slides below you show you how.
-The steps to use the code are:
-
-. Signup for GitHub
-. Fork http://github.com/codenameone/CodenameOne and
- http://github.com/codenameone/codenameone-skins
- (also star and watch the projects for good measure).
-. Clone the git URLs from the projects into the IDE using the #Team# -> #Git# -> #Clone# menu option. Notice that you must deselect projects in the IDE for the menu to appear.
-
-. Download the cn1-binaries project from GitHub https://github.com/codenameone/cn1-binaries/archive/master.zip[here].
-. Unzip the cn1-binaries project and make sure the directory has the name cn1-binaries. Verify that cn1-binaries, CodenameOne and codenameone-skins are within the same parent directory.
-.In your own project remove the jars both in the build & run libraries section. Replace the build libraries with the `CodenameOne/CodenameOne` project. Replace the runtime libraries with the `CodenameOne/Ports/JavaSEPort` project.
-
-This allows you to run the existing Codename One project with the Codename One source code and debug into Codename One. You can now also commit, push and send a pull request with the changes.
+Running against the framework sources rather than the released jars is covered in
+<<working-with-codename-one-sources,working with Codename One sources>>.
 
 === Device testing Framework/Unit testing
 
@@ -570,8 +575,14 @@ Here you defined:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava010Snippet.java[tag=performance-java-010,indent=0]
 ----
 
+The field is `volatile` because the listeners further down write it on the event dispatch thread while the loading thread reads it. Without that, the loader can keep seeing a stale timestamp and carry on decoding images while the user is still scrolling, which is the uneven scrolling this section sets out to remove.
+
 Then you did this within the background loading thread:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava017Snippet.java[tag=performance-java-017,indent=0]
+----
 
 This effectively sleeps when the user interacts with the UI and loads the images if the user hasn't touched the UI in a while.
 
@@ -579,8 +590,16 @@ Notice that you also check if the scroll changes, this allows you to notice case
 
 All you need to do now is update the `lastScroll` variable whenever user interaction is in place. This works for user touches:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava018Snippet.java[tag=performance-java-018,indent=0]
+----
 
 This works for general scrolling:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava019Snippet.java[tag=performance-java-019,indent=0]
+----
 
 NOTE: Due to technical constraints you can't use a lambda in this specific case...

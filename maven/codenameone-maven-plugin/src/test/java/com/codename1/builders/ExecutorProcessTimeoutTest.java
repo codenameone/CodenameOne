@@ -121,10 +121,31 @@ class ExecutorProcessTimeoutTest {
         // on the iOS and native steps, which are the ones that run with a timeout.
         //
         // Reproducing it needs the join to actually block, which means the pipe
-        // must outlive the process. Without the fix the watcher fires at 1000ms
-        // during that wait and exec returns 1.
+        // must outlive the process. Without the fix the watcher fires during that
+        // wait and exec returns 1.
+        //
+        // The numbers are sized off a measurement, not chosen. At the 1000ms this
+        // started with, the test was racing its own JVM: a BARE java launch that
+        // runs an empty main and exits takes 570-993ms on the machine this was
+        // written on, and this helper also spawns a child before exiting -- so the
+        // process legitimately outlived the deadline, the watcher legitimately
+        // fired, and the test failed 2 runs in 5 with nothing else running. That is
+        // an assertion about the speed of a JVM launch wearing the name of one
+        // about timeout accounting.
+        //
+        // 2500ms was tried and still failed 1 run in 8 while other work shared the
+        // machine, which is the condition every CI runner is in. 5000ms is ~5x the
+        // worst launch observed, and the pipe is held 8000ms so the deadline still
+        // falls comfortably INSIDE the join -- which is what the regression needs:
+        // with the bug the watcher fires at 5000ms while the join is waiting on a
+        // process that exited long before, and rc is 1 again. Verified by putting
+        // the bug back.
+        //
+        // The cost is that a passing run takes about as long as the pipe is held,
+        // since exec returns when the reader drains. Eight seconds of wall clock
+        // buys a test that measures what it says it measures.
         TestExecutor e = new TestExecutor();
-        int rc = e.executeProcess(javaProcess(ExitsLeavingChildHoldingOutput.class, "4000"), 1000);
+        int rc = e.executeProcess(javaProcess(ExitsLeavingChildHoldingOutput.class, "8000"), 5000);
 
         assertEquals(0, rc, "a command that exited 0 must not be reported as timed out");
     }

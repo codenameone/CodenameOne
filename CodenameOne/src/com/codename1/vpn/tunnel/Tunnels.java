@@ -43,12 +43,14 @@ import com.codename1.vpn.spi.VpnBridge;
 /// }
 /// ```
 ///
-/// #### Android only
+/// #### Ask whether it is supported
 ///
-/// [#isSupported] answers true on Android and false everywhere else,
-/// including iOS: a packet tunnel there runs in a Network Extension, and the
-/// translation that would give that process a virtual machine has not been
-/// written. Ask [#isSupported] and keep a path for the answer being no --
+/// [#isSupported] answers true on Android, and on an iOS build that
+/// generated the packet tunnel extension -- which is one that set
+/// `ios.vpn.tunnel=true`, named its tunnel in `ios.vpn.tunnel.class`, and
+/// holds the Network Extension entitlement Apple grants case by case. It
+/// answers false on every other iOS build, which is most of them, and
+/// everywhere else. Ask it and keep a path for the answer being no --
 /// [#start] refuses with `NOT_SUPPORTED` rather than pretending.
 ///
 /// #### Do not assume the instance you pass is the one that runs

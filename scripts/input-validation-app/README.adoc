@@ -1,8 +1,8 @@
 = CN1 Input Validation App
 
 A minimal Codename One app whose only purpose is to assert that physical
-input events (tap, drag, long-press) reach Component listeners end-to-end
-on iOS. Driven by XCUITest on the iOS simulator.
+input events (tap, drag, long-press, keyboard) reach Component listeners
+end-to-end on iOS. Driven by XCUITest on the iOS simulator.
 
 == Why a separate pipeline?
 
@@ -22,7 +22,7 @@ emitted when each gesture fires.
 
 == Suite
 
-Each step waits up to 15 seconds for its expected event, then auto-advances
+Each step waits up to 30 seconds for its expected event, then auto-advances
 on success or timeout. The XCUITest driver issues the actual OS input at
 the expected time.
 
@@ -44,6 +44,23 @@ the expected time.
 | `addLongPressListener` fires for a press-and-hold. Routes through the
   same touch chain as tap, so a recognizer that cancels touches mid-press
   causes this step to time out.
+
+| `keytype`
+| Typed characters reach a CN1 `TextField.DataChangedListener`. The
+  driver taps the field to bring up native iOS editing, then synthesises
+  keystrokes with `XCUIApplication.typeKey`, which drives the simulator's
+  hardware-keyboard pathway: on iOS 13.4+ those arrive as `UIPress`
+  events on the responder chain through `GLViewController`. That is the
+  path issue #5709 reports broken, where every printable key was treated
+  as "handled" and never forwarded to UIKit's text-input pipeline, so a
+  hardware keyboard typed nothing while the on-screen keyboard -- which
+  raises no `UIPress` -- kept working.
+
+  `typeKey` rather than `typeText`: `typeText` first demands an
+  accessibility element reporting `hasKeyboardFocus`, and CN1 publishes
+  its own accessibility tree (`updateAccessibilityTree` assigns
+  `container.accessibilityElements`), which replaces the real subviews --
+  so the native `CN1UITextField` is never in the tree to be found.
 |===
 
 == Log markers
@@ -54,7 +71,7 @@ Everything the driver cares about is a single line on stdout:
 CN1IV:SUITE:STARTED platform=<plat> w=<width> h=<height>
 CN1IV:READY:<step>             # step is armed and waiting for input
 CN1IV:EVENT:<step>:<details>   # input arrived; advancing to next step
-CN1IV:TIMEOUT:<step>           # 8s elapsed without input -- step failed
+CN1IV:TIMEOUT:<step>           # the step budget elapsed -- step failed
 CN1IV:SUITE:FINISHED
 ----
 

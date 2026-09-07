@@ -143,6 +143,19 @@ public class CertificateWizard extends Lifecycle {
         CN.setDarkMode(Boolean.valueOf(darkMode));
         applyThemeForCurrentScheme();
         binding = ProjectIO.loadBinding();
+        if (projectBundleIdentifier() == null) {
+            // Everything here is an operation on ONE project's identifiers: which App IDs
+            // are its own, which profile to preselect, which push hint to read, what
+            // automatic setup registers. Without the project's package name none of those
+            // questions has an answer, and the placeholder that used to stand in for it --
+            // com.example.app -- is a real identifier somebody's account can hold. It was
+            // then treated as this project's own: the account was narrowed to it, it was
+            // preselected, and Create would submit a profile for an app the developer has
+            // nothing to do with. There is no useful unbound mode to preserve, so the
+            // wizard says so and stops.
+            showLaunchFailure();
+            return;
+        }
         userEmail = firstNonEmpty(System.getProperty("certificatewizard.user"),
                 binding == null ? null : binding.user(), "Not signed in");
         token = firstNonEmpty(System.getProperty("certificatewizard.token"), binding == null ? null : binding.token(), "");
@@ -1080,8 +1093,19 @@ public class CertificateWizard extends Lifecycle {
     }
 
     private void bundleDialog(String initialIdentifier, String initialName) {
-        InteractionDialog d = modal("Register bundle ID");
+        bundleDialog(initialIdentifier, initialName, "IOS");
+    }
+
+    /// Registers an App ID for `platform`, which is not always iOS: the profiles page
+    /// offers this when the account has none that the selected profile type can use, and
+    /// registering an iOS identifier there leaves the user exactly where they started --
+    /// the platform filter still shows nothing, and the advertised way out is a dead end.
+    private void bundleDialog(String initialIdentifier, String initialName, String platform) {
+        InteractionDialog d = modal("IOS".equals(platform)
+                ? "Register bundle ID"
+                : "Register " + bundlePlatformName(platform) + " bundle ID");
         TextField id = field("Identifier", "com.example.app");
+        id.setName("modal.bundle.identifier");
         TextField name = field("Name", "My App");
         if (initialIdentifier != null) {
             id.setText(initialIdentifier);
@@ -1091,21 +1115,26 @@ public class CertificateWizard extends Lifecycle {
         }
         CheckBox push = new CheckBox("Enable Push Notifications");
         push.setUIID(uiid("CWFieldLabel"));
+        // Starts on what the project asks for. This dialog is the deliberate way to turn
+        // the capability on, so it follows ios.includePush rather than deciding for
+        // itself the way automatic setup used to.
+        push.setSelected(projectWantsPush(platform));
         CheckBox appGroups = new CheckBox("Enable App Groups (widgets / live activities)");
         appGroups.setUIID(uiid("CWFieldLabel"));
+        appGroups.setName("modal.bundle.appGroups");
         d.add(id).add(name).add(push).add(appGroups);
         Button save = primary("Register", "modal.bundle.submit");
         save.addActionListener(e -> {
             d.dispose();
             final String bundleIdentifier = id.getText();
             final boolean withGroups = appGroups.isSelected();
-            service.createBundleId(bundleIdentifier, name.getText(), push.isSelected(), r -> {
+            service.createBundleId(bundleIdentifier, name.getText(), platform, push.isSelected(), r -> {
                 if (!r.ok) {
                     showPageMessage(r.message, true);
                     return;
                 }
                 if (withGroups) {
-                    enableAppGroupsForBundle(bundleIdentifier);
+                    enableAppGroupsForBundle(bundleIdentifier, platform);
                 } else {
                     afterMutation(r, "Bundle ID registered");
                 }
@@ -1161,6 +1190,10 @@ public class CertificateWizard extends Lifecycle {
         final String[] profileType = {PROFILE_APP_STORE};
         final String[] bundleId = {null};
         final String[] certificateId = {null};
+        // The picker starts narrowed to the project's own App IDs, with the whole account
+        // one click away: the assumption is a default, not a restriction. Which of them is
+        // chosen depends on the profile type, so it is decided in the rebuild below.
+        final boolean[] showAllBundles = {false};
         final List<String> certs = new ArrayList<String>();
         final List<String> devs = new ArrayList<String>();
         // nameEdited: the suggested name follows the profile type until the user writes their own.
@@ -1215,8 +1248,53 @@ public class CertificateWizard extends Lifecycle {
             c.add(actionRow(Component.LEFT, typeButtons[3], typeButtons[4], typeButtons[5]));
 
             label(c, "Bundle ID", "CWFieldLabel");
+            // The project's own App ID and the ones derived from it for its extensions,
+            // unless the user asked for the rest. Every App ID on the account was listed
+            // here with equal weight, so the one identifier that can actually sign this
+            // project had to be found in a list of everything anyone on the team ever
+            // registered (issue #5654).
+            // Only the App IDs this profile type can be created against. An App ID
+            // registered for one platform cannot carry a profile for the other, and
+            // offering the row anyway let it be picked outright: nothing refused the
+            // selection, so Create submitted it and Apple rejected the request long after
+            // the dialog said it was fine. The certificate section below is filtered the
+            // same way, for the same reason.
+            final String bundlePlatform = platformForProfile(profileType[0]);
+            final List<SigningState.BundleId> usableBundles =
+                    WizardDecisions.usableBundleIds(state.bundleIds, bundlePlatform);
+            // Always the project's real identifier: the wizard refuses to start without one
+            // (see runApp), so this cannot narrow the account to a placeholder that merely
+            // happens to be registered in it and then preselect somebody else's app.
+            final List<SigningState.BundleId> ownBundles =
+                    WizardDecisions.projectBundleIds(usableBundles, projectDefaults().bundleId);
+            final boolean narrowed = !showAllBundles[0] && !ownBundles.isEmpty();
+            final List<SigningState.BundleId> shownBundles = narrowed ? ownBundles : usableBundles;
+            // A bundle selection outlives both the profile type it was made under and the
+            // list it was made from, and neither may be left standing out of sight: a
+            // selection that is not among the rows on screen is a choice nothing accounts
+            // for, and Create stayed enabled and submitted it. Dropped here, which is the
+            // one place every type change and every widening or narrowing of the list goes
+            // through, exactly as the device selection above is. With the list filtered by
+            // platform this covers the wrong-platform selection too -- such a row is no
+            // longer among them.
+            SigningState.BundleId selectedBundle = findBundleById(bundleId[0]);
+            if (selectedBundle != null && !shownBundles.contains(selectedBundle)) {
+                bundleId[0] = null;
+            }
+            if (bundleId[0] == null) {
+                // The project's own App ID for THIS profile type's platform. Choosing it
+                // platform-neutrally picked the iOS record of an identifier registered for
+                // both, and that selection then survived a switch to a Mac profile type: the
+                // request went to Apple naming an App ID that cannot carry it. It is always
+                // one of the rows on screen -- narrowing the list is what narrows it TO.
+                SigningState.BundleId projectBundle =
+                        findBundleByIdentifier(projectDefaults().bundleId, bundlePlatform);
+                if (projectBundle != null) {
+                    bundleId[0] = projectBundle.id();
+                }
+            }
             final List<Button> bundleButtons = new ArrayList<Button>();
-            for (SigningState.BundleId b : state.bundleIds) {
+            for (SigningState.BundleId b : shownBundles) {
                 Button pick = choice(b.identifier(), b.name(), b.id().equals(bundleId[0]));
                 pick.setName("pick.bundle." + b.id());
                 bundleButtons.add(pick);
@@ -1229,10 +1307,49 @@ public class CertificateWizard extends Lifecycle {
                 });
                 c.add(pick);
             }
-            if (state.bundleIds.isEmpty()) {
-                Button createBundle = outline("Register bundle ID first", "btn.profileNeedsBundle");
-                createBundle.addActionListener(e -> { d.dispose(); bundleDialog(null, null); });
-                c.add(createBundle);
+            // The toggle appears only when it would change what is on screen: an account
+            // holding nothing but this project's App IDs has nothing to reveal or hide.
+            if (ownBundles.size() < usableBundles.size() && !ownBundles.isEmpty()) {
+                Button toggle = narrowed
+                        ? outline("Show all " + usableBundles.size() + " bundle IDs",
+                                "btn.profileShowAllBundles")
+                        : outline("Show only this project's bundle IDs",
+                                "btn.profileShowProjectBundles");
+                toggle.addActionListener(e -> {
+                    showAllBundles[0] = !showAllBundles[0];
+                    rebuild[0].run();
+                });
+                c.add(toggle);
+            }
+            // Whether THIS project has an App ID this profile type can use, not whether the
+            // account holds one for anybody. An account full of other apps' Mac App IDs
+            // makes the list non-empty while the project's own identifier is still missing
+            // from it, and the developer is then offered other people's apps and no way to
+            // register their own -- the Bundle IDs page registers iOS identifiers only.
+            if (ownBundles.isEmpty()) {
+                // Whether THIS identifier is already registered decides the remedy, not
+                // whether the account holds any bundle IDs at all. An account full of other
+                // apps' iOS App IDs says nothing about whether this one can be registered
+                // for macOS, and testing the account left that case with an explanation and
+                // no way to act on it -- a Mac profile could not be reached from anywhere.
+                if (findBundleByIdentifier(projectDefaults().bundleId) == null) {
+                    Button createBundle = outline("Register bundle ID first", "btn.profileNeedsBundle");
+                    createBundle.addActionListener(e -> { d.dispose(); bundleDialog(null, null, bundlePlatform); });
+                    c.add(createBundle);
+                } else {
+                    // Registered, but not for this platform -- and this is not the same
+                    // remedy. Apple registers an identifier once for the whole account, so
+                    // an App ID that exists for iOS cannot be registered again for macOS;
+                    // the platform is added to the existing one in the portal. Saying so
+                    // beats an empty section, which is what filtering the list would
+                    // otherwise leave behind.
+                    label(c, "No bundle ID is registered for "
+                            + bundlePlatformName(bundlePlatform)
+                            + ". Automatic setup registers one, unless the identifier is already"
+                            + " registered for another platform -- Apple registers it once, and"
+                            + " the platform is added to it in the Apple Developer portal.",
+                            "CWCardMeta");
+                }
             }
 
             label(c, "Certificate", "CWFieldLabel");
@@ -1243,6 +1360,24 @@ public class CertificateWizard extends Lifecycle {
             // key, which creating a profile does not need and which a certificate synced from
             // Apple often does not have.
             List<SigningState.Certificate> usable = WizardDecisions.profileCertificateChoices(state, profileType[0]);
+            // Nothing is preselected while there is a choice to make, but when the account
+            // holds one certificate this profile could be signed with, picking it is not a
+            // decision -- it is the answer, and leaving it blank only disables Create until
+            // the user finds the single row and clicks it (issue #5654).
+            //
+            // This fills an EMPTY selection and never replaces one, which is all it has to
+            // do: the only thing that changes which certificates are usable is the profile
+            // type, and its listener clears the selection before asking for this rebuild.
+            // A stale certificate therefore cannot reach canCreateProfile -- the dead-end
+            // stage of the structure harness is what keeps that true.
+            if (certificateId[0] == null) {
+                SigningState.Certificate only = soleCertificate(usable);
+                if (only != null) {
+                    certificateId[0] = String.valueOf(only.id());
+                    certs.clear();
+                    certs.add(only.appleCertId());
+                }
+            }
             final List<Button> certButtons = new ArrayList<Button>();
             for (SigningState.Certificate cert : usable) {
                 String id = String.valueOf(cert.id());
@@ -1251,7 +1386,7 @@ public class CertificateWizard extends Lifecycle {
                 // and saying so here beats discovering it at install time -- the one step that
                 // actually needs it. A Button clips rather than wraps, so this stays short.
                 String detail = cert.privateKeyPresent() ? null : "no stored private key";
-                Button pick = choice(cert.displayName(), detail, id.equals(certificateId[0]));
+                Button pick = choice(certificateChoiceTitle(cert), detail, id.equals(certificateId[0]));
                 pick.setName("pick.cert." + cert.id());
                 certButtons.add(pick);
                 pick.addActionListener(e -> {
@@ -1415,6 +1550,13 @@ public class CertificateWizard extends Lifecycle {
 
     private void autoSetupCurrentProject() {
         ProjectDefaults defaults = projectDefaults();
+        autoSetupWarnings.clear();
+        // Both of the run's own records start empty. The reissue guard exists to stop one
+        // run deleting profiles forever; carrying it into the NEXT run turns it into the
+        // opposite -- a delete that failed leaves the id behind, and the retry then reads
+        // "already handled", skips the delete and installs the invalid profile it was
+        // supposed to replace, so the project ends up signed with assets that cannot sign.
+        reissuedProfiles.clear();
         autoSetupProject(defaults.bundleId, defaults.appName);
     }
 
@@ -1427,10 +1569,32 @@ public class CertificateWizard extends Lifecycle {
         if (!canInstallIntoProject()) {
             return;
         }
-        SigningState.BundleId existing = findBundleByIdentifier(bundleIdentifier);
+        // The iOS record specifically, because everything below this uses one. A neutral
+        // existence test was answered by the macOS registration of the same identifier on
+        // an account that had run Mac setup first: the create was skipped, and the run then
+        // stopped several steps later saying the bundle ID "could not be found after
+        // refresh" -- about an App ID it had never tried to create.
+        SigningState.BundleId existing = findBundleByIdentifier(bundleIdentifier, "IOS");
         if (existing == null) {
+            // Registered, but not for iOS. Apple registers an identifier once for the whole
+            // account, so asking again returns "not available" (the refusal issue #5652 is
+            // about) and adding iOS to it is a portal action the signing API does not offer.
+            // The Mac stages do not need the iOS App ID, so the run says what it skipped and
+            // goes on to do them -- the same shape as the Mac half skipping when the
+            // identifier is iOS-only.
+            SigningState.BundleId taken = findBundleByIdentifier(bundleIdentifier);
+            if (taken != null) {
+                warnDuringAutoSetup("iOS signing was skipped: the App ID " + bundleIdentifier
+                        + " is registered for " + bundlePlatformName(taken.platform())
+                        + ", and Apple registers an identifier once. Enable iOS on it in the Apple"
+                        + " Developer portal to sign iOS builds with it.");
+                ensurePushCapabilities(bundleIdentifier,
+                        () -> autoSetupMacStages(
+                                () -> finishAutoSetup("Automatic signing setup completed.")));
+                return;
+            }
             showPageMessage("Creating Bundle ID " + bundleIdentifier + "...", false);
-            service.createBundleId(bundleIdentifier, appName, true, r -> {
+            service.createBundleId(bundleIdentifier, appName, projectWantsPush("IOS"), r -> {
                 if (!r.ok) {
                     showPageMessage(r.message, true);
                     return;
@@ -1438,8 +1602,70 @@ public class CertificateWizard extends Lifecycle {
                 refreshForAutoSetup(() -> autoSetupDefaultProfiles(bundleIdentifier, appName));
             });
         } else {
-            autoSetupDefaultProfiles(bundleIdentifier, appName);
+            ensurePushCapabilities(bundleIdentifier,
+                    () -> autoSetupDefaultProfiles(bundleIdentifier, appName));
         }
+    }
+
+    /// Asserts every capability this project needs on the App IDs it already has, before
+    /// any profile is issued from them.
+    ///
+    /// One at a time would be enough if the platforms were always separate records, and
+    /// they are not: Apple's UNIVERSAL registration is ONE App ID serving both. Enabling
+    /// the Mac half at the start of the Mac stages therefore changed the capabilities of
+    /// the same App ID the iOS profiles had just been issued from, and Apple invalidates a
+    /// profile issued before a capability change -- the run reissued only its Mac profiles
+    /// and finished with the iOS pair installed and dead. A profile is a snapshot, so every
+    /// change to what it is a snapshot OF has to happen first.
+    private void ensurePushCapabilities(String bundleIdentifier, Runnable next) {
+        ensurePushCapability(bundleIdentifier, "IOS",
+                () -> ensurePushCapability(bundleIdentifier, "MAC_OS", next));
+    }
+
+    /// Asserts push notifications on an App ID this run did not create.
+    ///
+    /// Registration is the only place the capability was ever set, which covers exactly
+    /// the App IDs the wizard made itself. A project that turns `ios.includePush` on
+    /// later reuses the App ID it already has, so nothing enabled the capability while
+    /// the builder started stamping an aps-environment entitlement on the app -- and an
+    /// entitlement the profile does not grant is a codesign failure, not a warning.
+    ///
+    /// Asserted rather than compared, exactly as the App Group step above does it and for
+    /// the same reason: the service reports no capabilities with an App ID, so there is
+    /// nothing to compare against. Enabling one that is already on is what that step has
+    /// been doing on every run. It goes before the profiles, because a profile is a
+    /// snapshot of the capabilities the App ID had when it was issued, and the ones a
+    /// capability change leaves behind are reissued by [#autoSetupProfile].
+    ///
+    /// A failure is a warning rather than the end of the run: the iOS assets that follow
+    /// are still worth having, and the banner names the App ID that needs the capability.
+    ///
+    /// Resolved here, by identifier AND platform, rather than taken from the caller: the
+    /// existence test above answers with a record of any platform, and Apple returns an
+    /// account's App IDs in no documented order, so on an account holding both records of
+    /// one identifier the capability could land on the macOS one while every iOS profile
+    /// was issued from the other.
+    private void ensurePushCapability(String bundleIdentifier, String platform, Runnable next) {
+        SigningState.BundleId bundle = findBundleByIdentifier(bundleIdentifier, platform);
+        if (!projectWantsPush(platform) || bundle == null) {
+            next.run();
+            return;
+        }
+        showPageMessage("Enabling push notifications on " + bundle.identifier() + "...", false);
+        service.enablePushCapability(bundle.id(), r -> {
+            if (!r.ok) {
+                // Naming the hint that actually asked for it. The two platforms declare push
+                // through different settings, and a Mac-only project sent to ios.includePush
+                // is being pointed at something it never set.
+                warnDuringAutoSetup("Push notifications could not be enabled on " + bundle.identifier()
+                        + ": " + r.message + " The " + ("MAC_OS".equals(platform) ? "Mac " : "")
+                        + "build stamps a push entitlement because " + pushHintName(platform)
+                        + " asks for it, and signing fails until the App ID grants it.");
+                next.run();
+                return;
+            }
+            refreshForAutoSetup(next);
+        });
     }
 
     /// Enables every App Group an extension in this project needs on the MAIN App ID, before any
@@ -1465,6 +1691,10 @@ public class CertificateWizard extends Lifecycle {
         return profile.status() == null || "ACTIVE".equals(profile.status());
     }
 
+    /// Every step of the current automatic setup run that could not be done, in the order
+    /// they were found. Reported together when the run ends -- see [#finishAutoSetup].
+    private final List<String> autoSetupWarnings = new ArrayList<String>();
+
     /// Profile IDs already retired in this run, so a delete that does not take cannot loop.
     private final java.util.Set<Long> reissuedProfiles = new java.util.HashSet<Long>();
 
@@ -1481,6 +1711,120 @@ public class CertificateWizard extends Lifecycle {
                         "codename1.arg.ios.documentProvider.enabled"))
                 && !"false".equals(readSetting(binding.settings(),
                         "codename1.arg.ios.documentProvider.extension"));
+    }
+
+    /// Whether automatic setup should register the App ID of `platform` with push
+    /// notifications.
+    ///
+    /// It used to turn push on for every App ID it created, so a project that had never
+    /// asked for it got an App ID -- and every profile issued from it -- carrying the
+    /// capability, which is visible on the Apple Developer site and puzzling to find
+    /// there (issue #5657). The one thing that decides it is the hint the builder reads:
+    /// `ios.includePush`, defaulting to off, compared the way IPhoneBuilder compares it.
+    ///
+    /// The builder also infers push for an app that uses `com.codename1.call.voip`
+    /// without setting the hint, from a scan of the compiled classes the wizard does not
+    /// have. A project that declares the voip background mode says the same thing in the
+    /// settings file, and that much is read here -- see
+    /// [WizardDecisions#pushRequested(String,String)] for what is left over.
+    ///
+    /// Local notifications are NOT push, and a project using them must not have this
+    /// capability put on its App ID. IPhoneBuilder's `usesLocalNotifications` links
+    /// UserNotifications.framework and keeps the notification handling in the app
+    /// delegate; it does not emit an entitlement, and the block that runs when push was
+    /// not asked for STRIPS the push code even from an app that uses them. iOS asks for
+    /// nothing from an App ID to schedule a local notification -- only a remote one needs
+    /// the capability, which is why `aps-environment` appears nowhere in that builder and
+    /// the push entitlement reaches an iOS app through the provisioning profile. The
+    /// signing guide's note that the build server enables the notification entitlement for
+    /// a LocalNotification project even when `ios.includePush` is false is about not
+    /// hand-stripping that entitlement to quieten App Store Connect; it is not a
+    /// requirement on the App ID. Provisioning push for it would be issue #5657 again:
+    /// a capability nobody asked for, on every project that schedules a reminder.
+    private boolean projectWantsPush(String platform) {
+        if (binding == null) {
+            return false;
+        }
+        if ("MAC_OS".equals(platform)) {
+            // The Mac build declares the APNs entitlement from its own hint, and a Mac App
+            // ID has to grant what a Mac build declares. Asking the iOS question here
+            // registered a Mac App ID without push for a project whose Mac build carries
+            // the entitlement, and put it on one for a project whose push is iOS only.
+            // MacOSBuildHints reads the older macNative spelling as a fallback, so this
+            // does too.
+            String aps = readSetting(binding.settings(), "codename1.arg.macos.entitlements.apsEnvironment");
+            if (aps == null || aps.trim().isEmpty()) {
+                aps = readSetting(binding.settings(),
+                        "codename1.arg.macNative.entitlements.apsEnvironment");
+            }
+            return WizardDecisions.macPushRequested(aps);
+        }
+        return WizardDecisions.pushRequested(
+                readSetting(binding.settings(), "codename1.arg.ios.includePush"),
+                readSetting(binding.settings(), "codename1.arg.ios.background_modes"));
+    }
+
+    /// How an App ID's push capability reads in the tables.
+    ///
+    /// "Unknown" rather than "Off" when the service did not say: the listing the wizard
+    /// refreshes from carries no capabilities, so an App ID with push enabled at Apple
+    /// was reported here as having it off -- which is what the profile the wizard then
+    /// created contradicted on the Apple Developer site (issue #5657). Saying nothing is
+    /// known is worth more than a confident wrong answer; the Apple Developer portal is
+    /// where the capability itself is read and changed.
+    private String pushLabel(SigningState.BundleId b) {
+        Boolean push = b.pushEnabled();
+        if (push == null) {
+            return "Unknown";
+        }
+        return push.booleanValue() ? "Enabled" : "Off";
+    }
+
+    /// What has to happen after the push capability is turned on by hand.
+    ///
+    /// A profile is a snapshot of the App ID's capabilities at the moment it was issued,
+    /// and Apple invalidates the ones a capability change leaves behind -- which is what
+    /// [#isUsableProfile] and the reissue in [#autoSetupProfile] exist for. Reporting
+    /// success and stopping would leave the project installed against profiles that no
+    /// longer sign, so the developer would have fixed the App ID and still be looking at
+    /// the same codesign failure.
+    ///
+    /// Conditional, because the wizard cannot read a capability back: if push was already
+    /// on, the call changed nothing and nothing was invalidated. The remedy is offered
+    /// rather than performed for the same reason -- and it is the flow that already knows
+    /// how to do it, which reissues exactly the profiles Apple marked invalid.
+    private void afterPushEnabled(SigningState.BundleId bundle) {
+        String message = "Push notifications are on for " + bundle.identifier()
+                + ". Apple invalidates the provisioning profiles issued before a capability"
+                + " change, so if this turned push on, the ones this project uses have to be"
+                + " reissued before it can sign.";
+        boolean projectOwnsIt = binding != null && bundle.identifier() != null
+                && bundle.identifier().equals(projectDefaults().bundleId);
+        if (projectOwnsIt) {
+            showPageMessage(message, true, "Run automatic setup", this::autoSetupCurrentProject);
+            return;
+        }
+        showPageMessage(message + " Recreate them from the profiles page.", true);
+    }
+
+    /// The build hint that turns push on for this platform, as a developer would search
+    /// for it in their settings file.
+    private String pushHintName(String platform) {
+        return "MAC_OS".equals(platform) ? "macos.entitlements.apsEnvironment" : "ios.includePush";
+    }
+
+    /// Apple's BundleIdPlatform as a person reads it.
+    private String bundlePlatformName(String platform) {
+        if ("MAC_OS".equals(platform)) {
+            return "macOS";
+        }
+        if ("UNIVERSAL".equals(platform)) {
+            return "all platforms";
+        }
+        if (platform == null || platform.trim().isEmpty()) {
+            return "another platform";
+        }
+        return "IOS".equals(platform) ? "iOS" : platform;
     }
 
     private void autoSetupMainAppGroups(String bundleIdentifier, String appName, Runnable next) {
@@ -1565,15 +1909,54 @@ public class CertificateWizard extends Lifecycle {
     private void autoSetupDefaultProfilesAfterGroups(String bundleIdentifier, String appName) {
         autoSetupCertificate(bundleIdentifier, appName, PROFILE_DEVELOPMENT,
                 () -> autoSetupCertificate(bundleIdentifier, appName, PROFILE_APP_STORE,
-                        () -> autoSetupMacProject(PROFILE_MAC_STORE,
-                                () -> autoSetupMacProject(PROFILE_MAC_DIRECT,
-                                        () -> autoSetupWidgetExtension(bundleIdentifier, appName,
-                                                () -> autoSetupDocumentProviderExtension(bundleIdentifier, appName,
-                                                        () -> showPageMessage("Automatic signing setup completed.", false)))))));
+                        () -> autoSetupMacStages(
+                                () -> autoSetupWidgetExtension(bundleIdentifier, appName,
+                                        () -> autoSetupDocumentProviderExtension(bundleIdentifier, appName,
+                                                () -> finishAutoSetup("Automatic signing setup completed."))))));
+    }
+
+    /// The Mac half of a run: the store and Developer ID profiles, in that order.
+    ///
+    /// Named because it is reached two ways -- after the iOS half, and instead of it when
+    /// the identifier turns out not to be registered for iOS. The extensions are not part
+    /// of it: they are App IDs derived from the app's own iOS one.
+    private void autoSetupMacStages(Runnable next) {
+        autoSetupMacProject(PROFILE_MAC_STORE, () -> autoSetupMacProject(PROFILE_MAC_DIRECT, next));
     }
 
     private void autoSetupMacProject(String profileType) {
-        autoSetupMacProject(profileType, () -> showPageMessage("Mac signing setup completed.", false));
+        autoSetupWarnings.clear();
+        reissuedProfiles.clear();
+        final ProjectDefaults defaults = projectDefaults();
+        // The Mac capability only: this button is scoped to Mac signing, and asserting the
+        // iOS one here would change an App ID this run has no intention of reissuing
+        // profiles from. The full run asserts both, because it reissues both.
+        ensurePushCapability(defaults.bundleId, "MAC_OS", () -> {
+            // And it reissues one profile type, while a capability change invalidates every
+            // profile the App ID ever issued -- both Mac types, and on a UNIVERSAL
+            // registration the iOS ones too, since that is one App ID serving both. What
+            // this button does not cover, it says, and points at the run that does.
+            if (projectWantsPush("MAC_OS") && hasOtherProfiles(defaults.bundleId, profileType)) {
+                warnDuringAutoSetup("Only the " + profileTypeName(profileType)
+                        + " profile was reissued here. If asserting the push capability changed it,"
+                        + " Apple invalidated the other profiles issued from " + defaults.bundleId
+                        + " -- automatic setup reissues them.");
+            }
+            autoSetupMacProject(profileType, () -> finishAutoSetup("Mac signing setup completed."));
+        });
+    }
+
+    /// Whether the account holds a profile for this identifier that this run is not going
+    /// to reissue. Read from the profiles rather than assumed, so the caveat above appears
+    /// for an account that has something to lose and stays quiet for one that does not.
+    private boolean hasOtherProfiles(String bundleIdentifier, String profileType) {
+        for (SigningState.Profile p : state.profiles) {
+            if (bundleIdentifier != null && bundleIdentifier.equals(p.bundleId())
+                    && !profileType.equals(p.profileType())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void autoSetupMacProject(String profileType, Runnable next) {
@@ -1588,8 +1971,26 @@ public class CertificateWizard extends Lifecycle {
         }
         SigningState.BundleId existing = findBundleByIdentifier(defaults.bundleId, "MAC_OS");
         if (existing == null) {
+            // An App ID identifier belongs to the account, not to a platform, so Apple
+            // will not register this one a second time for macOS. Asking anyway is what
+            // produced "An App ID with Identifier '...' is not available. Please enter a
+            // different string." in the middle of a run that was otherwise going fine --
+            // an alarming message about a step that could never have worked (issue
+            // #5652). Adding macOS to the existing App ID is a portal action the signing
+            // API does not offer, so the run says so and carries on with the iOS assets
+            // it did produce.
+            SigningState.BundleId taken = findBundleByIdentifier(defaults.bundleId);
+            if (taken != null) {
+                warnDuringAutoSetup("Mac signing was skipped: the App ID " + defaults.bundleId
+                        + " is registered for " + bundlePlatformName(taken.platform())
+                        + ", and Apple registers an identifier once. Enable macOS on it in the Apple"
+                        + " Developer portal to sign Mac builds with it.");
+                next.run();
+                return;
+            }
             showPageMessage("Creating Mac Bundle ID " + defaults.bundleId + "...", false);
-            service.createBundleId(defaults.bundleId, defaults.appName, "MAC_OS", true, r -> {
+            service.createBundleId(defaults.bundleId, defaults.appName, "MAC_OS",
+                    projectWantsPush("MAC_OS"), r -> {
                 if (!r.ok) {
                     showPageMessage(r.message, true);
                     return;
@@ -1602,13 +2003,17 @@ public class CertificateWizard extends Lifecycle {
         }
     }
 
-    private void enableAppGroupsForBundle(String bundleIdentifier) {
+    /// `platform` is the one the App ID was registered for, and it has to be carried here:
+    /// this looks the bundle back up after a refresh, and looking for the iOS record of an
+    /// identifier registered only for macOS finds nothing -- the group would be created and
+    /// then reported as a bundle that cannot be found.
+    private void enableAppGroupsForBundle(String bundleIdentifier, String platform) {
         ProjectDefaults defaults = projectDefaults();
         String groupId = resolveAppGroupIdentifier(defaults);
         String groupName = defaults.appName + " Shared";
         showPageMessage("Enabling App Groups for " + bundleIdentifier + "...", false);
         findOrCreateAppGroup(groupId, groupName, group -> refreshForAutoSetup(() -> {
-            SigningState.BundleId bundle = findBundleByIdentifier(bundleIdentifier, "IOS");
+            SigningState.BundleId bundle = findBundleByIdentifier(bundleIdentifier, platform);
             if (bundle == null) {
                 showPageMessage("Bundle ID was created but could not be found after refresh.", true);
                 return;
@@ -1796,7 +2201,10 @@ public class CertificateWizard extends Lifecycle {
             return;
         }
         showPageMessage("Creating " + ext.label + " bundle ID " + ext.bundleIdentifier + "...", false);
-        service.createBundleId(ext.bundleIdentifier, appName + " " + ext.extensionName, true, r -> {
+        // Without push: a widget or document provider extension is not what a push
+        // notification is delivered to, so the capability would be on the App ID of a
+        // target that can never use it (issue #5657).
+        service.createBundleId(ext.bundleIdentifier, appName + " " + ext.extensionName, false, r -> {
             if (!r.ok) {
                 showPageMessage(r.message, true);
                 return;
@@ -2024,7 +2432,8 @@ public class CertificateWizard extends Lifecycle {
         certs.add(compatible.get(0).appleCertId());
         List<String> devices = deviceIdsFor(profileType);
         if (!WizardDecisions.canCreateProfile(profileType, bundle.id(), certs, devices, appName)) {
-            showPageMessage("Skipped " + profileTypeLabel(profileType) + ": register a device to create development signing assets.", true);
+            warnDuringAutoSetup("Skipped " + profileTypeLabel(profileType)
+                    + ": register a device to create development signing assets.");
             next.run();
             return;
         }
@@ -2098,6 +2507,16 @@ public class CertificateWizard extends Lifecycle {
         });
     }
 
+    /// The App ID a picker's selection refers to, by Apple's resource id.
+    private SigningState.BundleId findBundleById(String appleId) {
+        for (SigningState.BundleId b : state.bundleIds) {
+            if (appleId != null && appleId.equals(b.id())) {
+                return b;
+            }
+        }
+        return null;
+    }
+
     private SigningState.BundleId findBundleByIdentifier(String identifier) {
         return findBundleByIdentifier(identifier, null);
     }
@@ -2105,7 +2524,7 @@ public class CertificateWizard extends Lifecycle {
     private SigningState.BundleId findBundleByIdentifier(String identifier, String platform) {
         for (SigningState.BundleId b : state.bundleIds) {
             if (identifier != null && identifier.equals(b.identifier())
-                    && (platform == null || platform.equals(b.platform()))) {
+                    && WizardDecisions.bundlePlatformSatisfies(platform, b.platform())) {
                 return b;
             }
         }
@@ -2137,13 +2556,36 @@ public class CertificateWizard extends Lifecycle {
         return out;
     }
 
+    /// The project's own bundle identifier, or null when it has none. The wizard refuses
+    /// to start in that state, so every later caller is reading a real identifier -- see
+    /// runApp and `#showLaunchFailure()`.
+    private String projectBundleIdentifier() {
+        String settings = binding == null ? null : binding.settings();
+        String id = firstNonEmpty(readSetting(settings, "codename1.packageName"),
+                stripTeamPrefix(readSetting(settings, "codename1.ios.appid")));
+        return id == null || id.trim().isEmpty() ? null : id.trim();
+    }
+
+    /// The one screen the wizard shows when it was not given a project to work on.
+    private void showLaunchFailure() {
+        form = new Form("Codename One Certificate Wizard", new BorderLayout());
+        SpanLabel message = new SpanLabel("This tool works on one project's signing identities, "
+                + "and it was not given one. Open it from Codename One Settings for the project "
+                + "you want to sign, and make sure that project's codename1.packageName is set.");
+        message.setName("page.launchError");
+        message.getTextComponent().setTextSelectionEnabled(true);
+        form.add(BorderLayout.CENTER, message);
+        form.show();
+    }
+
     private ProjectDefaults projectDefaults() {
         String settings = binding == null ? null : binding.settings();
         String packageName = readSetting(settings, "codename1.packageName");
-        String iosAppId = readSetting(settings, "codename1.ios.appid");
         String appName = firstNonEmpty(readSetting(settings, "codename1.displayName"),
                 readSetting(settings, "codename1.mainName"), "Codename One App");
-        String bundleId = firstNonEmpty(packageName, stripTeamPrefix(iosAppId), "com.example.app");
+        // No placeholder: the wizard does not start without a real identifier, so there is
+        // nothing here to stand in for one.
+        String bundleId = projectBundleIdentifier();
         return new ProjectDefaults(appName, bundleId, firstNonEmpty(packageName, bundleId));
     }
 
@@ -2401,7 +2843,7 @@ public class CertificateWizard extends Lifecycle {
                 SigningAssetInstaller.applyReleaseCertificate(binding.settings(), certificatePath,
                         password, profilePath);
             }
-            clearPageMessage();
+            clearProgressMessage();
             ToastBar.showMessage(okMessage, FontImage.MATERIAL_CHECK);
         } catch (Exception ex) {
             Log.e(ex);
@@ -2415,7 +2857,7 @@ public class CertificateWizard extends Lifecycle {
             SigningAssetInstaller.applyMacCertificate(binding.settings(), certificatePath, password, profilePath,
                     "MAC_APP_DIRECT".equals(profileType) || "MAC_CATALYST_APP_DIRECT".equals(profileType)
                             ? "developerID" : "appStore");
-            clearPageMessage();
+            clearProgressMessage();
             ToastBar.showMessage(okMessage, FontImage.MATERIAL_CHECK);
         } catch (Exception ex) {
             Log.e(ex);
@@ -2473,6 +2915,56 @@ public class CertificateWizard extends Lifecycle {
         pageMessageActionText = null;
         pageMessageAction = null;
         renderPageMessage();
+    }
+
+    /// Clears a progress message, and leaves standing a warning the running automatic
+    /// setup has recorded.
+    ///
+    /// The banner reports both what the wizard is doing and what went wrong with it, and
+    /// automatic setup runs a dozen steps in a row: a step that succeeded wiped the
+    /// warning the step before it had just put up, so the only trace of a skipped step was
+    /// a banner that appeared and vanished too fast to read (issue #5652). It survives
+    /// until the run reports its outcome, or until the user navigates to another page.
+    ///
+    /// Only that warning, though, and not every warning-styled message. The install path
+    /// this guards is also the Install button on the certificates and profiles pages: a
+    /// failure there followed by a successful retry would otherwise leave the obsolete
+    /// failure on screen beside the success toast. What the run recorded is exactly what
+    /// the run will repeat in its summary; anything else is stale the moment something
+    /// succeeds.
+    private void clearProgressMessage() {
+        if (pageMessageWarn && pageMessage != null && autoSetupWarnings.contains(pageMessage)) {
+            return;
+        }
+        clearPageMessage();
+    }
+
+    /// Records a step of automatic setup that did not happen, and shows it.
+    ///
+    /// The run continues -- these are steps that cannot be done rather than failures of
+    /// the whole run -- so the message is also kept, and repeated in the summary the run
+    /// ends with. Otherwise the next step's success is the last thing on screen and the
+    /// run looks like it did everything.
+    private void warnDuringAutoSetup(String message) {
+        if (message != null && message.length() > 0 && !autoSetupWarnings.contains(message)) {
+            autoSetupWarnings.add(message);
+        }
+        showPageMessage(message, true);
+    }
+
+    /// Reports the outcome of an automatic setup run: what it did, and everything it
+    /// could not do, in one banner that stays put.
+    private void finishAutoSetup(String okMessage) {
+        if (autoSetupWarnings.isEmpty()) {
+            showPageMessage(okMessage, false);
+            return;
+        }
+        StringBuilder b = new StringBuilder(okMessage);
+        for (String warning : autoSetupWarnings) {
+            b.append(' ').append(warning);
+        }
+        autoSetupWarnings.clear();
+        showPageMessage(b.toString(), true);
     }
 
     private void renderPageMessage() {
@@ -2547,7 +3039,7 @@ public class CertificateWizard extends Lifecycle {
         detailRow(d, "Name", b.name());
         detailRow(d, "Apple ID", b.id());
         detailRow(d, "Platform", b.platform());
-        detailRow(d, "Push", b.pushEnabled() ? "Enabled" : "Off");
+        detailRow(d, "Push", pushLabel(b));
         addCloseAction(d);
         showModal(d);
     }
@@ -2824,8 +3316,40 @@ public class CertificateWizard extends Lifecycle {
             r.add(detailCell(cell(b.identifier(), b.id()), () -> bundleDetails(b)));
             r.add(detailCell(cell(b.name(), ""), () -> bundleDetails(b)));
             r.add(detailCell(pill(b.platform(), "CWPillMuted"), () -> bundleDetails(b)));
-            r.add(detailCell(pill(b.pushEnabled() ? "Enabled" : "Off", b.pushEnabled() ? "CWPillOk" : "CWPillMuted"), () -> bundleDetails(b)));
-            r.add(tableCell(blankCell()));
+            r.add(detailCell(pill(pushLabel(b), Boolean.TRUE.equals(b.pushEnabled()) ? "CWPillOk" : "CWPillMuted"),
+                    () -> bundleDetails(b)));
+            // The one capability the wizard can set on an App ID it did not just create.
+            //
+            // Automatic setup provisions push from what the project DECLARES, and the
+            // builders also turn it on for what they DETECT: IPhoneBuilder infers it for an
+            // app referencing com.codename1.call.voip, and the macOS builder scans the
+            // application's compiled classes for a push registration call. Neither
+            // inference is available here -- the wizard has no bytecode reader, and it is
+            // usually run before the project has ever been compiled, so a scan would answer
+            // "no push" for exactly the projects it was meant to help and do it silently.
+            // Guessing from what an application merely names would be worse still: the
+            // macOS scanner deliberately does not count naming PushContent in a callback,
+            // because receiving a push needs no entitlement, and a cruder test would put
+            // the capability on App IDs nobody asked to change -- which is issue #5657
+            // through a different door.
+            //
+            // So the answer to a build whose entitlement the App ID does not grant is this
+            // button rather than a guess: one click, on the page that lists the App IDs,
+            // instead of a signing failure with no remedy inside the wizard at all.
+            Button enablePush = outline("Enable push", "btn.enablePush." + b.id());
+            enablePush.addActionListener(e -> service.enablePushCapability(b.id(), r2 -> {
+                if (!r2.ok) {
+                    showPageError(r2, null);
+                    return;
+                }
+                // No toast beside the banner: the banner below says the capability is on AND
+                // what it did to the profiles, which is the part that matters, and a toast
+                // animating while the refresh rebuilds the page is a race -- container
+                // mutations are queued for the length of an animation, so the rebuilt page
+                // can be read back as if nothing had happened.
+                refreshForAutoSetup(() -> afterPushEnabled(b));
+            }));
+            r.add(tableCell(actionRow(Component.RIGHT, enablePush)));
             body.add(r);
         }
     }
@@ -3008,13 +3532,60 @@ public class CertificateWizard extends Lifecycle {
     /// The leading glyph is what makes the chosen row obvious at a glance; the tinted background
     /// alone was easy to miss on a list of rows that already have backgrounds.
     private Button choice(String title, String desc, boolean selected) {
-        String text = desc == null || desc.trim().isEmpty() ? title : title + "   " + desc.trim();
+        // A row with nothing written on it cannot be chosen on purpose. Apple returns
+        // certificates whose display name is empty, and the two halves used to be
+        // concatenated, so the type carried the row; on its own it rendered blank.
+        String head = title == null || title.trim().isEmpty() ? "(unnamed)" : title.trim();
+        String text = desc == null || desc.trim().isEmpty() ? head : head + "   " + desc.trim();
         Button b = new Button(text);
         b.setUIID(uiid(selected ? "CWChoiceSelected" : "CWChoice"));
         b.setAlignment(Component.LEFT);
         b.getAllStyles().setAlignment(Component.LEFT);
         applyChoiceIcon(b, selected);
         return b;
+    }
+
+    /// What to write on a certificate's row in the profile dialog.
+    ///
+    /// Apple hands back certificates whose display name is empty -- older ones, and ones
+    /// reconciled from a portal that never had a name for them. The row is a single
+    /// select, so it needs something that tells it apart from its neighbours: the type
+    /// and the serial number do, and the serial is what the Certificates page shows for
+    /// the same certificate.
+    private String certificateChoiceTitle(SigningState.Certificate cert) {
+        String name = cert.displayName();
+        if (name != null && !name.trim().isEmpty()) {
+            return name.trim();
+        }
+        String serial = cert.serialNumber();
+        String type = typeLabel(cert.certificateType());
+        if (serial == null || serial.trim().isEmpty()) {
+            return type.trim().isEmpty() ? "Unnamed certificate" : type;
+        }
+        return (type.trim().isEmpty() ? "Certificate" : type) + " " + serial.trim();
+    }
+
+    /// The one certificate a profile could be signed with, or null when the choice is
+    /// real. A certificate with no stored private key is still offered -- creating the
+    /// profile does not need one -- but it is not the obvious default when a usable one
+    /// sits beside it, because installing the pair into the project does need the key.
+    private SigningState.Certificate soleCertificate(List<SigningState.Certificate> usable) {
+        if (usable == null || usable.isEmpty()) {
+            return null;
+        }
+        if (usable.size() == 1) {
+            return usable.get(0);
+        }
+        SigningState.Certificate withKey = null;
+        for (SigningState.Certificate c : usable) {
+            if (c.privateKeyPresent()) {
+                if (withKey != null) {
+                    return null;
+                }
+                withKey = c;
+            }
+        }
+        return withKey;
     }
 
     private void applyChoiceIcon(Button b, boolean selected) {
@@ -3057,9 +3628,18 @@ public class CertificateWizard extends Lifecycle {
         }
     }
 
+    /// Swaps a component's UIID and repaints it.
+    ///
+    /// setUIID drops the cached styles without marking anything dirty, so a row that
+    /// stopped being the selected one kept painting selected until something else forced
+    /// a redraw: two certificates looked chosen at once, and scrolling the dialog -- any
+    /// repaint at all -- corrected it (issue #5656). Every selected/unselected UIID pair
+    /// here shares its padding and margin, so the new look needs a repaint rather than a
+    /// relayout.
     private void setScaledUIID(Component c, String id) {
         c.setUIID(uiid(id));
         applyFontScale(c);
+        c.repaint();
     }
 
     private Button iconButton(char icon, String tooltip, String name) {
@@ -3158,7 +3738,7 @@ public class CertificateWizard extends Lifecycle {
 
         ProjectDefaults(String appName, String bundleId, String packageName) {
             this.appName = appName == null || appName.trim().isEmpty() ? "Codename One App" : appName.trim();
-            this.bundleId = bundleId == null || bundleId.trim().isEmpty() ? "com.example.app" : bundleId.trim();
+            this.bundleId = bundleId == null ? null : bundleId.trim();
             this.packageName = packageName == null || packageName.trim().isEmpty()
                     ? this.bundleId : packageName.trim();
         }
@@ -3232,7 +3812,7 @@ public class CertificateWizard extends Lifecycle {
         List<SigningState.BundleId> out = new ArrayList<SigningState.BundleId>();
         String filter = tableFilter(Section.BUNDLES);
         for (SigningState.BundleId b : state.bundleIds) {
-            if (matches(filter, b.identifier(), b.id(), b.name(), b.platform(), b.pushEnabled() ? "Enabled" : "Off")) {
+            if (matches(filter, b.identifier(), b.id(), b.name(), b.platform(), pushLabel(b))) {
                 out.add(b);
             }
         }
@@ -3243,7 +3823,7 @@ public class CertificateWizard extends Lifecycle {
                 switch (col) {
                     case 1 -> v = cmp(a.name(), b.name());
                     case 2 -> v = cmp(a.platform(), b.platform());
-                    case 3 -> v = cmp(a.pushEnabled() ? "Enabled" : "Off", b.pushEnabled() ? "Enabled" : "Off");
+                    case 3 -> v = cmp(pushLabel(a), pushLabel(b));
                     default -> v = cmp(a.identifier(), b.identifier());
                 }
                 return sortDir(Section.BUNDLES, v);

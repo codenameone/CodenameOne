@@ -2,13 +2,13 @@
 
 The `ComponentSelector` class is a new class that brings the power of jQuery to Codename One. While it isn't *actually* jQuery, it's influenced by it. If you're not familiar with jQuery, here is the 10 second intro.
 
-jQuery is a JavaScript library, created by John Resig in 2006, that has become a staple of browser-based UI development. As of March 2017, over 70% of web sites are using jQuery. The initial problem that jQuery solved was browser incompatibility issues. It provided a consistent API for most useful DOM methods so that the developer didn't have to spend all their days and nights fighting with browser compatibility issues. In a way, it did for JavaScript, what Codename One does for mobile apps.
+jQuery is a JavaScript library, created by John Resig in 2006, that has become a staple of browser-based UI development. As of March 2017, over 70% of websites are using jQuery. The initial problem that jQuery solved was browser incompatibility issues. It provided a consistent API for most useful DOM methods so that the developer didn't have to spend all their days and nights fighting with browser compatibility issues. In a way, it did for JavaScript, what Codename One does for mobile apps.
 
-The other thing that jQuery did, was provide an elegant way to select and manipulate DOM elements (that is, HTML tags in a web page). It enabled developers to form sets of elements using a CSS-like syntax, and to operate on all elements of those sets, as if they were single elements, and they provided a fluent API to enable developers to chain multiple calls together, and delay onset of carpel tunnel for at least a few extra years.
+The other thing jQuery did was provide an elegant way to select and manipulate DOM elements (that is, HTML tags in a web page). It enabled developers to form sets of elements using a CSS-like syntax, and to operate on all elements of those sets, as if they were single elements, and they provided a fluent API to enable developers to chain multiple calls together, and delay onset of carpel tunnel for at least a few extra years.
 
 With the new `ComponentSelector` class, you've adopted the following aspects of jQuery:
 
-1. **CSS-like Selection Sytax** - Support for a CSS-like syntax for "selecting" Components to be included in a set.
+1. **CSS-like Selection Syntax** - Support for a CSS-like syntax for "selecting" Components to be included in a set.
 2. **Fluent API** - The API is fluent, meaning you can chain multiple method calls together and reduce typing.
 3. **Working on Sets** - Methods of this class operate on sets of components as if they're a single component. As you'll see, this can be incredibly powerful.
 4. **Effects** - Support for common effects on components such as fadeIn(), fadeOut(), slideDown(), and slideUp().
@@ -59,7 +59,7 @@ Finally, ComponentSelector provides a `find()` method that implicitly uses the c
 
 ==== Selector syntax
 
-far You've glossed over the selector syntax by saying it's `like CSS`. Though it's *like* CSS selectors, it's necessarily different to accommodate the differences between Codename One's component model and JavaScript's DOM. Rather than go into a technical language definition, You'll use some examples to illustrate the capabilities of your syntax.
+Until now the selector syntax has only been described as `like CSS`. It's *like* CSS, but it differs where Codename One's component model differs from the JavaScript DOM. Rather than a formal grammar, the examples below show what the syntax can express.
 
 . `$("Label")` - The set of all components on the form with UIID "Label"
 . `$("#MyField")` - The set of all components on the form with Name `MyField`.
@@ -103,7 +103,7 @@ Were you setting these values on the "selected" style, the "unselected" style, t
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ComponentSelectorJava004Snippet.java[tag=component-selector-java-004,indent=0]
 ----
 
-If a component was in "selected" state, then this would changed the selected style. If it was in pressed state, then it would change the "pressed" style. Etc. What if you wanted to specifically change the styles in the "pressed" state. Then you would call `selectPressedStyle()` prior calling your style mutation methods. For example:
+If a component was in "selected" state, then this would change the selected style. If it was in pressed state, then it would change the "pressed" style. Etc. What if you wanted to specifically change the styles in the "pressed" state. Then you would call `selectPressedStyle()` prior calling your style mutation methods. For example:
 
 [source,java]
 ----
@@ -142,6 +142,10 @@ Also to these basic effects, ComponentSelector wraps all the existing animation 
 
 For example, Consider this example, that shows a button that replaces itself and all siblings with replacement labels, and then replaces them back:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ComponentSelectorJava007Snippet.java[tag=component-selector-java-007,indent=0]
+----
 <1> Finds all siblings of the source button
 <2> Call `replaceAndWait()` with a mapping function to define the component that should replace each component. This will replace each component in the set with a replacement component in its respective container. This will also return a new ComponentSelector with the set of replacement components.
 <3> In your "mapper" callback, you will return a new Label component to replace each existing component.
@@ -165,9 +169,9 @@ This can get interesting when you start combining these methods. For example, `$
 
 === More demos
 
-you've posted a demo app that demonstrates a few of the things that you discuss https://github.com/shannah/cn1-component-selector-demo[here]. The file containing most relevant source code is https://github.com/shannah/cn1-component-selector-demo/blob/master/src/com/codename1/tests/stylebuilder/StyleBuilderDemo.java[here].
+A https://github.com/shannah/cn1-component-selector-demo[demo app] exercises several of the features covered here. Most of the interesting code is in https://github.com/shannah/cn1-component-selector-demo/blob/master/src/com/codename1/tests/stylebuilder/StyleBuilderDemo.java[StyleBuilderDemo.java].
 
-you've also posted a short screencast of the demo app on youtube:
+A short screencast of the demo app is on YouTube:
 
 video::Cue0fnJdB4U[youtube]
 

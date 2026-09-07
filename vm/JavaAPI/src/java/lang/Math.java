@@ -137,7 +137,47 @@ public final class Math{
     public native static double tan(double a);
 
     public native static double atan(double d);
-    
+
+    /**
+     * Returns the arc cosine of a value, in the range 0.0 through pi. Special
+     * case: if the argument is NaN or its absolute value is greater than 1,
+     * the result is NaN.
+     */
+    public native static double acos(double a);
+
+    /**
+     * Returns the arc sine of a value, in the range -pi/2 through pi/2. Special
+     * case: if the argument is NaN or its absolute value is greater than 1, the
+     * result is NaN.
+     */
+    public native static double asin(double a);
+
+    /**
+     * Returns the angle theta from the conversion of rectangular coordinates
+     * ({@code x}, {@code y}) to polar coordinates -- the angle of the vector,
+     * in the range -pi through pi.
+     */
+    public native static double atan2(double y, double x);
+
+    /**
+     * Returns Euler's number e raised to the power of a value.
+     */
+    public native static double exp(double a);
+
+    /**
+     * Returns the natural logarithm (base e) of a value. Special cases: if the
+     * argument is NaN or less than zero the result is NaN; if it is positive
+     * zero or negative zero the result is negative infinity.
+     */
+    public native static double log(double a);
+
+    /**
+     * Returns the base 10 logarithm of a value, with the same special cases as
+     * {@link #log(double)}.
+     */
+    public native static double log10(double a);
+
+
     /**
      * Converts an angle measured in radians to the equivalent angle measured in degrees.
      */

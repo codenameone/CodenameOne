@@ -26,7 +26,8 @@
 #if TARGET_OS_OSX
 
 #import <AppKit/AppKit.h>
-#import <QuartzCore/CAMetalLayer.h>
+#import <QuartzCore/QuartzCore.h>
+#import <IOSurface/IOSurface.h>
 #import "CN1RenderingView.h"
 @import Metal;
 @import simd;
@@ -39,9 +40,10 @@
 /// watch slice reuses `CodenameOne_GLViewController` for a class that shares
 /// nothing with the iOS one but its role.
 ///
-/// Layer-hosted rather than layer-backed: `makeBackingLayer` returns the
-/// `CAMetalLayer` itself, so AppKit never draws into it and the only thing that
-/// touches those pixels is Metal.
+/// Layer-hosted rather than layer-backed: `makeBackingLayer` returns a plain
+/// `CALayer`, so AppKit never draws into it and the only thing that touches
+/// those pixels is Metal. It presents through an IOSurface rather than a
+/// `CAMetalLayer` drawable pool -- see `makeBackingLayer` for why.
 ///
 /// #### Why this is a separate implementation rather than a guarded one
 ///

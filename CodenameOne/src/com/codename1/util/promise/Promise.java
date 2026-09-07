@@ -123,7 +123,10 @@ public class Promise<T> {
 
     }
 
-    /// The Promise.all() method takes an iterable of promises as an input, and returns a single Promise that resolves to an array of the results of the input promises. This returned promise will resolve when all of the input's promises have resolved, or if the input iterable contains no promises. It rejects immediately upon any of the input promises rejecting or non-promises throwing an error, and will reject with this first rejection message / error.
+    /// The Promise.all() method takes an iterable of promises as an input, and returns a single Promise that resolves to an array of the results of the input promises. This returned promise will resolve when all of the input's promises have resolved, or if the input iterable contains no promises. It rejects immediately upon any of the input promises rejecting or non-promises throwing an error. Unlike the
+    /// JavaScript original this makes no guarantee about WHICH error is reported when several inputs reject: a
+    /// handler already attached is called with the first, while one attached later reads the stored error, which
+    /// every subsequent rejection overwrites.
     ///
     /// #### Parameters
     ///

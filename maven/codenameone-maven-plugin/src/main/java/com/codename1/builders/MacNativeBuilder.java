@@ -305,6 +305,15 @@ class MacNativeBuilder {
         }
     }
 
+    /// Escapes a value going into the entitlements plist.
+    ///
+    /// A container identifier is normally plain, but it is project-supplied -- an app sharing a
+    /// store with a sibling names that sibling -- and an unescaped "&" turns the whole plist into
+    /// something codesign refuses to parse, which reads as a signing failure rather than a typo.
+    private static String escapeEntitlementValue(String value) {
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
     private void writeEntitlementsFile(BuildRequest request, File appSrcDir,
                                        String baseName, String channel) throws IOException {
         boolean sandbox = parseEntitlementBool(request,
@@ -384,6 +393,53 @@ class MacNativeBuilder {
                     "macNative.entitlements.personalInformation.calendars", needsCalendar)) {
                 sb.append("    <key>com.apple.security.personal-information.calendars</key>\n    <true/>\n");
             }
+        }
+        // The Catalyst archive is signed with THIS plist, and it is assembled from the
+        // macNative.entitlements.* namespace alone -- so an entitlement the iOS side generated
+        // reached the iOS slice and silently missed the Mac one. NSUbiquitousKeyValueStore then
+        // has no container in the Mac slice of the very build that switched the shared code on,
+        // and SyncedStore fails at runtime on a Mac with nothing said at build time.
+        //
+        // Read from the value the iOS side already resolved rather than through a hint of its own.
+        // There is one correct container per app, and a second place to configure it is a second
+        // place for the two slices to disagree.
+        //
+        // The namespaced argument ALONE, and the BuildDaemon twin deliberately resolves more. A
+        // review asked for the raw ios.entitlementsInject fragment to be consulted here too, on
+        // the grounds that a project naming its container that way would sign the two slices for
+        // different stores. That is true THERE and false here: this builder never reads that hint
+        // -- buildNamespacedEntitlements merges it only in the daemon -- so locally the fragment
+        // reaches no plist at all and both slices use exactly this value. Consulting it here would
+        // be a check over a value this builder never sees, which is the same asymmetry the VPN
+        // entitlement above already documents. A twin diff showing it is reading the right answer.
+        String ubiquityKvStore = request.getArg(
+                "ios.entitlements.com.apple.developer.ubiquity-kvstore-identifier", null);
+        if (ubiquityKvStore != null && ubiquityKvStore.trim().length() > 0) {
+            // MATERIALIZED, not copied. $(CFBundleIdentifier) is target-relative and this is not
+            // the iOS target: DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER makes the Catalyst
+            // bundle id "<package>.maccatalyst" -- the same derivation the provisioning-profile
+            // block above already relies on -- so copying the expression verbatim signed this
+            // slice for TEAM.<package>.maccatalyst while the iOS slice used TEAM.<package>. Two
+            // containers, neither able to see the other's writes, which is precisely the failure
+            // this entry was added to prevent.
+            //
+            // $(TeamIdentifierPrefix) is left alone: it is the same team in both targets.
+            String container = ubiquityKvStore.trim();
+            String iosBundleId = request.getPackageName();
+            if (iosBundleId != null && iosBundleId.length() > 0) {
+                // Through replaceBuildSetting, which knows BOTH spellings Xcode accepts. Listing
+                // "$(NAME)" by hand here meant a project writing "${CFBundleIdentifier}" -- the
+                // same reference, and equally valid -- left it unresolved, so the iOS entitlement
+                // expanded it against the iOS bundle id while this one expanded it against the
+                // derived Catalyst id and the two slices synchronized against different stores.
+                container = IPhoneBuilder.replaceBuildSetting(
+                        container, "CFBundleIdentifier", iosBundleId);
+                container = IPhoneBuilder.replaceBuildSetting(
+                        container, "PRODUCT_BUNDLE_IDENTIFIER", iosBundleId);
+            }
+            sb.append("    <key>com.apple.developer.ubiquity-kvstore-identifier</key>\n    <string>")
+                    .append(escapeEntitlementValue(container))
+                    .append("</string>\n");
         }
         if (extra != null && extra.trim().length() > 0) {
             sb.append(extra);

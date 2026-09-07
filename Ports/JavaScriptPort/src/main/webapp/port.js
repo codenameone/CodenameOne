@@ -1781,11 +1781,15 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage
   return jvm.createStringLiteral(String(value));
 });
 
+// The probe has to ask about the primitive we actually use. It used to ask
+// about WeakMap, which every engine since 2015 has and which tells you nothing
+// about WeakRef (ES2021: Chrome 84, Firefox 79, Safari 14.1). Keep this name in
+// step with HTML5Implementation.isWeakRefSupported.
 bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_isWeakMapSupported_R_boolean",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_isWeakMapSupported___R_boolean"
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isWeakRefSupported_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isWeakRefSupported___R_boolean"
 ], function() {
-  return typeof WeakMap === "function" ? 1 : 0;
+  return typeof WeakRef === "function" ? 1 : 0;
 });
 
 // ===================================================================
@@ -2025,44 +2029,51 @@ bindNative([
   return null;
 });
 
-// The cached value is declared java.lang.Object, not JSObject: the framework's
-// caches hold ordinary Java objects and the JSObject-only spelling sent every one
-// of them down the WeakReference fallback, which under ParparVM never holds its
-// referent. Keep these names in step with HTML5Implementation.createSoftWeakRefImpl
-// -- ParparVM encodes the whole signature here, so a stale name binds nothing.
+// createSoftWeakRef must hand back a token that does NOT keep its referent alive.
+// This used to be built on a WeakMap: a fresh {} was the key, the referent was the
+// VALUE, and the key came back to Java as the token. A WeakMap holds its keys
+// weakly and its values STRONGLY, so that is backwards -- Java parks the token in
+// EncodedImage.cache / Image.scaleCache / Border's round-rect cache, the token
+// keeps the key alive, the live key keeps the entry alive, and the entry holds the
+// referent strongly. The result had exactly the lifetime of a plain field: nothing
+// was ever reclaimable, and the two call sites that own the token map rather than
+// borrow it -- CacheMap.weakCache and com.codename1.ui.util.WeakHashMap, both plain
+// hashtables that only ever drop an entry on explicit remove/clear -- grew without
+// bound. WeakRef (ES2021) is the direct analogue of java.lang.ref.WeakReference and
+// is what belongs here: the token IS the WeakRef, and deref() is get().
+//
+// Keep these names in step with HTML5Implementation.createSoftWeakRefImpl --
+// ParparVM encodes the whole signature here, so a stale name binds nothing and the
+// (correct, but slower to notice) @JSBody twin in the Java file runs instead.
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl_java_lang_Object_R_com_codename1_html5_js_JSObject",
   "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl___java_lang_Object_R_com_codename1_html5_js_JSObject"
 ], function(objectRef) {
-  if (typeof WeakMap !== "function") {
+  if (typeof WeakRef !== "function") {
     return null;
   }
-  const win = global.window || global;
-  if (!(win.cn1GlobalWeakMap instanceof WeakMap)) {
-    win.cn1GlobalWeakMap = new WeakMap();
+  const referent = jvm.unwrapJsValue(objectRef);
+  // new WeakRef(x) throws TypeError for a non-object target. A VM object is
+  // always an object, but returning null rather than throwing means an
+  // unforeseen shape degrades to the Java-side strong fallback instead of
+  // taking down whatever was trying to cache.
+  if (referent == null || (typeof referent !== "object" && typeof referent !== "function")) {
+    return null;
   }
-  const key = {};
-  win.cn1GlobalWeakMap.set(key, jvm.unwrapJsValue(objectRef));
-  return jvm.wrapJsObject(key, "com_codename1_html5_js_JSObject");
+  return jvm.wrapJsObject(new WeakRef(referent), "com_codename1_html5_js_JSObject");
 });
 
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl_com_codename1_html5_js_JSObject_R_java_lang_Object",
   "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl___com_codename1_html5_js_JSObject_R_java_lang_Object"
 ], function(keyRef) {
-  if (typeof WeakMap !== "function") {
+  const token = jvm.unwrapJsValue(keyRef);
+  if (token == null || typeof token.deref !== "function") {
     return null;
   }
-  const win = global.window || global;
-  const weakMap = win.cn1GlobalWeakMap;
-  if (!(weakMap instanceof WeakMap)) {
-    return null;
-  }
-  const key = jvm.unwrapJsValue(keyRef);
-  if (key == null || !weakMap.has(key)) {
-    return null;
-  }
-  const value = weakMap.get(key);
+  // deref() answers undefined once the referent has been collected; == null
+  // covers both that and an explicitly stored null.
+  const value = token.deref();
   if (value == null) {
     return null;
   }

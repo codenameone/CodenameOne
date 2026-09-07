@@ -39,6 +39,13 @@ public interface SigningService {
     void createBundleId(String identifier, String name, String platform, boolean push, OnComplete<Result<Void>> callback);
     void createAppGroup(String identifier, String name, OnComplete<Result<SigningState.AppGroup>> callback);
     void enableAppGroupCapability(String bundleIdAppleId, List<String> appGroupIds, OnComplete<Result<Void>> callback);
+    /// Turns push notifications on for an App ID that already exists.
+    ///
+    /// createBundleId enables it at registration, which only covers an App ID this
+    /// wizard created. A project that adds push later reuses the App ID it already has,
+    /// and the capability has to be asserted on it separately or the build stamps an
+    /// aps-environment entitlement the profile does not grant.
+    void enablePushCapability(String bundleIdAppleId, OnComplete<Result<Void>> callback);
     void registerDevice(String name, String udid, OnComplete<Result<Void>> callback);
     void createProfile(String name, String profileType, String bundleIdAppleId, List<String> certificateAppleIds,
                        List<String> deviceAppleIds, OnComplete<Result<Void>> callback);

@@ -234,6 +234,18 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     // every test ends up in the jar without platform-dependent initialization.
     private static final BaseTest[] DEFAULT_TEST_CLASSES = new BaseTest[]{
             new MainScreenScreenshotTest(),
+            // Second, and deliberately near the front: it is the only test
+            // whose input comes from OUTSIDE the app process. The
+            // instrumentation harness watches the log for the probe's
+            // announcement and injects one system back for it, and its own wait
+            // is capped well below the length of a full suite -- a back test at
+            // the end of the list would be reached after that cap had expired,
+            // and the assertion would never run at all. Failing here is also
+            // the loudest place to fail: an unmigrated port leaves the app on a
+            // back press, so nothing after this point produces any output.
+            // Takes no screenshot; every port but Android skips it for want of
+            // a system back action.
+            new SystemBackNavigationTest(),
             // Advertising API: renders a banner + native-ad feed via the
             // deterministic MockAdProvider (cn1-ads-mock) for a pixel-stable shot.
             new AdsScreenshotTest(),
@@ -499,6 +511,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new FloatingToStringTest(),
             new StringFormatTest(),
             new ClipboardRoundTripTest(),
+            // The contact picker's request contract, and the only thing in
+            // this suite that references com.codename1.contacts.ContactPicker
+            // -- which is what makes the iOS build compile and link its
+            // CNContactPickerViewController delegate at all.
+            new ContactPickerApiTest(),
             // Log is an extension point (subclass + override createWriter) and the
             // JavaScript port used to shadow Log.e with a console stub, so a
             // subclass's writer was never created (issue #5519). Assertion-only.
@@ -518,6 +535,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // at all is also what makes the iOS extension target and the Android <provider> get
             // generated and compiled in the first place.
             new DocumentProviderPublishTest(),
+            // State restoration and continuity on the device VM: the codec both wire formats
+            // share, the payload rule, the checkpoint and the restore. Referencing
+            // com.codename1.continuity at all is also what makes the iOS build compile the
+            // NSUserActivity natives and declare this app's activity type in the plist.
+            new ContinuityStateTest(),
+
             // App intents on the device VM: the generated registry, the coercion it wraps
             // every parameter in, and entity resolution behind an id. The declarations it
             // exercises are also what make the iOS Swift and the Android shortcut resources

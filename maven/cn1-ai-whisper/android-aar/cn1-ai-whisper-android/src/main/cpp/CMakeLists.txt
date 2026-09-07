@@ -1,6 +1,18 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(cn1_ai_whisper_android LANGUAGES C CXX)
 
+# Google Play requires every 64-bit shared library in an upload to have
+# PT_LOAD segments aligned to 16 KB (API 35+ uploads since 2025-11-01, Wear OS
+# from 2026-09-15) -- see https://developer.android.com/guide/practices/page-sizes.
+# NDK r28, which build.gradle pins, already does this by default; these flags
+# are what keeps the result correct if this project is ever driven by an older
+# NDK or a standalone CMake invocation, where the default is still 4 KB and the
+# breakage is silent (the library loads fine on every 4 KB device).
+#
+# Set before any target is declared so it also reaches the whisper.cpp
+# subproject added below.
+add_link_options(-Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384)
+
 add_library(cn1aiwhisper SHARED native_whisper_jni.cpp)
 target_compile_features(cn1aiwhisper PRIVATE cxx_std_17)
 

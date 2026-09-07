@@ -51,6 +51,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 connection is reachable through `em.database()` for raw SQL when the
 dao surface isn't enough. Transactions:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnnotationSqliteOrmJava002Snippet.java[tag=annotation-sqlite-orm-java-002,indent=0]
+----
 
 === Relationships
 

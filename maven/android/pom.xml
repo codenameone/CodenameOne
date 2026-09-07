@@ -93,6 +93,19 @@
                                      generated app after PlatformFeatureCatalog
                                      injects their ML Kit/LiteRT dependencies. -->
                                 <exclude>com/codename1/impl/android/ai/**</exclude>
+                                <!-- The BiometricPrompt-backed implementation
+                                     names android.hardware.biometrics, which is
+                                     API 28 to 30 and so newer than the
+                                     cn1-binaries android.jar this jar compiles
+                                     against. It compiles in the generated app,
+                                     where compileSdk is a modern platform, and
+                                     AndroidBiometrics loads it by name. Its
+                                     legacy counterpart, com/codename1/impl/
+                                     android/fingerprint, is NOT excluded: that
+                                     API does exist here. It is the app build,
+                                     against an API 37 platform that dropped
+                                     it, which deletes that one instead. -->
+                                <exclude>com/codename1/impl/android/biometrics/**</exclude>
                                 <!-- The SQLCipher-backed database impl compiles
                                      against net.zetetic which is only on the
                                      classpath of app builds that use encrypted

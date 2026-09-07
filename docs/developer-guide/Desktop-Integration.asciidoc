@@ -183,6 +183,10 @@ native macOS build it goes through the same `UNUserNotificationCenter` path as i
 the notification delivers it to your app's `LocalNotificationCallback`, exactly as on mobile, so the
 same scheduling and handling code is shared across phone and desktop:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopIntegrationJava004Snippet.java[tag=desktop-integration-java-004,indent=0]
+----
 
 NOTE: On the Java SE build desktop notifications require an OS with system-tray support
 (`java.awt.SystemTray`); where it's unavailable the notification is logged and skipped.

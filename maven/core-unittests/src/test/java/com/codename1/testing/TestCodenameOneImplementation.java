@@ -85,7 +85,9 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -108,12 +110,28 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private final Map<String, Contact> contacts = new ConcurrentHashMap<String, Contact>();
     private final List<ScheduledNotification> scheduledNotifications = new CopyOnWriteArrayList<ScheduledNotification>();
     private final AtomicInteger contactIdCounter = new AtomicInteger(1);
+    private final AtomicReference<Contact[]> contactPickerSelection =
+            new AtomicReference<Contact[]>(new Contact[0]);
+    private final AtomicBoolean contactPickerSupported = new AtomicBoolean();
+    private final List<ContactPickerRequest> contactPickerRequests =
+            new CopyOnWriteArrayList<ContactPickerRequest>();
     private boolean getAllContactsFast;
     private boolean databaseCustomPathSupported;
     private String[] lastSentMessageRecipients;
     private String lastSentMessageSubject;
     private Message lastSentMessage;
     private int refreshContactsCount;
+
+    /// Native drag and drop, faked so the framework's outbound path can be exercised without a
+    /// real operating system drag: the last operation prepared and the last one started are
+    /// recorded, and startNativeDrag reports success only while nativeDragAndDropSupported is on.
+    private boolean nativeDragAndDropSupported;
+    private com.codename1.ui.NativeDragOperation preparedNativeDrag;
+    private com.codename1.ui.NativeDragOperation startedNativeDrag;
+    private int cancelledNativeDrags;
+    private boolean nativeDragStartRefused;
+    private int nativeDragSourceRegistrations;
+    private int nativeDropTargetRegistrations;
 
     private final TestFont defaultFont = new TestFont(8, 16);
     private int displayWidth = 1080;
@@ -3779,6 +3797,91 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void clearContacts() {
         contacts.clear();
+        contactPickerSelection.set(new Contact[0]);
+        contactPickerSupported.set(false);
+        contactPickerRequests.clear();
+    }
+
+    /** What a mocked picker reports the user chose. */
+    public void setContactPickerSelection(Contact... selection) {
+        contactPickerSelection.set(selection == null ? new Contact[0] : selection);
+    }
+
+    /** Whether the mocked platform claims to have a picker. */
+    public void setContactPickerSupported(boolean supported) {
+        contactPickerSupported.set(supported);
+    }
+
+    /** Every picker request made so far, oldest first. */
+    public List<ContactPickerRequest> getContactPickerRequests() {
+        return new ArrayList<ContactPickerRequest>(contactPickerRequests);
+    }
+
+    @Override
+    public boolean isContactPickerSupported() {
+        return contactPickerSupported.get();
+    }
+
+    @Override
+    public void pickContacts(int requestedFields, boolean multiSelect,
+            int selectionLimit, boolean requireAllRequestedFields,
+            ActionListener<ActionEvent> response) {
+        contactPickerRequests.add(new ContactPickerRequest(requestedFields,
+                multiSelect, selectionLimit, requireAllRequestedFields,
+                Display.getInstance().isEdt()));
+        // Through the real base-class hop rather than straight to the
+        // listener, so a test sees the same "answers later, on the EDT"
+        // shape the device does.
+        fireContactPickerResult(response, contactPickerSelection.get());
+    }
+
+    /** The arguments one {@code pickContacts} call was made with. */
+    public static final class ContactPickerRequest {
+        private final int requestedFields;
+        private final boolean multiSelect;
+        private final int selectionLimit;
+        private final boolean requireAllRequestedFields;
+        private final boolean onEdt;
+
+        ContactPickerRequest(int requestedFields, boolean multiSelect,
+                int selectionLimit, boolean requireAllRequestedFields,
+                boolean onEdt) {
+            this.requestedFields = requestedFields;
+            this.multiSelect = multiSelect;
+            this.selectionLimit = selectionLimit;
+            this.requireAllRequestedFields = requireAllRequestedFields;
+            this.onEdt = onEdt;
+        }
+
+        /** Whether the port was entered on the EDT. */
+        public boolean isOnEdt() {
+            return onEdt;
+        }
+
+        public int getRequestedFields() {
+            return requestedFields;
+        }
+
+        public boolean isMultiSelect() {
+            return multiSelect;
+        }
+
+        public int getSelectionLimit() {
+            return selectionLimit;
+        }
+
+        public boolean isRequireAllRequestedFields() {
+            return requireAllRequestedFields;
+        }
+
+        @Override
+        public String toString() {
+            return "ContactPickerRequest{fields=" + requestedFields
+                    + ", multiSelect=" + multiSelect
+                    + ", selectionLimit=" + selectionLimit
+                    + ", requireAll=" + requireAllRequestedFields
+                    + ", onEdt=" + onEdt + '}';
+        }
     }
 
     public void setGetAllContactsFast(boolean getAllContactsFast) {
@@ -5473,5 +5576,91 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     /// Delivers a pointer release into one of the additional native windows.
     public void windowPointerReleasedForTest(int windowId, int x, int y) {
         windowPointerReleased(windowId, x, y);
+    }
+
+    // ------------------------------------------------------------------------------------
+    // Native drag and drop test hooks
+    // ------------------------------------------------------------------------------------
+
+    /// Turns the fake native drag and drop on, which is what makes
+    /// `com.codename1.ui.NativeDragAndDrop#isSupported()` true for a test.
+    public void setNativeDragAndDropSupported(boolean supported) {
+        this.nativeDragAndDropSupported = supported;
+    }
+
+    @Override
+    public boolean isNativeDragAndDropSupported() {
+        return nativeDragAndDropSupported;
+    }
+
+    @Override
+    public void prepareNativeDrag(com.codename1.ui.NativeDragOperation op) {
+        preparedNativeDrag = op;
+    }
+
+    @Override
+    public boolean startNativeDrag(com.codename1.ui.NativeDragOperation op) {
+        if (!nativeDragAndDropSupported || nativeDragStartRefused) {
+            return false;
+        }
+        startedNativeDrag = op;
+        return true;
+    }
+
+    /// Makes startNativeDrag refuse, which is how a port whose operating system owns the drag
+    /// gesture behaves: it starts no session of its own and announces the platform's later.
+    public void setNativeDragStartRefused(boolean refused) {
+        this.nativeDragStartRefused = refused;
+    }
+
+    @Override
+    public void cancelNativeDrag() {
+        cancelledNativeDrags++;
+        preparedNativeDrag = null;
+    }
+
+    /// The operation the last press staged, or null.
+    public com.codename1.ui.NativeDragOperation getPreparedNativeDrag() {
+        return preparedNativeDrag;
+    }
+
+    /// The operation the last drag actually started, or null.
+    public com.codename1.ui.NativeDragOperation getStartedNativeDrag() {
+        return startedNativeDrag;
+    }
+
+    /// How many prepared operations were dropped because the press turned out to be a click.
+    public int getCancelledNativeDrags() {
+        return cancelledNativeDrags;
+    }
+
+    @Override
+    public void nativeDragSourceRegistered() {
+        nativeDragSourceRegistrations++;
+    }
+
+    /// How many times the framework has told the port that this application wants to drag. A
+    /// port whose platform needs a gesture recognizer installs it on the strength of this.
+    public int getNativeDragSourceRegistrations() {
+        return nativeDragSourceRegistrations;
+    }
+
+    @Override
+    public void nativeDropTargetRegistered() {
+        nativeDropTargetRegistrations++;
+    }
+
+    /// How many times the framework has told the port that this application accepts drops.
+    public int getNativeDropTargetRegistrations() {
+        return nativeDropTargetRegistrations;
+    }
+
+    /// Forgets everything recorded, so one test does not see another's drag.
+    public void resetNativeDragState() {
+        preparedNativeDrag = null;
+        startedNativeDrag = null;
+        cancelledNativeDrags = 0;
+        nativeDragSourceRegistrations = 0;
+        nativeDropTargetRegistrations = 0;
     }
 }

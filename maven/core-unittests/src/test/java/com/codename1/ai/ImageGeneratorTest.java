@@ -50,6 +50,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class ImageGeneratorTest extends UITestBase {
 
     private static final String URL = "https://api.openai.com/v1/images/generations";
+    private static final String PROXY_ROOT = "https://api.example.com/ai/v1";
+    private static final String PROXY_URL = PROXY_ROOT + "/images/generations";
 
     @AfterEach
     void clearMocks() {
@@ -170,4 +172,44 @@ class ImageGeneratorTest extends UITestBase {
         assertNotNull(conn);
         assertNull(conn.getHeaders().get("Authorization"));
     }
+    @Test
+    void openAiCompatiblePostsToTheGivenRoot() {
+        // The chapter tells readers to keep the provider key on their own server
+        // and proxy the call, which needs an endpoint other than OpenAI's.
+        mock(200, "{\"model\":\"dall-e-3\"}");
+        await(ImageGenerator.openAiCompatible(PROXY_ROOT, "token")
+                .generate(new GenerateImageRequest("a cat")));
+
+        assertNotNull(TestCodenameOneImplementation.getInstance().getConnection(PROXY_URL),
+                "the request has to go to the configured root");
+        assertNull(TestCodenameOneImplementation.getInstance().getConnection(URL),
+                "and not to OpenAI");
+    }
+
+    @Test
+    void openAiCompatibleToleratesATrailingSlash() {
+        mock(200, "{\"model\":\"dall-e-3\"}");
+        await(ImageGenerator.openAiCompatible(PROXY_ROOT + "/", "token")
+                .generate(new GenerateImageRequest("a cat")));
+        assertNotNull(TestCodenameOneImplementation.getInstance().getConnection(PROXY_URL));
+    }
+
+    @Test
+    void openAiCompatibleRefusesAMissingUrl() {
+        // Falling back to the public endpoint would send the proxy's token and
+        // the user's prompt to a third party -- the opposite of why this factory
+        // exists. A missing URL is a deployment mistake, so say so.
+        assertThrows(IllegalArgumentException.class,
+                () -> ImageGenerator.openAiCompatible(null, "token"));
+        assertThrows(IllegalArgumentException.class,
+                () -> ImageGenerator.openAiCompatible("", "token"));
+    }
+
+    @Test
+    void openaiStillPostsToOpenAi() {
+        mock(200, "{\"model\":\"dall-e-3\"}");
+        await(ImageGenerator.openai("k").generate(new GenerateImageRequest("a cat")));
+        assertNotNull(TestCodenameOneImplementation.getInstance().getConnection(URL));
+    }
+
 }

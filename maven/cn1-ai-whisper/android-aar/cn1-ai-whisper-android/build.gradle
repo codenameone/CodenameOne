@@ -9,10 +9,27 @@ def whisperIncludeDir = project.findProperty('whisperIncludeDir') ?: System.gete
 android {
     namespace 'com.codename1.ai.whisper.android'
     compileSdk 33
-    ndkVersion '26.3.11579264'
+    // NDK r28 is the first release that links shared libraries with 16 KB
+    // aligned PT_LOAD segments by default, which Google Play requires of every
+    // 64-bit native library (API 35+ uploads since 2025-11-01, Wear OS from
+    // 2026-09-15). The requirement covers libc++_shared.so and libomp.so too,
+    // and those are NDK *prebuilts* -- no linker flag applied to this project
+    // can realign them, so moving the NDK forward is the only fix rather than
+    // one option among several. scripts/check-16k-page-alignment.py gates the
+    // staged AAR.
+    ndkVersion '28.2.13676358'
 
     defaultConfig {
-        minSdk 19
+        // 21 is what the native code has always actually required: the NDK's
+        // own floor has been API 21 since r26 (meta/platforms.json "min": 21),
+        // so the previous `minSdk 19` was a manifest claim the .so files never
+        // honoured -- every shipped slice, 32-bit included, carries API 21 in
+        // its .note.android.ident. Declaring it makes the AAR honest instead
+        // of letting an API 19 install fail at System.loadLibrary.
+        // PlatformFeatureCatalog raises a consuming app's
+        // android.min_sdk_version to match, so the manifest merge still
+        // succeeds for a default (19) project.
+        minSdk 21
         externalNativeBuild {
             cmake {
                 abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'

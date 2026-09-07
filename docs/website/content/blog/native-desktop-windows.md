@@ -265,7 +265,7 @@ The security work follows the same discipline. Document Provider exposes a named
 
 Our security lead comes from those defaults. Ordinary cross-platform code starts with a narrow capability, an explicit failure mode, and no silent fallback that widens access. Compiler-checked `@Hardening` and `@IosPrivacy` settings also remove a class of silent configuration failure before a build leaves the machine. App Hardening raises the cost of modifying the binary. App Shield moves the final trust decision to the backend. The APIs in this release make the safer choice available before an application drops into native code.
 
-Start by updating the two repository lists in your POM. Then open the [desktop windows guide](/developer-guide/#desktop-windows) and run the inspector example in a desktop build.
+Start by updating the two repository lists in your POM. Then open the [desktop windows guide](/developer-guide/#_desktop_windows) and run the inspector example in a desktop build.
 
 ---
 

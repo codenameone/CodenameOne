@@ -3320,6 +3320,12 @@ public class Window extends Container implements TopLevelContainer {
                 stylusCmp.fireStylusEvent(ActionEvent.Type.PointerDrag, x, y);
             }
         }
+        // A press that landed on a native drag source becomes an operating system drag
+        // here, exactly as it does on a Form, once it has moved far enough to be a drag
+        // rather than a click. The platform owns the gesture from that point.
+        if (NativeDragAndDrop.pointerDragged(x, y)) {
+            return;
+        }
         // Read and cleared here, exactly as Form does: the flag describes the drag that
         // took a momentum scroll over, and leaving it set would tell every later drag in
         // the session that it too continued out of a glide.
@@ -3352,6 +3358,21 @@ public class Window extends Container implements TopLevelContainer {
     /// pressed child gets an ordinary one-finger drag and never its `pinch` callbacks.
     @Override
     public void pointerDragged(int[] x, int[] y) {
+        // The same hook the scalar overload runs, and the one an ordinary one-finger drag
+        // actually reaches: Display wraps a single pointer into one-element arrays and
+        // dispatches them here, and this overload is a separate implementation rather than a
+        // call to the scalar one. With the hook only there a gesture never began a native drag
+        // on any port that starts one itself.
+        //
+        // One pointer only: a second finger makes this a pinch or a two-finger scroll, which
+        // is not a drag to hand to the operating system -- and it spends the press that
+        // staged one, because the gesture has become something else. Merely skipping the
+        // hook left it staged for the next one-finger movement to start.
+        if (x.length > 1) {
+            NativeDragAndDrop.gestureCancelled();
+        } else if (NativeDragAndDrop.pointerDragged(x[0], y[0])) {
+            return;
+        }
         // The same listener block the scalar overload runs. Adding it there only
         // meant a gesture stopped notifying window listeners the moment it became
         // multi touch, which is where pull to refresh loses its updates.
@@ -3380,6 +3401,15 @@ public class Window extends Container implements TopLevelContainer {
         // a stylus press that puts a dialog up would have gone on stroking into the
         // dialog. Only the continuation is suppressed; the bookkeeping below still runs,
         // so the flags this gesture set are cleared as they always were.
+        // A press that never became a drag releases the operation the press staged, so a
+        // later gesture somewhere else cannot start the drag this one declined to.
+        //
+        // Before the stylus callback, for the same reason the teardown below carries a
+        // token: that callback is application code and may enter a nested event loop in
+        // which a fresh press stages an operation of its own. Clearing afterwards threw
+        // *that* gesture's staging away, and the drag it was about to become never
+        // started.
+        NativeDragAndDrop.pointerReleased(getCurrentPointerPress(), x, y);
         if (Display.getInstance().isStylusPointer() && !gestureCancelled) {
             Component stylusCmp = resolveComponentAt(x, y);
             if (stylusCmp != null) {
@@ -3812,6 +3842,13 @@ public class Window extends Container implements TopLevelContainer {
         pressedCmp = null;
         dragged = null;
         currentPointerPress = null;
+        // And what a press on this window staged for the operating system. This is the path a
+        // window being hidden, minimized or disposed takes, and it delivers no release -- so
+        // without it the gesture stayed staged on a window nobody can see, for the next press
+        // that never reaches initDragAndDrop, or the platform's own recognizer, to start a
+        // drag carrying its payload. cancelPointerGesture has always done this for the other
+        // kind of cancellation; this is the one for a window going away.
+        NativeDragAndDrop.topLevelInputCancelled(this);
         Display.getInstance().windowInputCancelled(this);
     }
 
@@ -4014,6 +4051,12 @@ public class Window extends Container implements TopLevelContainer {
     /// notification `#cancelPendingInput()` sends -- that one is for a window going
     /// away, this one is for input changing hands while the window stays put.
     private void cancelPointerGesture() {
+        // Whatever the press staged for the operating system goes with it. This is the
+        // window's own cancellation -- a press handler putting a dialog up, an overlay
+        // taking the pointer -- and it delivers no release, so nothing else clears it. The
+        // next motion packet reaches the native hook before the gestureCancelled test below
+        // it, and would have started a drag from the component now behind the dialog.
+        NativeDragAndDrop.gestureCancelled();
         if (dragged != null && dragged.isDragAndDropInitialized()) {
             // No drop target: the user never completed the drag, something took the
             // pointer away. This still restores visibility and clears the drag flags.

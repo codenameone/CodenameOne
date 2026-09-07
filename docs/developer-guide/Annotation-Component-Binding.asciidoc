@@ -109,6 +109,10 @@ For every two-way `@Bind` field whose write accessor is a method
 `cn1:process-annotations` Mojo reads the original `.class` file with
 ASM and inserts the equivalent of:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnnotationComponentBindingJava002Snippet.java[tag=annotation-component-binding-java-002,indent=0]
+----
 
 The injection lands before every `return` point of the setter. The
 instrumented setter is written back to `target/classes`, replacing the
@@ -165,6 +169,10 @@ Multiple annotations on the same field are combined into a
 
 After binding, drive validation through the returned handle:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnnotationComponentBindingJava003Snippet.java[tag=annotation-component-binding-java-003,indent=0]
+----
 
 `Binding#getValidator()` never returns `null` -- when the model has no
 validation annotations the validator is empty and `isValid()` returns

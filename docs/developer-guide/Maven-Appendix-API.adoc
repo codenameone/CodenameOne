@@ -10,7 +10,7 @@ See https://www.codenameone.com/javadoc/[the JavaDocs] for a full list of suppor
 
 NOTE: The Codename One source is open source. Released under GPLv2 with Classpath Exception.
 
-Codename One is much more than an API library. It provides a full tool-chain and eco-system for developing beautiful, performant native mobile apps with a single codebase in Java and Kotlin. Please see the https://www.codenameone.com/developer-guide.html#_introduction[introduction in the Developer guide] for a proper overview of Codename One.
+Codename One is much more than an API library. It provides a full tool-chain and eco-system for developing beautiful, performant native mobile apps with a single codebase in Java and Kotlin. Please see the <<_introduction,introduction in the Developer guide>> for a proper overview of Codename One.
 
 === Limitations
 
@@ -27,5 +27,5 @@ Add-on libraries can be added to your library in the common/pom.xml file, but, i
 
 Codename One supports its own library format (cn1lib) which sort of "certifies" that it's compatible with Codename One. Run `mvn cn1:settings` and open *Extensions* to browse the growing catalog of available cn1libs. See <<settings,Codename One Settings>>.
 
-For more information about cn1libs, see https://www.codenameone.com/developer-guide.html#_libraries_cn1lib[the cn1libs section] of the developer guide.
+For more information about cn1libs, see <<_libraries_cn1lib,the cn1libs section>> of the developer guide.
 

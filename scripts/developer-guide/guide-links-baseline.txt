@@ -1,0 +1,5 @@
+# Developer guide links that do not resolve, or are not TLS.
+# One line per occurrence: a file naming the same bad URL twice gets
+# two lines, because that is two things to fix.
+# A ratchet: entries may be removed as links are fixed, never added.
+# Regenerate with check-guide-links.py --write-baseline.

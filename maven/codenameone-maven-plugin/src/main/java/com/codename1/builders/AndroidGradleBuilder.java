@@ -472,6 +472,15 @@ public class AndroidGradleBuilder extends Executor {
     private boolean calendarReadPermission;
     private boolean calendarWritePermission;
     private boolean contactsWritePermission;
+    /**
+     * Which of the two contacts permissions the application actually needs.
+     *
+     * <p>Its own class because "referenced a class under
+     * com.codename1.contacts" stopped being the answer once the contact
+     * picker, which needs no permission at all, started returning
+     * {@code Contact} objects from that same package.</p>
+     */
+    private final ContactsPermissionScan contactsScan = new ContactsPermissionScan();
     private boolean addRemoteControlService;
     /**
      * @deprecated for use to build 1.1 version
@@ -2032,9 +2041,7 @@ public class AndroidGradleBuilder extends Executor {
                             foregroundServicePermission = true;
                         }
                     }
-                    if (cls.indexOf("com/codename1/contacts") > -1) {
-                        contactsReadPermission = true;
-                    }
+                    contactsScan.usesClass(cls);
                     if (cls.indexOf("com/codename1/payment") > -1) {
                         purchasePermissions = true;
                     }
@@ -2537,9 +2544,7 @@ public class AndroidGradleBuilder extends Executor {
                     if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("getMsisdn") > -1) {
                         phonePermission = true;
                     }
-                    if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("getAllContacts") > -1) {
-                        contactsReadPermission = true;
-                    }
+                    contactsScan.usesClassMethod(cls, method);
                     if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("lockScreen") > -1) {
                         wakeLock = true;
                     }
@@ -2556,18 +2561,7 @@ public class AndroidGradleBuilder extends Executor {
                     // usesClassMethodWithDescriptor: which overload was
                     // called decides whether any shared media is read,
                     // and the name alone cannot say.
-                    if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("createContact") > -1) {
-                        contactsWritePermission = true;
-                    }
-                    if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("deleteContact") > -1) {
-                        contactsWritePermission = true;
-                    }
-                    if (cls.indexOf("com/codename1/contacts/ContactsManager") == 0 && method.indexOf("createContact") > -1) {
-                        contactsWritePermission = true;
-                    }
-                    if (cls.indexOf("com/codename1/contacts/ContactsManager") == 0 && method.indexOf("deleteContact") > -1) {
-                        contactsWritePermission = true;
-                    }
+
                     // WiFi scan implies management. We detect the method
                     // rather than just the class so that apps that only read
                     // SSID/BSSID (no scan) do not pick up CHANGE_WIFI_STATE.
@@ -2590,6 +2584,8 @@ public class AndroidGradleBuilder extends Executor {
         } catch (IOException ex) {
             throw new BuildException("An error occurred while trying to scan the classes for API usage.", ex);
         }
+        contactsReadPermission = contactsScan.readPermissionRequired();
+        contactsWritePermission = contactsScan.writePermissionRequired();
 
         // The libraries as well as the loose class tree.
         //
@@ -4399,6 +4395,13 @@ public class AndroidGradleBuilder extends Executor {
 
         pruneOptionalAiSources(srcDir);
 
+        pruneBiometricSourcesForCompileSdk(srcDir,
+                compileSdkInt(maxPlatformVersion, buildToolsVersion,
+                        targetNumber, usesNearbyRanging,
+                        usesNearbyRanging || usesNearbyTransport
+                                || usesNearbyCompanion, usesCallVoip,
+                        usesCustomTunnel));
+
         final String moPubAdUnitId = request.getArg("android.mopubId", null);
         if (moPubAdUnitId != null && moPubAdUnitId.length() > 0) {
             integrateMoPub = true;
@@ -5432,7 +5435,17 @@ public class AndroidGradleBuilder extends Executor {
             String filePathsContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
                     "<paths xmlns:android=\"http://schemas.android.com/apk/res/android\">\n" +
                     "    <cache-path name=\"intent_files\" path=\"intent_files/\" />\n" +
-                    request.getArg("android.file_paths", "    <files-path name=\"app_files\" path=\".\" />") +
+                    // The roots a file has to be under for FileProvider to serve it. The
+                    // application's own directories, and its external ones -- a document or a
+                    // video picked by the user lives out there, FileSystemStorage lists those
+                    // roots, and getUriForFile throws for anything outside them, so sharing
+                    // such a file meant copying it first. Declaring a root exposes nothing by
+                    // itself: a URI is still minted per file, and only for files this
+                    // application deliberately shares.
+                    //
+                    // Only the default. An application that sets the hint still says exactly
+                    // what it wants and gets nothing it did not ask for.
+                    request.getArg("android.file_paths", "    <files-path name=\"app_files\" path=\".\" /><external-files-path name=\"app_external_files\" path=\".\" /><external-cache-path name=\"app_external_cache\" path=\".\" /><external-path name=\"external\" path=\".\" />") +
                     "</paths>";
 
             try {
@@ -6844,6 +6857,16 @@ public class AndroidGradleBuilder extends Executor {
                 // -- never runs. The service loads it by name instead, so the name has to
                 // survive R8.
                 + (usesIntents ? "-keep class cn1app.IntentBootstrap { *; }\n\n" : "")
+                // Biometrics: AndroidBiometrics picks its backend by name at
+                // class-init, because no single compileSdk can compile both
+                // packages (see pruneBiometricSourcesForCompileSdk). The name
+                // is a constant string at the Class.forName call so R8 keeps
+                // the class on its own, and this states it outright rather
+                // than resting on that inference.
+                + (usesBiometrics
+                        ? "-keep class com.codename1.impl.android.biometrics.** { *; }\n\n"
+                        + "-keep class com.codename1.impl.android.fingerprint.** { *; }\n\n"
+                        : "")
                 + facebookProguard
                 + " " + request.getArg("android.proguardKeep", "") + "\n"
                 // App-hardening keep rules for R8. On Android the engine does not rename (R8 is the
@@ -7270,6 +7293,58 @@ public class AndroidGradleBuilder extends Executor {
             namespace = "namespace '"+request.getPackageName()+"'\n";
         }
 
+        // Kotlin stdlib alignment, emitted for every AndroidX build rather than
+        // for Kotlin-shaped apps: the duplicate class it prevents is produced by
+        // ordinary AndroidX and Play dependencies, not by anything the app wrote.
+        // See KotlinStdlibAlignment for the mechanism and for why Gradle cannot
+        // work it out for itself on the kotlin-stdlib 1.8.x line. A constraint
+        // adds nothing to a graph that has no Kotlin in it, so an app that could
+        // never hit the clash resolves exactly as it did before.
+        //
+        // Gated on AndroidX because that is what decides the configuration name a few
+        // lines below: `compile` is only "implementation" when useAndroidX or the aar
+        // implementation flag is set, so a useAndroidX=false build would take this
+        // block on the legacy `compile` configuration. Reviewed as an unrelated flag
+        // to gate on -- it is not, and the failing case it is meant to protect needs
+        // a modern AndroidX dependency in a project that has AndroidX turned off,
+        // which AGP refuses for its own reasons before this could matter. That
+        // whole line of reasoning turned out not to matter either: see the
+        // useAndroidX note on the gate below.
+        //
+        // On Gradle 6 rather than on 4.6 where the constraints
+        // DSL first appeared. That is deliberate, and it has been questioned in
+        // review, so: 4.6 selects AGP 3.2.0, which cannot compile against a
+        // compileSdk the current AndroidX releases require, and the builder gives
+        // that path appcompat 1.0.0, whose graph contains no Kotlin at all. A graph
+        // that reaches a merged kotlin-stdlib cannot occur there. Widening the gate
+        // would put an untested constraints block into AGP 3.x builds that work
+        // today, to fix a clash they cannot have -- and the two failure directions
+        // are not symmetrical: too narrow leaves an ancient build with a failure it
+        // already had, too wide breaks a build that currently succeeds. Raise this
+        // gate only with a reproduction on that path.
+        // No inputs. This used to collect every Gradle fragment the app
+        // controls and search it for signs that the app was holding a stdlib
+        // version down, because the alignment RAISED one and could then break a
+        // build that resolved. It declares a capability now, which raises
+        // nothing, so there is nothing to search for -- see KotlinStdlibAlignment.
+        //
+        // Not gated on useAndroidX any more. It was, on the reasoning above that
+        // a non-AndroidX graph cannot reach a merged kotlin-stdlib -- and that
+        // reasoning is wrong, because the duplicate has nothing to do with
+        // AndroidX. Reproduced with android.useAndroidX=false explicitly set,
+        // AGP 8.1.4, kotlin-stdlib 1.8.10 beside kotlin-stdlib-jdk8 1.6.21:
+        // checkDebugDuplicateClasses fails exactly as it does with AndroidX on,
+        // and passes with this script. The old gate left those builds broken.
+        //
+        // The Gradle 6 floor stays, and for a reason that did survive
+        // measurement: capabilitiesResolution is the mechanism here, and AGP 3.x
+        // on Gradle 4.6 is a different world. Turning it off is the hint.
+        String kotlinStdlibAlignment = "";
+        if (gradleVersionInt >= 6
+                && request.getArg("android.kotlinStdlibAlignment", "true").equals("true")) {
+            kotlinStdlibAlignment = KotlinStdlibAlignment.alignmentScript();
+        }
+
         String gradleProps = "apply plugin: 'com.android.application'\n"
                 + kotlinPluginApply
                 + request.getArg("android.gradlePlugin", "")
@@ -7362,6 +7437,12 @@ public class AndroidGradleBuilder extends Executor {
                 + addNewlineIfMissing(request.getArg("android.gradleDep", ""))
                 + addNewlineIfMissing(aarDependencies)
                 + "}\n"
+                // After the dependencies block, not inside it: the alignment
+                // needs a component metadata rule (which lives in dependencies)
+                // AND a resolution strategy (which does not), so it brings its
+                // own dependencies block rather than being spliced into two
+                // places.
+                + kotlinStdlibAlignment
                 + request.getArg("android.xgradle", "");
 
         debug("Gradle File start\n-------\n");
@@ -7511,6 +7592,82 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
         return true;
+    }
+
+    /**
+     * Removes the BiometricPrompt-backed biometric package when the platform
+     * this build compiles against is too old for it.
+     *
+     * <p>The port has two biometric backends, one per Android biometric API,
+     * and {@code AndroidBiometrics} loads whichever one is present by name.
+     * The legacy one goes through {@code FingerprintManagerCompat} and so
+     * compiles against every platform, API 37 included -- which is the point,
+     * because an application compiled against 37 still runs on the API 23-28
+     * devices where the platform {@code FingerprintManager} it wraps is the
+     * only biometric API there is. Only the modern one has a floor, and this
+     * enforces it.</p>
+     *
+     * <p>The floor is 28, which is also the lowest the ladder in
+     * {@link #compileSdkInt} produces, so in practice this deletes nothing.
+     * That is deliberate rather than lucky: the modern backend reaches
+     * everything newer than 28 by name so that a project pinned low keeps it.
+     * An APK compiled at 28 or 29 runs on API 37 devices too, where the legacy
+     * backend's platform API is gone, so losing the modern one there would
+     * have left those users with no biometrics at all.</p>
+     *
+     * <p>Note the limit of what this can see. {@code android.xgradle} is
+     * appended to the generated {@code build.gradle} verbatim, so a fragment
+     * re-opening {@code android { }} can set a different compile SDK after the
+     * fact, and this decision -- like every other one the builder keys on the
+     * compile SDK, from the nearby and ranging floors to the manifest's
+     * foreground-service enums -- is made from the computed value. Reading the
+     * effective one would mean parsing arbitrary Groovy. Keeping the floor at
+     * the bottom of the ladder is what makes that gap harmless here: an
+     * override would have to drop below 28 to break this package, and nothing
+     * the builder generates goes there.</p>
+     *
+     * <p>Naming the removed platform class from a file every application
+     * compiles is what issue #5701 reported: an unmodified Hello World
+     * generated against an API 37 platform failed
+     * {@code compileDebugJavaWithJavac} in port sources the developer never
+     * wrote.</p>
+     *
+     * @param srcDir       the generated application's java source root
+     * @param compileSdk   the API level this build compiles against, or 0 when
+     *                     it could not be determined -- in which case nothing
+     *                     is deleted, because the compile is the thing that
+     *                     would then decide
+     */
+    static void pruneBiometricSourcesForCompileSdk(File srcDir, int compileSdk) {
+        if (compileSdk <= 0) {
+            return;
+        }
+        if (compileSdk < BIOMETRIC_PROMPT_BACKEND_MIN_SDK) {
+            deletePackage(new File(srcDir,
+                    "com/codename1/impl/android/biometrics"));
+        }
+    }
+
+    /**
+     * The API level the BiometricPrompt-backed package compiles against.
+     *
+     * <p>28, where {@code BiometricPrompt} itself arrives. {@code
+     * BiometricManager} (29), {@code canAuthenticate(int)} and {@code
+     * Authenticators} (30) are all reached by name in that package rather than
+     * compiled against, precisely so this number can sit at the bottom of the
+     * ladder instead of above it.</p>
+     */
+    static final int BIOMETRIC_PROMPT_BACKEND_MIN_SDK = 28;
+
+    /** Deletes a flat source package, if it is there at all. */
+    private static void deletePackage(File pkg) {
+        File[] files = pkg.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                f.delete();
+            }
+        }
+        pkg.delete();
     }
 
     private void pruneOptionalAiSources(File srcDir) {

@@ -208,6 +208,81 @@ public final class WizardDecisions {
         return out;
     }
 
+    /// The App IDs that belong to the project the wizard was opened from: its own bundle
+    /// identifier, and the ones the wizard derives from it for the extensions a build
+    /// generates (`.CN1Widgets`, `.CN1Documents`).
+    ///
+    /// An account accumulates App IDs -- one per app, per test, per colleague -- and the
+    /// profile dialog offered all of them with equal weight, which is a list to search
+    /// rather than a choice to make when exactly one of them can sign this project
+    /// (issue #5654). The full list stays one click away rather than being removed: a
+    /// profile for a bundle the project does not declare is unusual, not wrong.
+    ///
+    /// Empty when the project's identifier is not registered at all, so a caller can tell
+    /// "nothing to narrow to" from "narrowed to one" and fall back to the whole list
+    /// instead of showing an empty picker.
+    public static List<SigningState.BundleId> projectBundleIds(List<SigningState.BundleId> all,
+                                                               String projectBundleId) {
+        List<SigningState.BundleId> out = new ArrayList<SigningState.BundleId>();
+        if (all == null || projectBundleId == null || projectBundleId.trim().isEmpty()) {
+            return out;
+        }
+        String wanted = projectBundleId.trim();
+        for (SigningState.BundleId b : all) {
+            String identifier = b.identifier() == null ? null : b.identifier().trim();
+            if (identifier == null) {
+                continue;
+            }
+            if (identifier.equals(wanted) || identifier.startsWith(wanted + ".")) {
+                out.add(b);
+            }
+        }
+        return out;
+    }
+
+    /// Whether an App ID registered for `platform` covers a profile that needs `required`.
+    ///
+    /// Apple's App ID identifiers are unique across the whole account rather than per
+    /// platform, so an identifier already registered for iOS cannot be registered a
+    /// second time for macOS -- the attempt comes back as "An App ID with Identifier
+    /// '...' is not available. Please enter a different string." (issue #5652). A
+    /// registration marked UNIVERSAL already covers both, and one whose platform the
+    /// service does not report cannot be told apart from it, so both count: reading them
+    /// as "not the platform I need" is what sent automatic setup off to create the
+    /// duplicate Apple always refuses.
+    public static boolean bundlePlatformSatisfies(String required, String platform) {
+        if (required == null || platform == null || platform.trim().isEmpty()) {
+            return true;
+        }
+        String actual = platform.trim();
+        return required.equals(actual) || "UNIVERSAL".equals(actual);
+    }
+
+    /// The App IDs a profile of this platform can be created against.
+    ///
+    /// The dialog used to list every App ID whatever the profile type was, so a Mac App
+    /// Store profile could be pointed at an iOS App ID and Apple rejected the request --
+    /// the same "the wizard said it was fine" gap the certificate list closed. The
+    /// certificate section beside it is filtered exactly this way.
+    ///
+    /// Note this excludes the KNOWN WRONG platform rather than requiring the known right
+    /// one, for the reason [#isUsableDevice] gives: UNIVERSAL covers both, and a value the
+    /// service did not report must not empty the picker. Offering one App ID too many
+    /// costs a rejected request; offering none costs the whole flow.
+    public static List<SigningState.BundleId> usableBundleIds(List<SigningState.BundleId> all,
+                                                              String requiredPlatform) {
+        List<SigningState.BundleId> out = new ArrayList<SigningState.BundleId>();
+        if (all == null) {
+            return out;
+        }
+        for (SigningState.BundleId b : all) {
+            if (bundlePlatformSatisfies(requiredPlatform, b.platform())) {
+                out.add(b);
+            }
+        }
+        return out;
+    }
+
     /// The certificate types the wizard can generate, and how they are labelled.
     ///
     /// Kept here rather than inside the dialog so the set is one thing: every type
@@ -220,6 +295,89 @@ public final class WizardDecisions {
     public static final String[] GENERATABLE_CERTIFICATE_LABELS = {
         "iOS Distribution", "iOS Development", "Mac App Store",
         "Mac Development", "Developer ID", "Mac Installer"};
+
+    /// Whether a project's `ios.includePush` hint asks for push notifications.
+    ///
+    /// Read exactly the way IPhoneBuilder reads it -- absent is off, and only a trimmed,
+    /// case-insensitive "true" is on -- because the App ID capability and the entitlement
+    /// the build stamps on the app have to agree. Automatic setup used to pass a hardcoded
+    /// true instead, so a project that never asked for push got an App ID carrying the
+    /// capability, and every profile issued from it carried it too (issue #5657).
+    public static boolean pushRequested(String includePushHint) {
+        return includePushHint != null && "true".equalsIgnoreCase(includePushHint.trim());
+    }
+
+    /// Whether a project needs the push capability, reading the hint AND the one other
+    /// thing in the settings file that implies it.
+    ///
+    /// IPhoneBuilder turns an absent `ios.includePush` into true for an app that
+    /// references `com.codename1.call.voip`, because a VoIP call rings through a push --
+    /// and it makes that inference from a scan of the compiled classes, which the wizard
+    /// does not have and must not guess at. What the wizard can read is the project
+    /// declaring the voip background mode, which is the same statement made in the
+    /// settings file, and provisions it without inferring anything.
+    ///
+    /// Only when the hint is absent, and absent means the key is not there at all.
+    /// `ios.includePush=` with nothing after it is the project speaking, not silence:
+    /// IPhoneBuilder normalises every non-null value that is not a trimmed "true" to
+    /// "false", and makes this inference only when the argument is null -- an empty value
+    /// is preserved by getArg, so the build it produces does not request push. Reading it
+    /// as absent here would put the capability on the App ID, and invalidate and reissue
+    /// every profile under it, for a build that never asks for push.
+    ///
+    /// The residue is a VoIP app that declares neither: the builder infers push for it
+    /// from the class scan and the App ID will not grant it. That one is fixed by setting
+    /// `ios.includePush=true`, which is what the builder's own error tells a VoIP project
+    /// whose hint disagrees.
+    public static boolean pushRequested(String includePushHint, String backgroundModesHint) {
+        if (pushRequested(includePushHint)) {
+            return true;
+        }
+        return includePushHint == null && declaresVoipBackgroundMode(backgroundModesHint);
+    }
+
+    /// Whether a macOS build will carry the APNs entitlement, from the hint that decides
+    /// it: `macos.entitlements.apsEnvironment` (or the older `macNative.` spelling).
+    ///
+    /// Read exactly as MacOSBuildHints.EntitlementOverrides.push does -- `false` and
+    /// `none` suppress the entitlement and any other value selects an environment -- so
+    /// the Mac App ID grants what the Mac build declares. The two are not the same
+    /// question as the iOS one and are deliberately not shared: `ios.includePush` on an
+    /// iOS-only push app must not put the capability on a Mac App ID, and the entitlement
+    /// here is emitted for a Developer ID build too, not only a store one.
+    ///
+    /// An absent hint is false, where the builder falls back to scanning the application's
+    /// compiled classes for a push registration call. That scan is not reproducible here
+    /// and deliberately not approximated: the wizard has no bytecode reader, it is usually
+    /// run before the project has ever been compiled -- so a scan would answer "no push"
+    /// for exactly the projects that need it, silently -- and a cruder test on what a class
+    /// merely names would provision App IDs nobody asked to change, which is the whole of
+    /// issue #5657. A build whose entitlement the App ID does not grant is answered by the
+    /// Enable push action on the bundle IDs page instead.
+    public static boolean macPushRequested(String apsEnvironmentHint) {
+        if (apsEnvironmentHint == null || apsEnvironmentHint.trim().isEmpty()) {
+            return false;
+        }
+        String value = apsEnvironmentHint.trim();
+        return !"false".equalsIgnoreCase(value) && !"none".equalsIgnoreCase(value);
+    }
+
+    /// Whether `ios.background_modes` lists the VoIP mode.
+    ///
+    /// Matched as a whole token, the way IPhoneBuilder matches it: "remote-notification"
+    /// contains no mode as a substring, but "myvoipmode" contains "voip", and a substring
+    /// test reads that as VoIP already being declared.
+    public static boolean declaresVoipBackgroundMode(String backgroundModes) {
+        if (backgroundModes == null) {
+            return false;
+        }
+        for (String token : backgroundModes.split("[,\\s]+")) {
+            if ("voip".equalsIgnoreCase(token.trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /// Apple's BundleIdPlatform for the devices a profile of this type can name.
     public static String devicePlatformFor(String profileType) {

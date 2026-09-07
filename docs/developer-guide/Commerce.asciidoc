@@ -8,19 +8,37 @@ Codename One doesn't process payments and never touches your money -- the stores
 
 The core idea is the *entitlement*: an abstract access right such as `pro` or `remove_ads`. You map one or more store products to an entitlement, and your code only ever checks the entitlement:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/CommerceJava001Snippet.java[tag=commerce-java-001,indent=0]
+----
+
+`isEntitled` reads the answer the cloud last cached, so it's only as fresh as your last `refresh()`: before one completes the cache is empty and a paying subscriber reads as unentitled. It falls back to asking the store for a subscription named after the entitlement, and since the entitlement-to-SKU mapping lives in the cloud rather than on the device, that only matches when a product happens to share the id. Where the cloud can't answer -- commerce not enabled in the build, an offline start, a degraded account -- check the granting SKU yourself, as the post-purchase example below does. Don't do it when the cloud answered no: a refunded or revoked receipt still looks active on the device, and treating that as a grant unlocks the app after the server denied it.
 
 An entitlement is active when *any* of its granting products is active. This matters: a promotional grant and a paid subscription, or a sandbox and a production purchase, can both map to `pro` without one hiding the other. Access is decided by a single authoritative rule -- the latest expiry over the active grants, evaluated against a server timestamp -- so a tampered device clock can't extend it. Everything else (will-renew, billing stage, period type, family sharing) is advisory and never removes access on its own.
 
 === Client usage
 
-In your `Lifecycle.init` (or wherever you set up purchases):
+In your `Lifecycle.init` (or wherever you set up purchases). Installing a receipt store is part of the setup, not an optional extra: `Purchase` submits pending purchases and reloads its receipt list only when one is installed, so without it `refresh()` finds no receipts and no entitlement is ever granted. On iOS `isSubscriptionSupported()` returns false until one is installed, so subscriptions don't start at all. <<Monetization,The monetization chapter>> builds a store you can use here.
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/CommerceJava002Snippet.java[tag=commerce-java-002,indent=0]
+----
 
 Drive purchases through the manager (these delegate to the `Purchase` API):
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/CommerceJava003Snippet.java[tag=commerce-java-003,indent=0]
+----
 
-After a purchase, or on app start, validate the device's receipts with the cloud and refresh the entitlement cache. `refresh()` makes a blocking network call, so run it off the EDT:
+After a purchase, or on app start, validate the device's receipts with the cloud and refresh the entitlement cache. `refresh()` validates the receipts already stored rather than waiting for one in flight, so chain it off receipt synchronization after a purchase -- otherwise it runs before the new receipt has been submitted and nothing retries it. It's a blocking network call, so keep it off the EDT:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/CommerceJava004Snippet.java[tag=commerce-java-004,indent=0]
+----
 
 `isEntitled` returns the last cloud-validated answer when one is available, and otherwise falls back to the platform's own receipt (treating the entitlement id as a subscription SKU) so a paying user is never locked out while the network is down.
 

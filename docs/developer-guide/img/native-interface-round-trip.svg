@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="770" height="360" viewBox="0 0 770 360">
+  <rect x="0" y="0" width="770" height="360" fill="#ffffff"/>
+
+  <text x="385" y="26" font-family="Arial, sans-serif" font-size="15" font-weight="bold"
+        text-anchor="middle" fill="#222222">Wrapping a third party native SDK</text>
+
+  <rect x="30" y="50" width="200" height="250" rx="6" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="130" y="72" font-family="Arial, sans-serif" font-size="13" font-weight="bold"
+        text-anchor="middle" fill="#4a6fa5">Portable Java</text>
+
+  <rect x="50" y="86" width="160" height="48" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
+  <text x="130" y="105" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">Your public API</text>
+  <text x="130" y="122" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#666666">app code calls this</text>
+
+  <rect x="50" y="158" width="160" height="48" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
+  <text x="130" y="177" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">NativeInterface</text>
+  <text x="130" y="194" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">primitives, String, primitive[], PeerComponent</text>
+
+  <rect x="50" y="238" width="160" height="48" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
+  <text x="130" y="257" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">static callback</text>
+  <text x="130" y="274" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#666666">resolves the waiting caller</text>
+
+  <rect x="540" y="50" width="200" height="250" rx="6" fill="#f7f4fb" stroke="#7a5aa5" stroke-width="1.5"/>
+  <text x="640" y="72" font-family="Arial, sans-serif" font-size="13" font-weight="bold"
+        text-anchor="middle" fill="#7a5aa5">Per platform native</text>
+
+  <rect x="560" y="158" width="160" height="48" rx="4" fill="#ffffff" stroke="#7a5aa5" stroke-width="1"/>
+  <text x="640" y="177" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">Impl class</text>
+  <text x="640" y="194" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#666666">Java/Kotlin, Obj-C/Swift</text>
+
+  <rect x="560" y="238" width="160" height="48" rx="4" fill="#ffffff" stroke="#7a5aa5" stroke-width="1"/>
+  <text x="640" y="257" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">Vendor SDK</text>
+  <text x="640" y="274" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#666666">aar / pod / static library</text>
+
+  <line x1="130" y1="134" x2="130" y2="156" stroke="#4a6fa5" stroke-width="1.5"/>
+  <polygon points="130,156 125,146 135,146" fill="#4a6fa5"/>
+
+  <line x1="212" y1="172" x2="556" y2="172" stroke="#4a6fa5" stroke-width="1.5"/>
+  <polygon points="556,172 546,167 546,177" fill="#4a6fa5"/>
+  <text x="384" y="165" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#4a6fa5">call, marshalled by the translator</text>
+
+  <line x1="556" y1="188" x2="214" y2="188" stroke="#7a5aa5" stroke-width="1.5"/>
+  <polygon points="214,188 224,183 224,193" fill="#7a5aa5"/>
+  <text x="384" y="228" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#7a5aa5">return value, marshalled straight back</text>
+
+  <line x1="640" y1="206" x2="640" y2="236" stroke="#7a5aa5" stroke-width="1.5"/>
+  <polygon points="640,236 635,226 645,226" fill="#7a5aa5"/>
+  <line x1="656" y1="236" x2="656" y2="206" stroke="#7a5aa5" stroke-width="1.5"/>
+  <polygon points="656,206 651,216 661,216" fill="#7a5aa5"/>
+  <text x="700" y="226" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#7a5aa5">SDK</text>
+
+  <polyline points="558,203 546,203 546,262 214,262" fill="none" stroke="#7a5aa5"
+            stroke-width="1.5" stroke-dasharray="5 4"/>
+  <polygon points="214,262 224,257 224,267" fill="#7a5aa5"/>
+  <text x="384" y="255" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#7a5aa5">later result, the impl calls the static callback</text>
+
+  <text x="385" y="336" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#666666">
+    Only the implementation class talks to the SDK, in both directions; a method returning a supported type returns it directly
+  </text>
+</svg>

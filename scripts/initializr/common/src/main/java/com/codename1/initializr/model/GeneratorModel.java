@@ -43,7 +43,7 @@ import java.util.Map;
 import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
-    private static final String CN1_PLUGIN_VERSION = "7.0.267";
+    private static final String CN1_PLUGIN_VERSION = "7.0.269";
     private static final String PREVIEW_BUTTON_SELECTOR =
             "Button, InitializrLiveButtonDarkClean, "
                     + "InitializrLiveButtonLightTealRound, InitializrLiveButtonLightTealSquare, "
@@ -109,6 +109,8 @@ public class GeneratorModel {
             + "  deliberate subset, see `.agent-skills/codename-one/references/css.md`).\n"
             + "- Run the simulator with `mvn -pl common cn1:run`.\n"
             + "- Run tests with `mvn -pl common cn1:test` (on Linux CI use `xvfb-run -a`).\n"
+            + "- You can drive the RUNNING simulator yourself over MCP (read the screen, type,\n"
+            + "  tap) - see `.agent-skills/codename-one/references/mcp-agent-control.md`.\n"
             + "- Native cloud builds use `mvn -pl <ios|android|javascript|javase> package -Dcodename1.platform=... -Dcodename1.buildTarget=...`.\n"
             + "\n"
             + "When in doubt, open `.agent-skills/codename-one/SKILL.md` and follow the\n"

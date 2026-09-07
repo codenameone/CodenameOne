@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.developerguide.screenshots;
 
 import com.codename1.components.SpanLabel;
@@ -5,6 +27,7 @@ import com.codenameone.developerguide.snippets.generated.BasicsJava034Snippet;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.CN;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Font;
@@ -12,6 +35,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -40,10 +64,33 @@ public final class PreAdvancedThemingScreenshots {
     private static final int BLUE = 0x0b57d0;
     private static final int GREEN = 0x06a806;
     private static final int WHITE = 0xffffff;
-    private static final Font TITLE_FONT = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_LARGE)
-            .derive(35, Font.STYLE_PLAIN);
-    private static final Font BLOCK_FONT = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_LARGE)
-            .derive(24, Font.STYLE_PLAIN);
+    private static final Font TITLE_FONT = screenshotFont(35);
+    private static final Font BLOCK_FONT = screenshotFont(24);
+    /// Sized to match the height the theme's own default font had (13px), so
+    /// pinning the face on components the block styling does not touch keeps
+    /// their layout exactly where it was.
+    private static final Font FIELD_FONT = screenshotFont(11);
+
+    /// Loads a figure font from the port's bundled Roboto rather than from the host.
+    ///
+    /// `Font.createSystemFont` resolves through `JavaSEPort.fontFaceSystem`, which is
+    /// "Arial" on macOS and Linux alike. Arial exists on a developer's Mac and not on a
+    /// stock CI runner, so AWT silently substitutes a different face and every glyph in
+    /// every figure changes -- which is why none of these screenshots could be
+    /// regenerated outside CI and byte-compared against what was committed. The
+    /// `native:` scheme reads `/com/codename1/impl/javase/Roboto-*.ttf` off the
+    /// classpath, so the result does not depend on what the machine happens to have
+    /// installed. It is also what this project's font rule requires everywhere.
+    private static Font screenshotFont(int pixelSize) {
+        Font font = Font.createTrueTypeFont("native:MainRegular", "native:MainRegular");
+        if (font == null) {
+            // Falling back to a host font would quietly restore the very
+            // non-determinism this exists to remove, so refuse instead.
+            throw new IllegalStateException(
+                    "the native font scheme is unavailable, so figures would render with a host font");
+        }
+        return font.derive(pixelSize, Font.STYLE_PLAIN);
+    }
 
     private PreAdvancedThemingScreenshots() {
     }
@@ -53,6 +100,32 @@ public final class PreAdvancedThemingScreenshots {
     }
 
     public static void generate(ScreenshotSink sink) throws IOException {
+        // JavaSEPort.loadTrueTypeFont has an earlier branch for native: fonts:
+        // when isIOS is set -- which loadSkinFile does for any skin whose
+        // systemFontFamily contains "helvetica" -- it resolves to the first
+        // INSTALLED SF or Helvetica family and never reaches the bundled Roboto.
+        // This generator never loads a skin, so that branch is not taken, and the
+        // measurement agrees: figures rendered on a Mac match the Linux runner
+        // byte for byte, which could not happen if one side were using Helvetica
+        // Neue. Guard it anyway, because a future change that loads a skin here
+        // would put the host's fonts back into the output without any other
+        // symptom.
+        String platform = Display.getInstance().getPlatformName();
+        if ("ios".equals(platform)) {
+            throw new IllegalStateException(
+                    "an iOS skin is active, so native: fonts would resolve to installed "
+                    + "system faces instead of the bundled ones and these figures would "
+                    + "stop being reproducible off this machine");
+        }
+
+        // MigLayout picks its default gaps from PlatformDefaults, which reads
+        // System.getProperty("os.name") and returns MAC_OSX, GNOME or WINDOWS_XP.
+        // The gaps differ per platform, so mig-layout.png came out with macOS
+        // spacing on a Mac and GNOME spacing on the Linux runner -- a 12.8% pixel
+        // difference that has nothing to do with fonts. Pin it so the figure shows
+        // the same thing wherever it is generated.
+        com.codename1.ui.layouts.mig.PlatformDefaults.setPlatform(
+                com.codename1.ui.layouts.mig.PlatformDefaults.GNOME);
         write(sink, "flow-layout.png", flow("Flow Layout", Component.LEFT, Component.TOP), PORTRAIT_WIDTH, PORTRAIT_HEIGHT);
         write(sink, "flow-layout-center.png", flow("Flow Layout", Component.CENTER, Component.TOP), PORTRAIT_WIDTH, PORTRAIT_HEIGHT);
         write(sink, "flow-layout-right.png", flow("Flow Layout", Component.RIGHT, Component.TOP), PORTRAIT_WIDTH, PORTRAIT_HEIGHT);
@@ -328,6 +401,22 @@ public final class PreAdvancedThemingScreenshots {
     private static void applyBlockStyleToContent(Container container) {
         for (int i = 0; i < container.getComponentCount(); i++) {
             Component component = container.getComponentAt(i);
+            // Pin the font on EVERY component rather than on the types that also
+            // get block colours. Anything left on the theme's default font
+            // resolves through the host, and that is what made
+            // guibuilder-2-insets-3.png -- the only figure containing a
+            // TextField -- differ between a Mac and CI while the other 23
+            // matched byte for byte. Enumerating the types that carry text
+            // would leave the next one to be added broken in the same way.
+            component.getAllStyles().setFont(FIELD_FONT);
+            if (component instanceof TextArea) {
+                // The hint is painted by a Label that is not in the component
+                // tree, so the walk above never reaches it.
+                Label hint = ((TextArea) component).getHintLabel();
+                if (hint != null) {
+                    hint.getAllStyles().setFont(FIELD_FONT);
+                }
+            }
             if (component instanceof Label || component instanceof Button) {
                 styleBlock(component);
             }

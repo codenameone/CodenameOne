@@ -1258,7 +1258,7 @@ class WindowTest extends UITestBase {
         }
 
         @Override
-        public boolean fireMouseWheelEvent(com.codename1.ui.events.WheelEvent ev) {
+        protected boolean mouseWheel(com.codename1.ui.events.WheelEvent ev) {
             sawWheel = true;
             target.hide();
             return false;

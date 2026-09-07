@@ -49,7 +49,7 @@ import java.util.Random;
 /// Analytics.setConsent(AnalyticsConsent.granted());
 ///
 /// Analytics.screen("Home", null);
-/// Analytics.event(AnalyticsEvent.create("purchase").param("value", 9.99).build());
+/// Analytics.event(AnalyticsEvent.create("tutorial_complete").param("seconds", 42).build());
 /// ```
 ///
 /// ### Consent and privacy

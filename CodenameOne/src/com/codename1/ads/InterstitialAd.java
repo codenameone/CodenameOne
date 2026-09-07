@@ -28,11 +28,19 @@ package com.codename1.ads;
 /// ```java
 /// InterstitialAd ad = new InterstitialAd("ca-app-pub-xxx/yyy");
 /// ad.setAdListener(new AdListener() {
-///     public void onLoaded() { ad.show(); }
 ///     public void onDismissed() { ad.load(); } // preload the next one
 /// });
 /// ad.load();
+///
+/// // later, at a natural break such as the end of a level
+/// if (ad.isLoaded()) {
+///     ad.show();
+/// }
 /// ```
+///
+/// Show the ad at the break you chose rather than from `onLoaded()`. Because
+/// `onDismissed()` loads the next ad, a `show()` inside `onLoaded()` makes each
+/// dismissal open another ad and the user cannot get out of the sequence.
 ///
 /// All callbacks are delivered on the EDT. You can also let Codename One show an
 /// interstitial automatically on screen transitions with

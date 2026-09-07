@@ -296,7 +296,18 @@ public class Container extends Component implements Iterable<Component> {
                     parentLayout.addLayoutComponent(constraint, newParent, oldParent);
                 }
 
-                newParent.initComponentImpl();
+                // Only when we are splicing the wrapper into a hierarchy that is already
+                // live. initComponentImpl() recurses into every child, and doing that to a
+                // form that has not been shown runs initComponent() far too early: it binds
+                // the laf, registers animations, shows native overlays and - the way this
+                // surfaced in issue #2710 - makes InputComponent build its editor. The
+                // editor then exists when show() picks the initial focus, so merely asking
+                // a form for its layered pane before showing it left the first text field
+                // focused with a blinking caret. An uninitialized wrapper is initialized
+                // with the rest of the form when it is finally shown.
+                if (isInitialized()) {
+                    newParent.initComponentImpl();
+                }
                 if (oldParent != null) {
                     int cmpIndex = -1;
                     for (int i = 0; i < oldParent.getComponentCount(); i++) {
@@ -2940,6 +2951,28 @@ public class Container extends Component implements Iterable<Component> {
         return changed;
 
     }
+
+    // NOT suppressed, deliberately -- see the history before changing this.
+    //
+    // The padding written by the safe-area snap is scaffolding: doLayout and
+    // calcPreferredSize set it, use it for one measurement, and hand it straight
+    // back to TmpInsets.restore, which has always suppressed events. Only the
+    // SETTING half announces, and a padding change is exactly what
+    // Component.styleChanged answers with revalidateLater() on the parent -- so
+    // laying out a safe-area container queues another revalidate of the whole
+    // Form, which lays it out again, which queues another. On a busy event
+    // dispatch thread that treadmill measured ~200ms per pass against ~15ms of
+    // real painting.
+    //
+    // Suppressing the announcement removes the treadmill and is WRONG here
+    // anyway: peer components rely on those repaints. The JavaSE video peer
+    // fills its buffer from the AWT side and never asks for a repaint itself
+    // (Peer.paint deliberately calls paintOnBuffer rather than cnt.repaint, to
+    // avoid a loop), so with nothing else repainting the form its frames never
+    // reach the screen -- a video that decoded correctly and displayed nothing.
+    //
+    // Fixing the treadmill therefore needs the peers to drive their own
+    // repaints first; until then the wasted passes are the cheaper defect.
 
     void doLayout() {
         doLayoutDepth++;

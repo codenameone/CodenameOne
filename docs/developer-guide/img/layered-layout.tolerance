@@ -1,0 +1,15 @@
+# This figure contains a FontImage material glyph. Measured against the CI
+# runner's own output, the glyph lands at exactly the same size and position --
+# a 55x49 bounding box at the same origin -- and differs only in antialiased
+# edge coverage: 946 fully-white pixels against 916, 173 differing pixels in
+# total, 0.113% of the image. Java2D rasterizes the same glyph from the same
+# bundled font at the same size slightly differently on macOS and Linux.
+#
+# The two bounds are independent and both bind. maxMismatchPercent limits how
+# much of the image may change AT ALL -- every differing pixel counts, not only
+# those past the delta -- so a wholesale recolour cannot slip through by moving
+# each channel a little at a time. maxChannelDelta then caps how far any single
+# pixel may move: 160 clears the measured worst of 141 with room, while a solid
+# overwrite still fails on it.
+maxChannelDelta=160
+maxMismatchPercent=0.3

@@ -32,6 +32,10 @@ For `PropertyBusinessObject`-style classes the same annotations work on
 `Property#set` so subscribers (`addChangeListener`) still see the
 mutation:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnnotationJsonXmlMappingJava002Snippet.java[tag=annotation-json-xml-mapping-java-002,indent=0]
+----
 
 ==== Field-level annotations
 

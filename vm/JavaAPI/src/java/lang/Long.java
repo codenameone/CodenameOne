@@ -78,7 +78,16 @@ public final class Long extends Number implements Comparable<Long> {
      * Computes a hashcode for this Long. The result is the exclusive OR of the two halves of the primitive long value represented by this Long object. That is, the hashcode is the value of the expression: (int)(this.longValue()^(this.longValue()>>>32))
      */
     public int hashCode(){
-        return (int)(this.value^(this.value>>>32));
+        return hashCode(this.value);
+    }
+
+    /**
+     * Returns a hash code for a {@code long} value, without boxing it
+     * (Java 8's {@code Long.hashCode(long)}). The result is the exclusive OR of
+     * the two halves of the value: {@code (int)(value^(value>>>32))}.
+     */
+    public static int hashCode(long value) {
+        return (int)(value^(value>>>32));
     }
 
     /**

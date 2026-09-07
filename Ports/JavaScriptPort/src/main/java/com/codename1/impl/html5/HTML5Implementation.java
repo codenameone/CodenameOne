@@ -561,7 +561,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return x;
         }
         
-        return (int)(x * getDevicePixelRatio());
+        return (int)(x * devicePixelRatioValue());
     }
     
     private int getClientY(MouseEvent evt) {
@@ -569,7 +569,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (y == -1) {
             return y;
         }
-        return (int)((y + getScrollY_()) * getDevicePixelRatio());
+        return (int)((y + getScrollY_()) * devicePixelRatioValue());
     }
     
     private boolean hitTest(int x, int y) {
@@ -4038,87 +4038,28 @@ public class HTML5Implementation extends CodenameOneImplementation {
         //if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {
             //requestFocus();
             //final int units = convertToPixels(e.getUnitsToScroll() * 5, true) * -1;
-        //final int dx = -(int)(e.getDeltaX() * getDevicePixelRatio() * wheelMultiplier());
-        //final int dy = -(int)(e.getDeltaY() * getDevicePixelRatio() * wheelMultiplier());
-        final int dx = -(int)(ne.getPixelX() * getDevicePixelRatio() * wheelMultiplier());
-        final int dy = -(int)(ne.getPixelY() * getDevicePixelRatio() * wheelMultiplier());
+        //final int dx = -(int)(e.getDeltaX() * devicePixelRatioValue() * wheelMultiplier());
+        //final int dy = -(int)(e.getDeltaY() * devicePixelRatioValue() * wheelMultiplier());
+        final int dx = -(int)(ne.getPixelX() * devicePixelRatioValue() * wheelMultiplier());
+        final int dy = -(int)(ne.getPixelY() * devicePixelRatioValue() * wheelMultiplier());
         //debugLog("dx="+dx+"; dy="+dy);
-        // Give mouse wheel listeners a chance to handle (and consume) the wheel before the default
-        // scroll gesture, so WheelEvent is the same universal scroll API used on desktop and mobile.
-        if (Display.getInstance().fireMouseWheelEvent(x, y, dx, dy, true, 0)) {
-            return;
-        }
-        Display.getInstance().callSerially(new Runnable() {
-            public void run() {
-                scrollWheeling = true;
-                Form f = getCurrentForm();
-                if(f != null){
-                    //Component cmp = f.getContentPane().getComponentAt(x, y);
-                    Component cmp = f.getComponentAt(x, y);
-                    if(cmp != null && cmp.isFocusable()) {
-                        cmp.setFocusable(false);
-                        f.pointerPressed(x, y);
-                        f.pointerDragged(x + dx, y + dy / 4);
-                        cmp.setFocusable(true);
-                    } else {
-                        f.pointerPressed(x, y);
-                        f.pointerDragged(x + dx, y + dy / 4);
-                    }
-                }
-            }
-        });
-        Display.getInstance().callSerially(new Runnable() {
-            public void run() {
-                Form f = getCurrentForm();
-                if(f != null){
-                    //Component cmp = f.getContentPane().getComponentAt(x, y);
-                    Component cmp = f.getComponentAt(x, y);
-                    if(cmp != null && cmp.isFocusable()) {
-                        cmp.setFocusable(false);
-                        f.pointerDragged(x + dx, y + dy / 4 * 2);
-                        cmp.setFocusable(true);
-                    } else {
-                        f.pointerDragged(x + dx, y + dy / 4 * 2);
-                    }
-                }
-            }
-        });
-        Display.getInstance().callSerially(new Runnable() {
-            public void run() {
-                Form f = getCurrentForm();
-                if(f != null){
-                    //Component cmp = f.getContentPane().getComponentAt(x, y);
-                    Component cmp = f.getComponentAt(x, y);
-                    if(cmp != null && cmp.isFocusable()) {
-                        cmp.setFocusable(false);
-                        f.pointerDragged(x + dx, y + dy / 4 * 3);
-                        cmp.setFocusable(true);
-                    } else {
-                        f.pointerDragged(x + dx, y + dy / 4 * 3);
-                    }
-                }
-            }
-        });
-        Display.getInstance().callSerially(new Runnable() {
-            public void run() {
-                Form f = getCurrentForm();
-                if(f != null){
-                    //Component cmp = f.getContentPane().getComponentAt(x, y);
-                    Component cmp = f.getComponentAt(x, y);
-                    if(cmp != null && cmp.isFocusable()) {
-                        cmp.setFocusable(false);
-                        f.pointerDragged(x + dx, y + dy);
-                        f.pointerReleased(x + dx, y + dy);
-                        cmp.setFocusable(true);
-                    } else {
-                        f.pointerDragged(x + dx, y + dy);
-                        f.pointerReleased(x + dx, y + dy);
-                    }
-                }
-                scrollWheeling = false;
-            }
-        });
-        
+        // The wheel is handled where it lands, and goes no further. This used to treat the
+        // dispatch above as a listener-only preflight and, whenever nothing consumed it,
+        // synthesise a press, three drags and a release at the cursor -- so a small trackpad
+        // delta over a button pressed the button, and a wheel at a page boundary ran a drag
+        // gesture nobody made. Display scrolls the component under the cursor itself now, so
+        // a false return means nothing there can move, not that the port should emulate one.
+        //
+        // Handed to the shared implementation rather than dispatched from here. This
+        // callback runs on a thread of its own -- the wheel listener above starts one per
+        // event -- and the dispatch now moves scroll positions, fires scroll listeners and
+        // repaints, so running it here mutates the component hierarchy off the event
+        // thread, racing layout and paint. Dispatching only listeners from this thread was
+        // survivable; scrolling from it is not.
+        //
+        // The inherited entry point marshals onto the event thread and owns the
+        // isScrollWheeling flag for the duration, which is the path every other port takes.
+        pointerWheelMoved(x, y, dx, dy, true, 0);
     }
     
     private void updateCanvasSize() {
@@ -4126,7 +4067,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         JavaScriptCanvasLayout.Dimensions dimensions = JavaScriptCanvasLayout.compute(
                 doc().getBody().getClientWidth(),
                 window.getInnerHeight(),
-                getDevicePixelRatio());
+                devicePixelRatioValue());
         canvas.setWidth(dimensions.getBackingWidth());
         canvas.setHeight(dimensions.getBackingHeight());
         outputCanvas.setWidth(dimensions.getBackingWidth());
@@ -4184,7 +4125,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (deferSemanticsWhileAnimating()) {
             return;
         }
-        semanticOverlay.update(getAccessibilityTreeSnapshot(), getDevicePixelRatio());
+        semanticOverlay.update(getAccessibilityTreeSnapshot(), devicePixelRatioValue());
     }
 
     /**
@@ -4229,7 +4170,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
                 semanticRefreshPending = false;
                 if (semanticOverlay != null && accessibilityContainer != null) {
-                    semanticOverlay.update(getAccessibilityTreeSnapshot(), getDevicePixelRatio());
+                    semanticOverlay.update(getAccessibilityTreeSnapshot(), devicePixelRatioValue());
                 }
             }
         });
@@ -4692,7 +4633,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             } else {
                 ff = JavaScriptDisplayMetrics.FormFactor.DESKTOP;
             }
-            dDensity = JavaScriptDisplayMetrics.pickDensity(getDevicePixelRatio(), ff, getDensityOverride());
+            dDensity = JavaScriptDisplayMetrics.pickDensity(devicePixelRatioValue(), ff, getDensityOverride());
         }
         return dDensity;
     }
@@ -4867,11 +4808,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
     }
 
-    static double getDevicePixelRatio() {
+    /// Named apart from the core API deliberately: `CodenameOneImplementation`
+    /// declares `public float devicePixelRatioValue()` as an INSTANCE method, and a
+    /// static method of the same name cannot override it -- that is a compile
+    /// error, not shadowing. This one stays static because the canvas plumbing
+    /// calls it from static context.
+    static double devicePixelRatioValue() {
         if (devicePixelRatio < 0) {
             devicePixelRatio = getDevicePixelRatio_();
         }
         return devicePixelRatio;
+    }
+
+    /// The core API: this port knows its ratio exactly, so callers never have to
+    /// derive one from the density bucket.
+    @Override
+    public float getDevicePixelRatio() {
+        return (float) devicePixelRatioValue();
     }
 
     @Override
@@ -5692,11 +5645,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * @return 
      */
     public static int scaleCoord(int x) {
-        return (int)(x / getDevicePixelRatio());
+        return (int)(x / devicePixelRatioValue());
     }
     
     public static double scaleCoord(double x) {
-        return x / getDevicePixelRatio();
+        return x / devicePixelRatioValue();
     }
     
     
@@ -5707,7 +5660,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * @return 
      */
     public static int unscaleCoord(int x) {
-        return (int)(x * getDevicePixelRatio());
+        return (int)(x * devicePixelRatioValue());
     }
     
     private void resizeNativeEditor() {
@@ -7480,7 +7433,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // by DPR to compare against a CSS-pixel threshold (without
                 // this divide, a 375x667 retina viewport reports 750x1334
                 // and trips the sw600 gate).
-                double dpr = getDevicePixelRatio();
+                double dpr = devicePixelRatioValue();
                 if (dpr <= 0) dpr = 1.0;
                 int minSide = (int) (Math.min(getDisplayWidth(), getDisplayHeight()) / dpr);
                 isTablet = minSide >= 600 ? 1 : 0;
@@ -11043,12 +10996,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
         
     }
 
-    /// Caches any object, not just a `JSObject`.
+    /// Caches any object, not just a `JSObject`, behind a reference the browser's
+    /// collector is genuinely free to clear.
+    ///
+    /// Two things had to be true for this to mean anything, and neither was.
     ///
     /// The cached value used to have to be a `JSObject` and everything else fell
     /// through to `super`, which answers `new WeakReference(o)`. ParparVM's
-    /// `WeakReference` never holds what it was constructed with, so that branch is a
-    /// reference that is empty the moment it is made -- and the framework's caches
+    /// `WeakReference` never held what it was constructed with, so that branch was a
+    /// reference that was empty the moment it was made -- and the framework's caches
     /// are built on ordinary Java objects, not `JSObject`s, so that was every one of
     /// them. `EncodedImage` was the visible casualty: `getInternal()` keeps the
     /// decoded picture in one of these, so a permanent miss made it hand the bytes
@@ -11058,17 +11014,30 @@ public class HTML5Implementation extends CodenameOneImplementation {
     /// about a third of runs, each run missing a different subset of the cells that
     /// draw the same EncodedImage.
     ///
-    /// A Java object reaches a `@JSBody` script as its own JS representation, which
-    /// is a perfectly good WeakMap value, so nothing about the mechanism needed the
-    /// `JSObject` bound -- only the declared type did.
+    /// The JS side was then built on a `WeakMap` keyed by a throwaway token, with the
+    /// referent as the map VALUE. A `WeakMap` holds keys weakly and values strongly,
+    /// so the referent was reachable for exactly as long as the token this method
+    /// returns -- which is to say, for exactly as long as an ordinary strong field.
+    /// Nothing was reclaimable, and the callers that own the token map rather than
+    /// borrow it (`CacheMap.weakCache`, `com.codename1.ui.util.WeakHashMap`, both
+    /// plain hashtables that drop an entry only on explicit remove/clear) grew
+    /// without bound. The token is now a `WeakRef`, whose `deref()` is `get()`.
     @Override
     public Object createSoftWeakRef(Object o) {
         if (useES6WeakRefs()) {
             if (o == null) {
                 return new JSObjectWrapper();
             }
+            JSObject token = createSoftWeakRefImpl(o);
+            if (token == null) {
+                // The native declined this referent (no WeakRef in this realm, or a
+                // shape it cannot target). Falling back is the difference between a
+                // strong ref that works and a token that reads back null forever,
+                // which is an invisible permanent cache miss.
+                return super.createSoftWeakRef(o);
+            }
             JSObjectWrapper keyOut = new JSObjectWrapper();
-            keyOut.o = createSoftWeakRefImpl(o);
+            keyOut.o = token;
             return keyOut;
         } else {
             return super.createSoftWeakRef(o);
@@ -11077,13 +11046,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     /// Reads back whatever `#createSoftWeakRef(Object)` handed out.
     ///
-    /// Dispatches on the shape of the token rather than on the WeakMap being
-    /// available now, which is what the two used to disagree about: create fell
-    /// through to `super` for anything it could not put in the map, extract did not,
-    /// so a `super` token came back null however alive its referent was. The token is
-    /// the only thing that says which side made it, so it is the only thing worth
-    /// asking. Tested with `instanceof` rather than a cast because a failed cast does
-    /// not throw under ParparVM.
+    /// Dispatches on the shape of the token rather than on `WeakRef` being available
+    /// now, which is what the two used to disagree about: create fell through to
+    /// `super` for anything it could not store, extract did not, so a `super` token
+    /// came back null however alive its referent was. The token is the only thing
+    /// that says which side made it, so it is the only thing worth asking. Tested
+    /// with `instanceof` rather than a cast because a failed cast does not throw
+    /// under ParparVM.
     @Override
     public Object extractHardRef(Object o) {
         if (o == null) {
@@ -11096,25 +11065,45 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return super.extractHardRef(o);
     }
 
-    /// Whether the ES6 WeakMap path is both wanted and available.
+    /// Whether the ES6 weak-reference path is both wanted and available.
+    ///
+    /// Resolved once. The callers are hot -- `Image`'s scale cache, `Border`'s
+    /// round-rect cache and every `EncodedImage` decode go through
+    /// `createSoftWeakRef` -- and this was a `Display.getProperty` string compare
+    /// plus a native call on every single one of them. A benign race between two
+    /// threads resolving it costs one extra probe and reaches the same answer.
     private boolean useES6WeakRefs() {
-        return Display.getInstance().getProperty("javascript.useES6WeakRefs", "true").equals("true")
-                && isWeakMapSupported();
+        if (!weakRefsResolved) {
+            weakRefsUsable = Display.getInstance().getProperty("javascript.useES6WeakRefs", "true").equals("true")
+                    && isWeakRefSupported();
+            weakRefsResolved = true;
+        }
+        return weakRefsUsable;
     }
-    
-    
-    
+
+    private boolean weakRefsResolved;
+    private boolean weakRefsUsable;
+
     private static class JSObjectWrapper {
         JSObject o;
     }
-    
-    @JSBody(params={}, script="return window.WeakMap !== undefined;")
-    private static native boolean isWeakMapSupported();
-    
-    @JSBody(params={"o"}, script="var key={}; window.cn1GlobalWeakMap.set(key, o); return key;")
+
+    // These three @JSBody scripts are shadowed at runtime: port.js binds the same
+    // natives with bindNative and its override replaces the emitted body. They are
+    // kept, and kept correct, precisely because that binding is by mangled name --
+    // a signature drift silently un-binds it, and what runs then is whatever is
+    // written here. The previous versions could not survive that: they reached for
+    // `window.cn1GlobalWeakMap`, a global that only ever existed on the main thread
+    // while these natives run in the worker, so an un-binding turned a cache miss
+    // into a thrown TypeError. The translator unwraps object arguments and wraps the
+    // result on this path, so the script sees and returns plain JS values.
+    @JSBody(params={}, script="return typeof WeakRef === 'function';")
+    private static native boolean isWeakRefSupported();
+
+    @JSBody(params={"o"}, script="return (typeof WeakRef === 'function' && o != null && (typeof o === 'object' || typeof o === 'function')) ? new WeakRef(o) : null;")
     private native static JSObject createSoftWeakRefImpl(Object o);
-    
-    @JSBody(params={"key"}, script="return window.cn1GlobalWeakMap.has(key) ? window.cn1GlobalWeakMap.get(key) : null")
+
+    @JSBody(params={"key"}, script="if(key == null || typeof key.deref !== 'function') { return null; } var v = key.deref(); return v === undefined ? null : v;")
     private native static Object extractHardRefImpl(JSObject key);
     
     @JSBody(params={}, script="return window.cn1IsPreview === true")
@@ -12458,7 +12447,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // The display's pixel ratio when this font's height was worked out. A height is in
         // device pixels and everything drawn with it is divided by the ratio to reach CSS
         // pixels, so the height only means anything alongside the ratio it was sized against.
-        double ratioBasis = getDevicePixelRatio();
+        double ratioBasis = devicePixelRatioValue();
         // The height this font was created with, which never changes. Identity has to be built
         // from something that does not move: a font can be a key in a map when the display's
         // ratio changes, and a hash that changes underneath a stored key loses it.
@@ -12477,7 +12466,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
          * single place to recreate them: each brings itself up to date as it is used.</p>
          */
         void syncDensity() {
-            double current = getDevicePixelRatio();
+            double current = devicePixelRatioValue();
             if (current <= 0 || ratioBasis <= 0 || current == ratioBasis) {
                 return;
             }
@@ -13854,7 +13843,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private static String firstClipboardImageDataUrl(ClipboardContent rich) {
         String[] mimes = { ClipboardContent.MIME_PNG, ClipboardContent.MIME_JPEG, ClipboardContent.MIME_GIF };
         for (int i = 0; i < mimes.length; i++) {
-            byte[] bytes = rich.getBytes(mimes[i]);
+            byte[] bytes = clipboardBytes(rich, mimes[i]);
             if (bytes != null && bytes.length > 0) {
                 return "data:" + mimes[i] + ";base64," + Base64.encodeNoNewline(bytes);
             }
@@ -13879,7 +13868,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
             } catch (Throwable ignored) {
             }
-            obj = rich.getText(ClipboardContent.MIME_TEXT);
+            // Through clipboardValue, like every other port read: a provider is
+            // permitted to fail, and one that did threw the whole copy away.
+            obj = clipboardText(rich, ClipboardContent.MIME_TEXT);
         }
         if (!(obj instanceof String)) {
             return;
@@ -13890,10 +13881,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // path that works on the worker-based port; the textarea/execCommand
         // dance below runs in the worker where document is unavailable.
         if (nativeBrowserCopyToClipboard(selectedText,
-                rich == null ? null : rich.getText(ClipboardContent.MIME_HTML),
-                rich == null ? null : rich.getText(ClipboardContent.MIME_RTF),
-                rich == null ? null : rich.getText(ClipboardContent.MIME_MARKDOWN),
-                rich == null ? null : rich.getText(ClipboardContent.MIME_ASCIIDOC))) {
+                clipboardText(rich, ClipboardContent.MIME_HTML),
+                clipboardText(rich, ClipboardContent.MIME_RTF),
+                clipboardText(rich, ClipboardContent.MIME_MARKDOWN),
+                clipboardText(rich, ClipboardContent.MIME_ASCIIDOC))) {
             return;
         }
         HTMLDocument doc = Window.current().getDocument();

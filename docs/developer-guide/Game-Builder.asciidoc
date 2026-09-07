@@ -59,6 +59,10 @@ sets up the perspective camera, lights and a `Model` per element. Put game logic
 |===
 
 Loading and playing a level at runtime is three lines:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameBuilderJava001Snippet.java[tag=game-builder-java-001,indent=0]
+----
 
 
 === Getting started
@@ -178,6 +182,10 @@ The behavior _values_ are data; the behavior _itself_ is code you write in the g
 companion's `onUpdate(double dt)`. `GameSceneView` realizes every element into a sprite
 whose `getUserData()` is the source `GameElement`, so you read the properties you set in
 the editor:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameBuilderJava002Snippet.java[tag=game-builder-java-002,indent=0]
+----
 
 
 Win/lose conditions, scoring, enemy AI and level transitions (using a door's `target`)
@@ -235,6 +243,10 @@ companion in your app, where the scene is rendered by the GPU-accelerated
 *Build* writes the level to `src/main/resources/games/<Scene>.game` and (once) the
 companion `<Scene>.java`. To show the scene in your app, instantiate the companion and
 `start()` it:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GameBuilderJava003Snippet.java[tag=game-builder-java-003,indent=0]
+----
 
 
 The level is plain data, so you can ship many `.game` files and load whichever level the

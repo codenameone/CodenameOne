@@ -23,6 +23,7 @@
 package com.codename1.certificatewizard;
 
 import com.codename1.certificatewizard.api.MockSigningService;
+import com.codename1.certificatewizard.project.ProjectIO;
 import com.codename1.certificatewizard.api.SigningError;
 import com.codename1.certificatewizard.api.SigningService;
 import com.codename1.certificatewizard.api.SigningState;
@@ -36,6 +37,9 @@ import com.codename1.util.OnComplete;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -131,15 +135,58 @@ class CertificateWizardErrorBannerTest {
                 "a developer has to be able to copy the error out");
     }
 
+    @Test
+    void aWizardGivenNoProjectSaysSoInsteadOfGuessingOne() throws Exception {
+        // Every question this tool answers is about one project's identifiers. Without a
+        // project it used to substitute com.example.app -- an identifier a real account can
+        // hold -- and then treat it as the project's own: the bundle list was narrowed to
+        // it and it was preselected, so Create would submit a profile for somebody else's
+        // app. There is no useful unbound mode, so there is no unbound launch.
+        System.clearProperty(ProjectIO.INPUT_PROPERTY);
+        final CertificateWizard[] app = new CertificateWizard[1];
+        try {
+            onEdt(() -> {
+                CertificateWizard.setServiceForTesting(new MockSigningService());
+                app[0] = new CertificateWizard();
+                app[0].runApp();
+            });
+        } finally {
+            CertificateWizard.setServiceForTesting(null);
+        }
+
+        Component message = find(app[0].getForm(), "page.launchError");
+        assertNotNull(message, "the wizard has to say why it cannot run");
+        String text = ((SpanLabel) message).getText();
+        assertTrue(text.contains("codename1.packageName"),
+                "and name the setting that fixes it: " + text);
+        assertNull(find(app[0].getForm(), "nav.profiles"),
+                "none of the pages are built: they all answer questions about a project");
+    }
+
     // ---- harness ------------------------------------------------------------
 
     private static CertificateWizard launch(SigningError failure) throws Exception {
+        // Bound to a throwaway project: the wizard operates on one project's identifiers
+        // and refuses to start without one, so an unbound launch builds no pages at all.
+        Path dir = Files.createTempDirectory("cn1-cw-banner-errors");
+        Path settings = dir.resolve("codenameone_settings.properties");
+        Files.write(settings, ("codename1.packageName=com.example.myapp\n"
+                + "codename1.displayName=My App\n").getBytes(StandardCharsets.UTF_8));
+        Path binding = dir.resolve("binding.properties");
+        Files.write(binding, ("projectDir=" + dir + "\nsettings=" + settings + "\noutputDir=" + dir + "\n")
+                .getBytes(StandardCharsets.UTF_8));
+        System.setProperty(ProjectIO.INPUT_PROPERTY, binding.toString());
         final CertificateWizard[] app = new CertificateWizard[1];
-        onEdt(() -> {
-            CertificateWizard.setServiceForTesting(new FailingReconcile(failure));
-            app[0] = new CertificateWizard();
-            app[0].runApp();
-        });
+        try {
+            onEdt(() -> {
+                CertificateWizard.setServiceForTesting(new FailingReconcile(failure));
+                app[0] = new CertificateWizard();
+                app[0].runApp();
+            });
+        } finally {
+            System.clearProperty(ProjectIO.INPUT_PROPERTY);
+            CertificateWizard.setServiceForTesting(null);
+        }
         return app[0];
     }
 
@@ -223,6 +270,10 @@ class CertificateWizardErrorBannerTest {
 
         public void enableAppGroupCapability(String bundleId, List<String> groups, OnComplete<Result<Void>> cb) {
             delegate.enableAppGroupCapability(bundleId, groups, cb);
+        }
+
+        public void enablePushCapability(String bundleId, OnComplete<Result<Void>> cb) {
+            delegate.enablePushCapability(bundleId, cb);
         }
 
         public void registerDevice(String name, String udid, OnComplete<Result<Void>> cb) {

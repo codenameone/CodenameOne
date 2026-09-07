@@ -80,6 +80,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.ClipboardContent;
+import com.codename1.ui.NativeDragOperation;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -1131,6 +1132,49 @@ public abstract class CodenameOneImplementation {
     ///
     /// a native image
     public abstract Object createImage(byte[] bytes, int offset, int len);
+
+
+    /// Whether this port can round a picture's corners as it draws it.
+    ///
+    /// The alternative -- and what callers have to do when this is false -- is
+    /// to build a rounded COPY of the bitmap: read the pixels back, clear the
+    /// alpha outside the corner arcs, and upload the result as a second image.
+    /// That is a full pixel round trip and a second texture per picture, and the
+    /// corners are a property of how the picture is DRAWN, not of the picture.
+    ///
+    /// #### Returns
+    ///
+    /// true if `drawImageRounded` rounds; false if it will simply draw the image
+    /// square
+    public boolean isRoundedImageDrawSupported() {
+        return false;
+    }
+
+    /// Draws an image with its corners rounded to the given radius, if the port
+    /// supports it; otherwise draws it square.
+    ///
+    /// Check `isRoundedImageDrawSupported()` first -- a caller that needs the
+    /// corners must keep its own fallback for ports that cannot.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `img`: the image
+    ///
+    /// - `x`: destination x
+    ///
+    /// - `y`: destination y
+    ///
+    /// - `w`: destination width
+    ///
+    /// - `h`: destination height
+    ///
+    /// - `cornerRadius`: radius in destination pixels, clamped by the port to
+    /// half the smaller side
+    public void drawImageRounded(Object graphics, Object img, int x, int y, int w, int h, float cornerRadius) {
+        drawImage(graphics, img, x, y, w, h);
+    }
 
     /// Returns the width of a native image
     ///
@@ -5096,12 +5140,26 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
-    /// Returns one of the density variables appropriate for this device, notice that
-    /// density doesn't always correspond to resolution and an implementation might
-    /// decide to change the density based on DPI constraints.
+    /// Returns the platform's own logical-pixel scale factor: device pixels per
+    /// logical pixel, the number iOS calls `UIScreen.scale` and Android calls
+    /// `density`.
+    ///
+    /// This is NOT the same question as [#getDeviceDensity], even though the two are
+    /// easily confused. Density is a coarse DPI bucket used to pick artwork and to size
+    /// things in physical units. The scale factor is what the platform itself uses to
+    /// convert its own layout units into pixels, and on iOS it is only ever 1, 2 or 3 --
+    /// never the 3.5 that a 560-dpi bucket would imply. Anything laying out in
+    /// platform-logical units (density-independent pixels) has to ask this question, not the
+    /// density one, or it renders every dimension off by the ratio between them.
     ///
     /// #### Returns
     ///
+    /// pixels per logical pixel, or 0 when the platform does not report one -- callers
+    /// should then fall back to deriving it from the density bucket
+    public float getDevicePixelRatio() {
+        return 0;
+    }
+
     /// one of the DENSITY constants of Display
     public int getDeviceDensity() {
         int d = getActualDisplayHeight() * getDisplayWidth();
@@ -5566,6 +5624,117 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException();
     }
 
+    // ------------------------------------------------------------------------------------
+    // Native (operating system) drag and drop. The payload is a ClipboardContent, the same one
+    // copyToClipboard publishes, because a drag is a copy the user aims with the pointer.
+    //
+    // A port implements the outbound half here and calls
+    // com.codename1.ui.NativeDragAndDrop for the inbound half.
+    // ------------------------------------------------------------------------------------
+
+    /// Returns true when this platform can hand a drag to the operating system. False here
+    /// leaves the framework with only its lightweight in-form drag and drop, which is what
+    /// every port had before.
+    ///
+    /// #### Returns
+    ///
+    /// true when native drag and drop is available
+    public boolean isNativeDragAndDropSupported() {
+        return false;
+    }
+
+    /// Returns true when a drag started in this application can be dropped outside it -- on the
+    /// desktop, in a file manager, or in another application's window. Ports that can route a
+    /// drag between their own components but not out of the application return false while
+    /// still returning true from `#isNativeDragAndDropSupported()`.
+    ///
+    /// #### Returns
+    ///
+    /// true when a drag can leave the application
+    public boolean isNativeDragOutsideApplicationSupported() {
+        return isNativeDragAndDropSupported();
+    }
+
+    /// Hands the port the drag that would start if the press currently down turns into a drag.
+    ///
+    /// Ports whose platform owns the gesture -- where the operating system's own recognizer
+    /// decides a drag has begun and then asks what is being dragged -- answer from what they
+    /// were given here. Ports that start the session themselves can ignore this and use
+    /// `#startNativeDrag(com.codename1.ui.NativeDragOperation)`.
+    ///
+    /// Invoked on the event dispatch thread, once per press. A press that produces no drag is
+    /// followed by `#cancelNativeDrag()`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `op`: the drag that is now possible
+    public void prepareNativeDrag(NativeDragOperation op) {
+    }
+
+    /// Starts a native drag session now, because the pointer has moved far enough to be a drag.
+    /// Invoked on the event dispatch thread while the pointer is still down.
+    ///
+    /// A port that starts the session must eventually report the outcome through
+    /// `com.codename1.ui.NativeDragAndDrop#dragCompleted(int)`, or a source that offered a move
+    /// never learns whether to delete its copy.
+    ///
+    /// #### Parameters
+    ///
+    /// - `op`: what is being dragged
+    ///
+    /// #### Returns
+    ///
+    /// true when the operating system took the drag
+    public boolean startNativeDrag(NativeDragOperation op) {
+        return false;
+    }
+
+    /// Discards whatever `#prepareNativeDrag(com.codename1.ui.NativeDragOperation)` staged,
+    /// because the press turned out to be a click.
+    public void cancelNativeDrag() {
+    }
+
+    /// Notifies the port that the application has a component that can be dragged through the
+    /// operating system.
+    ///
+    /// A platform whose drag gesture is its own -- UIKit's is -- recognizes that gesture with a
+    /// recognizer installed on the surface, and installing one changes how every touch on that
+    /// surface is delivered. Doing it unconditionally would alter touch handling for every
+    /// application, including the overwhelming majority that never drags anything; a port that
+    /// needs a recognizer therefore installs it here, the first time an application says it
+    /// wants one.
+    ///
+    /// Called on the event dispatch thread, possibly many times; a port must make it idempotent.
+    public void nativeDragSourceRegistered() {
+    }
+
+    /// Notifies the port that the application has a component that accepts drops from the
+    /// operating system.
+    ///
+    /// The counterpart of `#nativeDragSourceRegistered()`, for the same reason: a port attaches
+    /// whatever the platform needs in order to receive drops only for applications that asked
+    /// to receive them, so an application that never does keeps exactly the input handling it
+    /// had.
+    ///
+    /// Called on the event dispatch thread, possibly many times; a port must make it idempotent.
+    public void nativeDropTargetRegistered() {
+    }
+
+    /// True when the port needs the drag image at the moment the operation is staged rather
+    /// than when the drag begins.
+    ///
+    /// A port that starts the session itself renders the image then, which costs nothing for a
+    /// press that turns out to be a click. A port whose platform owns the drag gesture is asked
+    /// for the preview from inside that platform's own callback, which is not a moment at which
+    /// a component can be rendered, so it has to have the image already.
+    ///
+    /// #### Returns
+    ///
+    /// true to render the drag image on every press over a native drag source
+    public boolean isNativeDragImageNeededOnPrepare() {
+        return false;
+    }
+
     /// Performs a clipboard copy operation, if the native clipboard is supported by the implementation it would be used
     ///
     /// #### Parameters
@@ -5620,9 +5789,67 @@ public abstract class CodenameOneImplementation {
             return (String) obj;
         }
         if (obj instanceof ClipboardContent) {
-            return ((ClipboardContent) obj).getText(ClipboardContent.MIME_TEXT);
+            return clipboardText((ClipboardContent) obj, ClipboardContent.MIME_TEXT);
         }
         return null;
+    }
+
+    /// One representation of a clip, or null when there is none -- and when the provider
+    /// that would have built it failed.
+    ///
+    /// Every port read of a clip goes through here. `ClipboardDataProvider` says in as many
+    /// words that a provider may fail, and a port asking for a representation is asking on
+    /// the application's behalf: the failure belongs to that one type. Read directly, it
+    /// belonged to whatever the port was doing -- one throwing provider threw the whole copy
+    /// away, put its exception in the caller's lap, and on one platform left a drag session
+    /// in flight that nothing would ever complete.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: the clip, which may be null
+    ///
+    /// - `mimeType`: the representation wanted
+    ///
+    /// #### Returns
+    ///
+    /// the value, or null when the clip does not offer it or cannot produce it
+    protected static Object clipboardValue(ClipboardContent content, String mimeType) {
+        if (content == null) {
+            return null;
+        }
+        try {
+            return content.getData(mimeType);
+        } catch (Throwable err) {
+            // Logged rather than swallowed: a provider that fails is an application bug
+            // worth seeing, it is simply not this copy's or this drag's bug.
+            //
+            // And the logging is itself guarded, because Log.e reaches through
+            // Util.getImplementation() and Display.getInstance(), and neither is
+            // necessarily there: AWT reads a Transferable whenever it likes, including
+            // before anything has installed an implementation. Reporting the failure must
+            // never be what turns a recoverable one into a NullPointerException thrown at
+            // whoever asked for the clip.
+            try {
+                Log.e(err);
+            } catch (Throwable unloggable) {
+                err.printStackTrace();
+            }
+            return null;
+        }
+    }
+
+    /// `#clipboardValue(com.codename1.ui.ClipboardContent, java.lang.String)` for a
+    /// representation carried as text.
+    protected static String clipboardText(ClipboardContent content, String mimeType) {
+        Object value = clipboardValue(content, mimeType);
+        return value instanceof String ? (String) value : null;
+    }
+
+    /// `#clipboardValue(com.codename1.ui.ClipboardContent, java.lang.String)` for a
+    /// representation carried as bytes.
+    protected static byte[] clipboardBytes(ClipboardContent content, String mimeType) {
+        Object value = clipboardValue(content, mimeType);
+        return value instanceof byte[] ? (byte[]) value : null;
     }
 
     /// Returns the clipboard representations available to framework code. The default adapter keeps
@@ -6447,6 +6674,20 @@ public abstract class CodenameOneImplementation {
     ///
     /// the document provider bridge, or null when unsupported
     public com.codename1.documents.spi.DocumentProviderBridge getDocumentProviderBridge() {
+        return null;
+    }
+
+    /// Returns the platform bridge used by the `com.codename1.continuity` API to advertise the
+    /// user's current activity to their other devices and to reach the platform's synced key/value
+    /// store. Ports supporting either capability override this; the base implementation returns
+    /// null, which leaves saving and restoring state on this device working -- that half is pure
+    /// `com.codename1.io.Storage` -- and makes every cross-device capability report itself
+    /// unsupported.
+    ///
+    /// #### Returns
+    ///
+    /// the continuity bridge, or null when unsupported
+    public com.codename1.continuity.spi.ContinuityBridge getContinuityBridge() {
         return null;
     }
 
@@ -8474,6 +8715,91 @@ public abstract class CodenameOneImplementation {
         return true;
     }
 
+    /// Returns true when the platform has a contact picker that hands over a
+    /// user-selected subset of the address book without the broad contacts
+    /// permission, see `com.codename1.contacts.ContactPicker`.
+    ///
+    /// #### Returns
+    ///
+    /// true if `#pickContacts(int, boolean, int, boolean, com.codename1.ui.events.ActionListener)`
+    /// shows a picker
+    public boolean isContactPickerSupported() {
+        return false;
+    }
+
+    /// Shows the platform's contact picker and reports the user's selection.
+    ///
+    /// A port that has no picker leaves this alone. The default reports an
+    /// empty selection rather than reading the address book, because falling
+    /// back to a broad read is exactly what the caller was avoiding.
+    ///
+    /// **An override must call `response` exactly once**, whether the user
+    /// picked, cancelled or the platform refused. `Display` counts on that to
+    /// know when a pick has finished, and a port that answers twice or not at
+    /// all breaks the next pick rather than only its own.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestedFields`: bit set of the field constants on
+    /// `com.codename1.contacts.ContactPicker`
+    ///
+    /// - `multiSelect`: true to let the user pick more than one contact
+    ///
+    /// - `selectionLimit`: the largest number of contacts the user may pick
+    ///
+    /// - `requireAllRequestedFields`: true to offer only contacts holding
+    /// every requested field
+    ///
+    /// - `response`: invoked with a `com.codename1.contacts.Contact` array
+    /// source once the user is done
+    public void pickContacts(int requestedFields, boolean multiSelect,
+                             int selectionLimit, boolean requireAllRequestedFields,
+                             ActionListener<ActionEvent> response) {
+        fireContactPickerResult(response, new Contact[0]);
+    }
+
+    /// Hands a picker result to its listener on the EDT.
+    ///
+    /// Ports call this from whatever thread the platform's picker answered
+    /// on -- an Android activity result, an iOS delegate callback -- so the
+    /// application's listener always runs where the rest of its code does.
+    ///
+    /// #### Parameters
+    ///
+    /// - `response`: the listener passed to
+    /// `#pickContacts(int, boolean, int, boolean, com.codename1.ui.events.ActionListener)`
+    ///
+    /// - `picked`: the selection, null being treated as empty
+    protected void fireContactPickerResult(ActionListener<ActionEvent> response,
+                                           Contact[] picked) {
+        if (response == null) {
+            return;
+        }
+        Contact[] result = picked == null ? new Contact[0] : picked;
+        Display.getInstance().callSerially(new ContactPickerDelivery(response, result));
+    }
+
+    /// Delivers one contact-picker selection on the EDT.
+    ///
+    /// A named static class rather than the anonymous one this obviously
+    /// wants to be. An anonymous one would capture the implementation it was
+    /// created in for no reason, which is a SpotBugs finding, and the gate is
+    /// zero-findings.
+    private static final class ContactPickerDelivery implements Runnable {
+        private final ActionListener<ActionEvent> response;
+        private final Contact[] picked;
+
+        ContactPickerDelivery(ActionListener<ActionEvent> response, Contact[] picked) {
+            this.response = response;
+            this.picked = picked;
+        }
+
+        @Override
+        public void run() {
+            response.actionPerformed(new ActionEvent(picked));
+        }
+    }
+
     /// removed a contact from the device contacts book
     ///
     /// #### Parameters
@@ -9261,26 +9587,29 @@ public abstract class CodenameOneImplementation {
         t.setIdentity();
     }
 
-    /// True while a scroll-wheel gesture started by `#pointerWheelMoved` is still
-    /// animating. The framework uses this to tell a wheel scroll apart from a
-    /// finger drag (e.g. it suppresses opening the native text editor mid-scroll).
+    /// True while a wheel scroll started by `#pointerWheelMoved` is being handled.
+    ///
+    /// It used to mean something stronger: that synthetic pointer events were in flight,
+    /// because a wheel was emulated as a press, drag and release into the component tree.
+    /// Components tested this to tell that impostor from a finger. Nothing is synthesized
+    /// any more -- the wheel scrolls the container directly -- so those tests can no longer
+    /// fail to be written, and the flag survives for application code that reads it.
     private boolean scrollWheeling;
 
     public boolean isScrollWheeling() {
         return scrollWheeling;
     }
 
-    /// Maps a physical scroll-wheel / trackpad scroll into a Codename One scroll
-    /// gesture. Ports call this from their native wheel callback instead of
-    /// fabricating raw pointer (or key) events of their own, so the mapping lives
-    /// in one place and behaves identically everywhere.
+    /// Maps a physical scroll-wheel / trackpad scroll into a Codename One scroll.
+    /// Ports call this from their native wheel callback instead of fabricating raw
+    /// pointer (or key) events of their own, so the mapping lives in one place and
+    /// behaves identically everywhere.
     ///
-    /// The shared implementation replays the scroll as a synthetic
-    /// press/drag/release over the component under `(x, y)` -- spread across a few
-    /// EDT cycles so Codename One's own drag/tensile/deceleration logic animates
-    /// it like a real drag rather than a single jump -- and temporarily makes that
-    /// component non-focusable so the synthetic press is not registered as a
-    /// click. While it runs `#isScrollWheeling` reports `true`.
+    /// The component under `(x, y)` is offered the wheel first, through
+    /// `Component#mouseWheel` and the mouse wheel listeners, walking up the hierarchy
+    /// until something consumes it. If nothing does, the nearest scrollable ancestor is
+    /// scrolled. No pointer event is synthesized: that is what this used to do, and what
+    /// every component reacting to a pointer then had to defend itself against.
     ///
     /// #### Parameters
     ///
@@ -9300,10 +9629,11 @@ public abstract class CodenameOneImplementation {
 
     /// Richer entry point for wheel events that also carries whether the deltas come from a high
     /// resolution device (a trackpad rather than a notched wheel) and the held keyboard modifiers.
-    /// Ports that can report these should call this overload. The framework first dispatches a
-    /// `com.codename1.ui.events.WheelEvent` to any mouse wheel listeners on the component under the
-    /// cursor; if a listener consumes it the default scrolling gesture is skipped, enabling
-    /// gestures such as control plus wheel to zoom.
+    /// Ports that can report these should call this overload. The framework dispatches a
+    /// `com.codename1.ui.events.WheelEvent` to the mouse wheel listeners on the component under
+    /// the cursor and its ancestors -- a listener that consumes it stops the gesture there,
+    /// enabling gestures such as control plus wheel to zoom -- and scrolls what nothing claimed.
+    /// The port calls this and is done: no pointer event is synthesized from a wheel.
     ///
     /// #### Parameters
     ///
@@ -9327,9 +9657,9 @@ public abstract class CodenameOneImplementation {
     /// event that arrived over a specific native window.
     ///
     /// A port with desktop windows has to say which window the wheel was over: the
-    /// main form version resolves everything -- the listeners and the synthesized
-    /// scroll gesture -- from the current form, so a wheel over a second window
-    /// would scroll the main form's content instead of the window's.
+    /// main form version resolves everything -- the listeners and the component that
+    /// scrolls -- from the current form, so a wheel over a second window would scroll
+    /// the main form's content instead of the window's.
     ///
     /// #### Parameters
     ///
@@ -9353,131 +9683,29 @@ public abstract class CodenameOneImplementation {
             return;
         }
         final Display d = Display.getInstance();
-        // First give mouse wheel listeners a chance to handle (and consume) the event on the EDT.
-        // Only when no listener consumes it do we fall through to the default scrolling gesture.
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                if (Desktop.getInstance().windowMouseWheelEvent(
-                        windowId, x, y, scrollX, scrollY, precise, modifiers)) {
-                    return;
-                }
-                playWheelScrollGesture(d, windowId, x, y, scrollX, scrollY);
-            }
-        });
-    }
-
-    /// Resolves the top level a wheel gesture should play into: the window with the
-    /// given id, or the current form for the main surface.
-    private Container wheelRoot(Display d, int windowId) {
-        // Modality is rechecked on every step, not only when the wheel arrived. The
-        // gesture is played as four queued steps and an unconsumed wheel listener can
-        // show a modal in between, after which the remaining synthetic press, drags
-        // and release would scroll or activate content behind it.
-        if (Desktop.getInstance().isWindowInputBlocked(windowId)) {
-            return null;
-        }
-        if (windowId > 0) {
-            Window w = Desktop.getInstance().windowById(windowId);
-            // Visibility as well as modality, and for the same reason: an unconsumed
-            // wheel listener can hide or minimize its own window before the gesture
-            // starts, and a hidden window stays registered -- so the synthetic press,
-            // drags and release would scroll and activate components in a hierarchy
-            // nobody can see.
-            if (w == null || !w.isWindowShowing()) {
-                return null;
-            }
-            return w;
-        }
-        return d.getCurrent();
-    }
-
-    /// Plays the default scroll gesture for a wheel movement. Quarter the gesture across four EDT
-    /// cycles: a single press->drag(full)->release would read as a fling and overshoot, whereas
-    /// stepped drags let the scroll container settle the way a finger drag does. While it runs
-    /// `#isScrollWheeling` reports `true`.
-    private void playWheelScrollGesture(final Display d, final int windowId, final int x,
-            final int y, final int scrollX, final int scrollY) {
-        // The root is resolved once, by the step that dispatches the press, and the
-        // remaining steps reuse it. Re-checking modality on every step -- which is
-        // what the previous version did -- suppressed the later steps including the
-        // only release, so a gesture whose press had already been delivered never
-        // completed and left the top level's pressed and drag bookkeeping stranded.
-        // A gesture blocked *before* its press still never starts, which is the case
-        // modality is there to stop.
-        final Container[] started = new Container[1];
-        d.callSerially(new Runnable() {
-            @Override
-            public void run() {
-                Container f = wheelRoot(d, windowId);
-                if (f != null) {
-                    started[0] = f;
-                    scrollWheeling = true;
-                    dragWheelStep(f, x, y, scrollX / 4, scrollY / 4, true, false);
+                // The whole of it: dispatch the wheel event, and if nobody took it, scroll
+                // the container under the cursor. No pointer events are synthesized.
+                //
+                // They used to be. A wheel was replayed as a press, three drags and a
+                // release into the component tree so the scroll would animate like a finger
+                // drag, and every component that reacts to a pointer had to be taught to
+                // recognise and refuse the impostor -- Button, Slider and ComboBox already
+                // carried that guard, and each new one that did not was a bug: a switch
+                // toggled by scrolling past it, a list row selected, a table row opening a
+                // dialog (issue #5655). The ports have reported real wheel deltas for a
+                // while now, so the emulation had nothing left to buy.
+                scrollWheeling = true;
+                try {
+                    Desktop.getInstance().windowMouseWheelEvent(windowId, x, y, scrollX, scrollY,
+                            precise, modifiers);
+                } finally {
+                    scrollWheeling = false;
                 }
             }
         });
-        d.callSerially(new Runnable() {
-            @Override
-            public void run() {
-                Container f = started[0];
-                if (f != null) {
-                    dragWheelStep(f, x, y, scrollX / 2, scrollY / 2, false, false);
-                }
-            }
-        });
-        d.callSerially(new Runnable() {
-            @Override
-            public void run() {
-                Container f = started[0];
-                if (f != null) {
-                    dragWheelStep(f, x, y, scrollX * 3 / 4, scrollY * 3 / 4, false, false);
-                }
-            }
-        });
-        d.callSerially(new Runnable() {
-            @Override
-            public void run() {
-                // The release, which must reach the same root the press did -- a
-                // modal shown mid-gesture must not strand the pressed component.
-                Container f = started[0];
-                if (f != null) {
-                    dragWheelStep(f, x, y, scrollX, scrollY, false, true);
-                }
-                scrollWheeling = false;
-            }
-        });
-    }
-
-    /// One synthetic step of a `#pointerWheelMoved` gesture, on the EDT: optionally
-    /// presses, drags to the accumulated `(dx, dy)` offset, and optionally
-    /// releases. The component under the cursor is made non-focusable around the
-    /// step so the synthetic press is not turned into a selection/click.
-    private void dragWheelStep(Container f, int x, int y, int dx, int dy, boolean press, boolean release) {
-        Component cmp;
-        try {
-            cmp = f.getComponentAt(x, y);
-        } catch (Throwable t) {
-            // getComponentAt can transiently fault while the UI is mutating off-EDT.
-            cmp = null;
-        }
-        boolean unfocus = cmp != null && cmp.isFocusable();
-        if (unfocus) {
-            cmp.setFocusable(false);
-        }
-        try {
-            if (press) {
-                f.pointerPressed(x, y);
-            }
-            f.pointerDragged(x + dx, y + dy);
-            if (release) {
-                f.pointerReleased(x + dx, y + dy);
-            }
-        } finally {
-            if (unfocus) {
-                cmp.setFocusable(true);
-            }
-        }
     }
 
     /// Blocks or enables copy and paste in the entire app.

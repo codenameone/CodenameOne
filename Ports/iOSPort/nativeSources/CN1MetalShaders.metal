@@ -2,6 +2,25 @@
  * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ *
  * Metal Shading Language shaders for the Codename One iOS Metal backend.
  * Compiled by Xcode into default.metallib at build time when -Dios.metal=true
  * is set (which adds these files to the Xcode project).
@@ -94,6 +113,60 @@ fragment float4 cn1_fs_textured(
     // Sample, multiply by tint (which is a uniform alpha modulator for DrawImage).
     // The GL path uses the same formula: gl_FragColor = texture2D(tex, coord) * uColor.
     return tex.sample(s, in.texcoord) * tint;
+}
+
+// --------- TexturedRounded pipeline ---------
+// The textured draw with the quad's corners rounded analytically, so a picture
+// can be drawn with rounded corners without anyone building a rounded COPY of
+// the bitmap first.
+//
+// params.xy is the destination size in pixels and params.z the corner radius.
+// Coverage comes from a rounded-rectangle signed distance field and is a smooth
+// ramp across the last pixel, so the edge is ANTIALIASED. That is the whole
+// point of doing it here: a stencil clip of the same shape has a hard edge, and
+// against a reference that anti-aliases its corners a hard edge measures WORSE
+// than rounding the bitmap did -- which is why the copy survived the first
+// attempt to remove it.
+fragment float4 cn1_fs_textured_rounded(
+    VertexOutTextured in [[stage_in]],
+    constant float4 &tint [[buffer(0)]],
+    constant float4 &params [[buffer(1)]],
+    texture2d<float> tex [[texture(0)]])
+{
+    constexpr sampler s(mag_filter::linear, min_filter::linear, address::clamp_to_edge);
+    float w = params.x;
+    float h = params.y;
+    float hw = w * 0.5;
+    float hh = h * 0.5;
+    float r = min(params.z, min(hw, hh));
+    if (r < 0.0) {
+        r = 0.0;
+    }
+    // Position relative to the quad's centre, in pixels.
+    float px = in.texcoord.x * w - hw;
+    float py = in.texcoord.y * h - hh;
+    // Distance to the rounded rectangle: positive inside, and the magnitude in
+    // the last pixel is the coverage.
+    float dxe = abs(px) - (hw - r);
+    float dye = abs(py) - (hh - r);
+    float ax = max(dxe, 0.0);
+    float ay = max(dye, 0.0);
+    float outside = sqrt(ax * ax + ay * ay);
+    float inside = min(max(dxe, dye), 0.0);
+    // The 0.5 is the pixel centre. The distance is measured from the centre of
+    // the fragment's cell, so the outermost cell INSIDE a straight edge has its
+    // centre half a pixel in and a bare clamp(-sd) scores it 0.5 -- a uniformly
+    // translucent one-pixel frame around all four sides, not just the corner
+    // arcs. Offsetting by half a pixel puts full coverage on a cell that lies
+    // entirely inside and 0.5 on one the boundary bisects, which is what the
+    // corner antialiasing wanted in the first place.
+    float coverage = clamp(0.5 - (outside + inside - r), 0.0, 1.0);
+    if (coverage <= 0.0) {
+        return float4(0.0);
+    }
+    // Coverage scales every channel: the texture pipeline works in
+    // premultiplied terms, exactly as the tint modulator above it does.
+    return tex.sample(s, in.texcoord) * tint * coverage;
 }
 
 // --------- AlphaMask pipeline (Phase 2/4) ---------

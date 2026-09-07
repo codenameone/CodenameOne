@@ -30,12 +30,15 @@ import java.util.Map;
 /// an ordered set of parameters. Build one via {@link #create(String)}:
 ///
 /// ```java
-/// Analytics.event(AnalyticsEvent.create("purchase")
-///         .category("commerce")
-///         .param("sku", "abc-123")
-///         .param("value", 9.99)
+/// Analytics.event(AnalyticsEvent.create("tutorial_complete")
+///         .category("onboarding")
+///         .param("step", "checkout")
+///         .param("seconds", 42)
 ///         .build());
 /// ```
+///
+/// Name your own events. The `purchase` family is emitted for you when a
+/// receipt completes, so sending one by hand counts the transaction twice.
 public final class AnalyticsEvent {
     private final String name;
     private final String category;

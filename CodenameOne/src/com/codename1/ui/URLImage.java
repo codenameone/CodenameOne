@@ -846,6 +846,10 @@ public final class URLImage extends EncodedImage {
                 //return EncodedImage.createFromImage(tmp, tmp.isOpaque());
                 return EncodedImage.createFromImage(tmp, false);
             }
+            // NOTE: postProcess() runs only on the resize path above, so an adapter
+            // from createMaskAdapter() does not apply its mask when the download
+            // already matches the placeholder's dimensions. Changing that alters what
+            // existing applications render, so it is documented rather than altered.
             return downloadedImage;
         }
 

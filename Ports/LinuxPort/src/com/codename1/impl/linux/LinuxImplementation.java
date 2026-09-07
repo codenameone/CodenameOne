@@ -2232,17 +2232,20 @@ public class LinuxImplementation extends CodenameOneImplementation {
         }
         if (obj instanceof com.codename1.ui.ClipboardContent) {
             com.codename1.ui.ClipboardContent content = (com.codename1.ui.ClipboardContent) obj;
-            byte[] image = content.getBytes(com.codename1.ui.ClipboardContent.MIME_PNG);
+            // Through clipboardValue, like every other port read: a provider is permitted to
+            // fail, and one that did threw the whole copy away rather than the one encoding
+            // it could not produce.
+            byte[] image = clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_PNG);
             if (image == null) {
-                image = content.getBytes(com.codename1.ui.ClipboardContent.MIME_JPEG);
+                image = clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_JPEG);
             }
             if (image == null) {
-                image = content.getBytes(com.codename1.ui.ClipboardContent.MIME_GIF);
+                image = clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_GIF);
             }
             if (image != null) {
                 LinuxNative.clipboardSetImage(image);
             }
-            Object files = content.getData(com.codename1.ui.ClipboardContent.MIME_FILE);
+            Object files = clipboardValue(content, com.codename1.ui.ClipboardContent.MIME_FILE);
             if (files instanceof String[]) {
                 String[] paths = (String[]) files;
                 if (paths.length > 0) {
@@ -3349,6 +3352,10 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    // NOTE: isRedirectToAudioBuffer() is not honoured here. MediaManager sends a
+    // redirected builder to build(), which lands in this method, and this recorder
+    // always writes a WAV file at getPath(). A caller asking for live PCM on this
+    // port therefore gets a file recorder rather than an AudioBuffer.
     public Media createMediaRecorder(com.codename1.media.MediaRecorderBuilder builder) throws IOException {
         if (builder == null || builder.getPath() == null) {
             return null;

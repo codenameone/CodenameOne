@@ -79,6 +79,12 @@ public class RequestBuilder {
     private ErrorCodeHandler<byte[]> byteArrayErrorCallback;
     private ErrorCodeHandler<Map> jsonErrorCallback;
     private ErrorCodeHandler<String> stringErrorCallback;
+
+    /// Whether a redirect may be followed, or NULL when the caller has not said.
+    ///
+    /// Three states rather than two: unspecified has to leave ConnectionRequest's global default
+    /// alone, and only an explicit call may override it -- in either direction.
+    private Boolean followRedirects;
     private ErrorCodeHandler<PropertyBusinessObject> propertyErrorCallback;
     private Class errorHandlerPropertyType;
     //private ActionListener<NetworkEvent> errorCallback;
@@ -420,6 +426,30 @@ public class RequestBuilder {
     /// #### Returns
     ///
     /// RequestBuilder instance
+    /// Whether this request may follow a redirect. Requests follow them by default.
+    ///
+    /// Turn it off for a request that carries CREDENTIALS. A redirect is followed with the same
+    /// headers, so a 307 hands the Authorization header -- and the body -- to whatever host the
+    /// response names, including an `http://` one, which silently undoes a caller that was
+    /// careful to use HTTPS. A 302 or 303 is not safer, only different: it turns a POST into a
+    /// GET and the final 2xx then reports success for a write that never happened.
+    ///
+    /// `ConnectionRequest` has always had this per request; this passes it through, which is all
+    /// that was missing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `follow`: false to refuse redirects
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder followRedirects(boolean follow) {
+        checkFetched();
+        followRedirects = Boolean.valueOf(follow);
+        return this;
+    }
+
     public RequestBuilder onErrorCodeString(ErrorCodeHandler<String> err) {
         checkFetched();
         stringErrorCallback = err;
@@ -1044,6 +1074,14 @@ public class RequestBuilder {
             req.setContentType(contentType);
         }
         req.setFailSilently(hasErrorCodeHandler());
+        if (followRedirects != null) {
+            // Only when the CALLER said so. Applying the field unconditionally would push this
+            // builder's default over ConnectionRequest.setDefaultFollowRedirects for every
+            // request that never asked, and testing it as a plain boolean made an explicit
+            // followRedirects(true) unreachable whenever the global default was false -- which is
+            // the opposite of a per-request setting.
+            req.setFollowRedirects(followRedirects.booleanValue());
+        }
         if (cache != null) {
             req.setCacheMode(cache);
         }

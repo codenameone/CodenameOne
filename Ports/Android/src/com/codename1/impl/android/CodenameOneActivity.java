@@ -68,6 +68,12 @@ public class CodenameOneActivity extends Activity {
 
     private PowerManager.WakeLock wakeLock;
 
+    /// The `android.window.OnBackInvokedCallback` registered for this activity,
+    /// or null on a platform older than Android 13. Held as `Object` because
+    /// the type does not exist in the SDK this port compiles against; see
+    /// [PredictiveBackBridge].
+    private Object onBackInvokedCallback;
+
     /**
      * Overriden by stub, returns the user application instance.
      */
@@ -187,12 +193,42 @@ public class CodenameOneActivity extends Activity {
         nativeMenu = enable;
     }
 
+    /// The legacy entry point for the system back action. Still the only one
+    /// below Android 13, and still the one Android 13 through 15 uses while
+    /// `android:enableOnBackInvokedCallback` defaults to false there. An app
+    /// targeting API 36 on Android 16 or newer never gets here: the platform
+    /// delivers back to the callback [PredictiveBackBridge] registers instead.
     @Override
     public void onBackPressed() {
+        handleBackNavigation();
+    }
+
+    /// Feeds one system back action into Codename One as a back key press and
+    /// release, whichever of the two activity-level entry points delivered it.
+    ///
+    /// The platform picks between `onBackPressed()` and the
+    /// `OnBackInvokedCallback`, never both. What it does deliver alongside the
+    /// callback is the key event itself, which the Codename One canvas also
+    /// turns into a back; [PredictiveBackBridge#claimBackForCallback()] is what
+    /// keeps that pair from popping two forms.
+    void handleBackNavigation() {
+        if (!PredictiveBackBridge.claimBackForCallback()) {
+            // The key-event path is already delivering this gesture; on
+            // Android 16 both can fire for a single press.
+            return;
+        }
+        if (!Display.isInitialized()) {
+            // Back before Codename One is up (or after it has shut down) has
+            // nowhere to go: pushing a key event into Display would throw out
+            // of a system callback. Behave like an activity with no back
+            // handling of its own instead.
+            finish();
+            return;
+        }
         Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_BACK);
         Display.getInstance().keyReleased(AndroidImplementation.DROID_IMPL_KEY_BACK);
     }
-    
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -221,6 +257,15 @@ public class CodenameOneActivity extends Activity {
             System.out.print("This exception is totally valid and here only for debugging purposes");
             t.printStackTrace();
         }
+
+        // Registered last: requestFeature() above has to run before anything
+        // touches the window, and back cannot arrive while onCreate is still
+        // on the stack.
+        onBackInvokedCallback = PredictiveBackBridge.register(this, new Runnable() {
+            public void run() {
+                handleBackNavigation();
+            }
+        });
     }
 
     @Override
@@ -238,6 +283,10 @@ public class CodenameOneActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        // Before super.onDestroy(): the dispatcher belongs to the window, and
+        // the window is on its way out by the time the superclass returns.
+        PredictiveBackBridge.unregister(this, onBackInvokedCallback);
+        onBackInvokedCallback = null;
         super.onDestroy();
         AndroidNativeUtil.onDestroy();
         if (isBillingEnabled()) {

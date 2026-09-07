@@ -69,6 +69,13 @@ public final class IOSNative {
     native boolean isPainted();
     native int getDisplayWidth();
     native int getDisplayHeight();
+
+    /// The screen's scale factor -- 1, 2 or 3 on iOS -- straight from UIScreen,
+    /// NOT derived from the artwork density bucket. The two are different
+    /// questions: the bucket approximates DPI and is chosen from the display
+    /// resolution (and under ios.densityOld from the superclass's own resolution
+    /// rules), so a 2x phone can land in a bucket that implies 3.
+    native float getDisplayScale();
     native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine,
             int rows, int maxSize, int constraint, String text, boolean forceSlideUp,
             int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight,
@@ -119,6 +126,14 @@ public final class IOSNative {
     native void nativeDrawStringGlobal(int color, int alpha, long fontPeer, String str, int x, int y);
     native void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints);
     native void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints);
+
+    /// Whether this build can round a picture's corners as it draws it -- only
+    /// the Metal renderer has the shader.
+    native boolean isRoundedImageDrawSupported();
+
+    native void nativeDrawImageRoundedGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius);
+
+    native void nativeDrawImageRoundedMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius);
     native void nativeTileImageGlobal(long peer, int alpha, int x, int y, int width, int height);
     native int stringWidthNative(long peer, String str);
     native int charWidthNative(long peer, char ch);
@@ -321,6 +336,10 @@ public final class IOSNative {
     native void peerSetVisible(long peer, boolean v);
     native long createPeerImage(long peer, int[] wh);
 
+    /// Tells the peer it does not have to keep the decoded UIImage alive once it
+    /// has uploaded its texture: the caller holds the encoded bytes and will
+    /// recreate the image if the platform loses it. See
+
     native void releasePeer(long peer);
     native void retainPeer(long peer);
 
@@ -344,10 +363,125 @@ public final class IOSNative {
 
     native void setClipboardString(String s);
     native String getClipboardString();
+    /// Adds one further representation to the clip the next setClipboardContent publishes.
+    ///
+    /// The fixed arguments below name the types the framework has constants for; a content
+    /// may offer any type at all, and one of those reached the pasteboard nowhere else.
+    native void addClipboardRepresentation(String mimeType, byte[] value);
     native void setClipboardContent(String plain, String html, String rtf, String markdown, String asciidoc, byte[] image, String fileUris);
     native String getClipboardContent(String mimeType);
+
+    /// How many representations the system pasteboard is offering, so they can be read by
+    /// index rather than joined into one string -- see addNativeDragFiles for what a
+    /// separator costs.
+    native int getClipboardTypeCount();
+
+    /// The MIME type of one of them, or null for an identifier this framework has no
+    /// reading of.
+    native String getClipboardTypeAt(int index);
+
+    /// Its bytes, or null when the pasteboard no longer has it.
+    native byte[] getClipboardRepresentation(String mimeType);
     native byte[] getClipboardImage();
     native String getClipboardFileUris();
+
+    /// Native drag and drop. UIKit owns the drag gesture, so the framework stages what a press
+    /// has made draggable and the native side asks for the payload once UIDragInteraction
+    /// decides a drag has begun. See `Ports/iOSPort/nativeSources/CN1DragAndDrop.m`.
+    native boolean isNativeDragAndDropSupported();
+
+    /// True where a drag started in this application can be dropped in another one, which is
+    /// iPadOS and Mac Catalyst rather than a phone in full screen.
+    native boolean isNativeDragOutsideAppSupported();
+
+    /// Stages the representations a drag could offer -- named, not built -- along with what a
+    /// receiver may do with them and the image to show under the finger.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mimeTypes`: newline separated MIME types
+    ///
+    /// - `allowedActions`: the `com.codename1.ui.NativeDragOperation` action bit set
+    ///
+    /// - `dragImagePng`: the preview as PNG bytes, or null for the platform default
+    ///
+    /// - `touchX`: the press position within the drag image
+    ///
+    /// - `touchY`: the press position within the drag image
+    native void prepareNativeDrag(String mimeTypes, int allowedActions, byte[] dragImagePng,
+            int touchX, int touchY);
+
+    /// Clears the payload, ready for the representations of the session UIKit has just started,
+    /// and records the id the framework gave that session. Called from inside the
+    /// session-started callback, so that a promised representation is built only once a drag
+    /// really happens.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sessionId`: travels with every load handler this session registers, so a
+    ///   representation read after another drag has begun resolves against its own operation
+    native void beginNativeDragPayload(int sessionId);
+
+    /// Names a representation the drag can offer, without producing it.
+    ///
+    /// Every MIME type the operation advertises goes through here rather than a fixed list, so
+    /// nothing the application published is silently left behind -- a drag offering only
+    /// `text/markdown` used to advertise it and then carry nothing, which UIKit cancels. The
+    /// value is produced only if a receiver reads that type, which is what
+    /// `com.codename1.ui.ClipboardContent#setDataProvider(java.lang.String, com.codename1.ui.ClipboardDataProvider)`
+    /// promises.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mimeType`: the representation's MIME type
+    native void declareNativeDragPayload(String mimeType);
+
+    /// Adds the file list, the one representation that cannot be deferred: UIKit needs the
+    /// number of items when the session begins, and for a file drag that is the number of
+    /// files.
+    ///
+    /// #### Parameters
+    ///
+    /// - `paths`: newline separated file paths or `file:` URIs
+    native void addNativeDragFiles(String path);
+
+    /// Reports that a drop's target callback has run, so the files it copied out are no longer
+    /// owed to anybody and may be reclaimed with the rest.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dropId`: the drop, as the commit named it
+    native void dropDeliveryFinished(int dropId);
+
+    /// Adds one link a text/uri-list named, which becomes a drag item of its own.
+    ///
+    /// Resolved when the session begins for the reason the file list is: the item count is
+    /// fixed then, and a list of links is that many items. A public.url representation is
+    /// one URL, so the whole list registered as a single one reached every native receiver
+    /// as a malformed address.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: one entry of the list, a URL or a local path
+    native void addNativeDragUrl(String url);
+
+    /// Drops whatever `#prepareNativeDrag(java.lang.String, int, byte[], int, int)` staged,
+    /// because the press turned out to be a tap.
+    native void cancelNativeDrag();
+
+    /// Attaches the drag interaction, because the application has a component that can be
+    /// dragged out.
+    ///
+    /// UIKit recognizes the drag gesture with a recognizer installed on the surface, and having
+    /// one there changes how every touch is delivered -- with it attached unconditionally a
+    /// plain tap stopped reaching the framework. So it is attached on demand, and an
+    /// application that never drags anything keeps exactly the touch handling it had.
+    /// Idempotent.
+    native void enableNativeDragSource();
+
+    /// Attaches the drop interaction, because the application has a component that accepts
+    /// drops. Withheld until then on the same principle as the drag interaction. Idempotent.
+    native void enableNativeDropTarget();
     
     native void setPinchToZoomEnabled(long peer, boolean e);
     native void setNativeBrowserScrollingEnabled(long peer, boolean e);
@@ -698,6 +832,51 @@ public final class IOSNative {
     native long createPersonPhotoImage(long id);
     native String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email);
     native boolean deleteContact(int id);
+
+    /**
+     * Whether {@code CNContactPickerViewController} was compiled into this
+     * build and can run on this device.
+     *
+     * <p>False when the application never referenced
+     * {@code com.codename1.contacts.ContactPicker}, because the builder only
+     * turns on {@code CN1_USE_CONTACT_PICKER} and links ContactsUI when it
+     * did.</p>
+     */
+    native boolean isContactPickerSupported();
+
+    /**
+     * Presents the system contact picker.
+     *
+     * <p>Unlike every other native on this class the picker needs no
+     * {@code NSContactsUsageDescription}: it runs out of process and hands
+     * back only the contacts the user tapped.</p>
+     *
+     * @param requestedFields bit set of
+     *                        {@code com.codename1.contacts.ContactPicker}
+     *                        constants
+     * @param multiSelect     true to let the user pick more than one
+     * @param selectionLimit  the largest selection to report back
+     */
+    native void openContactPicker(int requestedFields, boolean multiSelect, int selectionLimit);
+
+    /**
+     * Copies one picked contact into a Java {@code Contact}.
+     *
+     * <p>Valid only between the {@code contactPickerResult} callback and
+     * {@link #releasePickedContacts()}, which is when the native side is
+     * still holding the array the picker returned.</p>
+     *
+     * @param index           position in the picked array
+     * @param cnt             the contact to populate, whose hashtables must
+     *                        already exist
+     * @param requestedFields bit set of
+     *                        {@code com.codename1.contacts.ContactPicker}
+     *                        constants
+     */
+    native void updatePickedContact(int index, Contact cnt, int requestedFields);
+
+    /** Drops the picked contacts the native side was holding. */
+    native void releasePickedContacts();
     
     native void dial(String phone);
     native void requestAppStoreReview();
@@ -832,6 +1011,15 @@ public final class IOSNative {
     native void scanBarCode();
 
     native long createTruetypeFont(String name);
+
+    /// Registers ONE bundled font file, by its bundle-relative name.
+    ///
+    /// createTrueTypeFont is given both the font's name and the file it lives
+    /// in, and the file is the cheap way to make the name resolvable. Without
+    /// it the only option is registering every bundled font to satisfy one
+    /// lookup -- 33 files and 5.7MB in an application shipping a font family,
+    /// measured at 25ms on the start-up path.
+    native void registerBundledFont(String fileName);
     native long deriveTruetypeFont(long uiFont, boolean bold, boolean italic, float size);
 
     native void log(String text);
@@ -1371,6 +1559,45 @@ public final class IOSNative {
      * process if it is resumed twice.
      */
     native void intentsCompleteInvocation(String token, String resultJson);
+
+    // --- State restoration and continuity -----------------------------------
+    // Backs com.codename1.continuity. Two unrelated Apple mechanisms sit behind these and are
+    // answered separately: NSUserActivity carries the current activity to a device that is
+    // physically nearby, and NSUbiquitousKeyValueStore carries a few durable values to every
+    // device on the account whether they are nearby or not. The first needs no entitlement and
+    // the second needs one, which is why com.codename1.continuity.sync is a package of its own.
+    // Payloads cross as JSON strings, matching the intents natives above.
+
+    /** True when this build linked the continuation natives at all. */
+    native boolean continuitySupported();
+
+    /**
+     * Advertises the current activity to the user's nearby devices, replacing whatever was
+     * advertised before. The JSON is the state; the title is what the receiving device shows.
+     */
+    native void continuityPublish(String activityType, String title, String userInfoJson);
+
+    /** Withdraws the advertised activity. */
+    native void continuityClear();
+
+    /** True when this build linked the synced store and the entitlement granted one. */
+    native boolean continuitySyncedStoreSupported();
+
+    /** Writes a value to the synced store, answering whether the store holds it afterwards. */
+    native boolean continuitySyncedStorePut(String key, String value);
+
+    /** Reads a value from the synced store, or null when the key is absent. */
+    native String continuitySyncedStoreGet(String key);
+
+    /** Removes a key from the synced store. */
+    native void continuitySyncedStoreRemove(String key);
+
+    /**
+     * Every key in the synced store, as {@code {"keys":["a","b"]}}. A JSON document rather than
+     * a {@code String[]} because every other native here exchanges JSON, and because a store key
+     * is an application-chosen string that no separator character is safe against.
+     */
+    native String continuitySyncedStoreKeys();
 
     // --- Phone-to-watch link (WatchConnectivity) ----------------------------
     // Backs com.codename1.wearable. The same natives serve both halves of a pair: WCSession is

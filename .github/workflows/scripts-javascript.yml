@@ -22,6 +22,7 @@ on:
       - 'scripts/run-javascript-headless-browser.mjs'
       - 'scripts/run-javascript-lifecycle-tests.mjs'
       - 'scripts/test-javascript-surface-replay.mjs'
+      - 'scripts/test-javascript-weak-refs.mjs'
       - 'scripts/run-javascript-lifecycle-tests.sh'
       - 'scripts/verify-javascript-lens-parity.mjs'
       - 'scripts/build-javascript-port-hellocodenameone.sh'
@@ -47,6 +48,7 @@ on:
       - 'scripts/run-javascript-headless-browser.mjs'
       - 'scripts/run-javascript-lifecycle-tests.mjs'
       - 'scripts/test-javascript-surface-replay.mjs'
+      - 'scripts/test-javascript-weak-refs.mjs'
       - 'scripts/run-javascript-lifecycle-tests.sh'
       - 'scripts/verify-javascript-lens-parity.mjs'
       - 'scripts/build-javascript-port-hellocodenameone.sh'
@@ -138,6 +140,14 @@ jobs:
       # the ParparVM build.
       - name: Surface command replay guards
         run: node scripts/test-javascript-surface-replay.mjs
+
+      # Same placement rationale: node: builtins only, so it runs before the
+      # ParparVM build and fails in seconds. Guards createSoftWeakRef /
+      # extractHardRef in port.js -- the token has to be a real WeakRef, because
+      # the WeakMap it used to be held its referent as the map VALUE, which is a
+      # strong edge and made every "weak" cache in the framework unreclaimable.
+      - name: Weak reference guards
+        run: node scripts/test-javascript-weak-refs.mjs
 
       - name: Cache codenameone-tools
         uses: actions/cache@v5

@@ -90,6 +90,11 @@ static void configureStencilWriteOnly(MTLRenderPipelineColorAttachmentDescriptor
             desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_textured"];
             configureBlendPremultiplied(desc.colorAttachments[0]);
             break;
+        case CN1MetalPipelineTexturedRounded:
+            desc.vertexFunction = [library newFunctionWithName:@"cn1_vs_textured"];
+            desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_textured_rounded"];
+            configureBlendPremultiplied(desc.colorAttachments[0]);
+            break;
         case CN1MetalPipelineAlphaMask:
             desc.vertexFunction = [library newFunctionWithName:@"cn1_vs_textured"];
             desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_alpha_mask"];

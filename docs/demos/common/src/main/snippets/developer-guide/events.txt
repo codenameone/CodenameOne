@@ -1,0 +1,17 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::events-text-001[]
+public void pointerDragged(int[] x, int[] y)
+public void pointerDragged(final int x, final int y)
+public void pointerPressed(int[] x, int[] y)
+public void pointerPressed(int x, int y)
+public void pointerReleased(int[] x, int[] y)
+public void pointerReleased(int x, int y)
+public void pointerHover(int[] x, int[] y)
+public void pointerHoverPressed(int[] x, int[] y)
+public void pointerHoverReleased(int[] x, int[] y)
+public void longPointerPress(int x, int y)
+public void keyPressed(int keyCode)
+public void keyReleased(int keyCode)
+public void keyRepeated(int keyCode)
+// end::events-text-001[]

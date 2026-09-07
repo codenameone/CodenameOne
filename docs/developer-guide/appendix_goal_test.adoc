@@ -1,3 +1,4 @@
+[[appendix-goal-test]]
 === Run tests (`test`)
 
 Runs Codename One unit tests.

@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.developerguide.snippets.generated;
 
 import com.codename1.gpu.*;
@@ -57,18 +79,18 @@ class ComponentSelectorJava001Snippet {
     Resources theme;
     void snippet() throws Exception {
         // tag::component-selector-java-001[]
-        // null
+        // ...
 
-        Button slideUp = $(new Button("Slide Up")) //
-            .setIcon(FontImage.MATERIAL_EXPAND_LESS) //
-            .addActionListener(e->{ //
-                $(e) //
-                    .getParent() //
-                    .find(">*") //
-                    .slideUpAndWait(1000) //
-                    .slideDownAndWait(1000); //
+        Button slideUp = $(new Button("Slide Up")) // <1>
+            .setIcon(FontImage.MATERIAL_EXPAND_LESS) // <2>
+            .addActionListener(e->{ // <3>
+                $(e) // <4>
+                    .getParent() // <5>
+                    .find(">*") // <6>
+                    .slideUpAndWait(1000) // <7>
+                    .slideDownAndWait(1000); // <8>
             })
-            .asComponent(Button.class); //
+            .asComponent(Button.class); // <9>
         // end::component-selector-java-001[]
     }
 }

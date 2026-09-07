@@ -126,6 +126,7 @@ public class ChatView extends Container {
                 row.add(b);
                 history.add(message);
                 bubbles.add(b);
+                b.owner = ChatView.this;
                 messages.add(row);
                 messages.revalidateLater();
                 messages.scrollComponentToVisible(b);
@@ -160,6 +161,35 @@ public class ChatView extends Container {
             return;
         }
         bubbles.get(bubbles.size() - 1).appendText(delta);
+    }
+
+    /// Replaces the stored message for a bubble whose text has changed, so
+    /// `#getHistory` reflects a streamed reply rather than the empty
+    /// placeholder `#beginAssistantStream` created. Only the text is replaced:
+    /// a message may be a single text part and still carry tool calls, a
+    /// participant name or a tool call id, and dropping those breaks the replay
+    /// that a following tool result belongs to. A message whose content is not
+    /// a single text part -- one holding an image, say -- is left alone
+    /// entirely. Called on the EDT by [ChatBubble].
+    void bubbleTextChanged(ChatBubble bubble, String text) {
+        int i = bubbles.indexOf(bubble);
+        if (i < 0 || i >= history.size()) {
+            return;
+        }
+        ChatMessage existing = history.get(i);
+        List<MessagePart> parts = existing.getParts();
+        if (parts == null || parts.size() != 1 || !(parts.get(0) instanceof TextPart)) {
+            return;
+        }
+        ChatMessage replacement = new ChatMessage(existing.getRole(),
+                Arrays.<MessagePart>asList(new TextPart(text)),
+                existing.getToolCalls(), existing.getName(),
+                existing.getToolCallId());
+        history.set(i, replacement);
+        // The bubble hands the same message out through getMessage(), so it has
+        // to move too -- otherwise the two answers to "what does this bubble
+        // say" disagree the moment anything streams into it.
+        bubble.setMessage(replacement);
     }
 
     public void setTypingIndicatorVisible(final boolean v) {

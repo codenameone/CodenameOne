@@ -1,0 +1,874 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+
+package com.codename1.impl.javase;
+
+import com.codename1.io.Log;
+import com.codename1.ui.ClipboardContent;
+import com.codename1.ui.ClipboardDataProvider;
+import com.codename1.ui.NativeDragAndDrop;
+import com.codename1.ui.NativeDragOperation;
+
+import java.awt.EventQueue;
+import java.awt.GraphicsEnvironment;
+import java.awt.Point;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.Transferable;
+import java.awt.dnd.DnDConstants;
+import java.awt.dnd.DropTarget;
+import java.awt.dnd.DropTargetDragEvent;
+import java.awt.dnd.DropTargetDropEvent;
+import java.awt.dnd.DropTargetEvent;
+import java.awt.dnd.DropTargetListener;
+import java.awt.event.InputEvent;
+import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.InputStream;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.swing.JComponent;
+import javax.swing.TransferHandler;
+
+/// Bridges Codename One's native drag and drop onto AWT's, which is what lets a desktop
+/// application drag content out of itself -- onto the desktop, into a file manager, into another
+/// application's window -- and accept drags coming the other way.
+///
+/// #### Which thread does what
+///
+/// AWT delivers drag notifications on its own event dispatch thread, which is not Codename
+/// One's. Nothing here ever blocks one on the other: the Codename One event thread calls into
+/// `javax.swing.TransferHandler` through `java.awt.EventQueue#invokeLater`, and the drop
+/// callbacks answer AWT from `NativeDragAndDrop`, which resolves the target without needing the
+/// Codename One event thread. That is not fastidiousness -- the Codename One event thread
+/// blocks on AWT to blit every frame, so a synchronous call the other way deadlocks the
+/// simulator on the first drag.
+///
+/// #### Why the drag reads nothing until the drop
+///
+/// While a drag is merely passing over the window the transferable's *data* is not reliably
+/// readable -- on some platforms it does not exist yet -- but its list of flavors always is. So
+/// a drag in progress is described by a `ClipboardContent` whose representations are all
+/// `ClipboardDataProvider`s: enough for a drop target to say whether it wants a `text/html` or
+/// a file list, without a byte being transferred for a drag that ends up going somewhere else.
+/// On the drop the content is materialized eagerly instead, because the transferable stops
+/// being readable the moment the drop callback returns.
+final class JavaSENativeDragAndDrop {
+    /// The operation the Codename One event thread has asked to export, read by the transfer
+    /// handler on the AWT thread when the drag actually starts. One process drags one thing at
+    /// a time, so a single slot is the whole of the state; the lock is what publishes it from
+    /// one thread to the other.
+    private static final Object LOCK = new Object();
+    private static NativeDragOperation exporting;
+
+    private static NativeDragOperation exporting() {
+        synchronized (LOCK) {
+            return exporting;
+        }
+    }
+
+    private static void setExporting(NativeDragOperation op) {
+        synchronized (LOCK) {
+            exporting = op;
+        }
+    }
+
+    private JavaSENativeDragAndDrop() {
+    }
+
+    /// Makes one canvas both an AWT drop target and a drag source.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas, which is the surface for the main form or for one window
+    static void install(JavaSEPort.C canvas) {
+        if (GraphicsEnvironment.isHeadless()) {
+            return;
+        }
+        try {
+            canvas.setTransferHandler(new Cn1TransferHandler());
+            new DropTarget(canvas, DnDConstants.ACTION_COPY_OR_MOVE | DnDConstants.ACTION_LINK,
+                    new Cn1DropTargetListener(canvas), true);
+        } catch (Throwable err) {
+            // A desktop with no drag and drop service leaves the canvas as it was; the
+            // lightweight drag and drop is unaffected.
+            Log.e(err);
+        }
+    }
+
+    /// Starts an AWT drag for the operation Codename One has decided on. Invoked on the
+    /// Codename One event dispatch thread while the mouse button is still down.
+    ///
+    /// #### Returns
+    ///
+    /// true when the export was handed to AWT; the outcome arrives later through
+    /// `NativeDragAndDrop#dragCompleted(int)`
+    static boolean startDrag(final JavaSEPort port, final NativeDragOperation op) {
+        if (op == null || GraphicsEnvironment.isHeadless()) {
+            return false;
+        }
+        final JavaSEPort.C target = port.dndGestureCanvas != null ? port.dndGestureCanvas : port.canvas;
+        if (target == null) {
+            return false;
+        }
+        final InputEvent trigger = port.dndLastInputEvent();
+        if (!(trigger instanceof MouseEvent)) {
+            // AWT seeds a drag from the mouse event that provoked it and refuses without one.
+            return false;
+        }
+        final double scale = target.awtOverlayScale();
+        final java.awt.Image dragImage = toAwtDragImage(op, scale);
+        final Point offset = awtDragImageAnchor(op.getDragImageOffsetX(),
+                op.getDragImageOffsetY(), scale);
+        setExporting(op);
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    TransferHandler handler = target.getTransferHandler();
+                    if (handler == null) {
+                        // Staged and then abandoned, so what was staged goes back -- as the
+                        // failure below does it. Left set, the operation went on describing
+                        // every drag that arrived afterwards as this application's own,
+                        // with its content and its action mask, until some later outbound
+                        // drag happened to overwrite it.
+                        setExporting(null);
+                        NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+                        return;
+                    }
+                    // Every session, including the ones with no image at all. The handler
+                    // belongs to the canvas and outlives the drag, so setting it only when
+                    // there is one left the previous drag's picture on it and exported the
+                    // next payload under a preview of something else entirely.
+                    handler.setDragImage(dragImage);
+                    handler.setDragImageOffset(dragImage == null ? new Point(0, 0) : offset);
+                    handler.exportAsDrag(target, trigger, toAwtAction(preferred(op.getAllowedActions())));
+                } catch (Throwable err) {
+                    Log.e(err);
+                    setExporting(null);
+                    NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+                }
+            }
+        });
+        return true;
+    }
+
+    /// Forgets what a press staged, because the press turned out to be a click.
+    ///
+    /// What the press staged, never what a session is carrying -- the distinction the iOS side
+    /// draws in CN1CancelNativeDrag. This port fills the export slot in startDrag and nowhere
+    /// else: priming a press stages nothing here, so while a drag is running the slot holds
+    /// that drag. A second press during one -- a second finger, or a press the platform
+    /// delivers alongside the drag -- stages an operation of its own, and releasing it reaches
+    /// this method with the drag untouched by any of it. Clearing the slot then
+    /// took the running drag's operation away, and AWT asks for the payload *after*
+    /// exportAsDrag -- so getSourceActions answered NONE and createTransferable answered null,
+    /// and the drag that was already under way carried nothing at all.
+    ///
+    /// Asking the framework whether a drag is running is what tells the two apart. A slot with
+    /// nothing running is a leftover and still goes.
+    static void cancelDrag() {
+        if (NativeDragAndDrop.getActiveDrag() == null) {
+            setExporting(null);
+        }
+    }
+
+    /// The anchor AWT wants for a drag image, from the grab point the framework records.
+    ///
+    /// The two are opposites. NativeDragOperation's offset is where the pointer sits *inside*
+    /// the image, which is also what Android's shadow metrics ask for; DragSource documents
+    /// its own as "the offset of the Image origin from the hotspot" -- the vector from the
+    /// pointer to the image's top left corner -- and TransferHandler hands what it is given
+    /// straight to it. Passing the grab point through unchanged pushed the preview down and
+    /// to the right by exactly that much, so the part of the component the user took hold of
+    /// was never the part under the pointer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offsetX`: the grab point within the image, in Codename One pixels
+    ///
+    /// - `offsetY`: the grab point within the image, in Codename One pixels
+    ///
+    /// - `scale`: Codename One pixels per AWT point; see `#overlayScale(boolean, double, float)`
+    static Point awtDragImageAnchor(int offsetX, int offsetY, double scale) {
+        double factor = scale > 0 ? scale : 1;
+        return new Point((int) (-offsetX / factor), (int) (-offsetY / factor));
+    }
+
+    /// Codename One pixels per AWT point over a canvas.
+    ///
+    /// The display's backing scale, and the skin's zoom where there is a skin. A simulator
+    /// showing a device at a zoom other than 1 draws its content at that zoom on top of the
+    /// backing scale, so a preview divided by the backing scale alone came out zoomLevel times
+    /// too large or too small, with its grab point displaced by the same factor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `skinned`: true when the canvas is showing a device skin, which is what makes the
+    /// zoom apply
+    ///
+    /// - `backingScale`: the backing scale of the display the canvas is on
+    ///
+    /// - `zoom`: the skin's zoom level
+    static double overlayScale(boolean skinned, double backingScale, float zoom) {
+        if (skinned && zoom > 0) {
+            return backingScale / zoom;
+        }
+        return backingScale;
+    }
+
+    /// Renders the operation's drag image at the size AWT expects.
+    ///
+    /// Codename One images are in surface pixels while AWT places a drag image in points, so on
+    /// a scaled display the image has to come down or the user drags a picture twice the size
+    /// of the thing they grabbed.
+    private static java.awt.Image toAwtDragImage(NativeDragOperation op, double scale) {
+        com.codename1.ui.Image image = op.getDragImage();
+        if (image == null) {
+            return null;
+        }
+        Object peer = image.getImage();
+        if (!(peer instanceof java.awt.Image)) {
+            return null;
+        }
+        java.awt.Image awt = (java.awt.Image) peer;
+        // Both ways, not just down. A skin zoomed past 1 puts fewer Codename One pixels in
+        // an AWT point, so the preview has to grow -- and the grab point below is divided by
+        // the same number either way, which would put it outside an image that stayed as it
+        // was. Compared with a tolerance because it is a ratio of two measured scales.
+        if (scale <= 0 || Math.abs(scale - 1.0) < 0.001) {
+            return awt;
+        }
+        int w = Math.max(1, (int) (image.getWidth() / scale));
+        int h = Math.max(1, (int) (image.getHeight() / scale));
+        BufferedImage scaled = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D g = scaled.createGraphics();
+        g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.drawImage(awt, 0, 0, w, h, null);
+        g.dispose();
+        return scaled;
+    }
+
+    // ------------------------------------------------------------------------------------
+    // Action mapping. AWT's constants are a different bit set from ours, and both sides use
+    // masks in some places and a single action in others.
+    // ------------------------------------------------------------------------------------
+
+    static int toAwtActions(int actions) {
+        int out = DnDConstants.ACTION_NONE;
+        if ((actions & NativeDragOperation.ACTION_COPY) != 0) {
+            out |= DnDConstants.ACTION_COPY;
+        }
+        if ((actions & NativeDragOperation.ACTION_MOVE) != 0) {
+            out |= DnDConstants.ACTION_MOVE;
+        }
+        if ((actions & NativeDragOperation.ACTION_LINK) != 0) {
+            out |= DnDConstants.ACTION_LINK;
+        }
+        return out;
+    }
+
+    static int fromAwtActions(int actions) {
+        int out = NativeDragOperation.ACTION_NONE;
+        if ((actions & DnDConstants.ACTION_COPY) != 0) {
+            out |= NativeDragOperation.ACTION_COPY;
+        }
+        if ((actions & DnDConstants.ACTION_MOVE) != 0) {
+            out |= NativeDragOperation.ACTION_MOVE;
+        }
+        if ((actions & DnDConstants.ACTION_LINK) != 0) {
+            out |= NativeDragOperation.ACTION_LINK;
+        }
+        return out;
+    }
+
+    static int toAwtAction(int action) {
+        return toAwtActions(action);
+    }
+
+    static int preferred(int actions) {
+        if ((actions & NativeDragOperation.ACTION_COPY) != 0) {
+            return NativeDragOperation.ACTION_COPY;
+        }
+        if ((actions & NativeDragOperation.ACTION_MOVE) != 0) {
+            return NativeDragOperation.ACTION_MOVE;
+        }
+        if ((actions & NativeDragOperation.ACTION_LINK) != 0) {
+            return NativeDragOperation.ACTION_LINK;
+        }
+        return NativeDragOperation.ACTION_NONE;
+    }
+
+    // ------------------------------------------------------------------------------------
+    // Reading an AWT transferable as a ClipboardContent.
+    // ------------------------------------------------------------------------------------
+
+    /// Maps an AWT flavor onto the MIME type Codename One names that representation by, or null
+    /// when the flavor carries nothing the framework can express.
+    private static String mimeFor(DataFlavor flavor) {
+        if (flavor == null) {
+            return null;
+        }
+        if (DataFlavor.javaFileListFlavor.equals(flavor)) {
+            return ClipboardContent.MIME_FILE;
+        }
+        if (DataFlavor.imageFlavor.equals(flavor)) {
+            return ClipboardContent.MIME_PNG;
+        }
+        if (flavor.getRepresentationClass() != null
+                && java.awt.Image.class.isAssignableFrom(flavor.getRepresentationClass())) {
+            // A decoded image, whatever the flavor calls itself. All this can produce from one
+            // is a PNG, so PNG is what it advertises -- filing PNG bytes under image/jpeg or
+            // image/webp because the flavor said so handed a target bytes it could not decode
+            // by the type it had asked for. A source offering the real encoded bytes offers
+            // them through a stream flavor as well, and that one keeps its own type.
+            return ClipboardContent.MIME_PNG;
+        }
+        if (DataFlavor.stringFlavor.equals(flavor)) {
+            return ClipboardContent.MIME_TEXT;
+        }
+        String primary = flavor.getPrimaryType();
+        String sub = flavor.getSubType();
+        if (primary == null || sub == null) {
+            return null;
+        }
+        // Locale independent: a Turkish default folds the I of IMAGE to a dotless i, and
+        // the result stops being equal to the framework's own constants.
+        String mime = asciiLower(primary + "/" + sub);
+        if ("application/rtf".equals(mime)) {
+            return ClipboardContent.MIME_RTF;
+        }
+        if ("application/x-java-file-list".equals(mime)) {
+            return ClipboardContent.MIME_FILE;
+        }
+        if (mime.startsWith("application/x-java")) {
+            // AWT's own transport flavors -- serialized objects, local object references, the
+            // text-encoding list. They describe how a payload travels between Java processes,
+            // not what it is, and reading them can hand back arbitrary live objects.
+            return null;
+        }
+        if (mime.startsWith("text/") || mime.startsWith("image/")) {
+            return mime;
+        }
+        // Anything else the source offers in a shape this can actually read. RichTransferable
+        // exports arbitrary binary types on the way out, so refusing them on the way in left a
+        // component filtered to, say, application/pdf unable to receive one at all.
+        Class<?> representation = flavor.getRepresentationClass();
+        if (representation != null
+                && (InputStream.class.isAssignableFrom(representation)
+                        || byte[].class.equals(representation)
+                        || String.class.equals(representation)
+                        || java.io.Reader.class.isAssignableFrom(representation))) {
+            return mime;
+        }
+        return null;
+    }
+
+    /// True when this line is a `file:` URI, whatever case its scheme was written in --
+    /// which is a thing a scheme is allowed to vary in.
+    static boolean isFileUri(String value) {
+        return value.length() >= 5 && value.regionMatches(true, 0, "file:", 0, 5);
+    }
+
+    /// Lowercases ASCII letters only, so the result never depends on the JVM's locale.
+    ///
+    /// MIME types are ASCII by definition, and Codename One has no java.util.Locale to ask
+    /// for the root locale instead -- so this is what the ports use to canonicalize one.
+    static String asciiLower(String s) {
+        StringBuilder out = new StringBuilder(s.length());
+        for (int iter = 0; iter < s.length(); iter++) {
+            char c = s.charAt(iter);
+            out.append(c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
+        }
+        return out.toString();
+    }
+
+    /// The provider a hover installs: the representation is named, and has no value here.
+    /// See `#contentFor(java.awt.datatransfer.Transferable, java.awt.datatransfer.DataFlavor[],
+    /// boolean)`, and `com.codename1.ui.Component#canAcceptNativeDrop(com.codename1.ui.ClipboardContent)`
+    /// for what a target may expect of it.
+    private static final ClipboardDataProvider NAMED_ONLY = new ClipboardDataProvider() {
+        @Override
+        public Object getClipboardData(String requested) {
+            return null;
+        }
+    };
+
+    /// Describes a transferable as a `ClipboardContent`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `transferable`: the AWT transferable
+    ///
+    /// - `flavors`: the flavors it is offering, in the order AWT reported them
+    ///
+    /// - `eager`: true to read every representation now, which is only correct inside a drop
+    ///   callback; false to register providers that read on demand, which is what a drag in
+    ///   progress needs
+    static ClipboardContent contentFor(final Transferable transferable, DataFlavor[] flavors, boolean eager) {
+        ClipboardContent content = new ClipboardContent();
+        if (transferable == null || flavors == null) {
+            return content;
+        }
+        for (int iter = 0; iter < flavors.length; iter++) {
+            final DataFlavor flavor = flavors[iter];
+            final String mime = mimeFor(flavor);
+            if (mime == null || content.hasMimeType(mime)) {
+                // The first flavor offering a MIME type wins: AWT lists them in the source's
+                // preference order, and the richer representation is the earlier one.
+                continue;
+            }
+            if (eager) {
+                Object value = readValue(transferable, flavor, mime);
+                if (value != null) {
+                    content.setData(mime, value);
+                }
+            } else {
+                // The type, and no way to read the value. A drop target is handed this
+                // content by canAcceptNativeDrop and may ask it for anything, and reading an
+                // AWT transferable mid-drag is not the same act as reading it at the drop:
+                // the data is not guaranteed to exist before acceptDrop, so the answer would
+                // be the platform's rather than the source's -- and a one-shot representation
+                // read now is spent before the drop can read it, which is the payload gone.
+                // A hover names what is on offer; the drop is where the values are.
+                content.setDataProvider(mime, NAMED_ONLY);
+            }
+        }
+        // A file list is also a URI list as far as most applications are concerned, and a drag
+        // out of a Linux file manager offers only the latter while one out of the Finder offers
+        // only the former. Presenting both means a drop target that asks for either gets them
+        // whichever spelling the source used -- the same pair this port publishes on the way
+        // out. Declared the same way the rest of the content is -- eagerly on a drop, on demand
+        // during a drag -- so describing a drag still reads nothing.
+        //
+        // Only one of the two can fire for any one content, since each is conditioned on the
+        // other spelling being the one that is present, so neither provider can end up reading
+        // the other.
+        if (!content.hasMimeType(ClipboardContent.MIME_FILE) && content.hasMimeType(ClipboardContent.MIME_URI_LIST)) {
+            if (eager) {
+                content.setFiles(pathsFromUriList(content.getText(ClipboardContent.MIME_URI_LIST)));
+            } else {
+                // Only when the list really does name files. A URI list is not a file list:
+                // a link dragged out of a browser is one line of http, and declaring files
+                // for it made a file-only target light up and then be refused the drop,
+                // because the materialized content -- which keeps only the file: entries --
+                // no longer had what the hover had promised.
+                //
+                // This is the one representation the description reads a value to decide,
+                // and it is a short piece of text rather than the file or the image the
+                // laziness elsewhere exists to defer. Where the platform will not part with
+                // even that until the drop -- which several do -- nothing is declared, which
+                // is the safe direction: refusing a drag this port cannot describe beats
+                // accepting one it cannot deliver.
+                final String[] named = pathsFromUriList(uriListDuringDrag(transferable, flavors));
+                if (named != null) {
+                    content.setDataProvider(ClipboardContent.MIME_FILE, new ClipboardDataProvider() {
+                        @Override
+                        public Object getClipboardData(String requested) {
+                            return named.length == 1 ? (Object) named[0] : named;
+                        }
+                    });
+                }
+            }
+        } else if (!content.hasMimeType(ClipboardContent.MIME_URI_LIST)
+                && content.hasMimeType(ClipboardContent.MIME_FILE)) {
+            // The other direction, which was missing: a Finder or Explorer drag offers only
+            // javaFileListFlavor, so a component filtered to MIME_URI_LIST refused an ordinary
+            // file drag from the one source every desktop user has.
+            if (eager) {
+                String uris = uriListFrom(content);
+                if (uris != null) {
+                    content.setData(ClipboardContent.MIME_URI_LIST, uris);
+                }
+            } else {
+                final ClipboardContent describing = content;
+                content.setDataProvider(ClipboardContent.MIME_URI_LIST, new ClipboardDataProvider() {
+                    @Override
+                    public Object getClipboardData(String requested) {
+                        return uriListFrom(describing);
+                    }
+                });
+            }
+        }
+        return content;
+    }
+
+    /// The `text/uri-list` spelling of a content's files: one `file:` URI per line, CRLF
+    /// separated as RFC 2483 has it, or null when it names none.
+    private static String uriListFrom(ClipboardContent content) {
+        String[] paths = content.getFiles();
+        if (paths == null || paths.length == 0) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < paths.length; iter++) {
+            String path = paths[iter];
+            if (path == null || path.length() == 0) {
+                continue;
+            }
+            // Case insensitively: a scheme is, by specification, and FILE:///x read as a
+            // path would be encoded a second time into a file URI of something relative.
+            out.append(isFileUri(path) ? path : new File(path).toURI().toString());
+            out.append("\r\n");
+        }
+        return out.length() == 0 ? null : out.toString();
+    }
+
+    /// Reads one representation out of a transferable, converting it into the value type the
+    /// MIME type implies. Returns null rather than throwing: a flavor that turns out to be
+    /// unreadable is simply one the drop does not offer.
+    private static Object readValue(Transferable transferable, DataFlavor flavor, String mime) {
+        try {
+            if (mime.startsWith("text/") && flavor.isFlavorTextType()
+                    && !String.class.equals(flavor.getRepresentationClass())) {
+                // Before the read below, not after it. A text flavor that hands over bytes or a
+                // stream has to be decoded through the flavor's own reader, and that reader
+                // fetches the data itself -- so reading first and calling it afterwards
+                // transferred everything twice, leaked the first stream, and lost the
+                // representation outright where a source produces it only once.
+                String text = textFromFlavor(transferable, flavor);
+                if (text != null) {
+                    return text;
+                }
+            }
+            Object out = transferable.getTransferData(flavor);
+            if (out == null) {
+                return null;
+            }
+            if (ClipboardContent.MIME_FILE.equals(mime)) {
+                return filePaths(out);
+            }
+            if (ClipboardContent.MIME_PNG.equals(mime) && out instanceof java.awt.Image) {
+                return JavaSEPort.imageToPngBytes((java.awt.Image) out);
+            }
+            if (mime.startsWith("image/")) {
+                if (out instanceof byte[]) {
+                    return out;
+                }
+                if (out instanceof InputStream) {
+                    return readBytes((InputStream) out);
+                }
+                if (out instanceof java.awt.Image) {
+                    return JavaSEPort.imageToPngBytes((java.awt.Image) out);
+                }
+                return null;
+            }
+            if (out instanceof byte[]) {
+                return out;
+            }
+            if (!mime.startsWith("text/") && out instanceof InputStream) {
+                // A non-text type read as a stream is bytes, not characters; decoding it as
+                // UTF-8 the way the text path does would corrupt a PDF or an archive.
+                return readBytes((InputStream) out);
+            }
+            return JavaSEPort.clipboardText(out);
+        } catch (Throwable err) {
+            return null;
+        }
+    }
+
+    /// The URI list a drag is offering, read while it is still hovering, or null when the
+    /// platform will not produce one yet.
+    ///
+    /// Deliberately narrow: only the `text/uri-list` flavor, and only to answer whether the
+    /// drag names files. Everything else stays deferred.
+    private static String uriListDuringDrag(Transferable transferable, DataFlavor[] flavors) {
+        if (transferable == null || flavors == null) {
+            return null;
+        }
+        for (int iter = 0; iter < flavors.length; iter++) {
+            DataFlavor flavor = flavors[iter];
+            if (!ClipboardContent.MIME_URI_LIST.equals(mimeFor(flavor))
+                    || !String.class.equals(flavor.getRepresentationClass())) {
+                // Only the spelling that can be read twice. This runs on every drag event --
+                // the description is rebuilt for each one -- so consuming a stream here would
+                // spend a one-shot source on the first hover and leave the drop with nothing.
+                // A String flavor hands back the same string however often it is asked.
+                continue;
+            }
+            Object value = readValue(transferable, flavor, ClipboardContent.MIME_URI_LIST);
+            if (value instanceof String) {
+                return (String) value;
+            }
+        }
+        return null;
+    }
+
+    /// Reads a text flavor through the reader the flavor itself supplies, which applies the
+    /// charset the flavor declares. Returns null when the flavor will not produce one, leaving
+    /// the caller's own handling to run.
+    ///
+    /// A text flavor is free to hand over bytes -- text/html;class="[B" and
+    /// text/plain;class=java.io.InputStream are both ordinary on the desktop -- and the encoding
+    /// those bytes are in is a parameter of the flavor rather than something to assume. Storing
+    /// them as a binary payload made getText() answer null for a type the drop had just
+    /// accepted, and decoding them as UTF-8 by hand gets a charset=UTF-16 flavor wrong.
+    private static String textFromFlavor(Transferable transferable, DataFlavor flavor) {
+        try {
+            java.io.Reader reader = flavor.getReaderForText(transferable);
+            if (reader == null) {
+                return null;
+            }
+            try {
+                StringBuilder out = new StringBuilder();
+                char[] buffer = new char[2048];
+                int read;
+                while ((read = reader.read(buffer)) >= 0) {
+                    out.append(buffer, 0, read);
+                }
+                return out.toString();
+            } finally {
+                reader.close();
+            }
+        } catch (Throwable err) {
+            return null;
+        }
+    }
+
+    /// Turns whatever a file flavor produced -- a list of files, or a URI list as text -- into
+    /// absolute paths.
+    private static Object filePaths(Object value) throws Exception {
+        if (value instanceof List) {
+            List<?> list = (List<?>) value;
+            List<String> paths = new ArrayList<String>();
+            for (Object o : list) {
+                if (o instanceof File) {
+                    paths.add(((File) o).getAbsolutePath());
+                } else if (o != null) {
+                    paths.add(o.toString());
+                }
+            }
+            if (paths.isEmpty()) {
+                return null;
+            }
+            return paths.size() == 1 ? (Object) paths.get(0) : paths.toArray(new String[paths.size()]);
+        }
+        String[] fromUris = pathsFromUriList(JavaSEPort.clipboardText(value));
+        if (fromUris == null) {
+            return null;
+        }
+        return fromUris.length == 1 ? (Object) fromUris[0] : fromUris;
+    }
+
+    /// Parses the newline separated `text/uri-list` format, keeping only the `file:` entries,
+    /// which is what a drop from a file manager or the desktop consists of.
+    private static String[] pathsFromUriList(String uriList) {
+        if (uriList == null || uriList.length() == 0) {
+            return null;
+        }
+        List<String> paths = new ArrayList<String>();
+        String[] lines = uriList.split("\r\n|\n|\r");
+        for (int iter = 0; iter < lines.length; iter++) {
+            String line = lines[iter].trim();
+            if (line.length() == 0 || line.charAt(0) == '#') {
+                continue;
+            }
+            try {
+                if (isFileUri(line)) {
+                    // Rebuilt on the canonical spelling of the scheme: File(URI) is
+                    // specified for a "file" URI, and handing it FILE: relies on a
+                    // leniency it does not promise.
+                    paths.add(new File(new URI("file" + line.substring(4)))
+                            .getAbsolutePath());
+                }
+            } catch (Throwable err) {
+                // Not a URI this platform writes; skip it rather than fail the whole drop.
+            }
+        }
+        return paths.isEmpty() ? null : paths.toArray(new String[paths.size()]);
+    }
+
+    private static byte[] readBytes(InputStream input) throws Exception {
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int read;
+            while ((read = input.read(buffer)) >= 0) {
+                out.write(buffer, 0, read);
+            }
+            return out.toByteArray();
+        } finally {
+            input.close();
+        }
+    }
+
+    // ------------------------------------------------------------------------------------
+
+    /// Exports whatever `#startDrag(JavaSEPort, com.codename1.ui.NativeDragOperation)` staged.
+    /// The payload travels as the same `JavaSEPort.RichTransferable` a copy uses, which is why
+    /// a drag out of the application lands correctly in a text editor, an image editor and a
+    /// file manager alike.
+    private static final class Cn1TransferHandler extends TransferHandler {
+        @Override
+        public int getSourceActions(JComponent c) {
+            NativeDragOperation op = exporting();
+            return op == null ? NONE : toAwtActions(op.getAllowedActions());
+        }
+
+        @Override
+        protected Transferable createTransferable(JComponent c) {
+            NativeDragOperation op = exporting();
+            return op == null ? null : new JavaSEPort.RichTransferable(op.getContent());
+        }
+
+        @Override
+        protected void exportDone(JComponent source, Transferable data, int action) {
+            setExporting(null);
+            NativeDragAndDrop.dragCompleted(preferred(fromAwtActions(action)));
+        }
+    }
+
+    /// Receives drags entering one canvas and routes them into the framework.
+    private static final class Cn1DropTargetListener implements DropTargetListener {
+        private final JavaSEPort.C canvas;
+
+        Cn1DropTargetListener(JavaSEPort.C canvas) {
+            this.canvas = canvas;
+        }
+
+        @Override
+        public void dragEnter(DropTargetDragEvent e) {
+            respond(e, true);
+        }
+
+        @Override
+        public void dragOver(DropTargetDragEvent e) {
+            respond(e, false);
+        }
+
+        @Override
+        public void dropActionChanged(DropTargetDragEvent e) {
+            respond(e, false);
+        }
+
+        @Override
+        public void dragExit(DropTargetEvent e) {
+            try {
+                NativeDragAndDrop.dragExit(canvas.windowId);
+            } catch (Throwable err) {
+                Log.e(err);
+            }
+        }
+
+        @Override
+        public void drop(DropTargetDropEvent e) {
+            try {
+                int allowed = fromAwtActions(e.getSourceActions());
+                int action = preferred(fromAwtActions(e.getDropAction()));
+                if (action == NativeDragOperation.ACTION_NONE) {
+                    action = preferred(allowed);
+                }
+                Point at = e.getLocation();
+                int x = canvas.scaleCoordinateX(at.x);
+                int y = canvas.scaleCoordinateY(at.y);
+                // What the framework will settle on, asked before anything is committed. AWT
+                // has to be told the action when the drop is accepted, and that is before the
+                // transferable can be read -- so accepting the action AWT proposed and only
+                // then learning the target had chosen another reported a copy to the source
+                // through exportDone while handing the target a move.
+                action = NativeDragAndDrop.plannedDropAction(canvas.windowId, x, y,
+                        contentFor(e.getTransferable(), e.getCurrentDataFlavors(), false), action);
+                if (action == NativeDragOperation.ACTION_NONE) {
+                    e.rejectDrop();
+                    return;
+                }
+                // Before reading anything: on every platform the transferable only becomes
+                // readable once the drop has been accepted, and it stops being readable when
+                // this method returns -- which is why the content is materialized here rather
+                // than handed to the event dispatch thread as a live view of the transfer.
+                e.acceptDrop(toAwtAction(action));
+                ClipboardContent content = contentFor(e.getTransferable(), e.getCurrentDataFlavors(), true);
+                int accepted = NativeDragAndDrop.drop(canvas.windowId, x, y, content, action);
+                e.dropComplete(accepted != NativeDragOperation.ACTION_NONE);
+            } catch (Throwable err) {
+                Log.e(err);
+                try {
+                    e.dropComplete(false);
+                } catch (Throwable ignored) {
+                    // The drop is already over; nothing left to report to.
+                }
+            } finally {
+                // The drop is the end of the session, and AWT sends no dragExit after it: a
+                // rejected drop returns above without reaching NativeDragAndDrop.drop(), and a
+                // drag that arrived from another application has no exportDone() either, so
+                // without this the target stayed hovered at its own refusal and the next drag
+                // over it was routed as a move rather than an entry. Free after a drop that did
+                // go through, which clears the target itself.
+                try {
+                    NativeDragAndDrop.dragExit(canvas.windowId);
+                } catch (Throwable ignored) {
+                    // Nothing left to clean up.
+                }
+            }
+        }
+
+        /// What the source permits *at this instant*.
+        ///
+        /// getSourceActions is the whole mask the source offered, and answering with it alone
+        /// made the framework prefer a copy every time -- so holding the platform's modifier to
+        /// ask for a move changed nothing, because getDropAction, which is where AWT records
+        /// that choice, was never read. The user's choice wins where the source allows it, and
+        /// the full mask stands where it does not.
+        ///
+        /// The narrowed set is what the framework reports as
+        /// `com.codename1.ui.NativeDropEvent#getAllowedActions()`, and that is the answer that
+        /// method owes: what may be accepted here and now. Reporting the unnarrowed mask instead
+        /// would invite a target to accept the copy the user has just said they do not want, and
+        /// nothing on this side could then tell the framework which of the two to believe.
+        private int allowedActionsFor(DropTargetDragEvent e) {
+            int sourceActions = fromAwtActions(e.getSourceActions());
+            int chosen = fromAwtActions(e.getDropAction()) & sourceActions;
+            return chosen == NativeDragOperation.ACTION_NONE ? sourceActions : chosen;
+        }
+
+        private void respond(DropTargetDragEvent e, boolean entering) {
+            try {
+                Point at = e.getLocation();
+                int x = canvas.scaleCoordinateX(at.x);
+                int y = canvas.scaleCoordinateY(at.y);
+                ClipboardContent content = contentFor(e.getTransferable(), e.getCurrentDataFlavors(), false);
+                int allowed = allowedActionsFor(e);
+                int action = entering
+                        ? NativeDragAndDrop.dragEnter(canvas.windowId, x, y, content, allowed)
+                        : NativeDragAndDrop.dragOver(canvas.windowId, x, y, content, allowed);
+                if (action == NativeDragOperation.ACTION_NONE) {
+                    e.rejectDrag();
+                } else {
+                    e.acceptDrag(toAwtAction(action));
+                }
+            } catch (Throwable err) {
+                Log.e(err);
+                try {
+                    e.rejectDrag();
+                } catch (Throwable ignored) {
+                    // The drag has already moved on.
+                }
+            }
+        }
+    }
+}

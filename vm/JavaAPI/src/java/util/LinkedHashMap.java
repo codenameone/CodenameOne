@@ -188,7 +188,19 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
             c++;
         }
         int cap = cn1Meta.length;
-        int newCap = (n * 2 >= cap) ? cap << 1 : cap;
+        // Grow when the LIVE count has reached the threshold; rebuild at the
+        // same size only when the threshold was reached because of TOMBSTONES.
+        //
+        // Testing capacity directly (elementCount * 2 >= cap) silently assumed
+        // a load factor of 0.5 or more. Below that the threshold is reached
+        // while the table is still less than half full, so the rebuild kept the
+        // same capacity, the rebuilt table was immediately at its threshold
+        // again, and every subsequent put rebuilt the whole table: inserting
+        // 20000 entries at a load factor of 0.25 did 19999 rebuilds and
+        // rehashed 200 million entries. The two-argument constructor accepts
+        // any positive load factor, so this was reachable from ordinary code.
+        // At 0.75 and 0.5 the two rules agree exactly, rebuild for rebuild.
+        int newCap = (n >= threshold) ? cap << 1 : cap;
         cn1Alloc(newCap);
         cn1InitLinks();
         for (int i = 0; i < c; i++) {

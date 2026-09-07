@@ -187,10 +187,16 @@ class InteractionDialogTest extends UITestBase {
         dialog.dispose();
     }
 
-    @Test
+    /// The listeners go in from `initComponent()`, so the form has to be shown: naming it to
+    /// the implementation as the current one is not enough, because a form that was never
+    /// shown is not initialized and nothing added to it is either. That used to pass on a
+    /// bare `setCurrentForm` only because reaching for the layered pane initialized the
+    /// wrapper it splices in whether or not the form was live, which is the fault behind
+    /// issue #2710.
+    @FormTest
     void pointerOutOfBoundsListenersInstalledWhenEnabled() throws Exception {
         Form form = new Form(new BorderLayout());
-        implementation.setCurrentForm(form);
+        form.show();
         InteractionDialog dialog = new InteractionDialog();
         dialog.setDisposeWhenPointerOutOfBounds(true);
         dialog.setAnimateShow(false);

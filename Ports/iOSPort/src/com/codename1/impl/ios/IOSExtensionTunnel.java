@@ -37,26 +37,39 @@ import com.codename1.impl.vpn.ExtensionTunnelHost;
 /// #### Why it is called at all
 ///
 /// The extension is a separate process with a translated VM and no
-/// framework. The generated provider calls [#install()] before starting the
+/// framework. The generated provider calls [#install(int)] before starting the
 /// tunnel, which is what connects the Java packet loop to
 /// `NEPacketTunnelFlow`.
 ///
 /// @hidden not part of the public API; called by generated extension code.
 public final class IOSExtensionTunnel implements ExtensionTunnelHost.Writer {
 
-    private IOSExtensionTunnel() {
+    /// Which start this writer belongs to; see [#install(int)].
+    private final int generation;
+
+    private IOSExtensionTunnel(int generation) {
+        this.generation = generation;
     }
 
-    /// Installs this writer. Called by the generated extension.
+    /// Installs this writer for one start of the tunnel.
+    ///
+    /// The generation is the extension's own start counter, and carrying it
+    /// is what stops a packet crossing tunnels. A stopped tunnel's
+    /// `onPacket` can still be running -- the callback cannot be retracted --
+    /// and `ExtensionTunnelHost.end` clears the host and the transport but
+    /// not the writer, so a late `forward` used to reach whatever provider
+    /// was current. If a new tunnel had started by then, one session's
+    /// packet went out on another's link.
     ///
     /// @hidden not part of the public API.
-    public static void install() {
-        ExtensionTunnelHost.setWriter(new IOSExtensionTunnel());
+    public static void install(int generation) {
+        ExtensionTunnelHost.setWriter(generation,
+                new IOSExtensionTunnel(generation));
     }
 
     @Override
     public void write(byte[] packet, int offset, int length) {
-        writeNative(packet, offset, length);
+        writeNative(generation, packet, offset, length);
     }
 
     /// Hands one packet to `NEPacketTunnelFlow`.
@@ -67,6 +80,6 @@ public final class IOSExtensionTunnel implements ExtensionTunnelHost.Writer {
     /// target -- the app target has no packet flow to write to -- which is
     /// why the generated project lists it in
     /// `cn1-native-verify-ignore.txt`.
-    private static native void writeNative(byte[] packet, int offset,
-            int length);
+    private static native void writeNative(int generation, byte[] packet,
+            int offset, int length);
 }

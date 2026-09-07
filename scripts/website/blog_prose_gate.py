@@ -15,6 +15,7 @@ only responsible for not adding new problems; the backlog stays grandfathered.
 Checks:
   * Vale          (subprocess; uses docs/website/.vale.ini)
   * Paragraph cap (in-process; check_paragraph_capitalization.find_lowercase_paragraphs)
+  * Guide anchors (in-process; validates /developer-guide/#... against AsciiDoc IDs)
   * LanguageTool  (in-process; render_blog_prose_html + run_languagetool;
                    skipped automatically if language_tool_python is unavailable)
 
@@ -52,6 +53,17 @@ SELF_CERTIFYING_RE = re.compile(
     r"to be transparent|in all candor)\b",
     re.IGNORECASE,
 )
+
+DEV_GUIDE_ANCHOR_LINK_RE = re.compile(
+    r"\]\((?:https?://(?:www\.)?codenameone\.com)?"
+    r"/developer-guide/#([A-Za-z0-9_.:-]+)(?:\s+[^)]*)?\)"
+)
+ASCIIDOC_HEADING_RE = re.compile(r"^(={1,6})\s+(.+?)\s*$", re.MULTILINE)
+ASCIIDOC_BLOCK_ID_RE = re.compile(
+    r"^\s*(?:\[\[([^,\]]+)(?:,[^\]]*)?\]\]|\[#([^\]]+)\])\s*$",
+    re.MULTILINE,
+)
+ASCIIDOC_ATTRIBUTE_LIST_RE = re.compile(r"^\s*\[([^\]\n]+)\]\s*$", re.MULTILINE)
 
 
 # --------------------------------------------------------------------------- #
@@ -173,6 +185,142 @@ def run_self_certifying_language(text, rel):
                     f"directly instead of using [{phrase}]"
                 ),
             })
+    return out
+
+
+def asciidoc_default_anchor(heading):
+    """Return the default Asciidoctor section ID for a heading."""
+    plain = re.sub(r"[`*_#]", "", heading).lower()
+    normalized = re.sub(r"[^a-z0-9]+", "_", plain).strip("_")
+    return f"_{normalized}" if normalized else ""
+
+
+def split_asciidoc_attributes(attributes):
+    """Split an attribute list without treating commas inside quotes as separators."""
+    fields = []
+    current = []
+    quote = None
+    escaped = False
+    for char in attributes:
+        if escaped:
+            current.append(char)
+            escaped = False
+            continue
+        if char == "\\" and quote:
+            current.append(char)
+            escaped = True
+            continue
+        if char in ('"', "'"):
+            if quote == char:
+                quote = None
+            elif quote is None:
+                quote = char
+            current.append(char)
+            continue
+        if char == "," and quote is None:
+            fields.append("".join(current))
+            current = []
+            continue
+        current.append(char)
+    fields.append("".join(current))
+    return fields
+
+
+def asciidoc_long_form_ids(source):
+    """Return id= values from AsciiDoc attribute lists."""
+    ids = []
+    for attribute_list in ASCIIDOC_ATTRIBUTE_LIST_RE.finditer(source):
+        for field in split_asciidoc_attributes(attribute_list.group(1)):
+            name, separator, raw_value = field.partition("=")
+            if not separator or name.strip().lower() != "id":
+                continue
+            value = raw_value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+                value = value[1:-1]
+            if value:
+                ids.append(value)
+    return ids
+
+
+def developer_guide_sources(repo_root, git_ref=None):
+    """Yield (path, source) pairs from the worktree or a Git revision."""
+    guide_root = os.path.join(repo_root, "docs", "developer-guide")
+    if git_ref is None:
+        for root, _dirs, files in os.walk(guide_root):
+            for name in files:
+                if not name.endswith((".asciidoc", ".adoc")):
+                    continue
+                full_path = os.path.join(root, name)
+                rel_path = os.path.relpath(full_path, repo_root)
+                with open(full_path, "r", encoding="utf-8") as fh:
+                    yield rel_path, fh.read()
+        return
+
+    listed = _git(
+        ["ls-tree", "-r", "--name-only", git_ref, "--", "docs/developer-guide"],
+        repo_root,
+    )
+    if listed.returncode != 0:
+        raise RuntimeError(
+            f"could not list developer guide files at {git_ref}: {listed.stderr.strip()}"
+        )
+    for rel_path in listed.stdout.splitlines():
+        if not rel_path.endswith((".asciidoc", ".adoc")):
+            continue
+        shown = _git(["show", f"{git_ref}:{rel_path}"], repo_root)
+        if shown.returncode != 0:
+            raise RuntimeError(
+                f"could not read {rel_path} at {git_ref}: {shown.stderr.strip()}"
+            )
+        yield rel_path, shown.stdout
+
+
+def developer_guide_anchors(repo_root, git_ref=None):
+    """Collect generated and explicit IDs from the single-page developer guide."""
+    anchors = set()
+    generated_counts = collections.Counter()
+    guide_entry = "docs/developer-guide/developer-guide.asciidoc"
+    for rel_path, source in developer_guide_sources(repo_root, git_ref):
+        normalized_rel_path = rel_path.replace(os.sep, "/")
+        skipped_document_title = False
+        for match in ASCIIDOC_HEADING_RE.finditer(source):
+            level = len(match.group(1))
+            if (
+                normalized_rel_path == guide_entry
+                and level == 1
+                and not skipped_document_title
+            ):
+                skipped_document_title = True
+                continue
+            anchor = asciidoc_default_anchor(match.group(2))
+            if anchor:
+                generated_counts[anchor] += 1
+        for match in ASCIIDOC_BLOCK_ID_RE.finditer(source):
+            anchors.add(match.group(1) or match.group(2))
+        anchors.update(asciidoc_long_form_ids(source))
+    for anchor, count in generated_counts.items():
+        anchors.add(anchor)
+        for occurrence in range(2, count + 1):
+            anchors.add(f"{anchor}_{occurrence}")
+    return anchors
+
+
+def run_developer_guide_anchor_links(text, rel, anchors):
+    """Find links into the developer guide whose fragment does not exist."""
+    out = []
+    for match in DEV_GUIDE_ANCHOR_LINK_RE.finditer(text):
+        anchor = match.group(1)
+        if anchor in anchors:
+            continue
+        out.append({
+            "signature": ("link", "DeveloperGuideAnchor", anchor),
+            "file": rel,
+            "line": text.count("\n", 0, match.start()) + 1,
+            "message": (
+                "DeveloperGuideAnchor: "
+                f"/developer-guide/#{anchor} does not match a guide section ID"
+            ),
+        })
     return out
 
 
@@ -298,7 +446,9 @@ def build_accept_file(repo_root):
     return path
 
 
-def gate_file(path, base_sha, repo_root, lt_ctx):
+def gate_file(
+    path, base_sha, repo_root, lt_ctx, head_guide_anchors, base_guide_anchors
+):
     head = head_content(path, repo_root)
     base = base_content(base_sha, path, repo_root)
     new = []
@@ -307,6 +457,10 @@ def gate_file(path, base_sha, repo_root, lt_ctx):
     new += net_new(
         run_self_certifying_language(head, path),
         run_self_certifying_language(base, path),
+    )
+    new += net_new(
+        run_developer_guide_anchor_links(head, path, head_guide_anchors),
+        run_developer_guide_anchor_links(base, path, base_guide_anchors),
     )
     if lt_ctx:
         head_lt = lt_findings(head, path, lt_ctx)
@@ -339,11 +493,22 @@ def main():
         return 0
 
     accept_path = build_accept_file(repo_root)
+    head_guide_anchors = developer_guide_anchors(repo_root)
+    base_guide_anchors = developer_guide_anchors(repo_root, base_sha)
     lt_ctx = None if args.no_languagetool else make_lt_context(accept_path)
     try:
         all_new = []
         for path in posts:
-            all_new.extend(gate_file(path, base_sha, repo_root, lt_ctx))
+            all_new.extend(
+                gate_file(
+                    path,
+                    base_sha,
+                    repo_root,
+                    lt_ctx,
+                    head_guide_anchors,
+                    base_guide_anchors,
+                )
+            )
     finally:
         if lt_ctx:
             try:
