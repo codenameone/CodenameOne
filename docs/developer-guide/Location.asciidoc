@@ -31,26 +31,6 @@ longer.
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/LocationJavaSnippets.java[tag=location-java-001,indent=0]
 ----
 
-// EDITORIAL RULE for this section, so it is not "corrected" back.
-//
-// This describes what the component IS, not what our build servers are on
-// today. Review has asked twice for a note here explaining that the generated
-// project pins an Android Gradle plugin older than the control's library
-// wants, so current builds take the fallback -- which is true, and is still
-// not the reader's business. They do not choose our toolchain, they cannot
-// change it, and it moves without them: their app gets the system control on
-// Android 17 the day the build servers do, with nothing rebuilt by hand and
-// no line of their code changed. A note about our migration turns a seamless
-// feature into a warning about a problem they do not have.
-//
-// What they DO need is here: Google recommends the control, it behaves
-// sensibly on every platform, and the one decision only they can make -- the
-// exclusivity hint -- has its own section, worded so it holds whether or not
-// the system control is what grants precise location.
-//
-// If this ever stops being seamless -- if an app must be changed to get the
-// control, or if the fallback stops being a working button -- that is a
-// different feature and this rule does not cover it.
 `LocationButton` is a component you add to a form like any other. On Android 17
 (API 37) and later it's drawn by the system rather than by the app, and the tap
 is what grants precise location for that session. Everywhere else -- older
