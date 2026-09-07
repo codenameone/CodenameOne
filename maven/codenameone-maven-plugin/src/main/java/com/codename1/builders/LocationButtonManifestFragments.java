@@ -2357,29 +2357,189 @@ final class LocationButtonManifestFragments {
      */
     static boolean namesButtonInStream(java.io.Reader in, int chunk)
             throws java.io.IOException {
-        String[] spellings = {BUTTON_MARKER, BUTTON_MARKER.replace('/', '.')};
-        int longest = 0;
-        for (int iter = 0; iter < spellings.length; iter++) {
-            longest = Math.max(longest, spellings[iter].length());
-        }
-        char[] buffer = new char[chunk + longest];
-        int carried = 0;
+        String target = BUTTON_MARKER.replace('/', '.');
+        char[] buffer = new char[chunk];
+        // The same rules the buffered path applies, applied a character at a
+        // time. It used to be a raw indexOf over the text, on the reasoning
+        // that over-reporting here "refuses a build with a reason" -- which
+        // stopped being true when an unsupported toolchain started falling
+        // back instead of refusing. Over-reporting now puts fine and coarse
+        // location into an application that asks for location nowhere, so a
+        // mention in a comment, in a diagnostic string, or inside a longer
+        // name like LocationButtonHelper cannot be allowed to count.
+        int state = CODE;
+        boolean escaped = false;
+        char pendingSlash = 0;
+        int matched = 0;
+        char before = ' ';
+        boolean complete = false;
+        StringBuilder literal = null;
+        StringBuilder tail = new StringBuilder();
         while (true) {
-            int read = in.read(buffer, carried, buffer.length - carried);
+            int read = in.read(buffer, 0, buffer.length);
             if (read < 0) {
-                return false;
+                // End of file is a clean right boundary.
+                return complete;
             }
-            String window = new String(buffer, 0, carried + read);
-            for (int iter = 0; iter < spellings.length; iter++) {
-                if (window.indexOf(spellings[iter]) >= 0) {
+            for (int at = 0; at < read; at++) {
+                char c = buffer[at];
+                if (state == LINE_COMMENT) {
+                    if (c == '\n' || c == '\r') {
+                        state = CODE;
+                    }
+                    continue;
+                }
+                if (state == BLOCK_COMMENT) {
+                    if (pendingSlash == '*' && c == '/') {
+                        state = CODE;
+                        pendingSlash = 0;
+                    } else {
+                        pendingSlash = c == '*' ? '*' : 0;
+                    }
+                    continue;
+                }
+                if (state == STRING || state == CHAR) {
+                    if (escaped) {
+                        escaped = false;
+                    } else if (c == '\\') {
+                        escaped = true;
+                    } else if ((state == STRING && c == '"')
+                            || (state == CHAR && c == '\'')) {
+                        // A literal that IS a loader's argument still counts,
+                        // exactly as it does with the whole file in memory.
+                        if (literal != null
+                                && target.contentEquals(literal)
+                                && loaderCallEndsAt(tail)) {
+                            return true;
+                        }
+                        literal = null;
+                        state = CODE;
+                        before = c;
+                    } else if (literal != null) {
+                        if (literal.length() > target.length()) {
+                            literal = null;
+                        } else {
+                            literal.append(c);
+                        }
+                    }
+                    continue;
+                }
+                // CODE from here.
+                if (pendingSlash == '/') {
+                    pendingSlash = 0;
+                    if (c == '/') {
+                        state = LINE_COMMENT;
+                        continue;
+                    }
+                    if (c == '*') {
+                        state = BLOCK_COMMENT;
+                        continue;
+                    }
+                    // The '/' was division, and it is a clean boundary.
+                    if (complete) {
+                        return true;
+                    }
+                    matched = 0;
+                    before = '/';
+                    remember(tail, '/');
+                }
+                if (c == '/') {
+                    pendingSlash = '/';
+                    continue;
+                }
+                if (complete) {
+                    if (!Character.isJavaIdentifierPart(c)) {
+                        return true;
+                    }
+                    complete = false;
+                    matched = 0;
+                }
+                if (c == '"' || c == '\'') {
+                    state = c == '"' ? STRING : CHAR;
+                    literal = new StringBuilder();
+                    matched = 0;
+                    continue;
+                }
+                if (matched > 0 && c == target.charAt(matched)) {
+                    matched++;
+                } else {
+                    matched = 0;
+                    if (c == target.charAt(0)
+                            && !Character.isJavaIdentifierPart(before)
+                            && before != '.') {
+                        matched = 1;
+                    }
+                }
+                if (matched == target.length()) {
+                    complete = true;
+                    matched = 0;
+                }
+                before = c;
+                remember(tail, c);
+            }
+        }
+    }
+
+    /** Reader states for the streaming scan. */
+    private static final int CODE = 0;
+
+    private static final int LINE_COMMENT = 1;
+
+    private static final int BLOCK_COMMENT = 2;
+
+    private static final int STRING = 3;
+
+    private static final int CHAR = 4;
+
+    /** How much code the streaming scan keeps behind it. */
+    private static final int TAIL_LENGTH = 64;
+
+    /** Appends to a bounded tail of the code seen so far. */
+    private static void remember(StringBuilder tail, char c) {
+        tail.append(c);
+        if (tail.length() > TAIL_LENGTH) {
+            tail.delete(0, tail.length() - TAIL_LENGTH);
+        }
+    }
+
+    /**
+     * Whether the code just before a literal opens a class loader's call.
+     *
+     * <p>The streaming equivalent of {@code reflectivelyLoads}: it sees the
+     * literal's text as it closes, and the tail is what stood before the
+     * opening quote. Only a literal that is the ARGUMENT counts, which is the
+     * rule the buffered path already applies -- a diagnostic string that
+     * happens to hold the name is prose.</p>
+     *
+     * @param tail the code characters before the literal
+     * @return whether a loader was being called
+     */
+    private static boolean loaderCallEndsAt(StringBuilder tail) {
+        String code = tail.toString();
+        int at = code.length();
+        while (at > 0 && isSourceSpace(code.charAt(at - 1))) {
+            at--;
+        }
+        if (at == 0 || code.charAt(at - 1) != '(') {
+            return false;
+        }
+        at--;
+        while (at > 0 && isSourceSpace(code.charAt(at - 1))) {
+            at--;
+        }
+        for (int row = 0; row < CLASS_LOADERS.length; row++) {
+            String[] loader = CLASS_LOADERS[row];
+            for (int iter = 1; iter < loader.length; iter++) {
+                String method = loader[iter];
+                int start = at - method.length();
+                if (start >= 0 && code.startsWith(method, start)
+                        && (start == 0 || !Character.isJavaIdentifierPart(
+                                code.charAt(start - 1)))) {
                     return true;
                 }
             }
-            // Carry the tail, so a name split across two reads is seen.
-            carried = Math.min(longest, window.length());
-            window.getChars(window.length() - carried, window.length(),
-                    buffer, 0);
         }
+        return false;
     }
 
     /**
@@ -2735,21 +2895,36 @@ final class LocationButtonManifestFragments {
             if (walk >= source.length() || source.charAt(walk) != '"') {
                 return null;
             }
-            walk++;
-            int end = walk;
-            while (end < source.length() && source.charAt(end) != '"') {
-                // No escape handling: a class name has none, and a literal
-                // that needs one is not a class name this cares about.
-                if (source.charAt(end) == '\\') {
+            // Kotlin's RAW string first, because its opening delimiter starts
+            // with the ordinary one: reading """name""" a quote at a time sees
+            // an empty literal and stops, so a native source whose only
+            // reference is a raw-string Class.forName went unseen and the
+            // bridge was deleted from an application that builds a button.
+            // Nothing is escaped inside one, which is the whole point of it.
+            if (source.startsWith(RAW_QUOTE, walk)) {
+                int close = source.indexOf(RAW_QUOTE, walk + RAW_QUOTE.length());
+                if (close < 0) {
                     return null;
                 }
-                end++;
+                out.append(source, walk + RAW_QUOTE.length(), close);
+                walk = skipSpace(source, close + RAW_QUOTE.length());
+            } else {
+                walk++;
+                int end = walk;
+                while (end < source.length() && source.charAt(end) != '"') {
+                    // No escape handling: a class name has none, and a literal
+                    // that needs one is not a class name this cares about.
+                    if (source.charAt(end) == '\\') {
+                        return null;
+                    }
+                    end++;
+                }
+                if (end >= source.length()) {
+                    return null;
+                }
+                out.append(source, walk, end);
+                walk = skipSpace(source, end + 1);
             }
-            if (end >= source.length()) {
-                return null;
-            }
-            out.append(source, walk, end);
-            walk = skipSpace(source, end + 1);
             if (walk < source.length() && source.charAt(walk) == '+') {
                 walk = skipSpace(source, walk + 1);
                 continue;
@@ -2757,6 +2932,9 @@ final class LocationButtonManifestFragments {
             return out.toString();
         }
     }
+
+    /** Kotlin's raw string delimiter. */
+    private static final String RAW_QUOTE = "\"\"\"";
 
     /** One loader method, looking for {@code method("dotted")}. */
     private static boolean loadsWith(String source, String method,

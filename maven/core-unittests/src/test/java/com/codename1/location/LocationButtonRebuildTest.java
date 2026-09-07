@@ -1509,4 +1509,48 @@ class LocationButtonRebuildTest extends UITestBase {
             manager.setLocationListener(null);
         }
     }
+    @Test
+    void aThrottledStaleRebuildWakesItselfWhenNoLayoutFollows() {
+        // The throttle returned quietly, and that layout can be the LAST one:
+        // a second recreation lands inside the window of the first, nothing
+        // afterwards has to lay the component out again, and the control stays
+        // tied to a retired session for good -- the state the whole check
+        // exists to end. The window now schedules its own retry.
+        RecordingBridge bridge = install();
+        LocationButton button = new LocationButton();
+        Form form = new Form();
+        form.add(button);
+        form.show();
+        drain();
+
+        // First recreation: the peer goes stale and is rebuilt, which starts
+        // the throttle window.
+        if (button.getComponentAt(0) instanceof PeerComponent) {
+            bridge.stale.add((PeerComponent) button.getComponentAt(0));
+        }
+        button.revalidate();
+        drain();
+        drain();
+        int afterFirst = bridge.sessions.size();
+
+        // Second recreation, inside the window: the replacement is stale too.
+        if (button.getComponentAt(0) instanceof PeerComponent) {
+            bridge.stale.add((PeerComponent) button.getComponentAt(0));
+        }
+        button.revalidate();
+        drain();
+        assertEquals(afterFirst, bridge.sessions.size(),
+                "sanity: the throttle held the second attempt back");
+
+        // And now NOTHING lays it out again. Only the retry the throttle
+        // scheduled can save the control.
+        long until = System.currentTimeMillis() + 1200;
+        while (System.currentTimeMillis() < until
+                && bridge.sessions.size() == afterFirst) {
+            drain();
+        }
+        assertTrue(bridge.sessions.size() > afterFirst,
+                "the throttle must wake itself: no further layout is coming, "
+                + "and without one the peer stays retired for good");
+    }
 }

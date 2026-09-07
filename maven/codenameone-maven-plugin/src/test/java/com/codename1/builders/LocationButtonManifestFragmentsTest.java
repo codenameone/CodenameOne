@@ -2069,6 +2069,87 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aKotlinRawStringReflectiveLoadIsButtonUse() throws Exception {
+        // Kotlin's triple-quoted string is a legal spelling of the argument,
+        // and a parser that reads the second quote as the end of an empty
+        // string finds nothing -- so the only reference in a native source
+        // goes unseen and the bridge is deleted from an app that builds one.
+        File root = tempDir("cn1-lb-rawstring");
+        writeSource(new File(root, "com/example/Raw.kt"),
+                "package com.example\n"
+                + "class Raw {\n"
+                + "  fun f(): Any = Class.forName("
+                + "\"\"\"com.codename1.location.LocationButton\"\"\")\n"
+                + "}\n");
+        assertTrue(LocationButtonManifestFragments.sourcesNameTheButton(root),
+                "a raw-string class name is still the class name");
+    }
+
+    @Test
+    void aStreamedCommentIsNotButtonUse() throws Exception {
+        // The oversized-file path used to be a raw indexOf, justified by the
+        // claim that over-reporting "refuses a build with a reason". That
+        // stopped being true when an unsupported toolchain began falling back
+        // instead of refusing: it now adds fine and coarse location to an app
+        // that asks for location nowhere.
+        String source = "// see com.codename1.location.LocationButton\n"
+                + "class Big { int f() { return 1; } }\n";
+        assertFalse(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "a name in a comment is prose, not use");
+    }
+
+    @Test
+    void aStreamedBlockCommentIsNotButtonUse() throws Exception {
+        String source = "/* com.codename1.location.LocationButton */\n"
+                + "class Big { int f() { return 1; } }\n";
+        assertFalse(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "a name in a block comment is prose, not use");
+    }
+
+    @Test
+    void aStreamedDiagnosticStringIsNotButtonUse() throws Exception {
+        String source = "class Big { void f() { log("
+                + "\"com.codename1.location.LocationButton failed\"); } }\n";
+        assertFalse(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "a name in a diagnostic is prose, not use");
+    }
+
+    @Test
+    void aStreamedLongerNameIsNotButtonUse() throws Exception {
+        // LocationButtonHelper is a different class, and without a boundary
+        // check the raw search took it for this one.
+        String source = "class Big { "
+                + "com.codename1.location.LocationButtonHelper h; }\n";
+        assertFalse(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "a longer name that starts the same way is not the button");
+    }
+
+    @Test
+    void aStreamedReflectiveLoadIsStillButtonUse() throws Exception {
+        // Parity with the buffered path: a literal that IS the loader's
+        // argument counts, while the diagnostic above does not.
+        String source = "class Big { Object f() throws Exception { return "
+                + "Class.forName(\"com.codename1.location.LocationButton\"); "
+                + "} }\n";
+        assertTrue(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "a reflective load is use even in an oversized file");
+    }
+
+    @Test
+    void aStreamedPlainReferenceIsStillButtonUse() throws Exception {
+        String source = "class Big { "
+                + "com.codename1.location.LocationButton b; }\n";
+        assertTrue(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "an ordinary reference is still found");
+    }
+
+    @Test
     void aNameStraddlingAReadBoundaryIsStillFound() throws Exception {
         // Why the streaming search carries a tail between reads. With the
         // chunk given, the boundary is known: the name starts ten characters

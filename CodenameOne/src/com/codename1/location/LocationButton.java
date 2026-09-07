@@ -29,6 +29,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -1205,6 +1206,42 @@ public class LocationButton extends Container {
         }
     }
 
+    /// True while a wake-up is pending for the throttled staleness check.
+    private boolean staleRetryPending;
+
+    /// Asks the staleness question again once the throttle window has closed.
+    ///
+    /// On the EDT through UITimer rather than a java.util.Timer: this is a
+    /// component's own retry, it has to run where the component's state lives,
+    /// and Timer's thread is not a daemon -- one left behind keeps a desktop
+    /// JVM alive after the app is done.
+    ///
+    /// A no-op without a Form, which is not a gap: a component that is not in
+    /// one is not being laid out either, and its next attach re-asks through
+    /// initComponent.
+    ///
+    /// @param delay how much of the window is left, in milliseconds
+    private void scheduleStaleRetry(long delay) {
+        if (staleRetryPending) {
+            return;
+        }
+        Form form = getComponentForm();
+        if (form == null) {
+            return;
+        }
+        staleRetryPending = true;
+        int wait = delay <= 0 ? 1
+                : (int) Math.min(delay + 1, (long) Integer.MAX_VALUE);
+        com.codename1.ui.util.UITimer.timer(wait, false, form, new Runnable() {
+            @Override
+            public void run() {
+                staleRetryPending = false;
+                // Through a layout, so the one question has one asker.
+                revalidate();
+            }
+        });
+    }
+
     /// The other half of the staleness check, on the path Android really takes.
     ///
     /// An activity recreation does not re-initialise this component --
@@ -1260,6 +1297,16 @@ public class LocationButton extends Container {
                 && now - lastStaleRebuildAt < STALE_REBUILD_WINDOW_MS) {
             // Inside the window, which is where the rebuild's own revalidate
             // lands. Skipping it here is what stops the loop.
+            //
+            // With a WAKE-UP, because this layout may be the last one. A second
+            // recreation lands inside the window of the first, and nothing
+            // after it has to lay the component out again -- so returning
+            // quietly left the control tied to a retired session for good,
+            // which is the state the whole check exists to end. Asking again
+            // when the window closes costs one timer and cannot loop: the
+            // question it re-asks is throttled by the same window.
+            scheduleStaleRetry(STALE_REBUILD_WINDOW_MS
+                    - (now - lastStaleRebuildAt));
             return;
         }
         lastStaleRebuildAt = now;

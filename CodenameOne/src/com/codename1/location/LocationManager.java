@@ -247,6 +247,22 @@ public abstract class LocationManager {
                 long start = System.currentTimeMillis();
                 Location baseline = cachedFix();
                 answer[1] = baseline;
+                // Taken AFTER the grant, which is the one thing this cannot
+                // do better from here. If the application's listener happens
+                // to deliver the first post-grant fix in the instant between
+                // the grant and this read, that fix becomes the baseline and
+                // the loop then waits for a later one -- so a listener whose
+                // interval is longer than the deadline makes the caller wait
+                // the whole deadline out before getting back the very fix it
+                // wanted. Slow, not wrong: the answer returned is that fix.
+                //
+                // Curing it needs the cache as it stood BEFORE the grant, and
+                // nothing on this side of the button knows when that was. The
+                // component learns of the grant only when the platform reports
+                // it, and taking the snapshot earlier -- when the control is
+                // built -- means this same potentially long read running for
+                // every button on every form, tapped or not. That costs more
+                // than the wait it saves.
                 // No cache at all means the application has no fix yet, so
                 // the first one to arrive was taken after the grant and is the
                 // answer rather than a baseline to improve on.
