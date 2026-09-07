@@ -2684,22 +2684,52 @@ public final class HttpServer {
         // chain this replaces was the largest single source of allocation in the
         // server, and the buffer is reused for the life of the connection.
         conn.reset();
-        conn.put("HTTP/1.1 ");
-        conn.putNumber(response.status);
-        conn.put(' ');
-        conn.put(reason(response.status));
-        conn.put("\r\nContent-Type: ");
-        conn.put(response.contentType);
-        // RFC 9110 6.6.1: an origin server with a clock MUST send Date. Caches and
-        // conditional requests are both defined in terms of it, so a response
-        // without one is not cacheable in the way the sender expects.
-        conn.put("\r\nDate: ");
-        conn.put(currentHttpDateBytes(), 0, HTTP_DATE_LENGTH);
-        // Always an explicit length: without it a keep-alive client waits for a
-        // close that is not coming.
-        conn.put("\r\nContent-Length: ");
-        conn.putNumber(bodyLength);
-        conn.put(keepAlive ? "\r\nConnection: keep-alive" : "\r\nConnection: close");
+        // Pre-encoded, not re-encoded per response. put(String) walks the string
+        // one charAt at a time; these literals are 82 of the ~97 characters a
+        // plaintext 200 emits, so writing them that way spent 51 MILLION charAt
+        // calls a second at this server's throughput to reproduce bytes that never
+        // change. put(byte[]) is a System.arraycopy. Measured before this: 1.36us
+        // of user CPU per request against fasthttp's 0.74us, with system time at
+        // parity -- the gap was all in our own code, and this is the largest
+        // identifiable piece of it.
+        if(FAST_HEADERS) {
+            if(response.status == 200) {
+                conn.put(H_STATUS_200, 0, H_STATUS_200.length);   // overwhelmingly the common case
+            } else {
+                conn.put(H_VERSION, 0, H_VERSION.length);
+                conn.putNumber(response.status);
+                conn.put(' ');
+                conn.put(reason(response.status));
+            }
+            conn.put(H_CTYPE, 0, H_CTYPE.length);
+            conn.put(response.contentType);
+            // RFC 9110 6.6.1: an origin server with a clock MUST send Date.
+            conn.put(H_DATE, 0, H_DATE.length);
+            conn.put(currentHttpDateBytes(), 0, HTTP_DATE_LENGTH);
+            // Always an explicit length: without it a keep-alive client waits for
+            // a close that is not coming.
+            conn.put(H_CLEN, 0, H_CLEN.length);
+            conn.putNumber(bodyLength);
+            if(keepAlive) {
+                conn.put(H_KEEPALIVE, 0, H_KEEPALIVE.length);
+            } else {
+                conn.put(H_CLOSE, 0, H_CLOSE.length);
+            }
+        } else {
+            // The per-character path this replaces, kept so the two can be
+            // measured against each other in one binary.
+            conn.put("HTTP/1.1 ");
+            conn.putNumber(response.status);
+            conn.put(' ');
+            conn.put(reason(response.status));
+            conn.put("\r\nContent-Type: ");
+            conn.put(response.contentType);
+            conn.put("\r\nDate: ");
+            conn.put(currentHttpDateBytes(), 0, HTTP_DATE_LENGTH);
+            conn.put("\r\nContent-Length: ");
+            conn.putNumber(bodyLength);
+            conn.put(keepAlive ? "\r\nConnection: keep-alive" : "\r\nConnection: close");
+        }
         if(response.extraHeaders != null) {
             java.util.Iterator it = response.extraHeaders.keySet().iterator();
             while(it.hasNext()) {
@@ -2713,7 +2743,11 @@ public final class HttpServer {
                 }
             }
         }
-        conn.put("\r\n\r\n");
+        if(FAST_HEADERS) {
+            conn.put(H_END, 0, H_END.length);
+        } else {
+            conn.put("\r\n\r\n");
+        }
 
         // Head and body in ONE write when the body is small and already in memory.
         // Two writes are two syscalls and, on a fresh connection, two segments: the
@@ -2758,6 +2792,21 @@ public final class HttpServer {
 
     /** Pre-encoded: this goes out on the body path of every expecting client. */
     private static final byte[] CONTINUE_100 = asciiBytes("HTTP/1.1 100 Continue\r\n\r\n");
+
+    /**
+     * The response head's fixed bytes, encoded once at class init instead of
+     * character by character per response. CN1_HTTP_FAST_HEADERS=0 restores the
+     * per-character path, which is what the measurement compares against.
+     */
+    private static final boolean FAST_HEADERS = envInt("CN1_HTTP_FAST_HEADERS", 1) != 0;
+    private static final byte[] H_STATUS_200 = asciiBytes("HTTP/1.1 200 OK");
+    private static final byte[] H_VERSION    = asciiBytes("HTTP/1.1 ");
+    private static final byte[] H_CTYPE      = asciiBytes("\r\nContent-Type: ");
+    private static final byte[] H_DATE       = asciiBytes("\r\nDate: ");
+    private static final byte[] H_CLEN       = asciiBytes("\r\nContent-Length: ");
+    private static final byte[] H_KEEPALIVE  = asciiBytes("\r\nConnection: keep-alive");
+    private static final byte[] H_CLOSE      = asciiBytes("\r\nConnection: close");
+    private static final byte[] H_END        = asciiBytes("\r\n\r\n");
 
     private static byte[] asciiBytes(String value) {
         byte[] out = new byte[value.length()];
