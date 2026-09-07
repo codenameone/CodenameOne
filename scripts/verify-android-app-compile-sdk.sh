@@ -49,15 +49,16 @@ if [ ! -f "$GRADLE_PROJECT_DIR/gradlew" ]; then
   exit 2
 fi
 
-# From API 37 there is no unsuffixed platform package: sdkmanager offers
-# android-37.0, android-37.1 and android-37.2 and nothing called android-37, so
-# installing by the bare number is a silent no-op that surfaces later as a
-# missing build target.
-if [ "$API_LEVEL" -ge 37 ]; then
-  PLATFORM_PACKAGE="platforms;android-$API_LEVEL.0"
-else
-  PLATFORM_PACKAGE="platforms;android-$API_LEVEL"
-fi
+# The NEWEST stable revision of the level, not its ".0". An API level is not
+# one platform from 37 onward -- android-37.0, .1 and .2 are separate packages
+# and a removal can land in any of them -- and the builder picks the newest
+# revision a developer's SDK has, so pinning the .0 here would verify a
+# platform no user compiles against and merge a regression introduced later in
+# the level.
+PLATFORM_PACKAGE=$("$SCRIPT_DIR/android/newest-platform-package.sh" "$API_LEVEL")
+# The name AGP has to be given to reach exactly that platform: the bare level
+# always resolves to the .0.
+PLATFORM_NAME="${PLATFORM_PACKAGE#platforms;android-}"
 
 # The sdkmanager INSIDE the SDK root we are about to build against, before the
 # one on PATH. On a machine with the Homebrew android-commandlinetools cask the
@@ -121,11 +122,13 @@ if [ -f "$GRADLE_PROJECT_DIR/wear/build.gradle" ]; then
   PATCH_GRADLE_MODULES+=(--app "$GRADLE_PROJECT_DIR/wear/build.gradle")
 fi
 
-log "Re-pinning $GRADLE_PROJECT_DIR to compileSdk/targetSdk $API_LEVEL"
+# compileSdk names the exact platform installed above; targetSdk stays the
+# integer level, because that is an API level in the manifest and has no minor.
+log "Re-pinning $GRADLE_PROJECT_DIR to compileSdk $PLATFORM_NAME, targetSdk $API_LEVEL"
 "$PATCH_GRADLE_JAVA" "$PATCH_GRADLE_SOURCE_PATH/PatchGradleFiles.java" \
   --root "$GRADLE_PROJECT_DIR/build.gradle" \
   "${PATCH_GRADLE_MODULES[@]}" \
-  --compile-sdk "$API_LEVEL" \
+  --compile-sdk "$PLATFORM_NAME" \
   --target-sdk "$API_LEVEL"
 
 # AGP compares this against the name of the platform it RESOLVED, and from API
@@ -137,7 +140,7 @@ if [ -f "$GRADLE_PROPS" ]; then
   grep -v '^android.suppressUnsupportedCompileSdk=' "$GRADLE_PROPS" > "$GRADLE_PROPS.tmp" || true
   mv "$GRADLE_PROPS.tmp" "$GRADLE_PROPS"
 fi
-echo "android.suppressUnsupportedCompileSdk=$API_LEVEL,$API_LEVEL.0" >> "$GRADLE_PROPS"
+echo "android.suppressUnsupportedCompileSdk=$API_LEVEL,$API_LEVEL.0,$PLATFORM_NAME" >> "$GRADLE_PROPS"
 
 log "Assembling at API $API_LEVEL"
 ORIGINAL_JAVA_HOME="${JAVA_HOME:-}"
@@ -149,4 +152,4 @@ export JAVA_HOME="${JDK_HOME:-$JAVA17_HOME}"
 )
 export JAVA_HOME="$ORIGINAL_JAVA_HOME"
 
-log "OK: the generated project builds at compileSdk/targetSdk $API_LEVEL"
+log "OK: the generated project builds at compileSdk $PLATFORM_NAME, targetSdk $API_LEVEL"

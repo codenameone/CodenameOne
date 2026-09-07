@@ -150,7 +150,7 @@ public class PatchGradleFiles {
      * coverage report task there are configuration for tests that do not exist, and the report
      * finalizer fails on a module with nothing to report.</p>
      */
-    private static boolean patchAppBuildGradle(Path path, int compileSdk, int targetSdk,
+    private static boolean patchAppBuildGradle(Path path, String compileSdk, int targetSdk,
             boolean instrumented) throws IOException {
         String content = Files.readString(path, StandardCharsets.UTF_8);
         boolean changed = false;
@@ -183,7 +183,7 @@ public class PatchGradleFiles {
         return changed;
     }
 
-    private static Result ensureAndroidBlock(String content, int compileSdk, int targetSdk) {
+    private static Result ensureAndroidBlock(String content, String compileSdk, int targetSdk) {
         Matcher androidBlockMatcher = ANDROID_BLOCK_PATTERN.matcher(content);
         if (!androidBlockMatcher.find()) {
             if (!content.endsWith("\n")) {
@@ -419,20 +419,54 @@ afterEvaluate {
         final Path root;
         /** Every application module to pin; --app may be repeated. */
         final java.util.List<Path> apps;
-        final int compileSdk;
+        /**
+         * The compile SDK to pin, as it will be written.
+         *
+         * <p>A String, not an int, because an API level is not always one
+         * platform: from API 37 there is no unsuffixed platform and the
+         * revisions are android-37.0, android-37.1 and android-37.2. Pinning
+         * the bare level always resolves to the .0, so a caller that wants to
+         * build against the revision a developer's SDK actually settled on has
+         * to be able to name it.</p>
+         */
+        final String compileSdk;
         final int targetSdk;
 
-        Arguments(Path root, java.util.List<Path> apps, int compileSdk, int targetSdk) {
+        Arguments(Path root, java.util.List<Path> apps, String compileSdk, int targetSdk) {
             this.root = root;
             this.apps = apps;
             this.compileSdk = compileSdk;
             this.targetSdk = targetSdk;
         }
 
+        /**
+         * The Groovy literal for a requested compile SDK, or null if invalid.
+         *
+         * <p>Digits stay a bare number, which is what every level up to 36
+         * wants and keeps those generated files unchanged. A platform name --
+         * "37.2", or "android-37.2" -- becomes the quoted hash string AGP
+         * resolves to that exact platform, because the int property has no way
+         * to say a minor (compileSdkMinor is AGP 9).</p>
+         */
+        static String normalizeCompileSdk(String value) {
+            String trimmed = value == null ? "" : value.trim();
+            if (trimmed.matches("\\d+")) {
+                return trimmed;
+            }
+            String name = trimmed.startsWith("android-")
+                    ? trimmed.substring("android-".length()) : trimmed;
+            if (name.matches("\\d+\\.\\d+")) {
+                return "'android-" + name + "'";
+            }
+            System.err.println("Invalid --compile-sdk: " + value
+                    + " (expected 37, 37.2 or android-37.2)");
+            return null;
+        }
+
         static Arguments parse(String[] args) {
             Path root = null;
             java.util.List<Path> apps = new java.util.ArrayList<>();
-            int compileSdk = 36;
+            String compileSdk = "36";
             int targetSdk = 36;
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
@@ -456,7 +490,10 @@ afterEvaluate {
                             System.err.println("Missing value for --compile-sdk");
                             return null;
                         }
-                        compileSdk = Integer.parseInt(args[++i]);
+                        compileSdk = normalizeCompileSdk(args[++i]);
+                        if (compileSdk == null) {
+                            return null;
+                        }
                     }
                     case "--target-sdk" -> {
                         if (i + 1 >= args.length) {
