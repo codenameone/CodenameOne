@@ -104,6 +104,17 @@ int cn1GcFaultNoGrace = 0;
 // CN1_GC_FAULT=earlyfree restores the pre-fix O(1) page-reclaim bound
 // (gcLastMarkedEpoch != V), which frees slots the per-slot walk would keep.
 int cn1GcFaultEarlyFree = 0;
+// CN1_GC_FAULT=refnoclear skips the clear for a referent the sweep is about to free, so a
+// reachable Reference is left holding a pointer into reclaimed memory. That is the exact
+// hazard this feature's whole risk reduces to, and until cn1GcDiscoverReference routed the
+// referent to cn1GcVerifyChild the verifier could not see it at all -- such a Reference
+// passed with zero violations. This fault is how that hook is shown to have teeth, on the
+// same footing as nograce and earlyfree.
+//
+// Note the obvious-looking fault is the wrong one: clearing MORE references than liveness
+// warrants only produces extra nulls, which are safe, and an attempt at it reported
+// violations=0 for exactly that reason. The dangling direction is clearing LESS.
+int cn1GcFaultRefClear = 0;
 void cn1GcFaultInitPublic(void);
 static void cn1GcFaultInit(void) {
     static int done = 0;
@@ -117,6 +128,9 @@ static void cn1GcFaultInit(void) {
     } else if(strcmp(f, "earlyfree") == 0) {
         cn1GcFaultEarlyFree = 1;
         fprintf(stderr, "[GC-FAULT] O(1) page reclaim restored to the pre-fix bound\n");
+    } else if(strcmp(f, "refnoclear") == 0) {
+        cn1GcFaultRefClear = 1;
+        fprintf(stderr, "[GC-FAULT] dead referents left in place instead of cleared\n");
     } else {
         fprintf(stderr, "[GC-FAULT] unknown fault '%s'\n", f);
     }
@@ -2099,20 +2113,29 @@ static long cn1SatbTake(JAVA_OBJECT** out) {
             scratchCap = nc;
         }
     }
-    if(n > 0 && scratch != 0) memcpy(scratch, gcSatbStack, (size_t)n * sizeof(JAVA_OBJECT));
+    // CAPACITY, NOT JUST NON-NULLNESS. Growing through a temporary keeps the old buffer on
+    // failure, which is what the leak fix wanted -- and it means a FAILED growth leaves
+    // scratch non-null but SMALLER than n. Testing only scratch != 0 then memcpy'd n
+    // entries into an allocation sized for fewer: a heap overflow written by the collector
+    // under memory pressure, which is a far worse failure than the leak it replaced. The
+    // buffer is usable only if it exists AND is big enough.
+    JAVA_BOOLEAN usable = (scratch != 0 && scratchCap >= n) ? JAVA_TRUE : JAVA_FALSE;
+    if(n > 0 && usable) {
+        memcpy(scratch, gcSatbStack, (size_t)n * sizeof(JAVA_OBJECT));
+    }
     // TAKE-SIDE LOSS COUNTS AS A DROP TOO. gcSatbTop is reset either way, so entries that
     // were successfully logged are discarded here when the scratch buffer could not be
     // grown -- and the caller is told the batch was empty, which reads as "termination can
     // finish". For a referent Reference.get() has handed out that is the same hazard as a
     // failed enqueue and has to invalidate reference clearing the same way; a lost enqueue
     // and a lost batch are indistinguishable to the object that gets swept.
-    if(n > 0 && scratch == 0) {
+    if(n > 0 && !usable) {
         atomic_fetch_add_explicit(&cn1SatbDrops, 1, memory_order_relaxed);
     }
     gcSatbTop = 0;
     pthread_mutex_unlock(&gcSatbMutex);
     *out = scratch;
-    return (scratch != 0) ? n : 0;
+    return usable ? n : 0;
 }
 
 void cn1RefreshFreeMemCache(void);   // defined near cn1BibopMaybeGc; drives the dynamic pacing cap
@@ -2447,6 +2470,28 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
        || __atomic_load_n(referentField, __ATOMIC_RELAXED) == JAVA_NULL) {
         return;                                    // already cleared: nothing to decide
     }
+#ifdef CN1_GC_VERIFY
+    // THE VERIFIER HAS TO SEE THE REFERENT, and it could not.
+    //
+    // cn1GcVerifyHeap walks the surviving objects through the SAME generated mark
+    // functions, relying on every reference field arriving at gcMarkObject, whose verify
+    // branch classifies it. Suppressing that call for the referent -- which is what makes
+    // the edge weak -- also took the referent out of the verifier's reach, so a live
+    // Reference holding a pointer into reclaimed memory passed with zero violations. That
+    // is precisely the defect this collector work most needs the verifier to catch, and
+    // every "clean over N verify passes" result recorded on this branch before this hook
+    // existed was silent about the referent specifically.
+    //
+    // Answered here, ahead of the ageing and the dedupe: a verify walk is not a collection
+    // cycle, and letting it age references or mark cn1AgedCycle would corrupt the state the
+    // next real cycle reads -- and the dedupe would drop the second and later visits, which
+    // are exactly the ones a walk of the whole heap produces.
+    if(cn1GcVerifyActive) {
+        cn1GcVerifyChild(__atomic_load_n(referentField, __ATOMIC_RELAXED),
+                         __builtin_return_address(0));
+        return;
+    }
+#endif
 #ifdef CN1_NO_WEAK_REFS
     // ABLATION ARM: trace the referent strongly and never clear anything, which is
     // exactly what this VM did before references were implemented. It exists so the
@@ -2767,6 +2812,15 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
         if(mark == -1 || mark >= currentGcMarkValue - 1) {
             continue;
         }
+#ifdef CN1_GC_VERIFY
+        // Fault injection lives with the verifier, and the guard is not decoration: the
+        // cn1GcFault* family is declared inside CN1_GC_VERIFY, so referencing this one
+        // unguarded broke every ordinary build while the verifier build -- the only
+        // configuration where the symbol exists -- went on passing.
+        if(cn1GcFaultRefClear) {
+            continue;   // fault injection: leave the dead referent in place
+        }
+#endif
         // THE STORES ARE SEQUENTIAL, AND DELIBERATELY SO. Review asked for the clearing of
         // a referent's aliases to be PUBLISHED atomically as well as decided atomically,
         // on the grounds that a mutator landing between two iterations can see one alias
