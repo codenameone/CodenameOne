@@ -1104,7 +1104,11 @@ public class ByteCodeClass {
                 b.append("CN1_WRITE_BARRIER(__cn1T, __cn1Val); ");
                 // SATB deletion barrier: preserve the reference being overwritten for the
                 // current mark cycle. No-op (single flag load) outside GC.
-                b.append("CN1_SATB_DELETE(&((struct obj__").append(clsName).append("*)__cn1T)->")
+                // The referent takes the ATOMIC deletion barrier: the collector stores
+                // JAVA_NULL into that field concurrently, so the generic macro's plain
+                // volatile read would leave the pair a mixed atomic/non-atomic access.
+                b.append(isReferenceReferent(clsName, fld) ? "CN1_SATB_DELETE_REF" : "CN1_SATB_DELETE")
+                 .append("(&((struct obj__").append(clsName).append("*)__cn1T)->")
                  .append(fld.getClsName()).append("_").append(fld.getFieldName()).append("); ");
             } else {
                 b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n  ").append(nullCheck).append("  ");

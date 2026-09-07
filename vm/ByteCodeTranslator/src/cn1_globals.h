@@ -3154,6 +3154,25 @@ extern void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, J
 // registration), so either no mark is running -- and one starting later scans this thread
 // with the value already in a register -- or reference processing is complete, in which
 // case a field still holding a pointer was not condemned and its referent is marked.
+// The deletion barrier for the referent field, with an ATOMIC load.
+//
+// CN1_SATB_DELETE next door reads through a plain JAVA_OBJECT volatile*, which is right
+// for every ordinary field because nothing else writes them concurrently. The referent is
+// the exception: cn1GcProcessReferences stores JAVA_NULL into it atomically from the
+// collector while Reference.clear() runs here, so the plain read would leave that pair a
+// mixed atomic/non-atomic access -- undefined in C, and the same defect that was fixed for
+// the getter and for this setter's own store. Making the store atomic and leaving the
+// barrier's read plain fixes half a race.
+#if defined(CN1_DISABLE_SATB)
+#define CN1_SATB_DELETE_REF(fieldAddr) do { } while(0)
+#else
+#define CN1_SATB_DELETE_REF(fieldAddr) \
+    do { if(__builtin_expect(gcSatbActive, 0)) { \
+             JAVA_OBJECT cn1__old = __atomic_load_n((JAVA_OBJECT*)(fieldAddr), __ATOMIC_RELAXED); \
+             if(cn1__old != JAVA_NULL && !CN1_IS_TAGGED(cn1__old)) cn1SatbEnqueue(cn1__old); \
+         } } while(0)
+#endif
+
 #if defined(CN1_DISABLE_SATB)
 #define CN1_REF_LOAD_BEGIN() JAVA_FALSE
 #define CN1_REF_LOAD_END()   do { } while(0)

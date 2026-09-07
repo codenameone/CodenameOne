@@ -1690,6 +1690,10 @@ static JAVA_OBJECT* gcSatbStack = 0;
 static long gcSatbTop = 0;                 // guarded by gcSatbMutex
 static long gcSatbCap = 0;
 static pthread_mutex_t gcSatbMutex = PTHREAD_MUTEX_INITIALIZER;
+// Entries cn1SatbEnqueue could not record because its stack would not grow. Read by the
+// reference pass, which cannot act on a snapshot that may be missing a referent a mutator
+// has already been handed.
+_Atomic long cn1SatbDrops = 0;
 // Monotonic count of objects transitioned unmarked->marked this process; the SATB
 // drain snapshots it around a batch to detect "marked nothing new" (fixpoint).
 long gcMarkNewObjectCount = 0;
@@ -2061,7 +2065,16 @@ void cn1SatbEnqueue(JAVA_OBJECT old) {
     if(gcSatbTop >= gcSatbCap) {
         long ncap = gcSatbCap ? gcSatbCap * 2 : 8192;
         JAVA_OBJECT* n = (JAVA_OBJECT*)realloc(gcSatbStack, (size_t)ncap * sizeof(JAVA_OBJECT));
-        if(n == 0) { pthread_mutex_unlock(&gcSatbMutex); return; } // OOM: drop (rare; only re-opens the original race)
+        if(n == 0) {
+            // OOM: drop. For an ordinary STORE that only re-opens the original race and is
+            // survivable. For a weak REFERENT taken out by Reference.get() it is not --
+            // the clear pass would decide on stale liveness and the sweep would free an
+            // object a mutator is holding -- so record that it happened; the reference
+            // pass reads this and declines to clear anything this cycle.
+            atomic_fetch_add_explicit(&cn1SatbDrops, 1, memory_order_relaxed);
+            pthread_mutex_unlock(&gcSatbMutex);
+            return;
+        }
         gcSatbStack = n; gcSatbCap = ncap;
     }
     gcSatbStack[gcSatbTop++] = old;
@@ -2288,6 +2301,11 @@ static _Atomic int cn1RefEmergencyDrop = 0;
 // cache by however many times the mutator happened to storm the reference log.
 static int cn1RefAgedCycle = 0;
 
+// cn1SatbDrops as it stood when this cycle began. If it has moved by the time the clear
+// pass runs, some referent handed to a mutator never reached the log and the pass has no
+// sound basis for clearing anything.
+static long cn1RefDropsAtCycleStart = 0;
+
 // Called from the allocation-failure path. Idempotent, allocation-free and safe from a
 // thread that is about to park -- a relaxed store and nothing else.
 void cn1RefDropAllSoftReferents(void) {
@@ -2308,6 +2326,7 @@ long cn1RefPasses = 0;                // clear passes run this cycle (>1 == SATB
 // codenameOneGCMark before anything can mark.
 static void cn1RefBeginCycle(void) {
     cn1RefDiscoveredTop = 0;
+    cn1RefDropsAtCycleStart = atomic_load_explicit(&cn1SatbDrops, memory_order_relaxed);
 #ifdef CN1_GC_CONFORM
     // PER CYCLE, like every other figure in [GCPROBE]. A running total cannot show
     // whether the budget is tracking memory pressure, which is the whole question the
@@ -2663,6 +2682,24 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
         if(cn1RefDiscoveredTop == n) {
             break;                  // the drain found no further references
         }
+    }
+
+    // A DROPPED LOG ENTRY VOIDS THIS PASS'S EVIDENCE. cn1SatbEnqueue silently discards a
+    // reference when its stack cannot grow, which for an ordinary store is survivable --
+    // the comment there says so -- but not for a referent Reference.get() has already
+    // handed to a mutator: the enqueue was the only record that it escaped, sub-pass B
+    // decides purely on mark state, and the final take stays empty so nothing re-opens.
+    // The result would be the sweep freeing an object a thread is holding.
+    //
+    // Nothing here can allocate its way out of that, so the pass declines to clear for the
+    // cycle. It costs one cycle of reclaim in a situation where the process is already out
+    // of memory, and it does NOT disable the emergency drop, which clears at DISCOVERY and
+    // never touches the log.
+    if(atomic_load_explicit(&cn1SatbDrops, memory_order_relaxed) != cn1RefDropsAtCycleStart) {
+#ifdef CN1_GC_CONFORM
+        cn1RefPhaseNs += cn1GcNowNs() - __r0;
+#endif
+        return marked;
     }
 
     // SUB-PASS B: clear on the referent's liveness alone, then age.
