@@ -6,6 +6,10 @@ import com.codename1.flutter.MainAxisAlignment;
 import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.TextStyle;
 import com.codename1.flutter.Widget;
+import com.codename1.flutter.EdgeInsets;
+import com.codename1.flutter.EdgeInsetsGeometry;
+import com.codename1.flutter.widgets.DefaultTextStyle;
+import com.codename1.flutter.widgets.Padding;
 import com.codename1.flutter.widgets.Row;
 import com.codename1.flutter.widgets.SingleChildScrollView;
 
@@ -26,6 +30,7 @@ public class TabBar extends StatelessWidget {
     private Color labelColor;
     private Color unselectedLabelColor;
     private TextStyle labelStyle;
+    private EdgeInsetsGeometry labelPadding;
     private TextStyle unselectedLabelStyle;
     private Funcs.VoidFunc1<Long> onTap;
 
@@ -65,6 +70,7 @@ public class TabBar extends StatelessWidget {
     }
 
     public void labelPadding(Object v) {
+        this.labelPadding = v instanceof EdgeInsetsGeometry ? (EdgeInsetsGeometry) v : null;
     }
 
     public void unselectedLabelColor(Color v) {
@@ -94,16 +100,84 @@ public class TabBar extends StatelessWidget {
         this.onTap = v;
     }
 
+    /** Flutter's {@code _kTabHeight}: the height of a text-only tab bar. */
+    public static final double TAB_HEIGHT_LP = 46;
+
     @Override
     public Widget build(BuildContext context) {
         Row row = new Row();
-        row.mainAxisAlignment(MainAxisAlignment.spaceBetween);
-        row.children(tabs != null ? tabs : new DartList<Widget>());
+        // A scrollable bar packs its tabs from the start and lets the row
+        // overflow; a fixed one shares the width between them.
+        row.mainAxisAlignment(isScrollable
+                ? MainAxisAlignment.start : MainAxisAlignment.spaceBetween);
+        row.children(styledTabs());
+        Widget content = row;
         if (isScrollable) {
             SingleChildScrollView sv = new SingleChildScrollView();
+            sv.scrollDirection(com.codename1.flutter.Axis.horizontal);
             sv.child(row);
-            return sv;
+            content = sv;
         }
-        return row;
+        // A tab bar has a FIXED height — Flutter declares it as a
+        // PreferredSizeWidget for exactly this reason. Without it a scrollable
+        // bar is greedy: offered the whole app bar it took all of it, leaving
+        // the toolbar row zero pixels tall, so the colors demo lost its title
+        // and stacked its tab strip over the top of the bar.
+        com.codename1.flutter.widgets.SizedBox box =
+                new com.codename1.flutter.widgets.SizedBox();
+        box.height(TAB_HEIGHT_LP);
+        box.child(content);
+        return box;
+    }
+
+    /** Flutter's {@code kTabLabelPadding}, used when the bar names none. */
+    private static final double DEFAULT_LABEL_H_PADDING_LP = 16;
+
+    /**
+     * The tabs, each padded and coloured the way Flutter's TabBar does it.
+     *
+     * <p>Flutter pads every tab with {@code labelPadding} and styles it through
+     * the surrounding text style: {@code labelStyle}/{@code labelColor} for the
+     * selected tab and {@code unselectedLabelStyle}/{@code unselectedLabelColor}
+     * for the rest. Dropping the padding ran the labels together -- Crane's
+     * three tabs rendered as one word, "FLYSLEEPEAT" -- and dropping the colour
+     * painted them in the default ink on a bar whose whole point was that they
+     * are white.</p>
+     */
+    private DartList<Widget> styledTabs() {
+        DartList<Widget> out = new DartList<Widget>();
+        if (tabs == null) {
+            return out;
+        }
+        long selected = controller == null ? 0 : controller.index();
+        EdgeInsetsGeometry pad = labelPadding != null ? labelPadding
+                : EdgeInsets.symmetric(DEFAULT_LABEL_H_PADDING_LP, 0);
+        for (int i = 0; i < tabs.size(); i++) {
+            Widget tab = tabs.get(i);
+            if (tab == null) {
+                continue;
+            }
+            boolean isSelected = i == selected;
+            TextStyle base = isSelected ? labelStyle
+                    : (unselectedLabelStyle != null ? unselectedLabelStyle : labelStyle);
+            Color ink = isSelected ? labelColor
+                    : (unselectedLabelColor != null ? unselectedLabelColor : labelColor);
+            Widget styled = tab;
+            if (base != null || ink != null) {
+                TextStyle style = new TextStyle();
+                if (base != null) {
+                    style = style.merge(base);
+                }
+                if (ink != null) {
+                    style.color(ink);
+                }
+                styled = DefaultTextStyle.wrap(style, tab);
+            }
+            Padding p = new Padding();
+            p.padding(pad);
+            p.child(styled);
+            out.add(p);
+        }
+        return out;
     }
 }
