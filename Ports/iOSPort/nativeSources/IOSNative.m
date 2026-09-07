@@ -2225,7 +2225,30 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     [gaussianBlurFilter setValue:radiusNumber forKey:kCIInputRadiusKey];
 
     CIImage *outputImage = [gaussianBlurFilter outputImage];
-    CIContext *context   = [CIContext contextWithOptions:nil];
+    // The CIContext is created ONCE and kept. Building one compiles the
+    // filter pipeline and spins up a GPU command queue, which costs tens of
+    // milliseconds the first time and single-digit milliseconds after that --
+    // per call. Every blurred asset an app rasterises at startup (a Switch
+    // thumb, a shadowed round border) was paying that toll, so a screen with
+    // a handful of them lost more time to context construction than to the
+    // blur itself. The context is immutable and documented as safe to reuse.
+    // RETAINED. contextWithOptions: returns an autoreleased object, and this
+    // function runs inside POOL_BEGIN()/POOL_END(): without the retain the
+    // context is deallocated when the first call's pool drains, and every later
+    // blur reaches through a dangling pointer. Under a non-ARC build that
+    // surfaced as createCGImage returning nothing, so gaussianBlurImage handed
+    // back null and the first component to rasterise blurred artwork after
+    // start-up (a Switch thumb's drop shadow) died on it.
+    static CIContext *sharedBlurContext = nil;
+    static dispatch_once_t blurContextOnce;
+    dispatch_once(&blurContextOnce, ^{
+        CIContext *c = [CIContext contextWithOptions:nil];
+#ifndef CN1_USE_ARC
+        [c retain];
+#endif
+        sharedBlurContext = c;
+    });
+    CIContext *context   = sharedBlurContext;
     CGImageRef cgimg     = [context createCGImage:outputImage fromRect:[inputImage extent]];
 #if TARGET_OS_OSX
     CN1Image *image       = CN1AppleImageWithCGImage(cgimg);
@@ -2659,6 +2682,28 @@ void com_codename1_impl_ios_IOSNative_nativeDrawImageGlobal___long_int_int_int_i
     //XMLVM_END_WRAPPER
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRoundedImageDrawSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
+{
+    extern JAVA_BOOLEAN Java_com_codename1_impl_ios_IOSImplementation_isRoundedImageDrawSupportedImpl(void);
+    return Java_com_codename1_impl_ios_IOSImplementation_isRoundedImageDrawSupportedImpl();
+}
+
+void com_codename1_impl_ios_IOSNative_nativeDrawImageRoundedGlobal___long_int_int_int_int_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT renderingHints, JAVA_FLOAT cornerRadius)
+{
+    POOL_BEGIN();
+    extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalImpl(void*, int, int, int, int, int, int, float);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalImpl((void *)n1, alpha, n2, n3, n4, n5, renderingHints, cornerRadius);
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_nativeDrawImageRoundedMutable___long_int_int_int_int_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT renderingHints, JAVA_FLOAT cornerRadius)
+{
+    POOL_BEGIN();
+    extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedMutableImpl(void*, int, int, int, int, int, int, float);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedMutableImpl((void *)n1, alpha, n2, n3, n4, n5, renderingHints, cornerRadius);
+    POOL_END();
+}
+
 void com_codename1_impl_ios_IOSNative_nativeTileImageGlobal___long_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeTileImageGlobal___long_int_int_int_int]
@@ -2987,6 +3032,10 @@ void CN1MacWindowDeliverFocus(int windowId, BOOL gained) {
 
 void CN1MacWindowDeliverContentReady(int windowId) {
     com_codename1_impl_ios_IOSImplementation_windowContentReadyCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
+}
+
+void CN1MacWindowDeliverRepaint(int windowId) {
+    com_codename1_impl_ios_IOSImplementation_windowRepaintCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
 }
 
 void CN1MacWindowDeliverActivationFailed(int windowId, int requestSeq) {
@@ -5523,6 +5572,7 @@ void com_codename1_impl_ios_IOSNative_clearRadialGradientPaintMutable__(CN1_THRE
 {
     [PaintOp setCurrentMutable:NULL];
 }
+
 
 void com_codename1_impl_ios_IOSNative_releasePeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
 #ifndef CN1_USE_ARC
@@ -13431,12 +13481,68 @@ static void cn1RegisterBundledFontsOnce() {
     }
 }
 
+/// Registers a single bundled font file with Core Text.
+///
+/// The expensive part of cn1RegisterBundledFontsOnce is not the enumeration, it
+/// is handing every .ttf in the bundle to CTFontManager: each one is parsed far
+/// enough to learn the names it provides. An application shipping a font family
+/// pays that for all of them to make ONE name resolvable -- measured at 25ms of
+/// start-up in a bundle with 33 fonts.
+///
+/// createTrueTypeFont knows the file it wants, so this registers just that one.
+/// The full scan stays as the fallback for a name whose file is not known.
+void com_codename1_impl_ios_IOSNative_registerBundledFont___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT fileName) {
+    POOL_BEGIN();
+    NSString *f = toNSString(CN1_THREAD_STATE_PASS_ARG fileName);
+    if (f != nil && [f length] > 0) {
+        // Registering the same URL twice is an error Core Text reports and we
+        // discard, but the parse still costs -- so remember what has been done.
+        //
+        // Synchronised, which core Codename One deliberately is not. The
+        // framework runs on one event dispatch thread and its state needs no
+        // locks, but this is the native boundary and nothing holds callers to
+        // that thread: Font.createTrueTypeFont is public, carries no such
+        // restriction, and loading fonts on a background thread while the UI
+        // comes up is an ordinary thing for an application to do. Two threads
+        // mutating an NSMutableSet is not a stale read the way a Java map would
+        // be, it is undefined behaviour that crashes.
+        //
+        // dispatch_once for the creation so the set cannot be built twice, and
+        // the lock spans the registration rather than just the membership test:
+        // releasing it after the add would let a second caller for the same file
+        // decide it was already registered and ask Core Text for the name while
+        // the first was still parsing it. Serialising here costs nothing worth
+        // measuring -- a font file is registered once in the life of a process.
+        static NSMutableSet *done = nil;
+        static dispatch_once_t doneOnce;
+        dispatch_once(&doneOnce, ^{
+            done = [[NSMutableSet alloc] init];
+        });
+        @synchronized (done) {
+            if (![done containsObject:f]) {
+                [done addObject:f];
+                NSString *path = [[[NSBundle mainBundle] resourcePath]
+                                    stringByAppendingPathComponent:f];
+                if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
+                    CFErrorRef error = NULL;
+                    CTFontManagerRegisterFontsForURL(
+                        (BRIDGE_CAST CFURLRef)[NSURL fileURLWithPath:path],
+                        kCTFontManagerScopeProcess, &error);
+                    if (error != NULL) {
+                        CFRelease(error);
+                    }
+                }
+            }
+        }
+    }
+    POOL_END();
+}
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
     int pSize = 14;
 
     pSize *= scaleValue;
     POOL_BEGIN();
-    cn1RegisterBundledFontsOnce();
     NSString* str = toNSString(CN1_THREAD_STATE_PASS_ARG name);
 
     CN1Font* fnt;
@@ -13466,7 +13572,27 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String
     } else {
         fnt = [CN1Font fontWithName:str size:pSize];
     }
-    
+
+    // Register the bundle's fonts only once a name has actually failed to
+    // resolve, rather than before every lookup.
+    //
+    // Registration is what makes a BUNDLED font resolvable -- FontImage asks for
+    // "Material Icons" and nothing else would find it -- but it is not free: it
+    // walks the resource directory and hands every .ttf/.otf to Core Text. In an
+    // application bundling a font family that measured 12-28ms, and it was paid
+    // on the FIRST createTrueTypeFont, which is the one inside UIManager's
+    // constructor, on the event dispatch thread, before anything is painted.
+    //
+    // Nothing on that path needs it. The theme asks for native:MainLight and the
+    // rest of the native: family, which nativeFontName maps onto HelveticaNeue
+    // names -- answered above by systemFontOfSize:weight:, from the system font
+    // set, never nil. The first name that genuinely needs a bundled font is the
+    // one that pays, and it pays exactly once.
+    if(fnt == nil) {
+        cn1RegisterBundledFontsOnce();
+        fnt = [CN1Font fontWithName:str size:pSize];
+    }
+
 #ifndef CN1_USE_ARC
     [fnt retain];
 #endif
@@ -15916,6 +16042,63 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetRight___R_int(CN1_T
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetBottom___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return getSafeBottom();
+}
+
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_getDisplayScale___R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    // Not scaleValue on this slice either, and for a sharper reason than the
+    // watch: here it is a placeholder that LOOKS like a real answer.
+    // CN1MacRefreshScaleValue only publishes the true scale once the main window
+    // exists, and the window is built concurrently with Java start-up, so
+    // anything asking during initialisation would be told 1 -- indistinguishable
+    // from a genuine non-Retina display, and half the resolution the app should
+    // have been building its resources at.
+    //
+    // The already-published value answers instead, through an accessor that only
+    // reads atomics. Deliberately NOT [CN1MacHost sharedHost].window: that
+    // property BUILDS the window on first access, from whichever thread asks, so
+    // reaching it from the event dispatch thread during start-up costs 56-86ms
+    // of blocked EDT and races the queued build -- the exact regression
+    // builtWindow exists to prevent, described in CN1MacHost.h. Reading an
+    // AppKit property off the main thread would not be sound either.
+    //
+    // The published value is the main window's own screen scale where there is
+    // one, and the primary screen's otherwise, which is what the renderer draws
+    // at. Until something has published either, this returns 0 -- "not captured"
+    // -- and the Java caller defers to the portable implementation. Zero is the
+    // better failure: a caller can see it, and cannot see a wrong 1.
+    extern int cn1MacPublishedScaleTimes100(void);
+    int publishedScale = cn1MacPublishedScaleTimes100();
+    if (publishedScale > 0) {
+        return (JAVA_FLOAT)(publishedScale / 100.0);
+    }
+    return (JAVA_FLOAT)0;
+#elif TARGET_OS_WATCH
+    // Not scaleValue on this slice. It is only ever assigned from
+    // [UIScreen mainScreen].scale, which the watch compiles out, so it stays at
+    // its initializer of 1 forever -- while CN1WatchRenderingView allocates its
+    // bitmap at w*scale by h*scale and draws through a matching scale CTM. The
+    // honest device-pixel ratio is therefore the rendering view's scale;
+    // reporting 1 makes callers build 1x bitmaps for a Retina watch.
+    CN1WatchRenderingView *watchView = [CN1WatchHost sharedHost].renderingView;
+    if (watchView != nil) {
+        CGFloat watchScale = [watchView backingScale];
+        if (watchScale > 0) {
+            return (JAVA_FLOAT)watchScale;
+        }
+    }
+    // Host not started yet: 0 means "not captured", which the Java caller
+    // answers by deferring to the portable implementation.
+    return (JAVA_FLOAT)0;
+#else
+    // iOS and its UIKit relatives: scaleValue and nothing else. It is assigned
+    // from [UIScreen mainScreen].scale while the view controller is built, which
+    // happens before any application code runs, so there is no window in which it
+    // is still a placeholder here -- unlike the macOS and watchOS slices above,
+    // which is why they answer differently. 0 means "not captured yet", which the
+    // Java caller answers by deferring to the portable implementation.
+    return (JAVA_FLOAT)scaleValue;
+#endif
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayWidth___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {

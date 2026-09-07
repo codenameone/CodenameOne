@@ -2411,6 +2411,17 @@ public class Collections {
     }
 
     /**
+     * Returns an empty, immutable {@link Iterator}.
+     *
+     * @return an {@link Iterator} over no elements.
+     * @since 1.7
+     */
+    @SuppressWarnings("unchecked")
+    public static final <T> Iterator<T> emptyIterator() {
+        return EMPTY_LIST.iterator();
+    }
+
+    /**
      * Returns a type-safe empty, immutable {@link Set}.
      * 
      * @return an empty {@link Set}.

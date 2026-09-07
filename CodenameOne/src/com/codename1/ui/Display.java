@@ -5589,6 +5589,36 @@ public final class Display extends CN1Constants {
         return impl.getDeviceDensity();
     }
 
+    /// The platform's logical-pixel scale factor -- device pixels per logical pixel, what
+    /// iOS calls `UIScreen.scale` and Android calls `density`.
+    ///
+    /// Distinct from [#getDeviceDensity], which is a coarse DPI bucket for choosing
+    /// artwork and physical sizing. Code that lays out in the platform's own logical units
+    /// needs this number: on iOS the scale is 1, 2 or 3, while the density bucket of a
+    /// modern iPhone implies 3.5.
+    ///
+    /// #### Returns
+    ///
+    /// pixels per logical pixel, or 0 when the platform does not report one
+    public float getDevicePixelRatio() {
+        return impl.getDevicePixelRatio();
+    }
+
+    /// Whether this platform can round a picture's corners as it draws it,
+    /// rather than the caller having to build a rounded copy of the bitmap.
+    ///
+    /// The platform answering yes does not mean every picture can be rounded --
+    /// procedural images and rotated ones cannot. Ask
+    /// [Graphics#isRoundedImageSupported(Image)] about the specific picture
+    /// before skipping a rounded-copy fallback.
+    ///
+    /// #### Returns
+    ///
+    /// true if [Graphics#drawImageRounded(Image, int, int, int, int, float)] rounds
+    public boolean isRoundedImageSupported() {
+        return impl.isRoundedImageDrawSupported();
+    }
+
     /// Returns the device density as a string.
     ///
     /// - DENSITY_VERY_LOW : "very-low"

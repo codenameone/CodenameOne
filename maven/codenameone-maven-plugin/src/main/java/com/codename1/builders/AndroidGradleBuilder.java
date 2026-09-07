@@ -3370,9 +3370,23 @@ public class AndroidGradleBuilder extends Executor {
             // feature nobody asked for breaking projects that never mention
             // the button. A large enough set of submitted libraries could
             // exhaust the shared budget on its own, and those builds worked
-            // before this scan existed. So it degrades: what the application's
-            // own classes said still stands, the libraries' contribution is
-            // dropped, and the log says which.
+            // before this scan existed. So it degrades rather than refusing.
+            //
+            // Degrading is NOT the same as assuming the libraries said no. A
+            // button referenced only from a submitted library, in a set too
+            // large to finish scanning, would then go unseen: the bridge is
+            // deleted, no permission is declared, and the library's button
+            // draws and can never obtain a location. That is the silent
+            // failure this whole file is written against, and it is worse than
+            // the alternative -- which is an application that carries the
+            // location permissions, and on a capable toolchain the dependency
+            // and its minimum SDK, without using the button.
+            //
+            // So an unfinished scan counts AS button use. The toolchain gate
+            // below then does what it does for any such build: on a toolchain
+            // that cannot carry the library it clears the flag again and takes
+            // the fallback, which declares the ordinary permissions the
+            // fallback button needs.
             if (LocationButtonManifestFragments.isExclusive(
                     request.getArg("android.locationButton.exclusive",
                             "false"))) {
@@ -3384,11 +3398,14 @@ public class AndroidGradleBuilder extends Executor {
                         + " to be found before the build, not after.",
                         budgetOrIo);
             }
+            usesLocationButton = true;
             log("Could not finish scanning the submitted libraries for"
                     + " location API usage (" + budgetOrIo.getMessage()
-                    + "). Continuing with what the application's own classes"
-                    + " report; a library's own use of the location button is"
-                    + " not counted for this build.");
+                    + "). Continuing, and treating the location button as USED"
+                    + " so that a library which references it still gets the"
+                    + " permissions it needs; an application that does not use"
+                    + " it carries them without cause, which is the lesser of"
+                    + " the two errors available here.");
         }
 
         // android.blockLocationPermission turns the WHOLE feature off, here,
@@ -5424,6 +5441,19 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         pruneOptionalAiSources(srcDir);
+
+        // usesLocationButton passed here too, as every caller of compileSdkInt
+        // must: the merge that brought this call in was written against the
+        // older signature, and dropping the flag would ask this one question
+        // with a compile SDK that ignores the location button's own raise --
+        // so the biometric pruning would decide against a level the project
+        // does not build at.
+        pruneBiometricSourcesForCompileSdk(srcDir,
+                compileSdkInt(maxPlatformVersion, buildToolsVersion,
+                        targetNumber, usesNearbyRanging,
+                        usesNearbyRanging || usesNearbyTransport
+                                || usesNearbyCompanion, usesCallVoip,
+                        usesCustomTunnel, usesLocationButton));
 
         final String moPubAdUnitId = request.getArg("android.mopubId", null);
         if (moPubAdUnitId != null && moPubAdUnitId.length() > 0) {
@@ -7908,6 +7938,16 @@ public class AndroidGradleBuilder extends Executor {
                 // -- never runs. The service loads it by name instead, so the name has to
                 // survive R8.
                 + (usesIntents ? "-keep class cn1app.IntentBootstrap { *; }\n\n" : "")
+                // Biometrics: AndroidBiometrics picks its backend by name at
+                // class-init, because no single compileSdk can compile both
+                // packages (see pruneBiometricSourcesForCompileSdk). The name
+                // is a constant string at the Class.forName call so R8 keeps
+                // the class on its own, and this states it outright rather
+                // than resting on that inference.
+                + (usesBiometrics
+                        ? "-keep class com.codename1.impl.android.biometrics.** { *; }\n\n"
+                        + "-keep class com.codename1.impl.android.fingerprint.** { *; }\n\n"
+                        : "")
                 + facebookProguard
                 + " " + request.getArg("android.proguardKeep", "") + "\n"
                 // App-hardening keep rules for R8. On Android the engine does not rename (R8 is the
@@ -8659,6 +8699,82 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
         return true;
+    }
+
+    /**
+     * Removes the BiometricPrompt-backed biometric package when the platform
+     * this build compiles against is too old for it.
+     *
+     * <p>The port has two biometric backends, one per Android biometric API,
+     * and {@code AndroidBiometrics} loads whichever one is present by name.
+     * The legacy one goes through {@code FingerprintManagerCompat} and so
+     * compiles against every platform, API 37 included -- which is the point,
+     * because an application compiled against 37 still runs on the API 23-28
+     * devices where the platform {@code FingerprintManager} it wraps is the
+     * only biometric API there is. Only the modern one has a floor, and this
+     * enforces it.</p>
+     *
+     * <p>The floor is 28, which is also the lowest the ladder in
+     * {@link #compileSdkInt} produces, so in practice this deletes nothing.
+     * That is deliberate rather than lucky: the modern backend reaches
+     * everything newer than 28 by name so that a project pinned low keeps it.
+     * An APK compiled at 28 or 29 runs on API 37 devices too, where the legacy
+     * backend's platform API is gone, so losing the modern one there would
+     * have left those users with no biometrics at all.</p>
+     *
+     * <p>Note the limit of what this can see. {@code android.xgradle} is
+     * appended to the generated {@code build.gradle} verbatim, so a fragment
+     * re-opening {@code android { }} can set a different compile SDK after the
+     * fact, and this decision -- like every other one the builder keys on the
+     * compile SDK, from the nearby and ranging floors to the manifest's
+     * foreground-service enums -- is made from the computed value. Reading the
+     * effective one would mean parsing arbitrary Groovy. Keeping the floor at
+     * the bottom of the ladder is what makes that gap harmless here: an
+     * override would have to drop below 28 to break this package, and nothing
+     * the builder generates goes there.</p>
+     *
+     * <p>Naming the removed platform class from a file every application
+     * compiles is what issue #5701 reported: an unmodified Hello World
+     * generated against an API 37 platform failed
+     * {@code compileDebugJavaWithJavac} in port sources the developer never
+     * wrote.</p>
+     *
+     * @param srcDir       the generated application's java source root
+     * @param compileSdk   the API level this build compiles against, or 0 when
+     *                     it could not be determined -- in which case nothing
+     *                     is deleted, because the compile is the thing that
+     *                     would then decide
+     */
+    static void pruneBiometricSourcesForCompileSdk(File srcDir, int compileSdk) {
+        if (compileSdk <= 0) {
+            return;
+        }
+        if (compileSdk < BIOMETRIC_PROMPT_BACKEND_MIN_SDK) {
+            deletePackage(new File(srcDir,
+                    "com/codename1/impl/android/biometrics"));
+        }
+    }
+
+    /**
+     * The API level the BiometricPrompt-backed package compiles against.
+     *
+     * <p>28, where {@code BiometricPrompt} itself arrives. {@code
+     * BiometricManager} (29), {@code canAuthenticate(int)} and {@code
+     * Authenticators} (30) are all reached by name in that package rather than
+     * compiled against, precisely so this number can sit at the bottom of the
+     * ladder instead of above it.</p>
+     */
+    static final int BIOMETRIC_PROMPT_BACKEND_MIN_SDK = 28;
+
+    /** Deletes a flat source package, if it is there at all. */
+    private static void deletePackage(File pkg) {
+        File[] files = pkg.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                f.delete();
+            }
+        }
+        pkg.delete();
     }
 
     private void pruneOptionalAiSources(File srcDir) {

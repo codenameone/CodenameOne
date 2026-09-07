@@ -51,6 +51,7 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.annotations.Required;
 import java.util.*;
 import com.codename1.annotations.*;
 import com.codename1.binding.BindAttr;
@@ -85,6 +86,7 @@ class AnnotationComponentBindingJava001Snippet {
     public class LoginModel {
 
         @Bind(name = "userField", attr = BindAttr.TEXT)
+        @Required
         private String user;
         public String getUser()              { return user; }
         public void   setUser(String u)      { this.user = u; }                  // <1>
@@ -100,8 +102,10 @@ class AnnotationComponentBindingJava001Snippet {
               getter = "computeFullName",
               setter = "applyFullName")                                           // <3>
         private String fullName;
-        public String computeFullName()      { return fullName.toUpperCase(); }
-        public void   applyFullName(String f){ this.fullName = f.trim(); }
+        // both run during the initial bind, against a model that may still be
+        // empty, so neither can assume a value is present
+        public String computeFullName()      { return fullName == null ? "" : fullName.toUpperCase(); }
+        public void   applyFullName(String f){ this.fullName = f == null ? null : f.trim(); }
     }
     // end::annotation-component-binding-java-001[]
 }

@@ -51,6 +51,7 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.system.Lifecycle;
 import java.util.*;
 
 
@@ -79,11 +80,22 @@ class IndexJava001Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     // tag::index-java-001[]
-    public class HelloWorld { // <1>
-        private Form current; // <2>
-        private Resources theme; // <3>
+    public class HelloWorld extends Lifecycle {                             // <1>
 
-        // null class methods null
+        @Override
+        public void runApp() {                                              // <2>
+            Form hi = new Form("Hi World", BoxLayout.y());                  // <3>
+            Button helloButton = new Button("Hello World");
+            hi.add(helloButton);
+            helloButton.addActionListener(e -> hello());
+            hi.getToolbar().addMaterialCommandToSideMenu("Hello Command",
+                    FontImage.MATERIAL_CHECK, 4, e -> hello());             // <4>
+            hi.show();
+        }
+
+        private void hello() {
+            Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null);
+        }
     }
     // end::index-java-001[]
 }

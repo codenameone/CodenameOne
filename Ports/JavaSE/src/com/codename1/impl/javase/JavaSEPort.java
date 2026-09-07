@@ -936,6 +936,68 @@ public class JavaSEPort extends CodenameOneImplementation {
         designMode = aDesignMode;
     }
 
+    /// The backing scale of the display the pixels actually land on.
+    ///
+    /// This port is a deployment target, not only the simulator -- a desktop
+    /// build runs on it -- and there the host display's scale is exactly the
+    /// question this API asks, the same thing UIScreen.scale answers on iOS.
+    /// It is what the port already sizes its own buffers and fonts with, so a
+    /// caller sizing a bitmap from it matches what gets rasterised.
+    ///
+    /// Under a device skin the simulator is imitating a phone whose real scale
+    /// may differ, but the pixels still land on this display, so this stays the
+    /// useful answer for anything choosing a bitmap resolution. It also honours
+    /// the cn1.retinaScale property and CN1_RETINA_SCALE, which is how a
+    /// developer pins the value when testing.
+    ///
+    /// Secondary windows can sit on a monitor with a different transform --
+    /// see canvasScale() -- but this question is asked of the Display as a
+    /// whole, so it answers for the main one.
+    ///
+    /// retinaScale is captured once at start-up and is NOT re-read when the main
+    /// window is dragged to a monitor with a different scale. That is deliberate
+    /// here rather than an oversight, and reading the current GraphicsConfiguration
+    /// instead would make this WRONG: the main canvas renders at exactly this
+    /// value. canvasScale() returns retinaScale for windowId 0, and that is what
+    /// sizes the surface, allocates the backing buffer, and sets the blit, paint
+    /// and pointer scales. Reporting a scale the renderer is not using would hand
+    /// callers a number their artwork then fails to match, which is the very
+    /// mismatch the question is asked to avoid.
+    ///
+    /// The main window not following its display IS a real limitation, but it is
+    /// one of the rendering path: the fix is for canvasScale() to track the
+    /// canvas's configuration for window 0 as it already does for the others, at
+    /// which point this method follows for free because it reports whatever the
+    /// port draws with. Changing only this accessor would just split the two.
+    @Override
+    public float getDevicePixelRatio() {
+        return devicePixelRatioFor(isDesktop(), retinaScale, super.getDevicePixelRatio());
+    }
+
+    /// Decides the reported ratio from the three things that determine it.
+    ///
+    /// Separated from the accessor so it can be exercised without constructing a
+    /// port: the constructor initialises a look and feel, which needs a native
+    /// library that is not present on every machine the tests run on.
+    ///
+    /// The host display's backing scale is reported ONLY when no skin is loaded.
+    /// A skin means this process is standing in for another device, and the
+    /// host's scale is not that device's -- a 2x machine showing a 3x phone skin
+    /// would report 2, and everything laid out in the platform's logical units
+    /// comes out two thirds of its size.
+    ///
+    /// With a skin the answer is the "not reported" value, which the documented
+    /// contract already defines: the caller derives the ratio from the density
+    /// bucket, which describes the device being simulated rather than the
+    /// machine simulating it, and is what this call resolved to before the
+    /// platform reported a scale at all.
+    static float devicePixelRatioFor(boolean desktop, double hostScale, float notReported) {
+        if (!desktop) {
+            return notReported;
+        }
+        return hostScale > 0 ? (float) hostScale : notReported;
+    }
+
     public int getDeviceDensity() {
         if(defaultPixelMilliRatio != null) {
             /*
@@ -3788,7 +3850,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if(menuDisplayed){
                 return;
             }
-            
+
             // We keep a blitCounter that gets reset in paintComponent()
             // If blit is called a number of times with no call to paintComponet
             // in between then it is probably safe to just use a shared 
@@ -3851,7 +3913,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 Runnable r = new Runnable() {
                     public void run() {
                         if (buffer != null) {
-                            
+
                             java.awt.Graphics g = getGraphics();
                             if (g == null) {
                                 return;

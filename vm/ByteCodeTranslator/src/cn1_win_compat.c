@@ -78,6 +78,15 @@ int pthread_mutex_lock(pthread_mutex_t* mutex) {
     return 0;
 }
 
+/* Used by monitorEnter to find out whether a monitor is free WITHOUT blocking:
+ * a thread that does not block never has to announce itself to the collector.
+ * EBUSY on failure, like pthread_mutex_trylock, and TryAcquireSRWLockExclusive
+ * is its exact counterpart -- it takes the lock or reports that it could not,
+ * and never waits. */
+int pthread_mutex_trylock(pthread_mutex_t* mutex) {
+    return TryAcquireSRWLockExclusive((PSRWLOCK)&mutex->lock) ? 0 : EBUSY;
+}
+
 int pthread_mutex_unlock(pthread_mutex_t* mutex) {
     ReleaseSRWLockExclusive((PSRWLOCK)&mutex->lock);
     return 0;

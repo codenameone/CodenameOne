@@ -492,8 +492,14 @@ cn1ss_generate_port_status() {
   if [ "${CN1SS_FAIL_ON_TEST_PROBLEMS:-0}" = "1" ]; then
     args+=(--fail-on-test-problems)
   fi
-  if ! "$python_bin" "${args[@]}"; then
-    cn1ss_log "FATAL: Failed to generate normalized port status for $CN1SS_PORT_ID"
+  local normalize_rc=0
+  "$python_bin" "${args[@]}" || normalize_rc=$?
+  if [ "$normalize_rc" -ne 0 ]; then
+    if [ "$normalize_rc" -eq 10 ]; then
+      cn1ss_log "FATAL: Normalized report contains failing or missing tests for $CN1SS_PORT_ID ($output)"
+    else
+      cn1ss_log "FATAL: Failed to generate normalized port status for $CN1SS_PORT_ID (rc=$normalize_rc)"
+    fi
     return 19
   fi
   cn1ss_log "Wrote normalized port status to $output"

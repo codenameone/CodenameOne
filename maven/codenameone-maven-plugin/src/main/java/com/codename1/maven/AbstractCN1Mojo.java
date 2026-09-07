@@ -868,6 +868,19 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      * @param artifact
      * @return 
      */
+    /**
+     * Forwards the effective local repository to a forked Maven invocation.
+     * Goals like cn1:run re-invoke Maven through the Invoker API; without
+     * this, a build executed with -Dmaven.repo.local=... forks a child that
+     * silently resolves from the settings-default repository and runs stale
+     * artifacts.
+     */
+    protected void forwardLocalRepository(java.util.Properties props) {
+        if (localRepository != null && localRepository.getBasedir() != null) {
+            props.setProperty("maven.repo.local", localRepository.getBasedir());
+        }
+    }
+
     protected File findArtifactFile(Artifact artifact) {
         File[] out = new File[1];
         

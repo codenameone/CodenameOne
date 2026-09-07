@@ -179,6 +179,12 @@ public final class Class<T> implements java.lang.reflect.Type {
     public native boolean isInstance(java.lang.Object obj);
 
     /**
+     * The Class representing the superclass of this class, or null when this
+     * class is Object, an interface, a primitive type or void.
+     */
+    public native java.lang.Class getSuperclass();
+
+    /**
      * Determines if the specified Class object represents an interface type.
      */
     public native boolean isInterface();

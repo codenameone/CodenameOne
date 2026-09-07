@@ -47,6 +47,10 @@ provisioning profile doesn't carry breaks code signing).
 `LocalNotification` is scheduled through `Display.scheduleLocalNotification(...)` as
 before; the bean has been extended with fluent, backward-compatible setters:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NotificationsAndBackgroundExecutionJava002Snippet.java[tag=notifications-and-background-execution-java-002,indent=0]
+----
 
 When the user taps an action, the selected action id (and any quick-reply text) are
 delivered through `com.codename1.push.PushContent` -- `getActionId()`, `getActionTitle()`
@@ -90,6 +94,10 @@ Channels let the user control importance, sound, vibration, lights, lock screen
 visibility and badge display for a group of notifications. Build and register one at startup,
 then reference it from a notification with `setChannelId(...)`:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NotificationsAndBackgroundExecutionJava003Snippet.java[tag=notifications-and-background-execution-java-003,indent=0]
+----
 
 Channels are an Android concept. On iOS and the simulator `register()` is a no-op (the
 simulator stores the channel so its name can be shown in the notification panel); the
@@ -101,6 +109,17 @@ channel id you assign is still carried so the notification behaves consistently.
 Implement `BackgroundWorker` in a class with a public no-argument constructor (it's
 reconstructed after a cold launch -- pass state through the input data, not fields):
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NotificationsAndBackgroundExecutionJava004Snippet.java[tag=notifications-and-background-execution-java-004,indent=0]
+----
+
+iOS needs the identifier declared at build time before `BGTaskScheduler` will
+accept the request, and nothing detects `BackgroundWork` on the classpath for
+you. Set `ios.usesBackgroundProcessing=true`, which declares
+`<packageName>.processing` -- the id the sample derives -- or list your own ids
+with `ios.backgroundProcessingIds`. Without one of those the scheduling call is
+rejected on the device.
 
 [options="header"]
 |===
@@ -112,6 +131,16 @@ reconstructed after a cold launch -- pass state through the input data, not fiel
 | periodic | Approximated (resubmit) | Yes (>= 15 min) | Yes
 |===
 
+WARNING: The iOS approximation of a periodic request doesn't carry the request
+forward. After a run completes, the port resubmits the task with an earliest
+date one minute out and with both the network and power requirements cleared, so
+the work can recur far more often than the period you asked for and outside the
+constraints you set. Treat a periodic request on iOS as "sometime after the app
+is next backgrounded," and re-check the conditions you care about at the top of
+the worker. The completion value is Android-only for the same reason: the iOS
+port resubmits periodic work whichever value you report, and never resubmits
+one-shot work, so a `FALSE` there doesn't buy you a retry.
+
 `BackgroundTask.scheduleProcessing(id, earliestBeginDate, requiresNetwork, requiresPower,
 runnable)` is a one-shot variant for occasional maintenance work. On iOS the identifiers
 must be declared via the `ios.backgroundProcessingIds` build hint (comma separated,
@@ -120,8 +149,16 @@ and links `BackgroundTasks.framework` automatically.
 
 === Foreground service (Android)
 
-`ForegroundService` runs a long task while a persistent notification is shown:
+`ForegroundService` runs a long task while a persistent notification is shown.
+The first argument names a channel, but the Android service currently routes
+its notification through the app-wide channel -- `android.NotificationChannel.id`,
+defaulting to `cn1-channel` -- so the id here doesn't place the notification
+in a channel of its own today:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NotificationsAndBackgroundExecutionJava005Snippet.java[tag=notifications-and-background-execution-java-005,indent=0]
+----
 
 [options="header"]
 |===
@@ -138,6 +175,10 @@ Override the type with the `android.foregroundServiceType` build hint (default `
 Override `onReceivedSharedContent(SharedContent)` on your `Lifecycle` subclass to receive
 text, URLs, files or images shared into your app from other apps:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NotificationsAndBackgroundExecutionJava006Snippet.java[tag=notifications-and-background-execution-java-006,indent=0]
+----
 
 [options="header"]
 |===

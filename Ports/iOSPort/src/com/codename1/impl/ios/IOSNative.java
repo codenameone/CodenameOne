@@ -69,6 +69,13 @@ public final class IOSNative {
     native boolean isPainted();
     native int getDisplayWidth();
     native int getDisplayHeight();
+
+    /// The screen's scale factor -- 1, 2 or 3 on iOS -- straight from UIScreen,
+    /// NOT derived from the artwork density bucket. The two are different
+    /// questions: the bucket approximates DPI and is chosen from the display
+    /// resolution (and under ios.densityOld from the superclass's own resolution
+    /// rules), so a 2x phone can land in a bucket that implies 3.
+    native float getDisplayScale();
     native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine,
             int rows, int maxSize, int constraint, String text, boolean forceSlideUp,
             int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight,
@@ -119,6 +126,14 @@ public final class IOSNative {
     native void nativeDrawStringGlobal(int color, int alpha, long fontPeer, String str, int x, int y);
     native void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints);
     native void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints);
+
+    /// Whether this build can round a picture's corners as it draws it -- only
+    /// the Metal renderer has the shader.
+    native boolean isRoundedImageDrawSupported();
+
+    native void nativeDrawImageRoundedGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius);
+
+    native void nativeDrawImageRoundedMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius);
     native void nativeTileImageGlobal(long peer, int alpha, int x, int y, int width, int height);
     native int stringWidthNative(long peer, String str);
     native int charWidthNative(long peer, char ch);
@@ -320,6 +335,10 @@ public final class IOSNative {
     native void peerDeinitialized(long peer);
     native void peerSetVisible(long peer, boolean v);
     native long createPeerImage(long peer, int[] wh);
+
+    /// Tells the peer it does not have to keep the decoded UIImage alive once it
+    /// has uploaded its texture: the caller holds the encoded bytes and will
+    /// recreate the image if the platform loses it. See
 
     native void releasePeer(long peer);
     native void retainPeer(long peer);
@@ -992,6 +1011,15 @@ public final class IOSNative {
     native void scanBarCode();
 
     native long createTruetypeFont(String name);
+
+    /// Registers ONE bundled font file, by its bundle-relative name.
+    ///
+    /// createTrueTypeFont is given both the font's name and the file it lives
+    /// in, and the file is the cheap way to make the name resolvable. Without
+    /// it the only option is registering every bundled font to satisfy one
+    /// lookup -- 33 files and 5.7MB in an application shipping a font family,
+    /// measured at 25ms on the start-up path.
+    native void registerBundledFont(String fileName);
     native long deriveTruetypeFont(long uiFont, boolean bold, boolean italic, float size);
 
     native void log(String text);

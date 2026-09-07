@@ -885,7 +885,7 @@ class GcSteadyStateIntegrationTest {
         cmake.addAll(CompilerHelper.cmakeToolchainArgs());
         // CMAKE_C_FLAGS composes with the target's own options, so the mandatory
         // -fwrapv / -fno-strict-aliasing the generated project adds are kept.
-        cmake.add("-DCMAKE_C_FLAGS=" + cFlags);
+        cmake.add(CompilerHelper.cFlagsArg("") + cFlags);
         CleanTargetIntegrationTest.runCommand(cmake, distDir);
         CleanTargetIntegrationTest.runCommand(
                 Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
@@ -1181,4 +1181,6 @@ class GcSteadyStateIntegrationTest {
             // best effort
         }
     }
+
+
 }

@@ -973,4 +973,106 @@ void CN1MacInstallAppDelegate(void) {
         delegate = [[CN1MacAppDelegate alloc] init];
         [NSApp setDelegate:delegate];
     }
+    // Publish the primary screen's backing scale, HERE rather than in
+    // applicationDidFinishLaunching: -- this runs before [NSApp run], and so
+    // before the generated main dispatches the application's own main onto a
+    // background queue. Any later and the event dispatch thread beats it: the
+    // delegate callback is not delivered until AppKit has finished bringing
+    // itself up, which is exactly the ~25ms during which the first query lands.
+    // Measured -- publishing from didFinishLaunching lost the race on every run
+    // and the hop still cost 15-19ms.
+    //
+    // See CN1MacPublishPrimaryScale. Reading it is what lets the event dispatch
+    // thread skip a dispatch_sync onto a main queue that is still busy.
+    extern void CN1MacPublishPrimaryScale(void);
+    CN1MacPublishPrimaryScale();
+    // Build the window HERE, once, on this thread.
+    //
+    // It has to exist before the event dispatch thread first asks anything about
+    // it, and it has to be built at a moment when its size is already settled.
+    // Both of the obvious alternatives fail one of those:
+    //
+    //  - Letting the first size query build it (what the port did) blocks the
+    //    EDT inside UIManager's constructor for as long as the build takes,
+    //    which measured 56-86ms of every launch.
+    //  - Letting the first PAINT build it moves the construction into the middle
+    //    of layout, where the size is still in flux -- so the surface is created
+    //    and then resized, leaving a second full-size IOSurface behind. Measured
+    //    10.8MB -> 21.5MB.
+    //
+    // This runs before [NSApp run], and therefore before the generated main
+    // dispatches the application onto a background queue, so the EDT cannot
+    // arrive first and there is nothing to race. The window is built once, at
+    // its real size, and every later query just reads it.
+    // QUEUED onto the main queue, not built inline.
+    //
+    // The generated main dispatches the application's own main onto a background
+    // queue AFTER this function returns, so anything done inline here delays the
+    // VM boot by its full duration -- building the window inline cost 34.8ms of
+    // exactly that, and gave back the whole start-up win.
+    //
+    // Queued, it runs when [NSApp run] turns the run loop over, by which point
+    // the VM boot is already in flight on the other queue. The main thread builds
+    // the window while the background queue boots Java, and the two overlap
+    // instead of queueing behind one another. It is still built ONCE, before
+    // anything paints, so there is no create-then-resize.
+    // QUEUED on the main queue. Every alternative measured worse, so the
+    // placement is deliberate rather than incidental:
+    //
+    //  - inline here delays the VM boot by the full build, because the
+    //    generated main dispatches the application onto its background queue
+    //    only after this function returns;
+    //  - from applicationWillFinishLaunching: it starts 19ms sooner but blocks
+    //    [NSApp run]'s own start-up, pushing applicationDidFinishLaunching 41ms
+    //    out and the first paint 32ms with it;
+    //  - deferred to the first paint it lands mid-layout, so the surface is
+    //    created and then resized, leaving a second full-size IOSurface behind.
+    //
+    // Queued, it runs once the run loop turns over -- with the VM already
+    // booting on the other queue -- and the window is built once, at its real
+    // size, before anything paints.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        (void)[CN1MacHost sharedHost].renderingView;
+        // The window exists now, so the screen it opened on can be published.
+        // Until this runs macMonitorForMainWindow has to marshal to find out,
+        // and Style.convertUnit asks it through convertToPixels for every
+        // padding and margin on every component.
+        extern void CN1MacPublishMainWindowScreen(void);
+        CN1MacPublishMainWindowScreen();
+
+        // ...and keep it fresh when the window itself moves.
+        //
+        // The republish in CN1AppKitWindows lives on the window DELEGATE, and
+        // the main window has none -- CN1MacHost never sets one, so that path
+        // only ever fires for secondary windows. Without these the published
+        // index and scale stay whatever the window opened with, and dragging
+        // the main window between a 1x and a Retina display left
+        // convertToPixels and getDeviceDensity using the old scale for good.
+        //
+        // Both notifications: DidChangeScreen is the move, and
+        // DidChangeBackingProperties is the same window's scale changing under
+        // it, which a move between displays of different scale also produces.
+        NSWindow *mainWindow = [CN1MacHost sharedHost].builtWindow;
+        if (mainWindow != nil) {
+            for (NSNotificationName n in @[NSWindowDidChangeScreenNotification,
+                                           NSWindowDidChangeBackingPropertiesNotification]) {
+                [[NSNotificationCenter defaultCenter]
+                    addObserverForName:n
+                                object:mainWindow
+                                 queue:[NSOperationQueue mainQueue]
+                            usingBlock:^(NSNotification *note) {
+                    CN1MacPublishMainWindowScreen();
+                }];
+            }
+        }
+    });
+    [[NSNotificationCenter defaultCenter]
+        addObserverForName:NSApplicationDidChangeScreenParametersNotification
+                    object:nil
+                     queue:[NSOperationQueue mainQueue]
+                usingBlock:^(NSNotification *note) {
+        CN1MacPublishPrimaryScale();
+        extern void CN1MacPublishMainWindowScreen(void);
+        CN1MacPublishMainWindowScreen();
+    }];
 }

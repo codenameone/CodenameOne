@@ -1,0 +1,105 @@
+== Promises
+
+`com.codename1.util.promise.Promise` is an implementation of the JavaScript
+promise for Codename One. It exists to compose asynchronous work without
+nesting a callback inside a callback inside a callback: each step is a value you
+can hand around, chain onto and combine with others.
+
+Two method names differ from the JavaScript originals, because `catch` and
+`finally` are Java keywords. `except` takes the place of `catch`. `always` runs
+for either outcome, but it isn't a `finally`: it's implemented as
+`then(f, f)`, so whatever the functor returns becomes the value of the promise
+`always` hands back. Returning `null` after a rejection resolves the rest of the
+chain instead of keeping it rejected, and returning `null` after a success
+replaces the value. Returning the incoming value keeps a
+successful chain unchanged, but it doesn't preserve a rejection: any non-promise
+return is treated as a result, so returning the `Throwable` fulfils the chain
+with it. To stay rejected you have to throw, because `processThens`
+catches what a functor throws and rejects with it -- but `Functor.call` declares
+no checked exceptions, so a checked reason can't simply be rethrown. Wrap it, as
+`throw new RuntimeException(err)`, or return a promise you rejected with the
+original reason, whose state the chain adopts.
+
+=== Creating and consuming one
+
+The constructor takes an `ExecutorFunction`, which receives the two functions
+that settle the promise. It runs immediately, on the calling thread:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PromisesJava001Snippet.java[tag=promises-java-001,indent=0]
+----
+
+Resolution is marshalled for you. `resolve` and `reject` check whether they're
+on the EDT and hand themselves to `callSerially` when they aren't, so the
+callbacks you attach always run on the EDT and can touch the UI directly. That
+is worth contrasting with `EasyThread`, whose result callback stays on the
+worker thread.
+
+=== Chaining
+
+There are two families of callback and the difference is what they return.
+`then`, `except` and `always` take a `Functor`, whose return value becomes the
+input of the next step -- that's what makes a chain a pipeline. `onSuccess`,
+`onFail` and `onComplete` take a `SuccessCallback` instead, which returns
+nothing, so they suit the end of a chain where there is no value to pass on.
+Attach both outcomes with `ready(success, failure)` rather than chaining
+`onSuccess(...).onFail(...)`: the second form hangs the failure handler off the
+promise `onSuccess` returns, behind the default rejection functor described
+below:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PromisesJava002Snippet.java[tag=promises-java-002,indent=0]
+----
+
+`getState()` reports `Pending`, `Fulfilled` or `Rejected`, and `getValue()`
+returns the resolved value once there is one.
+
+WARNING: Give the first `then` in a chain a rejection functor, as above. A
+`then` called with only a success functor installs a default one that does
+`throw (RuntimeException) reason`, so a rejection carrying a checked exception --
+an `IOException` from a network call, say -- fails that cast and reaches your
+`except` as a `ClassCastException` with the real cause gone.
+
+=== Combining several
+
+`all` and `allSettled` both take a varargs list of promises and return one
+promise, and they differ in how they treat a failure:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PromisesJava003Snippet.java[tag=promises-java-003,indent=0]
+----
+
+`all` rejects as soon as any input rejects, so it fits work where one failure
+makes the rest pointless. Don't depend on which error you get when several
+inputs fail. A handler attached before the rejections arrive is drained by the
+first one, while a handler attached afterward reads the stored error, which
+each later rejection overwrites. `allSettled` waits for every input whatever happens to
+each, which fits independent tasks. It resolves with the original array of
+promises rather than a list of outcome descriptors, so inspect each one with
+`getState()` and `getValue()`. There's no getter for a rejected promise's error,
+so attach a failure handler to an input if you need to see why it failed.
+
+=== Working with AsyncResource
+
+Much of the framework returns `AsyncResource` rather than a promise, and the
+conversion goes both ways:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PromisesJava004Snippet.java[tag=promises-java-004,indent=0]
+----
+
+`await()` is the blocking form. It waits through `invokeAndBlock`, so calling it
+on the EDT doesn't freeze the UI, and it throws
+`AsyncResource.AsyncExecutionException` when the promise rejected.
+
+WARNING: A promise from `promisify` never settles if the underlying
+`AsyncResource` is cancelled *after* `promisify` registered on it.
+`AsyncResource.cancel` records the cancellation and notifies its observers
+without running that callback, so the promise stays `Pending` and an `await()`
+waits forever. A resource already cancelled beforehand is fine: registering on a
+resource that has finished with an error fires the callback straight away.
+Don't await a promise wrapping a resource something else can cancel.

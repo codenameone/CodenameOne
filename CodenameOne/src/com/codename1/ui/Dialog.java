@@ -4191,8 +4191,16 @@ public class Dialog extends Form implements AbstractDialog {
             Image img = Image.createImage(previousForm.getWidth(), previousForm.getHeight());
             Graphics g = img.getGraphics();
             previousForm.paintComponent(g, true);
-            img = Display.getInstance().gaussianBlurImage(img, blurBackgroundRadius);
-            getUnselectedStyle().setBgImage(img);
+            Image blurred = Display.getInstance().gaussianBlurImage(img, blurBackgroundRadius);
+            if (blurred == null) {
+                // The platform said it supports the blur and then produced
+                // nothing. Installing the null as a background image is how that
+                // turns into a dialog with no backdrop at all and no error to
+                // explain it; the unblurred painter is the honest fallback.
+                super.initDialogBgPainter(p, previousForm);
+                return;
+            }
+            getUnselectedStyle().setBgImage(blurred);
             getUnselectedStyle().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FILL);
         } else {
             super.initDialogBgPainter(p, previousForm);

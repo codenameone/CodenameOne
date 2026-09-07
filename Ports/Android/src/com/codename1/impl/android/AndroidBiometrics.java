@@ -25,7 +25,6 @@ package com.codename1.impl.android;
 import android.Manifest;
 import android.app.Activity;
 import android.content.pm.PackageManager;
-import android.hardware.fingerprint.FingerprintManager;
 import android.os.Build;
 import android.os.CancellationSignal;
 import android.os.Looper;
@@ -50,24 +49,35 @@ import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 
-/**
- * Android backing for {@link Biometrics}. Uses
- * {@code BiometricPrompt} on API 29+ (via reflection &mdash; the cn1-binaries
- * android.jar predates API 28 so direct calls would not compile) and the
- * legacy {@code FingerprintManager} on API 23-28. Mirrors the dual-path
- * behaviour of the historical {@code FingerprintScanner} cn1lib but completes
- * per-call {@link AsyncResource} instances instead of a shared static
- * callback.
- *
- * <p>FingerprintManager error codes documented at
- * <a href="https://developer.android.com/reference/android/hardware/fingerprint/FingerprintManager">developer.android.com</a>;
- * the constants missing from the compile-time android.jar are inlined below.</p>
- */
+/// Android backing for [Biometrics]. Mirrors the dual-path behaviour of the
+/// historical `FingerprintScanner` cn1lib but completes per-call
+/// [AsyncResource] instances instead of a shared static callback.
+///
+/// Neither Android biometric API can be named from this file. `BiometricPrompt`
+/// is newer than the `android.jar` the port jar compiles against, and
+/// `FingerprintManager` was removed in API 37, so naming it broke every
+/// generated application built against a 37 platform (issue #5701). Both live
+/// behind [BiometricBackend], one implementation per package, resolved once by
+/// [AndroidBiometrics#backend]; the legacy one reaches its API through
+/// `FingerprintManagerCompat` so that it keeps working on an API 23-28 device
+/// no matter which platform the application was compiled against.
 public final class AndroidBiometrics extends Biometrics {
 
-    // FingerprintManager constants not in the cn1-binaries android.jar.
-    private static final int FINGERPRINT_ERROR_NO_FINGERPRINTS = 11;
-    private static final int FINGERPRINT_ERROR_HW_NOT_PRESENT = 12;
+    // Android biometric error codes. BiometricPrompt and FingerprintManager
+    // number these identically -- 1 through 12 are the same constants under two
+    // names in AOSP -- which is why one mapping serves both backends. Inlined
+    // because neither class can be named here, and because the two above 12
+    // exist on androidx's BiometricPrompt rather than the framework's.
+    private static final int ERROR_HW_UNAVAILABLE = 1;
+    private static final int ERROR_UNABLE_TO_PROCESS = 2;
+    private static final int ERROR_CANCELED = 5;
+    private static final int ERROR_LOCKOUT = 7;
+    private static final int ERROR_LOCKOUT_PERMANENT = 9;
+    private static final int ERROR_USER_CANCELED = 10;
+    private static final int ERROR_NO_BIOMETRICS = 11;
+    private static final int ERROR_HW_NOT_PRESENT = 12;
+    private static final int ERROR_NEGATIVE_BUTTON = 13;
+    private static final int ERROR_NO_DEVICE_CREDENTIAL = 14;
 
     // Probe key tying biometric success to a real KeyStore unlock so the
     // success callback cannot be bypassed by app hooking tools (Frida etc.).
@@ -76,16 +86,11 @@ public final class AndroidBiometrics extends Biometrics {
     private static final String ANDROID_KEY_STORE = "AndroidKeyStore";
     private static final byte[] PROBE_PLAINTEXT = new byte[]{0x42};
 
-    // BiometricPrompt error codes (API 28+) -- values are stable per AOSP.
-    static final int BIOMETRIC_ERROR_HW_UNAVAILABLE = 1;
-    static final int BIOMETRIC_ERROR_HW_NOT_PRESENT = 12;
-    static final int BIOMETRIC_ERROR_LOCKOUT = 7;
-    static final int BIOMETRIC_ERROR_LOCKOUT_PERMANENT = 9;
-    static final int BIOMETRIC_ERROR_NO_BIOMETRICS = 11;
-    static final int BIOMETRIC_ERROR_USER_CANCELED = 10;
-    static final int BIOMETRIC_ERROR_NEGATIVE_BUTTON = 13;
-    static final int BIOMETRIC_ERROR_CANCELED = 5;
-    static final int BIOMETRIC_ERROR_NO_DEVICE_CREDENTIAL = 14;
+    /// The backend this device and this build have, or `null` when there is
+    /// none. Resolved once at class initialisation: the answer cannot change
+    /// while the process lives, and a lazily initialised static would be a
+    /// SpotBugs finding in a tree that gates on zero of them.
+    private static final BiometricBackend BACKEND = resolveBackend();
 
     private CancellationSignal cancellationSignal;
     private AsyncResource<Boolean> pending;
@@ -137,35 +142,28 @@ public final class AndroidBiometrics extends Biometrics {
     }
 
     private static void collectAvailableBiometrics(List<BiometricType> out) {
+        if (BACKEND == null) {
+            return;
+        }
         try {
             Activity act = AndroidNativeUtil.getActivity();
             PackageManager pm = act.getPackageManager();
-            boolean okBio;
             if (Build.VERSION.SDK_INT >= 29) {
                 if (!AndroidNativeUtil.checkForPermission("android.permission.USE_BIOMETRIC",
                         "Authorize using biometrics")) {
                     return;
                 }
-                okBio = BiometricsApi29.canAuthenticate(act);
-            } else {
-                if (!AndroidNativeUtil.checkForPermission(Manifest.permission.USE_FINGERPRINT,
-                        "Authorize using fingerprint")) {
-                    return;
-                }
-                FingerprintManager fpm = (FingerprintManager)
-                        act.getSystemService(Activity.FINGERPRINT_SERVICE);
-                okBio = fpm != null && fpm.isHardwareDetected()
-                        && fpm.hasEnrolledFingerprints();
-            }
-            if (!okBio) {
+            } else if (!AndroidNativeUtil.checkForPermission(
+                    Manifest.permission.USE_FINGERPRINT,
+                    "Authorize using fingerprint")) {
                 return;
             }
-            if (pm.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT)) {
-                FingerprintManager fpm = (FingerprintManager)
-                        act.getSystemService(Activity.FINGERPRINT_SERVICE);
-                if (fpm != null && fpm.hasEnrolledFingerprints()) {
-                    out.add(BiometricType.FINGERPRINT);
-                }
+            if (!BACKEND.canAuthenticate(act)) {
+                return;
+            }
+            if (pm.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT)
+                    && BACKEND.hasEnrolledFingerprints(act)) {
+                out.add(BiometricType.FINGERPRINT);
             }
             if (Build.VERSION.SDK_INT >= 29) {
                 if (pm.hasSystemFeature("android.hardware.biometrics.face")) {
@@ -188,6 +186,11 @@ public final class AndroidBiometrics extends Biometrics {
                     "Android API 23 (Marshmallow) required for biometric authentication"));
             return result;
         }
+        if (BACKEND == null) {
+            result.error(new BiometricException(BiometricError.NOT_AVAILABLE,
+                    "No biometric API is available to this build"));
+            return result;
+        }
         final String reason = opts == null || opts.getReason() == null
                 ? "Authenticate" : opts.getReason();
         final String title = opts == null || opts.getTitle() == null
@@ -207,63 +210,15 @@ public final class AndroidBiometrics extends Biometrics {
             // initProbeCipher already errored the result.
             return result;
         }
-        if (Build.VERSION.SDK_INT >= 29) {
-            runOnUi(new Runnable() {
-                @Override
-                public void run() {
-                    if (cancellationSignal != null) {
-                        cancellationSignal.cancel();
-                    }
-                    cancellationSignal = new CancellationSignal();
-                    BiometricsApi29.authenticateWithCipher(
-                            AndroidNativeUtil.getActivity(),
-                            title, subtitle, description, negative,
-                            probeCipher,
-                            cancellationSignal,
-                            new BiometricsApi29.CipherAuthCallback() {
-                                @Override
-                                public void onSuccess(Object authedCipher) {
-                                    if (verifyProbeCipher((Cipher) authedCipher)) {
-                                        completeSuccess(result);
-                                    } else {
-                                        completeError(result, BiometricError.AUTHENTICATION_FAILED,
-                                                "Probe cipher rejected -- biometric success may have been spoofed");
-                                    }
-                                }
-
-                                @Override
-                                public void onError(int code, String msg) {
-                                    completeError(result, mapBiometricPromptError(code), msg);
-                                }
-                            });
-                }
-            });
-        } else {
-            authenticateLegacy(result, probeCipher);
-        }
-        return result;
-    }
-
-    private void authenticateLegacy(final AsyncResource<Boolean> result, final Cipher probeCipher) {
         runOnUi(new Runnable() {
             @Override
             public void run() {
-                if (!AndroidNativeUtil.checkForPermission(Manifest.permission.USE_FINGERPRINT,
-                        "Authorize using fingerprint")) {
+                if (Build.VERSION.SDK_INT < 29
+                        && !AndroidNativeUtil.checkForPermission(
+                                Manifest.permission.USE_FINGERPRINT,
+                                "Authorize using fingerprint")) {
                     completeError(result, BiometricError.NOT_AVAILABLE,
                             "USE_FINGERPRINT permission denied");
-                    return;
-                }
-                FingerprintManager fpm = (FingerprintManager)
-                        AndroidNativeUtil.getActivity()
-                                .getSystemService(Activity.FINGERPRINT_SERVICE);
-                if (fpm == null || !fpm.isHardwareDetected()) {
-                    completeError(result, BiometricError.NOT_AVAILABLE,
-                            "No fingerprint hardware");
-                    return;
-                }
-                if (!fpm.hasEnrolledFingerprints()) {
-                    completeError(result, BiometricError.NOT_ENROLLED, "No fingerprints enrolled");
                     return;
                 }
                 if (cancellationSignal != null) {
@@ -271,44 +226,40 @@ public final class AndroidBiometrics extends Biometrics {
                 }
                 final CancellationSignal cs = new CancellationSignal();
                 cancellationSignal = cs;
-                FingerprintManager.AuthenticationCallback cb = new FingerprintManager.AuthenticationCallback() {
-                    int failures;
+                BACKEND.authenticate(AndroidNativeUtil.getActivity(),
+                        title, subtitle, description, negative,
+                        probeCipher, cs, new BiometricBackend.Callback() {
+                            @Override
+                            public void onSuccess(Cipher authedCipher) {
+                                cs.cancel();
+                                // Confirm the unlock by running an actual
+                                // crypto operation on the cipher the OS handed
+                                // back. A hooked or spoofed success callback
+                                // either has no CryptoObject at all or reaches
+                                // a still-locked cipher, and doFinal() throws.
+                                if (verifyProbeCipher(authedCipher)) {
+                                    completeSuccess(result);
+                                } else {
+                                    completeError(result, BiometricError.AUTHENTICATION_FAILED,
+                                            "Probe cipher rejected -- biometric success may have been spoofed");
+                                }
+                            }
 
-                    @Override
-                    public void onAuthenticationError(int errorCode, CharSequence errString) {
-                        completeError(result, mapFingerprintManagerError(errorCode),
-                                errString == null ? "" : errString.toString());
-                    }
-
-                    @Override
-                    public void onAuthenticationSucceeded(FingerprintManager.AuthenticationResult r) {
-                        cs.cancel();
-                        // Require the OS to return the same CryptoObject we
-                        // passed in, and confirm by running an actual crypto
-                        // operation on the unlocked cipher. A hooked / spoofed
-                        // success callback either lacks the CryptoObject or
-                        // hits a Keystore-locked cipher and doFinal() throws.
-                        FingerprintManager.CryptoObject crypto = r.getCryptoObject();
-                        if (crypto == null || !verifyProbeCipher(crypto.getCipher())) {
-                            completeError(result, BiometricError.AUTHENTICATION_FAILED,
-                                    "Probe cipher rejected -- biometric success may have been spoofed");
-                            return;
-                        }
-                        completeSuccess(result);
-                    }
-
-                    @Override
-                    public void onAuthenticationFailed() {
-                        if (failures++ > 5) {
-                            cs.cancel();
-                            completeError(result, BiometricError.AUTHENTICATION_FAILED,
-                                    "Authentication failed");
-                        }
-                    }
-                };
-                fpm.authenticate(new FingerprintManager.CryptoObject(probeCipher), cs, 0, cb, null);
+                            @Override
+                            public void onError(int code, String msg) {
+                                // The legacy backend gives up after a run of
+                                // unrecognised touches while the sensor is
+                                // still listening, so the signal has to be
+                                // cancelled here rather than left to the OS.
+                                // Cancelling one the OS has already finished
+                                // with is a no-op.
+                                cs.cancel();
+                                completeError(result, mapBiometricError(code), msg);
+                            }
+                        });
             }
         });
+        return result;
     }
 
     /// Initialises an AES/CBC/PKCS7 Cipher under the Keystore probe key in
@@ -446,47 +397,88 @@ public final class AndroidBiometrics extends Biometrics {
         }
     }
 
-    static BiometricError mapBiometricPromptError(int code) {
+    /// Translates an Android biometric error code into the portable
+    /// [BiometricError]. One mapping for both backends: the `FINGERPRINT_ERROR_`
+    /// and `BIOMETRIC_ERROR_` constants are the same numbers in AOSP.
+    static BiometricError mapBiometricError(int code) {
         switch (code) {
-            case BIOMETRIC_ERROR_HW_UNAVAILABLE:
-            case BIOMETRIC_ERROR_HW_NOT_PRESENT:
+            case ERROR_HW_UNAVAILABLE:
+            case ERROR_HW_NOT_PRESENT:
                 return BiometricError.NOT_AVAILABLE;
-            case BIOMETRIC_ERROR_LOCKOUT:
+            case ERROR_UNABLE_TO_PROCESS:
+                // Also what the legacy backend reports once a finger has
+                // touched the sensor too many times without being recognised;
+                // FingerprintManager has no dedicated code for that.
+                return BiometricError.AUTHENTICATION_FAILED;
+            case ERROR_LOCKOUT:
                 return BiometricError.LOCKED_OUT;
-            case BIOMETRIC_ERROR_LOCKOUT_PERMANENT:
+            case ERROR_LOCKOUT_PERMANENT:
                 return BiometricError.PERMANENTLY_LOCKED_OUT;
-            case BIOMETRIC_ERROR_NO_BIOMETRICS:
+            case ERROR_NO_BIOMETRICS:
                 return BiometricError.NOT_ENROLLED;
-            case BIOMETRIC_ERROR_USER_CANCELED:
-            case BIOMETRIC_ERROR_NEGATIVE_BUTTON:
+            case ERROR_USER_CANCELED:
+            case ERROR_NEGATIVE_BUTTON:
                 return BiometricError.USER_CANCELED;
-            case BIOMETRIC_ERROR_CANCELED:
+            case ERROR_CANCELED:
                 return BiometricError.SYSTEM_CANCELED;
-            case BIOMETRIC_ERROR_NO_DEVICE_CREDENTIAL:
+            case ERROR_NO_DEVICE_CREDENTIAL:
                 return BiometricError.PASSCODE_NOT_SET;
             default:
                 return BiometricError.UNKNOWN;
         }
     }
 
-    static BiometricError mapFingerprintManagerError(int code) {
-        switch (code) {
-            case FingerprintManager.FINGERPRINT_ERROR_HW_UNAVAILABLE:
-            case FINGERPRINT_ERROR_HW_NOT_PRESENT:
-                return BiometricError.NOT_AVAILABLE;
-            case FingerprintManager.FINGERPRINT_ERROR_LOCKOUT:
-                return BiometricError.LOCKED_OUT;
-            case FingerprintManager.FINGERPRINT_ERROR_LOCKOUT_PERMANENT:
-                return BiometricError.PERMANENTLY_LOCKED_OUT;
-            case FINGERPRINT_ERROR_NO_FINGERPRINTS:
-                return BiometricError.NOT_ENROLLED;
-            case FingerprintManager.FINGERPRINT_ERROR_USER_CANCELED:
-                return BiometricError.USER_CANCELED;
-            case FingerprintManager.FINGERPRINT_ERROR_CANCELED:
-                return BiometricError.SYSTEM_CANCELED;
-            default:
-                return BiometricError.UNKNOWN;
+    /// The backend for this device, or `null` when neither package survived
+    /// into this build.
+    ///
+    /// Both are loaded by name because the modern one cannot be linked: it is
+    /// excluded from the port jar compile, and deleted from a generated
+    /// application whose `compileSdk` is below 30. The fallback to the legacy
+    /// backend is what covers such a build, and the legacy backend is loaded
+    /// the same way for symmetry rather than necessity.
+    private static BiometricBackend resolveBackend() {
+        Object instance = null;
+        if (Build.VERSION.SDK_INT >= 29) {
+            try {
+                // The class name is a literal AT the Class.forName call, not a
+                // parameter threaded into a shared helper. R8 keeps a class
+                // named by a constant string there and cannot see one that
+                // arrives through a variable, and a release build renaming
+                // these would leave the lookup failing with no biometrics and
+                // no error -- the same shape as the absence this catch treats
+                // as normal.
+                instance = Class.forName(
+                        "com.codename1.impl.android.biometrics.BiometricPromptBackend")
+                        .newInstance();
+            } catch (Throwable absent) {
+                // Only reachable on a build compiled below API 28, where
+                // BiometricPrompt does not exist and the builder deleted the
+                // package. Nothing the builder generates goes there, so in
+                // practice every device from API 29 up -- 37 included -- is
+                // served by BiometricPrompt.
+                instance = null;
+            }
         }
+        if (!(instance instanceof BiometricBackend) && Build.VERSION.SDK_INT >= 23) {
+            try {
+                instance = Class.forName(
+                        "com.codename1.impl.android.fingerprint.FingerprintBackend")
+                        .newInstance();
+            } catch (Throwable absent) {
+                // Not expected: the legacy backend goes through
+                // FingerprintManagerCompat and so compiles against every
+                // platform, and nothing deletes it. Kept because the load is
+                // by name and a rename or a stripped package must degrade
+                // rather than throw out of a static initialiser.
+                instance = null;
+            }
+        }
+        // Tested rather than cast inside the catch. A failed cast does not
+        // throw under ParparVM, so a catch around one is a handler that never
+        // runs, and scripts/check-cast-semantics.sh holds the whole tree --
+        // Android sources included -- to the guarded shape.
+        return instance instanceof BiometricBackend
+                ? (BiometricBackend) instance : null;
     }
 
     @Override
@@ -506,6 +498,13 @@ public final class AndroidBiometrics extends Biometrics {
         });
         completeError(p, BiometricError.USER_CANCELED, "Authentication cancelled by app");
         return true;
+    }
+
+    /// The resolved backend, or `null` when this device and this build have
+    /// none. Shared with [AndroidSecureStorage], which prompts with the same
+    /// API for a different cipher.
+    static BiometricBackend backend() {
+        return BACKEND;
     }
 
     static void runOnUi(Runnable r) {

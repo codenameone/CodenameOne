@@ -191,8 +191,12 @@ fi
 
 PATCH_GRADLE_MODULES=(--app "$APP_BUILD_GRADLE")
 # A companion Wear build adds a second application module. It needs the same compileSdk pin as
-# the phone one: unpinned it picks the newest platform on the runner, and an API the port still
-# compiles against can be gone there (FingerprintManager is absent from API 37).
+# the phone one, so that both modules compile against the platform this job installs rather than
+# whichever one happens to be newest on the runner. AGP 8.13.2 is tested up to 36 and only warns
+# above it, and the suite's targetSdk-dependent behaviour is what the screenshots were taken
+# against, so the pin is about reproducibility. It is NOT a workaround for API 37 any more:
+# the port no longer names FingerprintManager (see pruneBiometricSourcesForCompileSdk), and a
+# compileSdk 37 / targetSdk 37 build of this sample was verified by hand.
 WEAR_BUILD_GRADLE="$GRADLE_PROJECT_DIR/wear/build.gradle"
 if [ -f "$WEAR_BUILD_GRADLE" ]; then
   ba_log "Wear module present; pinning its SDK levels too"

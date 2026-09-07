@@ -22,10 +22,8 @@
  */
 package com.codename1.impl.android;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.hardware.fingerprint.FingerprintManager;
 import android.os.Build;
 import android.os.CancellationSignal;
 import android.security.keystore.KeyGenParameterSpec;
@@ -665,8 +663,9 @@ public final class AndroidSecureStorage extends SecureStorage {
 
     /**
      * Generic helper that initialises the cipher under the keystore key,
-     * prompts the user via {@code BiometricPrompt} (or legacy
-     * {@code FingerprintManager}), and on success runs the supplied
+     * prompts the user through {@link BiometricBackend} -- whichever of
+     * {@code BiometricPrompt} and the legacy {@code FingerprintManager} this
+     * device and this build have -- and on success runs the supplied
      * {@link CipherWork} against the authenticated cipher.
      */
     private <V> void runAuthenticatedCipher(final String reason, final String account,
@@ -707,16 +706,17 @@ public final class AndroidSecureStorage extends SecureStorage {
         // Carried as a parameter from here on. It belongs to this operation and to no
         // other, which is what stops a concurrent call from handing its cipher to this
         // prompt.
-        if (Build.VERSION.SDK_INT >= 29) {
-            promptBiometric29(reason, mode, account, result, work, operationCipher);
-        } else {
-            promptBiometricLegacy(mode, account, operationCipher, result, work);
-        }
+        promptBiometric(reason, mode, account, result, work, operationCipher);
     }
 
-    private <V> void promptBiometric29(final String reason, final int mode, final String account,
-                                       final AsyncResource<V> result, final CipherWork<V> work,
-                                       final Cipher operationCipher) {
+    private <V> void promptBiometric(final String reason, final int mode, final String account,
+                                     final AsyncResource<V> result, final CipherWork<V> work,
+                                     final Cipher operationCipher) {
+        final BiometricBackend backend = AndroidBiometrics.backend();
+        if (backend == null) {
+            failResult(result, BiometricError.NOT_AVAILABLE, "No biometric hardware");
+            return;
+        }
         AndroidBiometrics.runOnUi(new Runnable() {
             @Override
             public void run() {
@@ -725,74 +725,35 @@ public final class AndroidSecureStorage extends SecureStorage {
                 }
                 final CancellationSignal cs = new CancellationSignal();
                 cancellationSignal = cs;
-                BiometricsApi29.authenticateWithCipher(
-                        AndroidNativeUtil.getActivity(),
+                backend.authenticate(AndroidNativeUtil.getActivity(),
                         reason == null ? "Authenticate" : reason,
                         null, null, "Cancel",
-                        operationCipher,
-                        cs,
-                        new BiometricsApi29.CipherAuthCallback() {
+                        operationCipher, cs, new BiometricBackend.Callback() {
                             @Override
-                            public void onSuccess(Object authedCipher) {
+                            public void onSuccess(Cipher authedCipher) {
                                 cs.cancel();
-                                runCipherWork((Cipher) authedCipher, work, result, mode, account);
+                                if (authedCipher == null) {
+                                    // The OS reported success without handing
+                                    // back the CryptoObject we passed in, so
+                                    // nothing proves a real unlock happened.
+                                    failResult(result, BiometricError.AUTHENTICATION_FAILED,
+                                            "Authenticated cipher missing -- "
+                                                    + "biometric success may have been spoofed");
+                                    return;
+                                }
+                                runCipherWork(authedCipher, work, result, mode, account);
                             }
 
                             @Override
                             public void onError(int errorCode, String errString) {
+                                // See AndroidBiometrics: the legacy backend can
+                                // report failure with the sensor still armed.
+                                cs.cancel();
                                 failResult(result,
-                                        AndroidBiometrics.mapBiometricPromptError(errorCode),
+                                        AndroidBiometrics.mapBiometricError(errorCode),
                                         errString == null ? "" : errString);
                             }
                         });
-            }
-        });
-    }
-
-    private <V> void promptBiometricLegacy(final int mode, final String account,
-                                           final Cipher operationCipher,
-                                           final AsyncResource<V> result, final CipherWork<V> work) {
-        AndroidBiometrics.runOnUi(new Runnable() {
-            @Override
-            public void run() {
-                FingerprintManager fpm = (FingerprintManager)
-                        AndroidNativeUtil.getActivity()
-                                .getSystemService(Activity.FINGERPRINT_SERVICE);
-                if (fpm == null) {
-                    failResult(result, BiometricError.NOT_AVAILABLE, "No fingerprint hardware");
-                    return;
-                }
-                if (cancellationSignal != null) {
-                    cancellationSignal.cancel();
-                }
-                final CancellationSignal cs = new CancellationSignal();
-                cancellationSignal = cs;
-                FingerprintManager.CryptoObject crypto =
-                        new FingerprintManager.CryptoObject(operationCipher);
-                fpm.authenticate(crypto, cs, 0, new FingerprintManager.AuthenticationCallback() {
-                    int failures;
-
-                    @Override
-                    public void onAuthenticationError(int errorCode, CharSequence errString) {
-                        failResult(result, AndroidBiometrics.mapFingerprintManagerError(errorCode),
-                                errString == null ? "" : errString.toString());
-                    }
-
-                    @Override
-                    public void onAuthenticationSucceeded(FingerprintManager.AuthenticationResult r) {
-                        cs.cancel();
-                        runCipherWork(r.getCryptoObject().getCipher(), work, result, mode, account);
-                    }
-
-                    @Override
-                    public void onAuthenticationFailed() {
-                        if (failures++ > 5) {
-                            cs.cancel();
-                            failResult(result, BiometricError.AUTHENTICATION_FAILED,
-                                    "Authentication failed");
-                        }
-                    }
-                }, null);
             }
         });
     }

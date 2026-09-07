@@ -1262,7 +1262,7 @@ public class BufferedGraphics extends HTML5Graphics {
                 clipBoundsTracker.getX(), clipBoundsTracker.getY(),
                 clipBoundsTracker.getWidth(), clipBoundsTracker.getHeight(),
                 getRenderState().getColor(), getRenderState().getAlpha(),
-                getRenderState().getFont(), HTML5Implementation.getDevicePixelRatio());
+                getRenderState().getFont(), HTML5Implementation.devicePixelRatioValue());
     }
 
     @Override

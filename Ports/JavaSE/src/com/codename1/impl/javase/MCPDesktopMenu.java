@@ -47,7 +47,7 @@ import javax.swing.JRadioButtonMenuItem;
  *
  * The tools serve MCP over a loopback socket; {@link MCPStdioLauncher} bridges a host's
  * stdio to that socket, so "Install" makes the running tool drivable from stdio hosts such
- * as Claude Desktop, Codex and opencode.
+ * as Claude Desktop, Claude Code and Codex.
  */
 public final class MCPDesktopMenu {
     private static final int DEFAULT_PORT = 8765;
@@ -155,7 +155,9 @@ public final class MCPDesktopMenu {
     private static void doInstall(String toolName, Component anchor) {
         try {
             MCPClientRegistrar registrar = MCPClientRegistrar.getInstance();
-            List<MCPClientRegistrar.MCPClient> updated = registrar.register(bridgeDescriptor(toolName));
+            List<MCPClientRegistrar.MCPClient> detected = registrar.detectClients();
+            List<MCPClientRegistrar.MCPClient> updated =
+                    registrar.register(bridgeDescriptor(toolName), detected);
             StringBuilder sb = new StringBuilder();
             if (updated.isEmpty()) {
                 sb.append("No auto-configurable MCP hosts were found.\n")
@@ -167,6 +169,8 @@ public final class MCPDesktopMenu {
                 }
                 sb.append("\nRestart the host and this tool will appear as an MCP server.");
             }
+            appendSkipped(sb, detected, updated,
+                    "Its configuration was left untouched; the log says why.");
             JOptionPane.showMessageDialog(anchor, sb.toString(), "MCP Install", JOptionPane.INFORMATION_MESSAGE);
         } catch (Throwable t) {
             JOptionPane.showMessageDialog(anchor, "Install failed: " + t.getMessage(),
@@ -174,13 +178,63 @@ public final class MCPDesktopMenu {
         }
     }
 
+    /// Names the hosts that could be written to and were not, so a refusal to rewrite a
+    /// configuration the registrar could not safely edit reaches the user instead of only
+    /// the log. Hosts that need manual configuration are listed by "Detect MCP Hosts" and
+    /// are not failures, so they are left out.
+    private static void appendSkipped(StringBuilder sb, List<MCPClientRegistrar.MCPClient> detected,
+                                      List<MCPClientRegistrar.MCPClient> updated, String why) {
+        StringBuilder skipped = new StringBuilder();
+        for (int i = 0; i < detected.size(); i++) {
+            MCPClientRegistrar.MCPClient client = detected.get(i);
+            if (!client.isWritable() || containsId(updated, client.getId())) {
+                continue;
+            }
+            skipped.append("  ").append(client.getDisplayName())
+                    .append(" (").append(client.getConfigPath()).append(")\n");
+        }
+        if (skipped.length() == 0) {
+            return;
+        }
+        if (sb.length() > 0) {
+            sb.append("\n\n");
+        }
+        sb.append("Not updated:\n\n").append(skipped).append('\n').append(why);
+    }
+
+    private static boolean containsId(List<MCPClientRegistrar.MCPClient> clients, String id) {
+        for (int i = 0; i < clients.size(); i++) {
+            if (clients.get(i).getId().equals(id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static void doUninstall(String toolName, Component anchor) {
         try {
             List<MCPClientRegistrar.MCPClient> updated =
                     MCPClientRegistrar.getInstance().unregister(serverName(toolName));
-            String msg = updated.isEmpty() ? "No matching MCP host entries were found."
-                    : "Removed '" + serverName(toolName) + "' from " + updated.size() + " host(s).";
-            JOptionPane.showMessageDialog(anchor, msg, "MCP Remove", JOptionPane.INFORMATION_MESSAGE);
+            StringBuilder sb = new StringBuilder();
+            if (updated.isEmpty()) {
+                // Deliberately not "no matching entries were found": an empty result also
+                // covers a host whose config the registrar refused to rewrite, and the two
+                // are indistinguishable from here. Nor does this list the hosts that were
+                // not updated, the way Install does - on removal that set is every host
+                // the tool was never registered with, so naming them would report the
+                // normal case as a failure. The log says which host was refused and why.
+                sb.append("Nothing was removed.\n")
+                        .append("Either '").append(serverName(toolName))
+                        .append("' was not registered with any host, or a host's ")
+                        .append("configuration could not be edited - see the log.");
+            } else {
+                sb.append("Removed '").append(serverName(toolName)).append("' from:\n\n");
+                for (int i = 0; i < updated.size(); i++) {
+                    sb.append("  ").append(updated.get(i).getDisplayName()).append('\n');
+                }
+                sb.append("\nRestart the host for the change to take effect.");
+            }
+            JOptionPane.showMessageDialog(anchor, sb.toString(), "MCP Remove", JOptionPane.INFORMATION_MESSAGE);
         } catch (Throwable t) {
             JOptionPane.showMessageDialog(anchor, "Remove failed: " + t.getMessage(),
                     "MCP Remove", JOptionPane.ERROR_MESSAGE);

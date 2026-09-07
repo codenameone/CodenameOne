@@ -845,6 +845,26 @@ public class Component implements Animation, StyleListener, Editable {
         }
     }
 
+    /// Bits recording which scroll-behaviour defaults the caller has set explicitly, so
+    /// [#initLaf] leaves those alone.
+    ///
+    /// initLaf runs from the constructor, from refreshTheme and - the one that used to
+    /// bite - from `Form#show`, which walks the whole hierarchy. Anything set between
+    /// building a component and showing its Form was therefore reverted to the look and
+    /// feel's default without a word: `setScrollVisible(false)` in particular came back
+    /// as true and painted a scrollbar the caller had explicitly turned off.
+    private byte lafOverrides;
+
+    private static final byte LAF_SCROLL_VISIBLE = 1;
+    private static final byte LAF_TENSILE_DRAG = 2;
+    private static final byte LAF_SNAP_TO_GRID = 4;
+    private static final byte LAF_ALWAYS_TENSILE = 8;
+    private static final byte LAF_TENSILE_LENGTH = 16;
+
+    private boolean lafOverridden(byte bit) {
+        return (lafOverrides & bit) != 0;
+    }
+
     /// This method initializes the Component defaults constants
     protected void initLaf(UIManager uim) {
         if (uim == getUIManager() && isInitialized()) { //NOPMD CompareObjectsWithEquals
@@ -855,17 +875,27 @@ public class Component implements Animation, StyleListener, Editable {
         animationSpeed = laf.getDefaultSmoothScrollingSpeed();
         rtl = laf.isRTL();
         tactileTouch = isFocusable();
-        tensileDragEnabled = laf.isDefaultTensileDrag();
-        snapToGrid = laf.isDefaultSnapToGrid();
-        alwaysTensile = laf.isDefaultAlwaysTensile();
+        if (!lafOverridden(LAF_TENSILE_DRAG)) {
+            tensileDragEnabled = laf.isDefaultTensileDrag();
+        }
+        if (!lafOverridden(LAF_SNAP_TO_GRID)) {
+            snapToGrid = laf.isDefaultSnapToGrid();
+        }
+        if (!lafOverridden(LAF_ALWAYS_TENSILE)) {
+            alwaysTensile = laf.isDefaultAlwaysTensile();
+        }
         tensileHighlightEnabled = laf.isDefaultTensileHighlight();
         scrollOpacityChangeSpeed = laf.getFadeScrollBarSpeed();
-        isScrollVisible = laf.isScrollVisible();
+        if (!lafOverridden(LAF_SCROLL_VISIBLE)) {
+            isScrollVisible = laf.isScrollVisible();
+        }
 
-        if (tensileHighlightEnabled) {
-            tensileLength = 3;
-        } else {
-            tensileLength = -1;
+        if (!lafOverridden(LAF_TENSILE_LENGTH)) {
+            if (tensileHighlightEnabled) {
+                tensileLength = 3;
+            } else {
+                tensileLength = -1;
+            }
         }
     }
 
@@ -3164,6 +3194,13 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `g`: the component graphics
     protected void paintScrollbars(Graphics g) {
+        // isScrollVisible is what getBottomGap/getSideGap consult to decide whether to
+        // reserve room for a scrollbar, so painting one regardless left a component that
+        // had asked for no scrollbar with a scrollbar drawn OVER its content, in the
+        // space it was told it could use. A caller that turns the flag off means it.
+        if (!isScrollVisible()) {
+            return;
+        }
         if (isScrollableX()) {
             paintScrollbarX(g);
         }
@@ -5128,6 +5165,26 @@ public class Component implements Animation, StyleListener, Editable {
     public void pointerHover(int[] x, int[] y) {
     }
 
+    /// Stops any momentum or tensile scroll animation currently running on this component,
+    /// leaving the scroll position exactly where it is.
+    ///
+    /// This is for a component that wants to take over after the finger lifts and drive the
+    /// scroll itself - a paging/snapping container being the usual case. Codename One starts
+    /// its own decay from `#pointerReleased(int, int)`, so without this the component's own
+    /// animation and the built-in momentum both run, and the result is the scroll coasting
+    /// to a halt and then visibly moving a second time.
+    ///
+    /// Unlike `#clearDrag()` this affects only this component: an ancestor that is
+    /// legitimately scrolling on the other axis keeps its momentum.
+    ///
+    /// #### See also
+    ///
+    /// - #pointerReleased(int, int)
+    public void stopScrollMomentum() {
+        draggedMotionX = null;
+        draggedMotionY = null;
+    }
+
     void clearDrag() {
         Component leadParent = LeadUtil.leadParentImpl(this);
         if (leadParent != null && leadParent != this) { //NOPMD CompareObjectsWithEquals
@@ -6388,6 +6445,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `tensileDragEnabled`: true to enable tensile drag
     public void setTensileDragEnabled(boolean tensileDragEnabled) {
         this.tensileDragEnabled = tensileDragEnabled;
+        lafOverrides |= LAF_TENSILE_DRAG;
     }
 
     /// Returns text selection support object for this component.  Only used by
@@ -8386,6 +8444,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `isScrollVisible`: Indicate whether this component scroll is visible
     public void setScrollVisible(boolean isScrollVisible) {
         this.isScrollVisible = isScrollVisible;
+        lafOverrides |= LAF_SCROLL_VISIBLE;
     }
 
     /// Set whether this component scroll is visible
@@ -8398,7 +8457,12 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// replaced by setScrollVisible to match the JavaBeans spec
     public void setIsScrollVisible(boolean isScrollVisible) {
-        this.isScrollVisible = isScrollVisible;
+        // Straight through, so this stays a true alias. Setting the field alone
+        // left no override bit, and initLaf() then restored the look-and-feel
+        // default over it the next time the component was shown -- the two
+        // methods stopped behaving the same, which is the one thing a deprecated
+        // alias must not do.
+        setScrollVisible(isScrollVisible);
     }
 
     void lockStyleImages(Style stl) {
@@ -9107,6 +9171,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// [#1947](https://github.com/codenameone/CodenameOne/issues/1947).
     public void setSnapToGrid(boolean snapToGrid) {
         this.snapToGrid = snapToGrid;
+        lafOverrides |= LAF_SNAP_TO_GRID;
     }
 
     /// A component that might need side swipe such as the slider
@@ -9176,6 +9241,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `tensileLength`: length for tensile drag
     public void setTensileLength(int tensileLength) {
         this.tensileLength = tensileLength;
+        lafOverrides |= LAF_TENSILE_LENGTH;
     }
 
     Label getHintLabelImpl() {
@@ -9341,6 +9407,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `alwaysTensile`: the alwaysTensile to set
     public void setAlwaysTensile(boolean alwaysTensile) {
         this.alwaysTensile = alwaysTensile;
+        lafOverrides |= LAF_ALWAYS_TENSILE;
     }
 
     /// Indicates whether this component can be dragged in a drag and drop operation rather than scroll the parent

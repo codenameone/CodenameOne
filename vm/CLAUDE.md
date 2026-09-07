@@ -1,5 +1,111 @@
 # vm/ (ParparVM)
 
+## The compact HashMap: benchmark the MISS, not the hit
+
+`java.util.HashMap` here is open-addressed over three parallel arrays with linear probing
+and native C hot paths (`vm/JavaAPI/src/java/util/HashMap.java`,
+`vm/ByteCodeTranslator/src/nativeMethods.m`). Open addressing has a failure mode chaining
+does not, and it is invisible to any benchmark that only looks up keys that are present.
+
+`cn1Marker` spreads the hash with the JDK's `h ^= h >>> 16`, which was designed for a
+**chained** map, where colliding keys share a bucket and clustering costs nothing.
+`Integer.hashCode()` is the value itself, so under that spread a dense key range -- ids from
+zero, epoch seconds, counters, indices -- lands at `slot == value`, one contiguous run of
+occupied slots with no gap. Linear probing then walks that run end to end for any probe that
+enters it and does not find its key. Measured average probe length for a MISS:
+
+| entries | miss probes, `i + 1` | miss probes, perturbed |
+|---|---|---|
+| 20,000 | 2,547 | 1.39 |
+| 100,000 | 16,742 | 1.53 |
+| 1,000,000 | 222,721 | 1.98 |
+
+That is **O(n) per unsuccessful lookup**, and it reaches `get` returning null, `containsKey`
+returning false, and `put` of a key not adjacent to the run. In wall time on this Mac, 3M
+`containsKey` calls against a 100k-entry map took **32.7 seconds**, against 49.9ms on
+HotSpot -- 655x. A remove/insert churn shape took 7.8 seconds against 12.5ms.
+
+**Hits stayed at exactly one probe the whole time.** `hashMapChurn` in `CommonWorkloads` is
+get+put on keys that are present, so it reported a healthy 1.12x throughout. That is the
+lesson worth keeping: for an open-addressed table, a hit-only benchmark cannot see the
+defect that matters, and neither can a checksum.
+
+The fix is the probe SEQUENCE, not the spread (`cn1NextSlot` / `cn1HmNextSlot`, CPython's
+dict recurrence). Scrambling the hash instead was tried first and is the wrong trade: it
+fixes the miss but destroys the sequential placement, and dense-key **build** and **scan**
+shapes regressed 1.8x-2.2x, because inserting keys 0..n in ascending slot order is a
+sequential memory walk and HotSpot's `HashMap` gets the same benefit from the same weak
+spread. Keeping the first probe at `marker & mask` and perturbing only the steps after it
+keeps that locality and still leaves the run immediately.
+
+Residual cost, measured interleaved best-of-N: `largeTable` (1M-entry map, random hits) 1.26x
+and `hashMapChurn` 1.07x, against 728x and 471x the other way; `vm/benchmarks` geomean moved
+1.005, i.e. not at all. `MapTorture` stays bit-identical.
+
+`vm/benchmarks/src/com/bench/MapBench.java` is the suite that found this -- miss-heavy,
+String-keyed, large-table, tombstone-heavy, grow-dominated and identity-keyed shapes. It is
+deliberately NOT in `CommonWorkloads`, because
+`scripts/hellocodenameone/conformance/port_status.py` requires exactly ten benchmark ids
+there.
+
+### The growth rule assumed a load factor it never checked
+
+All three compact maps decided whether to double or to rebuild-in-place with
+`elementCount * 2 >= capacity`. That is a capacity test standing in for a threshold
+test, and it silently assumes a load factor of 0.5 or more. Below that the threshold is
+reached while the table is still less than half full, so the rebuild keeps the same
+capacity, the rebuilt table is immediately at its threshold again, and **every
+subsequent put rebuilds the whole table**. Inserting 20000 entries at a load factor of
+0.25 cost 19999 rebuilds and 200 million rehashed entries -- **22.3 seconds against
+16.4ms once fixed, 1362x**. The two-argument constructors accept any positive load
+factor, so `new HashMap<>(16, 0.25f)` reached it from ordinary code.
+
+The rule is `elementCount >= threshold` -- grow when the LIVE count has reached the
+threshold, and rebuild at the same size only when the threshold was reached because of
+tombstones. At 0.75 and 0.5 the two rules agree rebuild for rebuild, which is why no
+existing benchmark or torture moved, and why none of them could have caught it:
+`MapBench.lowLoadFactorBuild` and `HtTorture`'s `sparse` case exist for this alone.
+
+### The neighbours
+
+`java.util.Hashtable` has since been given the same compact layout (open addressed, no
+`Entry` per mapping, the same perturbed probe). Build got 1.74x faster. **Lookup only got
+1.09x**, and the reason is worth knowing: with identical probe code, `Hashtable` is still 3x
+`HashMap` on the same workload, and the difference is `synchronized`. ParparVM keeps monitors
+in an address-keyed side table (`CN1MonitorEntry`, 4096 buckets in `cn1_globals.m`) rather
+than an object header word, so an uncontended `synchronized` accessor costs roughly 23ns --
+which is more than the entire lookup. Do not look for more in the map; look at the monitor.
+
+`java.util.IdentityHashMap` also got fixed, and it is the cautionary tale of the group.
+**Do not port HotSpot's hash function to this VM.** Its `identityHashCode` is a scrambled
+per-object value; ours is a truncated object ADDRESS, measured 32-byte aligned (five always-zero
+low bits). `java.util.IdentityHashMap` indexes with `(h << 1) - (h << 8)`, i.e. `h * -254` --
+an EVEN multiplier, which preserves those zeros and adds a sixth. Copying it reached 2045
+distinct home slots out of 65536 and 12.73 probes per lookup, and made the class measurably
+SLOWER than the unscrambled modulo it replaced. What works is folding the high half down
+first (`h ^= h >>> 16`), which reached 50000/65536 home slots and 1.00 probes. An extra
+multiply on top made it worse again (2.36 probes): sequentially allocated objects have
+sequentially increasing addresses, so one fold is already near a perfect hash and scrambling
+it re-randomizes near-perfect placement into collisions. Net 2.65x on both lookup and build.
+`vm/benchmarks/src/com/bench/IdmProbe.java` is the diagnostic that settled this; it must run
+ON the target, because the input distribution is a property of the allocator.
+
+`LinkedHashMap` inherits the compact layout but overrides `get`/`put`/`remove`/`clear` in
+Java rather than native (the natives are deliberately base-class-only), which measures 1.21x
+over `HashMap` on the same shape. Still open. Note #5658 already fixed a different
+`LinkedHashMap` cost -- the `CompactEntry` allocated per insertion to feed `removeEldestEntry`
+-- so do not confuse the two.
+
+### A trap in the benchmark target itself
+
+A null receiver is a hard SIGSEGV on the `clean` target these benchmarks and tortures run on,
+not a `NullPointerException`. On iOS it IS an NPE, but only because the port installs a
+SIGSEGV handler (`installSignalHandlers` in `CodenameOne_GLAppDelegate.m`); the clean and
+desktop targets install nothing, as `cn1ThrowNullPointerOrDie`'s comment in `cn1_globals.h`
+says. So `Hashtable.get(null)` -- which reaches `key.hashCode()` -- crashes the harness with
+no output and exit 139. A torture cannot assert on null-receiver NPEs; only on the explicit
+`throw new NullPointerException()` paths.
+
 ## GC memory: measure the steady state, not the peak
 
 Every GC workload in `vm/tests` measures a **peak under load**, and a peak cannot express

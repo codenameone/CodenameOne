@@ -13,7 +13,7 @@ Every desktop Codename One tool, including the simulator and Codename One Settin
 The menu has these items:
 
 - *Expose This Tool To Agents* starts and stops the loopback MCP server for the running tool.
-- *Install in MCP Hosts* registers this tool with the MCP hosts detected on the machine, such as Claude Desktop, Claude Code, Codex, and opencode. After a host restarts, the tool appears as an MCP server the agent can use.
+- *Install in MCP Hosts* registers this tool with the MCP hosts detected on the machine: Claude Desktop, Claude Code, and Codex. After a host restarts, the tool appears as an MCP server the agent can use. A detected host whose configuration format isn't supported yet is reported rather than written to.
 - *Remove From MCP Hosts* removes that registration.
 - *Detect MCP Hosts* lists the hosts found on the machine and where their configuration lives.
 - *Debug Logging* controls how much of the MCP conversation is echoed to the log.
@@ -95,4 +95,14 @@ The levels of `MCPVerbosity` are, from quietest to loudest: `OFF`, `ERRORS` (onl
 
 The Install and Remove items in the MCP menu call `MCPClientRegistrar`, which detects the MCP hosts installed on the machine and writes a server entry into each host configuration, so an end user doesn't edit configuration by hand. Detection and registration are available to any Codename One tool, and they run inside the runtime because they use the portable `FileSystemStorage`.
 
-A caller describes the server with an `MCPClientDescriptor` (a name and the command that launches it) and registers it with the detected hosts. Hosts whose configuration format isn't yet supported are reported so the user can add the entry manually.
+A caller describes the server with an `MCPClientDescriptor` (a name and the command that launches it) and registers it with the detected hosts. Hosts whose configuration format isn't yet supported are reported so the user can add the entry manually. `opencode` is the one that's left: it nests its servers in an `mcp` block whose entries have a shape of their own.
+
+Claude Desktop and Claude Code keep their servers in a JSON `mcpServers` object. Codex keeps its own in `~/.codex/config.toml`, as one `[mcp_servers.<name>]` table per server, and that file is shared by the ChatGPT desktop app, the Codex CLI, and the Codex IDE extension, so registering once reaches all three.
+
+The default path is the one that's used. If you've moved your Codex configuration with `CODEX_HOME`, add the entry there by hand: the registrar runs inside the Codename One runtime, which has no `System.getenv`, so it can't follow the variable.
+
+The TOML file is edited as text rather than parsed and written back. Only the lines belonging to the one server are replaced, so every other server, setting, comment, and choice of formatting in the file survives the edit exactly as the user left it, and the file keeps its own line endings. Registering again replaces the entry instead of adding a second one, and removing takes the server's `env` sub-table with it.
+
+A configuration the editor can't make sense of is left untouched, and the reason is logged. That covers a file that isn't valid TOML, and the shapes it won't rewrite: the server declared through a dotted key or an inline table, `mcp_servers` declared as an array of tables, or the same server declared twice. Losing a Codex configuration is a worse outcome than not registering.
+
+The host reads its configuration at startup, so a host that's already running needs a restart before the new server appears.
