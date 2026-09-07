@@ -80,15 +80,23 @@ public final class Float extends Number implements Comparable<Float> {
      * Returns the value of this Float as a byte (by casting to a byte).
      */
     public byte byteValue(){
-        return (byte)value; 
+        return (byte)cn1Value();
     }
 
     /**
      * Returns the double value of this Float object.
      */
     public double doubleValue(){
-        return value;
+        return cn1Value();
     }
+
+    /**
+     * Returns this Float's value, transparently handling both heap-allocated and
+     * tagged-immediate representations. All value reads route here -- Float is final, so a
+     * plain `return value;` getter would be inlined into a raw field load off a tagged
+     * pointer, which has no fields.
+     */
+    private native float cn1Value();
 
     /**
      * Compares this object against some other object. The result is true if and only if the argument is not null and is a Float object that represents a float that has the identical bit pattern to the bit pattern of the float represented by this object. For this purpose, two float values are considered to be the same if and only if the method
@@ -98,7 +106,7 @@ public final class Float extends Number implements Comparable<Float> {
      * also has the value true. However, there are two exceptions: If f1 and f2 both represent Float.NaN, then the equals method returns true, even though Float.NaN==Float.NaN has the value false. If f1 represents +0.0f while f2 represents -0.0f, or vice versa, the equal test has the value false, even though 0.0f==-0.0f has the value true. This definition allows hashtables to operate properly.
      */
     public boolean equals(java.lang.Object obj){
-        return obj != null && obj.getClass() == getClass() && floatToIntBits(((Float)obj).value) == floatToIntBits(value);
+        return obj != null && obj.getClass() == getClass() && floatToIntBits(((Float)obj).cn1Value()) == floatToIntBits(cn1Value());
     }
 
     /**
@@ -111,7 +119,7 @@ public final class Float extends Number implements Comparable<Float> {
      * Returns the float value of this Float object.
      */
     public float floatValue(){
-        return value; 
+        return cn1Value();
     }
 
     /**
@@ -119,7 +127,7 @@ public final class Float extends Number implements Comparable<Float> {
      * , of the primitive float value represented by this Float object.
      */
     public int hashCode(){
-        return floatToIntBits(value);
+        return floatToIntBits(cn1Value());
     }
 
     /**
@@ -137,14 +145,14 @@ public final class Float extends Number implements Comparable<Float> {
      * Returns the integer value of this Float (by casting to an int).
      */
     public int intValue(){
-        return (int)value;
+        return (int)cn1Value();
     }
 
     /**
      * Returns true if this Float value is infinitely large in magnitude.
      */
     public boolean isInfinite(){
-        return isInfinite(value);
+        return isInfinite(cn1Value());
     }
 
     /**
@@ -163,7 +171,8 @@ public final class Float extends Number implements Comparable<Float> {
      * Returns true if this Float value is Not-a-Number (NaN).
      */
     public boolean isNaN(){
-        return value != value; 
+        float cn1v = cn1Value();
+        return cn1v != cn1v;
     }
 
     /**
@@ -177,7 +186,7 @@ public final class Float extends Number implements Comparable<Float> {
      * Returns the long value of this Float (by casting to a long).
      */
     public long longValue(){
-        return (long)value; 
+        return (long)cn1Value();
     }
 
     /**
@@ -191,14 +200,14 @@ public final class Float extends Number implements Comparable<Float> {
      * Returns the value of this Float as a short (by casting to a short).
      */
     public short shortValue(){
-        return (short)value;
+        return (short)cn1Value();
     }
 
     /**
      * Returns a String representation of this Float object. The primitive float value represented by this object is converted to a String exactly as if by the method toString of one argument.
      */
     public java.lang.String toString() {
-        return toString(value);
+        return toString(cn1Value());
     }
 
     /**
@@ -210,12 +219,19 @@ public final class Float extends Number implements Comparable<Float> {
      */
     public static java.lang.String toString(float d){
         float m = Math.abs(d);
-        if ( d == POSITIVE_INFINITY ){
+        // The NaN and signed-zero branches mirror Double.toString, which has had both for a
+        // while; Float was never brought into line. Without the first, NaN fell through to
+        // the scientific-notation path (every comparison against a NaN is false); without
+        // the second, Float.toString(-0.0f) printed "0.0", losing the sign that
+        // Float.compare, Float.equals and Arrays.sort all still honour.
+        if (isNaN(d)) {
+            return "NaN";
+        } else if ( d == POSITIVE_INFINITY ){
             return "Infinity";
         } else if ( d == NEGATIVE_INFINITY ){
             return "-Infinity";
         } else if ( d == 0 ){
-            return "0.0";
+            return floatToIntBits(d) == NEGATIVE_ZERO_BITS ? "-0.0" : "0.0";
         } else if ( m >= 1e-3 && m < 1e7 ){
             String str = toStringImpl(d, false);
             char[] chars = str.toCharArray();
@@ -258,7 +274,11 @@ public final class Float extends Number implements Comparable<Float> {
      * @param i the primitive
      * @return object instance
      */
-    public static Float valueOf(float i) {
+    // Native so the tagged build can return an immediate without allocating. The off path
+    // (and 32-bit-pointer targets) calls valueOfHeap, preserving the previous behaviour.
+    public static native Float valueOf(float i);
+
+    static Float valueOfHeap(float i) {
         return new Float(i);
     }
     
@@ -282,6 +302,6 @@ public final class Float extends Number implements Comparable<Float> {
     }
 
     public int compareTo(Float another) {
-        return compare(value, another.value);
+        return compare(cn1Value(), another.cn1Value());
     }
 }

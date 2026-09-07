@@ -100,6 +100,36 @@ Two rules the workloads follow, and any addition must:
   allocates here (tagged immediates), so boxing inside the timed loop measures the
   allocator instead of the probe.
 
+## Tagged immediates (`BoxEdge`, `BoxBench`, `TagProbe`, `ab-tagged.sh`)
+
+`valueOf` on the six boxed number types returns an immediate with a type code in the low
+three bits rather than a heap object. Three drivers and an A/B script cover it; the design
+and the measured numbers are in `vm/CLAUDE.md`.
+
+```bash
+./ab-tagged.sh 6 BoxBench    # HEAP vs INT vs ALL, checksum-verified, + tag coverage
+./ab-tagged.sh 8 Bench       # the no-regression check on the common workloads
+./translate-and-build.sh TagProbe target/bin/TagProbe && ./target/bin/TagProbe
+```
+
+- **`BoxEdge`** is the correctness gate and runs in `run-gauntlet.sh`: all six types crossed
+  with tagged, heap-allocated, `null` and wrong-type receivers, over getClass / instanceof /
+  equals / hashCode / compareTo, the collections, NaN and both zeroes, monitors, and
+  Long/Double values chosen to fall OUTSIDE the taggable range so the heap fallback and the
+  mixed tagged/heap paths are exercised rather than assumed. It prints incrementally rather
+  than buffering, because a native crash on this target is a bare SIGSEGV and the last line
+  emitted is the only locator there is.
+- **`BoxBench`** is the perf driver, and prints a `COVERAGE` line beside its timings.
+  `Long` and `Double` are only PARTIALLY representable, so a speedup with no coverage figure
+  next to it says nothing about real data -- read both or neither.
+- **`TagProbe`** is a diagnostic, not a torture: it reports the encoding, asserts that every
+  real object is 8-byte aligned on every allocation path, and reports coverage. Its output is
+  target-specific and is deliberately not compared to a host JVM. It is valid in all three
+  ablation arms.
+- **`ab-tagged.sh`** takes an optional driver argument (default `BoxBench`). Arm `INT` --
+  Integer-only tagging, what shipped before the other five -- is the baseline worth reading
+  against; `HEAP` vs `INT` only re-measures a win that was already taken.
+
 ## The tortures (run by `run-gauntlet.sh`)
 
 | test | guards |

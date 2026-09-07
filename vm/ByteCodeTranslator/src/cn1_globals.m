@@ -9975,9 +9975,19 @@ extern void cn1NurseryPromote(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
 #endif
 
 #if CN1_TAGGED_ACTIVE
-// Object-shaped proxy whose header is Integer's class; see CN1_CLASS_OF in cn1_globals.h.
-// Lets a tagged Integer resolve to Integer without dereferencing the tagged pointer.
-struct JavaObjectPrototype cn1TaggedProxy = { .__codenameOneParentClsReference = &class__java_lang_Integer };
+// Object-shaped proxies indexed by tag code; see cn1ClassOf in cn1_globals.h. They let a
+// tagged immediate resolve to its boxed class without dereferencing the tagged pointer.
+// Slot 0 is never selected (code 0 means "an ordinary heap pointer" and cn1ClassOf takes
+// the object itself), and the slots for codes with no tagged type yet stay zero, which is
+// unreachable for the same reason: nothing produces those codes.
+struct JavaObjectPrototype cn1TaggedProxy[CN1_TAG_COUNT] = {
+    [CN1_TAG_INTEGER]   = { .__codenameOneParentClsReference = &class__java_lang_Integer },
+    [CN1_TAG_LONG]      = { .__codenameOneParentClsReference = &class__java_lang_Long },
+    [CN1_TAG_DOUBLE]    = { .__codenameOneParentClsReference = &class__java_lang_Double },
+    [CN1_TAG_FLOAT]     = { .__codenameOneParentClsReference = &class__java_lang_Float },
+    [CN1_TAG_CHARACTER] = { .__codenameOneParentClsReference = &class__java_lang_Character },
+    [CN1_TAG_SHORT]     = { .__codenameOneParentClsReference = &class__java_lang_Short }
+};
 #endif
 
 #if !defined(CN1_DISABLE_BIBOP) && !defined(CN1_BIBOP_NO_FASTSWEEP)

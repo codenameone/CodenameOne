@@ -977,20 +977,107 @@ extern int instanceofFunction(int sourceClass, int destId);
 #define CN1_TAGGED_ACTIVE 0
 #endif
 extern struct clazz class__java_lang_Integer;
+extern struct clazz class__java_lang_Long;
+extern struct clazz class__java_lang_Double;
+extern struct clazz class__java_lang_Float;
+extern struct clazz class__java_lang_Character;
+extern struct clazz class__java_lang_Short;
+
+// The tag is the LOW THREE BITS of the word, and code 0 means "an ordinary heap pointer".
+// Three bits rather than one because 8-byte object alignment is ALREADY load-bearing:
+// cn1ConservativeResolve rejects any word with a bit set in (sizeof(void*) - 1), and
+// conservative roots are on by default, so an object living at a 4-byte address would
+// already be invisible to the root scan and freed under a live reference. Widening the tag
+// therefore rests on an invariant the collector enforces rather than introducing a new one,
+// and it buys one code per boxed type over a 61-bit payload.
+//
+// One code per type is what makes the immediate SELF-DESCRIBING, which is the whole point:
+// a value is boxed precisely because it is flowing through an Object / Number / Comparable
+// slot, so the callsite that has to dispatch hashCode() on it has no static type to consult.
+#define CN1_TAG_MASK      7
+#define CN1_TAG_SHIFT     3
+#define CN1_TAG_NONE      0
+#define CN1_TAG_INTEGER   1
+#define CN1_TAG_LONG      2
+#define CN1_TAG_DOUBLE    3
+#define CN1_TAG_FLOAT     4
+#define CN1_TAG_CHARACTER 5
+#define CN1_TAG_SHORT     6
+#define CN1_TAG_COUNT     8
+
+// Ablation arm for the five types added after Integer. It gates only the PRODUCTION side --
+// the valueOf natives -- and never the consumption side (cn1Value, the proxy table,
+// cn1ClassOf), so turning it off simply stops those immediates being created and cannot
+// leave the runtime half-taught about a tag it might still meet.
+#if !defined(CN1_DISABLE_TAGGED_VALUES)
+#define CN1_TAGGED_EXTRA_ACTIVE CN1_TAGGED_ACTIVE
+#else
+#define CN1_TAGGED_EXTRA_ACTIVE 0
+#endif
+
 #if CN1_TAGGED_ACTIVE
 struct JavaObjectPrototype;
-// A static object-shaped proxy whose header is Integer's class. CN1_CLASS_OF selects a
-// VALID object pointer (proxy for a tagged int, else the object itself) BEFORE the single
-// header load, so clang's if-conversion can branchlessly select the pointer yet the load
-// is always on a dereferenceable address -- a plain ternary lets clang speculate the
-// faulting `tagged->header` load above the tag test (observed: a SIGSEGV in interface
-// dispatch like Comparable.compareTo, where no inline fast path guards it first).
-extern struct JavaObjectPrototype cn1TaggedProxy;
-#define CN1_IS_TAGGED(o) (((uintptr_t)(o)) & 1)
-#define CN1_TAG_INT(v) ((JAVA_OBJECT)((((uintptr_t)(intptr_t)(JAVA_INT)(v)) << 1) | 1))
-#define CN1_UNTAG_INT(o) ((JAVA_INT)(((intptr_t)(o)) >> 1))
-#define CN1_CLASS_OF(o) ((CN1_IS_TAGGED(o) ? &cn1TaggedProxy : (struct JavaObjectPrototype*)(o))->__codenameOneParentClsReference)
+// Static object-shaped proxies, one per tag code, each carrying its boxed class in the
+// header slot. cn1ClassOf selects a VALID object pointer (this code's proxy, else the object
+// itself) BEFORE the single header load, so clang's if-conversion can branchlessly select
+// the pointer yet the load is always on a dereferenceable address -- a plain ternary lets
+// clang speculate the faulting `tagged->header` load above the tag test (observed: a SIGSEGV
+// in interface dispatch like Comparable.compareTo, where no inline fast path guards it
+// first). Do not "simplify" this back into a conditional over the loaded value.
+//
+// Indexing by tag code costs an address computation and NOT a memory access, because the
+// proxies are one contiguous array: &cn1TaggedProxy[code] is a shifted add on both arm64 and
+// x86-64. That is the entire runtime price of knowing which boxed type an immediate is.
+extern struct JavaObjectPrototype cn1TaggedProxy[CN1_TAG_COUNT];
+#define CN1_TAG_CODE(o) (((uintptr_t)(o)) & CN1_TAG_MASK)
+#define CN1_IS_TAGGED(o) (CN1_TAG_CODE(o) != 0)
+// A function rather than a macro so the argument is evaluated exactly once; every caller
+// passes an lvalue, but SP[-1].data.o through a volatile SP would otherwise be three loads.
+static inline struct clazz* cn1ClassOf(JAVA_OBJECT o) {
+    uintptr_t cn1__code = ((uintptr_t)o) & CN1_TAG_MASK;
+    struct JavaObjectPrototype* cn1__p = cn1__code ? &cn1TaggedProxy[cn1__code]
+                                                   : (struct JavaObjectPrototype*)o;
+    return cn1__p->__codenameOneParentClsReference;
+}
+#define CN1_TAG_INT(v) ((JAVA_OBJECT)((((uintptr_t)(intptr_t)(JAVA_INT)(v)) << CN1_TAG_SHIFT) | CN1_TAG_INTEGER))
+#define CN1_UNTAG_INT(o) ((JAVA_INT)(((intptr_t)(o)) >> CN1_TAG_SHIFT))
+
+// Short and Character are narrower than int and always fit. The arithmetic shift recovers
+// the sign correctly across the OR'd tag because the tag occupies exactly the bits the left
+// shift zero-filled: -32768 tags to (-262144 | 6) and shifts back to -32768.
+#define CN1_TAG_SHORT_VAL(v) ((JAVA_OBJECT)((((uintptr_t)(intptr_t)(JAVA_SHORT)(v)) << CN1_TAG_SHIFT) | CN1_TAG_SHORT))
+#define CN1_UNTAG_SHORT(o) ((JAVA_SHORT)(((intptr_t)(o)) >> CN1_TAG_SHIFT))
+#define CN1_TAG_CHAR_VAL(v) ((JAVA_OBJECT)(((((uintptr_t)(JAVA_CHAR)(v)) & 0xFFFF) << CN1_TAG_SHIFT) | CN1_TAG_CHARACTER))
+#define CN1_UNTAG_CHAR(o) ((JAVA_CHAR)((((uintptr_t)(o)) >> CN1_TAG_SHIFT) & 0xFFFF))
+
+// A float is 32 bits, so its RAW bit pattern always fits. Raw, not canonicalized: the
+// immediate has to round-trip Float.floatToRawIntBits, and equals/hashCode canonicalize NaN
+// for themselves through floatToIntBits.
+#define CN1_TAG_FLOAT_BITS(b) ((JAVA_OBJECT)((((uintptr_t)(uint32_t)(b)) << CN1_TAG_SHIFT) | CN1_TAG_FLOAT))
+#define CN1_UNTAG_FLOAT_BITS(o) ((uint32_t)(((uintptr_t)(o)) >> CN1_TAG_SHIFT))
+
+// Long and Double are the two that do NOT always fit in the 61-bit payload, so both are
+// PARTIAL: the test below decides, and anything that fails it takes the ordinary heap path.
+// A partial scheme can look excellent on a benchmark and never fire on real data, so
+// whatever measures this has to report the hit rate rather than the speedup alone.
+//
+// Long: 61 signed bits, i.e. [-2^60, 2^60). Timestamps, ids, counters and sizes are far
+// inside it; a uniformly random 64-bit value is outside it seven times in eight.
+#define CN1_LONG_TAGGABLE(v) (((JAVA_LONG)(v)) >= -(((JAVA_LONG)1) << 60) && ((JAVA_LONG)(v)) < (((JAVA_LONG)1) << 60))
+#define CN1_TAG_LONG_VAL(v) ((JAVA_OBJECT)((((uintptr_t)(intptr_t)(JAVA_LONG)(v)) << CN1_TAG_SHIFT) | CN1_TAG_LONG))
+#define CN1_UNTAG_LONG(o) ((JAVA_LONG)(((intptr_t)(o)) >> CN1_TAG_SHIFT))
+
+// Double: a 64-bit pattern cannot be shifted at all, so instead of narrowing the value the
+// scheme narrows the SET -- a double whose low three mantissa bits are already zero carries
+// its own tag space, making tag an OR and untag a mask with no shifting and no value loss.
+// That set is every small integer, half, quarter and eighth (what JSON numbers overwhelmingly
+// are), and it excludes 0.1 and 3.14. -0.0 and +0.0 stay distinct, which Double.equals needs.
+#define CN1_DOUBLE_TAGGABLE_BITS(b) ((((uint64_t)(b)) & CN1_TAG_MASK) == 0)
+#define CN1_TAG_DOUBLE_BITS(b) ((JAVA_OBJECT)(((uintptr_t)(uint64_t)(b)) | CN1_TAG_DOUBLE))
+#define CN1_UNTAG_DOUBLE_BITS(o) ((uint64_t)(((uintptr_t)(o)) & ~((uintptr_t)CN1_TAG_MASK)))
+#define CN1_CLASS_OF(o) cn1ClassOf((JAVA_OBJECT)(o))
 #else
+#define CN1_TAG_CODE(o) (0)
 #define CN1_IS_TAGGED(o) (0)
 #define CN1_CLASS_OF(o) ((o)->__codenameOneParentClsReference)
 #endif
@@ -1203,9 +1290,13 @@ static inline JAVA_BOOLEAN cn1InNursery(void* p) {
 // check with no call and no getThreadLocalData() TLS lookup. This matters enormously
 // for store-heavy code (HashMap internals, etc.) and makes the barrier ~free whenever
 // the nursery isn't holding the value (including while bypassed).
+// The CN1_IS_TAGGED guard is not decoration: cn1NurseryWriteBarrier dereferences
+// value->__heapPosition, and a tagged immediate has no header. With a one-bit tag this
+// survived on cn1InNursery's range check happening to exclude small odd addresses; a tagged
+// Long or Double is an ordinary-looking large word that can land inside an arena.
 #define CN1_WRITE_BARRIER(target, value) \
     do { JAVA_OBJECT cn1__bv = (JAVA_OBJECT)(value); \
-         if(cn1__bv != JAVA_NULL && cn1InNursery(cn1__bv)) { \
+         if(cn1__bv != JAVA_NULL && !CN1_IS_TAGGED(cn1__bv) && cn1InNursery(cn1__bv)) { \
              cn1NurseryWriteBarrier((JAVA_OBJECT)(target), cn1__bv); } } while(0)
 #else
 // No nursery: repurpose the (already-emitted-at-every-object-store) write barrier as the

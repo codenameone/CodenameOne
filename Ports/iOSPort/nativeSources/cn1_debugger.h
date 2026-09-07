@@ -104,12 +104,15 @@ extern struct clazz* cn1_debugger_class_of(JAVA_OBJECT obj);
 extern int cn1_debugger_is_valid_object(JAVA_OBJECT obj);
 
 /**
- * Whether a reference is a tagged int rather than a heap object, and the value
- * it carries. A tagged int has no object header, so no caller may compute a
- * field address from one.
+ * Whether a reference is a tagged immediate of any boxed type rather than a heap
+ * object, and the value it carries. An immediate has no object header, so no caller
+ * may compute a field address from one. cn1_debugger_tagged_int_value answers only for
+ * a tagged Integer; cn1_debugger_tagged_value decodes every type into a JDWP type
+ * character plus a 64-bit payload (IEEE bits for float and double).
  */
-extern int cn1_debugger_is_tagged_int(JAVA_OBJECT obj);
+extern int cn1_debugger_is_tagged_value(JAVA_OBJECT obj);
 extern JAVA_INT cn1_debugger_tagged_int_value(JAVA_OBJECT obj);
+extern int cn1_debugger_tagged_value(JAVA_OBJECT obj, char* typeChar, uint64_t* value);
 
 /**
  * Records a reference as handed to the proxy, tests whether one was, and

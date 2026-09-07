@@ -15,7 +15,15 @@ J8="${JDK_8_HOME:?set JDK_8_HOME}"
 # TaggedSync guards Java monitor semantics on tagged boxed Integers (mutual
 # exclusion + wait/notify) -- regression test for the tagged monitorEnter/Exit
 # no-op bug a review caught.
-TORTURES="MapTorture IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync"
+#
+# BoxEdge is the gate for the tagged immediates as a whole: all six boxed types
+# (Integer/Long/Double/Float/Character/Short) crossed with tagged, heap-allocated,
+# null and wrong-type receivers, over getClass/instanceof/equals/hashCode/compareTo,
+# the collections, NaN and both zeroes, monitors, and Long/Double values chosen to
+# fall OUTSIDE the taggable range so the heap fallback is exercised rather than
+# assumed. It catches the failure this scheme makes easy -- a wrong class or a wrong
+# hash, returned silently with nothing thrown.
+TORTURES="MapTorture IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge"
 mkdir -p target/host-classes target/bin
 # FusedTest uses @com.codename1.annotations.Fused -- supply the annotation
 # source for the host compile (ParparVM's JavaAPI carries its own copy)
