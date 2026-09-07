@@ -67,32 +67,15 @@ instead. An app that implements a one-time nearby search with a persistent grant
 is subject to enforcement, which since it's a policy matter rather than a
 technical one shows up as a rejected update rather than a crash.
 
-Referencing `com.codename1.location.LocationButton` is the whole opt-in on the
-build side. The Android build then declares `USE_LOCATION_BUTTON`, adds the
-library that renders the control and raises `minSdkVersion` to 24, which the
-library requires. An app that never references the class sees no change at all.
+Google recommends this control for one-time location, and on Android it's a
+better experience than the permission dialog it replaces: the tap is the grant,
+so the user is never asked twice and the app never holds precise location for
+longer than the request that needed it.
 
-[NOTE]
-====
-The library that renders the system button is an experimental Jetpack artifact,
-and its metadata requires Android Gradle plugin 9.1.0, Gradle 9 and compile SDK
-37. Codename One's generated project is on Android Gradle plugin 8 with Gradle
-8, and the hosted build images carry platforms through android-36, so that
-library can't be resolved yet.
-
-None of that reaches your app. An Android build on the current toolchain
-simply uses the standard location API: `LocationButton` becomes an ordinary
-Codename One button that requests location permission the usual way -- the same
-fallback it already uses on every platform without the system control -- and the
-app builds and ships normally. Codename One skips the library, leaves
-`minSdkVersion` alone, and declares the ordinary location permissions so the
-button works.
-
-When Codename One moves to Android Gradle plugin 9 and compile SDK 37, the same
-code picks the system control up on its own. Write against `LocationButton`
-today and you get the platform button on Android 17 devices when the toolchain
-lands, without touching your app.
-====
+Using the class is the whole opt-in. The build adds whatever the platform
+control needs, the permission it grants included, and an app that never
+references it sees no change. Where the control ships it needs Android 7.0, so
+an app that uses one takes that as its minimum.
 
 There's one decision the build can't make for you.
 
@@ -118,12 +101,9 @@ calls `addGeoFencing` or `setBackgroundLocationListener`, or that declares
 background location, fails with a sentence naming the conflict rather than
 shipping a manifest that fights itself.
 
-On a build whose toolchain can't carry the system control, the hint is ignored
-rather than applied, and the build log says so. Exclusivity means the
-fine-location grant belongs to the button alone; with no system button that
-would be a permission nothing could ever grant, so the app gets the ordinary
-declaration instead. Keep the hint set -- it starts working, unchanged, on the
-toolchain that brings the button.
+The hint only ever means something where the system control is what grants
+precise location. Anywhere it isn't, the app gets the ordinary declaration and
+the button keeps working -- so the hint is safe to set once and leave set.
 
 === Migrating a One-Time `getCurrentLocationSync`
 
