@@ -394,8 +394,21 @@ class BibopPageFloorIntegrationTest {
         // stderr, and a merged write can land in the middle of a marker line --
         // observed as a phase silently missing from the table because its marker
         // had a tracer line spliced through it. The footprint columns are the
-        // evidence here; set CN1_LOG_PAGE_RELEASE=1 by hand when you want the
-        // per-sweep page counts alongside them.
+        // evidence here, and the per-sweep page counts go beside them.
+        //
+        // The tracer is turned on HERE rather than in the workflow, because the
+        // workflow's env reaches every test in the suite and these are timing
+        // sensitive: an extra stderr write per major sweep is not free in a
+        // verifier run, and scoping it to the one test that needs it keeps the
+        // others exactly as they were. It is read-only in any case -- gated on
+        // getenv, and it only prints -- so it changes no collection decision.
+        //
+        // Why it is on at all: this test fails intermittently on arm64 Linux, and
+        // bimodally (6-7% of a dropped live set's pages handed back against 91%
+        // on a good run) rather than marginally. Bimodal is a major sweep running
+        // or not, since cn1BibopTrimFreePool runs only at the end of one, so a
+        // failing run has to say whether one ran and what it spliced.
+        builder.environment().put("CN1_LOG_PAGE_RELEASE", "1");
         builder.redirectError(ProcessBuilder.Redirect.INHERIT);
         Process process = builder.start();
         String output;
