@@ -622,8 +622,12 @@ Here is a trivial hello world style `Button`:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava030Snippet.java[tag=the-components-of-codename-one-java-030,indent=0]
 ----
 
-.Simple button in the iOS styling, notice iOS doesn't have borders on buttons...
-image::img/components-button.png[Simple button in the iOS styling, notice iOS doesn't have borders on buttons...,scaledwidth=40%]
+The same three buttons under the two modern native themes. A button takes its
+shape, fill and font from the theme, so the platform difference costs no code:
+
+.The same buttons under iOS Modern (left) and Android Material (right)
+image:img/generated/components-button-ios.png[iOS Modern,scaledwidth=45%]
+image:img/generated/components-button-android.png[Android Material,scaledwidth=45%]
 
 Such a button can be styled to look like a link using code like this or by making these settings in the theme and using code such as `btn.setUIID("Hyperlink")`:
 

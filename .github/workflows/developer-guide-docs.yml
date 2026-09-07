@@ -85,6 +85,17 @@ jobs:
       - name: Render the build hint table
         run: scripts/gen-build-hint-table.sh
 
+      # The javase jar carries iOSModernTheme.res and AndroidMaterialTheme.res,
+      # which the figure renderer installs. They are copied in from Themes/ by an
+      # antrun step with failonerror=false, so if they have not been compiled the
+      # copy fails open and the jar ships without them -- and the renderer then
+      # dies on a theme resource that is simply absent. Compiling them first is
+      # what run-javase-simulator-integration-tests.sh already does, for the same
+      # reason.
+      - name: Compile the native themes
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        run: ./scripts/build-native-themes.sh
+
       - name: Install local Codename One Maven artifacts
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
@@ -122,7 +133,7 @@ jobs:
             install \
             -DskipTests
 
-      - name: Verify pre-Advanced Theming screenshots are current
+      - name: Verify generated developer guide figures are current
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
           set -euo pipefail
@@ -142,8 +153,7 @@ jobs:
           # difference if it carries a .tolerance sidecar saying why.
           python3 scripts/developer-guide/compare-screenshots.py \
             --generated "$GENERATED_DIR" \
-            --committed docs/developer-guide/img \
-            --expected-count 24
+            --committed docs/developer-guide/img/generated
 
       # When the byte compare fails, the message names the file but not what it
       # actually rendered, which leaves no way to tell a real regression from an

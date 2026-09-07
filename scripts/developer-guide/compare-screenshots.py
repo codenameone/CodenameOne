@@ -98,15 +98,26 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--generated", required=True, type=Path)
     parser.add_argument("--committed", required=True, type=Path)
-    parser.add_argument("--expected-count", type=int, required=True)
     args = parser.parse_args()
 
     produced = sorted(args.generated.glob("*.png"))
-    if len(produced) != args.expected_count:
-        print(
-            f"::error::Expected {args.expected_count} generated figures, found {len(produced)}",
-            file=sys.stderr,
-        )
+    committed_figures = sorted(args.committed.glob("*.png"))
+    if not produced:
+        print("::error::The generator produced no figures at all", file=sys.stderr)
+        return 1
+
+    # The committed directory is the manifest. Checking only that each produced
+    # figure matches would let a golden quietly stop being generated -- the run
+    # would compare whatever was still produced and pass, and the stale image
+    # would keep shipping. Requiring the two sets to be equal makes a figure
+    # that fell out of the generator a failure instead of a silent gap.
+    missing = sorted({c.name for c in committed_figures} - {p.name for p in produced})
+    if missing:
+        for name in missing:
+            print(
+                f"::error::{name} is committed as a generated figure but nothing produced it",
+                file=sys.stderr,
+            )
         return 1
 
     failures = 0
