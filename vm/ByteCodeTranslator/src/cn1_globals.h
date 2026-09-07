@@ -855,16 +855,48 @@ else if (IS_DOUBLE_WORD(-1)) SP=BC_DUP2_X2_DSS(SP);\
 
 #define BC_I2C() SP[-1].data.i = (SP[-1].data.i & 0xffff)
 
-#define BC_ISHL() SP--; SP[-1].data.i = (SP[-1].data.i << (0x1f & (*SP).data.i))
-#define BC_ISHL_EXPR(val1, val2) (val1 << (0x1f & val2))
-#define BC_LSHL() SP--; SP[-1].data.l = (SP[-1].data.l << (0x3f & (*SP).data.l))
-#define BC_LSHL_EXPR(val1, val2) (val1 << (0x3f & val2))
+// Java defines << as two's-complement wraparound. C does not: shifting a signed
+// value left so that the result is not representable -- 1 << 31, or any negative
+// left operand -- is UNDEFINED, not merely implementation-defined, so the
+// optimizer is entitled to assume it never happens. Shifting through the
+// unsigned type of the same width gives Java's answer with no undefined step,
+// and the conversion back is the ordinary two's-complement reinterpretation.
+//
+// The signed RIGHT shifts below are left alone deliberately: a negative >> n is
+// implementation-defined rather than undefined, and every compiler this VM is
+// built with defines it as the arithmetic shift Java specifies.
+#define BC_ISHL() SP--; SP[-1].data.i = (JAVA_INT)(((unsigned int)SP[-1].data.i) << (0x1f & (*SP).data.i))
+#define BC_ISHL_EXPR(val1, val2) ((JAVA_INT)(((unsigned int)(JAVA_INT)(val1)) << (0x1f & (val2))))
+#define BC_LSHL() SP--; SP[-1].data.l = (JAVA_LONG)(((unsigned long long)SP[-1].data.l) << (0x3f & (*SP).data.l))
+/* val1 is CAST, and that cast is the whole point.
+ *
+ * The translator emits a long constant as a bare C literal, so LCONST_1 reaches
+ * here as `BC_LSHL_EXPR(1, n)` -- and in C `1` is an int, which makes this an
+ * int shift no matter what the 0x3f mask says. The result was silently wrong for
+ * every shift of a long CONSTANT by 31 or more:
+ *
+ *     1L << 31  gave -2147483648   (int overflow, then sign-extended)
+ *     1L << 32  gave 1             (int shift counts are masked to 5 bits)
+ *     1L << 33  gave 2
+ *
+ * `x << n` for a long VARIABLE was always right, which is why this survived: the
+ * variable carries JAVA_LONG into the macro and the constant does not. Found by a
+ * histogram whose bucket labels came out negative.
+ *
+ * BC_LUSHR_EXPR below already casts, so this class of bug was fixed once for the
+ * unsigned shift and not carried across to its two siblings. */
+// The inner JAVA_LONG cast is load-bearing and separate from the unsigned one:
+// the translator emits long constants as bare C literals, so without it LCONST_1
+// arrives as an int and 1L << 32 evaluates to 1. See the LongShift benchmark.
+#define BC_LSHL_EXPR(val1, val2) ((JAVA_LONG)(((unsigned long long)(JAVA_LONG)(val1)) << (0x3f & (val2))))
 
 #define BC_ISHR() SP--; SP[-1].data.i = (SP[-1].data.i >> (0x1f & (*SP).data.i))
 #define BC_ISHR_EXPR(val1, val2) (val1 >> (0x1f & val2))
 
 #define BC_LSHR() SP--; SP[-1].data.l = (SP[-1].data.l >> (0x3f & (*SP).data.l))
-#define BC_LSHR_EXPR(val1, val2) (val1 >> (0x3f & val2))
+/* Cast for the same reason as BC_LSHL_EXPR above: a long constant arrives as an
+ * int literal and would otherwise be shifted 32 bits wide. */
+#define BC_LSHR_EXPR(val1, val2) (((JAVA_LONG)(val1)) >> (0x3f & (val2)))
 
 #define BC_IUSHL() SP--; SP[-1].data.i = (((unsigned int)SP[-1].data.i) << (0x1f & ((unsigned int)(*SP).data.i)))
 #define BC_IUSHL_EXPR(val1, val2) (((unsigned int)val1) << (0x1f & ((unsigned int)val2)))
@@ -1778,6 +1810,22 @@ extern long long totalAllocations;
 #define CN1_BIBOP_FLUSH_BYTES(ts) do {} while(0)
 #endif
 
+#ifdef CN1_GC_CONFORM
+// Defined in cn1_globals.m. Declared here because the BiBOP fast paths are inline
+// in this header and are the route MOST small objects take -- profiling only
+// codenameOneGcMalloc would miss them and blame whatever little reaches it.
+//
+// There are FOUR entry points, and the profile is only honest if every one of
+// them records exactly once: codenameOneGcMalloc, cn1BibopFastAlloc (what
+// CN1_FAST_NEW calls), cn1BibopFastAllocNoZero, cn1AllocFused and
+// cn1FusedLatin1Begin. cn1BibopAlloc is deliberately NOT hooked -- it is an
+// internal callee of three of those and hooking it would double-count.
+// Each hook sits on the SUCCESS return rather than at function entry: a fast
+// path that returns 0 falls back to __NEW_X -> codenameOneGcMalloc, so an
+// entry-side hook counts that allocation twice.
+void cn1RecordAllocation(struct clazz* parent, int size);
+#endif
+
 // Inlined bump fast path. Returns 0 (slow path: page full / free-list present /
 // ineligible / oversized) -> caller falls back to __NEW_X / codenameOneGcMalloc.
 static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
@@ -1859,6 +1907,9 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
             // allocationsSinceLastGC / totalAllocations (the isHighFrequencyGC heuristic)
             // are now bumped in bulk by CN1_BIBOP_FLUSH_BYTES once per page-acquire, not
             // per object -- removing two global-counter stores from the hot path.
+#ifdef CN1_GC_CONFORM
+            cn1RecordAllocation(parent, size);
+#endif
             return o;
         }
     }
@@ -1883,6 +1934,7 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 // memset" note in cn1BibopFastAlloc and OVERFLOW RESCAN in cn1_globals.m). The
 // header (parentCls / mark / heapPosition) is still initialized here; ONLY the
 // body zero is elided.
+
 static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
     if(__builtin_expect(threadStateData->bibopBypassRemaining[ci] > 0, 0)) {
@@ -1937,6 +1989,9 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
             __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
 #endif
             CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
+#ifdef CN1_GC_CONFORM
+            cn1RecordAllocation(parent, size);
+#endif
             return o;
         }
     }

@@ -642,6 +642,10 @@ static JAVA_BOOLEAN cn1GcPageIndexStale = JAVA_FALSE;
 // peak footprint. Tracer-gated, like the counters above.
 static _Atomic long long cn1GcAllocatedTotal = 0;
 static _Atomic int cn1GcOverflowTrace = -1;
+#ifdef CN1_GC_CONFORM
+void cn1RecordAllocation(struct clazz* parent, int size);
+#endif
+
 static int cn1GcOverflowTraceOn(void) {
     int on = atomic_load_explicit(&cn1GcOverflowTrace, memory_order_relaxed);
     if(on < 0) {
@@ -1632,6 +1636,7 @@ static void gcMarkDrainWorklist(CODENAME_ONE_THREAD_STATE);
 // is configured. Defined further down (after gcMarkDrain). See the big comment block
 // at the worklist declarations for the design and the invariants it preserves.
 static void gcMarkDrainParallel(CODENAME_ONE_THREAD_STATE);
+static int cn1GcMutatorAssist(CODENAME_ONE_THREAD_STATE);
 
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
 // PHASE 3b forward declarations (definitions live after the BiBOP block because the
@@ -4097,6 +4102,38 @@ BOOL isAppSuspended = 0;
 #ifndef CN1_BIBOP_GC_MAX_TRIGGER_BYTES
 #define CN1_BIBOP_GC_MAX_TRIGGER_BYTES (192*1024*1024)
 #endif
+// THE FLOOR IS PROPORTIONAL TO THE LIVE SET, not a constant.
+//
+// CN1_BIBOP_GC_TRIGGER_BYTES used to be the floor outright, so a process whose
+// live set was nearly nothing still let 24MB of garbage pile up before
+// collecting, and the page pool sized itself to that. Measured on the backend
+// (/plaintext, 64 connections), resident memory tracks the trigger almost
+// linearly and nothing else: 4MB -> 30MB RSS, 8MB -> 49MB, 16MB -> 68MB,
+// 24MB -> 98MB. Throughput and p99 across that same sweep were flat inside the
+// run-to-run noise, so the 24MB floor was buying footprint and no speed.
+//
+// So this is a floor a deployment CHOOSES, not one the collector infers. It
+// defaults to the old constant, which is why a stock build collects exactly
+// where it always did, and an application that knows its live set is small sets
+// it lower -- the backend uses 4MB and its resident memory fell from 98MB to
+// 38MB.
+//
+// It is deliberately not sized from the live set. Every modern collector does
+// size the next heap against what survived -- Go's GOGC=100 collects when the
+// heap reaches twice the live set -- and this collector tried that and could not
+// make it sound, because it cannot measure a live set. What a sweep reports is
+// what that sweep SAMPLED: an ordinary sweep walks retired pages only and never
+// sees a live object on a partial page, a major sweep splices the partial pools
+// in but withholds their slots from the policy numbers, mutator-owned current
+// pages are never swept at all, and the legacy heap above CN1_BIBOP_MAX_OBJECT
+// is not in BiBOP pages and reaches none of these counters. Three attempts to
+// build a proportional floor on that number each failed differently, the first
+// of them by latching a departed live set high enough to starve the sweeps that
+// return pages to the OS. A constant a deployment sets from what it knows about
+// its own workload needs no such measurement to be correct.
+#ifndef CN1_BIBOP_GC_MIN_TRIGGER_BYTES
+#define CN1_BIBOP_GC_MIN_TRIGGER_BYTES CN1_BIBOP_GC_TRIGGER_BYTES
+#endif
 #ifndef CN1_BIBOP_HIGH_THROUGHPUT_BYTES
 #define CN1_BIBOP_HIGH_THROUGHPUT_BYTES (8*1024*1024)
 #endif
@@ -5385,7 +5422,11 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
         }
         CN1_GC_PARK_CAPTURE(threadStateData);
         CN1_STALL_T0(__stallVol);
-        threadStateData->threadActive = JAVA_FALSE;
+        // NOT marked parked yet: the assist below runs Java mark functions on
+        // this thread's own stack, and advertising it as parked would let the
+        // collector scan that stack conservatively while it is moving. The flag
+        // is lowered only around the sleep, which is the one place this thread
+        // really is idle.
         int spins = 0;
         while(cn1PacingVolume(which) > (long long)cap &&
               get_static_java_lang_System_gcThreadInstance() != JAVA_NULL &&
@@ -5408,16 +5449,62 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             // Yielding hands the host back. The virtual thread is RUNNABLE, not
             // waiting on its socket, so the scheduler must re-queue it rather
             // than hand it to the poller; see CN1_VT_YIELD_RUNNABLE.
+            // Help before sleeping: marking a batch shortens the very cycle this
+            // thread is waiting on, where sleeping only waits for someone else to
+            // finish it. This is Go's mutator assist in the one place we had a
+            // sleep-until-done park. See cn1GcMutatorAssist.
+            if(!threadStateData->threadBlockedByGC
+                    && cn1GcMutatorAssist(threadStateData) > 0) {
+                continue;
+            }
+            threadStateData->threadActive = JAVA_FALSE;
             if(!cn1VirtualThreadYieldIfVirtual()) {
                 usleep(50);
             }
+            // Do NOT go active again while the collector has this thread blocked.
+            //
+            // threadActive is what tells the collector it may scan this thread's
+            // roots without stopping it. If threadBlockedByGC went up during the
+            // sleep, the collector saw threadActive == false and may already be
+            // walking this stack conservatively; raising the flag here would let
+            // the mutator run -- moving that stack, and the assist above running
+            // mark functions on it -- underneath a scan in progress, which loses
+            // reachable objects. Wait the block out first, exactly as the tail of
+            // this function does.
+            while(threadStateData->threadBlockedByGC) {
+                if(!cn1VirtualThreadYieldIfVirtual()) {
+                    usleep((JAVA_INT)(500));
+                }
+            }
+            threadStateData->threadActive = JAVA_TRUE;
         }
+        threadStateData->threadActive = JAVA_FALSE;
         while(threadStateData->threadBlockedByGC) {
             if(!cn1VirtualThreadYieldIfVirtual()) {
                 usleep((JAVA_INT)(500));
             }
         }
         threadStateData->threadActive = JAVA_TRUE;
+        // This is CN1_RESUME_THREAD's handshake, deliberately, and NOT a stronger
+        // one. A review asked for an atomic block-check-and-reactivate here on the
+        // grounds that the collector can set threadBlockedByGC after this loop's
+        // last read but before the store above, observe threadActive already
+        // false, and scan a stack that is about to start moving. The window is
+        // real and the description is accurate.
+        //
+        // It is also not this function's window. CN1_RESUME_THREAD is exactly
+        // `while(threadBlockedByGC) wait; threadActive = TRUE;`, the collector
+        // stops threads by setting the flag and then waiting for threadActive to
+        // clear with no re-validation afterwards, and that pair is the protocol at
+        // every native boundary in the VM. Making this one site atomic would close
+        // nothing -- the same window stays open at thousands of others -- while
+        // leaving one function speaking a different protocol from the collector it
+        // has to agree with, which is how the last few defects here happened.
+        //
+        // So it is left matching the protocol on purpose. If the window is worth
+        // closing it needs a collector-side acknowledgement applied to every
+        // resume site at once, which is a change to the VM's thread protocol and
+        // not something to smuggle in through a pacing fix.
         CN1_STALL_ADD(__stallVol, CN1_STALL_PACING_VOLUME, threadStateData);
         return;
     }
@@ -6248,7 +6335,26 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
         long oldTrigger = atomic_load_explicit(&bibopGcTriggerBytes,
                                                memory_order_relaxed);
         bibopTriggerHighSurvivalStreak = 0;
-        if(oldTrigger != CN1_BIBOP_GC_TRIGGER_BYTES) {
+        // The live-set floor deliberately does NOT apply here. Low memory mode is
+        // about surviving pressure rather than about footprint, and it pins the
+        // trigger to the constant on purpose: GcSteadyState pins the free-memory
+        // reading to 16MB precisely to make the per-thread pending table fill, and
+        // a live-set floor collects early enough that it never does -- the test
+        // then fails itself as measuring nothing, which is exactly what it did.
+        // LOWER ONLY. This used to assign the constant, which on master could
+        // only ever bring the trigger down because nothing there put it below
+        // 24MB. Once a deployment can define CN1_BIBOP_GC_MIN_TRIGGER_BYTES lower
+        // -- the server sets 4MB -- the same assignment RAISES a trigger that the
+        // low-survival path had already shrunk, so an OS memory warning would
+        // postpone collection at the moment headroom is scarcest, and lift the
+        // pacing cap derived from it as well.
+        //
+        // Pinning to the constant from above is still the intent and is unchanged
+        // at the default: GcSteadyState pins the free-memory reading to 16MB to
+        // make the per-thread pending table fill, and it runs with the default
+        // minimum, so its trigger is at or above the constant and takes exactly
+        // the branch it always did.
+        if(oldTrigger > CN1_BIBOP_GC_TRIGGER_BYTES) {
             atomic_store_explicit(&bibopGcTriggerBytes,
                                   CN1_BIBOP_GC_TRIGGER_BYTES,
                                   memory_order_relaxed);
@@ -6258,6 +6364,30 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
         long oldTrigger = atomic_load_explicit(&bibopGcTriggerBytes,
                                                memory_order_relaxed);
         long newTrigger = oldTrigger;
+        // NO LIVE-SET FLOOR. The trigger is not sized from the live set here,
+        // because this collector cannot measure the live set and a policy built on
+        // a number it cannot measure kept being wrong in a new way.
+        //
+        // liveBytes is what a sweep SAMPLED. An ordinary sweep walks retired pages
+        // only, so every live object on a partial page is invisible to it. A major
+        // sweep splices the partial pools in, but mutator-owned current pages are
+        // never swept at all -- that is an invariant, not an omission -- and the
+        // legacy heap above CN1_BIBOP_MAX_OBJECT is not in BiBOP pages and never
+        // reaches these counters. Three successive attempts to derive a floor from
+        // this number were each unsound in a different direction: it latched a
+        // dropped live set at 192MB and stopped the sweeps that return pages to
+        // the OS (BibopPageFloorIntegrationTest, 6% of pages returned against 91%
+        // on a luckier run of the same commit); then it believed a partial sample
+        // as a collapse; then it called an ordinary sweep complete precisely when
+        // it saw least.
+        //
+        // What actually delivered the footprint win is the MINIMUM, which is a
+        // build-time constant and not an estimate: a deployment that knows its
+        // live set is small defines CN1_BIBOP_GC_MIN_TRIGGER_BYTES lower and the
+        // shrink path below walks the trigger down to it. That is the whole of the
+        // 98MB-to-38MB result, and it needs no live-set measurement to be correct.
+        // So the shrink target is that minimum rather than the fixed 24MB constant
+        // master uses, and nothing else about this policy differs from master.
         if(survival >= CN1_BIBOP_BYPASS_SURVIVAL_PERCENT) {
             bibopTriggerHighSurvivalStreak++;
             if(bibopTriggerHighSurvivalStreak >= 2) {
@@ -6265,8 +6395,8 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
                 long freeMem = atomic_load_explicit(&cn1CachedFreeMem,
                                                     memory_order_relaxed);
                 if(freeMem > 0 && freeMem / 8 < ceiling) ceiling = freeMem / 8;
-                if(ceiling < CN1_BIBOP_GC_TRIGGER_BYTES) {
-                    ceiling = CN1_BIBOP_GC_TRIGGER_BYTES;
+                if(ceiling < CN1_BIBOP_GC_MIN_TRIGGER_BYTES) {
+                    ceiling = CN1_BIBOP_GC_MIN_TRIGGER_BYTES;
                 }
                 newTrigger = oldTrigger * 2;
                 if(newTrigger > ceiling) newTrigger = ceiling;
@@ -6274,10 +6404,10 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
             }
         } else if(survival <= 20) {
             bibopTriggerHighSurvivalStreak = 0;
-            if(oldTrigger > CN1_BIBOP_GC_TRIGGER_BYTES) {
+            if(oldTrigger > CN1_BIBOP_GC_MIN_TRIGGER_BYTES) {
                 newTrigger = oldTrigger / 2;
-                if(newTrigger < CN1_BIBOP_GC_TRIGGER_BYTES) {
-                    newTrigger = CN1_BIBOP_GC_TRIGGER_BYTES;
+                if(newTrigger < CN1_BIBOP_GC_MIN_TRIGGER_BYTES) {
+                    newTrigger = CN1_BIBOP_GC_MIN_TRIGGER_BYTES;
                 }
             }
         }
@@ -6332,6 +6462,11 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
 // pages it processes are off the SWEEP stack (owner==0), so no mutator is
 // allocating into them and no marking is in flight -> plain header access.
 static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
+    // Live bytes on pages this sweep excluded from the survival ratio, and whether
+    // it walked the partial pools at all. Only a MAJOR sweep does: an ordinary one
+    // sees retired pages alone, so its liveBytes omits every live object sitting
+    // on a partial page and is not a live-set measurement. Declared here because
+    // the major-sweep decision below is made before the accumulators.
 #ifdef CN1_GC_VERIFY
     extern int cn1GcFaultEarlyFree;
     { extern void cn1GcFaultInitPublic(void); cn1GcFaultInitPublic(); }
@@ -6371,9 +6506,27 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         // bibopCycleAllocatedBytes alone would call it quiet and splice every
         // partial page in every sweep -- the O(all pages) regression issue 5425
         // fixed, reintroduced for exactly the workload that reported it.
+        //
+        // The cutoff is a QUARTER OF THE TRIGGER IN FORCE, not a fixed constant.
+        // "Quiet" is meant to describe a cycle that ran without the application
+        // allocating much, and what counts as much is relative to how much
+        // allocation it takes to start a cycle at all. A fixed cutoff derived
+        // from the 24MB default breaks as soon as the trigger is lower than it:
+        // a deployment that sets CN1_BIBOP_GC_MIN_TRIGGER_BYTES to 4MB collects
+        // every 4-6MB, every one of those ordinary allocation-driven cycles is
+        // below a 6MB cutoff, and every single collection then splices every
+        // partial pool -- the O(all pages) behaviour issue 5425 removed, handed
+        // straight back to the workload that reported it. Tracking the live
+        // trigger keeps the ratio the constant was chosen to express, at every
+        // trigger the policy can reach.
+        long quietCutoff = (long)(atomic_load_explicit(&bibopGcTriggerBytes,
+                                                       memory_order_relaxed) / 4);
+        if(quietCutoff > CN1_BIBOP_MAJOR_SWEEP_QUIET_BYTES) {
+            quietCutoff = CN1_BIBOP_MAJOR_SWEEP_QUIET_BYTES;
+        }
         JAVA_BOOLEAN quiet =
                 ((long long)bibopCycleAllocatedBytes + legacyCycleAllocatedBytes)
-                        < (long long)CN1_BIBOP_MAJOR_SWEEP_QUIET_BYTES;
+                        < (long long)quietCutoff;
         int major = atomic_load_explicit(&lowMemoryMode, memory_order_relaxed)
                 || quiet
                 || bibopCyclesSinceMajorSweep >= CN1_BIBOP_MAJOR_SWEEP_CYCLES;
@@ -8960,6 +9113,9 @@ static void cn1GcSelfCheckThreadStack(struct ThreadLocalData* t, int stackSize) 
 #endif /* CN1_CONSERVATIVE_GC_ROOTS */
 
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
+#ifdef CN1_GC_CONFORM
+    cn1RecordAllocation(parent, size);
+#endif
 cn1GcMallocRetry:
     CN1_CLAZZ_REGISTER(parent); // first-alloc-per-class: exact clazz registry for the GC guard
     if(isAppSuspended) {
@@ -10736,6 +10892,19 @@ static int gcMarkResolveThreadCount() {
 #ifdef CN1_GC_MARK_THREADS
     int n = CN1_GC_MARK_THREADS;
 #elif 1
+    // NOTE (later): this verdict predates the fixes. The isolation experiment
+    // below ran on 2026-07-03. The SATB write barrier that closes the
+    // concurrent-mark cross-thread race landed 2026-07-05, as did the freed-slot
+    // rejection in gcMarkObject, the grace-subtree drain before sweep, the belt
+    // pass for mark-drain completeness and the looped stop-the-world final mark;
+    // and on 2026-07-06 object-bearing frameless was defaulted off as "unsound
+    // under conservative GC on arm64", which is an arm64 heap corruptor that has
+    // nothing to do with this pool. Parallel marking was never re-tested after
+    // the experiment, and gcMarkDrainParallel/gcMarkObject/gcMarkFlushLocal/
+    // gcMarkWorklistPush have all been reworked since. Treat the text below as a
+    // record of what was believed that day, not as a current finding -- see
+    // .github/workflows/parparvm-parallel-mark.yml, which re-tests it on arm64.
+    //
     // ISOLATION EXPERIMENT (git-A/B): default to SERIAL marking. The acquire-load
     // fix removed the parallel mark-worker crash, but arm64 Linux still corrupts the
     // heap (crash moved to a frameless method reading a smashed threadStateData), so
@@ -10833,6 +11002,115 @@ static void gcMarkWorkerDrainLoop() {
 // Helper-thread entry point. Sleeps on the control condition until the GC thread bumps
 // the generation to dispatch a drain, participates, then reports completion. Lives for
 // the lifetime of the process (like the GC thread itself).
+/**
+ * MUTATOR ASSIST: a thread that has outrun the collector marks instead of sleeping.
+ *
+ * cn1PacingPark used to answer "you are too far ahead" with usleep(50) in a loop,
+ * so the thread contributed nothing while one collector thread did all the work,
+ * and the park therefore lasted as long as a whole collection. Measured on
+ * demo/gcpause (one thread, 20M short-lived objects, a 4096-node live set):
+ * 7 parks averaging 1.54s, worst 3.31s, against Go's 20ms worst pause on the
+ * identical loop -- and the heap reached 1.25GB to hold 128KB of live data,
+ * because nothing slowed the mutator until it crossed the 512MB floor.
+ *
+ * Go charges an allocating goroutine proportional marking work at allocation
+ * time, so the brake is proportional and the work SHORTENS the cycle. This is
+ * that: one batch of real marking per call, which both delays the allocator and
+ * helps the collection it is waiting for.
+ *
+ * Three things make it safe to join a mark already in progress:
+ *
+ *   - It REGISTERS in gcMarkActiveWorkers before releasing the lock. The
+ *     termination protocol is "last worker to find the list empty declares done",
+ *     so a thread holding a batch that is not counted would let mark finish early
+ *     and leave live objects unmarked. Registering makes this thread visible to
+ *     it, and the decrement below repeats the workers' own end condition.
+ *   - It only assists the PARALLEL mark. gcMarkDrainParallel falls back to the
+ *     serial gcMarkDrain when the pool is one thread, and that path touches the
+ *     worklist without the mutex, so joining it would be a data race.
+ *     gcMarkActiveWorkers > 0 is true only on the parallel path.
+ *   - It refuses to recurse: a thread already inside a mark has gcMarkLocalBuf
+ *     set, and pushing a second local buffer over it would strand the first.
+ *
+ * Returns the number of entries marked, 0 if there was nothing to do.
+ */
+// A/B switch for the assist, so it can be measured against the sleep it replaces
+// in one binary rather than two builds. Resolved through pthread_once because
+// this runs on every PACED MUTATOR: with more than one marker several of them
+// reach their first assist together, and a plain function-local static would be
+// read and written by all of them at once -- a data race in exactly the parallel
+// configuration the new workflow exists to exercise.
+static pthread_once_t cn1GcAssistOnce = PTHREAD_ONCE_INIT;
+static int cn1GcAssistEnabled = 1;
+
+static void cn1GcResolveAssistEnabled(void) {
+    const char* v = getenv("CN1_GC_NO_MUTATOR_ASSIST");
+    cn1GcAssistEnabled = (v != 0 && v[0] != '0') ? 0 : 1;
+}
+
+static int cn1GcMutatorAssist(CODENAME_ONE_THREAD_STATE) {
+    struct gcMarkLocalBuffer localBuf;
+    struct gcMarkWorklistEntry batch[CN1_GC_MARK_BATCH];
+    int n;
+    int i;
+    pthread_once(&cn1GcAssistOnce, cn1GcResolveAssistEnabled);
+    if(!cn1GcAssistEnabled || gcMarkLocalBuf != 0) {
+        return 0;
+    }
+    pthread_mutex_lock(&gcMarkWorklistMutex);
+    if(gcMarkDone || gcMarkActiveWorkers <= 0 || gcMarkWorklistTop <= 0) {
+        pthread_mutex_unlock(&gcMarkWorklistMutex);
+        return 0;
+    }
+    n = gcMarkWorklistTop;
+    if(n > CN1_GC_MARK_BATCH) {
+        n = CN1_GC_MARK_BATCH;
+    }
+    gcMarkWorklistTop -= n;
+    memcpy(batch, &gcMarkWorklist[gcMarkWorklistTop],
+           n * sizeof(struct gcMarkWorklistEntry));
+    gcMarkActiveWorkers++;
+    pthread_mutex_unlock(&gcMarkWorklistMutex);
+
+    localBuf.count = 0;
+    gcMarkLocalBuf = &localBuf;
+    for(i = 0 ; i < n ; i++) {
+        JAVA_OBJECT obj = batch[i].obj;
+        gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
+        if(fp != 0) {
+#if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
+            JAVA_BOOLEAN __savedMaturing = gcCurrentlyMaturing;
+            gcCurrentlyMaturing = (obj->__heapPosition == CN1_BIBOP_ADOPTED)
+                    ? JAVA_TRUE : __savedMaturing;
+            fp(threadStateData, obj, batch[i].force);
+            gcCurrentlyMaturing = __savedMaturing;
+#else
+            fp(threadStateData, obj, batch[i].force);
+#endif
+        }
+    }
+    gcMarkFlushLocal(&localBuf);
+    gcMarkLocalBuf = 0;
+
+    pthread_mutex_lock(&gcMarkWorklistMutex);
+    gcMarkActiveWorkers--;
+    // BOTH conditions, and the worklist half is the one that matters here.
+    //
+    // gcMarkFlushLocal ran just above and may have pushed children this batch
+    // discovered. A worker only decrements after re-checking the list at the top
+    // of its loop, so it never declares done with work outstanding; this function
+    // decrements straight after flushing, so testing the worker count alone could
+    // end the mark with reachable subtrees unscanned and let the sweep reclaim
+    // them. The flush already broadcasts when it appends, so an idle worker wakes
+    // and picks the work up.
+    if(gcMarkActiveWorkers == 0 && gcMarkWorklistTop == 0) {
+        gcMarkDone = JAVA_TRUE;
+        pthread_cond_broadcast(&gcMarkWorklistCond);
+    }
+    pthread_mutex_unlock(&gcMarkWorklistMutex);
+    return n;
+}
+
 extern void cn1InstallThreadAltStack(void);
 static void* gcMarkWorkerMain(void* arg) {
     cn1InstallThreadAltStack();  // so a fault in the GC mark dumps a backtrace, not a silent die
@@ -10952,7 +11230,11 @@ JAVA_OBJECT cn1AllocFused(CODENAME_ONE_THREAD_STATE, int totalSize, struct clazz
        && !threadStateData->nativeAllocationMode
 #endif
        ) {
-        return cn1BibopAlloc(threadStateData, totalSize, cls);
+        JAVA_OBJECT fused = cn1BibopAlloc(threadStateData, totalSize, cls);
+#ifdef CN1_GC_CONFORM
+        if(fused != JAVA_NULL) { cn1RecordAllocation(cls, totalSize); }
+#endif
+        return fused;
     }
 #endif
     return JAVA_NULL;
@@ -11354,6 +11636,14 @@ JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_B
                 JAVA_OBJECT arr = cn1FusedInstallPrimArray(so, off, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), len);
                 ((struct obj__java_lang_String*)so)->java_lang_String_value = arr; // count stays 0 until End
                 *dst = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)arr)->data;
+#ifdef CN1_GC_CONFORM
+                // Attribute the two halves separately: the fused block is one
+                // allocation but the profile is read to find out WHAT is being
+                // allocated, and "String" alone would hide the byte[] payload
+                // that dominates the block for long strings.
+                cn1RecordAllocation(&class__java_lang_String, off);
+                cn1RecordAllocation(&class_array1__JAVA_BYTE, total - off);
+#endif
                 return so;
             }
         }
@@ -11893,6 +12183,253 @@ static long long cn1StallPercentileUs(int cause, double q) {
 
 // The whole-run table. Printed at exit so a run that ends in a kill still leaves the
 // 1Hz series behind, and a run that ends cleanly leaves the distribution too.
+#ifdef CN1_GC_CONFORM
+// PER-CLASS ALLOCATION PROFILE.
+//
+// Four attempts to cut allocation on the backend's hot path were aimed by
+// reading code, and all four missed: a per-request buffer copy that turned out
+// to be per-connection, a header materialisation the load generator never
+// triggers. 662 bytes per request on /plaintext is a fact; WHERE they come from
+// was guesswork. This counts every allocation by class so the answer is a table
+// rather than an argument.
+//
+// CONFORM-only, two relaxed atomics on the allocation path, printed at exit.
+// Class ids are numbered scalar classes first and array classes after them
+// (cn1_array_start_offset), one contiguous range, so the bound has to cover
+// BOTH -- an app well under the limit in scalar classes can still put its array
+// classes past it. The table is CONFORM-only and costs 24 bytes an entry, so it
+// is sized past any plausible translated app rather than tuned.
+//
+// Whatever still lands outside is counted and REPORTED rather than dropped. A
+// profile that silently omits the hottest class reads exactly like a profile
+// that found nothing there, and this file already has one instrument that lied
+// by omission (see the entry-point note on cn1RecordAllocation). The overflow
+// row is how a reader learns the bound was reached instead of trusting a total
+// that quietly excludes it.
+#define CN1_ALLOC_PROFILE_SLOTS 65536
+static _Atomic long long cn1AllocProfBytes[CN1_ALLOC_PROFILE_SLOTS];
+static _Atomic long cn1AllocProfCount[CN1_ALLOC_PROFILE_SLOTS];
+// Atomic like the counters beside it. Several mutators allocating the same class
+// write this slot at once, and same-value concurrent writes are still a race in
+// C; the atexit report also reads it while allocation continues, so a torn read
+// would be dereferenced as a class pointer to print a name.
+static _Atomic(struct clazz*) cn1AllocProfClass[CN1_ALLOC_PROFILE_SLOTS];
+static _Atomic long long cn1AllocProfOutOfRangeBytes = 0;
+static _Atomic long cn1AllocProfOutOfRangeCount = 0;
+static _Atomic int cn1AllocProfMaxSeenId = 0;
+
+// A per-class total answers "what is being allocated" but not "which line
+// allocates it": byte[] is one class and a dozen unrelated call sites. Sizes
+// separate them, because the sites differ in what they allocate -- a 13-byte
+// body, a 48-byte empty array and a 120-byte header block are three distinct
+// buckets even though the profile calls all of them byte[]. Set
+// CN1_ALLOC_SIZE_CLASS to a class name to get its size histogram alongside the
+// totals; the table is tiny and linear-probed because a handful of distinct
+// sizes is the expected case, and a site with a genuinely variable size shows up
+// as the overflow row rather than crowding out the fixed ones.
+#define CN1_ALLOC_SIZE_BUCKETS 48
+// pthread_once rather than a flag plus a pointer. Read and written by every
+// mutator's first allocation, those two are a data race in the C sense, and its
+// visible form is the wrong one for an instrument: a thread that sees the flag
+// set before the pointer is published reads a null name and silently drops its
+// early samples, so the histogram quietly loses exactly the allocations a
+// start-up question is about. Once-initialisation publishes both or neither.
+static pthread_once_t cn1AllocSizeClassOnce = PTHREAD_ONCE_INIT;
+static const char* cn1AllocSizeClassName = 0;
+
+static void cn1ResolveAllocSizeClass(void) {
+    cn1AllocSizeClassName = getenv("CN1_ALLOC_SIZE_CLASS");
+}
+static _Atomic int cn1AllocSizeKey[CN1_ALLOC_SIZE_BUCKETS];
+static _Atomic long long cn1AllocSizeCount[CN1_ALLOC_SIZE_BUCKETS];
+static _Atomic long long cn1AllocSizeOverflow = 0;
+
+static void cn1RecordAllocationSize(struct clazz* parent, int size) {
+    int i;
+    pthread_once(&cn1AllocSizeClassOnce, cn1ResolveAllocSizeClass);
+    if(cn1AllocSizeClassName == 0 || parent->clsName == 0 ||
+       strcmp(parent->clsName, cn1AllocSizeClassName) != 0) {
+        return;
+    }
+    for(i = 0 ; i < CN1_ALLOC_SIZE_BUCKETS ; i++) {
+        int k = atomic_load_explicit(&cn1AllocSizeKey[i], memory_order_relaxed);
+        if(k == 0) {
+            // Claim the empty bucket with a compare-exchange rather than a store.
+            // The allocation path is genuinely concurrent -- that is why the counts
+            // beside this are atomics -- so two threads allocating the profiled
+            // class at DIFFERENT sizes could both read this zero, both store, and
+            // then both add into whichever size was written last: one size's row
+            // vanishes and the other's count is overstated by exactly the same
+            // amount. The value of this table is that a reading like "7073173 of
+            // 7073834 allocations were exactly 97 bytes" can be trusted to mean one
+            // site, so a silent merge would attack the one thing it is for. On
+            // losing the race the winner's key is adopted and compared, which lands
+            // the allocation in that bucket if the sizes agree and moves to the next
+            // bucket if they do not.
+            int expected = 0;
+            if(atomic_compare_exchange_strong_explicit(&cn1AllocSizeKey[i], &expected,
+                                                       size, memory_order_relaxed,
+                                                       memory_order_relaxed)) {
+                k = size;
+            } else {
+                k = expected;
+            }
+        }
+        if(k == size) {
+            atomic_fetch_add_explicit(&cn1AllocSizeCount[i], 1, memory_order_relaxed);
+            return;
+        }
+    }
+    atomic_fetch_add_explicit(&cn1AllocSizeOverflow, 1, memory_order_relaxed);
+}
+
+void cn1RecordAllocation(struct clazz* parent, int size) {
+    int id;
+    if(parent == 0) {
+        return;
+    }
+    // Before the id range check, so a class past the table still contributes its
+    // sizes -- the out-of-range row says a class is missing, this says what size
+    // it was.
+    cn1RecordAllocationSize(parent, size);
+    id = parent->classId;
+    if(id < 0 || id >= CN1_ALLOC_PROFILE_SLOTS) {
+        atomic_fetch_add_explicit(&cn1AllocProfOutOfRangeBytes, (long long)size,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&cn1AllocProfOutOfRangeCount, 1, memory_order_relaxed);
+        // Compare-exchange rather than load-then-store: that pair is a
+        // read-modify-write, so two threads reporting out-of-range classes can
+        // both pass the comparison and the smaller id can land last. This number
+        // exists to tell a reader how far the table has to grow, and understating
+        // it sends the next run back with a bound that is still too small.
+        {
+            int seen = atomic_load_explicit(&cn1AllocProfMaxSeenId, memory_order_relaxed);
+            while(id > seen &&
+                  !atomic_compare_exchange_weak_explicit(&cn1AllocProfMaxSeenId, &seen, id,
+                                                         memory_order_relaxed,
+                                                         memory_order_relaxed)) {
+                /* seen was reloaded by the failed exchange; retry while we are still larger */
+            }
+        }
+        return;
+    }
+    atomic_store_explicit(&cn1AllocProfClass[id], parent, memory_order_relaxed);
+    atomic_fetch_add_explicit(&cn1AllocProfBytes[id], (long long)size, memory_order_relaxed);
+    atomic_fetch_add_explicit(&cn1AllocProfCount[id], 1, memory_order_relaxed);
+}
+
+// NOT comparable with the allocatedKb figure CN1_LOG_GC_OVERFLOW prints, and a
+// close agreement between the two is not evidence either is right. This profile
+// counts REQUESTED bytes at the moment of allocation; allocatedKb accumulates
+// BiBOP SLOT bytes (rounded up to the size class) and only at GC cycle
+// boundaries, so everything allocated after the last cycle is missing from it.
+// The two therefore differ by the rounding gap in one direction and the tail of
+// the run in the other. An earlier version of this profile double-counted every
+// fast-path allocation that fell back to codenameOneGcMalloc and still landed
+// within 2% of allocatedKb, because those errors happened to cancel -- which is
+// exactly how a broken instrument reads as a verified one.
+//
+// count|1 was meant to guard a divide by zero and silently changed the divisor
+// instead: two allocations reported bytes/3. Selecting on bytes>0 already implies
+// a nonzero count, so the guard only has to be honest about the degenerate case.
+static long long cn1AllocProfAvg(long long bytes, long count) {
+    return count > 0 ? bytes / count : 0;
+}
+
+// Report-local copies. atexit handlers do not stop the other threads, so a
+// mutator can still be allocating while this runs: ranking the live counters
+// destructively meant a class could be printed, keep allocating, and be selected
+// again for a second row, while its bytes and count were read at different
+// instants and need not describe the same set of allocations. Everything is
+// copied once here and the ranking then consumes the copy, so the report is a
+// snapshot of one moment and the live counters are left alone.
+static long long cn1AllocProfSnapBytes[CN1_ALLOC_PROFILE_SLOTS];
+static long cn1AllocProfSnapCount[CN1_ALLOC_PROFILE_SLOTS];
+static struct clazz* cn1AllocProfSnapClass[CN1_ALLOC_PROFILE_SLOTS];
+
+static void cn1ReportAllocProfile(void) {
+    long long total = 0;
+    int i;
+    int printed = 0;
+    for(i = 0 ; i < CN1_ALLOC_PROFILE_SLOTS ; i++) {
+        cn1AllocProfSnapBytes[i] =
+                atomic_load_explicit(&cn1AllocProfBytes[i], memory_order_relaxed);
+        cn1AllocProfSnapCount[i] =
+                atomic_load_explicit(&cn1AllocProfCount[i], memory_order_relaxed);
+        cn1AllocProfSnapClass[i] =
+                atomic_load_explicit(&cn1AllocProfClass[i], memory_order_relaxed);
+        total += cn1AllocProfSnapBytes[i];
+    }
+    if(cn1AllocSizeClassName != 0) {
+        int i;
+        // Snapshot first, for the same reason as the per-class table above; 48
+        // entries fit on the stack. Descending by count, selection-style: this
+        // runs once at exit, so the quadratic scan costs nothing and keeps the hot
+        // recorder free of any ordering work.
+        long long snapCount[CN1_ALLOC_SIZE_BUCKETS];
+        int snapKey[CN1_ALLOC_SIZE_BUCKETS];
+        for(i = 0 ; i < CN1_ALLOC_SIZE_BUCKETS ; i++) {
+            snapCount[i] = atomic_load_explicit(&cn1AllocSizeCount[i], memory_order_relaxed);
+            snapKey[i] = atomic_load_explicit(&cn1AllocSizeKey[i], memory_order_relaxed);
+        }
+        for(;;) {
+            int bestIdx = -1;
+            long long bestCount = 0;
+            for(i = 0 ; i < CN1_ALLOC_SIZE_BUCKETS ; i++) {
+                if(snapCount[i] > bestCount) { bestCount = snapCount[i]; bestIdx = i; }
+            }
+            if(bestIdx < 0) { break; }
+            fprintf(stderr, "[ALLOCSIZE] %-28s bytes=%-8d count=%lld\n",
+                    cn1AllocSizeClassName, snapKey[bestIdx], bestCount);
+            snapCount[bestIdx] = 0;
+        }
+        fprintf(stderr, "[ALLOCSIZE] %-28s overflow=%lld\n", cn1AllocSizeClassName,
+                atomic_load_explicit(&cn1AllocSizeOverflow, memory_order_relaxed));
+    }
+    {
+        // Counted into the total so the headline figure stays the truth about the
+        // run, and printed separately so a non-zero row names the bound to raise.
+        long long oor = atomic_load_explicit(&cn1AllocProfOutOfRangeBytes,
+                                             memory_order_relaxed);
+        total += oor;
+        fprintf(stderr, "[ALLOCPROF] totalBytes=%lld\n", total);
+        if(oor > 0) {
+            fprintf(stderr, "[ALLOCPROF] %-44s bytes=%-12lld count=%-10ld "
+                            "(classId past %d, highest seen %d -- RAISE THE BOUND)\n",
+                    "<unattributed: classId out of range>", oor,
+                    atomic_load_explicit(&cn1AllocProfOutOfRangeCount, memory_order_relaxed),
+                    CN1_ALLOC_PROFILE_SLOTS - 1,
+                    atomic_load_explicit(&cn1AllocProfMaxSeenId, memory_order_relaxed));
+        }
+    }
+    // Top twenty by bytes, selected by repeated max rather than a sort: this runs
+    // once at exit and the table is small.
+    while(printed < 20) {
+        int best = -1;
+        long long bestBytes = 0;
+        for(i = 0 ; i < CN1_ALLOC_PROFILE_SLOTS ; i++) {
+            if(cn1AllocProfSnapBytes[i] > bestBytes) {
+                bestBytes = cn1AllocProfSnapBytes[i];
+                best = i;
+            }
+        }
+        if(best < 0) {
+            break;
+        }
+        {
+            struct clazz* cls = cn1AllocProfSnapClass[best];
+            long count = cn1AllocProfSnapCount[best];
+            fprintf(stderr, "[ALLOCPROF] %-44s bytes=%-12lld count=%-10ld avg=%lld\n",
+                    (cls != 0 && cls->clsName != 0) ? cls->clsName : "?",
+                    bestBytes, count, cn1AllocProfAvg(bestBytes, count));
+        }
+        cn1AllocProfSnapBytes[best] = 0;   // consume the COPY, not the counter
+        printed++;
+    }
+    fflush(stderr);
+}
+#endif
+
 static void cn1ReportStalls(void) {
     long long wallMs = cn1GcProbeElapsedMs();
     // Mutator-only, to match the thread count it is divided by; the per-cause table below
@@ -12205,6 +12742,9 @@ void initConstantPool() {
     cn1StartSimulatedMemoryWarnings();
 #ifdef CN1_GC_CONFORM
     atexit(cn1ReportStalls);
+#ifdef CN1_GC_CONFORM
+    atexit(cn1ReportAllocProfile);
+#endif
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     // The self test sorts the conservative extent table, which only exists on
     // this arm. Calling it under CN1_GC_CONFORM alone does not compile, so
