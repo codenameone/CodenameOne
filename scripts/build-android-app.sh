@@ -120,7 +120,28 @@ if [ -z "$GRADLE_PROJECT_DIR" ]; then
   exit 1
 fi
 
-ba_log "Normalizing Android Gradle project in $GRADLE_PROJECT_DIR"
+# The API level this build compiles and targets. 36 by default, which is what
+# the screenshot baselines and the emulator leg were taken against, so a change
+# here changes what the suite is comparing. Overridable so the same script can
+# be pointed at a newer platform -- see scripts/verify-android-app-compile-sdk.sh,
+# which is how CI proves the generated project still builds at API 37.
+ANDROID_APP_COMPILE_SDK="${CN1_ANDROID_COMPILE_SDK:-36}"
+ANDROID_APP_TARGET_SDK="${CN1_ANDROID_TARGET_SDK:-$ANDROID_APP_COMPILE_SDK}"
+
+# The sdkmanager package that carries a platform. Every level up to 36 is named
+# by the bare number; from 37 there is no unsuffixed package at all -- only
+# android-37.0, android-37.1 and android-37.2 -- so asking for "android-37"
+# installs nothing and the build then fails on a missing target rather than on
+# anything real.
+android_platform_package() {
+  if [ "$1" -ge 37 ]; then
+    echo "platforms;android-$1.0"
+  else
+    echo "platforms;android-$1"
+  fi
+}
+
+ba_log "Normalizing Android Gradle project in $GRADLE_PROJECT_DIR (compileSdk $ANDROID_APP_COMPILE_SDK, targetSdk $ANDROID_APP_TARGET_SDK)"
 
 # --- Install Android instrumentation harness for coverage ---
 # CN1_ANDROID_TEST_SOURCE_DIR overrides the instrumentation sources (the
@@ -148,7 +169,8 @@ ba_log "Installed Android instrumentation tests in $ANDROID_TEST_JAVA_DIR"
 GRADLE_PROPS="$GRADLE_PROJECT_DIR/gradle.properties"
 grep -q '^android.useAndroidX=' "$GRADLE_PROPS" 2>/dev/null || echo 'android.useAndroidX=true' >> "$GRADLE_PROPS"
 grep -q '^android.enableJetifier=' "$GRADLE_PROPS" 2>/dev/null || echo 'android.enableJetifier=true' >> "$GRADLE_PROPS"
-grep -q '^android.suppressUnsupportedCompileSdk=' "$GRADLE_PROPS" 2>/dev/null || echo 'android.suppressUnsupportedCompileSdk=36' >> "$GRADLE_PROPS"
+grep -q '^android.suppressUnsupportedCompileSdk=' "$GRADLE_PROPS" 2>/dev/null || \
+  echo "android.suppressUnsupportedCompileSdk=$ANDROID_APP_COMPILE_SDK,$ANDROID_APP_COMPILE_SDK.0" >> "$GRADLE_PROPS"
 
 # More heap than the builder's generated default, for this script only.
 #
@@ -194,9 +216,10 @@ PATCH_GRADLE_MODULES=(--app "$APP_BUILD_GRADLE")
 # the phone one, so that both modules compile against the platform this job installs rather than
 # whichever one happens to be newest on the runner. AGP 8.13.2 is tested up to 36 and only warns
 # above it, and the suite's targetSdk-dependent behaviour is what the screenshots were taken
-# against, so the pin is about reproducibility. It is NOT a workaround for API 37 any more:
-# the port no longer names FingerprintManager (see pruneBiometricSourcesForCompileSdk), and a
-# compileSdk 37 / targetSdk 37 build of this sample was verified by hand.
+# against, so the pin is about reproducibility -- not about API 37, which the port has compiled
+# against since #5723. That claim is no longer taken on trust: the same project is rebuilt at
+# API 37 by scripts/verify-android-app-compile-sdk.sh, and the port's sources are compared
+# against the two platforms by scripts/check-android-api-removals.py.
 WEAR_BUILD_GRADLE="$GRADLE_PROJECT_DIR/wear/build.gradle"
 if [ -f "$WEAR_BUILD_GRADLE" ]; then
   ba_log "Wear module present; pinning its SDK levels too"
@@ -206,8 +229,8 @@ fi
 "$PATCH_GRADLE_JAVA" "$PATCH_GRADLE_SOURCE_PATH/$PATCH_GRADLE_MAIN_CLASS.java" \
   --root "$ROOT_BUILD_GRADLE" \
   "${PATCH_GRADLE_MODULES[@]}" \
-  --compile-sdk 36 \
-  --target-sdk 36
+  --compile-sdk "$ANDROID_APP_COMPILE_SDK" \
+  --target-sdk "$ANDROID_APP_TARGET_SDK"
 # --- END: robust Gradle patch ---
 
 echo "----- app/build.gradle tail -----"
@@ -220,14 +243,21 @@ ORIGINAL_JAVA_HOME="$JAVA_HOME"
 export JAVA_HOME="${JDK_HOME:-$JAVA17_HOME}"
 (
   cd "$GRADLE_PROJECT_DIR"
-  if command -v sdkmanager >/dev/null 2>&1; then
-    ba_log "Ensuring Android SDK platform/build-tools 36 are installed"
-    yes | sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null 2>&1 || ba_log "Warning: unable to install Android SDK 36 components"
-    yes | sdkmanager --licenses >/dev/null 2>&1 || true
-  elif [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
-    ba_log "Ensuring Android SDK platform/build-tools 36 are installed"
-    yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" >/dev/null 2>&1 || ba_log "Warning: unable to install Android SDK 36 components"
-    yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+  SDK_PLATFORM_PACKAGE=$(android_platform_package "$ANDROID_APP_COMPILE_SDK")
+  SDK_BUILD_TOOLS_PACKAGE="build-tools;$ANDROID_APP_COMPILE_SDK.0.0"
+  # SDK-root copy first; see scripts/verify-android-app-compile-sdk.sh for why
+  # the one on PATH is the wrong default.
+  SDKMANAGER=""
+  if [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+    SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+  elif command -v sdkmanager >/dev/null 2>&1; then
+    SDKMANAGER="sdkmanager"
+  fi
+  if [ -n "$SDKMANAGER" ]; then
+    ba_log "Ensuring $SDK_PLATFORM_PACKAGE and $SDK_BUILD_TOOLS_PACKAGE are installed"
+    yes | "$SDKMANAGER" "$SDK_PLATFORM_PACKAGE" "$SDK_BUILD_TOOLS_PACKAGE" >/dev/null 2>&1 || \
+      ba_log "Warning: unable to install Android SDK $ANDROID_APP_COMPILE_SDK components"
+    yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
   fi
   # --stacktrace, always. A packaging failure inside
   # PackageAndroidArtifact$IncrementalSplitterRunnable reports only "a failure

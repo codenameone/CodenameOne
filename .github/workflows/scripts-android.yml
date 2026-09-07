@@ -15,6 +15,8 @@ name: Test Android build scripts
       - 'scripts/ci/retry.sh'
       - 'scripts/build-android-port.sh'
       - 'scripts/build-android-app.sh'
+      - 'scripts/verify-android-app-compile-sdk.sh'
+      - 'scripts/check-android-api-removals.py'
       - 'scripts/run-android-instrumentation-tests.sh'
       - 'scripts/generate-android-coverage-report.sh'
       - 'scripts/android/lib/**/*.java'
@@ -45,6 +47,8 @@ name: Test Android build scripts
       - 'scripts/ci/retry.sh'
       - 'scripts/build-android-port.sh'
       - 'scripts/build-android-app.sh'
+      - 'scripts/verify-android-app-compile-sdk.sh'
+      - 'scripts/check-android-api-removals.py'
       - 'scripts/run-android-instrumentation-tests.sh'
       - 'scripts/generate-android-coverage-report.sh'
       - 'scripts/android/lib/**/*.java'
@@ -190,6 +194,38 @@ jobs:
         run: bash scripts/ci/retry.sh ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build Android port
         run: bash scripts/ci/retry.sh ./scripts/build-android-port.sh -q -DskipTests
+      # Only on the default leg. What this compares is the platform jar, not the
+      # JDK, so running it three times would answer the same question three
+      # times.
+      - name: Install Android platform 37
+        if: matrix.id == 'default'
+        run: |
+          # SDK-root copy first: a sdkmanager on PATH can belong to a
+          # different SDK root and install where the build never looks.
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          [ -x "$SDKMANAGER" ] || SDKMANAGER="$(command -v sdkmanager)"
+          # No unsuffixed package exists at this level: sdkmanager offers
+          # android-37.0, android-37.1 and android-37.2 and nothing called
+          # android-37, so "platforms;android-37" installs nothing and exits 0.
+          # `yes` dies of SIGPIPE once sdkmanager stops reading prompts, so its
+          # status says nothing; assert on the jar that had to appear instead.
+          yes | "$SDKMANAGER" "platforms;android-37.0" > /dev/null || true
+          test -f "$ANDROID_SDK_ROOT/platforms/android-37.0/android.jar"
+      - name: Check the Android port against API 37
+        if: matrix.id == 'default'
+        run: |
+          set -euo pipefail
+          source "${RUNNER_TEMP}/codenameone-tools/tools/env.sh"
+          # The port's real compile classpath, so the raw error counts either
+          # side of the comparison stay small enough to read. The check does not
+          # depend on it being complete -- anything unresolved fails against
+          # both platforms and cancels out.
+          (cd maven && "$MAVEN_HOME/bin/mvn" -B -q -Pcompile-android -pl android \
+             dependency:build-classpath -DincludeScope=compile \
+             -Dmdep.outputFile="${RUNNER_TEMP}/android-port-classpath.txt")
+          python3 scripts/check-android-api-removals.py \
+            --classpath "$(cat "${RUNNER_TEMP}/android-port-classpath.txt")" \
+            --require-all
       - name: Build Hello Codename One Android app
         id: build-android-app
         run: |
@@ -209,6 +245,14 @@ jobs:
           target: google_apis
           disk-size: 2048M
           script: ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
+      # After the emulator, deliberately: the instrumentation suite runs against
+      # the APK the primary build produced, and this rewrites that project in
+      # place. It is the end-to-end half of the API 37 coverage -- the offline
+      # check above sees javac only, while this one also puts AAPT, the manifest
+      # merger, aar metadata and packaging through the newer platform.
+      - name: Rebuild the generated app at API 37
+        if: matrix.id == 'default'
+        run: ./scripts/verify-android-app-compile-sdk.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}" 37
       - name: Upload Android port status
         if: always() && matrix.id == 'default'
         uses: actions/upload-artifact@v7

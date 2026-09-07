@@ -149,6 +149,89 @@ removing one can make a previously-used private method dead.
 
 Findings land in each module's `target/spotbugsXml.xml`.
 
+### Android removes API, and nothing used to notice
+
+Codename One issue #5701: API 37 deleted
+`android.hardware.fingerprint.FingerprintManager` and
+`Context.FINGERPRINT_SERVICE`, the port named both from files every generated
+application compiles, and an unmodified Hello World failed
+`:app:compileDebugJavaWithJavac` in sources the developer never wrote. Every
+check in the tree was green, and structurally had to be:
+
+- The port's Maven build compiles against the **cn1-binaries `android.jar`**,
+  which is old enough to still *contain* whatever a new platform removed.
+- The only place port sources meet a current platform is the **generated Gradle
+  project**, and `scripts/build-android-app.sh` pins its compile SDK so the
+  screenshot baselines and the emulator leg stay reproducible.
+
+Two checks close that, both in `scripts-android.yml` and both on the default
+leg only -- what they compare is the platform jar, not the JDK.
+
+```bash
+source tools/env.sh
+scripts/check-android-api-removals.py                 # offline, ~1 min
+scripts/check-android-api-removals.py --require-all   # what CI runs
+scripts/verify-android-app-compile-sdk.sh <gradle-project-dir> 37
+```
+
+`check-android-api-removals.py` compiles `Ports/Android/src` twice from the
+same sources, against two platform jars, and reports the errors that appear
+only against the newer one. **The comparison is what makes it work without a
+perfect classpath**: the port excludes its optional packages (`ai`, `ar`,
+`cipher`, `nearby`) from the module build, so their dependencies are absent and
+they cannot compile here at all -- but they fail identically against both jars
+and cancel out. Error lines are compared whole, line numbers included, which is
+exact because both runs see byte-identical source.
+
+One trap it has to defend against: **a second `android.jar` on the classpath
+silently defeats it.** The port's Maven compile classpath carries the
+cn1-binaries stub, javac resolves the platform jar first, misses the removed
+class, falls through to the stub and finds it -- so the target compile succeeds
+on exactly the symbol the gate exists to catch. Any entry named `android.jar`
+is therefore dropped from a supplied classpath.
+
+`verify-android-app-compile-sdk.sh` is the end-to-end half: it re-pins the
+project the primary build already produced and assembles it again, so AAPT, the
+manifest merger, aar metadata and packaging go through the newer platform too.
+It reuses the generated sources and the warm Gradle cache, so it costs one more
+assemble rather than another build.
+
+**Not covered: runtime.** No API 37 emulator runs anywhere -- the leg is at
+`api-level: 36`, and moving it would reseed every Android screenshot baseline.
+Android 17 behaviour changes are still unverified.
+
+#### API 37 is the first release with no unsuffixed platform
+
+`sdkmanager` offers `platforms;android-37.0`, `android-37.1` and
+`android-37.2`, and nothing called `android-37`. Consequences that have each
+already cost a fix:
+
+- **Installing by the bare number is a silent no-op.** `sdkmanager
+  "platforms;android-37"` exits 0 and installs nothing; the build then fails
+  much later on a missing target. Ask for `android-37.0`.
+- **The platform string the builder carries now has a dot in it.** It reaches
+  `Integer.parseInt` in `AndroidGradleBuilder`, which threw outright on the
+  legacy `android.useGradle8=false` path and made `compileSdkInt` answer 0 --
+  the value every caller reads as "could not be determined", so the manifest
+  fragments lost the compile SDK they check attribute values against. Reduce a
+  platform name to its API level before comparing it, and note that gathering
+  its digits (`"37.2"` -> 372) is worse than parsing it: 372 compares greater
+  than every floor in the class and defeats all of them silently.
+- **`android.suppressUnsupportedCompileSdk` wants the resolved name.** AGP
+  8.13.2 builds fine at `compileSdk 37` but warns, and it asks to be suppressed
+  with `37.0`, not the `37` the build requested. The property is a
+  comma-separated list, so both spellings go in rather than guessing.
+- **Prefer the `sdkmanager` inside the SDK root you are building against.** The
+  one on `PATH` can belong to a different root (the Homebrew cask), where it
+  installs the platform somewhere the build never looks. It also needs JDK 17
+  or newer, so a script that has sourced `tools/env.sh` (JDK 8) must run it
+  with `JAVA17_HOME`.
+
+Removals are recorded in the platform's own
+`data/api-versions.xml`, and against the **minor** they happened in, never the
+bare major -- a query for `removed="37"` matches nothing, while `37.0` and
+`37.1` are the real answers. The gate prints the whole set when it fails.
+
 ### Build hints
 
 A build hint is a `codename1.arg.<name>=<value>` line the builders read as
