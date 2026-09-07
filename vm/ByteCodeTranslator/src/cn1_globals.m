@@ -2506,7 +2506,26 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
         // definition, and the alternative is an allocator that cannot make progress. The
         // lifetime-oracle callers use weak references, which take the marking branch.
         JAVA_OBJECT r = __atomic_load_n(referentField, __ATOMIC_RELAXED);
-        if(strength == CN1_REF_SOFT
+        // NOT IF IT IS ALREADY MARKED. A soft reference may only be cleared when its
+        // referent is softly reachable, and an object already marked at this point is
+        // reachable some other way -- through an ordinary strong edge, or as a root. An
+        // application holding both a field and a SoftReference to one object would
+        // otherwise watch get() answer null under allocation pressure for an object that
+        // was never a candidate for collection at all.
+        //
+        // Partial, and deliberately so: the mark is still in progress here, so a referent
+        // that a strong edge reaches LATER in this cycle is not yet marked and can still be
+        // cleared. Being sure would mean deferring to the clear pass, which is precisely
+        // what this path exists because it cannot do -- the list is full and cannot grow.
+        // Under genuine exhaustion the residue is a spurious cache miss on an object that
+        // stays alive, against an allocator that otherwise cannot make progress.
+        JAVA_BOOLEAN alreadyLive = JAVA_FALSE;
+        if(r != JAVA_NULL && !CN1_IS_TAGGED(r)) {
+            int rm = __atomic_load_n(&r->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+            alreadyLive = (rm == currentGcMarkValue || rm == -1) ? JAVA_TRUE : JAVA_FALSE;
+        }
+        if(!alreadyLive
+           && strength == CN1_REF_SOFT
            && atomic_load_explicit(&cn1SoftRetainCycles, memory_order_relaxed) < 0
            && __atomic_load_n(touchAgeField, __ATOMIC_RELAXED) != CN1_REF_TOUCHED) {
             __atomic_store_n(referentField, JAVA_NULL, __ATOMIC_RELAXED);

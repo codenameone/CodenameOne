@@ -1051,23 +1051,25 @@ public class ByteCodeClass {
                 // snapshot, and the trial clear of gcSatbActive then finds a non-empty log,
                 // re-arms, marks it, and leaves the reference alone.
                 //
-                // Loading BEFORE the barrier check rather than inside it is what makes that
-                // sound. Checking the flag first and loading afterwards leaves a gap: a
-                // thread that read the flag as 0, was SIGUSR2-frozen with the referent not
-                // yet in any register, scanned, released, and only then loaded, came away
-                // with an unmarked referent nothing had enqueued. With the load first the
-                // value is in a register before any freeze, where the conservative root scan
-                // finds it.
+                // REGISTERING BEFORE THE LOAD, and holding it across, is what makes that
+                // sound. Any flag sampled before registering can go stale in the gap: a
+                // thread that read the flag as 0 -- or read it as 1 and was then descheduled
+                // before registering -- can come away with an unmarked referent nothing
+                // enqueued, while the collector finishes termination and sweeps it.
+                // CN1_REF_LOAD_BEGIN registers first and answers afterwards, so the
+                // collector's quiesce cannot complete anywhere inside this accessor.
+                b.append("JAVA_BOOLEAN __cn1RefActive = CN1_REF_LOAD_BEGIN();\n    ");
                 b.append(fld.getCDefinition()).append(" __cn1Ref = __atomic_load_n(&((struct obj__")
                  .append(clsName).append("*)__cn1T)->")
                  .append(fld.getClsName()).append("_").append(fld.getFieldName())
                  .append(", __ATOMIC_RELAXED);\n    ");
-                b.append("CN1_SATB_REF_KEEP(__cn1Ref);\n    ");
+                b.append("CN1_SATB_REF_KEEP(__cn1RefActive, __cn1Ref);\n    ");
                 // The touch stamp, and the entire per-read cost of ranking soft references
                 // by use: a store of an immediate. Unconditional rather than guarded by a
                 // "did it change" test, because the branch would cost more than the store.
                 b.append("__atomic_store_n(&((struct obj__").append(clsName).append("*)__cn1T)->")
                  .append(REFERENCE_CLASS).append("_cn1TouchAge, CN1_REF_TOUCHED, __ATOMIC_RELAXED);\n    ");
+                b.append("CN1_REF_LOAD_END();\n    ");
                 b.append("return __cn1Ref;\n}\n\n");
             } else if (fld.isVolatile()) {
                 b.append("return atomic_load_explicit(&((struct obj__");
