@@ -183,6 +183,41 @@ used `ptr | 2`, which is now a valid tagged `Long`, so it uses the reserved code
 `cn1_debugger_class_of` resolves through `CN1_CLASS_OF` -- would have made every tagged
 assertion an assertion about nothing.
 
+## Narrowing a float to an int is SATURATING, and C's cast is not
+
+JLS 5.1.3: converting a `float` or `double` to an `int` or `long` clamps -- NaN becomes 0,
+anything at or above the target's maximum becomes `MAX_VALUE`, anything at or below its
+minimum becomes `MIN_VALUE`. A C cast is **undefined** out of range, and the two
+architectures this VM ships on disagree about what it actually does:
+
+| | `(int) Double.MAX_VALUE` |
+|---|---|
+| arm64 (`fcvtzs`) | 2147483647 -- accidentally correct |
+| x86-64 (`cvttsd2si`) | **-2147483648** -- the "integer indefinite" value |
+
+So this was right on Apple silicon and wrong everywhere else, for every app, silently. It was
+found by running `BoxEdge` under CI's x86 Linux after it had passed on an M-series Mac.
+
+**There are THREE emission sites, and patching two of them looks like it works.** The two
+obvious ones are `BC_{F2I,F2L,D2I,D2L}` in `cn1_globals.h` and the statement forms in
+`BasicInstruction.java`. The third is `ArithmeticExpression.java`, which renders a conversion
+as a raw cast *inside a composed expression* -- and that is the one the optimizer actually
+uses for the common shapes, so a fix to the first two changes nothing you can see. All three
+now call `cn1SaturateToInt` / `cn1SaturateToLong`. Note `L2I` sits beside them and is NOT one
+of these: long-to-int is defined truncation.
+
+`-DCN1_NO_SATURATING_NARROWING` restores the old cast; because all three sites route through
+the two helpers, that single macro ablates the whole change and an A/B needs no second
+translator build. `vm/benchmarks/ab-narrowing.sh` interleaves the arms: **geomean 1.0073**,
+every workload within 3.4%, i.e. free.
+
+**That number had to be re-measured to be believed, and the first attempt was worthless.**
+Comparing the new build against ms figures recorded earlier in the same session reported a
+uniform 9-14% regression -- including on `intArithmetic` and `stringBuilding`, which perform
+no narrowing at all. A slowdown that appears on workloads the change cannot touch is the
+host, not the code; this machine cannot resolve 5% across runs minutes apart. Interleave the
+arms inside one process-pair or do not quote a number.
+
 ### Dimension and Rectangle: investigated, and tagging is the wrong mechanism
 
 The obvious next thought is to extend this to framework value types. It does not work, and

@@ -617,15 +617,55 @@ typedef struct clazz*       JAVA_CLASS;
 
 #define BC_I2F() do { SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.i; SP[-1].type = CN1_TYPE_FLOAT; } while(0)
 
-#define BC_F2I() do { SP[-1].data.i = (JAVA_INT)SP[-1].data.f; SP[-1].type = CN1_TYPE_INT; } while(0)
+// JLS 5.1.3: narrowing a float or double to an int or long SATURATES -- NaN becomes 0,
+// anything at or above the target's maximum becomes MAX_VALUE, anything at or below its
+// minimum becomes MIN_VALUE. C's cast is UNDEFINED out of range instead, and the two
+// architectures shipped here disagree about what it actually does: arm64's fcvtzs
+// saturates, so this was accidentally correct on Apple silicon, while x86-64's cvttsd2si
+// yields the "integer indefinite" value 0x80000000 -- so (int) 1.7976931348623157E308 came
+// out as Integer.MIN_VALUE rather than Integer.MAX_VALUE on every x86 target.
+//
+// The thresholds are compared in DOUBLE, and float goes through the double form because
+// float-to-double is exact and lossless. Note 2147483647.0 is exactly representable so the
+// int bounds are exact, while Long.MAX_VALUE is NOT -- 9223372036854775808.0 is 2^63, the
+// first double above it, which is why the upper long test is >= that rather than > it.
+#define CN1_D2L_LIMIT 9223372036854775808.0
 
-#define BC_F2L() do { SP[-1].data.l = (JAVA_LONG)SP[-1].data.f; SP[-1].type = CN1_TYPE_LONG; } while(0)
+// -DCN1_NO_SATURATING_NARROWING restores the old undefined cast. All three emission sites
+// route through these two functions, so that one macro ablates the whole change and an A/B
+// needs no second translator build -- which matters, because this host cannot resolve a 5%
+// difference across sessions and the arms have to be interleaved inside one.
+static inline JAVA_INT cn1SaturateToInt(JAVA_DOUBLE cn1__d) {
+#ifdef CN1_NO_SATURATING_NARROWING
+    return (JAVA_INT)cn1__d;
+#else
+    if(cn1__d != cn1__d) return 0;
+    if(cn1__d >= 2147483647.0) return (JAVA_INT)2147483647;
+    if(cn1__d <= -2147483648.0) return (JAVA_INT)(-2147483647 - 1);
+    return (JAVA_INT)cn1__d;
+#endif
+}
+
+static inline JAVA_LONG cn1SaturateToLong(JAVA_DOUBLE cn1__d) {
+#ifdef CN1_NO_SATURATING_NARROWING
+    return (JAVA_LONG)cn1__d;
+#else
+    if(cn1__d != cn1__d) return 0;
+    if(cn1__d >= CN1_D2L_LIMIT) return (JAVA_LONG)9223372036854775807LL;
+    if(cn1__d <= -CN1_D2L_LIMIT) return (JAVA_LONG)(-9223372036854775807LL - 1);
+    return (JAVA_LONG)cn1__d;
+#endif
+}
+
+#define BC_F2I() do { SP[-1].data.i = cn1SaturateToInt((JAVA_DOUBLE)SP[-1].data.f); SP[-1].type = CN1_TYPE_INT; } while(0)
+
+#define BC_F2L() do { SP[-1].data.l = cn1SaturateToLong((JAVA_DOUBLE)SP[-1].data.f); SP[-1].type = CN1_TYPE_LONG; } while(0)
 
 #define BC_F2D() do { SP[-1].data.d = SP[-1].data.f; SP[-1].type = CN1_TYPE_DOUBLE; } while(0)
 
-#define BC_D2I() do { SP[-1].data.i = (JAVA_INT)SP[-1].data.d; SP[-1].type = CN1_TYPE_INT; } while(0)
+#define BC_D2I() do { SP[-1].data.i = cn1SaturateToInt(SP[-1].data.d); SP[-1].type = CN1_TYPE_INT; } while(0)
 
-#define BC_D2L() do { SP[-1].data.l = (JAVA_LONG)SP[-1].data.d; SP[-1].type = CN1_TYPE_LONG; } while(0)
+#define BC_D2L() do { SP[-1].data.l = cn1SaturateToLong(SP[-1].data.d); SP[-1].type = CN1_TYPE_LONG; } while(0)
 
 #define BC_I2D() do { SP[-1].data.d = SP[-1].data.i; SP[-1].type = CN1_TYPE_DOUBLE; } while(0)
 

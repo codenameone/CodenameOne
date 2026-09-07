@@ -137,6 +137,14 @@ and the measured numbers are in `vm/CLAUDE.md`.
   Integer-only tagging, what shipped before the other five -- is the baseline worth reading
   against; `HEAP` vs `INT` only re-measures a win that was already taken.
 
+`ab-narrowing.sh` A/Bs the JLS-saturating float/double -> int/long narrowing against the old
+undefined C cast (`-DCN1_NO_SATURATING_NARROWING`). Both arms come from one translation, so
+only the conversion differs; measured geomean 1.0073, i.e. free.
+
+```bash
+./ab-narrowing.sh 8 Bench
+```
+
 ## The tortures (run by `run-gauntlet.sh`)
 
 | test | guards |

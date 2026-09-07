@@ -605,17 +605,22 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
                 case Opcodes.F2D: {
                     return subExpression.getExpressionAsString().trim();
                 }
+                // JLS 5.1.3 narrowing is SATURATING, and a C cast is undefined out of range --
+                // arm64 saturates and x86-64 returns 0x80000000, so a raw cast here silently
+                // disagreed with itself across the architectures we ship. The helpers live in
+                // cn1_globals.h; BC_{F2I,F2L,D2I,D2L} and BasicInstruction use the same ones.
+                // L2I below is NOT one of these: long-to-int is defined truncation.
                 case Opcodes.F2I: {
-                    return "((JAVA_INT)" + subExpression.getExpressionAsString().trim() + ")";
+                    return "cn1SaturateToInt((JAVA_DOUBLE)" + subExpression.getExpressionAsString().trim() + ")";
                 }
                 case Opcodes.F2L: {
-                    return "((JAVA_LONG)" + subExpression.getExpressionAsString().trim() + ")";
+                    return "cn1SaturateToLong((JAVA_DOUBLE)" + subExpression.getExpressionAsString().trim() + ")";
                 }
                 case Opcodes.D2I: {
-                    return "((JAVA_INT)" + subExpression.getExpressionAsString().trim() + ")";
+                    return "cn1SaturateToInt(" + subExpression.getExpressionAsString().trim() + ")";
                 }
                 case Opcodes.D2L: {
-                    return "((JAVA_LONG)" + subExpression.getExpressionAsString().trim() + ")";
+                    return "cn1SaturateToLong(" + subExpression.getExpressionAsString().trim() + ")";
                 }
                 case Opcodes.I2B: {
                     return "(("+subExpression.getExpressionAsString()+" << 24) >> 24)";

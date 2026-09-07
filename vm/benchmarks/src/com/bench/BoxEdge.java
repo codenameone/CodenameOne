@@ -369,6 +369,49 @@ public final class BoxEdge {
         p("d.negZeroStr", nz.toString());
         p("d.posZeroStr", pz.toString());
 
+        // JLS 5.1.3 narrowing: saturating, not wrapping, and not whatever the host C
+        // compiler's undefined cast happens to do. This is the case that x86 and arm64
+        // silently disagreed about -- arm64's fcvtzs saturates, x86's cvttsd2si returns
+        // 0x80000000 -- so (int) Double.MAX_VALUE was Integer.MIN_VALUE on x86 and
+        // Integer.MAX_VALUE on arm64. Every one of these is specified exactly.
+        double[] narrowD = {
+            Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY,
+            Double.MAX_VALUE, -Double.MAX_VALUE, Double.MIN_VALUE,
+            2147483647.0, 2147483648.0, -2147483648.0, -2147483649.0,
+            9.2233720368547758E18, -9.2233720368547758E18, 1.5, -1.5, 0.0, -0.0
+        };
+        for (int i = 0; i < narrowD.length; i++) {
+            p("narrow.d2i." + i, (int) narrowD[i]);
+            p("narrow.d2l." + i, (long) narrowD[i]);
+            p("narrow.d2s." + i, (short) narrowD[i]);
+            p("narrow.d2b." + i, (byte) narrowD[i]);
+            p("narrow.d2c." + i, (int) (char) narrowD[i]);
+        }
+        float[] narrowF = {
+            Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY,
+            Float.MAX_VALUE, -Float.MAX_VALUE, Float.MIN_VALUE,
+            2.14748365E9f, -2.14748365E9f, 9.223372E18f, -9.223372E18f, 1.5f, -1.5f
+        };
+        for (int i = 0; i < narrowF.length; i++) {
+            p("narrow.f2i." + i, (int) narrowF[i]);
+            p("narrow.f2l." + i, (long) narrowF[i]);
+            p("narrow.f2s." + i, (short) narrowF[i]);
+            p("narrow.f2b." + i, (byte) narrowF[i]);
+        }
+        // The same conversions reached through a BOXED receiver, which is how the tagged
+        // path gets there: Number.intValue() on an immediate still has to saturate.
+        Number[] boxedNarrow = {
+            Double.valueOf(Double.MAX_VALUE), Double.valueOf(Double.NaN),
+            Double.valueOf(Double.NEGATIVE_INFINITY), Float.valueOf(Float.MAX_VALUE),
+            Float.valueOf(Float.NEGATIVE_INFINITY)
+        };
+        for (int i = 0; i < boxedNarrow.length; i++) {
+            p("narrow.boxed.int." + i, boxedNarrow[i].intValue());
+            p("narrow.boxed.long." + i, boxedNarrow[i].longValue());
+            p("narrow.boxed.short." + i, boxedNarrow[i].shortValue());
+            p("narrow.boxed.byte." + i, boxedNarrow[i].byteValue());
+        }
+
         // A NaN key must be findable in a map even though NaN != NaN.
         Map m = new HashMap();
         m.put(nan1, "nan");
