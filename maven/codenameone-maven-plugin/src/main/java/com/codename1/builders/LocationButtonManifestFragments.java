@@ -2381,7 +2381,11 @@ final class LocationButtonManifestFragments {
         // that spells it.
         StringBuilder word = new StringBuilder();
         StringBuilder statement = null;
+        String keyword = null;
         java.util.List<String> bound = new java.util.ArrayList<String>();
+        int lastDot = target.lastIndexOf('.');
+        String pkg = lastDot < 0 ? "" : target.substring(0, lastDot);
+        String simple = lastDot < 0 ? target : target.substring(lastDot + 1);
         while (true) {
             int read = in.read(buffer, 0, buffer.length);
             if (read < 0) {
@@ -2436,16 +2440,34 @@ final class LocationButtonManifestFragments {
                 }
                 if (state == IMPORT) {
                     if (c == ';' || c == '\n' || c == '\r') {
-                        String name = importBinds(statement.toString(), target);
-                        if (name == null && statement.indexOf(target) >= 0) {
-                            // Binds a name nothing here can predict, so the
-                            // file counts -- the static-wildcard case.
-                            return true;
-                        }
-                        if (name != null) {
-                            bound.add(name);
+                        String text = statement.toString();
+                        if ("package".equals(keyword)) {
+                            // The file DECLARES the package, so the simple
+                            // name needs no import at all -- the same rule the
+                            // buffered pass applies, and without it a sibling
+                            // of the button read as not using it.
+                            if (namesToken(text, pkg)) {
+                                bound.add(simple);
+                            }
+                        } else if (namesToken(text, pkg + ".*")) {
+                            // A wildcard import puts the package in scope, and
+                            // the code then spells the simple name. The
+                            // statement never contains the full dotted name,
+                            // so the check below cannot see it.
+                            bound.add(simple);
+                        } else {
+                            String name = importBinds(text, target);
+                            if (name == null && text.indexOf(target) >= 0) {
+                                // Binds a name nothing here can predict, so
+                                // the file counts -- the static-wildcard case.
+                                return true;
+                            }
+                            if (name != null) {
+                                bound.add(name);
+                            }
                         }
                         statement = null;
+                        keyword = null;
                         state = CODE;
                         before = ' ';
                         matched = 0;
@@ -2509,8 +2531,10 @@ final class LocationButtonManifestFragments {
                 } else if (word.length() > 0) {
                     String finished = word.toString();
                     word.setLength(0);
-                    if ("import".equals(finished)) {
+                    if ("import".equals(finished)
+                            || "package".equals(finished)) {
                         statement = new StringBuilder();
+                        keyword = finished;
                         state = IMPORT;
                         matched = 0;
                         continue;

@@ -2154,6 +2154,40 @@ class LocationButtonManifestFragmentsTest {
     }
 
     @Test
+    void aStreamedWildcardImportPutsTheSimpleNameInScope() throws Exception {
+        // The statement never contains the full dotted name, so the matcher
+        // looking for that name cannot see it -- and the code then spells the
+        // simple name alone. Missing it deletes the bridge from an app that
+        // builds a button.
+        String source = "import com.codename1.location.*;\n"
+                + "class Big { Object f() { return new LocationButton(); } }\n";
+        assertTrue(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "a wildcard import puts the simple name in scope");
+    }
+
+    @Test
+    void aStreamedSiblingInThePackageNeedsNoImport() throws Exception {
+        String source = "package com.codename1.location;\n"
+                + "class Big { Object f() { return new LocationButton(); } }\n";
+        assertTrue(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "a file declaring the package needs no import");
+    }
+
+    @Test
+    void aStreamedWildcardImportOfAnotherPackageIsNotScope()
+            throws Exception {
+        // And the scope has to be the RIGHT package, or every app importing
+        // anything with a wildcard would ship asking for precise location.
+        String source = "import com.example.other.*;\n"
+                + "class Big { Object f() { return new LocationButton(); } }\n";
+        assertFalse(LocationButtonManifestFragments.namesButtonInStream(
+                        new java.io.StringReader(source), 16),
+                "another package's wildcard is not this package's scope");
+    }
+
+    @Test
     void aStreamedUnusedImportIsNotButtonUse() throws Exception {
         // The same rule the buffered pass applies. An import the compiler
         // emits nothing for is not use, and on the fallback toolchain
