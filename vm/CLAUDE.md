@@ -114,6 +114,36 @@ compare equal.
 `BoxEdge` exists for exactly this and is **proven non-vacuous**: re-widening that guard makes
 it diverge on 115 lines, starting with a Double whose hash silently becomes 0.
 
+### The gate has to be in CI, and it has to know which arm it ran
+
+`BoxEdge` first lived only in `run-gauntlet.sh` -- and **no workflow runs the gauntlet**, so
+the feature shipped on by default with nothing in CI exercising it.
+`TaggedValueIntegrationTest` closes that: it drives the *same* `BoxEdge` source (read from
+`vm/benchmarks`, not copied, so the two cannot drift) through the translator and cmake, builds
+it twice from one translation, and compares both against a real JVM. About 67s.
+
+The subtle part is that byte-identity **cannot** tell a correct tagged build from one where
+tagging never happened -- the two representations are required to be indistinguishable, which
+is the whole contract. So `BoxEdge` prints `[TAGCODES]`, the tag code each type actually got,
+and the test asserts `123456` for the default build and `000000` for
+`-DCN1_DISABLE_TAGGED_INT`. Compiling the extra types out and re-running proves this is load
+bearing: the two byte-identity assertions still **pass**, and only the witness fails, with
+`expected: <123456> but was: <100000>`.
+
+Two mechanics worth knowing before touching it:
+
+- **Stderr is not a way to keep a diagnostic out of the compared stream.** On the clean target
+  `System.err` also reaches fd 1. The `[`-prefix convention is the answer, and
+  `run-gauntlet.sh` now applies that filter to **both** sides -- it used to filter only the
+  target, so any torture emitting a diagnostic diverged against its own host run.
+- **The reference JVM must be JDK 19+.** JDK 19 replaced `Double.toString`/`Float.toString`
+  with the shortest round-tripping representation (JDK-4511638) and ParparVM implements the
+  new algorithm, so an older reference reports divergences that are the reference being out of
+  date: `4.6116860184273879E18` from JDK 17 against `4.611686018427388E18` from ParparVM and
+  JDK 19+. Both round-trip; only the second is the shortest such string. The test selects its
+  reference JDK independently of the toolchain that drives the translator, and skips if none
+  is new enough.
+
 ### Three defects this work surfaced, none of them caused by it
 
 All three were pre-existing and are fixed here, and all three were found by `BoxEdge` on its

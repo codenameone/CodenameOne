@@ -77,7 +77,34 @@ public final class BoxEdge {
         stringsAndSwitch();
         synchronization();
         arraysAndSorting();
+        reportTagCodes();
         System.out.println("BOXEDGE DONE");
+    }
+
+    /**
+     * Which tag code each boxed type actually got in THIS build, on stderr.
+     *
+     * It carries the `[` prefix this tree uses for diagnostics ([GCPROBE], [ALLOC:...]),
+     * because that is what `run-gauntlet.sh` filters out of BOTH sides before comparing --
+     * stdout has to stay byte-identical to a host JVM and this line is target-specific by
+     * construction. Note stderr is NOT a way out: on the clean target System.err also
+     * reaches fd 1, so a stderr diagnostic still lands in the compared stream.
+     *
+     * Its job is to stop the rest of this file being VACUOUS. Every assertion here passes
+     * on a build where tagging never happened -- that is the point, the two representations
+     * must be indistinguishable -- so without a witness saying which arm ran, a green
+     * BoxEdge cannot tell "the tagged path is correct" from "the tagged path never
+     * executed". Expect 123456 in a default build and 000000 with -DCN1_DISABLE_TAGGED_INT.
+     */
+    static void reportTagCodes() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(System.identityHashCode(Integer.valueOf(1)) & 7);
+        sb.append(System.identityHashCode(Long.valueOf(1L)) & 7);
+        sb.append(System.identityHashCode(Double.valueOf(1.0)) & 7);
+        sb.append(System.identityHashCode(Float.valueOf(1.0f)) & 7);
+        sb.append(System.identityHashCode(Character.valueOf('a')) & 7);
+        sb.append(System.identityHashCode(Short.valueOf((short) 1)) & 7);
+        System.out.println("[TAGCODES] " + sb);
     }
 
     /* ---- getClass / instanceof / isInstance, on tagged and heap boxes alike ---- */

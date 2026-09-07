@@ -16,7 +16,7 @@ optimization work. Two invariants govern everything here:
 
 ```bash
 export JDK_8_HOME=/path/to/jdk8        # builds JavaAPI + bench sources
-export BENCH_JAVA=/path/to/jdk25/bin/java   # the reference JVM (optional; default `java`)
+export BENCH_JAVA=/path/to/jdk25/bin/java   # the reference JVM -- must be JDK 19+
 
 ./run-benchmark.sh          # 5 interleaved rounds, ratio table + geomean
 ./run-benchmark.sh 10       # more rounds
@@ -28,6 +28,13 @@ CN1_BENCH_CFLAGS="" ./run-benchmark.sh    # without ThinLTO (debug shape)
 ./run-bibop-adaptive.sh     # issue-5425 retained-small-array correctness,
                             # adaptive-policy, wall-time, and peak-RSS gate
 ```
+
+The reference JVM must be **JDK 19 or newer**. JDK 19 replaced `Double.toString` and
+`Float.toString` with the shortest round-tripping representation (JDK-4511638) and ParparVM
+implements the new algorithm, so an older reference reports divergences that are the
+reference being out of date rather than the VM being wrong -- `4.6116860184273879E18` from
+JDK 17 against `4.611686018427388E18` from ParparVM and JDK 19+. Both round-trip; only the
+second is the shortest such string.
 
 Requirements: Maven and clang on `PATH` (gcc also works:
 `CN1_BENCH_CC=gcc-16` — the suite is validated under both; gcc is the

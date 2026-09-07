@@ -35,7 +35,10 @@ fail=0
 for t in $TORTURES; do
     ./translate-and-build.sh "$t" "target/bin/$t" > /dev/null
     a="$(./target/bin/$t 2>/dev/null | grep -v '^\[')"
-    b="$("$REF_JAVA" -cp target/host-classes "com.bench.$t" 2>/dev/null)"
+    # The SAME filter on both sides. It used to be applied only to the target, so a
+    # torture that emitted a "[...]" diagnostic diverged against its own host run -- and
+    # stderr is no way around that, because System.err reaches fd 1 on the clean target.
+    b="$("$REF_JAVA" -cp target/host-classes "com.bench.$t" 2>/dev/null | grep -v '^\[')"
     if [ -n "$a" ] && [ "$a" = "$b" ]; then
         echo "$t: MATCH"
     else
