@@ -1,0 +1,466 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.location;
+
+import com.codename1.ui.Button;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.PeerComponent;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.util.SuccessCallback;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// A button that asks for the device location once, for a single transaction.
+///
+/// This is the Codename One face of the platform's own location button. From
+/// Android 17 (API level 37) Google Play requires transactional precise-location
+/// use -- "find restaurants near me", filling in an address, tagging a photo --
+/// to go through a button the *system* draws, rather than through an app-held
+/// `ACCESS_FINE_LOCATION` grant. A tap on a button the system drew earns a
+/// session-scoped grant, so the application never has to hold precise location
+/// permanently.
+///
+/// ```java
+/// LocationButton b = new LocationButton(LocationButton.TEXT_USE_PRECISE_LOCATION);
+/// b.addLocationSharedListener(loc -> {
+///     if (loc != null) {
+///         search(loc.getLatitude(), loc.getLongitude());
+///     }
+/// });
+/// form.add(b);
+/// ```
+///
+/// #### Where the system draws it, and where it does not
+///
+/// On a platform that has such a control -- today only Android 17 and up -- this
+/// component *is* that control: it is rendered by the system in its own process
+/// and this application cannot restyle its label or intercept its taps, which is
+/// exactly what makes the grant trustworthy. Everywhere else, and on older
+/// Android, the component is an ordinary Codename One [com.codename1.ui.Button]
+/// that asks for the location permission the usual way. Either way the listener
+/// receives a [Location] or null, so an application is written once.
+///
+/// [#isSystemRendered()] reports which of the two is in use, for an application
+/// that wants to say something different about it.
+///
+/// #### On Android
+///
+/// Referencing this class makes the build add `USE_LOCATION_BUTTON` to the
+/// manifest, which the platform requires before it will render the control.
+/// Nothing else is needed.
+///
+/// An application whose *only* location use is transactional can go one step
+/// further and declare that precise location is reachable through the button
+/// alone, which removes the "allow precise location" question from the app
+/// entirely. That is a manifest attribute rather than an API, so it is set
+/// through the `android.xpermissions` build hint:
+///
+/// ```
+/// codename1.arg.android.xpermissions=<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:usesPermissionFlags="onlyForLocationButton" />
+/// ```
+///
+/// Do not set that in an application that also tracks, navigates or geofences:
+/// those need a grant this flag takes away.
+public class LocationButton extends Container {
+
+    /// An icon with no label. The narrowest form of the control.
+    public static final int TEXT_NONE = 0;
+
+    /// Labelled "Precise location".
+    public static final int TEXT_PRECISE_LOCATION = 1;
+
+    /// Labelled "Use precise location". The default.
+    public static final int TEXT_USE_PRECISE_LOCATION = 2;
+
+    /// Labelled "Share precise location".
+    public static final int TEXT_SHARE_PRECISE_LOCATION = 3;
+
+    /// Labelled "Near my precise location".
+    public static final int TEXT_NEAR_MY_PRECISE_LOCATION = 4;
+
+    /// Labelled "Near your precise location".
+    public static final int TEXT_NEAR_YOUR_PRECISE_LOCATION = 5;
+
+    /// Passed to the platform for a colour the application did not choose, so
+    /// the system picks its own. -1 rather than 0 because black is a colour a
+    /// caller can legitimately ask for.
+    private static final int UNSET_COLOR = -1;
+
+    private static final int MAX_TEXT_TYPE = TEXT_NEAR_YOUR_PRECISE_LOCATION;
+
+    /// The smallest the platform will draw its own control.
+    ///
+    /// Android's minimum touch target is 48dp. Codename One's "dips" are
+    /// millimetres, and 48dp is 0.3in, which is 7.62mm -- but asking for
+    /// exactly that measured 122px against the platform's own 126px, because
+    /// [com.codename1.ui.Display#convertToPixels(float)] rounds through an int
+    /// twice. 8mm is 50.4dp before that loss and stays above 48dp after it, at
+    /// any density, which is what stops the platform clamping.
+    private static final float MIN_TOUCH_TARGET_MM = 8f;
+
+    private int textType;
+    private int buttonBackgroundColor = UNSET_COLOR;
+    private int buttonTextColor = UNSET_COLOR;
+    private long timeout = 30000;
+    private boolean acquiring;
+
+    /// Always built, and used for the preferred size even when the platform
+    /// draws the control -- the system button has no size of its own, we tell it
+    /// how big to be, and telling it the size an ordinary themed button would
+    /// have is what keeps it looking like part of the application.
+    private final Button fallback;
+
+    private PeerComponent peer;
+
+    private final List<LocationSharedListener> listeners =
+            new ArrayList<LocationSharedListener>();
+
+    /// A button labelled "Use precise location".
+    public LocationButton() {
+        this(TEXT_USE_PRECISE_LOCATION);
+    }
+
+    /// A button with one of the labels the platform offers.
+    ///
+    /// #### Parameters
+    ///
+    /// - `textType`: one of the `TEXT_` constants
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if `textType` is not one of them
+    public LocationButton(int textType) {
+        super(new BorderLayout());
+        checkTextType(textType);
+        this.textType = textType;
+        setUIID("Container");
+        getAllStyles().stripMarginAndPadding();
+        fallback = new Button(labelFor(textType), "LocationButton");
+        FontImage.setMaterialIcon(fallback, FontImage.MATERIAL_MY_LOCATION);
+        fallback.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                acquire();
+            }
+        });
+    }
+
+    /// Whether a tap will go through a button the system itself drew.
+    ///
+    /// False means the component is an ordinary Codename One button that asks
+    /// for the location permission -- which is the answer on every platform
+    /// other than Android, and on Android below API level 37.
+    ///
+    /// #### Returns
+    ///
+    /// whether the platform draws this control
+    public static boolean isSystemRendered() {
+        return Display.getInstance().isLocationButtonSupported();
+    }
+
+    /// The label this button carries.
+    ///
+    /// #### Returns
+    ///
+    /// one of the `TEXT_` constants
+    public int getTextType() {
+        return textType;
+    }
+
+    /// Chooses the label this button carries.
+    ///
+    /// Takes effect the next time the component is shown; the system renders
+    /// its side of the control once, when the control is attached.
+    ///
+    /// #### Parameters
+    ///
+    /// - `textType`: one of the `TEXT_` constants
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if `textType` is not one of them
+    public void setTextType(int textType) {
+        checkTextType(textType);
+        this.textType = textType;
+        fallback.setText(labelFor(textType));
+    }
+
+    /// Asks the platform to draw the button on this background colour.
+    ///
+    /// Only reaches the system-rendered control; the fallback button is themed
+    /// through its `LocationButton` UIID like any other component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `color`: an RRGGBB colour, or -1 to let the system choose
+    public void setButtonBackgroundColor(int color) {
+        this.buttonBackgroundColor = color;
+    }
+
+    /// The background colour asked of the platform, or -1.
+    ///
+    /// #### Returns
+    ///
+    /// an RRGGBB colour or -1
+    public int getButtonBackgroundColor() {
+        return buttonBackgroundColor;
+    }
+
+    /// Asks the platform to draw the button's label in this colour.
+    ///
+    /// #### Parameters
+    ///
+    /// - `color`: an RRGGBB colour, or -1 to let the system choose
+    public void setButtonTextColor(int color) {
+        this.buttonTextColor = color;
+    }
+
+    /// The label colour asked of the platform, or -1.
+    ///
+    /// #### Returns
+    ///
+    /// an RRGGBB colour or -1
+    public int getButtonTextColor() {
+        return buttonTextColor;
+    }
+
+    /// How long to wait for a fix once the request has been granted.
+    ///
+    /// #### Returns
+    ///
+    /// the timeout in milliseconds, or -1 to wait indefinitely
+    public long getTimeout() {
+        return timeout;
+    }
+
+    /// How long to wait for a fix once the request has been granted.
+    ///
+    /// A cold GPS fix is legitimately slow, so this is deliberately generous;
+    /// on expiry the listener is invoked with null rather than left hanging.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: milliseconds, or -1 to wait indefinitely
+    public void setTimeout(long timeout) {
+        this.timeout = timeout;
+    }
+
+    /// Registers a listener for the location this button obtains.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void addLocationSharedListener(LocationSharedListener l) {
+        if (l != null && !listeners.contains(l)) {
+            listeners.add(l);
+        }
+    }
+
+    /// Removes a previously registered listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void removeLocationSharedListener(LocationSharedListener l) {
+        listeners.remove(l);
+    }
+
+    /// The size an ordinary themed button with the same label would have, but
+    /// never below the platform's minimum touch target.
+    ///
+    /// The system-rendered control is given whatever size we ask for, so this
+    /// answer is used for both paths and the two look alike. The floor is not a
+    /// nicety: Android clamps a location button up to 48dp and says so in the
+    /// log ("Clamping height up from 60 to 126 px"), and the button it then
+    /// draws overflows the slot Codename One laid out for it -- observed on an
+    /// Android 17 emulator, where the control was visibly cut in half.
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size
+    @Override
+    protected Dimension calcPreferredSize() {
+        Dimension size = new Dimension(fallback.getPreferredSize());
+        int floor = Display.getInstance().convertToPixels(MIN_TOUCH_TARGET_MM);
+        if (size.getHeight() < floor) {
+            size.setHeight(floor);
+        }
+        return size;
+    }
+
+    @Override
+    protected void initComponent() {
+        super.initComponent();
+        if (getComponentCount() == 0) {
+            buildChild();
+        }
+    }
+
+    /// Puts either the platform's control or the fallback button in place.
+    private void buildChild() {
+        if (Display.getInstance().isLocationButtonSupported()) {
+            peer = Display.getInstance().createLocationButton(textType,
+                    buttonBackgroundColor, buttonTextColor,
+                    new SuccessCallback<Boolean>() {
+                        @Override
+                        public void onSucess(Boolean granted) {
+                            permissionResult(granted);
+                        }
+                    });
+            if (peer != null) {
+                add(BorderLayout.CENTER, peer);
+                return;
+            }
+        }
+        peer = null;
+        add(BorderLayout.CENTER, fallback);
+    }
+
+    /// The platform's answer to a tap, or to the session it opened.
+    ///
+    /// #### Parameters
+    ///
+    /// - `granted`: TRUE when the user shared their location, FALSE when they
+    ///   declined, and null when the platform's control failed -- which can
+    ///   arrive without a tap, because the session is opened when the control
+    ///   is attached
+    private void permissionResult(final Boolean granted) {
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (granted == null) {
+                    useFallback();
+                    return;
+                }
+                if (granted.booleanValue()) {
+                    acquire();
+                } else {
+                    fireLocationShared(null);
+                }
+            }
+        });
+    }
+
+    /// Replaces a control the platform could not open with the ordinary button.
+    ///
+    /// The alternative is a control that is present, correct and dead, which is
+    /// the worst way for this to fail: the build and the manifest are both fine
+    /// and nothing says otherwise.
+    private void useFallback() {
+        if (peer == null) {
+            return;
+        }
+        removeComponent(peer);
+        peer = null;
+        add(BorderLayout.CENTER, fallback);
+        Container parent = getParent();
+        if (parent != null) {
+            parent.revalidate();
+        } else {
+            revalidate();
+        }
+    }
+
+    /// Fetches the fix and tells the listeners, on the EDT.
+    ///
+    /// Called after a granted system session, and directly from the fallback
+    /// button's action -- in which case obtaining the manager is what asks the
+    /// user for permission.
+    private void acquire() {
+        if (acquiring) {
+            return;
+        }
+        acquiring = true;
+        try {
+            final LocationManager manager = LocationManager.getLocationManager();
+            if (manager == null) {
+                fireLocationShared(null);
+                return;
+            }
+            final Location[] result = new Location[1];
+            // invokeAndBlock so a cold fix does not freeze the form; the EDT
+            // keeps pumping while the platform looks for one.
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    result[0] = manager.getCurrentLocationSync(timeout);
+                }
+            });
+            fireLocationShared(result[0]);
+        } finally {
+            acquiring = false;
+        }
+    }
+
+    private void fireLocationShared(Location location) {
+        // A copy, because a listener is entitled to remove itself while it
+        // is being told.
+        List<LocationSharedListener> copy =
+                new ArrayList<LocationSharedListener>(listeners);
+        for (LocationSharedListener l : copy) {
+            l.locationShared(location);
+        }
+    }
+
+    private static void checkTextType(int textType) {
+        if (textType < TEXT_NONE || textType > MAX_TEXT_TYPE) {
+            throw new IllegalArgumentException("Unknown text type: " + textType);
+        }
+    }
+
+    /// The wording the platform uses, for the fallback button to match.
+    ///
+    /// Localized through the resource bundle so an application that translates
+    /// its UI translates this too; the platform localizes its own control.
+    private static String labelFor(int textType) {
+        switch (textType) {
+            case TEXT_NONE:
+                return "";
+            case TEXT_PRECISE_LOCATION:
+                return localize("LocationButton.preciseLocation", "Precise location");
+            case TEXT_SHARE_PRECISE_LOCATION:
+                return localize("LocationButton.sharePreciseLocation", "Share precise location");
+            case TEXT_NEAR_MY_PRECISE_LOCATION:
+                return localize("LocationButton.nearMyPreciseLocation", "Near my precise location");
+            case TEXT_NEAR_YOUR_PRECISE_LOCATION:
+                return localize("LocationButton.nearYourPreciseLocation", "Near your precise location");
+            default:
+                return localize("LocationButton.usePreciseLocation", "Use precise location");
+        }
+    }
+
+    private static String localize(String key, String defaultValue) {
+        UIManager manager = UIManager.getInstance();
+        if (manager == null) {
+            return defaultValue;
+        }
+        return manager.localize(key, defaultValue);
+    }
+}

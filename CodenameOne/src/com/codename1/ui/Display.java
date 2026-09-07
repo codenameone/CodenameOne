@@ -6413,6 +6413,54 @@ public final class Display extends CN1Constants {
         return impl.getLocationManager();
     }
 
+    /// Whether this platform draws a location button of its own.
+    ///
+    /// From Android 17 Google Play requires transactional precise-location use
+    /// to go through a button the *system* draws, because a tap on such a button
+    /// is what earns a session-scoped grant. Where there is no such control this
+    /// returns false and [com.codename1.location.LocationButton] falls back to
+    /// an ordinary Codename One button that asks for the location permission.
+    ///
+    /// Application code normally reads this through
+    /// `com.codename1.location.LocationButton#isSystemRendered()`.
+    ///
+    /// #### Returns
+    ///
+    /// whether [#createLocationButton] can produce a control
+    public boolean isLocationButtonSupported() {
+        return impl.isLocationButtonSupported();
+    }
+
+    /// Builds the platform's own location button.
+    ///
+    /// This is the platform half of [com.codename1.location.LocationButton],
+    /// which is what application code uses; it is public for the same reason
+    /// [#createGpuPeer] is, so a port and the component can meet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `textType`: one of the `TEXT_` constants on
+    ///   [com.codename1.location.LocationButton]
+    ///
+    /// - `backgroundColor`: an RRGGBB colour for the control, or -1 to let the
+    ///   platform choose
+    ///
+    /// - `textColor`: an RRGGBB colour for its label, or -1 to let the platform
+    ///   choose
+    ///
+    /// - `onPermissionResult`: invoked with TRUE when the user shared their
+    ///   location, FALSE when they declined, and null when the platform's own
+    ///   session failed
+    ///
+    /// #### Returns
+    ///
+    /// the control, or null when this platform has none
+    public PeerComponent createLocationButton(int textType, int backgroundColor,
+            int textColor, SuccessCallback<Boolean> onPermissionResult) {
+        return impl.createLocationButton(textType, backgroundColor, textColor,
+                onPermissionResult);
+    }
+
     /// Returns the platform motion sensor entry point or {@code null} when the
     /// current port does not provide motion sensors. Prefer
     /// {@link com.codename1.sensors.MotionSensorManager#getInstance()} in

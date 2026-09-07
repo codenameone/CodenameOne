@@ -465,6 +465,48 @@ public class AndroidGradleBuilder extends Executor {
     private boolean vibratePermission;
     private boolean smsPermission;
     private boolean gpsPermission;
+
+    /// Set when the application references `com.codename1.location.LocationButton`.
+    ///
+    /// The system-rendered location button will not render at all without
+    /// `USE_LOCATION_BUTTON` in the merged manifest, and there is no runtime way
+    /// to acquire it. Detected from actual usage, so an application that never
+    /// shows one does not carry the permission.
+    private boolean locationButtonPermission;
+
+    /// What the platform requires before it will render the system location
+    /// button. Google Play requires that button for transactional precise
+    /// location from Android 17.
+    ///
+    /// Its optional companion -- `usesPermissionFlags="onlyForLocationButton"`
+    /// on `ACCESS_FINE_LOCATION`, which takes ordinary precise location away
+    /// from the application entirely -- is deliberately NOT inferred. Whether
+    /// that is safe depends on what else the application does with location,
+    /// which is the developer's answer to give through `android.xpermissions`.
+    static final String LOCATION_BUTTON_PERMISSION =
+            "    <uses-permission android:name=\"android.permission.USE_LOCATION_BUTTON\" />\n";
+
+    /// Whether a class the application references is the location button.
+    ///
+    /// Nested classes count -- an anonymous listener written inside the
+    /// component is still the component -- while every other class in the
+    /// location package does not: they are the ordinary location APIs, which
+    /// need `ACCESS_FINE_LOCATION` and not this.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cls`: an internal class name, e.g. `com/codename1/location/LocationButton`
+    ///
+    /// #### Returns
+    ///
+    /// whether the application shows a location button
+    static boolean isLocationButtonClass(String cls) {
+        if (cls == null) {
+            return false;
+        }
+        return cls.equals("com/codename1/location/LocationButton")
+                || cls.startsWith("com/codename1/location/LocationButton$");
+    }
     private boolean pushPermission;
     private int pushVersion;
     private boolean foregroundServicePermission;
@@ -2069,6 +2111,10 @@ public class AndroidGradleBuilder extends Executor {
                     }
                     if (cls.indexOf("com/codename1/maps") == 0 || cls.indexOf("com/codename1/location") == 0) {
                         gpsPermission = true;
+                    }
+                    if (isLocationButtonClass(cls)) {
+                        debug("Adding location button permission because of class " + cls);
+                        locationButtonPermission = true;
                     }
                     if (cls.indexOf("com/codename1/push") > -1) {
                         pushPermission = true;
@@ -5244,6 +5290,10 @@ public class AndroidGradleBuilder extends Executor {
                 permissions += permissionAdd(request, "ACCESS_MOCK_LOCATION",
                         "    <uses-permission android:name=\"android.permission.ACCESS_MOCK_LOCATION\"  android:required=\"false\" />\n");
             }
+        }
+        if (locationButtonPermission) {
+            permissions += permissionAdd(request, "USE_LOCATION_BUTTON",
+                    LOCATION_BUTTON_PERMISSION);
         }
         if (pushPermission && !useFCM && !useHMS) {
             permissions += "<permission android:name=\"" + request.getPackageName() + ".permission.C2D_MESSAGE\" android:protectionLevel=\"signature\" />\n"
