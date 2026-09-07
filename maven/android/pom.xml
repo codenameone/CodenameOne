@@ -111,6 +111,15 @@
                                      the builder deletes whichever halves the
                                      app did not ask for. -->
                                 <exclude>com/codename1/impl/android/nearby/**</exclude>
+                                <!-- The location button compiles against
+                                     androidx.core.locationbutton, an artifact
+                                     AndroidGradleBuilder adds only for an app
+                                     that referenced
+                                     com.codename1.location.LocationButton; it
+                                     deletes the package for everyone else. Like
+                                     the ones above it ships as source and
+                                     compiles inside the generated app. -->
+                                <exclude>com/codename1/impl/android/locationbutton/**</exclude>
                                 <!-- BillingSupport is written against the Play
                                      Billing ProductDetails API, which needs
                                      billing 8 or newer; cn1-binaries carries

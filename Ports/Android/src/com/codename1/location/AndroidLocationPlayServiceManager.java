@@ -118,6 +118,17 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         return instance;
     }
 
+    /**
+     * How long {@link #getLastKnownLocation()} waits for the Google API client
+     * to connect before answering that it has no fix.
+     *
+     * <p>Generous, because a real connect is quick and this is only reached
+     * when one is not happening at all -- a device where Play Services is
+     * absent, disabled or out of date. Short enough that a caller which set no
+     * deadline of its own still returns.</p>
+     */
+    private static final long CONNECT_WAIT_MS = 10000;
+
     @Override
     public Location getCurrentLocation() throws IOException {
         Location l = getLastKnownLocation();
@@ -127,9 +138,35 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         return l;
     }
 
+    /**
+     * The last fix Play Services holds, or null.
+     *
+     * <p>The connect wait is BOUNDED, and it is the only one in this class
+     * that is. Every other {@code isConnected} loop here sits inside a thread
+     * of its own that nothing joins, so a client that never connects costs
+     * that thread and nothing else. This one runs on the CALLER's thread and
+     * hands back a value, so an unbounded loop is a caller that never returns
+     * -- and the client does not always connect: Play Services can be absent,
+     * disabled or out of date on the device.</p>
+     *
+     * <p>What that cost: {@code getCurrentLocation} above calls this, and a
+     * {@code LocationButton} tap goes through it, so a disconnected client
+     * meant the tap's listener was never called at all and the timeout the
+     * application had set could never fire -- there is no deadline on a wait
+     * that has not ended. Every other caller of {@code getCurrentLocation}
+     * hung the same way.</p>
+     *
+     * <p>Returning null on expiry is the answer this method already documents
+     * for having no fix, and the caller above turns it into the same
+     * "cannot retrieve location try later" it raises for an empty cache.</p>
+     */
     @Override
     public Location getLastKnownLocation() {
+        long connectDeadline = System.currentTimeMillis() + CONNECT_WAIT_MS;
         while (!getmGoogleApiClient().isConnected()) {
+            if (System.currentTimeMillis() > connectDeadline) {
+                return null;
+            }
             Util.sleep(300);
         }
         //android.location.Location location = LocationServices.FusedLocationApi.getLastLocation(getmGoogleApiClient());
@@ -260,6 +297,33 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
     }
 
     @Override
+    // KNOWN HAZARD, deliberately not patched here.
+    //
+    // This method and bindListener each spawn a thread that waits for the API
+    // client to CONNECT before posting to the main looper, so the order they
+    // are called in is not the order they run in. If the client is down when a
+    // clear starts and up when the bind after it starts, the bind posts first
+    // and this removal lands on the subscription that bind had just made --
+    // and what is removed is the MANAGER, not a per-request listener, so it
+    // cancels whatever is current and its owner waits out its timeout getting
+    // nothing.
+    //
+    // Two patches were tried on the location-button branch and both were
+    // withdrawn, because each traded a narrow failure for a broader one. A
+    // counter that suppressed an overtaken clear also suppressed the clear in
+    // setLocationListener, which calls clear and bind back to back on EVERY
+    // listener replacement: when that replacement switches delivery between
+    // the callback and the PendingIntent -- which is what crossing
+    // foreground/background does -- the old channel is then never removed and
+    // goes on asking for high-accuracy fixes. Guarding the bind side as well
+    // does not help, because the two calls are still racing.
+    //
+    // The real fix is to SERIALIZE bind and clear so they run in the order
+    // they were called, which means one worker for this manager rather than a
+    // thread per call. That is a change to location code every Android app
+    // uses, it cannot be exercised by anything in this repository -- the
+    // emulator instrumentation suite is a separate job -- and it wants device
+    // testing. It does not belong to a feature branch about a button.
     protected void clearListener() {
         final Class bgListenerClass = getBackgroundLocationListener();
         Thread t = new Thread(new Runnable() {

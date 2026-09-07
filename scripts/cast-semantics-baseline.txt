@@ -36,7 +36,6 @@ com/codename1/impl/android/AndroidImplementation#getEnabledAccessibilityServices
 com/codename1/impl/android/AndroidImplementation#getHostOrIP()Ljava/lang/String;|cast to java.net.InetAddress inside catch(java.lang.Throwable)
 com/codename1/impl/android/AndroidImplementation#getHostOrIP()Ljava/lang/String;|cast to java.net.NetworkInterface inside catch(java.lang.Throwable)
 com/codename1/impl/android/AndroidImplementation#getInAppPurchase()Lcom/codename1/payment/Purchase;|cast to com.codename1.payment.Purchase inside catch(java.lang.Throwable)
-com/codename1/impl/android/AndroidImplementation#getLocationManager()Lcom/codename1/location/LocationManager;|cast to com.codename1.location.LocationManager inside catch(java.lang.Exception)
 com/codename1/impl/android/AndroidImplementation#getPendingPush(Ljava/lang/String;Landroid/content/Context;)[Ljava/lang/String;|cast to java.lang.String inside catch(java.lang.Exception)
 com/codename1/impl/android/AndroidImplementation#getSSLCertificatesEx(Ljava/lang/Object;Ljava/lang/String;)[Ljava/lang/String;|cast to [Ljava.lang.String; inside catch(java.lang.Exception)
 com/codename1/impl/android/AndroidImplementation#getSystemBarInsets(Landroid/view/View;)Landroid/graphics/Rect;|cast to java.lang.Integer inside catch(java.lang.Throwable)

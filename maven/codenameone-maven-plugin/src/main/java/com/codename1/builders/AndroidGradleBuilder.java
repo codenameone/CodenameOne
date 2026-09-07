@@ -85,7 +85,44 @@ import org.xeustechnologies.jtar.TarOutputStream;
 public class AndroidGradleBuilder extends Executor {
 
     private static final String GRADLE_8_VERSION = "8.13";
-    private static final String ANDROID_GRADLE_PLUGIN_8_VERSION = "8.13.2";
+    static final String ANDROID_GRADLE_PLUGIN_8_VERSION = "8.13.2";
+
+    /**
+     * The compile SDK {@code androidx.core.locationbutton} demands, which is
+     * the level the platform's own location button API arrived in. Read out of
+     * the aar's metadata rather than inferred: AGP's {@code checkAarMetadata}
+     * refuses the dependency below it, before a line is compiled.
+     */
+    static final int LOCATION_BUTTON_MIN_COMPILE_SDK = 37;
+
+    /**
+     * The Android Gradle plugin that same metadata demands. There is no way
+     * around it: {@code checkAarMetadata} is not a warning and has no opt-out,
+     * so a build below this floor fails with a message about aar metadata
+     * rather than about the feature the developer asked for.
+     */
+    static final String LOCATION_BUTTON_MIN_AGP_VERSION = "9.1.0";
+
+    /// The Gradle version androidx.core.locationbutton needs.
+    ///
+    /// Separate from the plugin floor and not implied by it. AGP 9 refuses to
+    /// run on Gradle 8 outright, so a build that has the plugin and not the
+    /// distribution fails at Gradle startup -- before anything this builder
+    /// wrote is even read. Testing only "is the pinned plugin the one we get"
+    /// let that through the moment the pinned plugin moved to 9.1.0 while the
+    /// resolved Gradle was still 8.x, which is exactly the half-migrated state
+    /// this gate exists to refuse. The error message has always said "Gradle 9
+    /// or newer"; this is the line that makes it true.
+    static final String LOCATION_BUTTON_MIN_GRADLE_VERSION = "9.6";
+
+    // 9.6 because that is the distribution the working combination was
+    // actually built with -- AGP 9.4.0, Gradle 9.6.0, compile SDK 37, which is
+    // the arrangement that got a generated project past checkAarMetadata and
+    // through a real build. It is NOT a vendor-documented minimum, and it is
+    // deliberately the conservative direction: too high refuses a build that
+    // might have worked, and says why; too low opens the gate and the build
+    // dies in Gradle's own startup, which is the failure this guard exists to
+    // replace.
     private static final String DESUGAR_JDK_LIBS_VERSION = "2.1.5";
     private static final String GRADLE_8_DISTRIBUTION_URL =
             "https://services.gradle.org/distributions/gradle-" + GRADLE_8_VERSION + "-bin.zip";
@@ -903,6 +940,268 @@ public class AndroidGradleBuilder extends Executor {
     private boolean migrateToAndroidX;
     private boolean shouldIncludeGoogleImpl;
     private boolean arSupport;
+
+    /// The application references com.codename1.location.LocationButton, which
+    /// is what earns it USE_LOCATION_BUTTON, the AndroidX library that draws
+    /// the system control, and the implementation package the build otherwise
+    /// deletes.
+    private boolean usesLocationButton;
+
+    /// Whether `cls`, as the scanner reports it, names `internalName`.
+    ///
+    /// The scanner reports a class in TWO spellings. The method and field
+    /// visitors give the internal, slash-separated name; visitLdcInsn gives
+    /// Type.getClassName(), which is DOTTED. An application that reaches the
+    /// button only through a class literal -- LocationButton.class handed to a
+    /// reflective factory -- therefore arrived here dotted, a slash-only
+    /// comparison read it as unused, and the build skipped the gate and deleted
+    /// the bridge package: a green build shipping a button that cannot work.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cls`: the name as the scanner reported it, in either spelling
+    /// - `internalName`: the slash-separated name to match
+    ///
+    /// #### Returns
+    ///
+    /// whether they name the same class
+    private static boolean namesClass(String cls, String internalName) {
+        if (cls == null) {
+            return false;
+        }
+        return internalName.equals(cls)
+                || internalName.equals(cls.replace('.', '/'));
+    }
+
+    /// The framework wrappers whose CONSTRUCTION is a non-button precise
+    /// location use, detected by class reference rather than through their
+    /// calls.
+    ///
+    /// Their calls into LocationManager are their own -- GeofenceManager makes
+    /// the addGeoFencing and setBackgroundLocationListener calls, MapComponent
+    /// makes a getLastKnownLocation call to centre itself -- and that is
+    /// framework code the attribution deliberately ignores. So an app using the
+    /// documented API of either looked, to a scan watching only LocationManager,
+    /// exactly like an app that never touched location: it passed the
+    /// exclusivity check and had its geofencing refused the grant it needs, or
+    /// its map quietly centred on an approximate position.
+    ///
+    /// Safe as bare class references: nothing in the framework names either
+    /// except their own inner classes, which the framework filter strips to the
+    /// outer name and drops.
+    ///
+    /// The SAME list the archive scanner uses, and it has to stay that way. The
+    /// two scans answer one question about two trees, and a marker added to one
+    /// of them alone is a hole in whichever tree the app happens to use --
+    /// MapComponent went into the archive scan first and this one reported an
+    /// app with a map as using no location at all.
+    static final String[] NON_BUTTON_LOCATION_CLASSES = {
+        "com/codename1/location/GeofenceManager",
+    };
+
+    /// The map class this builder matches, for the parity test.
+    static String mapComponentClassForTest() {
+        return LocationButtonManifestFragments.MAP_COMPONENT_CLASS;
+    }
+
+    /// Whether this constructs a MapComponent, whichever constructor it is.
+    ///
+    /// Narrowed to the centreless overloads once, on the reasoning that a map
+    /// given a centre never reaches getLastKnownLocation. It does when that
+    /// centre is NULL -- a supported value MapComponent handles by looking a
+    /// location up -- and no descriptor distinguishes null from a real Coord.
+    /// The value of an argument is not something this scan has: ACONST_NULL is
+    /// modelled here as "not a boolean literal", which is indistinguishable
+    /// from unknown.
+    ///
+    /// So it over-approximates deliberately. A map with a real centre beside
+    /// android.locationButton.exclusive is refused and says why, and dropping
+    /// an opt-in hint fixes that in seconds; the alternative ships a map that
+    /// quietly stopped being accurate. Constructing the class is the signal --
+    /// naming the type still is not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cls`: the owner as the scanner reported it, in either spelling
+    /// - `method`: the method name
+    /// - `descriptor`: the method descriptor
+    ///
+    /// #### Returns
+    ///
+    /// whether this construction performs a location lookup
+    private static boolean isMapLookupConstructor(String cls, String method,
+            String descriptor) {
+        if (!"<init>".equals(method)
+                || !namesClass(cls,
+                        LocationButtonManifestFragments.MAP_COMPONENT_CLASS)) {
+            return false;
+        }
+        return true;
+    }
+
+    /// Whether `cls`, as the scanner reports it, is one of those wrappers.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cls`: the name as the scanner reported it, in either spelling
+    ///
+    /// #### Returns
+    ///
+    /// whether constructing it needs precise location outside the button
+    private static boolean isNonButtonLocationClass(String cls) {
+        for (int iter = 0; iter < NON_BUTTON_LOCATION_CLASSES.length; iter++) {
+            if (namesClass(cls, NON_BUTTON_LOCATION_CLASSES[iter])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether `method` is one of the LocationManager calls that needs precise
+    /// location OUTSIDE the button.
+    ///
+    /// Shared by the loose-class scan and named rather than inlined so the two
+    /// halves of the same question cannot drift: the library scan asks it of a
+    /// constant pool through LocationButtonManifestFragments, and this asks it
+    /// of a method name the scanner has already separated from its owner.
+    ///
+    /// #### Parameters
+    ///
+    /// - `method`: the called method's name
+    ///
+    /// #### Returns
+    ///
+    /// whether that call needs a grant android.locationButton.exclusive
+    /// gives away
+    private static boolean isNonButtonLocationMethod(String method) {
+        return "addGeoFencing".equals(method)
+                || "setBackgroundLocationListener".equals(method)
+                || "setLocationListener".equals(method)
+                || "getCurrentLocation".equals(method)
+                || "getCurrentLocationSync".equals(method)
+                || "getLastKnownLocation".equals(method);
+    }
+
+    /// Background location the APPLICATION asked for, as opposed to the flag
+    /// beside it.
+    ///
+    /// backgroundLocationPermission is set by two unattributed tests that have
+    /// been there for years, and in a tree where the framework is staged beside
+    /// the app the framework's OWN GeofenceManager trips them. That was
+    /// harmless while the flag only added a permission -- an app that geofences
+    /// wants it -- and stopped being harmless when the exclusivity check began
+    /// consuming it: a button-only application was refused
+    /// android.locationButton.exclusive because of a call it never made.
+    ///
+    /// So the conflict check reads THIS, and the manifest still reads the other
+    /// one. Tightening the original would change what permissions existing apps
+    /// ship, which is not this change's business.
+    private boolean appBackgroundLocation;
+
+    /// Every class the scan saw, mapped to the class it extends.
+    ///
+    /// Kept so a method owner can be resolved through the hierarchy after the
+    /// scan, which is the only time the whole hierarchy is known.
+    private final java.util.Map<String, String> scannedSupers =
+            new java.util.HashMap<String, String>();
+
+    /// Owners of a non-button location call that were not LocationManager
+    /// itself, waiting to be tested against the hierarchy.
+    /// A submitted archive asks for precise location in its own manifest.
+    ///
+    /// Kept separate from usesPersistentLocation because it is a different
+    /// fact with a different message: nothing of ours is called, so no bytecode
+    /// marker exists, and the permission the library declares is the whole
+    /// evidence.
+    private boolean libraryPreciseLocation;
+
+    private final java.util.Set<String> deferredLocationOwners =
+            new java.util.HashSet<String>();
+
+    /// Whether {@code owner} is LocationManager or something that extends it.
+    ///
+    /// Bounded, because the map is built from files: a hand-made class can
+    /// name itself as its own superclass, and a cycle would otherwise spin
+    /// here. Nothing javac emits comes near this depth.
+    private boolean extendsLocationManager(String owner) {
+        String at = owner;
+        for (int step = 0; at != null && step < 32; step++) {
+            if ("com/codename1/location/LocationManager".equals(at)) {
+                return true;
+            }
+            at = scannedSupers.get(at);
+        }
+        return false;
+    }
+
+    /// True when this reference is the APPLICATION asking for background
+    /// location, as opposed to the framework staged beside it.
+    ///
+    /// EXACT names and exact methods, unlike the prefix and substring tests
+    /// that set `backgroundLocationPermission` beside every call to this. Those
+    /// have always been loose and it cost nothing: the worst a
+    /// `LocationManagerHelper` calling `addGeoFencingLater` bought was a
+    /// background permission it did not need. This flag REFUSES the build
+    /// alongside `android.locationButton.exclusive`, so a name that merely
+    /// starts with or contains the right thing would turn a historical
+    /// over-grant into a build the developer cannot make.
+    static boolean appOwnsBackgroundLocation(String cls, String method,
+            String scanningType) {
+        return "com/codename1/location/LocationManager".equals(cls)
+                && ("addGeoFencing".equals(method)
+                        || "setBackgroundLocationListener".equals(method))
+                && !LocationButtonManifestFragments
+                        .isFrameworkOwner(scanningType);
+    }
+
+    /// True when the APPLICATION itself references the geofencing API.
+    ///
+    /// Exact for the reason above. The legacy test beside this one asks whether
+    /// the name CONTAINS `com/codename1/location/Geofence`, which an
+    /// application's own `GeofenceHelper` satisfies. Nested classes are the
+    /// framework's own and count.
+    static boolean appOwnsGeofencing(String cls, String scanningType) {
+        return ("com/codename1/location/Geofence".equals(cls)
+                        || "com/codename1/location/GeofenceManager".equals(cls)
+                        || cls.startsWith("com/codename1/location/Geofence$")
+                        || cls.startsWith(
+                                "com/codename1/location/GeofenceManager$"))
+                && !LocationButtonManifestFragments
+                        .isFrameworkOwner(scanningType);
+    }
+
+    /// The identifier of the highest platform this machine has installed --
+    /// "37.0", not "37".
+    ///
+    /// From Android 17 a platform package carries a MINOR version:
+    /// platforms;android-37.0 and android-37.2 exist and platforms;android-37
+    /// does not, which is why this branch's own CI installs the minor-versioned
+    /// package by name. Validating the integer floor and then emitting a bare
+    /// "37" as the compile SDK would ask Gradle for a platform directory that
+    /// is not there.
+    private String maxInstalledPlatformVersion = "";
+
+    /// The highest Android platform this machine has INSTALLED, or 0.
+    ///
+    /// Distinct from maxPlatformVersionInt, which counts sdkmanager rows for
+    /// packages that are merely available and is then floored to 36 under
+    /// useGradle8. Only the location-button gate reads this, because it is the
+    /// only place that refuses a build for the absence of a platform.
+    private int maxInstalledPlatformVersionInt;
+
+    /// The class whose body the scanner is currently reading, so a reference to
+    /// com.codename1.location.LocationButton can be attributed to whoever made
+    /// it. Only the location-button test needs this; see the comment there.
+    private String scanningLocationType;
+
+    /// The application CALLS a location API that needs the grant to survive
+    /// the session -- geofencing or a background location listener.
+    ///
+    /// Attributed to a call rather than to a class reference, unlike
+    /// `gpsPermission`: the framework's own `LocationManager` names `Geofence`
+    /// in a method signature, so every application ever built references the
+    /// class and only the ones that invoke the method are actually using it.
+    private boolean usesPersistentLocation;
     /** The catalog entry that carries the SQLCipher dependencies and their minimum SDK. */
     private static final String DATABASE_CIPHER_CATALOG_CLASS = "com/codename1/db/DatabaseConfig";
 
@@ -1259,6 +1558,7 @@ public class AndroidGradleBuilder extends Executor {
         }
         Scanner sdkScanner = new Scanner(sdkListStr);
         List<String> installedPlatforms = new ArrayList<>();
+        List<String> reallyInstalledPlatforms = new ArrayList<>();
         List<String> installedBuildToolsVersions = new ArrayList<>();
         while (sdkScanner.hasNextLine()) {
             String line = sdkScanner.nextLine().trim();
@@ -1282,6 +1582,18 @@ public class AndroidGradleBuilder extends Executor {
                     }
 
                     installedPlatforms.add(platform);
+                    // FOUR columns means installed; three means merely
+                    // available. The build-tools branch above has always drawn
+                    // that line and this one has not, so installedPlatforms
+                    // holds packages this machine can download as well as ones
+                    // it has. Left as it is -- what it feeds has behaved this
+                    // way for years -- and recorded separately for the
+                    // location-button gate, which refuses a build when the
+                    // platform is absent and must not be told a downloadable
+                    // one is present.
+                    if (columns.length >= 4) {
+                        reallyInstalledPlatforms.add(platform);
+                    }
                 }
             }
         }
@@ -1311,6 +1623,17 @@ public class AndroidGradleBuilder extends Executor {
         if (maxPlatformVersionInt == 0) {
             maxPlatformVersionInt = 31;
             maxPlatformVersion = "31";
+        }
+
+        // The highest platform this machine actually HAS, which is not
+        // maxPlatformVersionInt: that one counts available packages too and is
+        // floored to 36 under useGradle8 whatever is on disk.
+        for (String ver : reallyInstalledPlatforms) {
+            int verInt = parseVersionStringAsInt(ver);
+            if (verInt > maxInstalledPlatformVersionInt) {
+                maxInstalledPlatformVersionInt = verInt;
+                maxInstalledPlatformVersion = ver;
+            }
         }
 
         if (maxBuildToolsVersionInt == 0) {
@@ -1969,9 +2292,26 @@ public class AndroidGradleBuilder extends Executor {
                 public void declaresType(String cls, String superName,
                         boolean isConcrete) {
                     healthScan.declaresType(cls, superName, isConcrete);
+                    // Kept for the location resolution below: a call through a
+                    // SUBCLASS-typed reference records the subclass as the
+                    // method's owner, and the scan cannot tell whether that
+                    // subclass is a LocationManager until it has seen the
+                    // class that declares it -- which may be after the call.
+                    if (cls != null && superName != null) {
+                        scannedSupers.put(cls, superName);
+                    }
                 }
 
 
+
+                @Override
+                public void scanningType(String cls) {
+                    // Remembered for the location-button test below, which is
+                    // the one flag here that must not fire on the framework's
+                    // own classes. Everything else in this scanner is happy to
+                    // be unattributed.
+                    scanningLocationType = cls;
+                }
 
                 @Override
                 public void usesClass(String cls) {
@@ -2030,6 +2370,52 @@ public class AndroidGradleBuilder extends Executor {
                     if (cls.indexOf("com/codename1/maps") == 0 || cls.indexOf("com/codename1/location") == 0) {
                         gpsPermission = true;
                     }
+                    // The button on its own, not the whole location package.
+                    // gpsPermission above is what declares the ordinary
+                    // location permissions; this is what declares the one that
+                    // renders the system control and pulls in the library that
+                    // talks to it.
+                    //
+                    // ATTRIBUTED, unlike gpsPermission beside it, and this is
+                    // defence in depth rather than a fix for something observed.
+                    //
+                    // Review raised it as a P0: LocationButton's own anonymous
+                    // inner classes -- the grant callback, the failure Runnable,
+                    // the fallback ActionListener -- do call back into the outer
+                    // class, so visitMethodInsn names
+                    // com/codename1/location/LocationButton as the OWNER while
+                    // scanning LocationButton$1, and an unattributed test would
+                    // then answer yes for every application ever built. Since
+                    // this flag gates a build-refusing toolchain check, that
+                    // would reject every Android build in existence.
+                    //
+                    // MEASURED, because the conclusion is severe enough to be
+                    // worth a real build rather than a reading: hellocodenameone
+                    // with no reference to the class was built for Android on
+                    // exactly the reviewed code, and the refusal did not fire --
+                    // the generated project has no USE_LOCATION_BUTTON, no
+                    // dependency, and the bridge package deleted. So the
+                    // framework's own classes do not reach this callback in the
+                    // tree the builder actually scans, and nothing was broken.
+                    //
+                    // The attribution stays anyway. The mechanism is real, what
+                    // keeps it harmless is how the framework happens to be
+                    // staged, and the failure it would cause is total. scanningType
+                    // names the class making the reference, which is exactly what
+                    // that callback is documented for, so this costs one field.
+                    if (namesClass(cls, "com/codename1/location/LocationButton")
+                            && !LocationButtonManifestFragments
+                                    .isFrameworkOwner(scanningLocationType)) {
+                        usesLocationButton = true;
+                    }
+                    // The wrappers, as class references. See
+                    // NON_BUTTON_LOCATION_CLASSES for why their own calls
+                    // cannot serve.
+                    if (isNonButtonLocationClass(cls)
+                            && !LocationButtonManifestFragments
+                                    .isFrameworkOwner(scanningLocationType)) {
+                        usesPersistentLocation = true;
+                    }
                     if (cls.indexOf("com/codename1/push") > -1) {
                         pushPermission = true;
                         if ("com/codename1/push/PushClient".equals(cls)) {
@@ -2061,6 +2447,8 @@ public class AndroidGradleBuilder extends Executor {
                             playFlag = "false";
                             if (targetSDKVersionInt >= 29) {
                                 backgroundLocationPermission = true;
+                                appBackgroundLocation |= appOwnsGeofencing(cls,
+                                        scanningLocationType);
                             }
                         }
                     }
@@ -2327,6 +2715,15 @@ public class AndroidGradleBuilder extends Executor {
                 @Override
                 public void usesClassMethodWithDescriptor(String cls,
                         String method, String descriptor) {
+                    // A map constructed WITHOUT a centre looks up the last
+                    // known location. Attributed like the rest: MapComponent's
+                    // own inner classes construct it, and the framework is
+                    // staged beside every application.
+                    if (isMapLookupConstructor(cls, method, descriptor)
+                            && !LocationButtonManifestFragments
+                                    .isFrameworkOwner(scanningLocationType)) {
+                        usesPersistentLocation = true;
+                    }
                     if (readsSharedMediaForPlayback(cls, method,
                             descriptor)) {
                         mediaPlaybackPermission = true;
@@ -2511,11 +2908,64 @@ public class AndroidGradleBuilder extends Executor {
                         }
                     }
 
-                    if (cls.indexOf("com/codename1/location/LocationManager") == 0 && (method.indexOf("addGeoFencing") > -1 || method.indexOf("setBackgroundLocationListener") > -1)) {
+                    // OUTSIDE the legacy condition above, not nested in it.
+                    // That condition tests for addGeoFencing and
+                    // setBackgroundLocationListener only, so setLocationListener
+                    // -- and now the one-shot lookups -- never reached a test
+                    // nested under it and this flag stayed false for exactly
+                    // the app the hint is dangerous for. The library scanner
+                    // caught the same call and the loose tree did not, which is
+                    // the sort of half-working that reads as working.
+                    //
+                    // EXACT names, unlike the prefix and substring tests
+                    // around it. Those have always been loose and it cost
+                    // nothing: the worst a LocationManagerHelper calling
+                    // addGeoFencingLater bought was a background permission it
+                    // did not need. This flag REFUSES the build alongside
+                    // android.locationButton.exclusive.
+                    //
+                    // ATTRIBUTED like the button test above: GeofenceManager
+                    // calls addGeoFencing and setBackgroundLocationListener,
+                    // LocationManager calls setLocationListener and
+                    // getCurrentLocation, and LocationButton's own inner class
+                    // calls getCurrentLocationSync. Those are FRAMEWORK calls
+                    // present in any tree that stages the framework beside the
+                    // application; reading them as the app's own would refuse
+                    // the hint for every project that ever set it -- including
+                    // the button-only app it exists for.
+                    if ("com/codename1/location/LocationManager".equals(cls)
+                            && isNonButtonLocationMethod(method)
+                            && !LocationButtonManifestFragments
+                                    .isFrameworkOwner(scanningLocationType)) {
+                        usesPersistentLocation = true;
+                    }
+                    // The same call made through a subclass-typed reference.
+                    // javac records the STATIC type as the method's owner, so
+                    // `MyLocationManager m; m.setLocationListener(l)` names
+                    // MyLocationManager and the exact test above never fires --
+                    // and an exclusive build was then accepted over continuous
+                    // location the application really does request.
+                    //
+                    // Deferred rather than decided here: whether that owner is
+                    // a LocationManager depends on a declaresType that may not
+                    // have arrived yet. Resolved once the scan is complete.
+                    // No null guard on cls: this callback dereferences it
+                    // several times above and SpotBugs reads a check here as
+                    // proof the earlier ones could NPE (RCN_REDUNDANT_NULLCHECK
+                    // _WOULD_HAVE_BEEN_A_NPE), which is a zero-findings gate.
+                    if (!cls.startsWith("com/codename1/")
+                            && isNonButtonLocationMethod(method)
+                            && !LocationButtonManifestFragments
+                                    .isFrameworkOwner(scanningLocationType)) {
+                        deferredLocationOwners.add(cls);
+                    }
 
+                    if (cls.indexOf("com/codename1/location/LocationManager") == 0 && (method.indexOf("addGeoFencing") > -1 || method.indexOf("setBackgroundLocationListener") > -1)) {
                         if (!"true".equals(playServicesValue)) {
                             if (targetSDKVersionInt >= 29) {
                                 backgroundLocationPermission = true;
+                                appBackgroundLocation |= appOwnsBackgroundLocation(cls,
+                                        method, scanningLocationType);
                             }
                         }
                     }
@@ -2628,6 +3078,360 @@ public class AndroidGradleBuilder extends Executor {
         usesNearbyCompanion |= libraryNearby.usesCompanion();
         usesNearbyPresence |= libraryNearby.usesPresence();
 
+        // The libraries as well, for the reason the nearby scan above gives:
+        // the implementation package is DELETED for an application that does
+        // not reference the button, and a cn1lib can be the only thing that
+        // does. Reading only the loose tree would leave that library calling
+        // into a package this build had removed, with USE_LOCATION_BUTTON
+        // missing from the manifest as well -- so the application would fall
+        // back to the ordinary permission prompt on exactly the Android
+        // version where that is a Play policy violation.
+        // Owners resolved through the hierarchy, now that all of it is known.
+        //
+        // A call through a subclass-typed reference records the subclass as the
+        // method's owner, so the exact test during the scan cannot see it, and
+        // the class that says what that subclass extends may be scanned after
+        // the call site. Walking up from each deferred owner answers it once.
+        for (String owner : deferredLocationOwners) {
+            if (extendsLocationManager(owner)) {
+                debug("Persistent location through a LocationManager subclass: "
+                        + owner);
+                usesPersistentLocation = true;
+                break;
+            }
+        }
+
+        // And the application's own tree, for the BUTTON alone.
+        //
+        // The loose scan is ASM, and ASM is handed a visitor that returns null
+        // from visitAnnotation -- so annotations are never walked. An
+        // annotation's Class value is not a CONSTANT_Class either: it is a
+        // field DESCRIPTOR in a Utf8, which is why normalising class literals
+        // did not reach it. An application whose only reference to the button
+        // is @Widget(LocationButton.class) therefore looked like an
+        // application that never mentions it, and the bridge was deleted out
+        // from under a control the app really does build.
+        //
+        // The byte-level scan already reads exactly that Utf8, which is how
+        // the SAME annotation inside a cn1lib is found today. Running it over
+        // the application tree removes that inconsistency rather than adding a
+        // new rule: the same code was detected or not depending only on which
+        // jar it shipped in.
+        //
+        // The button flag ONLY. usesPersistentLocation and the background flag
+        // decide whether to REFUSE a build, and the attributed ASM scan is
+        // what makes them precise; widening those to a name search would
+        // refuse builds over a method name that appears in a constant pool.
+        // This one fails the other way -- it keeps an implementation package
+        // that would otherwise be deleted -- so a false positive costs an
+        // unused class and a false negative costs the feature.
+        //
+        // Declared out here because BOTH scans below need it and they sit in
+        // separate try blocks.
+        boolean locationBlocked = request.getArg(
+                "android.blockLocationPermission", "false").equals("true");
+        // Declared out here because the LIBRARY scan below needs it too: the
+        // two roots hold half of a subclass hierarchy each, and resolving
+        // across them means having both results in hand at once.
+        LocationButtonManifestFragments.LocationUsage appLocation;
+        try {
+            // Not read at all when the feature is switched off, so not paid
+            // for either. android.blockLocationPermission clears
+            // usesLocationButton below, and every other consumer of these two
+            // scans is either inside "if (usesLocationButton)" -- the
+            // exclusivity check and everything it feeds -- or already tests
+            // the hint itself, as the gpsPermission fold-in does. Running them
+            // anyway walked every application class and every submitted
+            // archive through the scan budget, which REFUSES a tree over its
+            // cap, so a large project that had deliberately turned location
+            // off could be failed by a question nobody asked.
+            appLocation = locationBlocked
+                            ? new LocationButtonManifestFragments
+                                    .LocationUsage()
+                            : LocationButtonManifestFragments
+                                    .scanForLocationUsage(dummyClassesDir);
+            // The same fold-in the library path does below, for the same
+            // reason: without it the uses-feature declarations at the
+            // manifest stage are absent, and Play can infer GPS hardware as
+            // REQUIRED and filter the app off devices that lack it. The
+            // bytecode scan sets this from an ordinary reference; an
+            // annotation-only one never reached it.
+            //
+            // Honours android.blockLocationPermission, because the rest of
+            // this feature does.
+            gpsPermission |= appLocation.usesButton()
+                    && !request.getArg("android.blockLocationPermission",
+                            "false").equals("true");
+            // The persistent bit as well, which this scan gets RIGHT where
+            // the bytecode one cannot. Attribution there strips a class name at
+            // the first dollar, so an application's own legal top-level
+            // com/codename1/location/LocationManager$999 calling
+            // setLocationListener is read as a framework inner class and its
+            // call dropped -- and exclusive mode is then accepted over a
+            // request that really is being made, which downgrades it to
+            // approximate location.
+            //
+            // I withheld this bit in the commit that added the scan, on the
+            // grounds that widening a build-REFUSING flag to a name search
+            // would refuse builds over a method name that happened to sit in a
+            // constant pool. That was wrong about this scan: callsMethodOn
+            // walks Methodref entries and requires the OWNER class to be
+            // LocationManager as well as the name to match, so it is attributed
+            // -- at least as precise as the bytecode scan, and right about the
+            // dollar-named case the bytecode scan gets wrong.
+            //
+            // The background flag is NOT folded in here: on this tree it can
+            // only come from a manifest inside a staged archive, and archives
+            // the developer submitted are what libsDir covers below.
+            usesPersistentLocation |= appLocation.usesPersistentLocation();
+            // And the application's own ANDROID sources, which no bytecode
+            // scan can reach: a native interface implemented in .java or .kt
+            // is compiled by Gradle from the staged tree, so it is in no jar
+            // and no class directory here. Code there calling
+            // android.location.LocationManager needs precise location as
+            // surely as ours does, and accepting exclusivity over it
+            // downgrades those requests to approximate results silently.
+            //
+            // This has to run HERE, before the Codename One Android port is
+            // unpacked into the same srcDir further down: the port's own
+            // sources call the platform manager, and reading them would refuse
+            // every application that sets the hint.
+            // The staged native sources too, which no bytecode scan can
+            // reach. This one is NOT gated on the hint: it decides whether the
+            // button exists at all, and every Android build reads that -- the
+            // toolchain gate and the bridge package both hang off it. It
+            // cannot refuse a build either, which is why it skips a file the
+            // budget will not read rather than failing.
+            if (!locationBlocked && LocationButtonManifestFragments
+                    .sourcesNameTheButton(srcDir)) {
+                debug("Location button found in the staged native sources");
+                usesLocationButton = true;
+                // The feature declarations too, exactly as the two bytecode
+                // branches fold them in. They are emitted only when this is
+                // set, and their ABSENCE is what lets Play infer GPS hardware
+                // as REQUIRED and filter the app off devices without it -- so
+                // a button found only here would have cost the developer
+                // reach they never gave up. The block hint is already excluded
+                // by the guard above.
+                gpsPermission = true;
+            }
+            if (appLocation.usesButton() && !usesLocationButton) {
+                debug("Location button found in the application by the "
+                        + "byte-level scan, which reads annotation class "
+                        + "values the bytecode scan cannot see");
+                usesLocationButton = true;
+            }
+        } catch (IOException budgetOrIo) {
+            // Upwards, exactly like the library scan below, and for the same
+            // reason: a tree we only partly read cannot answer whether the
+            // button is used. Swallowing it here made unknown mean ABSENT --
+            // and absent deletes the bridge and drops the permission, so an
+            // application that reaches the button only through an annotation
+            // would ship the API-37 control with nothing behind it. The
+            // bytecode scan cannot cover for that: it does not visit
+            // annotations at all, which is why this scan exists.
+            throw new BuildException("Failed to scan the application classes"
+                    + " for location API usage.", budgetOrIo);
+        }
+
+        try {
+            LocationButtonManifestFragments.LocationUsage libraryLocation =
+                    locationBlocked
+                            ? new LocationButtonManifestFragments
+                                    .LocationUsage()
+                            : LocationButtonManifestFragments
+                                    .scanForLocationUsage(libsDir);
+            if (!libraryLocation.isEmpty()) {
+                debug("Location usage found inside a submitted library"
+                        + (libraryLocation.usesButton() ? " button" : "")
+                        + (libraryLocation.usesPersistentLocation()
+                                ? " persistent" : ""));
+            }
+            usesLocationButton |= libraryLocation.usesButton();
+            // Folded in for the same reason the button is, and it is the half
+            // that matters for correctness: android.locationButton.exclusive
+            // asserts that NOTHING in the application needs precise location to
+            // outlive the session, and the attributed method scan above reads
+            // the loose class tree only. A cn1lib that shows the button and
+            // also geofences would have passed the conflict check and then had
+            // its background behaviour refused the grant on Android 17.
+            usesPersistentLocation |= libraryLocation.usesPersistentLocation();
+            // And the hierarchy the two scans only hold HALF of each. The
+            // application may call an inherited setLocationListener through a
+            // subclass a cn1lib supplies: the call names that subclass as its
+            // owner and is deferred here, while the "extends LocationManager"
+            // that explains it sits in the library jar. Each scan resolved its
+            // own root alone and neither could answer, so exclusivity was
+            // accepted over a lookup the application really makes.
+            usesPersistentLocation |= LocationButtonManifestFragments
+                    .resolvesAcross(appLocation, libraryLocation);
+            // Unless the application REMOVES it, exactly as the background
+            // flag beside this one is discounted. An unscoped tools:node
+            // ="remove" of fine location takes the library's request out of the
+            // merged manifest, and inject() then declares fine location itself
+            // with onlyForLocationButton -- so the library cannot obtain
+            // ordinary precise location either way and nothing contradicts.
+            // Refusing the hint over a permission the developer already opted
+            // out of punishes them for doing the thing that makes the hint
+            // correct.
+            //
+            // A bytecode hit has no element type to match, so it is not
+            // discounted: a plain jar calling the platform's location manager
+            // is still going to call it whatever the manifest says.
+            // The library's CALL, which no manifest edit can discount. A
+            // tools:node="remove" takes a DECLARATION out of the merged
+            // manifest and takes nothing out of the library's bytecode, so
+            // folding the two into one flag let a removal discount the call
+            // as well: exclusivity was accepted, inject() then restored fine
+            // location with onlyForLocationButton, and the lookup the library
+            // still performs came back approximate with nothing to say so.
+            libraryPreciseLocation |= libraryLocation.callsPreciseLocation();
+            libraryPreciseLocation |= libraryLocation.declaresPreciseLocation()
+                    && !(!libraryLocation.preciseElements().isEmpty()
+                            && LocationButtonManifestFragments
+                                    .removesPermission(xPermissions,
+                                            LocationButtonManifestFragments
+                                                    .FINE_LOCATION)
+                                    .containsAll(libraryLocation
+                                            .preciseElements()));
+            // A submitted aar's own manifest asking for background location.
+            // It calls nothing of ours -- a native location SDK does its own --
+            // so no bytecode scan sees it, and its permission still merges into
+            // the application's manifest. Exclusive mode is as wrong for that
+            // app as it is for one that geofences.
+            // Unless the application REMOVES it. tools:node="remove" in the
+            // project's own block outranks the library that contributed the
+            // permission and the merger honours it, so the merged manifest
+            // asks for nothing -- and refusing the build anyway punishes the
+            // developer who did exactly the right thing to qualify for the
+            // hint. Same mistake as reading their removal as a declaration,
+            // approached from the other side.
+            appBackgroundLocation |= libraryLocation.declaresBackgroundLocation()
+                    && !LocationButtonManifestFragments
+                            .removesBackgroundLocation(xPermissions)
+                            .containsAll(libraryLocation.backgroundElements());
+            // The library hit declares the ORDINARY location permissions too,
+            // not only the button's. inject() below adds fine and coarse, but
+            // the uses-feature declarations that mark the location hardware
+            // OPTIONAL live in the gpsPermission block instead -- and an
+            // application whose only reference to the button is inside a cn1lib
+            // never trips that block, because the attributed class scan reads
+            // the loose tree only. Play infers android.hardware.location and
+            // .location.gps as REQUIRED from a fine-location permission that no
+            // uses-feature contradicts, so the store would have filtered the
+            // app off every device without GPS hardware. The direct-reference
+            // case has always had this; the library case now matches it.
+            //
+            // usesButton() rather than !isEmpty(), deliberately. A library that
+            // only geofences gets nothing new here: it declares no permission
+            // today, and quietly adding fine location to an application that
+            // never mentions the location button is a Play Console declaration
+            // its author did not ask for.
+            //
+            // Honours android.blockLocationPermission, because the rest of this
+            // feature does. A project that asked for no location permission at
+            // all must not acquire one through a library's button either.
+            gpsPermission |= libraryLocation.usesButton()
+                    && !request.getArg("android.blockLocationPermission",
+                            "false").equals("true");
+        } catch (IOException budgetOrIo) {
+            // The scan refuses an archive that blows its budget rather than
+            // reading on, and unknown has to resolve upwards: carrying on would
+            // decide the manifest and the deletable package from a tree we only
+            // partly read.
+            throw new BuildException("Failed to scan the submitted libraries for"
+                    + " location API usage.", budgetOrIo);
+        }
+
+        // android.blockLocationPermission turns the WHOLE feature off, here,
+        // once, rather than at each of the eight places that read this flag.
+        //
+        // The button cannot work without the permission: the system control
+        // hands back an ACCESS_FINE_LOCATION grant, and a permission the
+        // manifest does not declare cannot be granted. So an app that set the
+        // hint has a dead button whatever else is done for it -- and everything
+        // downstream of this flag was still being done. It refused the build on
+        // a toolchain it will never need, raised the minimum SDK to 24, asked
+        // for a compile SDK of 37, injected the AndroidX dependency, and kept a
+        // bridge package with nothing to talk to. Worst of it is the refusal:
+        // a cn1lib that merely mentions the button was enough to reject the
+        // Android build of an app whose author had said, in the clearest terms
+        // the build system offers, that it wants no location.
+        //
+        // Clearing the flag makes every one of those consistent by
+        // construction, which is why it is done here and not guarded there.
+        if (request.getArg("android.blockLocationPermission", "false")
+                .equals("true")) {
+            usesLocationButton = false;
+        }
+
+        // A toolchain that cannot carry the library is NOT a build failure.
+        //
+        // androidx.core.locationbutton declares minCompileSdk 37 and
+        // minAndroidGradlePluginVersion 9.1.0 in its aar metadata, and AGP's
+        // checkAarMetadata enforces both with no opt-out. This builder pins
+        // AGP 8 with Gradle 8, and the hosted images carry platforms through
+        // android-36, so the artifact cannot be resolved here yet. A legacy
+        // support-library project cannot resolve it either: it is an AndroidX
+        // aar whose graph is appcompat, activity and lifecycle the whole way
+        // down, and such a project writes neither android.useAndroidX nor
+        // Jetifier.
+        //
+        // None of that is the application's problem. LocationButton already
+        // degrades to an ordinary Codename One button that asks for location
+        // the normal way -- that is its documented behaviour on every platform
+        // without the system control, and it is what the simulator and the
+        // desktop ports show. So a build on this toolchain simply takes that
+        // path: no dependency, no compile-SDK raise, no minimum-SDK raise, and
+        // the bridge package deleted further down because the flag is off. The
+        // app ships and works.
+        //
+        // This REPLACES a refusal, and the refusal was wrong. It made a
+        // component that works everywhere else un-buildable for Android over a
+        // library the developer never named, and told them to delete their code
+        // and come back later. Nothing needs to happen when the pin moves
+        // either: the same sources pick the system control up implicitly the
+        // moment compile SDK 37 and AGP 9 are what this builder writes, because
+        // that is the only condition standing between here and the live path.
+        //
+        // Ordered before the minimum-SDK raise and before compileSdkInt is
+        // asked for the first time, which is the whole reason it sits up here
+        // beside the hint above rather than where the refusal used to be. Read
+        // any later and the compile SDK has already been raised to 37 and the
+        // build fails looking for a platform the host does not have -- which is
+        // the failure this exists to avoid, arriving by a different route.
+        boolean locationButtonFallback = false;
+        if (usesLocationButton
+                && (!useAndroidX
+                    || gradleVersionInt < 8
+                    || !useGradle8
+                    || compareVersions(gradleVersion,
+                            LOCATION_BUTTON_MIN_GRADLE_VERSION) < 0
+                    || compareVersions(ANDROID_GRADLE_PLUGIN_8_VERSION,
+                            LOCATION_BUTTON_MIN_AGP_VERSION) < 0
+                    // The PLATFORM has to be on this machine as well. Nothing
+                    // here installs one, and a scan that found nothing reports
+                    // 31, so an unreadable SDK takes the fallback rather than
+                    // failing inside Gradle with a message naming a missing
+                    // Android target and not the feature that asked for it.
+                    || maxInstalledPlatformVersionInt
+                            < LOCATION_BUTTON_MIN_COMPILE_SDK)) {
+            log("com.codename1.location.LocationButton: this toolchain cannot"
+                    + " carry androidx.core.locationbutton, which needs Android"
+                    + " Gradle plugin " + LOCATION_BUTTON_MIN_AGP_VERSION
+                    + ", Gradle " + LOCATION_BUTTON_MIN_GRADLE_VERSION
+                    + ", compile SDK " + LOCATION_BUTTON_MIN_COMPILE_SDK
+                    + " and android.useAndroidX=true. Building with the"
+                    + " standard location API instead: the component falls back"
+                    + " to an ordinary button that requests location"
+                    + " permission the usual way. The system control is picked"
+                    + " up automatically once this builder moves to Android"
+                    + " Gradle plugin 9 and compile SDK "
+                    + LOCATION_BUTTON_MIN_COMPILE_SDK + ".");
+            usesLocationButton = false;
+            locationButtonFallback = true;
+        }
+
         // Fed to the CATALOG as well as to the flags. The flags decide which
         // sources survive and which manifest fragments are written; the
         // accumulator is what supplies the dependencies, the frameworks, the
@@ -2703,6 +3507,23 @@ public class AndroidGradleBuilder extends Executor {
         if (arSupport) {
             // ARCore requires API 24.
             minSDK = maxInt("24", minSDK);
+        }
+
+        if (usesLocationButton) {
+            // The AndroidX location button library declares minSdkVersion 24.
+            // Raised here rather than left to the manifest merge, which fails
+            // with a message that names the library and not the feature.
+            String raised = maxInt(
+                    Integer.toString(
+                            LocationButtonManifestFragments.MINIMUM_SDK),
+                    minSDK);
+            if (!raised.equals(minSDK)) {
+                log("The location button requires minSdk "
+                        + LocationButtonManifestFragments.MINIMUM_SDK
+                        + "; raising android.min_sdk_version from " + minSDK
+                        + " to " + raised);
+                minSDK = raised;
+            }
         }
 
         // Inject USE_BIOMETRIC / USE_FINGERPRINT only when the app actually
@@ -2901,7 +3722,7 @@ public class AndroidGradleBuilder extends Executor {
                             targetNumber, usesNearbyRanging,
                             usesNearbyRanging || usesNearbyTransport
                                     || usesNearbyCompanion, usesCallVoip,
-                            usesCustomTunnel));
+                            usesCustomTunnel, usesLocationButton));
             if (callServices.length() > 0) {
                 request.putArgument("android.xapplication",
                         existingApplication + callServices);
@@ -2935,6 +3756,150 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
+        // The Android location button (com.codename1.location.LocationButton).
+        //
+        // Last of the location-touching injectors on purpose. Bluetooth, Wi-Fi
+        // management and the nearby transport each declare
+        // ACCESS_FINE_LOCATION with a maxSdkVersion cap of their own, and this
+        // block has to see what they wrote: it widens the declaration rather
+        // than adding a second one, because a location button wired to a
+        // permission the manifest stops granting at API 30 draws perfectly and
+        // never returns a location.
+        //
+        // android.blockLocationPermission needs no test here: it cleared
+        // usesLocationButton at the scan, so this whole block and the toolchain
+        // gate above it are already skipped.
+        if (usesLocationButton) {
+            boolean locationButtonExclusive =
+                    LocationButtonManifestFragments.isExclusive(
+                            request.getArg("android.locationButton.exclusive",
+                                    "false"));
+            // The application's own ANDROID sources, read HERE and not at the
+            // scan above.
+            //
+            // No bytecode scan can reach them: a native interface implemented
+            // in .java or .kt is compiled by Gradle out of the staged tree, so
+            // code there calling a location provider is in no jar and no class
+            // directory. But this walks every staged source through the scan
+            // budget, which REFUSES a tree over its cap -- so running it any
+            // earlier failed builds that were never going to read the answer.
+            // Everything that can turn the question off has happened by now:
+            // the button may be unused, android.blockLocationPermission may
+            // have cleared it, and the hint may be absent from a configuration
+            // that is shared with projects which do use it.
+            //
+            // Still before the Codename One Android port is unpacked into the
+            // same srcDir further down, which is the constraint that decides
+            // how late this can go: the port's own sources call the platform
+            // manager, and reading them would refuse every application that
+            // sets the hint.
+            if (locationButtonExclusive) {
+                try {
+                    usesPersistentLocation |= LocationButtonManifestFragments
+                            .sourcesCallPlatformLocation(srcDir);
+                } catch (IOException budgetOrIo) {
+                    // Upwards, like the scans above: a tree we only partly
+                    // read cannot answer whether the application asks for
+                    // location outside the button, and accepting the hint on
+                    // an unknown is the downgrade this check exists to stop.
+                    throw new BuildException("Failed to scan the staged"
+                            + " Android sources for location API usage.",
+                            budgetOrIo);
+                }
+            }
+            String conflict =
+                    LocationButtonManifestFragments.exclusiveConflict(
+                            locationButtonExclusive,
+                            // Inferred from bytecode OR declared by hand.
+                            // A project can ask for background location
+                            // through a build hint or straight into
+                            // android.xpermissions, and neither sets the flag,
+                            // so exclusive mode used to be accepted beside an
+                            // explicit background request and then stop it
+                            // working. See declaresBackgroundLocation.
+                            appBackgroundLocation
+                                    || LocationButtonManifestFragments
+                                            .declaresLiveBackgroundLocation(
+                                                    xPermissions),
+                            usesPersistentLocation,
+                            // A submitted library's OWN precise-location
+                            // request. A native SDK inside an aar calls
+                            // android.location.LocationManager directly, so no
+                            // marker of ours names it -- its manifest asking
+                            // for ACCESS_FINE_LOCATION is the only evidence
+                            // there is, and under this hint it cannot have it.
+                            libraryPreciseLocation);
+            if (conflict != null) {
+                error("Error: " + conflict, new RuntimeException());
+                return false;
+            }
+            if (locationButtonExclusive) {
+                // The legacy flag as well, which the conflict check above
+                // deliberately does not read: it is set by unattributed tests
+                // that the framework's own GeofenceManager trips in every build
+                // ever made, so reading it would refuse the hint for the
+                // button-only app it exists for.
+                //
+                // But the MANIFEST reads it, and that is the half this missed.
+                // An accepted exclusive build still emitted
+                // ACCESS_BACKGROUND_LOCATION beside onlyForLocationButton --
+                // asking for persistent background location while declaring
+                // that the fine-location grant is the button's alone, which is
+                // the exact contradiction this block exists to prevent. It also
+                // switched on the runtime background path for a permission the
+                // app can never be granted.
+                //
+                // Scoped to exclusivity ACCEPTED, so no build that does not set
+                // the hint changes: the worry recorded on appBackgroundLocation
+                // -- that tightening the legacy flag would change which
+                // permissions existing apps ship -- does not apply here,
+                // because the hint is this branch's own.
+                backgroundLocationPermission = false;
+            }
+            log("Location button fragments version "
+                    + LocationButtonManifestFragments.FRAGMENT_VERSION
+                    + (locationButtonExclusive ? " exclusive" : ""));
+            xPermissions = LocationButtonManifestFragments.inject(
+                    xPermissions, locationButtonExclusive);
+        } else if (locationButtonFallback) {
+            // The ordinary permissions, because the ordinary button needs them.
+            //
+            // The fallback asks for location through Codename One's own
+            // LocationManager, which is a normal runtime permission request
+            // against a normally declared permission. Without this an app whose
+            // only location use is the button ships a manifest that names no
+            // location permission at all -- the gpsPermission block declares
+            // them for an app that references com.codename1.location directly,
+            // and an app that only ever placed a LocationButton, or that gets
+            // one from a cn1lib, never trips it. The button would then draw
+            // correctly and never return a location, which is precisely the
+            // silent breakage the refusal this replaces was worried about.
+            //
+            // USE_LOCATION_BUTTON is NOT declared here: it is the permission
+            // that gates the system control, there is no system control on this
+            // build, and it does not exist before the API this toolchain cannot
+            // compile against.
+            //
+            // Nor is the exclusivity flag, whatever the hint says. Exclusivity
+            // means the fine-location grant belongs to the button alone; with
+            // no button that is a permission nothing can ever be granted, so
+            // honouring the hint here would ship exactly the dead permission it
+            // exists to prevent. The hint is not an error either -- a project
+            // shared between builds should not fail on the one whose toolchain
+            // is older -- so it is logged and ignored.
+            String ignoredExclusive =
+                    LocationButtonManifestFragments.isExclusive(
+                            request.getArg("android.locationButton.exclusive",
+                                    "false"))
+                    ? " (android.locationButton.exclusive ignored: exclusivity"
+                        + " needs the system control)"
+                    : "";
+            log("Location button fragments version "
+                    + LocationButtonManifestFragments.FRAGMENT_VERSION
+                    + " fallback" + ignoredExclusive);
+            xPermissions = LocationButtonManifestFragments
+                    .injectFallback(xPermissions);
+        }
 
         // Smart home (com.codename1.home.*).
         //
@@ -4362,6 +5327,23 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
+        if (!usesLocationButton) {
+            // The location button implementation compiles against
+            // androidx.core.locationbutton, which is only on the classpath when
+            // the dependency below was injected, so it must be removed for
+            // apps that never reference com.codename1.location.LocationButton
+            // (AndroidImplementation reaches it through reflection only).
+            File locationButtonPackage = new File(srcDir,
+                    "com/codename1/impl/android/locationbutton");
+            File[] locationButtonFiles = locationButtonPackage.listFiles();
+            if (locationButtonFiles != null) {
+                for (File f : locationButtonFiles) {
+                    f.delete();
+                }
+            }
+            locationButtonPackage.delete();
+        }
+
         if (!arSupport) {
             // The ARCore-backed impl package compiles against com.google.ar
             // classes that only exist when the AR gradle dependency is added,
@@ -5185,6 +6167,31 @@ public class AndroidGradleBuilder extends Executor {
         if (smsPermission) {
             permissions += permissionAdd(request, "SEND_SMS",
                     "<uses-permission android:name=\"android.permission.SEND_SMS\" android:required=\"false\" />\n");
+        }
+        // Scoped to the permissions this build adds FOR LOCATION, and that is
+        // the limit of what the hint can honestly promise. Review asked for the
+        // accumulated xPermissions to be stripped as well, on the grounds that
+        // the Bluetooth, Wi-Fi and nearby injectors have already written
+        // ACCESS_FINE_LOCATION into it. They have -- and it is not this hint's
+        // to remove: BLE scan results require a location grant up to API 30
+        // (see BluetoothManifestFragments), so stripping it leaves an app
+        // scanning and finding nothing, on the platform versions where it
+        // matters most, with nothing in the build to say why. The hint's
+        // catalog entry said "every location permission" and that was the thing
+        // that was wrong; it now says what this does.
+        //
+        // android.blockLocationPermission zeroes BOTH flags before any of this,
+        // the way the hosted builder has always done it. Skipping only the
+        // location-button injector was not enough: the generic
+        // com/codename1/location scan sets gpsPermission for any app that
+        // touches the package -- the button included -- so fine and coarse
+        // still reached the manifest and the hint's promise to keep every
+        // location permission out was false for exactly the direct reference it
+        // most obviously covers.
+        if (request.getArg("android.blockLocationPermission", "false")
+                .equals("true")) {
+            gpsPermission = false;
+            backgroundLocationPermission = false;
         }
         if (gpsPermission) {
             permissions += "    <uses-feature android:name=\"android.hardware.location\" android:required=\"false\" />\n"
@@ -6772,6 +7779,8 @@ public class AndroidGradleBuilder extends Executor {
         String keepAi = visionSupport || languageSupport || inferenceSupport
                 ? "-keep class com.codename1.impl.android.ai.** { *; }\n\n"
                 : "";
+        String keepLocationButton =
+                locationButtonProguardRules(usesLocationButton);
         String keepInferenceRuntime =
                 androidInferenceProguardRules(inferenceSupport);
         // workaround broken optimizer in proguard
@@ -6785,6 +7794,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "-dontwarn com.google.android.gms.**\n"
                 + keepFirebase
                 + keepAi
+                + keepLocationButton
                 + keepInferenceRuntime
                 + "-keep class com.codename1.impl.android.AndroidBrowserComponentCallback {\n"
                 + "*;\n"
@@ -7014,6 +8024,32 @@ public class AndroidGradleBuilder extends Executor {
             additionalDependencies += " implementation 'com.google.android.play:review:"+reviewVersion+"'\n";
         }
 
+        // The AndroidX location button, added only when the app references
+        // com.codename1.location.LocationButton. Its graph is AndroidX the
+        // whole way down (appcompat, activity, lifecycle) and it is written in
+        // Kotlin, so a legacy support-library build cannot resolve it -- refused
+        // further up with a sentence rather than left to AGP.
+        // The coordinates are group androidx.core.locationbutton, artifact
+        // locationbutton -- NOT androidx.core:core-locationbutton, which review
+        // twice asked for and which does not exist: that path 404s on
+        // dl.google.com, while this one resolves and is the aar whose metadata
+        // was read to get minCompileSdk 37 and minAndroidGradlePluginVersion
+        // 9.1.0 below. Verified by download, not by reading a doc page.
+        if (usesLocationButton) {
+            String locationButtonVersion = request.getArg(
+                    "android.locationButton.version", "1.0.0-alpha01");
+            // Onto a line of its own. additionalDependencies starts life as the
+            // project's own gradleDependencies value, which need not end in a
+            // newline, and appending " implementation ..." straight onto it
+            // produces two declarations on one line that Gradle cannot parse.
+            // addNewlineIfMissing further down only repairs the END of the
+            // combined string, so it cannot fix a join in the middle.
+            additionalDependencies = addNewlineIfMissing(additionalDependencies);
+            additionalDependencies +=
+                    " implementation 'androidx.core.locationbutton"
+                    + ":locationbutton:" + locationButtonVersion + "'\n";
+        }
+
         // OidcClient routes sign-in through androidx.browser Custom Tabs.
         // Pull the browser dep in automatically when the app references
         // anything in com.codename1.io.oidc -- otherwise apps that don't
@@ -7192,7 +8228,7 @@ public class AndroidGradleBuilder extends Executor {
                 buildToolsVersion, targetNumber, usesNearbyRanging,
                 usesNearbyRanging || usesNearbyTransport
                         || usesNearbyCompanion, usesCallVoip,
-                usesCustomTunnel));
+                usesCustomTunnel, usesLocationButton));
         String supportLibVersion = maxPlatformVersion;
         String[] supportLadder = {"28", "29", "30", "31", "32", "33", "34",
             "35", "36"};
@@ -7691,6 +8727,41 @@ public class AndroidGradleBuilder extends Executor {
             return "AndroidTextRecognitionKoreanAdapter.java";
         }
         return null;
+    }
+
+    /**
+     * The R8 keep for the location button's bridge, which R8 would otherwise
+     * take away.
+     *
+     * <p>{@code AndroidImplementation.getLocationButtonBridge} reaches
+     * {@code com.codename1.impl.android.locationbutton.AndroidLocationButtonBridge}
+     * by NAME. It has to: the package is deleted for every app that does not
+     * use the button, so nothing that always compiles can reference it. That
+     * leaves the class unreachable as far as R8 is concerned, and
+     * {@code minifyEnabled} is on for a signed release by default --
+     * {@code android.enableProguard} defaults to {@code true} -- so the class
+     * is renamed or shrunk away.</p>
+     *
+     * <p>{@code Class.forName} then throws, the lookup answers null, and
+     * {@code LocationButton} installs its fallback. That is silent, and it is
+     * the worst shape this feature can fail in: the app builds, the button
+     * draws, and on a release built with
+     * {@code android.locationButton.exclusive} the manifest has restricted
+     * fine location to a system control that is no longer in the apk -- so
+     * every location request is refused, in the one build the developer ships
+     * and can least easily debug.</p>
+     *
+     * <p>Conditional, like the AI keep beside it: an app that never carried
+     * the package gets nothing, so no existing build changes.</p>
+     *
+     * @param locationButtonIncluded whether this build kept the bridge package
+     * @return the keep, or an empty string
+     */
+    static String locationButtonProguardRules(boolean locationButtonIncluded) {
+        return locationButtonIncluded
+                ? "-keep class com.codename1.impl.android.locationbutton.**"
+                    + " { *; }\n\n"
+                : "";
     }
 
     static String androidInferenceProguardRules(boolean inferenceIncluded) {
@@ -10540,10 +11611,11 @@ public class AndroidGradleBuilder extends Executor {
     /// manifest before anything was compiled.
     static final int TUNNEL_MIN_COMPILE_SDK = 34;
 
+
     static int compileSdkInt(String maxPlatformVersion, String buildToolsVersion,
             String targetNumber, boolean usesNearbyRanging,
             boolean usesAnyNearby, boolean usesCallVoip,
-            boolean usesCustomTunnel) {
+            boolean usesCustomTunnel, boolean usesLocationButton) {
         String compileSdkVersion = maxPlatformVersion;
         String[] ladder = {"28", "29", "30", "31", "32", "33", "34", "35", "36"};
         for (int i = 0; i < ladder.length; i++) {
@@ -10576,6 +11648,40 @@ public class AndroidGradleBuilder extends Executor {
             // legitimately target something older than 34.
             compileSdkVersion = ensureCompileSdkAtLeastTarget(
                     compileSdkVersion, String.valueOf(TUNNEL_MIN_COMPILE_SDK));
+        }
+        if (usesLocationButton) {
+            // The library's aar metadata names this level and AGP refuses the
+            // dependency below it. Not covered by the raise-to-target above: an
+            // app can show the button while targeting something older, and the
+            // requirement is the LIBRARY's rather than the manifest's.
+            //
+            // Unreachable while the toolchain guard further up still refuses
+            // every location-button build, and kept anyway -- deliberately, and
+            // it was removed once. The guard is conditioned on the pinned AGP
+            // version, so raising that pin is all it takes to let these builds
+            // through; without this raise they would then reach
+            // checkAarMetadata with a compile SDK the ladder caps at 36 and
+            // fail there instead. Everything else on this path is kept live for
+            // the same reason.
+            // Emits the bare integer, and that is NOT enough on its own once
+            // this path goes live. From Android 17 a platform package carries a
+            // minor version -- platforms;android-37.0 and android-37.2 exist,
+            // platforms;android-37 does not, which is why this branch's CI
+            // installs the minor-versioned name explicitly -- so a generated
+            // project asking for compileSdk 37 asks for a directory that is not
+            // there.
+            //
+            // Carrying "37.0" through here is not a local change: compileSdkInt
+            // RETURNS an int and both callers wrap it in String.valueOf, so the
+            // whole compile-SDK pipeline is integer-shaped, and widening it
+            // would alter compile-SDK selection for every Android build this
+            // plugin makes. That belongs to the AGP 9 / compileSdk 37 migration
+            // this branch documents and deliberately does not attempt -- the
+            // same migration that has to move the pinned plugin before the gate
+            // above opens at all. Whoever does it needs both halves: the
+            // identifier and a compile SDK that can express it.
+            compileSdkVersion = ensureCompileSdkAtLeastTarget(compileSdkVersion,
+                    String.valueOf(LOCATION_BUTTON_MIN_COMPILE_SDK));
         }
         // NO VoIP raise here, deliberately, and this is where the daemon
         // twin has one. A VoIP app targeting 29 or later must declare

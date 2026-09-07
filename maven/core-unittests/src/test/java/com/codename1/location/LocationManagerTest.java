@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.location;
 
 import com.codename1.junit.FormTest;
@@ -5,6 +27,7 @@ import com.codename1.junit.UITestBase;
 import com.codename1.ui.Display;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -119,6 +142,44 @@ class LocationManagerTest extends UITestBase {
         Field field = Display.class.getDeclaredField(name);
         field.setAccessible(true);
         return field.get(Display.getInstance());
+    }
+
+    @Test
+    void aTimedOutRequestReleasesTheSlotWithoutClearingThePlatform() {
+        // A timed-out request used to stay installed forever, so the NEXT
+        // getCurrentLocationSync saw a non-null listener and took the
+        // getCurrentLocation() path instead of starting a fresh timed request.
+        //
+        // Releasing the field fixes that. Calling the port's clear would fix
+        // it too and cost more: on Android with Play Services clearListener()
+        // is ASYNCHRONOUS, and a retry arriving as connectivity returns can
+        // bind first, after which the late clear removes the retry's own
+        // subscription. Nothing in core can serialize against that, so core
+        // does not start it -- the next bind replaces the listener inside one
+        // port call instead.
+        TestLocationManager manager = new TestLocationManager();
+        manager.notifyOnBind = false;
+        manager.setCurrentLocation(null);
+
+        Location timedOut = manager.getCurrentLocationSync(50);
+        assertNull(timedOut, "sanity: the request must time out");
+        assertEquals(1, manager.bindCount, "sanity: it bound once");
+        assertEquals(0, manager.clearCount,
+                "the timeout must not start a platform clear of its own");
+        assertNotNull(manager.getLocationListener(),
+                "and the listener stays INSTALLED, or the next install has "
+                + "nothing to clear and the subscription is orphaned");
+
+        // The retry starts a fresh timed request rather than falling through
+        // to getCurrentLocation()...
+        manager.getCurrentLocationSync(50);
+        assertEquals(2, manager.bindCount, "the retry binds again");
+        assertEquals(0, manager.getCurrentLocationCalls,
+                "and does not take the already-listening path");
+        // ...and tearing the orphan down is what that same call does, inside
+        // one port call it controls the ordering of.
+        assertEquals(1, manager.clearCount,
+                "the retry's install clears the timed-out subscription");
     }
 
     private static class DummyLocationListener implements LocationListener {

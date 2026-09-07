@@ -91,6 +91,12 @@ public abstract class LocationManager {
     public static final int TEMPORARILY_UNAVAILABLE = 2;
     private static final Object LISTENER_LOCK = new Object();
     private static LocationListener listener;
+
+    /// The installed listener whose timed wait expired, or null.
+    ///
+    /// Routing treats it as absent; the slot still holds it so the next
+    /// install still tears the platform subscription down. See markTimedOut.
+    private static LocationListener timedOut;
     private static Class backgroundlistener;
     private LocationRequest request;
     private int status = TEMPORARILY_UNAVAILABLE;
@@ -158,9 +164,140 @@ public abstract class LocationManager {
     /// #### Returns
     ///
     /// the current location or null in case of an error
+    /// A fix taken after this call, for a caller whose permission is new.
+    ///
+    /// [#getCurrentLocationSync(long)] hands back the CACHED fix whenever a
+    /// listener is installed, and that is right for an ordinary caller: the
+    /// listener is keeping the cache current, and starting a second
+    /// acquisition would replace the application's own listener -- `LL.bind`
+    /// calls [#setLocationListener(LocationListener)] -- and silently end its
+    /// tracking.
+    ///
+    /// It is wrong for the location button. The whole of that gesture is that
+    /// the tap earns precise location for this session, and the cached fix was
+    /// taken BEFORE it: on an application that until now held only the
+    /// approximate grant, the cache holds an approximate fix and the tap
+    /// reports it. The control appears to work and quietly answers with the
+    /// accuracy the user just agreed to improve.
+    ///
+    /// So this waits for the next fix the installed listener delivers, which is
+    /// the first one taken under the new grant, and recognises it by its
+    /// timestamp. Nothing is registered or cleared, so the application's
+    /// listener is untouched -- the constraint that makes the obvious fix
+    /// (bind a fresh LL) unsafe.
+    ///
+    /// Every read happens inside the bounded wait, the baseline included: on
+    /// Android with Play Services the "cached" read spins until the Google API
+    /// client connects, with no bound, and doing that on the EDT freezes the
+    /// application before the caller's timeout has begun to apply.
+    ///
+    /// Falls back to the cached fix rather than to null when none arrives in
+    /// time. A listener registered at a slow interval may have nothing newer
+    /// for minutes, and a slightly imprecise answer beats the empty one the
+    /// caller would otherwise report -- so this is never worse than the
+    /// method it wraps.
+    ///
+    /// Package private on purpose. It exists for `LocationButton`, which is in
+    /// this package, and a public "give me a fix ignoring the cache" is a
+    /// wider promise than this keeps.
+    ///
+    /// @param timeout how long to wait, in milliseconds, or -1 for the default
+    /// @return a fix taken under the caller's new grant where one arrives, the
+    ///         cached fix otherwise, or null if there is none at all
+    Location freshLocationSync(long timeout) {
+        // No listener of the application's to protect, so the ordinary path
+        // already starts a fresh acquisition and this adds nothing.
+        if (listener == null || listener == timedOut) { //NOPMD CompareObjectsWithEquals
+            return getCurrentLocationSync(timeout);
+        }
+        final long wait = timeout > -1 ? timeout : FRESH_FIX_DEFAULT_MS;
+        // [0] the fix taken after the grant, [1] the cache to fall back on.
+        final Location[] answer = new Location[2];
+        // EVERYTHING inside the block, the baseline read included.
+        //
+        // getCurrentLocation is not the cheap accessor its name suggests. On
+        // Android with Play Services it reaches getLastKnownLocation, which
+        // waits for the Google API client to connect -- so reading the
+        // baseline on the EDT, which is where this is called from, freezes the
+        // whole application for as long as that takes, and the caller's
+        // timeout cannot be applied to a wait that has not started yet. It
+        // also THROWS when there is no cached fix, and taking that as the
+        // answer reported null to a caller whose next update was moments away.
+        //
+        // That port wait used to be unbounded, which put a ceiling on what
+        // this loop could promise: the deadline governs the POLLING, and
+        // nothing in core can interrupt a port that sleeps. It is bounded at
+        // the source now -- see AndroidLocationPlayServiceManager
+        // .getLastKnownLocation -- so a client that never connects ends as no
+        // fix rather than as a tap that is never answered.
+        //
+        // The residual, stated exactly rather than left to be discovered: the
+        // port's cap is its own and knows nothing of the caller's deadline, so
+        // a read already in progress can overrun by up to that cap. A caller
+        // asking for one second can therefore wait about ten. Closing that gap
+        // means either handing the port a budget -- API on LocationManager for
+        // a single caller -- or running the read on a thread this can abandon,
+        // which is cross-thread state in a framework that is single threaded
+        // by design. Neither is worth a slow answer in a state where Play
+        // Services is not connecting at all; what matters is that the answer
+        // arrives, and it does.
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                long start = System.currentTimeMillis();
+                Location baseline = cachedFix();
+                answer[1] = baseline;
+                // No cache at all means the application has no fix yet, so
+                // the first one to arrive was taken after the grant and is the
+                // answer rather than a baseline to improve on.
+                boolean compare = baseline != null;
+                long was = compare ? baseline.getTimeStamp() : 0;
+                while (System.currentTimeMillis() - start < wait) {
+                    try {
+                        Thread.sleep(20);
+                    } catch (InterruptedException interrupted) {
+                    }
+                    Location now = cachedFix();
+                    if (now == null) {
+                        continue;
+                    }
+                    if (!compare || now.getTimeStamp() > was) {
+                        answer[0] = now;
+                        return;
+                    }
+                }
+            }
+        });
+        return answer[0] != null ? answer[0] : answer[1];
+    }
+
+    /// The cached fix, or null where there is none.
+    ///
+    /// A port throws when it has nothing cached, which is a legitimate state
+    /// and not a failure to report: the caller is waiting for the next fix and
+    /// an empty cache simply means every fix from here is a new one.
+    private Location cachedFix() {
+        try {
+            return getCurrentLocation();
+        } catch (IOException noneYet) {
+            return null;
+        }
+    }
+
+    /// How long [#freshLocationSync(long)] waits when the caller names no
+    /// deadline of its own.
+    private static final long FRESH_FIX_DEFAULT_MS = 10000;
+
     public Location getCurrentLocationSync(long timeout) {
         try {
-            if (listener == null) {
+            // A timed-out listener routes as absent, and is deliberately
+            // still INSTALLED. Nulling the field made this branch right and
+            // broke the next setLocationListener, which only calls
+            // clearListener() when it finds a listener to replace: the
+            // platform subscription was then never torn down at all, and on
+            // the JavaSE stub that is a non-daemon Timer still delivering to
+            // an expired LL.
+            if (listener == null || listener == timedOut) { //NOPMD CompareObjectsWithEquals
                 LL l = new LL();
                 l.timeout = timeout;
                 l.bind();
@@ -248,6 +385,9 @@ public abstract class LocationManager {
                 status = TEMPORARILY_UNAVAILABLE;
             }
             listener = l;
+            // Whatever timed out is gone now, whether it was replaced or
+            // cleared: the marker only ever describes the current occupant.
+            timedOut = null;
             if (l == null) {
                 return;
             }
@@ -291,6 +431,69 @@ public abstract class LocationManager {
                 return;
             }
             bindBackgroundListener();
+        }
+    }
+
+    /// Removes `l` only if it is still the listener this manager holds.
+    ///
+    /// Under LISTENER_LOCK so the test and the removal cannot be split by the
+    /// EDT installing a different listener in between -- which is the whole
+    /// point: the only caller is a timed wait undoing ITS OWN subscription, and
+    /// it must not touch one somebody else made while it was parked.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to remove if it is still current
+    /// Marks `l` as having timed out, leaving it INSTALLED.
+    ///
+    /// Two things have to be true at once and neither may be traded for the
+    /// other. `getCurrentLocationSync` must stop routing through it, or the
+    /// next request takes `getCurrentLocation()` instead of starting a fresh
+    /// timed one. And the platform subscription must still be torn down when
+    /// something replaces it -- `setLocationListener` only calls
+    /// `clearListener()` when it finds a listener there, so forgetting the
+    /// field orphans the subscription for good.
+    ///
+    /// Marking does both: the retry's `setLocationListener` sees a listener,
+    /// so it clears and binds rather than binding over an orphan.
+    ///
+    /// It does NOT make those two ordered, and an earlier version of this note
+    /// claimed it did -- "within that ONE port call, which is the ordering the
+    /// port controls". That is wrong on Android with Play Services, where
+    /// `clearListener` and `bindListener` each spawn a thread that waits for
+    /// the API client to connect before posting, so a clear starting while the
+    /// client is down can land after the bind that followed it and remove the
+    /// retry's subscription. The port documents that as a known hazard at
+    /// `AndroidLocationPlayServiceManager.clearListener`, along with the two
+    /// patches for it that were written and withdrawn, and the real fix --
+    /// one worker per manager, so the calls run in the order they were made.
+    ///
+    /// So this is a trade rather than a cure, and the direction is the one
+    /// that fails smaller. Forgetting the field orphans the platform
+    /// subscription CERTAINLY and for good: nothing ever calls `clearListener`
+    /// again, the device keeps a live GPS subscription nobody can reach, and
+    /// on the JavaSE stub a non-daemon Timer goes on delivering to an expired
+    /// request. Keeping it risks ONE retry timing out, transiently, and only
+    /// when the client happens to be down at the moment the clear starts.
+    private void markTimedOut(LocationListener l) {
+        synchronized (LISTENER_LOCK) {
+            // Reference identity, for the reason clearListenerIfStill says.
+            if (listener == l) { //NOPMD CompareObjectsWithEquals
+                timedOut = l;
+            }
+        }
+    }
+
+    private void clearListenerIfStill(LocationListener l) {
+        synchronized (LISTENER_LOCK) {
+            // Reference identity is the question, not equality: "is the
+            // manager still holding the very listener this wait installed".
+            // A LocationListener is an application object with no equals
+            // contract, and two distinct listeners that happened to compare
+            // equal would be exactly the case this must not treat as the same.
+            if (listener == l) { //NOPMD CompareObjectsWithEquals
+                setLocationListener(null);
+            }
         }
     }
 
@@ -357,13 +560,66 @@ public abstract class LocationManager {
         public void bind() {
             setLocationListener(this);
             Display.getInstance().invokeAndBlock(this);
+            if (!finished) {
+                // The wait ended without a fix, which means run() hit the
+                // timeout and broke out. Only the two callbacks below used to
+                // clear the listener, so a timed-out request left this LL bound
+                // as the manager's listener for the life of the process: the
+                // platform kept delivering updates nothing consumed, and the
+                // NEXT getCurrentLocationSync saw a non-null listener and took
+                // the getCurrentLocation() path instead of starting a fresh
+                // timed request.
+                //
+                // Latent until something actually passed a timeout -- the
+                // no-argument getCurrentLocationSync passes -1 and waits
+                // forever -- and LocationButton defaults to 30 seconds, which
+                // is what makes this reachable in ordinary use.
+                //
+                // The CORE field only, and deliberately not the platform
+                // subscription.
+                //
+                // What the leak actually broke is right here: getCurrentLocation
+                // Sync branches on this field, so a timed-out LL left in it sent
+                // the next request down getCurrentLocation() instead of starting
+                // a fresh timed one. Releasing the field fixes that entirely.
+                //
+                // Calling setLocationListener(null) would fix it too and cost
+                // more than it is worth. On Android with Play Services that
+                // starts an ASYNCHRONOUS clearListener(), and a retry arriving
+                // as connectivity returns can bind first -- the late clear then
+                // removes the retry's subscription and the retry times out as
+                // well. AndroidLocationPlayServiceManager.clearListener()
+                // documents that ordering hazard; nothing in core can serialize
+                // against it, and before this cleanup existed there was no
+                // clear here to race at all.
+                //
+                // The platform subscription is not orphaned for long: the next
+                // request's bind() calls setLocationListener(this), and a port
+                // replaces a listener inside that ONE call rather than through
+                // a separate clear that can overtake it.
+                //
+                // Only when this LL is STILL the manager's listener. The wait
+                // runs through invokeAndBlock, so the EDT keeps pumping and the
+                // application can call setLocationListener(other) while we are
+                // parked here -- `finished` is false either way, so an
+                // unconditional release would forget a listener the application
+                // had just installed.
+                markTimedOut(this);
+            }
         }
 
         @Override
         public void locationUpdated(Location location) {
             result = location;
             finished = true;
-            setLocationListener(null);
+            // Only while this LL is STILL the installed listener, for the same
+            // reason the timeout path above says so. The platform can deliver
+            // to a listener it captured before the wait gave up: the slot has
+            // been released by then and the next request has installed its
+            // own, and an unconditional clear here removed THAT one -- so a
+            // fix arriving late for a request nobody is waiting on any more
+            // made the request that is waiting time out instead.
+            clearListenerIfStill(this);
         }
 
         @Override
@@ -379,7 +635,10 @@ public abstract class LocationManager {
                 result = null;
             }
             finished = true;
-            setLocationListener(null);
+            // Conditional for the reason locationUpdated above is: a late
+            // state change belongs to the request that installed this LL, not
+            // to whoever holds the slot now.
+            clearListenerIfStill(this);
         }
 
         @Override

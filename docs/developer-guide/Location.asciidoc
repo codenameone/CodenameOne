@@ -1,0 +1,181 @@
+== Location
+
+Codename One exposes device location under `com.codename1.location`, and it
+splits into two shapes that platforms increasingly treat as different features.
+
+*Persistent location* is `LocationManager`: a listener that follows the device,
+a geofence that fires when it crosses a boundary, a background listener that
+wakes the app. It's what navigation, fitness tracking and delivery apps need,
+and it holds a precise-location grant for as long as the app is installed.
+
+*Transactional location* is one fix, once, because the user asked for it: a
+nearby-shop search, an address field that fills itself, one share of the current
+position. `LocationButton` is the component for that, and on platforms that draw
+a location button of their own the grant it produces lasts for the session and no
+longer.
+
+[options="header"]
+|===
+| Capability | Android | iOS | Simulator and desktop | JavaScript
+| One fix (`getCurrentLocationSync`) | yes | yes | simulated | yes
+| Foreground listener | yes | yes | simulated | yes
+| Background listener | yes | yes (needs `ios.background_modes`) | -- | --
+| Geofencing | yes | yes (needs `ios.background_modes`) | -- | --
+| System-rendered location button | yes (Android 17 and later) | -- | -- | --
+|===
+
+=== The Location Button
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/LocationJavaSnippets.java[tag=location-java-001,indent=0]
+----
+
+`LocationButton` is a component you add to a form like any other. On Android 17
+(API 37) and later it's drawn by the system rather than by the app, and the tap
+is what grants precise location for that session. Everywhere else -- older
+Android, iOS, the simulator, the desktop and the browser -- it's an ordinary
+Codename One button that asks for location the usual way. The same code compiles
+and behaves sensibly everywhere, so there's nothing to branch on;
+`LocationButton.isSystemRendered()` exists only for explanatory copy that wants
+to say which one the user is looking at.
+
+The listener is handed a `Location` or `null`, and `null` covers both a user who
+declined and a fix that never arrived. The timeout defaults to 30 seconds, and
+`setTimeout` restores that default for zero or anything negative: the button
+can't be asked to wait forever. One request is served at a time across every
+`LocationButton` on the form, because `LocationManager` has a single listener
+slot, so a wait that never ends parks every other button behind it -- and if the
+platform session fails while it's parked, nothing can end it. A first GPS fix
+indoors can fail to arrive at all, which is exactly when that would bite.
+
+The label comes from `TEXT_PRECISE_LOCATION` (the default),
+`TEXT_USE_PRECISE_LOCATION`, `TEXT_SHARE_PRECISE_LOCATION`,
+`TEXT_NEAR_MY_PRECISE_LOCATION`, `TEXT_NEAR_YOUR_PRECISE_LOCATION` or
+`TEXT_NONE` for the icon alone. `setButtonBackgroundColor` and
+`setButtonTextColor` override the colors, and both are worth leaving alone: a
+button the user recognizes is the whole point of the control, and the system's
+own colors are what make it recognizable.
+
+=== Why This Matters on Google Play
+
+From *2027-01-27*, Google Play requires apps targeting Android 17 or later to
+obtain precise location for transactional purposes through the location button.
+Persistent `ACCESS_FINE_LOCATION` remains available for core functionality --
+navigation, tracking, geofencing -- and carries a Play Console declaration
+instead. An app that implements a one-time nearby search with a persistent grant
+is subject to enforcement, which since it's a policy matter rather than a
+technical one shows up as a rejected update rather than a crash.
+
+Referencing `com.codename1.location.LocationButton` is the whole opt-in on the
+build side. The Android build then declares `USE_LOCATION_BUTTON`, adds the
+library that renders the control and raises `minSdkVersion` to 24, which the
+library requires. An app that never references the class sees no change at all.
+
+[NOTE]
+====
+The library that renders the system button is an experimental Jetpack artifact,
+and its metadata requires Android Gradle plugin 9.1.0, Gradle 9 and compile SDK
+37. Codename One's generated project is on Android Gradle plugin 8 with Gradle
+8, and the hosted build images carry platforms through android-36, so that
+library can't be resolved yet.
+
+None of that reaches your app. An Android build on the current toolchain
+simply uses the standard location API: `LocationButton` becomes an ordinary
+Codename One button that requests location permission the usual way -- the same
+fallback it already uses on every platform without the system control -- and the
+app builds and ships normally. Codename One skips the library, leaves
+`minSdkVersion` alone, and declares the ordinary location permissions so the
+button works.
+
+When Codename One moves to Android Gradle plugin 9 and compile SDK 37, the same
+code picks the system control up on its own. Write against `LocationButton`
+today and you get the platform button on Android 17 devices when the toolchain
+lands, without touching your app.
+====
+
+There's one decision the build can't make for you.
+
+=== Declaring That the Button Is the Only Way In
+
+`android.locationButton.exclusive=true` declares `ACCESS_FINE_LOCATION` with
+`usesPermissionFlags="onlyForLocationButton"`, which tells the platform that
+precise location reaches this app through the button and through nothing else.
+That's what removes the need for the persistent-location declaration in the Play
+Console.
+
+It isn't inferred from the code, and it isn't the default, because it's the same
+question the Play Console asks -- is precise location core functionality here?
+-- and the two ways of getting it wrong aren't symmetrical. Leaving it off when
+it could have been on costs a Play Console declaration. Turning it on in an app
+that also navigates or tracks means every `getCurrentLocationSync` outside the
+button is refused the grant it needs, on Android 17 only, in a build that looks
+entirely healthy.
+
+Set it, then, when *every* use of precise location in the app is transactional. The
+build rejects the hint outright when it can see the contradiction -- an app that
+calls `addGeoFencing` or `setBackgroundLocationListener`, or that declares
+background location, fails with a sentence naming the conflict rather than
+shipping a manifest that fights itself.
+
+On a build whose toolchain can't carry the system control, the hint is ignored
+rather than applied, and the build log says so. Exclusivity means the
+fine-location grant belongs to the button alone; with no system button that
+would be a permission nothing could ever grant, so the app gets the ordinary
+declaration instead. Keep the hint set -- it starts working, unchanged, on the
+toolchain that brings the button.
+
+=== Migrating a One-Time `getCurrentLocationSync`
+
+The pattern being replaced looks like this, and it stays correct on every
+platform except a Play-distributed app targeting Android 17 or later:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/LocationJavaSnippets.java[tag=location-java-002,indent=0]
+----
+
+The replacement is the same shape, with the tap and the grant now being the same
+gesture:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/LocationJavaSnippets.java[tag=location-java-003,indent=0]
+----
+
+Both handle `null`, which the old code should have been doing anyway --
+`getCurrentLocationSync` has always been able to return it.
+
+=== A Checklist for Persistent Location Apps
+
+An app that genuinely needs a grant that outlives the session doesn't use the
+button, and nothing here changes for it. What it does need, before
+*2027-01-27*:
+
+* Leave `android.locationButton.exclusive` unset, which is the default.
+* From November 2026, complete the Play Console declaration for persistent
+  precise location, describing the core functionality it serves.
+* Check that the persistent use is core. A geofence that only decorates a
+  feature is the case the policy is aimed at, and it's cheaper to move that flow
+  to a `LocationButton` than to defend it.
+* Where an app has both -- turn-by-turn navigation and a separate one-tap
+  nearby search -- keep the persistent declaration and use `LocationButton`
+  for the transactional half anyway. The button costs nothing to an app that
+  already holds the grant, and it's the flow users are least willing to hand a
+  permanent permission to.
+
+=== Persistent Location
+
+`LocationManager` is unchanged and remains the API for everything the button
+isn't for.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/LocationJavaSnippets.java[tag=location-java-004,indent=0]
+----
+
+On iOS every one of these needs the `ios.locationUsageDescription` build hint,
+which is the sentence Apple shows the user; background listeners and geofences
+additionally need `ios.background_modes` to include `location`. Guard geofencing
+with `isGeofenceSupported()` and background listeners with
+`isBackgroundLocationSupported()` rather than with platform detection.

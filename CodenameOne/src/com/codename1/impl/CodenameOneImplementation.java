@@ -6624,6 +6624,24 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the bridge [com.codename1.location.LocationButton] uses to reach a
+    /// system-rendered location button -- the control a platform draws itself so that a tap
+    /// grants precise location for one session rather than persistently. Ports that have one
+    /// override this; the base implementation returns null, which makes the component fall back
+    /// to an ordinary Codename One button that asks for location the usual way, so application
+    /// code needs no platform-specific branch.
+    ///
+    /// Deliberately not routed through `getLocationManager()`, which several ports gate behind a
+    /// location permission prompt. Building the button must not ask for the permission the
+    /// button exists to avoid asking for.
+    ///
+    /// #### Returns
+    ///
+    /// the location button bridge, or null when this port has no system button
+    public com.codename1.location.spi.LocationButtonBridge getLocationButtonBridge() {
+        return null;
+    }
+
     /// Returns the platform bridge used by the `com.codename1.call` API to reach the system call
     /// stack. Ports supporting system call integration override this; the default answers `null`.
     ///

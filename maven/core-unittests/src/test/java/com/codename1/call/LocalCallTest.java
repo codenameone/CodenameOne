@@ -687,7 +687,6 @@ public class LocalCallTest {
         // a desktop JVM alive long after the call is over. The action being
         // answered exactly once hides this completely at the API level; the
         // only thing that shows it is the thread.
-        java.util.Set<Thread> before = timerThreads();
         final List<CallAction> seen = new ArrayList<CallAction>();
         Calls.addActionListener(new CallActionAdapter() {
             public void endRequested(String callId, CallAction action) {
@@ -698,37 +697,52 @@ public class LocalCallTest {
         });
         String id = CallId.random();
         ring(id);
+        // Snapshot taken as late as possible: the ONLY threads that can be this
+        // action's safety nets are the ones born between here and the deferral
+        // completing. Anything already running is somebody else's, and anything
+        // born after this window closes is somebody else's too.
+        java.util.Set<Thread> beforeDefer = liveTimerThreads();
         bridge.simulateEndRequest(id);
         waitFor(seen, 1);
+        java.util.Set<Thread> candidates = liveTimerThreads();
+        candidates.removeAll(beforeDefer);
+        // Non-empty, which is what stops the rest of this passing by finding
+        // nothing to look at. Two defers arm a safety net; if none appeared,
+        // either the mechanism changed or this test stopped exercising it.
+        assertFalse(candidates.isEmpty(),
+                "deferring must arm a safety net");
         seen.get(0).fulfill();
 
         long limit = System.currentTimeMillis() + 2000;
-        while (!survivingNewTimers(before).isEmpty()
+        while (!stillAlive(candidates).isEmpty()
                 && System.currentTimeMillis() < limit) {
             sleep();
         }
-        // IDENTITY, not a count. These threads are JVM-wide -- anything named "Timer-" -- so a
-        // count compares this call's safety timer against every other timer in the run, and
-        // arithmetic hides the thing under test: two unrelated timers expiring inside the window
-        // offsets one that leaked, and the assertion passes.
+        // Scoped to the threads born WHILE this action was being deferred, and
+        // that scope is the whole reliability of the check.
         //
-        // That is not hypothetical. This started as an equality check, failed with "expected 4
-        // but was 2" when two unrelated timers finished -- which is correct behaviour and nothing
-        // to do with call deferral -- and was weakened to "not more than before" to quiet it. The
-        // weakening made it pass for the wrong reason instead of fixing what it measured.
+        // A count of Timer-* threads mixed this test's timer with whatever an
+        // earlier class left behind: one of those dying mid-test failed the
+        // assertion with the count going the safe way, and relaxing it to <=
+        // then let a real leak hide. Identity against a set captured at the top
+        // of the test fixed the deaths and not the births -- any unrelated
+        // java.util.Timer started anywhere later in the test landed in the
+        // difference and failed a test whose own timer had been cancelled.
         //
-        // Tracking which threads existed BEFORE answers the actual question: did answering leave
-        // a timer of its own running. Unrelated timers may start or stop freely and are never
-        // counted, because they are compared by identity rather than by number.
-        java.util.Set<Thread> leaked = survivingNewTimers(before);
+        // Naming the thread would answer this exactly, and core cannot:
+        // java.util.Timer(String) is in vm/JavaAPI and not in Ports/CLDC11, and
+        // Thread.setName is in neither. So the window is narrowed instead of
+        // eliminated -- from the whole test to the few milliseconds a deferral
+        // takes -- which is an honest improvement rather than a proof.
+        java.util.Set<Thread> leaked = stillAlive(candidates);
         assertTrue(leaked.isEmpty(),
                 "answering left a safety timer running: " + names(leaked));
     }
 
-    /// The live java.util.Timer threads, BY IDENTITY, which is where a leaked safety net shows.
-    private static java.util.Set<Thread> timerThreads() {
-        java.util.Set<Thread> out =
-                java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Thread, Boolean>());
+    /// The live java.util.Timer threads, by identity.
+    private static java.util.Set<Thread> liveTimerThreads() {
+        java.util.Set<Thread> out = java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<Thread, Boolean>());
         Thread[] all = new Thread[Thread.activeCount() * 2 + 16];
         int found = Thread.enumerate(all);
         for (int i = 0; i < found; i++) {
@@ -740,14 +754,7 @@ public class LocalCallTest {
         return out;
     }
 
-    /// Timer threads that are alive now and were not alive before -- the only ones this action
-    /// can be held responsible for.
-    private static java.util.Set<Thread> survivingNewTimers(java.util.Set<Thread> before) {
-        java.util.Set<Thread> now = timerThreads();
-        now.removeAll(before);
-        return now;
-    }
-
+    /// The names of a set of threads, for a failure message that says which.
     private static String names(java.util.Set<Thread> threads) {
         StringBuilder sb = new StringBuilder();
         for (Thread t : threads) {
@@ -758,6 +765,20 @@ public class LocalCallTest {
         }
         return sb.toString();
     }
+
+    /// Those of `candidates` that are still running.
+    private static java.util.Set<Thread> stillAlive(
+            java.util.Set<Thread> candidates) {
+        java.util.Set<Thread> out = java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<Thread, Boolean>());
+        for (Thread t : candidates) {
+            if (t.isAlive()) {
+                out.add(t);
+            }
+        }
+        return out;
+    }
+
 
     @Test
     public void reportConnectedCannotResurrectAnEndedSession() {

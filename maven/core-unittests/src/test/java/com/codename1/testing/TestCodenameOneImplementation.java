@@ -505,6 +505,38 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         nativeImageCacheSupported = supported;
     }
 
+    private com.codename1.location.spi.LocationButtonBridge locationButtonBridge;
+
+    /**
+     * Installs the bridge {@code LocationButton} will find, so a test can hand
+     * it a platform control that reports whatever the test needs. A port that
+     * has no bridge answers null, which is the default here too.
+     */
+    public void setLocationButtonBridge(
+            com.codename1.location.spi.LocationButtonBridge bridge) {
+        locationButtonBridge = bridge;
+    }
+
+    private boolean locationButtonBridgeThrows;
+
+    /**
+     * Makes the LOOKUP itself fail, which a port resolving native state can
+     * do while that state is being rebuilt -- distinct from a bridge that is
+     * present and cannot answer.
+     */
+    public void setLocationButtonBridgeThrows(boolean throwing) {
+        locationButtonBridgeThrows = throwing;
+    }
+
+    @Override
+    public com.codename1.location.spi.LocationButtonBridge
+            getLocationButtonBridge() {
+        if (locationButtonBridgeThrows) {
+            throw new RuntimeException("native state is being rebuilt");
+        }
+        return locationButtonBridge;
+    }
+
     public void resetTextSelectionTracking() {
         initializeTextSelectionCount = 0;
         deinitializeTextSelectionCount = 0;

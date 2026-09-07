@@ -6226,6 +6226,17 @@ public final class Display extends CN1Constants {
         return impl.getNearbyBridge();
     }
 
+    /// Returns the platform bridge [com.codename1.location.LocationButton] uses to reach a
+    /// system-rendered location button, or null when this port has none. Internal -- application
+    /// code uses [com.codename1.location.LocationButton] rather than this bridge directly.
+    ///
+    /// #### Returns
+    ///
+    /// the location button bridge, or null
+    public com.codename1.location.spi.LocationButtonBridge getLocationButtonBridge() {
+        return impl.getLocationButtonBridge();
+    }
+
     /// Returns the platform bridge used by the `com.codename1.call` API to reach the system call
     /// stack -- CallKit and PushKit on iOS, `ConnectionService` and `TelecomManager` on Android --
     /// or null when unsupported on this port. Internal -- application code uses the
