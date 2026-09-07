@@ -2457,20 +2457,35 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
             cn1RefDiscoveredCap = nc;
         }
     }
+    JAVA_BOOLEAN recorded = JAVA_FALSE;
     if(cn1RefDiscoveredTop < cn1RefDiscoveredCap) {
         struct CN1RefEntry* e = &cn1RefDiscovered[cn1RefDiscoveredTop++];
         e->ref = ref;
         e->referentField = referentField;
         e->touchAgeField = touchAgeField;
         e->strength = strength;
+        recorded = JAVA_TRUE;
     }
-    // A DROPPED ENTRY IS SAFE, and safe in the direction that matters -- whether it was
-    // dropped because realloc failed or because the growth above was declined. The clear
-    // pass never sees this reference, so the referent stays reachable through a field
-    // nothing cleared: a missed reclaim, never a freed object under a live pointer. Note
-    // the reference was still AGED above, so a dropped cycle does not make it immortal;
-    // the next cycle discovers it again and the list has usually grown by then.
     pthread_mutex_unlock(&cn1RefMutex);
+    // A DROPPED ENTRY MUST BE RETAINED, NOT IGNORED -- whether it was dropped because the
+    // realloc failed or because the growth above was declined while a thread is frozen.
+    //
+    // An earlier version of this comment claimed the opposite, that dropping was safe
+    // because "the referent stays reachable through a field nothing cleared". That is
+    // exactly backwards, and it is worth spelling out because it reads as obviously true:
+    // not clearing the field is not the same as keeping the referent ALIVE. Nothing else
+    // marks it -- that is the whole point of a weak edge -- so the sweep frees it, and the
+    // field nothing cleared is then a dangling pointer inside a perfectly reachable
+    // Reference, handed to the next get(). On this VM that is a native crash no Java catch
+    // can see, which is the worst possible outcome for a path taken only when memory is
+    // already short.
+    //
+    // Marking is the conservative direction: the referent survives one more cycle, the
+    // reference is rediscovered next time, and by then the list has usually grown.
+    if(!recorded) {
+        gcMarkObject(threadStateData, __atomic_load_n(referentField, __ATOMIC_RELAXED), force);
+        return;
+    }
 #ifdef CN1_GC_CONFORM
     atomic_fetch_add_explicit(&cn1RefDiscoveries, 1, memory_order_relaxed);
     if(strength != CN1_REF_SOFT) {
@@ -2638,6 +2653,24 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
         if(mark == -1 || mark >= currentGcMarkValue - 1) {
             continue;
         }
+        // THE STORES ARE SEQUENTIAL, AND DELIBERATELY SO. Review asked for the clearing of
+        // a referent's aliases to be PUBLISHED atomically as well as decided atomically,
+        // on the grounds that a mutator landing between two iterations can see one alias
+        // already null and another not.
+        //
+        // It can, and that is not fixable at an acceptable price. Making N stores visible
+        // as one step needs a lock the reader also takes, and the reader is
+        // Reference.get() -- the single hot path this whole design is built to keep free
+        // of one. HotSpot does not do it either: its reference processing clears referents
+        // one at a time and get() is not synchronised against it.
+        //
+        // What the contract actually requires is that the DECISION covers every alias
+        // together, so the collector never leaves one alias cleared and another live once
+        // it is finished. That is what the two sub-passes above provide, and it is the
+        // part that was genuinely broken before them. The residual window is transient and
+        // self-healing: it lasts only until this loop reaches the other alias, and a get()
+        // inside it returns a referent that is still valid, because the same read arms the
+        // barrier and resurrects the object for this cycle.
         __atomic_store_n(e->referentField, JAVA_NULL, __ATOMIC_RELAXED);
 #ifdef CN1_GC_CONFORM
         atomic_fetch_add_explicit(&cn1RefCleared, 1, memory_order_relaxed);

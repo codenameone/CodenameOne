@@ -248,7 +248,15 @@ public class RefPolicy {
                 // marked, so nothing is ever condemned and no split is possible. The pause
                 // lets a group become collectable between bursts.
                 while (aliasRacing) {
-                    for (int g = 0; g < groups; g++) {
+                    // ONE GROUP IN FOUR. Touching every group keeps every group alive:
+                    // the stamp now survives until the end of the clear pass, so any read
+                    // anywhere in a cycle makes sub-pass A mark that referent, and with
+                    // one alias of each group read per burst nothing is ever condemned.
+                    // That was measured -- ALIAS_CLEARED_GROUPS=0/256 -- and it is the
+                    // vacuum this phase exists to detect, not to fall into. Leaving three
+                    // groups in four untouched keeps the collection half honest while the
+                    // touched quarter still exercises the interleaving.
+                    for (int g = 0; g < groups; g += 4) {
                         aliasSink = ((Reference) aliasRefs[g * ALIASES + ALIASES - 1]).get();
                     }
                     aliasSink = null;

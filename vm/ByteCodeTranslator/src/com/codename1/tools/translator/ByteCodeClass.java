@@ -1038,46 +1038,37 @@ public class ByteCodeClass {
             b.append(fld.getFieldName());
             b.append("(JAVA_OBJECT __cn1T) {\n ").append(nullCheck).append("    ");
             if(isReferenceReferent(clsName, fld)) {
-                // Reference.get() compiles into this accessor, and reading a weak
-                // referent while a concurrent mark is running needs a barrier that an
-                // ordinary field read does not.
+                // Reference.get() compiles into this accessor, and reading a weak referent
+                // while a concurrent mark is running needs a barrier an ordinary field read
+                // does not.
                 //
-                // The collector clears a reference only after the strong mark has
-                // reached its fixpoint, but it does so with the mutators still running
-                // and with the SATB barrier still armed. Without the enqueue below, a
-                // thread whose stack was scanned and released early could take the
-                // referent out of here, hold it in a local the collector has already
-                // walked past, and watch the same cycle's sweep free it -- the object
-                // is by then neither marked nor fresh, which is the one case the
-                // "already marked or FRESH" invariant the sweep relies on does not
-                // cover. Enqueuing makes the referent part of the snapshot, so the
-                // fixpoint loop marks it and the clear pass then sees it live and
-                // leaves the reference alone.
+                // ONE LOAD, and everything below acts on that value. The collector clears a
+                // reference after the strong mark reaches its fixpoint but with mutators
+                // still running, so a thread whose stack was scanned and released early can
+                // take the referent out of here and hold it in a local the collector has
+                // walked past -- neither marked nor fresh, the one case the sweep's "already
+                // marked or FRESH" invariant does not cover. Enqueuing puts it back in the
+                // snapshot, and the trial clear of gcSatbActive then finds a non-empty log,
+                // re-arms, marks it, and leaves the reference alone.
                 //
-                // CN1_SATB_REF_LOAD rather than the plain CN1_SATB_DELETE next door: a
-                // referent that is already marked this epoch, or fresh, is one the clear
-                // pass would refuse to clear, so logging it is pure cost -- and on a hot
-                // cache that cost is enough to stop the SATB termination loop converging.
-                // Off-mark both are one predicted-not-taken load of gcSatbActive.
-                b.append("CN1_SATB_REF_LOAD(&((struct obj__").append(clsName).append("*)__cn1T)->")
-                 .append(fld.getClsName()).append("_").append(fld.getFieldName()).append(");\n    ");
-                // The touch stamp, and the entire per-read cost of ranking soft
-                // references by use: a store of an immediate. Unconditional rather than
-                // guarded by a "did it change" test, because the branch would cost more
-                // than the store it saves.
+                // Loading BEFORE the barrier check rather than inside it is what makes that
+                // sound. Checking the flag first and loading afterwards leaves a gap: a
+                // thread that read the flag as 0, was SIGUSR2-frozen with the referent not
+                // yet in any register, scanned, released, and only then loaded, came away
+                // with an unmarked referent nothing had enqueued. With the load first the
+                // value is in a register before any freeze, where the conservative root scan
+                // finds it.
+                b.append(fld.getCDefinition()).append(" __cn1Ref = __atomic_load_n(&((struct obj__")
+                 .append(clsName).append("*)__cn1T)->")
+                 .append(fld.getClsName()).append("_").append(fld.getFieldName())
+                 .append(", __ATOMIC_RELAXED);\n    ");
+                b.append("CN1_SATB_REF_KEEP(__cn1Ref);\n    ");
+                // The touch stamp, and the entire per-read cost of ranking soft references
+                // by use: a store of an immediate. Unconditional rather than guarded by a
+                // "did it change" test, because the branch would cost more than the store.
                 b.append("__atomic_store_n(&((struct obj__").append(clsName).append("*)__cn1T)->")
                  .append(REFERENCE_CLASS).append("_cn1TouchAge, CN1_REF_TOUCHED, __ATOMIC_RELAXED);\n    ");
-                // RELAXED ATOMIC, not a plain load, and the same everywhere this field is
-                // touched -- cn1GcProcessReferences clears it from the collector thread
-                // while mutators are running, which is the whole point of the design, so a
-                // plain access on either side is a data race and undefined in C however
-                // benign the generated instruction looks. Relaxed is the same instruction
-                // on every target built here; what it buys is that the write is one the
-                // reader is allowed to observe. Note the mark word two lines down in
-                // gcMarkObject is already handled this way for exactly this reason.
-                b.append("return __atomic_load_n(&((struct obj__").append(clsName).append("*)__cn1T)->")
-                 .append(fld.getClsName()).append("_").append(fld.getFieldName())
-                 .append(", __ATOMIC_RELAXED);\n}\n\n");
+                b.append("return __cn1Ref;\n}\n\n");
             } else if (fld.isVolatile()) {
                 b.append("return atomic_load_explicit(&((struct obj__");
                 b.append(clsName);

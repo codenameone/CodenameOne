@@ -3130,17 +3130,26 @@ extern void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, J
 //
 // A retained soft reference costs nothing here at all, because its referent is marked as
 // an ordinary strong edge by cn1GcDiscoverReference before any get() can reach it.
+// KEEPS A VALUE THE CALLER HAS ALREADY LOADED, rather than loading its own.
+//
+// The accessor loads the referent ONCE, into a local, and hands that same value here --
+// so what the barrier acts on is exactly what get() returns. The previous shape checked
+// gcSatbActive and only then loaded, leaving the accessor to load again afterwards, and
+// the gap between the two was a real hole: a thread that read the flag as 0, was then
+// SIGUSR2-frozen, scanned (with the referent not yet in any register or stack slot),
+// released, and only then performed its load, came away holding an unmarked referent that
+// nothing had enqueued. Loading first closes it without a barrier, because the value is
+// in a register before the freeze can happen and the conservative root scan covers
+// registers and the native stack.
 #if defined(CN1_DISABLE_SATB)
-#define CN1_SATB_REF_LOAD(fieldAddr) do { } while(0)
+#define CN1_SATB_REF_KEEP(refVal) do { (void)(refVal); } while(0)
 #else
-#define CN1_SATB_REF_LOAD(fieldAddr) \
-    do { if(__builtin_expect(gcSatbActive, 0)) { \
-             JAVA_OBJECT cn1__r = __atomic_load_n((JAVA_OBJECT*)(fieldAddr), __ATOMIC_RELAXED); \
-             if(cn1__r != JAVA_NULL && !CN1_IS_TAGGED(cn1__r)) { \
-                 int cn1__m = __atomic_load_n(&cn1__r->__codenameOneGcMark, __ATOMIC_RELAXED); \
-                 int cn1__e = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed); \
-                 if(cn1__m != -1 && cn1__m != cn1__e) cn1SatbEnqueue(cn1__r); \
-             } \
+#define CN1_SATB_REF_KEEP(refVal) \
+    do { JAVA_OBJECT cn1__r = (refVal); \
+         if(__builtin_expect(gcSatbActive, 0) && cn1__r != JAVA_NULL && !CN1_IS_TAGGED(cn1__r)) { \
+             int cn1__m = __atomic_load_n(&cn1__r->__codenameOneGcMark, __ATOMIC_RELAXED); \
+             int cn1__e = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed); \
+             if(cn1__m != -1 && cn1__m != cn1__e) cn1SatbEnqueue(cn1__r); \
          } } while(0)
 #endif
 
