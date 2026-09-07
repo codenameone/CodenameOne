@@ -2501,6 +2501,43 @@ public final class HttpServer {
     };
 
     /**
+     * The same constants as bytes, because comparing against the String walks it a
+     * character at a time and String.charAt is a call.
+     *
+     * Every one of these is matched against raw buffer bytes on the request path,
+     * and the comparison was reaching into a String for each character: a profile
+     * of the plaintext benchmark put String.charInternal at 4.92% of in-binary self
+     * time, third behind syscall dispatch and serveOne itself. A request line costs
+     * about eleven of those calls -- eight for the version and three for the method
+     * -- before a single header is looked at. Held as bytes the same comparison is
+     * a byte load, and the constants are built once at class initialisation.
+     *
+     * The IGNORE-CASE constants are stored already folded, so only the data side is
+     * folded at comparison time rather than both sides on every character.
+     */
+    private static final byte[] HTTP_1_1_BYTES = asciiConstant("HTTP/1.1");
+    private static final byte[] HTTP_1_0_BYTES = asciiConstant("HTTP/1.0");
+    private static final byte[] CONTENT_LENGTH_BYTES = asciiConstant("content-length");
+    private static final byte[] TRANSFER_ENCODING_BYTES = asciiConstant("transfer-encoding");
+    private static final byte[][] KNOWN_METHOD_BYTES = asciiConstants(KNOWN_METHODS);
+
+    private static byte[] asciiConstant(String ascii) {
+        byte[] out = new byte[ascii.length()];
+        for(int iter = 0 ; iter < ascii.length() ; iter++) {
+            out[iter] = (byte)ascii.charAt(iter);
+        }
+        return out;
+    }
+
+    private static byte[][] asciiConstants(String[] values) {
+        byte[][] out = new byte[values.length][];
+        for(int iter = 0 ; iter < values.length ; iter++) {
+            out[iter] = asciiConstant(values[iter]);
+        }
+        return out;
+    }
+
+    /**
      * Reads one request. Null when the peer closed; ProtocolException when what
      * arrived is not a request this server will act on.
      */
@@ -2552,9 +2589,9 @@ public final class HttpServer {
         String version;
         int versionStart = secondSpace + 1;
         int versionLength = lineEnd - versionStart;
-        if(sliceEquals(raw, versionStart, versionLength, "HTTP/1.1")) {
+        if(sliceEquals(raw, versionStart, versionLength, HTTP_1_1_BYTES)) {
             version = "HTTP/1.1";
-        } else if(sliceEquals(raw, versionStart, versionLength, "HTTP/1.0")) {
+        } else if(sliceEquals(raw, versionStart, versionLength, HTTP_1_0_BYTES)) {
             version = "HTTP/1.0";
         } else {
             throw new ProtocolException(505, "unsupported HTTP version");
@@ -2663,7 +2700,7 @@ public final class HttpServer {
         boolean chunked = false;
         for(int iter = 0 ; iter < headerCount ; iter++) {
             int base = iter * 4;
-            if(sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], "content-length")) {
+            if(sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], CONTENT_LENGTH_BYTES)) {
                 // Two different lengths means two readings of where this request
                 // ends. Refuse rather than pick one.
                 if(contentLengthAt >= 0
@@ -2673,7 +2710,7 @@ public final class HttpServer {
                 }
                 contentLengthAt = base;
             } else if(sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1],
-                                            "transfer-encoding")) {
+                                            TRANSFER_ENCODING_BYTES)) {
                 chunked = sliceContainsIgnoreCase(raw, slices[base + 2], slices[base + 3],
                                                   "chunked");
             }
@@ -3156,6 +3193,22 @@ public final class HttpServer {
         return true;
     }
 
+    /**
+     * Folded compare against a constant that is ALREADY folded, so only the bytes
+     * that arrived off the socket have to be folded here.
+     */
+    static boolean sliceEqualsIgnoreCase(byte[] data, int start, int length, byte[] asciiLower) {
+        if(length != asciiLower.length) {
+            return false;
+        }
+        for(int iter = 0 ; iter < length ; iter++) {
+            if(foldAscii(data[start + iter] & 0xff) != (asciiLower[iter] & 0xff)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     static boolean sliceEqualsIgnoreCase(byte[] data, int start, int length, String ascii) {
         if(length != ascii.length()) {
             return false;
@@ -3420,9 +3473,12 @@ public final class HttpServer {
      * safe as well as the equals ones.
      */
     static String knownMethod(byte[] data, int start, int length) {
-        for(int iter = 0 ; iter < KNOWN_METHODS.length ; iter++) {
-            if(sliceEqualsIgnoreCase(data, start, length, KNOWN_METHODS[iter])
-                    && sliceEquals(data, start, length, KNOWN_METHODS[iter])) {
+        // The folded compare that used to guard this one was redundant: an EXACT
+        // match implies a folded match, so it could only ever agree with the test
+        // below it, at the cost of a second walk of the same bytes -- with a
+        // foldAscii call per character on both sides -- for every request.
+        for(int iter = 0 ; iter < KNOWN_METHOD_BYTES.length ; iter++) {
+            if(sliceEquals(data, start, length, KNOWN_METHOD_BYTES[iter])) {
                 return KNOWN_METHODS[iter];
             }
         }
@@ -3430,6 +3486,19 @@ public final class HttpServer {
     }
 
     /** Exact, not folded: HTTP methods are case SENSITIVE. */
+    /** Exact compare against a constant already held as bytes. */
+    private static boolean sliceEquals(byte[] data, int start, int length, byte[] ascii) {
+        if(length != ascii.length) {
+            return false;
+        }
+        for(int iter = 0 ; iter < length ; iter++) {
+            if(data[start + iter] != ascii[iter]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static boolean sliceEquals(byte[] data, int start, int length, String ascii) {
         if(length != ascii.length()) {
             return false;
