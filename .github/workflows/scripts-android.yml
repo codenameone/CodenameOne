@@ -212,7 +212,14 @@ jobs:
           # it, and the builder gives a developer whichever revision their SDK
           # has -- so pinning the .0 here would let a regression introduced in
           # 37.1 or 37.2 merge green.
-          TARGET_PACKAGE=$(scripts/android/newest-platform-package.sh 37)
+          # Checked explicitly, not left to `set -e`: a failing command
+          # substitution in an assignment does not reliably abort, and an
+          # empty package name here would read as a successful resolution.
+          if ! TARGET_PACKAGE=$(scripts/android/newest-platform-package.sh 37); then
+            echo "could not determine the newest API 37 platform" >&2
+            exit 1
+          fi
+          test -n "$TARGET_PACKAGE"
           echo "Newest stable API 37 platform: $TARGET_PACKAGE"
           # The baseline stays the unsuffixed 36 deliberately: it has to sit
           # UNDER the whole range of removals being watched, and a later

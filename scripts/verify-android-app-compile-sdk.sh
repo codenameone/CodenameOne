@@ -55,7 +55,19 @@ fi
 # revision a developer's SDK has, so pinning the .0 here would verify a
 # platform no user compiles against and merge a regression introduced later in
 # the level.
-PLATFORM_PACKAGE=$("$SCRIPT_DIR/android/newest-platform-package.sh" "$API_LEVEL")
+# Checked explicitly rather than left to `set -e`: the status of a failing
+# command substitution in an assignment does not reliably abort under every
+# shell, and this one silently produced an empty package name that then read
+# as a successful resolution.
+if ! PLATFORM_PACKAGE=$("$SCRIPT_DIR/android/newest-platform-package.sh" "$API_LEVEL"); then
+  log "cannot determine the newest API $API_LEVEL platform; refusing to fall" >&2
+  log "back to the .0, which is the revision this check exists to stop pinning" >&2
+  exit 1
+fi
+if [ -z "$PLATFORM_PACKAGE" ]; then
+  log "newest-platform-package.sh printed nothing for API $API_LEVEL" >&2
+  exit 1
+fi
 # The name AGP has to be given to reach exactly that platform: the bare level
 # always resolves to the .0.
 PLATFORM_NAME="${PLATFORM_PACKAGE#platforms;android-}"

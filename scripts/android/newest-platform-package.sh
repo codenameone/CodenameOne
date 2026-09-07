@@ -35,25 +35,38 @@ elif command -v sdkmanager >/dev/null 2>&1; then
   SDKMANAGER="sdkmanager"
 fi
 
-fallback() {
-  # What the level would have been called before minor revisions existed, and
-  # the first revision after. Used only when sdkmanager cannot be consulted.
-  if [ "$API" -ge 37 ]; then echo "platforms;android-$API.0"; else echo "platforms;android-$API"; fi
-}
-
+# No fallback, deliberately. The obvious one -- assume the ".0" -- is the
+# single answer this script must never give: ".0" is the oldest revision of a
+# level, it is usually the one already on a runner, and returning it would let
+# the jar assertions and both API checks pass while testing exactly the
+# revision this script exists to stop them pinning. A resolver that quietly
+# degrades to the thing it was written to prevent is worse than no resolver,
+# because the coverage looks present. Anything that stops it answering is
+# therefore fatal, and the caller's `set -e` turns that into a failed step.
 if [ -z "$SDKMANAGER" ]; then
-  fallback
-  exit 0
+  echo "$0: no sdkmanager on PATH or under ANDROID_SDK_ROOT/ANDROID_HOME," \
+       "so the newest API $API platform cannot be determined" >&2
+  exit 1
 fi
 
 # JDK 17+, or sdkmanager refuses to run at all; a script that sourced the
 # workspace env has JAVA_HOME pointing at the JDK 8 the framework is built with.
-LIST=$(JAVA_HOME="${JDK_HOME:-${JAVA17_HOME:-${JAVA_HOME:-}}}" "$SDKMANAGER" --list 2>/dev/null || true)
+if ! LIST=$(JAVA_HOME="${JDK_HOME:-${JAVA17_HOME:-${JAVA_HOME:-}}}" "$SDKMANAGER" --list 2>&1); then
+  echo "$0: sdkmanager --list failed, so the newest API $API platform cannot" \
+       "be determined:" >&2
+  echo "$LIST" | tail -5 >&2
+  exit 1
+fi
 if [ -z "$LIST" ]; then
-  fallback
-  exit 0
+  echo "$0: sdkmanager --list printed nothing, so the newest API $API" \
+       "platform cannot be determined" >&2
+  exit 1
 fi
 
+# `|| true` because a grep that matches nothing exits 1, and under `set -o
+# pipefail` that killed the script here -- before the explicit "offers no
+# platform" check below could say so. The failure was silent: exit 1, no
+# message, which is the shape of bug this whole script exists to refuse.
 BEST=$(echo "$LIST" \
   | grep -oE "platforms;android-${API}(\.[0-9]+)?([^0-9a-zA-Z.-]|$)" \
   | grep -oE "platforms;android-${API}(\.[0-9]+)?" \
@@ -61,11 +74,12 @@ BEST=$(echo "$LIST" \
   | sed "s/^platforms;android-${API}//" \
   | sed 's/^\.//' \
   | sort -n \
-  | tail -1)
+  | tail -1 || true)
 
 if [ -z "$BEST" ]; then
-  fallback
-elif [ "$BEST" = "$API" ] || [ -z "$BEST" ]; then
+  echo "$0: sdkmanager offers no platform for API $API" >&2
+  exit 1
+elif [ "$BEST" = "$API" ]; then
   echo "platforms;android-$API"
 else
   echo "platforms;android-$API.$BEST"
