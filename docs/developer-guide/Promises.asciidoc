@@ -11,8 +11,12 @@ for either outcome, but it isn't a `finally`: it's implemented as
 `then(f, f)`, so whatever the functor returns becomes the value of the promise
 `always` hands back. Returning `null` after a rejection resolves the rest of the
 chain instead of keeping it rejected, and returning `null` after a success
-replaces the value. Return the incoming value through it if the chain should
-carry on unchanged.
+replaces the value. Returning the incoming value keeps a
+successful chain unchanged, but it doesn't preserve a rejection: any non-promise
+return is treated as a result, so returning the `Throwable` fulfils the chain
+with it. To stay rejected, throw it, or return `Promise.reject(...)` -- a
+returned promise has its state adopted, and a thrown exception is caught and
+becomes the rejection.
 
 === Creating and consuming one
 
