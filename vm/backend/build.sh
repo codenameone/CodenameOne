@@ -38,6 +38,20 @@ CC="${CN1_BACKEND_CC:-clang}"
 # referenced from _cn1VirtualThreadYield". Gated off there is no reference to
 # resolve. See cn1_virtual_thread.h.
 CN1_BACKEND_CFLAGS="${CN1_BACKEND_CFLAGS:-} -DCN1_VIRTUAL_THREADS=1"
+
+# Collect at 4MB rather than the VM's 24MB default.
+#
+# Resident memory tracks this almost linearly and nothing else -- measured on
+# /plaintext at 64 connections: 4MB -> 30MB RSS, 8MB -> 49MB, 16MB -> 68MB,
+# 24MB -> 98MB -- while throughput and p99 across that same sweep were flat
+# inside the run-to-run noise. A server holding almost nothing live has no use
+# for 24MB of headroom, so the default was buying footprint and no speed.
+#
+# Set HERE rather than by editing cn1_globals.m, which is the whole VM's file and
+# was carrying this as a local change in one checkout. The define is
+# #ifndef-guarded precisely so a deployment can choose its own floor at build
+# time, which is what this is.
+CN1_BACKEND_CFLAGS="$CN1_BACKEND_CFLAGS -DCN1_BIBOP_GC_MIN_TRIGGER_BYTES=$((4*1024*1024))"
 J8="${JDK_8_HOME:?set JDK_8_HOME to a JDK 8 home}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/cn1backend.XXXXXX")"
 
