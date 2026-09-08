@@ -48,11 +48,43 @@ public final class FileIo {
     private static final class OpenFile {
         final FileChannel channel;
         final Path path;
+        /**
+         * Captured when the descriptor was opened, not read from the path later.
+         *
+         * A static asset replaced between the open and the stat would otherwise be
+         * described by its replacement while the bytes still came from the original
+         * channel: the response advertised the new length, timestamp and ETag and
+         * streamed the old file, which truncates or overruns whenever the two sizes
+         * differ. A descriptor is a snapshot, so its metadata has to be one too.
+         */
+        final long size;
+        final long modified;
+        final boolean directory;
         long position;
 
         OpenFile(FileChannel channel, Path path) {
             this.channel = channel;
             this.path = path;
+            long capturedSize = 0;
+            long capturedModified = 0;
+            boolean capturedDirectory = false;
+            try {
+                if(channel != null) {
+                    capturedSize = channel.size();
+                }
+                BasicFileAttributes attributes = Files.readAttributes(path,
+                        BasicFileAttributes.class);
+                capturedModified = attributes.lastModifiedTime().toMillis();
+                capturedDirectory = attributes.isDirectory();
+                if(channel == null) {
+                    capturedSize = attributes.size();
+                }
+            } catch (Exception ignored) {
+                // stat() reports the failure; there is nothing to do here.
+            }
+            this.size = capturedSize;
+            this.modified = capturedModified;
+            this.directory = capturedDirectory;
         }
     }
 
@@ -90,16 +122,11 @@ public final class FileIo {
             return -1;
         }
         OpenFile file = (OpenFile)entry;
-        try {
-            BasicFileAttributes attributes = Files.readAttributes(file.path,
-                    BasicFileAttributes.class);
-            out[0] = attributes.size();
-            out[1] = attributes.lastModifiedTime().toMillis();
-            out[2] = attributes.isDirectory() ? 1 : 0;
-            return 0;
-        } catch (Exception err) {
-            return -1;
-        }
+        // From the descriptor, so the metadata and the bytes describe one file.
+        out[0] = file.size;
+        out[1] = file.modified;
+        out[2] = file.directory ? 1 : 0;
+        return 0;
     }
 
     public static long sendFile(int socketFd, int fileFd, long offset, long count) {

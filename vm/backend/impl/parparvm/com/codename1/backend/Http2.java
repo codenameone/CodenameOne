@@ -134,7 +134,20 @@ public final class Http2 {
         for(int iter = 0 ; iter < count ; iter++) {
             String name = headerNameImpl(session, iter);
             if(name != null) {
-                headers.put(name, headerValueImpl(session, iter));
+                String value = headerValueImpl(session, iter);
+                Object existing = headers.get(name);
+                if(existing == null) {
+                    headers.put(name, value);
+                } else {
+                    // A repeated field is COMBINED, not replaced. HTTP/2 lets a client
+                    // split its cookies across several fields for better compression,
+                    // and overwriting meant a session cookie sent in an earlier field
+                    // vanished -- an authenticated request answered as anonymous.
+                    // Cookie joins on "; " and everything else on ",", which is what
+                    // RFC 9110 says a repeated field line means.
+                    String separator = name.equalsIgnoreCase("cookie") ? "; " : ",";
+                    headers.put(name, String.valueOf(existing) + separator + value);
+                }
             }
         }
         return new Stream(id, methodImpl(session), pathImpl(session),

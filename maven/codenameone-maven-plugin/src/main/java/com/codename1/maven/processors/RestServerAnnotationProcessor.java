@@ -221,11 +221,51 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                         + " declares more than one @Body parameter; a request has one body");
                 anyError = true;
             }
+            // Every @Path has to name a placeholder that is actually in the template.
+            // A typo bound null, or 0 for a primitive, and the route still matched --
+            // so the handler ran with the wrong identifier and nothing said so.
+            String[] template = splitTemplate(op.pathTemplate);
+            for (int pi = 0; pi < op.params.size(); pi++) {
+                Param p = op.params.get(pi);
+                if ("path".equals(p.bindKind) && placeholderIndex(template, p.bindName) < 0) {
+                    ctx.error(cls, api.binaryName + "." + op.name + " binds @Path(\""
+                            + p.bindName + "\") but the route " + op.pathTemplate
+                            + " has no {" + p.bindName + "} to bind it to");
+                    anyError = true;
+                }
+            }
             api.ops.add(op);
+        }
+        // Two routes of the same verb and shape generate the same predicate, and
+        // dispatch takes the first that matches -- so the second is unreachable
+        // however it is called. The names differ; the SHAPE is what the router sees.
+        Map<String, String> shapes = new LinkedHashMap<String, String>();
+        for (Op op : api.ops) {
+            String shape = op.verb + " " + placeholderShape(op.pathTemplate);
+            String first = shapes.get(shape);
+            if (first != null) {
+                ctx.error(cls, api.binaryName + "." + op.name + " and " + first
+                        + " are both " + shape + " once the placeholder names are"
+                        + " taken out, so only the first can ever be reached");
+                anyError = true;
+            } else {
+                shapes.put(shape, op.name);
+            }
         }
         if (!anyError && !api.ops.isEmpty()) {
             accepted.put(api.binaryName, api);
         }
+    }
+
+    /// A route with its placeholder NAMES removed, which is all the generated
+    /// router matches on: "/pets/{id}" and "/pets/{name}" are one shape.
+    private static String placeholderShape(String template) {
+        String[] parts = splitTemplate(template);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < parts.length; i++) {
+            sb.append('/').append(isPlaceholder(parts[i]) ? "{}" : parts[i]);
+        }
+        return sb.length() == 0 ? "/" : sb.toString();
     }
 
     /// Records any application class reachable as a body or a result so a codec is

@@ -158,21 +158,51 @@ public final class Crypto {
         }
     }
 
+    /**
+     * PBKDF2-HMAC-SHA256 over the password BYTES, per RFC 8018.
+     *
+     * Computed here rather than through PBEKeySpec, which takes chars and leaves the
+     * encoding to the provider: for PBKDF2WithHmacSHA256 that encoding is UTF-8, so
+     * a byte of 0xc3 handed over as a char came back out as TWO bytes. Mapping the
+     * UTF-8 bytes to chars first therefore did not preserve them -- it re-encoded
+     * them -- and the derived key stopped matching the native side, which passes the
+     * original octets to OpenSSL. The effect was confined to non-ASCII passwords: a
+     * hash written by one runtime that no longer verifies on the other, and a
+     * PostgreSQL SCRAM proof that simply does not authenticate.
+     */
     static byte[] pbkdf2(byte[] password, byte[] salt, int iterations, int length)
             throws IOException {
         try {
-            // PBEKeySpec takes chars, and the password is UTF-8 bytes here. Mapping
-            // each byte to one char keeps both targets deriving the SAME key from
-            // the same input; decoding to a String first would not, for anything
-            // outside ASCII, and a password hash that differs by target is a login
-            // that works on one and fails on the other.
-            char[] chars = new char[password.length];
-            for(int iter = 0 ; iter < password.length ; iter++) {
-                chars[iter] = (char)(password[iter] & 0xff);
+            Mac mac = Mac.getInstance("HmacSHA256");
+            // SecretKeySpec rejects a zero-length key. HMAC pads the key to the block
+            // size with zeros, so a single zero byte and an empty key are the same
+            // key -- the substitution is exact rather than a workaround.
+            mac.init(new SecretKeySpec(password.length == 0 ? new byte[1] : password,
+                    "HmacSHA256"));
+            int hLen = mac.getMacLength();
+            byte[] out = new byte[length];
+            byte[] counted = new byte[salt.length + 4];
+            System.arraycopy(salt, 0, counted, 0, salt.length);
+            int done = 0;
+            for(int block = 1 ; done < length ; block++) {
+                counted[salt.length] = (byte)(block >>> 24);
+                counted[salt.length + 1] = (byte)(block >>> 16);
+                counted[salt.length + 2] = (byte)(block >>> 8);
+                counted[salt.length + 3] = (byte)block;
+                byte[] u = mac.doFinal(counted);
+                byte[] t = new byte[hLen];
+                System.arraycopy(u, 0, t, 0, hLen);
+                for(int round = 1 ; round < iterations ; round++) {
+                    u = mac.doFinal(u);
+                    for(int iter = 0 ; iter < hLen ; iter++) {
+                        t[iter] ^= u[iter];
+                    }
+                }
+                int take = length - done < hLen ? length - done : hLen;
+                System.arraycopy(t, 0, out, done, take);
+                done += take;
             }
-            KeySpec spec = new PBEKeySpec(chars, salt, iterations, length * 8);
-            return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-                    .generateSecret(spec).getEncoded();
+            return out;
         } catch (Exception err) {
             throw new IOException("Key derivation failed");
         }

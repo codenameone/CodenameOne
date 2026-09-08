@@ -427,6 +427,66 @@ public class RestServerAnnotationProcessorTest {
                 ctx.hasErrors());
     }
 
+    /**
+     * A @Path that names no placeholder is a typo, and it used to bind null -- or 0
+     * for a primitive -- while the route still matched, so the handler ran with the
+     * wrong identifier and the build said nothing.
+     */
+    @Test
+    public void refusesAPathBindingThatMatchesNoPlaceholder() throws Exception {
+        assertTrue("a @Path naming no placeholder must fail the build",
+                processApi("TypoApi",
+                        "    @GET(\"/users/{id}\")\n"
+                        + "    void user(@Path(\"userId\") String id,\n"
+                        + "              OnComplete<Response<String>> callback);\n").hasErrors());
+    }
+
+    /**
+     * Two routes of one verb and shape compile to the same predicate, and dispatch
+     * returns on the first match -- so the second can never be reached however it is
+     * called. The placeholder NAMES differ; the router never sees them.
+     */
+    @Test
+    public void refusesTwoRoutesOfTheSameShape() throws Exception {
+        assertTrue("an unreachable duplicate route must fail the build",
+                processApi("AmbiguousApi",
+                        "    @GET(\"/pets/{id}\")\n"
+                        + "    void byId(@Path(\"id\") String id,\n"
+                        + "              OnComplete<Response<String>> callback);\n"
+                        + "    @GET(\"/pets/{name}\")\n"
+                        + "    void byName(@Path(\"name\") String name,\n"
+                        + "                OnComplete<Response<String>> callback);\n").hasErrors());
+    }
+
+    /** Two routes of the same shape but DIFFERENT verbs are not ambiguous. */
+    @Test
+    public void allowsTheSameShapeUnderDifferentVerbs() throws Exception {
+        assertNoErrors(processApi("VerbsApi",
+                "    @GET(\"/pets/{id}\")\n"
+                + "    void read(@Path(\"id\") String id,\n"
+                + "              OnComplete<Response<String>> callback);\n"
+                + "    @DELETE(\"/pets/{id}\")\n"
+                + "    void remove(@Path(\"id\") String id,\n"
+                + "                OnComplete<Response<String>> callback);\n"));
+    }
+
+    /** Compiles one throwaway contract and runs the processor over it. */
+    private ProcessorContext processApi(String name, String methods) throws Exception {
+        File classes = tmp.newFolder();
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example." + name,
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface " + name + " {\n"
+                + methods
+                + "}\n");
+        JavaSourceCompiler.compile(sources, classes, Arrays.asList(testClassesDir()));
+        return runProcessor(classes);
+    }
+
     @Test
     public void generatesNothingWhenTheServerHalfIsOff() throws Exception {
         System.clearProperty("cn1.restServer");
