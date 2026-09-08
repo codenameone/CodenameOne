@@ -100,194 +100,92 @@ build_javadocs_for_site() {
     return
   fi
 
-  echo "Building fresh JavaDocs for website..." >&2
+  local jdk_home="${JDK_25_HOME:-${JAVA_HOME:-}}"
+  local javadoc_bin="javadoc"
+  if [ -n "${jdk_home}" ] && [ -x "${jdk_home}/bin/javadoc" ]; then
+    javadoc_bin="${jdk_home}/bin/javadoc"
+  fi
+
+  # The downloadable zip, still produced by the standard doclet. The two
+  # renderings share one source of truth and neither replaces the other: the zip
+  # is what someone unpacks next to an offline IDE, and the Hugo pages are what
+  # the website serves.
+  echo "Building JavaDoc archive..." >&2
   (
     cd "${REPO_ROOT}"
     ./.github/scripts/build_javadocs.sh
   )
-
-  rm -rf "${WEBSITE_DIR}/static/javadoc"
-  mkdir -p "${WEBSITE_DIR}/static/javadoc" "${WEBSITE_DIR}/static/files" "${WEBSITE_DIR}/generated"
-  cp -a "${REPO_ROOT}/CodenameOne/dist/javadoc/." "${WEBSITE_DIR}/static/javadoc/"
+  mkdir -p "${WEBSITE_DIR}/static/files"
   cp "${REPO_ROOT}/CodenameOne/javadocs.zip" "${WEBSITE_DIR}/static/files/javadocs.zip"
 
-  if [ -f "${WEBSITE_DIR}/static/javadoc/index.html" ]; then
-    mv "${WEBSITE_DIR}/static/javadoc/index.html" "${WEBSITE_DIR}/static/javadoc/_index-raw.html"
+  # The doclet needs a JDK new enough to hand it markdown documentation comments
+  # as DocTree.Kind.MARKDOWN, which is JDK 23 and later. Its own pom pins
+  # release 25 and it is deliberately outside the JDK 8 reactor, so it is built
+  # here with an explicit -f.
+  echo "Building the Hugo JavaDoc doclet..." >&2
+  (
+    cd "${REPO_ROOT}"
+    JAVA_HOME="${jdk_home}" mvn -q -B \
+      -f maven/javadoc-hugo-doclet/pom.xml \
+      -Dmaven.repo.local="${REPO_ROOT}/.m2-repo" \
+      package
+  )
+
+  local doclet_classes="${REPO_ROOT}/maven/javadoc-hugo-doclet/target/classes"
+  if [ ! -d "${doclet_classes}" ]; then
+    echo "Hugo doclet did not build: ${doclet_classes} is missing." >&2
+    exit 1
   fi
 
-  awk '
-    BEGIN { in_body = 0 }
-    /<body[^>]*>/ {
-      in_body = 1
-      sub(/^.*<body[^>]*>/, "")
-      if (length($0) > 0) print
-      next
-    }
-    in_body && /<\/body>/ {
-      sub(/<\/body>.*/, "")
-      if (length($0) > 0) print
-      exit
-    }
-    in_body { print }
-  ' "${WEBSITE_DIR}/static/javadoc/_index-raw.html" > "${WEBSITE_DIR}/generated/javadoc-content.html"
+  # build_javadocs.sh already staged a source tree with the ImplementationFactory
+  # stub that com.codename1.ui.Display imports but that does not exist in the
+  # repository. Reusing it keeps the two renderings reading identical sources.
+  local temp_sources="${REPO_ROOT}/CodenameOne/build/tempJavaSources"
+  if [ ! -d "${temp_sources}" ]; then
+    echo "Expected staged JavaDoc sources at ${temp_sources}." >&2
+    exit 1
+  fi
 
-  if [ -f "${WEBSITE_DIR}/static/javadoc/resource-files/stylesheet.css" ]; then
-    "${PYTHON_BIN}" - "${WEBSITE_DIR}/static/javadoc/resource-files/stylesheet.css" "${WEBSITE_DIR}/static/javadoc/resource-files/stylesheet-scoped.css" <<'PY'
-import re
-import sys
+  local content_dir="${WEBSITE_DIR}/content/javadoc"
+  rm -rf "${content_dir}"
+  mkdir -p "${content_dir}" "${WEBSITE_DIR}/static"
 
-src_path, out_path = sys.argv[1], sys.argv[2]
-src = open(src_path, "r", encoding="utf-8").read()
-src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+  local sources_argfile="${REPO_ROOT}/CodenameOne/build/javadoc-sources.txt"
+  if [ ! -s "${sources_argfile}" ]; then
+    echo "Expected the JavaDoc source list at ${sources_argfile}." >&2
+    exit 1
+  fi
 
-PREFIX = ".cn1-javadoc"
+  echo "Generating Hugo API content..." >&2
+  # No -Xdoclint here: it is a standard doclet option and javadoc rejects it
+  # outright when another doclet is in use.
+  #
+  # --release 8 for the same reason build_javadocs.sh passes it. Ports/CLDC11
+  # declares java.lang, java.util and java.io, and on a modular JDK every one of
+  # those files fails with "package exists in another module: java.base".
+  # Compiling for a release that predates modules is what lets the framework's
+  # own java.* classes be the documented ones.
+  "${javadoc_bin}" \
+    -doclet com.codename1.doclet.hugo.HugoDoclet \
+    -docletpath "${doclet_classes}" \
+    --release 8 \
+    -d "${content_dir}" \
+    --search-index "${WEBSITE_DIR}/static/javadoc-search.json" \
+    -sourcepath "${temp_sources}:${REPO_ROOT}/Ports/CLDC11/src" \
+    -quiet \
+    -protected \
+    "@${sources_argfile}"
 
-def split_selectors(text):
-    out, cur = [], []
-    depth_paren = depth_bracket = 0
-    in_string = None
-    escape = False
-    for ch in text:
-        if in_string:
-            cur.append(ch)
-            if escape:
-                escape = False
-            elif ch == "\\":
-                escape = True
-            elif ch == in_string:
-                in_string = None
-            continue
-        if ch in ("'", '"'):
-            in_string = ch
-            cur.append(ch)
-            continue
-        if ch == "(":
-            depth_paren += 1
-        elif ch == ")":
-            depth_paren = max(0, depth_paren - 1)
-        elif ch == "[":
-            depth_bracket += 1
-        elif ch == "]":
-            depth_bracket = max(0, depth_bracket - 1)
-        if ch == "," and depth_paren == 0 and depth_bracket == 0:
-            out.append("".join(cur))
-            cur = []
-            continue
-        cur.append(ch)
-    out.append("".join(cur))
-    return out
-
-def transform_selector(sel):
-    sel = sel.strip()
-    if not sel:
-        return sel
-    if PREFIX in sel:
-        return sel
-    if sel in ("html", "body", ":root"):
-        return PREFIX
-    return f"{PREFIX} {sel}"
-
-def extract_block(text, start):
-    depth = 1
-    i = start
-    n = len(text)
-    in_string = None
-    escape = False
-    while i < n:
-        ch = text[i]
-        if in_string:
-            if escape:
-                escape = False
-            elif ch == "\\":
-                escape = True
-            elif ch == in_string:
-                in_string = None
-            i += 1
-            continue
-        if ch in ("'", '"'):
-            in_string = ch
-            i += 1
-            continue
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return text[start:i], i + 1
-        i += 1
-    return text[start:], n
-
-def process(css):
-    out = []
-    i = 0
-    n = len(css)
-    while i < n:
-        j = i
-        depth_paren = depth_bracket = 0
-        in_string = None
-        escape = False
-        while j < n:
-            ch = css[j]
-            if in_string:
-                if escape:
-                    escape = False
-                elif ch == "\\":
-                    escape = True
-                elif ch == in_string:
-                    in_string = None
-                j += 1
-                continue
-            if ch in ("'", '"'):
-                in_string = ch
-                j += 1
-                continue
-            if ch == "(":
-                depth_paren += 1
-            elif ch == ")":
-                depth_paren = max(0, depth_paren - 1)
-            elif ch == "[":
-                depth_bracket += 1
-            elif ch == "]":
-                depth_bracket = max(0, depth_bracket - 1)
-            if depth_paren == 0 and depth_bracket == 0 and ch in "{;":
-                break
-            j += 1
-        if j >= n:
-            out.append(css[i:])
-            break
-        prelude = css[i:j].strip()
-        term = css[j]
-        if term == ";":
-            out.append(css[i:j + 1])
-            i = j + 1
-            continue
-        block, next_i = extract_block(css, j + 1)
-        low = prelude.lower()
-        if low.startswith("@media") or low.startswith("@supports"):
-            out.append(f"{prelude}{{{process(block)}}}")
-        elif low.startswith("@"):
-            out.append(f"{prelude}{{{block}}}")
-        else:
-            selectors = [transform_selector(s) for s in split_selectors(prelude)]
-            out.append(f"{','.join(selectors)}{{{block}}}")
-        i = next_i
-    return "".join(out)
-
-with open(out_path, "w", encoding="utf-8") as f:
-    scoped = process(src)
-    # Inline scoped stylesheet is injected on /javadoc/ pages, so make asset refs absolute.
-    # This keeps icons/fonts resolvable from both /javadoc/ and deep class pages loaded in-page.
-    import re
-    def repl(m):
-        raw = m.group(1).strip().strip('"\'')
-        if (raw.startswith("data:") or raw.startswith("http://") or raw.startswith("https://")
-                or raw.startswith("/") or raw.startswith("#")):
-            return f"url({m.group(1)})"
-        normalized = raw.lstrip("./")
-        return f"url('/javadoc/resource-files/{normalized}')"
-    scoped = re.sub(r"url\(([^)]+)\)", repl, scoped)
-    f.write(scoped)
-PY
+  # The same guard build_javadocs.sh keeps over the standard doclet. A partial
+  # generation is the failure mode that ships quietly, so assert the core type
+  # and the internal package separately rather than trusting the exit status.
+  if [ ! -f "${content_dir}/com/codename1/ui/Component.md" ]; then
+    echo "Hugo API generation produced no com.codename1.ui content; aborting." >&2
+    exit 1
+  fi
+  if [ -e "${content_dir}/com/codename1/impl" ]; then
+    echo "Hugo API generation emitted com.codename1.impl; the internal package must stay excluded." >&2
+    exit 1
   fi
 }
 
@@ -842,4 +740,19 @@ if command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
   "${PYTHON_BIN}" "${WEBSITE_DIR}/scripts/generate_lunr_index.py"
 else
   echo "Warning: python3 not found; skipping lunr index generation." >&2
+fi
+
+# The site and the downloadable zip are two renderings of one set of sources, and
+# the split only works while they agree on addresses. Compare them here rather
+# than trusting the generator: a fragment that drifts is a dead link from the
+# developer guide, from a blog post, or from somewhere outside the project, and
+# nothing else in the build would notice.
+if [ "${WEBSITE_INCLUDE_JAVADOCS}" = "true" ]; then
+  if command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
+    "${PYTHON_BIN}" "${REPO_ROOT}/scripts/website/check-javadoc-parity.py" \
+      "${REPO_ROOT}/CodenameOne/dist/javadoc" \
+      "${WEBSITE_DIR}/public/javadoc"
+  else
+    echo "Warning: python3 not found; skipping JavaDoc URL parity check." >&2
+  fi
 fi

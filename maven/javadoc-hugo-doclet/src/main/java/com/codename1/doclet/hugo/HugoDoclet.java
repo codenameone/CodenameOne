@@ -1,0 +1,872 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.doclet.hugo;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import javax.lang.model.SourceVersion;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.PackageElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.ElementFilter;
+import javax.lang.model.util.Elements;
+import javax.lang.model.util.Types;
+import jdk.javadoc.doclet.Doclet;
+import jdk.javadoc.doclet.DocletEnvironment;
+import jdk.javadoc.doclet.Reporter;
+
+/**
+ * Renders the Codename One API as Hugo content instead of as a standalone HTML
+ * site.
+ *
+ * <p>The website used to embed the standard doclet's output by copying the whole
+ * generated tree into {@code static/}, prefixing every selector of javadoc's
+ * stylesheet with a scoping class, and fetching deep pages into a {@code div}
+ * with a script that faked {@code window.pathtoroot} and re-enabled the search
+ * box javadoc had disabled. Themed pages fought a stylesheet that was never
+ * built to be themed, so dark mode broke.
+ *
+ * <p>This doclet emits a page per type as a Hugo content file whose front matter
+ * is the API model and whose prose is markdown. The site's own templates render
+ * it, so the API pages are the same pages as the rest of the site -- same theme,
+ * same dark mode, same typography, same search. The standard doclet still runs
+ * alongside this one to produce the downloadable zip.
+ *
+ * <p>The generated URLs match the standard doclet's exactly, fragments included;
+ * see {@link Refs}.
+ */
+public final class HugoDoclet implements Doclet {
+
+    private Reporter reporter;
+    private Path contentRoot;
+    private Path searchIndex;
+
+    private DocletEnvironment environment;
+    private Elements elements;
+    private Types types;
+    private Refs refs;
+    private DocReader docReader;
+    private TypeNames typeNames;
+
+    /** Every type we publish a page for, by qualified name. */
+    private final Map<String, TypeElement> documented = new LinkedHashMap<>();
+    /** Direct subtypes, keyed by the qualified name of the supertype. */
+    private final Map<String, List<TypeElement>> subtypes = new LinkedHashMap<>();
+    /** Rows for the search index. */
+    private final List<Map<String, Object>> searchRows = new ArrayList<>();
+    /** Lower cased directory path of every documented package, for alias collisions. */
+    private final Set<String> packageDirs = new LinkedHashSet<>();
+
+    @Override
+    public void init(Locale locale, Reporter reporter) {
+        this.reporter = reporter;
+    }
+
+    @Override
+    public String getName() {
+        return "HugoDoclet";
+    }
+
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return SourceVersion.latest();
+    }
+
+    @Override
+    public Set<? extends Option> getSupportedOptions() {
+        return Set.of(
+                new SimpleOption("-d", "<dir>", "Hugo content directory to generate into",
+                        value -> contentRoot = Path.of(value)),
+                new SimpleOption("--search-index", "<file>", "JSON search index to write",
+                        value -> searchIndex = Path.of(value)));
+    }
+
+    @Override
+    public boolean run(DocletEnvironment environment) {
+        if (contentRoot == null) {
+            reporter.print(javax.tools.Diagnostic.Kind.ERROR, "-d is required");
+            return false;
+        }
+        this.environment = environment;
+        this.elements = environment.getElementUtils();
+        this.types = environment.getTypeUtils();
+        this.refs = new Refs(types);
+
+        CommentRenderer.Links links = this::urlOf;
+        this.typeNames = new TypeNames(links);
+        this.docReader = new DocReader(environment.getDocTrees(), elements, types,
+                new CommentRenderer(environment.getDocTrees(), links));
+
+        try {
+            index(environment);
+            for (TypeElement type : documented.values()) {
+                writeTypePage(type);
+            }
+            writePackagePages();
+            writeOverview();
+            writeSearchIndex();
+        } catch (IOException failure) {
+            reporter.print(javax.tools.Diagnostic.Kind.ERROR,
+                    "failed to write Hugo content: " + failure + "\n" + stackTrace(failure));
+            return false;
+        }
+        return true;
+    }
+
+    // ---------------------------------------------------------------- indexing
+
+    /**
+     * Collects the types that get a page, before anything is rendered.
+     *
+     * <p>Link resolution needs the whole set up front: a comment on the first type
+     * processed can reference the last, and a reference to a type we do not
+     * publish has to render as text rather than as a link into a 404.
+     */
+    private void index(DocletEnvironment environment) {
+        for (Element element : environment.getIncludedElements()) {
+            if (element instanceof TypeElement type) {
+                collectType(type);
+            }
+        }
+        for (TypeElement type : documented.values()) {
+            packageDirs.add(Refs.packageOf(type).getQualifiedName().toString()
+                    .replace('.', '/').toLowerCase(Locale.ROOT));
+        }
+        for (TypeElement type : documented.values()) {
+            for (TypeMirror supertype : types.directSupertypes(type.asType())) {
+                if (supertype instanceof DeclaredType declared
+                        && declared.asElement() instanceof TypeElement parent
+                        && documented.containsKey(parent.getQualifiedName().toString())) {
+                    subtypes.computeIfAbsent(parent.getQualifiedName().toString(),
+                            key -> new ArrayList<>()).add(type);
+                }
+            }
+        }
+    }
+
+    private void collectType(TypeElement type) {
+        if (isHidden(type) || !isVisible(type)) {
+            return;
+        }
+        documented.put(type.getQualifiedName().toString(), type);
+        for (TypeElement nested : ElementFilter.typesIn(type.getEnclosedElements())) {
+            collectType(nested);
+        }
+    }
+
+    /** Whether an element carries {@code @hidden}, which removes it from the API entirely. */
+    private boolean isHidden(Element element) {
+        return docReader != null && docReader.read(element).hidden;
+    }
+
+    /**
+     * Whether an element is part of the published API.
+     *
+     * <p>The generator runs javadoc with {@code -protected}, so javadoc has already
+     * filtered the source set; this is the belt to that braces, and it also keeps
+     * package private nested types out of an otherwise public type's page.
+     */
+    private static boolean isVisible(Element element) {
+        return element.getModifiers().contains(Modifier.PUBLIC)
+                || element.getModifiers().contains(Modifier.PROTECTED);
+    }
+
+    /** The page URL of an element, or null when it is not something we publish. */
+    private String urlOf(Element target) {
+        if (target == null) {
+            return null;
+        }
+        if (target instanceof PackageElement pkg) {
+            return environment.isIncluded(pkg) ? Refs.packageUrl(pkg) : null;
+        }
+        if (target instanceof TypeElement type) {
+            return documented.containsKey(type.getQualifiedName().toString())
+                    ? Refs.typeUrl(type) : null;
+        }
+        TypeElement owner = Refs.enclosingType(target);
+        if (owner == null || !documented.containsKey(owner.getQualifiedName().toString())) {
+            return null;
+        }
+        List<String> anchors = refs.anchors(target);
+        return Refs.typeUrl(owner) + "#" + anchors.get(0);
+    }
+
+    // ------------------------------------------------------------ type pages
+
+    private void writeTypePage(TypeElement type) throws IOException {
+        ElementDoc doc = docReader.read(type);
+        Map<String, Object> api = new LinkedHashMap<>();
+
+        api.put("kind", kindOf(type));
+        api.put("qualified", type.getQualifiedName().toString());
+        api.put("simple", Refs.nestedDisplayName(type));
+        api.put("modifiers", TypeNames.modifiers(type));
+        api.put("typeParameters", typeNames.typeParameters(type.getTypeParameters()));
+
+        PackageElement pkg = Refs.packageOf(type);
+        api.put("package", Map.of(
+                "name", pkg.getQualifiedName().toString(),
+                "url", Refs.packageUrl(pkg)));
+
+        api.put("inheritance", inheritanceChain(type));
+        api.put("interfaces", interfacesOf(type));
+        api.put("subclasses", subclassesOf(type));
+
+        api.put("deprecated", doc.deprecated);
+        api.put("deprecatedText", doc.deprecatedText);
+        api.put("description", doc.description);
+        api.put("seeAlso", seeAlsoRefs(doc, type));
+
+        // javadoc documents a package private supertype's members on the visible
+        // subclass rather than dropping them, because the supertype has no page
+        // to link to. com.codename1.ads.InterstitialAd is the case here: it
+        // declares nothing itself and inherits everything from the package
+        // private AbstractFullScreenAd, so treating those as merely "inherited"
+        // left seven documented methods with no page anywhere on the site.
+        List<TypeElement> hidden = undocumentedSupertypes(type);
+        List<Element> owned = new ArrayList<>(type.getEnclosedElements());
+        for (TypeElement supertype : hidden) {
+            owned.addAll(supertype.getEnclosedElements());
+        }
+
+        api.put("nested", nestedRows(type));
+        api.put("fields", memberRows(ElementFilter.fieldsIn(owned), type));
+        api.put("constructors", executableRows(
+                ElementFilter.constructorsIn(type.getEnclosedElements()), type));
+        api.put("methods", executableRows(dedupeBySignature(ElementFilter.methodsIn(owned)), type));
+        api.put("inherited", inheritedMembers(type, hidden));
+
+        Map<String, Object> frontMatter = new LinkedHashMap<>();
+        frontMatter.put("title", Refs.nestedDisplayName(type));
+        frontMatter.put("url", Refs.typeUrl(type));
+        frontMatter.put("description", TypeNames.summary(doc.description));
+        frontMatter.put("layout", "type");
+        // The directory spelling of the same page, so that a link written without
+        // the .html suffix redirects instead of 404ing. The old embed script
+        // refused anything that did not end in .html, and roughly 2200 links in
+        // this shape already exist across the site content and the developer
+        // guide, every one of them broken until now.
+        frontMatter.put("aliases", directoryAlias(type));
+        frontMatter.put("javadoc", api);
+
+        write(contentRoot.resolve(Refs.typeContentPath(type)), Json.write(frontMatter));
+        addSearchRows(type, doc);
+    }
+
+    /**
+     * The directory spelling of a type's URL, unless a package already owns that
+     * directory.
+     *
+     * <p>{@code com.codename1.ui.List} is a class and {@code com.codename1.ui.list}
+     * is a package, so the alias directory {@code ui/List/} and the package
+     * directory {@code ui/list/} are the same directory on a case insensitive
+     * filesystem. On macOS the package's pages were being written into the
+     * alias's directory and the whole package went missing from the site, while
+     * the same build on Linux was correct -- a difference that would only ever
+     * have been noticed by whoever previewed the site on a Mac. Dropping the
+     * alias for the colliding type keeps the output identical everywhere; it
+     * costs two types their optional second URL.
+     */
+    private List<String> directoryAlias(TypeElement type) {
+        String alias = Refs.typeUrl(type).replaceAll("\\.html$", "/");
+        String directory = alias.substring("/javadoc/".length(), alias.length() - 1);
+        return packageDirs.contains(directory.toLowerCase(Locale.ROOT))
+                ? List.of() : List.of(alias);
+    }
+
+    /**
+     * Every supertype we publish no page for, anywhere in the hierarchy.
+     *
+     * <p>The walk continues through documented supertypes rather than stopping
+     * at them, because an undocumented ancestor can sit behind a documented one:
+     * the constants of the package private {@code CSSParserCallback} are
+     * inherited by the public {@code HTMLCallback} and again by
+     * {@code DefaultHTMLCallback}, and javadoc documents them on both, since
+     * there is no page anywhere in the chain for an "inherited from" link to
+     * point at. Only undocumented types are collected; a documented one is
+     * walked through and then listed as inherited.
+     */
+    private List<TypeElement> undocumentedSupertypes(TypeElement type) {
+        List<TypeElement> out = new ArrayList<>();
+        collectUndocumented(type.asType(), new LinkedHashSet<>(), out);
+        return out;
+    }
+
+    private void collectUndocumented(TypeMirror type, Set<String> visited, List<TypeElement> out) {
+        for (TypeMirror supertype : types.directSupertypes(type)) {
+            if (!(supertype instanceof DeclaredType declared)
+                    || !(declared.asElement() instanceof TypeElement element)
+                    || !visited.add(element.getQualifiedName().toString())) {
+                continue;
+            }
+            if (!documented.containsKey(element.getQualifiedName().toString())) {
+                out.add(element);
+            }
+            collectUndocumented(supertype, visited, out);
+        }
+    }
+
+    /** Keeps the first declaration of each signature, so an override wins over what it overrides. */
+    private List<ExecutableElement> dedupeBySignature(List<ExecutableElement> methods) {
+        Set<String> seen = new LinkedHashSet<>();
+        List<ExecutableElement> out = new ArrayList<>();
+        for (ExecutableElement method : methods) {
+            if (seen.add(signatureKey(method))) {
+                out.add(method);
+            }
+        }
+        return out;
+    }
+
+    private String kindOf(TypeElement type) {
+        return switch (type.getKind()) {
+            case INTERFACE -> "interface";
+            case ENUM -> "enum";
+            case ANNOTATION_TYPE -> "annotation";
+            case RECORD -> "record";
+            default -> "class";
+        };
+    }
+
+    /** Superclasses from the immediate parent outwards, the way javadoc stacks them. */
+    private List<Map<String, Object>> inheritanceChain(TypeElement type) {
+        List<Map<String, Object>> chain = new ArrayList<>();
+        TypeMirror current = type.getSuperclass();
+        Set<String> seen = new LinkedHashSet<>();
+        while (current != null && current.getKind() == TypeKind.DECLARED) {
+            DeclaredType declared = (DeclaredType) current;
+            if (!(declared.asElement() instanceof TypeElement element)
+                    || !seen.add(element.getQualifiedName().toString())) {
+                break;
+            }
+            chain.add(typeNames.reference(current));
+            current = element.getSuperclass();
+        }
+        java.util.Collections.reverse(chain);
+        return chain;
+    }
+
+    private List<Map<String, Object>> interfacesOf(TypeElement type) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (TypeMirror implemented : type.getInterfaces()) {
+            out.add(typeNames.reference(implemented));
+        }
+        return out;
+    }
+
+    private List<Map<String, Object>> subclassesOf(TypeElement type) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        List<TypeElement> children =
+                new ArrayList<>(subtypes.getOrDefault(type.getQualifiedName().toString(), List.of()));
+        children.sort(Comparator.comparing(child -> child.getQualifiedName().toString()));
+        for (TypeElement child : children) {
+            out.add(Map.of("label", Refs.nestedDisplayName(child), "url", Refs.typeUrl(child)));
+        }
+        return out;
+    }
+
+    private List<Map<String, Object>> nestedRows(TypeElement type) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (TypeElement nested : ElementFilter.typesIn(type.getEnclosedElements())) {
+            if (!documented.containsKey(nested.getQualifiedName().toString())) {
+                continue;
+            }
+            ElementDoc doc = docReader.read(nested);
+            out.add(new LinkedHashMap<>(Map.of(
+                    "name", Refs.nestedDisplayName(nested),
+                    "url", Refs.typeUrl(nested),
+                    "kind", kindOf(nested),
+                    "summary", TypeNames.summary(doc.description))));
+        }
+        return out;
+    }
+
+    private List<Map<String, Object>> memberRows(List<VariableElement> fields, TypeElement owner) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (VariableElement field : fields) {
+            if (!isVisible(field)) {
+                continue;
+            }
+            ElementDoc doc = docReader.read(field);
+            if (doc.hidden) {
+                continue;
+            }
+            Map<String, Object> row = baseRow(field, doc);
+            row.put("fieldType", typeNames.reference(field.asType()));
+            Object constant = field.getConstantValue();
+            row.put("constant", constant == null ? null : String.valueOf(constant));
+            out.add(row);
+        }
+        return out;
+    }
+
+    private List<Map<String, Object>> executableRows(
+            List<? extends ExecutableElement> members, TypeElement owner) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (ExecutableElement member : members) {
+            if (!isVisible(member)) {
+                continue;
+            }
+            ElementDoc doc = docReader.read(member);
+            if (doc.hidden) {
+                continue;
+            }
+            Map<String, Object> row = baseRow(member, doc);
+            row.put("typeParameters", typeNames.typeParameters(member.getTypeParameters()));
+            row.put("returnType", member.getKind() == ElementKind.CONSTRUCTOR
+                    ? null : typeNames.reference(member.getReturnType()));
+            row.put("parameters", parameterRows(member, doc));
+            row.put("throws", throwsRows(member, doc));
+            row.put("returns", doc.returns);
+            out.add(row);
+        }
+        return out;
+    }
+
+    private Map<String, Object> baseRow(Element member, ElementDoc doc) {
+        List<String> anchors = refs.anchors(member);
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("name", member.getSimpleName().toString());
+        row.put("anchor", anchors.get(0));
+        // Javadoc answers to both the declared and the erased spelling of a
+        // signature containing a type variable, and links in the wild use both.
+        row.put("anchors", anchors);
+        row.put("modifiers", TypeNames.modifiers(member));
+        row.put("deprecated", doc.deprecated);
+        row.put("deprecatedText", doc.deprecatedText);
+        row.put("description", doc.description);
+        row.put("summary", TypeNames.summary(doc.description));
+        row.put("seeAlso", seeAlsoRefs(doc, Refs.enclosingType(member)));
+        return row;
+    }
+
+    private List<Map<String, Object>> parameterRows(ExecutableElement member, ElementDoc doc) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        List<? extends VariableElement> parameters = member.getParameters();
+        for (int i = 0; i < parameters.size(); i++) {
+            VariableElement parameter = parameters.get(i);
+            String name = parameter.getSimpleName().toString();
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("name", name);
+            Map<String, Object> reference = typeNames.reference(parameter.asType());
+            if (member.isVarArgs() && i == parameters.size() - 1) {
+                // The declared type is an array; the source spelling is an ellipsis.
+                String label = String.valueOf(reference.get("label"));
+                reference.put("label", label.endsWith("[]")
+                        ? label.substring(0, label.length() - 2) + "..." : label);
+            }
+            row.put("type", reference);
+            String text = doc.parameterText(name);
+            row.put("doc", text == null ? "" : text);
+            out.add(row);
+        }
+        // Type parameter documentation has nowhere to sit in the signature table,
+        // so it is carried separately rather than dropped.
+        for (MarkdownSections.NamedText documented : doc.parameters) {
+            if (documented.name().startsWith("<")) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("name", documented.name());
+                row.put("type", Map.of("label", "", "url", null));
+                row.put("doc", documented.text());
+                out.add(row);
+            }
+        }
+        return out;
+    }
+
+    private List<Map<String, Object>> throwsRows(ExecutableElement member, ElementDoc doc) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        Set<String> named = new LinkedHashSet<>();
+        for (MarkdownSections.NamedText documented : doc.exceptions) {
+            named.add(documented.name());
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("name", documented.name());
+            row.put("url", urlOfTypeNamed(documented.name()));
+            row.put("doc", documented.text());
+            out.add(row);
+        }
+        // A declared exception with no prose still belongs in the throws list.
+        for (TypeMirror thrown : member.getThrownTypes()) {
+            String label = typeNames.label(thrown);
+            if (named.contains(label)) {
+                continue;
+            }
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("name", label);
+            row.put("url", typeNames.url(thrown));
+            row.put("doc", "");
+            out.add(row);
+        }
+        return out;
+    }
+
+    /** Resolves a bare exception name from a markdown Throws bullet to a page. */
+    private String urlOfTypeNamed(String name) {
+        if (name.indexOf('.') > 0) {
+            TypeElement exact = documented.get(name);
+            return exact == null ? null : Refs.typeUrl(exact);
+        }
+        String suffix = "." + name;
+        for (Map.Entry<String, TypeElement> entry : documented.entrySet()) {
+            if (entry.getKey().endsWith(suffix)) {
+                return Refs.typeUrl(entry.getValue());
+            }
+        }
+        return null;
+    }
+
+    /**
+     * See-also entries, resolved to links where they name something we publish.
+     *
+     * <p>The markdown convention writes these as bare text: a type name, or a
+     * {@code #member} reference into the same type. Block tag entries have already
+     * been rendered to markdown by the comment renderer and are passed through.
+     */
+    private List<Map<String, Object>> seeAlsoRefs(ElementDoc doc, TypeElement context) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (String entry : doc.seeAlso) {
+            String text = entry.strip();
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("label", text);
+            row.put("url", null);
+            if (text.startsWith("#") && context != null) {
+                row.put("label", text.substring(1));
+                row.put("url", memberUrl(context, text.substring(1)));
+            } else if (!text.contains("[") && !text.contains(" ")) {
+                row.put("url", urlOfTypeNamed(text));
+            }
+            out.add(row);
+        }
+        return out;
+    }
+
+    /** The URL of a member named in a see-also reference, matched by name alone. */
+    private String memberUrl(TypeElement owner, String reference) {
+        String name = reference;
+        int paren = name.indexOf('(');
+        if (paren > 0) {
+            name = name.substring(0, paren);
+        }
+        for (Element member : owner.getEnclosedElements()) {
+            if (member.getSimpleName().contentEquals(name) && isVisible(member)) {
+                return Refs.typeUrl(owner) + "#" + refs.anchors(member).get(0);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Members a type gets from its supertypes, grouped by where they come from --
+     * the "Methods inherited from" blocks javadoc renders.
+     */
+    private List<Map<String, Object>> inheritedMembers(TypeElement type, List<TypeElement> promoted) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        Set<String> declared = new LinkedHashSet<>();
+        for (ExecutableElement method : ElementFilter.methodsIn(type.getEnclosedElements())) {
+            declared.add(signatureKey(method));
+        }
+        Set<String> promotedNames = new LinkedHashSet<>();
+        for (TypeElement supertype : promoted) {
+            promotedNames.add(supertype.getQualifiedName().toString());
+            for (ExecutableElement method : ElementFilter.methodsIn(supertype.getEnclosedElements())) {
+                declared.add(signatureKey(method));
+            }
+        }
+
+        Set<String> visited = new LinkedHashSet<>();
+        for (TypeMirror supertype : allSupertypes(type.asType(), visited)) {
+            if (!(supertype instanceof DeclaredType declaredType)
+                    || !(declaredType.asElement() instanceof TypeElement parent)) {
+                continue;
+            }
+            // Already rendered as this type's own members just above.
+            if (promotedNames.contains(parent.getQualifiedName().toString())) {
+                continue;
+            }
+            List<Map<String, Object>> members = new ArrayList<>();
+            for (ExecutableElement method : ElementFilter.methodsIn(parent.getEnclosedElements())) {
+                if (!isVisible(method) || !declared.add(signatureKey(method))) {
+                    continue;
+                }
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("name", method.getSimpleName().toString());
+                String url = urlOf(method);
+                row.put("url", url);
+                members.add(row);
+            }
+            if (members.isEmpty()) {
+                continue;
+            }
+            Map<String, Object> group = new LinkedHashMap<>();
+            group.put("from", Refs.nestedDisplayName(parent));
+            group.put("url", documented.containsKey(parent.getQualifiedName().toString())
+                    ? Refs.typeUrl(parent) : null);
+            group.put("members", members);
+            out.add(group);
+        }
+        return out;
+    }
+
+    private List<TypeMirror> allSupertypes(TypeMirror type, Set<String> visited) {
+        List<TypeMirror> out = new ArrayList<>();
+        for (TypeMirror supertype : types.directSupertypes(type)) {
+            if (!(supertype instanceof DeclaredType declared)
+                    || !(declared.asElement() instanceof TypeElement element)
+                    || !visited.add(element.getQualifiedName().toString())) {
+                continue;
+            }
+            out.add(supertype);
+            out.addAll(allSupertypes(supertype, visited));
+        }
+        return out;
+    }
+
+    /** Name plus erased parameter types: what makes one method the same as another. */
+    private String signatureKey(ExecutableElement method) {
+        List<String> anchors = refs.anchors(method);
+        return anchors.get(anchors.size() - 1);
+    }
+
+    // --------------------------------------------------------- package pages
+
+    private void writePackagePages() throws IOException {
+        Map<String, List<TypeElement>> byPackage = new TreeMap<>();
+        for (TypeElement type : documented.values()) {
+            // Nested types are listed on their outer type's page, exactly as javadoc
+            // lists them, so only top level types get a row in the package summary.
+            if (type.getEnclosingElement() instanceof TypeElement) {
+                continue;
+            }
+            byPackage.computeIfAbsent(Refs.packageOf(type).getQualifiedName().toString(),
+                    key -> new ArrayList<>()).add(type);
+        }
+
+        for (Map.Entry<String, List<TypeElement>> entry : byPackage.entrySet()) {
+            PackageElement pkg = elements.getPackageElement(entry.getKey());
+            if (pkg == null) {
+                continue;
+            }
+            ElementDoc doc = docReader.read(pkg);
+            List<TypeElement> members = entry.getValue();
+            members.sort(Comparator.comparing(type -> type.getSimpleName().toString()));
+
+            List<Map<String, Object>> rows = new ArrayList<>();
+            for (TypeElement type : members) {
+                rows.add(new LinkedHashMap<>(Map.of(
+                        "name", Refs.nestedDisplayName(type),
+                        "url", Refs.typeUrl(type),
+                        "kind", kindOf(type),
+                        "summary", TypeNames.summary(docReader.read(type).description))));
+            }
+
+            Map<String, Object> api = new LinkedHashMap<>();
+            api.put("kind", "package");
+            api.put("qualified", entry.getKey());
+            api.put("description", doc.description);
+            api.put("types", rows);
+
+            Map<String, Object> frontMatter = new LinkedHashMap<>();
+            frontMatter.put("title", entry.getKey());
+            frontMatter.put("url", Refs.packageUrl(pkg));
+            frontMatter.put("description", TypeNames.summary(doc.description));
+            frontMatter.put("layout", "package");
+            frontMatter.put("javadoc", api);
+
+            write(contentRoot.resolve(Refs.packageContentPath(pkg)), Json.write(frontMatter));
+        }
+    }
+
+    /** The API index at {@code /javadoc/}, listing every package. */
+    private void writeOverview() throws IOException {
+        Set<String> packageNames = new java.util.TreeSet<>();
+        for (TypeElement type : documented.values()) {
+            packageNames.add(Refs.packageOf(type).getQualifiedName().toString());
+        }
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (String name : packageNames) {
+            PackageElement pkg = elements.getPackageElement(name);
+            if (pkg == null) {
+                continue;
+            }
+            rows.add(new LinkedHashMap<>(Map.of(
+                    "name", name,
+                    "url", Refs.packageUrl(pkg),
+                    "summary", TypeNames.summary(docReader.read(pkg).description))));
+        }
+
+        Map<String, Object> api = new LinkedHashMap<>();
+        api.put("kind", "overview");
+        api.put("packages", rows);
+        api.put("typeCount", documented.size());
+
+        Map<String, Object> frontMatter = new LinkedHashMap<>();
+        frontMatter.put("title", "API");
+        frontMatter.put("url", "/javadoc/");
+        frontMatter.put("description", "Codename One API reference");
+        frontMatter.put("layout", "overview");
+        // The website has linked the API from /api/ since 2015.
+        frontMatter.put("aliases", List.of("/api/"));
+        frontMatter.put("javadoc", api);
+
+        write(contentRoot.resolve("_index.md"), Json.write(frontMatter));
+    }
+
+    // -------------------------------------------------------------- search
+
+    private void addSearchRows(TypeElement type, ElementDoc doc) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("n", Refs.nestedDisplayName(type));
+        row.put("p", Refs.packageOf(type).getQualifiedName().toString());
+        row.put("u", Refs.typeUrl(type));
+        row.put("k", kindOf(type));
+        row.put("s", TypeNames.summary(doc.description));
+
+        // Members are two strings each -- the label to show and the fragment to
+        // jump to -- nested under their type rather than repeated as standalone
+        // rows. The flat form, with a URL, a package and a summary per member,
+        // came to 9.7MB over 31519 entries, which is not a file a browser should
+        // download to answer one search. Grouping removes the repetition and
+        // dropping member summaries removes the bulk; the type summaries stay,
+        // because those are what a result list actually shows.
+        List<Object> members = new ArrayList<>();
+        for (Element member : type.getEnclosedElements()) {
+            if (!isVisible(member) || member instanceof TypeElement) {
+                continue;
+            }
+            if (docReader.read(member).hidden) {
+                continue;
+            }
+            String label = member instanceof ExecutableElement executable
+                    ? member.getSimpleName() + "(" + parameterLabels(executable) + ")"
+                    : member.getSimpleName().toString();
+            members.add(List.of(label, refs.anchors(member).get(0)));
+        }
+        row.put("m", members);
+        searchRows.add(row);
+    }
+
+    private String parameterLabels(ExecutableElement executable) {
+        List<String> out = new ArrayList<>();
+        for (VariableElement parameter : executable.getParameters()) {
+            out.add(typeNames.label(parameter.asType()));
+        }
+        return String.join(", ", out);
+    }
+
+    private void writeSearchIndex() throws IOException {
+        if (searchIndex == null) {
+            return;
+        }
+        Map<String, Object> document = new LinkedHashMap<>();
+        document.put("generator", "HugoDoclet");
+        document.put("types", searchRows);
+        write(searchIndex, Json.writeCompact(document));
+
+        int memberCount = 0;
+        for (Map<String, Object> row : searchRows) {
+            Object members = row.get("m");
+            if (members instanceof List<?> list) {
+                memberCount += list.size();
+            }
+        }
+        reporter.print(javax.tools.Diagnostic.Kind.NOTE,
+                "Hugo javadoc: " + documented.size() + " types, "
+                        + memberCount + " searchable members");
+    }
+
+    // --------------------------------------------------------------- output
+
+    private static void write(Path target, String content) throws IOException {
+        Path parent = target.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        try {
+            Files.writeString(target, content, StandardCharsets.UTF_8);
+        } catch (IOException failure) {
+            throw new IOException("writing " + target + ": " + failure, failure);
+        }
+    }
+
+    /** A doclet option that takes exactly one argument. */
+    private record SimpleOption(String name, String parameters, String description,
+                                java.util.function.Consumer<String> action) implements Option {
+        @Override
+        public int getArgumentCount() {
+            return 1;
+        }
+
+        @Override
+        public String getDescription() {
+            return description;
+        }
+
+        @Override
+        public Kind getKind() {
+            return Kind.STANDARD;
+        }
+
+        @Override
+        public List<String> getNames() {
+            return List.of(name);
+        }
+
+        @Override
+        public String getParameters() {
+            return parameters;
+        }
+
+        @Override
+        public boolean process(String option, List<String> arguments) {
+            action.accept(arguments.get(0));
+            return true;
+        }
+    }
+
+    static String stackTrace(Throwable failure) {
+        StringWriter text = new StringWriter();
+        failure.printStackTrace(new PrintWriter(text));
+        return text.toString();
+    }
+}

@@ -1,0 +1,445 @@
+/*
+ * API reference pages.
+ *
+ * Everything here is expressed in the site's own design tokens, so dark mode is
+ * whatever body.dark already says it is. That is the point of the rewrite: the
+ * previous integration copied javadoc's stylesheet in, rewrote every selector to
+ * scope it under one div, and then tried to force roughly thirty of javadoc's
+ * own custom properties back onto theme colours with !important. It lost that
+ * fight in dark mode, because a stylesheet that was never built to be themed
+ * cannot be themed from the outside.
+ */
+
+.cn1-api {
+  max-width: var(--cn1-shell);
+}
+
+.cn1-api__header {
+  border-bottom: 1px solid var(--cn1-border);
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.cn1-api__crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-family: var(--cn1-mono);
+  font-size: 0.85rem;
+  color: var(--cn1-muted);
+  margin-bottom: 0.5rem;
+}
+
+.cn1-api__crumbs a {
+  color: var(--cn1-accent);
+}
+
+.cn1-api__title {
+  font-family: var(--cn1-mono);
+  word-break: break-word;
+}
+
+.cn1-api__kind {
+  display: inline-block;
+  font-family: var(--cn1-font);
+  font-size: 0.75em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cn1-muted);
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+
+.cn1-api__intro {
+  color: var(--cn1-muted);
+}
+
+/* Inheritance chain, indented one step per level the way javadoc stacks it. */
+.cn1-api__inheritance {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+  font-family: var(--cn1-mono);
+  font-size: 0.85rem;
+}
+
+.cn1-api__inheritance li {
+  padding-left: 1.1rem;
+  position: relative;
+  color: var(--cn1-muted);
+}
+
+.cn1-api__inheritance li + li::before {
+  content: "\2514";
+  position: absolute;
+  left: 0.2rem;
+  color: var(--cn1-border-strong);
+}
+
+.cn1-api__inheritance li + li {
+  margin-left: 0.8rem;
+}
+
+.cn1-api__inheritance .is-current {
+  color: var(--cn1-text);
+  font-weight: 600;
+}
+
+.cn1-api__relations {
+  font-size: 0.9rem;
+  color: var(--cn1-muted);
+  margin: 0.6rem 0 0;
+}
+
+.cn1-api__relations > span {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.72rem;
+  margin-right: 0.4rem;
+}
+
+/* -------------------------------------------------------------- signatures */
+
+.cn1-api-signature {
+  font-family: var(--cn1-mono);
+  font-size: 0.88rem;
+  line-height: 1.7;
+  background: none;
+  padding: 0;
+  color: var(--cn1-text);
+  overflow-wrap: anywhere;
+}
+
+.cn1-api-mod {
+  color: var(--cn1-muted);
+}
+
+.cn1-api-name {
+  font-weight: 600;
+  color: var(--cn1-text);
+}
+
+.cn1-api-arg {
+  color: var(--cn1-text);
+}
+
+.cn1-api-punct {
+  color: var(--cn1-muted);
+}
+
+.cn1-api-const {
+  color: var(--cn1-success);
+}
+
+a.cn1-api-type,
+.cn1-api-type {
+  color: var(--cn1-accent);
+}
+
+.cn1-api-table__member a {
+  text-decoration: none;
+}
+
+.cn1-api-table__member a:hover .cn1-api-name {
+  text-decoration: underline;
+}
+
+/* ----------------------------------------------------------------- tables */
+
+.cn1-api-summary {
+  margin: 2rem 0;
+}
+
+.cn1-api-summary__title,
+.cn1-api-details__title {
+  font-size: 1.15rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cn1-muted);
+  border-bottom: 1px solid var(--cn1-border);
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.8rem;
+}
+
+.cn1-api-table {
+  width: 100%;
+  border-collapse: collapse;
+  display: table;
+  margin: 0;
+}
+
+.cn1-api-table td {
+  border-bottom: 1px solid var(--cn1-border);
+  padding: 0.6rem 0.8rem 0.6rem 0;
+  vertical-align: top;
+}
+
+.cn1-api-table tr:hover td {
+  background: var(--cn1-surface-soft);
+}
+
+.cn1-api-table__member {
+  width: 45%;
+  min-width: 16rem;
+}
+
+.cn1-api-table__summary {
+  color: var(--cn1-muted);
+  font-size: 0.92rem;
+}
+
+.cn1-api-table__summary p {
+  margin: 0;
+}
+
+.cn1-api-table tr.is-deprecated .cn1-api-name {
+  text-decoration: line-through;
+}
+
+.cn1-api-tag {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cn1-surface);
+  background: var(--cn1-muted);
+  border-radius: var(--cn1-radius-sm);
+  padding: 0.05rem 0.4rem;
+  margin-right: 0.3rem;
+  vertical-align: 1px;
+}
+
+/* ---------------------------------------------------------------- members */
+
+.cn1-api-member {
+  border-left: 3px solid var(--cn1-border);
+  padding: 0.2rem 0 0.2rem 1rem;
+  margin: 1.6rem 0;
+  /* Anchored jumps land under the sticky header without this. */
+  scroll-margin-top: 5rem;
+}
+
+.cn1-api-member:target {
+  border-left-color: var(--cn1-accent);
+  background: var(--cn1-accent-soft);
+  border-radius: 0 var(--cn1-radius-sm) var(--cn1-radius-sm) 0;
+}
+
+.cn1-api-member__name {
+  font-family: var(--cn1-mono);
+  font-size: 1.05rem;
+  margin: 0 0 0.35rem;
+}
+
+/* A zero-size marker carrying an alternate spelling of the same fragment. */
+.cn1-api-alias {
+  display: block;
+  height: 0;
+  scroll-margin-top: 5rem;
+}
+
+.cn1-api-block {
+  margin: 0.9rem 0 0;
+}
+
+.cn1-api-block__title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--cn1-muted);
+  margin: 0 0 0.3rem;
+}
+
+.cn1-api-params {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(6rem, max-content) 1fr;
+  gap: 0.25rem 1rem;
+}
+
+.cn1-api-params dt {
+  font-family: var(--cn1-mono);
+  font-size: 0.85rem;
+}
+
+.cn1-api-params dt code {
+  background: none;
+  padding: 0;
+  color: var(--cn1-text);
+  font-weight: 600;
+}
+
+.cn1-api-params__type {
+  color: var(--cn1-muted);
+  font-weight: 400;
+}
+
+.cn1-api-params dd {
+  margin: 0;
+  color: var(--cn1-text);
+}
+
+.cn1-api-params dd p {
+  margin: 0;
+}
+
+.cn1-api-undocumented {
+  color: var(--cn1-muted);
+  font-style: italic;
+}
+
+.cn1-api-see {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+/* Typography for comment prose.
+ *
+ * Documentation comments are markdown and go through the same goldmark as the
+ * rest of the site, but they are rendered into these containers rather than
+ * into PaperMod's .post-content, so none of the theme's element spacing reaches
+ * them. Without this every paragraph, list and heading in a comment runs
+ * together into one block of text. */
+.cn1-api-prose p,
+.cn1-api-prose ul,
+.cn1-api-prose ol,
+.cn1-api-prose blockquote,
+.cn1-api-prose table,
+.cn1-api-prose pre {
+  margin: 0 0 0.85rem;
+}
+
+.cn1-api-prose ul,
+.cn1-api-prose ol {
+  padding-left: 1.4rem;
+}
+
+.cn1-api-prose li {
+  margin-bottom: 0.25rem;
+}
+
+.cn1-api-prose h1,
+.cn1-api-prose h2,
+.cn1-api-prose h3,
+.cn1-api-prose h4,
+.cn1-api-prose h5,
+.cn1-api-prose h6 {
+  margin: 1.4rem 0 0.5rem;
+  line-height: 1.3;
+}
+
+/* A comment's own headings must never outrank the page structure around them,
+   however deep the author nested them. */
+.cn1-api-prose h1,
+.cn1-api-prose h2,
+.cn1-api-prose h3 {
+  font-size: 1.05rem;
+}
+
+.cn1-api-prose h4,
+.cn1-api-prose h5,
+.cn1-api-prose h6 {
+  font-size: 0.95rem;
+}
+
+.cn1-api-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--cn1-radius-sm);
+}
+
+.cn1-api-prose blockquote {
+  border-left: 3px solid var(--cn1-border);
+  padding-left: 0.9rem;
+  color: var(--cn1-muted);
+}
+
+.cn1-api-prose table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.cn1-api-prose > :first-child {
+  margin-top: 0;
+}
+
+.cn1-api-prose > :last-child {
+  margin-bottom: 0;
+}
+
+.cn1-api-deprecated {
+  border-left: 3px solid var(--cn1-accent);
+  background: var(--cn1-surface-soft);
+  border-radius: 0 var(--cn1-radius-sm) var(--cn1-radius-sm) 0;
+  padding: 0.6rem 0.9rem;
+  margin: 0.6rem 0;
+  font-size: 0.92rem;
+}
+
+.cn1-api-deprecated p {
+  margin: 0;
+}
+
+.cn1-api-inherited__group {
+  margin: 0.9rem 0;
+}
+
+.cn1-api-inherited__from {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cn1-muted);
+  margin: 0 0 0.25rem;
+}
+
+.cn1-api-inherited__list {
+  margin: 0;
+  font-family: var(--cn1-mono);
+  font-size: 0.82rem;
+  line-height: 1.9;
+  color: var(--cn1-muted);
+}
+
+.cn1-api-inherited__list code {
+  background: none;
+  padding: 0;
+}
+
+@media (max-width: 720px) {
+  /* Two columns of signature and prose do not fit a phone, so the summary
+     tables become stacked blocks rather than scrolling sideways. */
+  .cn1-api-table,
+  .cn1-api-table tbody,
+  .cn1-api-table tr,
+  .cn1-api-table td {
+    display: block;
+    width: auto;
+  }
+
+  .cn1-api-table td {
+    border-bottom: none;
+    padding: 0.15rem 0;
+  }
+
+  .cn1-api-table tr {
+    border-bottom: 1px solid var(--cn1-border);
+    padding: 0.6rem 0;
+  }
+
+  .cn1-api-table__member {
+    min-width: 0;
+  }
+
+  .cn1-api-params {
+    grid-template-columns: 1fr;
+    gap: 0.1rem;
+  }
+
+  .cn1-api-params dd {
+    margin-bottom: 0.5rem;
+  }
+}

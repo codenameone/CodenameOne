@@ -36,6 +36,10 @@ on:
       # The Hugo build embeds JavaDocs produced by this script, so a change
       # to how the docs are generated must redeploy the website too.
       - '.github/scripts/build_javadocs.sh'
+      # The doclet that renders the API pages themselves. It is outside the
+      # maven reactor and built only by this workflow, so nothing else would
+      # catch a change to it.
+      - 'maven/javadoc-hugo-doclet/**'
       - '.github/workflows/website-docs.yml'
   push:
     branches: [main, master]
@@ -61,6 +65,10 @@ on:
       # The Hugo build embeds JavaDocs produced by this script, so a change
       # to how the docs are generated must redeploy the website too.
       - '.github/scripts/build_javadocs.sh'
+      # The doclet that renders the API pages themselves. It is outside the
+      # maven reactor and built only by this workflow, so nothing else would
+      # catch a change to it.
+      - 'maven/javadoc-hugo-doclet/**'
       - '.github/workflows/website-docs.yml'
   workflow_dispatch:
     inputs:
@@ -205,6 +213,23 @@ jobs:
           # (push to master) keep the default so future posts only appear
           # on their actual date.
           HUGO_BUILD_FUTURE: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
+
+      - name: Validate API reference output
+        run: |
+          set -euo pipefail
+          test -f docs/website/public/javadoc/index.html
+          test -f docs/website/public/javadoc/com/codename1/ui/Component.html
+          test -f docs/website/public/javadoc/com/codename1/ui/package-summary.html
+          test -f docs/website/public/javadoc-search.json
+          # The fragment encoding is the compatibility surface, so assert one of
+          # the awkward spellings rather than only that the page exists.
+          grep -Fq 'id="createImage(byte[],int,int)"' \
+            docs/website/public/javadoc/com/codename1/ui/Image.html
+          # The old integration copied the standard doclet's tree into static/
+          # and scoped its stylesheet with a script. Nothing should reintroduce
+          # either: they are what broke dark mode.
+          test ! -e docs/website/static/javadoc
+          test ! -e docs/website/assets/js/cn1-javadoc.js
 
       - name: Validate Port Status page output
         run: |

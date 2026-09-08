@@ -1,0 +1,69 @@
+{{- /* The full entry for one member. Called with a dict of "member" and "page",
+       because prose has to be rendered through the page that owns it. */ -}}
+{{- $m := .member -}}
+{{- $page := .page -}}
+<section class="cn1-api-member" id="{{ $m.anchor }}">
+  {{- /* Javadoc answers to both the declared and the erased spelling of a
+         signature containing a type variable, and links in the wild use both,
+         so every alternate identifier gets an anchor of its own. */ -}}
+  {{- range $i, $a := $m.anchors }}{{ if $i }}<span class="cn1-api-alias" id="{{ $a }}"></span>{{ end }}{{ end }}
+  <h3 class="cn1-api-member__name">{{ $m.name }}</h3>
+  {{ partial "javadoc/signature.html" $m }}
+
+  {{- if $m.deprecated }}
+  <div class="cn1-api-deprecated" role="note">
+    <strong>Deprecated.</strong>
+    {{- with $m.deprecatedText }} {{ $page.RenderString . }}{{ end }}
+  </div>
+  {{- end }}
+
+  {{- with $m.description }}
+  <div class="cn1-api-prose">{{ $page.RenderString . }}</div>
+  {{- end }}
+
+  {{- if $m.parameters }}
+  {{- $documented := false }}
+  {{- range $m.parameters }}{{ if .doc }}{{ $documented = true }}{{ end }}{{ end }}
+  {{- if $documented }}
+  <div class="cn1-api-block">
+    <h4 class="cn1-api-block__title">Parameters</h4>
+    <dl class="cn1-api-params">
+      {{- range $m.parameters }}
+      <dt><code>{{ .name }}</code>{{ with .type.label }} <span class="cn1-api-params__type">{{ . }}</span>{{ end }}</dt>
+      <dd>{{ with .doc }}{{ $page.RenderString . }}{{ else }}<span class="cn1-api-undocumented">Not documented.</span>{{ end }}</dd>
+      {{- end }}
+    </dl>
+  </div>
+  {{- end }}
+  {{- end }}
+
+  {{- with $m.returns }}
+  <div class="cn1-api-block">
+    <h4 class="cn1-api-block__title">Returns</h4>
+    <div class="cn1-api-prose">{{ $page.RenderString . }}</div>
+  </div>
+  {{- end }}
+
+  {{- if $m.throws }}
+  <div class="cn1-api-block">
+    <h4 class="cn1-api-block__title">Throws</h4>
+    <dl class="cn1-api-params">
+      {{- range $m.throws }}
+      <dt>{{ if .url }}<a href="{{ .url }}"><code>{{ .name }}</code></a>{{ else }}<code>{{ .name }}</code>{{ end }}</dt>
+      <dd>{{ with .doc }}{{ $page.RenderString . }}{{ end }}</dd>
+      {{- end }}
+    </dl>
+  </div>
+  {{- end }}
+
+  {{- if $m.seeAlso }}
+  <div class="cn1-api-block">
+    <h4 class="cn1-api-block__title">See also</h4>
+    <ul class="cn1-api-see">
+      {{- range $m.seeAlso }}
+      <li>{{ if .url }}<a href="{{ .url }}"><code>{{ .label }}</code></a>{{ else }}<code>{{ .label }}</code>{{ end }}</li>
+      {{- end }}
+    </ul>
+  </div>
+  {{- end }}
+</section>

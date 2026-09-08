@@ -1,0 +1,231 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.doclet.hugo;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import javax.tools.DocumentationTool;
+import javax.tools.JavaFileObject;
+import javax.tools.StandardJavaFileManager;
+import javax.tools.ToolProvider;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+/**
+ * Runs the doclet over a source file written for the awkward cases and checks
+ * what it emits.
+ *
+ * <p>The fragment identifiers are the reason this test exists. They are the
+ * addresses the site publishes, they have to match the ones the standard doclet
+ * writes exactly, and the encoding has details that look like details until a
+ * link dies: type arguments are erased away but arrays keep their brackets, a
+ * varargs parameter keeps its ellipsis in the declared spelling and loses it in
+ * the erased one, and a method with a type variable answers to both spellings.
+ *
+ * <p>scripts/website/check-javadoc-parity.py checks the same property against a
+ * real javadoc run over the real sources, which is the stronger check but needs
+ * a full website build. This one runs in a second.
+ */
+class HugoDocletTest {
+
+    @TempDir
+    static Path workspace;
+
+    private static Path content;
+
+    @BeforeAll
+    static void generate() throws IOException {
+        Path sources = workspace.resolve("src/p");
+        Files.createDirectories(sources);
+        content = workspace.resolve("content");
+
+        Files.writeString(sources.resolve("Sample.java"), String.join("\n",
+                "package p;",
+                "import java.util.List;",
+                "import java.util.Map;",
+                "",
+                "/// A sample type.",
+                "///",
+                "/// #### See also",
+                "///",
+                "/// - Other",
+                "public class Sample<T> {",
+                "    /// A constant",
+                "    public static final int LIMIT = 7;",
+                "    /// Builds one",
+                "    public Sample() {}",
+                "    /// Type arguments are erased out of the identifier",
+                "    ///",
+                "    /// #### Parameters",
+                "    ///",
+                "    /// - `values`: the values to use",
+                "    public void generic(List<String> values) {}",
+                "    /// Nested generics collapse to the raw type too",
+                "    public void nested(Map<String, List<Integer>> m) {}",
+                "    /// Arrays keep their brackets",
+                "    public void arrays(byte[] a, int[][] b) {}",
+                "    /// Varargs keep the ellipsis",
+                "    public void varargs(String... parts) {}",
+                "    /// A type variable is spelt twice",
+                "    public void variable(T value) {}",
+                "    /// A varargs type variable is spelt twice as well",
+                "    public void variableVarargs(T... values) {}",
+                "    /// Takes a nested type",
+                "    public void inner(Sample.Inner value) {}",
+                "    /// Returns something documented",
+                "    ///",
+                "    /// #### Returns",
+                "    ///",
+                "    /// the limit",
+                "    public int limit() { return LIMIT; }",
+                "    /// Not part of the API",
+                "    ///",
+                "    /// @hidden",
+                "    public void secret() {}",
+                "    /// Nested",
+                "    public static class Inner {}",
+                "}",
+                ""), StandardCharsets.UTF_8);
+
+        Files.writeString(sources.resolve("Other.java"), String.join("\n",
+                "package p;",
+                "/// Another type.",
+                "public class Other {}",
+                ""), StandardCharsets.UTF_8);
+
+        DocumentationTool tool = ToolProvider.getSystemDocumentationTool();
+        try (StandardJavaFileManager files = tool.getStandardFileManager(null, null, null)) {
+            Iterable<? extends JavaFileObject> units = files.getJavaFileObjects(
+                    sources.resolve("Sample.java"), sources.resolve("Other.java"));
+            boolean ok = tool.getTask(null, files, null, HugoDoclet.class,
+                    List.of("-d", content.toString(),
+                            "-sourcepath", workspace.resolve("src").toString(),
+                            "-protected", "-quiet"),
+                    units).call();
+            assertTrue(ok, "the doclet run failed");
+        }
+    }
+
+    private static String page(String name) throws IOException {
+        return Files.readString(content.resolve("p").resolve(name), StandardCharsets.UTF_8);
+    }
+
+    private static void assertAnchor(String page, String anchor) throws IOException {
+        // The identifier is written into JSON, so a quote and a backslash are the
+        // only characters that could be escaped, and neither appears in one.
+        assertTrue(page(page).contains("\"" + anchor + "\""),
+                "expected fragment identifier " + anchor + " in " + page);
+    }
+
+    @Test
+    void erasesTypeArgumentsFromIdentifiers() throws IOException {
+        assertAnchor("Sample.md", "generic(java.util.List)");
+        assertAnchor("Sample.md", "nested(java.util.Map)");
+    }
+
+    @Test
+    void keepsArrayBrackets() throws IOException {
+        assertAnchor("Sample.md", "arrays(byte[],int[][])");
+    }
+
+    @Test
+    void keepsTheVarargsEllipsis() throws IOException {
+        assertAnchor("Sample.md", "varargs(java.lang.String...)");
+    }
+
+    @Test
+    void spellsATypeVariableBothWays() throws IOException {
+        assertAnchor("Sample.md", "variable(T)");
+        assertAnchor("Sample.md", "variable(java.lang.Object)");
+    }
+
+    @Test
+    void dropsTheEllipsisFromAnErasedVarargs() throws IOException {
+        // javadoc gives Stream.of(T... values) both of these, and only the
+        // declared spelling keeps the ellipsis. Emitting "java.lang.Object..."
+        // for the erasure loses the second address entirely.
+        assertAnchor("Sample.md", "variableVarargs(T...)");
+        assertAnchor("Sample.md", "variableVarargs(java.lang.Object[])");
+    }
+
+    @Test
+    void namesConstructorsAndFieldsTheWayJavadocDoes() throws IOException {
+        assertAnchor("Sample.md", "<init>()");
+        assertAnchor("Sample.md", "LIMIT");
+    }
+
+    @Test
+    void qualifiesNestedTypesWithDots() throws IOException {
+        assertAnchor("Sample.md", "inner(p.Sample.Inner)");
+    }
+
+    @Test
+    void writesNestedTypesToTheirOwnPageBesideTheOuterOne() throws IOException {
+        assertTrue(Files.exists(content.resolve("p/Sample.Inner.md")),
+                "a nested type gets Outer.Inner.md, which is what javadoc links");
+    }
+
+    @Test
+    void publishesTheJavadocUrlAndItsDirectoryAlias() throws IOException {
+        String page = page("Sample.md");
+        assertTrue(page.contains("\"/javadoc/p/Sample.html\""), "the canonical URL");
+        assertTrue(page.contains("\"/javadoc/p/Sample/\""), "the directory alias");
+    }
+
+    @Test
+    void obeysHidden() throws IOException {
+        assertFalse(page("Sample.md").contains("secret"),
+                "@hidden removes the member from the API entirely");
+    }
+
+    @Test
+    void liftsMarkdownSectionsIntoStructure() throws IOException {
+        String page = page("Sample.md");
+        assertTrue(page.contains("\"the values to use\""), "the parameter's documentation");
+        assertTrue(page.contains("\"the limit\""), "the return documentation");
+        assertFalse(page.contains("#### Parameters"),
+                "a lifted heading must not also remain in the description");
+    }
+
+    @Test
+    void linksSeeAlsoEntriesThatNameSomethingPublished() throws IOException {
+        assertTrue(page("Sample.md").contains("/javadoc/p/Other.html"),
+                "a bare type name under #### See also resolves to its page");
+    }
+
+    @Test
+    void writesTheOverviewAndPackagePages() throws IOException {
+        assertTrue(Files.exists(content.resolve("_index.md")), "the API overview");
+        assertTrue(Files.exists(content.resolve("p/package-summary.md")), "the package summary");
+        assertEquals(true, Files.readString(content.resolve("_index.md")).contains("\"/api/\""),
+                "the overview keeps the /api/ URL the site has published since 2015");
+    }
+}

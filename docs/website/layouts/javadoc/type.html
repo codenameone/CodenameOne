@@ -1,0 +1,115 @@
+{{- define "main" -}}
+{{- $j := .Params.javadoc -}}
+<article class="post-single cn1-api cn1-api--type">
+  <header class="post-header cn1-api__header">
+    <nav class="cn1-api__crumbs" aria-label="API location">
+      <a href="/javadoc/">API</a>
+      <span aria-hidden="true">/</span>
+      <a href="{{ $j.package.url }}">{{ $j.package.name }}</a>
+    </nav>
+    <h1 class="post-title cn1-api__title">
+      <span class="cn1-api__kind">{{ $j.kind }}</span>
+      {{ $j.simple }}{{ $j.typeParameters }}
+    </h1>
+
+    {{- if $j.inheritance }}
+    <ol class="cn1-api__inheritance">
+      {{- range $j.inheritance }}<li>{{ partial "javadoc/type-ref.html" . }}</li>{{ end }}
+      <li class="is-current">{{ $j.simple }}</li>
+    </ol>
+    {{- end }}
+
+    {{- if $j.interfaces }}
+    <p class="cn1-api__relations"><span>Implements</span>
+      {{- range $i, $t := $j.interfaces }}{{ if $i }}, {{ end }}{{ partial "javadoc/type-ref.html" $t }}{{ end }}
+    </p>
+    {{- end }}
+
+    {{- if $j.subclasses }}
+    <p class="cn1-api__relations"><span>Known subtypes</span>
+      {{- range $i, $t := $j.subclasses }}{{ if $i }}, {{ end }}{{ partial "javadoc/type-ref.html" $t }}{{ end }}
+    </p>
+    {{- end }}
+  </header>
+
+  {{- if $j.deprecated }}
+  <div class="cn1-api-deprecated cn1-api-deprecated--type" role="note">
+    <strong>Deprecated.</strong>
+    {{- with $j.deprecatedText }} {{ $.RenderString . }}{{ end }}
+  </div>
+  {{- end }}
+
+  {{- with $j.description }}
+  <div class="cn1-api-prose cn1-api__description">{{ $.RenderString . }}</div>
+  {{- end }}
+
+  {{- if $j.seeAlso }}
+  <div class="cn1-api-block">
+    <h4 class="cn1-api-block__title">See also</h4>
+    <ul class="cn1-api-see">
+      {{- range $j.seeAlso }}
+      <li>{{ if .url }}<a href="{{ .url }}"><code>{{ .label }}</code></a>{{ else }}<code>{{ .label }}</code>{{ end }}</li>
+      {{- end }}
+    </ul>
+  </div>
+  {{- end }}
+
+  {{- if $j.nested }}
+  <section class="cn1-api-summary">
+    <h2 class="cn1-api-summary__title">Nested types</h2>
+    <table class="cn1-api-table">
+      <tbody>
+        {{- range $j.nested }}
+        <tr>
+          <td class="cn1-api-table__member"><a href="{{ .url }}"><code class="cn1-api-signature"><span class="cn1-api-mod">{{ .kind }}</span> <span class="cn1-api-name">{{ .name }}</span></code></a></td>
+          <td class="cn1-api-table__summary">{{ with .summary }}{{ $.RenderString . }}{{ end }}</td>
+        </tr>
+        {{- end }}
+      </tbody>
+    </table>
+  </section>
+  {{- end }}
+
+  {{ partial "javadoc/summary-table.html" (dict "rows" $j.fields "title" "Fields" "page" .) }}
+  {{ partial "javadoc/summary-table.html" (dict "rows" $j.constructors "title" "Constructors" "page" .) }}
+  {{ partial "javadoc/summary-table.html" (dict "rows" $j.methods "title" "Methods" "page" .) }}
+
+  {{- if $j.inherited }}
+  <section class="cn1-api-summary cn1-api-inherited">
+    <h2 class="cn1-api-summary__title">Inherited methods</h2>
+    {{- range $j.inherited }}
+    <div class="cn1-api-inherited__group">
+      <h3 class="cn1-api-inherited__from">From
+        {{- if .url }} <a href="{{ .url }}">{{ .from }}</a>{{ else }} {{ .from }}{{ end }}</h3>
+      <p class="cn1-api-inherited__list">
+        {{- range $i, $m := .members }}{{ if $i }}, {{ end -}}
+          {{- if $m.url }}<a href="{{ $m.url }}"><code>{{ $m.name }}</code></a>{{ else }}<code>{{ $m.name }}</code>{{ end -}}
+        {{- end }}
+      </p>
+    </div>
+    {{- end }}
+  </section>
+  {{- end }}
+
+  {{- if $j.fields }}
+  <section class="cn1-api-details">
+    <h2 class="cn1-api-details__title">Field details</h2>
+    {{- range $j.fields }}{{ partial "javadoc/member-detail.html" (dict "member" . "page" $) }}{{ end }}
+  </section>
+  {{- end }}
+
+  {{- if $j.constructors }}
+  <section class="cn1-api-details">
+    <h2 class="cn1-api-details__title">Constructor details</h2>
+    {{- range $j.constructors }}{{ partial "javadoc/member-detail.html" (dict "member" . "page" $) }}{{ end }}
+  </section>
+  {{- end }}
+
+  {{- if $j.methods }}
+  <section class="cn1-api-details">
+    <h2 class="cn1-api-details__title">Method details</h2>
+    {{- range $j.methods }}{{ partial "javadoc/member-detail.html" (dict "member" . "page" $) }}{{ end }}
+  </section>
+  {{- end }}
+</article>
+{{- end -}}
