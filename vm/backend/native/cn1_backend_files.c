@@ -176,7 +176,22 @@ JAVA_INT com_codename1_backend_FileIo_statImpl___int_long_1ARRAY_R_int(CODENAME_
     }
     data = (JAVA_ARRAY_LONG*)((JAVA_ARRAY)out)->data;
     data[0] = (JAVA_LONG)st.st_size;
+    /* Milliseconds, not whole seconds. StaticFiles builds its ETag from size and
+       this, so at one-second resolution a file replaced by different content of
+       the SAME size within the same second kept both halves of its validator and
+       every client holding the old ETag got a 304 for as long as it asked. The
+       Last-Modified header formats from the same value and is unaffected: HTTP
+       dates are whole seconds, so the extra precision is simply dropped there. */
+#if defined(__APPLE__)
+    data[1] = (JAVA_LONG)st.st_mtimespec.tv_sec * 1000LL
+            + (JAVA_LONG)(st.st_mtimespec.tv_nsec / 1000000L);
+#elif defined(st_mtime)
+    /* POSIX.1-2008 defines st_mtime as a macro exactly when st_mtim exists. */
+    data[1] = (JAVA_LONG)st.st_mtim.tv_sec * 1000LL
+            + (JAVA_LONG)(st.st_mtim.tv_nsec / 1000000L);
+#else
     data[1] = (JAVA_LONG)st.st_mtime * 1000LL;
+#endif
     data[2] = S_ISDIR(st.st_mode) ? 1 : 0;
     return 0;
 #endif

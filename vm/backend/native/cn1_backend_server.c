@@ -111,9 +111,16 @@ JAVA_INT com_codename1_backend_ServerSocket_bindImpl___java_lang_String_int_int_
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_flags = AI_PASSIVE;
         snprintf(portStr, sizeof(portStr), "%d", (int)port);
+        /* The same reason the outbound connect yields around this: getaddrinfo
+           blocks, and a thread the VM believes is running holds up a collection
+           for as long as the resolver takes. `h` is in the thread state's own
+           malloc'd buffer, so it survives the yield. */
+        CN1_YIELD_THREAD;
         if(getaddrinfo(h, portStr, &hints, &res) != 0) {
+            CN1_RESUME_THREAD;
             return -1;
         }
+        CN1_RESUME_THREAD;
         for(it = res ; it != NULL ; it = it->ai_next) {
             fd = socket(it->ai_family, it->ai_socktype, it->ai_protocol);
             if(fd < 0) {

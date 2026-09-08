@@ -193,11 +193,20 @@ JAVA_LONG com_codename1_backend_Tcp_connectImpl___java_lang_String_int_int_R_lon
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     snprintf(portStr, sizeof(portStr), "%d", (int)port);
+    cn1IgnoreSigPipe();
+    /* Yielded BEFORE the resolver, not after it. getaddrinfo blocks -- for the
+       full resolver timeout when DNS is slow or unreachable -- and the VM counted
+       this thread as running throughout, so a collection waited for it and every
+       unrelated request waited with it. The timeoutMillis argument does not cover
+       this either: it starts once there is an address to connect to.
+
+       Safe across a yield because `h` is a copy in the thread state's own utf8
+       buffer, which stringToUTF8 mallocs; nothing here holds a heap pointer. */
+    CN1_YIELD_THREAD;
     if(getaddrinfo(h, portStr, &hints, &res) != 0) {
+        CN1_RESUME_THREAD;
         return 0;
     }
-    cn1IgnoreSigPipe();
-    CN1_YIELD_THREAD;
     for(it = res ; it != 0 ; it = it->ai_next) {
         fd = (int)socket(it->ai_family, it->ai_socktype, it->ai_protocol);
         if(fd < 0) {

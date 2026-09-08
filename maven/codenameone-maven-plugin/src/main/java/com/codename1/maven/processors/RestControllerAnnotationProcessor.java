@@ -285,7 +285,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 continue;
             }
             String other = e.getKey();
-            if (!swallows(other, shape) && !swallows(shape, other)) {
+            // Same verb, or they cannot collide at all.
+            int mySpace = shape.indexOf(' ');
+            int otherSpace = other.indexOf(' ');
+            if (mySpace < 0 || otherSpace < 0
+                    || !shape.substring(0, mySpace).equals(other.substring(0, otherSpace))) {
+                continue;
+            }
+            if (!overlaps(other.substring(otherSpace + 1), shape.substring(mySpace + 1))) {
                 continue;
             }
             return mine + "." + route.javaMethod + " answers " + shape + ", which "
@@ -298,11 +305,50 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         return null;
     }
 
-    /** Whether `pattern` (which may hold {} wildcards) matches the literal `other`. */
-    private static boolean swallows(String pattern, String other) {
-        if (pattern.indexOf("{}") < 0 || other.indexOf("{}") >= 0) {
+    /**
+     * Whether one path can satisfy both shapes.
+     *
+     * Two patterns that BOTH hold variables can still collide: "/a/{x}/c" and
+     * "/a/b/{y}" are different shapes, and "/a/b/c" is answered by either. An
+     * earlier version compared a variable pattern only against a literal one and
+     * returned early whenever both had a variable, which is exactly the case this
+     * misses. Segment by segment instead: a variable segment matches any single
+     * segment, so two shapes overlap when they have the same number of segments
+     * and every pair of segments is compatible.
+     */
+    private static boolean overlaps(String left, String right) {
+        String[] a = left.split("/", -1);
+        String[] b = right.split("/", -1);
+        if (a.length != b.length) {
             return false;
         }
+        for (int i = 0; i < a.length; i++) {
+            if (!segmentsOverlap(a[i], b[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Whether two single segments can be the same text.
+     *
+     * A segment is a literal, a whole variable, or a variable with literal text
+     * around it ("{}.json"). Two segments that both contain a variable are treated
+     * as overlapping unless their fixed edges make that impossible, which errs
+     * toward reporting an ambiguity rather than shipping one.
+     */
+    private static boolean segmentsOverlap(String left, String right) {
+        boolean leftVar = left.indexOf("{}") >= 0;
+        boolean rightVar = right.indexOf("{}") >= 0;
+        if (!leftVar && !rightVar) {
+            return left.equals(right);
+        }
+        if (leftVar && rightVar) {
+            return true;
+        }
+        String pattern = leftVar ? left : right;
+        String literal = leftVar ? right : left;
         StringBuilder regex = new StringBuilder();
         for (int i = 0; i < pattern.length(); i++) {
             if (pattern.startsWith("{}", i)) {
@@ -316,7 +362,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 regex.append(c);
             }
         }
-        return other.matches(regex.toString());
+        return literal.matches(regex.toString());
     }
 
     /**

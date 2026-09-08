@@ -2907,6 +2907,13 @@ public final class HttpServer {
                 try {
                 boolean headOnly = "HEAD".equals(stream.getMethod());
                 List extra = new java.util.ArrayList();
+                // RFC 9110 6.6.1: an origin server with a clock MUST send Date, and
+                // the HTTP/1 writer does. This path sent only the content type and
+                // whatever the handler added -- and a handler cannot make up for it,
+                // because "date" is refused as server-owned. Caches were left without
+                // the timestamp they compute freshness and age from.
+                extra.add("date");
+                extra.add(currentHttpDate());
                 if(response.extraHeaders != null) {
                     java.util.Iterator it = response.extraHeaders.keySet().iterator();
                     while(it.hasNext()) {

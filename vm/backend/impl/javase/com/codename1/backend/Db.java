@@ -57,6 +57,17 @@ public final class Db {
     }
 
     public static Db open(String path) throws IOException {
+        // Db is the SQLite class on both arms: the packaged one hands this string
+        // straight to sqlite3_open. Accepting "jdbc:postgresql:..." here because a
+        // driver happens to be on the dev classpath let code work through
+        // cn1:backend and then fail once translated -- a dev loop that behaves
+        // differently from production, which is the one thing it must not do.
+        // Database is what speaks to those servers, on both arms.
+        if(path != null && path.startsWith("jdbc:") && !path.startsWith("jdbc:sqlite:")) {
+            throw new IOException("Db opens SQLite only, and the translated build "
+                    + "would hand " + path + " to sqlite3_open. Use Database.open for "
+                    + "PostgreSQL or MySQL.");
+        }
         String url = path != null && path.startsWith("jdbc:") ? path : "jdbc:sqlite:" + path;
         try {
             Connection connection = DriverManager.getConnection(url);
