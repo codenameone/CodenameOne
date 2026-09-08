@@ -435,9 +435,27 @@ public class ScaffoldRenderElement extends RenderElement {
             setChildOffset(fabRender,
                     fabX(scaffold().getFloatingActionButtonLocation(), self.width(), fs.width()),
                     fabY(scaffold().getFloatingActionButtonLocation(), self.height(),
-                            fs.height(), navHeight));
+                            fs.height(), navHeight + bottomSafeAreaPx()));
         }
         return self;
+    }
+
+    /**
+     * The bottom safe-area inset in device pixels.
+     *
+     * <p>Flutter measures a floating action button from the bottom of the
+     * CONTENT, which excludes the display's own bottom padding -- the home
+     * indicator on this device. Measuring from the bottom of the scaffold
+     * instead put the starter study's button 102 device pixels lower than the
+     * reference's, sitting over the indicator rather than above it.</p>
+     */
+    private double bottomSafeAreaPx() {
+        try {
+            com.codename1.flutter.EdgeInsets p = com.codename1.flutter.MediaQuery.paddingOf(this);
+            return p == null ? 0 : Dp.px(p.bottom());
+        } catch (Throwable noMediaQuery) {
+            return 0;
+        }
     }
 
     /**

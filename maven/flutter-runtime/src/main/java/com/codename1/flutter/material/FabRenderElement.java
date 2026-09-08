@@ -75,22 +75,24 @@ public class FabRenderElement extends RenderElement {
 
     @Override
     protected Component createComponent() {
-        // An EXTENDED fab is a labelled pill, and Codename One's
+        // A plain Button wearing the FAB's UIID, in BOTH forms.
+        //
+        // An extended fab is a labelled pill, and Codename One's
         // FloatingActionButton cannot be one: its setText stores the string for
         // the text-badge popup and only forwards it to the Button when the
-        // instance IS a badge, so the label never rendered. The extended form
-        // is therefore a plain Button wearing the same UIID -- same surface,
-        // same elevation, and a label that appears. Every study's "Back" button
-        // is one of these, and each drew a bare round plus sign.
-        com.codename1.ui.Button b;
-        if (fab().isExtended()) {
-            b = new com.codename1.ui.Button();
-            b.setUIID("FloatingActionButton");
-            FontImage.setMaterialIcon(b, iconChar(),
-                    com.codename1.components.FloatingActionButton.getIconDefaultSize());
-        } else {
-            b = com.codename1.components.FloatingActionButton.createFAB(iconChar());
-        }
+        // instance IS a badge, so the label never rendered. Every study's "Back"
+        // button is one of these, and each drew a bare round plus sign.
+        //
+        // The regular form cannot use it either, for a subtler reason: that
+        // class re-installs its own circular border from styleChanged() every
+        // time the background colour is set, so the Material 3 shape put on it
+        // here was replaced the moment the colour followed, and the button
+        // painted 96 device pixels of surface inside the 168 pixel box this
+        // element had laid out for it.
+        com.codename1.ui.Button b = new com.codename1.ui.Button();
+        b.setUIID("FloatingActionButton");
+        FontImage.setMaterialIcon(b, iconChar(),
+                com.codename1.components.FloatingActionButton.getIconDefaultSize());
         // The listener reads the CURRENT widget config so onPressed updates
         // never require listener rewiring.
         b.addActionListener(new ActionListener<ActionEvent>() {
@@ -132,6 +134,13 @@ public class FabRenderElement extends RenderElement {
             ((com.codename1.ui.Button) c).setText(label == null ? "" : label);
         }
         com.codename1.ui.plaf.Style all = c.getAllStyles();
+        // No margin. A Codename One button carries one from its theme, and it
+        // insets the surface INSIDE the box this element lays out, so a FAB
+        // given Material's 56 logical pixels painted 96 device pixels of colour
+        // in a 168 pixel box. Flutter's FAB has no margin of its own; the
+        // Scaffold positions it.
+        all.setMarginUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+        all.setMargin(0, 0, 0, 0);
         if (label != null) {
             all.setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
             int h = (int) Math.round(com.codename1.flutter.rendering.Dp.px(16));
@@ -196,7 +205,34 @@ public class FabRenderElement extends RenderElement {
         if (c == null) {
             return constraints.smallest();
         }
-        Dimension d = c.getPreferredSize();
-        return constraints.constrain(new Size(d.getWidth(), d.getHeight()));
+        return constraints.constrain(
+                materialSize(fab().isExtended(), c.getPreferredSize().getWidth()));
     }
+
+    /**
+     * The size Material gives a floating action button, in device pixels.
+     *
+     * <p>A regular one is a FIXED square. Taking the component's preferred size
+     * instead made it as small as its glyph plus whatever padding the theme in
+     * force happened to carry -- 83 device pixels against the reference's 168,
+     * less than half. An extended one is a capsule: the height is fixed too and
+     * only the width follows the label, and never below the minimum.</p>
+     */
+    static Size materialSize(boolean extended, double preferredWidth) {
+        if (!extended) {
+            double side = com.codename1.flutter.rendering.Dp.px(FAB_SIZE_LP);
+            return new Size(side, side);
+        }
+        return new Size(
+                Math.max(com.codename1.flutter.rendering.Dp.px(EXTENDED_MIN_WIDTH_LP),
+                        preferredWidth),
+                com.codename1.flutter.rendering.Dp.px(EXTENDED_HEIGHT_LP));
+    }
+
+    /** Material's regular FAB is this many logical pixels on a side. */
+    public static final double FAB_SIZE_LP = 56;
+    /** The extended form's fixed height -- 56 in Material 3, not M2's 48. */
+    public static final double EXTENDED_HEIGHT_LP = 56;
+    /** The extended form's minimum width. */
+    public static final double EXTENDED_MIN_WIDTH_LP = 80;
 }
