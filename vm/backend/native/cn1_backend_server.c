@@ -55,6 +55,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #endif
 
 #if defined(__linux__)
@@ -94,6 +95,41 @@ JAVA_INT com_codename1_backend_ServerSocket_bindImpl___java_lang_String_int_int_
        bind costs nothing and cannot be skipped by a server that listens. */
     signal(SIGPIPE, SIG_IGN);
 
+    if(h != NULL && h[0] != 0 && strcmp(h, "0.0.0.0") != 0) {
+        /* Resolved, not parsed as numeric IPv4.
+           inet_pton alone accepted only a dotted quad, so "localhost" -- the most
+           ordinary bind host there is -- and every IPv6 address failed startup, but
+           ONLY once packaged natively: the JavaSE side goes through
+           InetSocketAddress and takes all of them, so the configuration was proven
+           under cn1:backend and then would not start. */
+        struct addrinfo hints;
+        struct addrinfo* res = NULL;
+        struct addrinfo* it;
+        char portStr[16];
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_flags = AI_PASSIVE;
+        snprintf(portStr, sizeof(portStr), "%d", (int)port);
+        if(getaddrinfo(h, portStr, &hints, &res) != 0) {
+            return -1;
+        }
+        for(it = res ; it != NULL ; it = it->ai_next) {
+            fd = socket(it->ai_family, it->ai_socktype, it->ai_protocol);
+            if(fd < 0) {
+                continue;
+            }
+            setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char*)&on, sizeof(on));
+            if(bind(fd, it->ai_addr, it->ai_addrlen) == 0 && listen(fd, backlog) == 0) {
+                freeaddrinfo(res);
+                return fd;
+            }
+            close(fd);
+        }
+        freeaddrinfo(res);
+        return -1;
+    }
+
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if(fd < 0) {
         return -1;
@@ -105,12 +141,7 @@ JAVA_INT com_codename1_backend_ServerSocket_bindImpl___java_lang_String_int_int_
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons((unsigned short)port);
-    if(h == NULL || h[0] == 0 || strcmp(h, "0.0.0.0") == 0) {
-        addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    } else if(inet_pton(AF_INET, h, &addr.sin_addr) != 1) {
-        close(fd);
-        return -1;
-    }
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
     if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
         close(fd);
         return -1;
@@ -288,12 +319,18 @@ JAVA_INT com_codename1_backend_ServerSocket_boundPortImpl___int_R_int(CODENAME_O
     (void)fd;
     return -1;
 #else
-    struct sockaddr_in addr;
+    /* sockaddr_storage, because the bind above may have chosen IPv6 and the port
+       does not sit at the same offset in the two families -- reading a v6 socket
+       through sockaddr_in reports a number that was never the port. */
+    struct sockaddr_storage addr;
     socklen_t len = sizeof(addr);
     if(fd < 0 || getsockname(fd, (struct sockaddr*)&addr, &len) != 0) {
         return -1;
     }
-    return (JAVA_INT)ntohs(addr.sin_port);
+    if(addr.ss_family == AF_INET6) {
+        return (JAVA_INT)ntohs(((struct sockaddr_in6*)&addr)->sin6_port);
+    }
+    return (JAVA_INT)ntohs(((struct sockaddr_in*)&addr)->sin_port);
 #endif
 }
 

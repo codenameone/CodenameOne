@@ -245,8 +245,20 @@ public final class HttpServer {
                 Map out = new LinkedHashMap();
                 for(int iter = 0 ; iter < headerCount ; iter++) {
                     int base = iter * 4;
-                    out.put(lowerCaseString(raw, slices[base], slices[base + 1]),
-                            asciiString(raw, slices[base + 2], slices[base + 3]));
+                    String name = lowerCaseString(raw, slices[base], slices[base + 1]);
+                    String value = asciiString(raw, slices[base + 2], slices[base + 3]);
+                    Object existing = out.get(name);
+                    if(existing == null) {
+                        out.put(name, value);
+                    } else {
+                        // Combined in arrival order, as the HTTP/2 path does. Replacing
+                        // meant getHeader() answered with the FIRST occurrence while
+                        // this map held the last, so a cookie split across two fields
+                        // was visible through one API and gone from the other -- and a
+                        // generated dispatcher reads this map.
+                        out.put(name, String.valueOf(existing)
+                                + ("cookie".equals(name) ? "; " : ",") + value);
+                    }
                 }
                 headers = out;
             }
@@ -443,6 +455,12 @@ public final class HttpServer {
     public interface Handler {
         Response handle(Request request) throws Exception;
     }
+
+    /**
+     * How long stop() waits, after closing the sockets, for workers to unwind before
+     * it releases any session they might still have been inside.
+     */
+    private static final int SESSION_RELEASE_GRACE_MILLIS = 2000;
 
     private static final int MAX_HEADER_BYTES = 64 * 1024;
     private static final int MAX_BODY_BYTES = 8 * 1024 * 1024;
@@ -672,6 +690,19 @@ public final class HttpServer {
     private boolean fullyStopped;
     private final java.util.concurrent.atomic.AtomicInteger openConnections =
             new java.util.concurrent.atomic.AtomicInteger();
+    /**
+     * Requests actually being served, as opposed to connections being held.
+     *
+     * activeRequests counts a worker's whole stay on a connection, which the pool
+     * sizing below genuinely wants -- but in virtual-thread mode a worker owns a
+     * keep-alive connection for its lifetime and parks between requests, so that
+     * number stays positive while the client sits idle. Reported as saturation it is
+     * wrong, and stop() waiting on it meant one idle keep-alive client held shutdown
+     * for the entire drain window.
+     */
+    private final java.util.concurrent.atomic.AtomicInteger inFlightRequests =
+            new java.util.concurrent.atomic.AtomicInteger();
+
     private final java.util.concurrent.atomic.AtomicInteger activeRequests =
             new java.util.concurrent.atomic.AtomicInteger();
     /**
@@ -887,7 +918,7 @@ public final class HttpServer {
 
     /** Requests being handled right now. This is what saturation looks like. */
     public int getActiveRequests() {
-        return activeRequests.get();
+        return inFlightRequests.get();
     }
 
     /**
@@ -900,7 +931,7 @@ public final class HttpServer {
         out.put("status", running ? "ok" : "draining");
         out.put("uptimeSeconds", new Long((System.currentTimeMillis() - startedAt) / 1000L));
         out.put("openConnections", new Integer(openConnections.get()));
-        out.put("activeRequests", new Integer(activeRequests.get()));
+        out.put("activeRequests", new Integer(inFlightRequests.get()));
         out.put("requestsServed", new Long(servedTotal()));
         out.put("connectionsAccepted", new Long(connectionsAccepted.get()));
         out.put("connectionsRefused", new Long(connectionsRefused.get()));
@@ -954,7 +985,7 @@ public final class HttpServer {
         // Waits on requests IN FLIGHT, not on open connections: an idle keep-alive
         // connection has nothing to finish and would otherwise hold the shutdown
         // open for the whole window for no reason.
-        while(System.currentTimeMillis() < deadline && activeRequests.get() > 0) {
+        while(System.currentTimeMillis() < deadline && inFlightRequests.get() > 0) {
             try {
                 Thread.sleep(20);
             } catch (InterruptedException err) {
@@ -963,16 +994,39 @@ public final class HttpServer {
             }
         }
         // Whatever is still open at the deadline is an idle keep-alive connection or
-        // a request that overran; both get closed rather than held forever.
+        // a request that overran; both have to be closed rather than held forever.
         //
-        // Through drop(), which is the one place that closes a served connection: it
-        // releases the HTTP/2 session, the TLS session and the descriptor together,
-        // and keeps the open count honest. Closing only the session objects -- which
-        // is what this did -- left every plaintext socket open and freed a session a
-        // worker past the deadline could still be inside.
+        // The DESCRIPTOR first, and only the descriptor. A worker past the deadline
+        // may be sitting inside SSL_read or nghttp2 on this very connection, and
+        // freeing the session under it is a native use-after-free -- a crash during
+        // shutdown, which is exactly when the remaining work is least recoverable.
+        // Closing the socket instead unblocks that worker: its next read fails, and
+        // it takes its own connection down through drop(), which frees the session on
+        // the thread that was using it.
         java.util.Iterator live = new java.util.ArrayList(liveConnections.keySet()).iterator();
         while(live.hasNext()) {
-            drop(((Integer)live.next()).intValue());
+            ServerSocket.closeFd(((Integer)live.next()).intValue());
+        }
+        // Then give those workers a moment to notice and unwind. Freeing a session
+        // while one is still inside it is the thing being avoided, so the sweep below
+        // waits for the count to reach zero rather than assuming it has.
+        long freeBy = System.currentTimeMillis() + SESSION_RELEASE_GRACE_MILLIS;
+        while(System.currentTimeMillis() < freeBy && inFlightRequests.get() > 0) {
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        // Anything still registered had no worker to take it down -- an idle
+        // connection in reactor mode, where nothing runs for it once its descriptor
+        // is gone. With no request in flight there is no one left to race, so these
+        // are safe to release here, and leaving them would leak a native session per
+        // connection for the life of the process.
+        java.util.Iterator stranded = new java.util.ArrayList(liveConnections.keySet()).iterator();
+        while(stranded.hasNext()) {
+            drop(((Integer)stranded.next()).intValue());
         }
         // Belt and braces: a session recorded for a descriptor that was already
         // dropped would otherwise never be freed.
@@ -2062,6 +2116,48 @@ public final class HttpServer {
         }
 
         /**
+         * Reads until `needed` bytes are buffered, into ONE array sized for them.
+         *
+         * fill() grows by exactly what it just read, so a body arriving in
+         * scratch-sized pieces reallocated and recopied everything once per read:
+         * an 8MB upload over an 8KB buffer is about a thousand resizes and some 4GB
+         * of copying before the handler is even called, which a few concurrent
+         * uploads turn into the whole machine.
+         *
+         * When the total is known -- and for Content-Length it is -- the destination
+         * can be allocated once and read into directly. That is one copy of what was
+         * already buffered and none after it.
+         *
+         * The invariant the rest of this class depends on is kept: the array is
+         * exactly `needed` long and every byte of it is valid, so `buffer.length`
+         * still means "bytes readable" and no cached extent is introduced. See the
+         * class comment for why a `limit` field is not the answer here.
+         */
+        boolean fillTo(int needed) throws IOException {
+            int keep = available();
+            if(keep >= needed) {
+                return true;
+            }
+            byte[] grown = new byte[needed];
+            System.arraycopy(buffer, pos, grown, 0, keep);
+            int at = keep;
+            while(at < needed) {
+                // Exactly the shortfall, so a pipelined request behind this body stays
+                // in the socket for the next parse rather than being read into it.
+                int n = readFrom(fd, session, grown, at, needed - at);
+                if(n <= 0) {
+                    closedByPeer = true;
+                    return false;
+                }
+                at += n;
+            }
+            buffer = grown;
+            pos = 0;
+            borrowed = false;
+            return true;
+        }
+
+        /**
          * Give up the shared thread buffer before this connection can be taken by a
          * different worker.
          *
@@ -2208,26 +2304,33 @@ public final class HttpServer {
             // Methods are case-sensitive, so this is an exact comparison.
             boolean headOnly = "HEAD".equals(request.getMethod());
             Response response;
+            // From here to the end of the write is the request being in flight. Not
+            // the whole of serveOne: that is the CONNECTION, which outlives this.
+            inFlightRequests.incrementAndGet();
             try {
-                response = handler.handle(request);
-                if(response == null) {
-                    response = Response.text(404, "not found");
+                try {
+                    response = handler.handle(request);
+                    if(response == null) {
+                        response = Response.text(404, "not found");
+                    }
+                } catch (Exception err) {
+                    System.err.println("handler failed: " + err);
+                    response = Response.text(500, "internal error");
                 }
-            } catch (Exception err) {
-                System.err.println("handler failed: " + err);
-                response = Response.text(500, "internal error");
-            }
-            try {
-                writeResponse(conn, fd, session, response, keepAlive, headOnly);
-                if(conn.stripe >= 0) {
-                    servedStripes[conn.stripe]++;      // single writer: this host
-                } else {
-                    requestsServed.incrementAndGet();  // reactor mode, no stripes
+                try {
+                    writeResponse(conn, fd, session, response, keepAlive, headOnly);
+                    if(conn.stripe >= 0) {
+                        servedStripes[conn.stripe]++;      // single writer: this host
+                    } else {
+                        requestsServed.incrementAndGet();  // reactor mode, no stripes
+                    }
+                } catch (Exception err) {
+                    trace("fd=" + fd + " write failed: " + err);
+                    drop(fd);
+                    return;
                 }
-            } catch (Exception err) {
-                trace("fd=" + fd + " write failed: " + err);
-                drop(fd);
-                return;
+            } finally {
+                inFlightRequests.decrementAndGet();
             }
             if(!keepAlive) {
                 drop(fd);
@@ -2426,6 +2529,7 @@ public final class HttpServer {
                 Request request = new Request(stream.getMethod(), stream.getPath(),
                         "HTTP/2", headers, stream.getBodyAsString());
                 Response response;
+                inFlightRequests.incrementAndGet();
                 try {
                     response = handler.handle(request);
                     if(response == null) {
@@ -2434,6 +2538,10 @@ public final class HttpServer {
                 } catch (Exception err) {
                     System.err.println("handler failed: " + err);
                     response = Response.text(500, "internal error");
+                } finally {
+                    // Decremented once the handler is done. The HTTP/2 write is
+                    // nghttp2's to schedule from here, not this thread's to finish.
+                    inFlightRequests.decrementAndGet();
                 }
                 boolean headOnly = "HEAD".equals(stream.getMethod());
                 List extra = new java.util.ArrayList();
@@ -2907,10 +3015,8 @@ public final class HttpServer {
             if(declaredLength > MAX_BODY_BYTES) {
                 throw new ProtocolException(413, "request body too large");
             }
-            while(conn.available() < declaredLength) {
-                if(!conn.fill(scratch)) {
-                    return null;
-                }
+            if(!conn.fillTo(declaredLength)) {
+                return null;
             }
             if(declaredLength > 0) {
                 body = new String(conn.buffer, conn.pos, declaredLength, "UTF-8");
@@ -2998,7 +3104,13 @@ public final class HttpServer {
                     }
                 }
             }
-            if(body.size() + size > MAX_BODY_BYTES) {
+            // Subtraction, not addition: body.size() + size overflows to a negative
+            // for a chunk size near Integer.MAX_VALUE and sails past the cap, after
+            // which the loop below grows the buffer toward the declared multi-gigabyte
+            // chunk. Four bytes and a "7ffffffd" header was enough for an
+            // unauthenticated client to take the process out. Both sides here are
+            // non-negative, so there is nothing left to overflow.
+            if(size > MAX_BODY_BYTES - body.size()) {
                 throw new ProtocolException(413, "chunked body too large");
             }
             // The chunk and its trailing CRLF must both be present before it is taken.
