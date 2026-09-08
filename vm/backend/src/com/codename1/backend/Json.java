@@ -545,6 +545,14 @@ public final class Json {
             out.append(']');
             return;
         }
+        if(value instanceof byte[]) {
+            // As base64url, which is what the byte-sink writer does. The two have to
+            // agree: HTTP/1.1 writes through the sink and HTTP/2 through this one, so
+            // a disagreement means a BLOB comes back readable over one protocol and
+            // as "[B@1a2b3c" over the other, from the same handler.
+            writeString(out, Base64Url.encode((byte[])value));
+            return;
+        }
         if(value instanceof Collection) {
             // As above: the two writers have to agree on what a Set is.
             out.append('[');

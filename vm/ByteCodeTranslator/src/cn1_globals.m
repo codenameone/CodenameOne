@@ -2119,13 +2119,33 @@ static long cn1SatbTake(JAVA_OBJECT** out) {
         if(ns != 0) {
             gcSatbScratch = ns;
             gcSatbScratchCap = nc;
+        } else {
+            // realloc failed and left the OLD, smaller buffer and capacity in place.
+            // Copying n entries into it writes past the allocation, and does so with
+            // the collector running over the same heap. Take only what fits.
+            n = gcSatbScratchCap;
         }
     }
-    if(n > 0 && gcSatbScratch != 0) memcpy(gcSatbScratch, gcSatbStack, (size_t)n * sizeof(JAVA_OBJECT));
-    gcSatbTop = 0;
+    if(n > 0 && gcSatbScratch != 0) {
+        memcpy(gcSatbScratch, gcSatbStack, (size_t)n * sizeof(JAVA_OBJECT));
+        // Whatever did not fit STAYS in the log for the next take. A dropped SATB
+        // entry is a reference the mark never sees, so the object it named is swept
+        // while it is still live -- a use-after-free one collection later and
+        // nowhere near here. Holding the tail costs one more take and cannot do that.
+        {
+            long left = gcSatbTop - n;
+            if(left > 0) {
+                memmove(gcSatbStack, gcSatbStack + n, (size_t)left * sizeof(JAVA_OBJECT));
+            }
+            gcSatbTop = left;
+        }
+    } else {
+        // Nothing could be staged; leave the log intact rather than clearing it.
+        n = 0;
+    }
     pthread_mutex_unlock(&gcSatbMutex);
     *out = gcSatbScratch;
-    return (gcSatbScratch != 0) ? n : 0;
+    return n;
 }
 
 /*

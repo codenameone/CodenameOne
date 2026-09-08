@@ -82,6 +82,13 @@ public final class Db {
                 Statement statement = c.createStatement();
                 try {
                     statement.execute(sql);
+                    // Also here: an INSERT with literal values is still an INSERT, and
+                    // the native implementation answers lastInsertRowid for it. Without
+                    // this, the two backends disagree and the JavaSE one reports the id
+                    // of some earlier parameterised insert. captureInsertId only assigns
+                    // when the driver actually returns a key, so a PRAGMA or a CREATE
+                    // leaves the previous value alone.
+                    captureInsertId(statement);
                     int updated = statement.getUpdateCount();
                     return updated < 0 ? 0 : updated;
                 } finally {

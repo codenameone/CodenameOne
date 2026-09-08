@@ -623,7 +623,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        for(int i = 0 ; i < pairs.length ; i++) {\n");
         sb.append("            String pair = pairs[i].trim();\n");
         sb.append("            int eq = pair.indexOf('=');\n");
-        sb.append("            if(eq > 0 && pair.substring(0, eq).trim().equals(name)) return decodeQuery(pair.substring(eq + 1));\n");
+        sb.append("            if(eq > 0 && pair.substring(0, eq).trim().equals(name)) return decodeCookie(pair.substring(eq + 1));\n");
         sb.append("        }\n");
         sb.append("        return null;\n");
         sb.append("    }\n\n");
@@ -647,8 +647,14 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         // client never sent.
         sb.append("    /** A path segment. '+' is literal here, per RFC 3986. */\n");
         sb.append("    private static String decodePath(String value) { return decode(value, false); }\n\n");
-        sb.append("    /** A query or cookie value, which is form-encoded: '+' is a space. */\n");
+        sb.append("    /** A query value, which is form-encoded: '+' is a space. */\n");
         sb.append("    private static String decodeQuery(String value) { return decode(value, true); }\n\n");
+        sb.append("    /**\n");
+        sb.append("     * A cookie value. Cookie syntax has no plus-to-space rule, and '+' is\n");
+        sb.append("     * ordinary in the base64 that session tokens are made of, so folding it\n");
+        sb.append("     * to a space corrupts the token and the session with it.\n");
+        sb.append("     */\n");
+        sb.append("    private static String decodeCookie(String value) { return decode(value, false); }\n\n");
         sb.append("    private static String decode(String value, boolean plusIsSpace) {\n");
         sb.append("        if(value == null) return null;\n");
         sb.append("        if(value.indexOf('%') < 0 && !(plusIsSpace && value.indexOf('+') >= 0)) return value;\n");
