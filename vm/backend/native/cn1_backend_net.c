@@ -196,6 +196,21 @@ JAVA_INT com_codename1_backend_Tcp_readImpl___long_byte_1ARRAY_int_int_R_int(COD
         return -2;
     }
     data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    /*
+     * This blocks, and on a virtual thread it blocks the HOST.
+     *
+     * CN1_YIELD_THREAD releases the thread to the COLLECTOR; it is not a park. The
+     * server's own readImpl parks on EAGAIN because its descriptor is registered in
+     * a host's poller, which is what resumes it. An outbound socket is in no poller,
+     * so there is nothing to wake it and yielding here would spin.
+     *
+     * The consequence is real: with one host per core, as many concurrent slow
+     * database reads as there are cores occupy every host, and unrelated HTTP
+     * connections stop being served. Making this park means giving outbound
+     * descriptors the same poller registration inbound ones have -- a scheduler
+     * feature, not a local change -- and until that exists the guide says so under
+     * "Limits worth knowing" rather than the mode quietly not holding.
+     */
     CN1_YIELD_THREAD;
     n = (long)recv(fd, (char*)&data[offset], (size_t)length, 0);
     CN1_RESUME_THREAD;

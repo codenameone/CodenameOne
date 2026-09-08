@@ -335,6 +335,18 @@ no TLS, and what it does need is exactly what a translated binary is good at.
   backend's class library instead of reusing the jar Maven built, which is what
   keeps a server off classes the runtime doesn't have, and is also why Kotlin is
   not wired into this path yet even though the client ports support it.
+* A virtual thread parks on the socket it's SERVING, and not on any other. An
+  outbound read -- a database query, an HTTP call to another service -- blocks the
+  host thread that's running it, because only the server's own descriptors are
+  registered with a poller that can wake them. With one host per core, that many
+  concurrent slow outbound calls occupy every host and other connections wait.
+  Servers that mostly compute and serve get the full benefit; servers whose
+  handlers spend their time waiting on a database should size for that, or run the
+  thread pool with `CN1_HTTP_POLL_MODE=0`.
+* TLS runs on the thread pool, whatever the poll mode says. The TLS layer can't
+  park a read yet, and a blocking read on a virtual thread holds its host for the
+  duration, so one idle TLS client per core would occupy every one of them. The
+  server says so at startup when it makes that choice.
 * Native builds target Linux. Development happens anywhere a JVM runs.
 
 The reasons to choose this are cold start, footprint, deployment shape, and one

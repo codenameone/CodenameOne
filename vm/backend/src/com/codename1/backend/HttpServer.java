@@ -755,6 +755,24 @@ public final class HttpServer {
     /** How many requests may be in flight at once; the pool size. */
     private final int workerCount;
 
+    /**
+     * Whether THIS server runs on virtual threads, which is not the same question as
+     * whether the build supports them.
+     *
+     * A TLS server does not, however POLL_MODE is set. Tls.readImpl maps
+     * SSL_ERROR_WANT_READ to a hard error rather than parking, so a TLS descriptor
+     * has to stay blocking -- and a blocking descriptor on a virtual thread holds
+     * its host OS thread for the whole read. With one host per core, one idle TLS
+     * client per core occupies every host and unrelated connections stop being
+     * served. A thread pool has a worse ceiling and an honest one; virtual threads
+     * here have a better ceiling that a single slow client removes.
+     *
+     * So TLS falls back to the pool until the TLS layer can park. This is decided
+     * once, here, rather than tested at each use, because half a server in each mode
+     * is neither.
+     */
+    private final boolean virtualThreads;
+
     private HttpServer(ServerSocket listener, Reactor reactor, ExecutorService workers,
                        int workerCount, Handler handler, Tls tls) {
         this.listener = listener;
@@ -763,6 +781,7 @@ public final class HttpServer {
         this.workerCount = workerCount;
         this.handler = handler;
         this.tls = tls;
+        this.virtualThreads = VIRTUAL_THREADS && tls == null;
     }
 
     /**
@@ -849,10 +868,17 @@ public final class HttpServer {
         // size was the only variable -- WORKERS=64 segfaulted 2 runs in 6 and
         // WORKERS=4 survived 6 of 6. Throughput was unaffected when it did not
         // crash (265k either way), so this buys robustness rather than speed.
+        boolean useVirtualThreads = VIRTUAL_THREADS && tls == null;
+        if(VIRTUAL_THREADS && tls != null) {
+            System.out.println("TLS is configured, so this server runs on a thread "
+                    + "pool rather than virtual threads: the TLS layer cannot park a "
+                    + "read yet, and a blocking read on a virtual thread holds its "
+                    + "host for the duration.");
+        }
         final HttpServer server = new HttpServer(listener, reactor,
-                VIRTUAL_THREADS ? null : Executors.newFixedThreadPool(workerCount),
+                useVirtualThreads ? null : Executors.newFixedThreadPool(workerCount),
                 workerCount, handler, tls);
-        if(VIRTUAL_THREADS) {
+        if(useVirtualThreads) {
             ACTIVE_SERVER = server;
             // A poller PER HOST, because affinity is enforced by the poller: a
             // descriptor registered in one host's set can only ever be reported
@@ -1528,7 +1554,7 @@ public final class HttpServer {
      * descriptor table, so that table stays single-writer.
      */
     private void armConnection(int fd, boolean fresh) throws IOException {
-        if(!VIRTUAL_THREADS) {
+        if(!virtualThreads) {
             reactor.add(fd, CONN_EVENTS);
             return;
         }
@@ -2229,7 +2255,7 @@ public final class HttpServer {
             // SSL_ERROR_WANT_READ to a hard error rather than parking, so a
             // non-blocking descriptor would break TLS reads outright. Giving the TLS
             // layer a park path is the real fix and is not this change.
-            boolean parking = VIRTUAL_THREADS && tls == null;
+            boolean parking = virtualThreads;
             if(!parking) {
                 ServerSocket.setBlocking(fd, true);
             }
@@ -2260,7 +2286,7 @@ public final class HttpServer {
         Conn conn = new Conn(fd, session);
         // Which stripe this connection's requests count into. Resolved once here
         // rather than per request: the owner cannot change for a live descriptor.
-        if(VIRTUAL_THREADS && fd >= 0 && fd < vtOwnerByFd.length && servedStripes.length > 0) {
+        if(virtualThreads && fd >= 0 && fd < vtOwnerByFd.length && servedStripes.length > 0) {
             int host = vtOwnerByFd[fd];
             if(host >= 0 && host * SERVED_STRIPE_STRIDE < servedStripes.length) {
                 conn.stripe = host * SERVED_STRIPE_STRIDE;
@@ -2372,7 +2398,7 @@ public final class HttpServer {
             // 164307 requests at four connections, and it made every earlier
             // virtual-thread measurement an underestimate.
             if(++served >= KEEPALIVE_BURST_LIMIT) {
-                if(VIRTUAL_THREADS) {
+                if(virtualThreads) {
                     // Step aside rather than close. A virtual thread under a load
                     // generator never runs out of bytes, so it never parks on its
                     // own and would hold this host thread for as long as the
@@ -2393,7 +2419,7 @@ public final class HttpServer {
             // the host thread immediately, so holding the connection costs no one
             // anything and handing it back would only add a poller round trip per
             // request.
-            if(!VIRTUAL_THREADS && pendingWork.get() > 0
+            if(!virtualThreads && pendingWork.get() > 0
                     && workerCount - activeRequests.get() <= pendingWork.get()) {
                 // Hand back only when something is actually waiting AND there are
                 // not enough idle workers for it -- the case where holding this
@@ -2436,8 +2462,8 @@ public final class HttpServer {
             // client cares to take. That is not a blocked thread, it is a parked
             // virtual thread costing a stack and nothing else, which is exactly
             // the resource an idle keep-alive connection should cost.
-            int linger = VIRTUAL_THREADS ? -1 : KEEPALIVE_LINGER_MILLIS;
-            if(VIRTUAL_THREADS || linger > 0) {
+            int linger = virtualThreads ? -1 : KEEPALIVE_LINGER_MILLIS;
+            if(virtualThreads || linger > 0) {
                 boolean more;
                 try {
                     // A readiness wait rather than a timed read: it is one syscall
@@ -2492,7 +2518,7 @@ public final class HttpServer {
         try {
             // Back to the poller for the next request on this connection. Both
             // epoll_ctl and kevent are safe to call from this thread.
-            if(VIRTUAL_THREADS) {
+            if(virtualThreads) {
                 // Reached only when the connection itself is finished: a virtual
                 // thread does not come back here to wait, it parks where it waits.
                 // Re-arming now would hand the poller a descriptor nobody owns.
@@ -2578,7 +2604,10 @@ public final class HttpServer {
                             String text = String.valueOf(value);
                             // The native side splits this block on '\n', so a newline
                             // here is another field exactly as it is over HTTP/1.1.
-                            if(isHeaderSafe(name) && isHeaderSafe(text)) {
+                            if(isServerOwnedHeader(name)) {
+                                System.err.println("dropped a response header the "
+                                        + "server owns: " + sanitizeForLog(name));
+                            } else if(isHeaderSafe(name) && isHeaderSafe(text)) {
                                 extra.add(name + ": " + text);
                             } else {
                                 System.err.println("dropped a response header containing "
@@ -2692,6 +2721,28 @@ public final class HttpServer {
         } finally {
             StaticFiles.closeFile(response.fileFd);
         }
+    }
+
+    /**
+     * True for the fields whose values this server decides.
+     *
+     * A handler that sets Content-Length or Transfer-Encoding through extraHeaders
+     * gets it serialised AFTER the server's own, so the response carries two
+     * answers to "where does the body end". A client and a proxy may pick
+     * different ones, which desynchronises everything after it on that connection
+     * -- request smuggling, and cache poisoning when the map came from the request.
+     * Connection is the same: the server decides keep-alive from the request and
+     * the framing follows from that.
+     *
+     * Dropped rather than merged. There is no sensible merge of two lengths, and a
+     * handler wanting a different body should return a different body.
+     */
+    private static boolean isServerOwnedHeader(String name) {
+        return name.equalsIgnoreCase("content-length")
+                || name.equalsIgnoreCase("transfer-encoding")
+                || name.equalsIgnoreCase("connection")
+                || name.equalsIgnoreCase("content-type")
+                || name.equalsIgnoreCase("date");
     }
 
     /**
@@ -3365,7 +3416,10 @@ public final class HttpServer {
                     // response splitting, and it is a cache-poisoning primitive.
                     // Dropped rather than escaped: there is no correct escaping, and a
                     // header the handler could not have meant is not worth sending.
-                    if(isHeaderSafe(name) && isHeaderSafe(text)) {
+                    if(isServerOwnedHeader(name)) {
+                        System.err.println("dropped a response header the server owns: "
+                                + sanitizeForLog(name));
+                    } else if(isHeaderSafe(name) && isHeaderSafe(text)) {
                         conn.put("\r\n");
                         conn.put(name);
                         conn.put(": ");
