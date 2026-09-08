@@ -4158,6 +4158,13 @@ void codenameOneGCMark() {
                 // Draining is the strictly better of the two -- it loses an object only if
                 // a mutator moves a reference out of one specific object during one
                 // specific scan, where not draining loses it with certainty.
+                // RETAIN WHILE THE BARRIER IS STILL UP. Retention marks referents that
+                // were white and gcMarkDrain then traces them, so doing it after the clear
+                // below would leave those objects grey with nothing watching -- the same
+                // hazard the trial-clear comment describes, and the same one the drop
+                // recovery was corrected for. Everything known at this point is covered
+                // here, under the barrier.
+                cn1GcRetainAllReferences(d);
                 __atomic_store_n(&gcSatbActive, 0, __ATOMIC_SEQ_CST);
                 cn1SatbBulkQuiesce();
                 {
@@ -4170,27 +4177,22 @@ void codenameOneGCMark() {
                         gcMarkDrain(d);
                     }
                 }
-                // REFERENCES ONE LAST TIME, and RETAINED rather than cleared.
+                // ANYTHING THAT LAST DRAIN DISCOVERED, retained too.
                 //
-                // The drains above can newly mark an object whose graph contains a
-                // Reference, whose mark function then appends a discovery after the only
-                // reference pass this cycle has run -- so leaving here without doing
-                // anything would let the sweep free a referent a reachable Reference still
-                // points at.
+                // The drain above can newly mark an object whose graph holds a Reference,
+                // whose mark function then registers a discovery after the retention that
+                // ran under the barrier. Retaining is all that is left to do with it:
+                // clearing would need a liveness decision, and the barrier is down.
                 //
-                // An earlier revision called cn1GcProcessReferences here and justified it
-                // by saying the barrier was already down so a racing get() could not log.
-                // THAT WAS WRONG: cn1SatbBulkBegin answers gcSatbActive OR
-                // gcSatbTerminating, and gcSatbTerminating stays raised until after this
-                // loop, so a getter here enqueues successfully -- into a log this path then
-                // never takes again. Clearing on that basis could free an object a getter
-                // was in the middle of being handed.
-                //
-                // Retaining needs none of that reasoning. Nothing is cleared, so nothing
-                // can dangle however the race falls; the cost is one cycle of reclaim on a
-                // path reached only when a mutator has stormed the barrier past
-                // CN1_SATB_MAX_REOPENS, which measures 0-4 against a cap of 32.
-                cn1GcRetainAllReferences(d);
+                // This last call does trace with the barrier lowered, and that is the
+                // weaker invariant the cap already documents and already relies on for the
+                // gcMarkDrain immediately above -- it is not a new exposure, and it is
+                // bounded by a path measured at 0-4 reopens against a cap of 32. The
+                // retention that matters happened before the barrier came down.
+                if(cn1RefDiscoveredTop != 0
+                   || atomic_load_explicit(&cn1RefEmergencyTop, memory_order_relaxed) != 0) {
+                    cn1GcRetainAllReferences(d);
+                }
                 break;
             }
         }
