@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.flutter.widgets;
 
 import com.codename1.flutter.Element;
@@ -40,6 +63,63 @@ public abstract class ScrollRenderElement extends RenderElement {
      * the current configuration), or null for an empty scrollable.
      */
     protected abstract Widget buildContent();
+
+    /**
+     * The content, padded the way Flutter pads a scroll view that was given no
+     * padding of its own.
+     *
+     * <p>{@code BoxScrollView} does not simply leave the padding null: it takes
+     * the ambient MediaQuery padding along its OWN axis, applies that, and
+     * removes it for everything inside so it is not counted twice. That is how a
+     * full-screen list keeps its first item out from under the display cutout
+     * without anyone writing a SafeArea, and the gallery's home list relies on
+     * it entirely -- it has no padding, no SafeArea and no app bar, and without
+     * this its title sat 133 device pixels too high, under the island.</p>
+     *
+     * <p>A list that DOES name its own padding keeps it, and a list under an app
+     * bar sees nothing to add, because the Scaffold has already taken the top
+     * padding off its body.</p>
+     */
+    protected final Widget padForScrollAxis(Widget content,
+            com.codename1.flutter.EdgeInsets explicit) {
+        if (explicit != null) {
+            return padded(explicit, content);
+        }
+        if (content == null) {
+            return null;
+        }
+        com.codename1.flutter.EdgeInsets media;
+        try {
+            media = com.codename1.flutter.MediaQuery.paddingOf(this);
+        } catch (Throwable noMediaQuery) {
+            return content;
+        }
+        if (media == null) {
+            return content;
+        }
+        boolean across = horizontal();
+        double left = across ? media.left() : 0;
+        double right = across ? media.right() : 0;
+        double top = across ? 0 : media.top();
+        double bottom = across ? 0 : media.bottom();
+        if (left == 0 && right == 0 && top == 0 && bottom == 0) {
+            return content;
+        }
+        Widget inner = com.codename1.flutter.MediaQuery.removePadding(this,
+                across ? Boolean.TRUE : Boolean.FALSE,
+                across ? Boolean.FALSE : Boolean.TRUE,
+                across ? Boolean.TRUE : Boolean.FALSE,
+                across ? Boolean.FALSE : Boolean.TRUE,
+                content);
+        return padded(com.codename1.flutter.EdgeInsets.only(left, top, right, bottom), inner);
+    }
+
+    private static Widget padded(com.codename1.flutter.EdgeInsets insets, Widget child) {
+        Padding p = new Padding();
+        p.padding(insets);
+        p.child(child);
+        return p;
+    }
 
     /**
      * When true the scrollable sizes its main axis to the content instead of

@@ -312,11 +312,25 @@ public class ScaffoldRenderElement extends RenderElement {
      */
     private com.codename1.flutter.Widget bodyWidget() {
         com.codename1.flutter.Widget body = scaffold().getBody();
-        if (body == null || scaffold().getAppBar() == null) {
+        if (body == null) {
+            return body;
+        }
+        // Flutter's own rule for the body slot: the top padding goes when there
+        // is an app bar to stand in for it, and the BOTTOM padding goes when
+        // there is a bottom bar or a footer standing in for that. What is left
+        // reaches the body, and a scroll view inside it applies it along its own
+        // axis -- which is how a full-screen list keeps clear of the display
+        // cutout. Leaving the bottom padding in place under a bottom bar counted
+        // it twice and lengthened every such list by 34 logical pixels.
+        boolean removeTop = scaffold().getAppBar() != null;
+        boolean removeBottom = scaffold().getBottomNavigationBar() != null
+                || scaffold().getPersistentFooterButtons() != null;
+        if (!removeTop && !removeBottom) {
             return body;
         }
         return com.codename1.flutter.MediaQuery.removePadding(this, Boolean.FALSE,
-                Boolean.TRUE, Boolean.FALSE, Boolean.FALSE, body);
+                removeTop ? Boolean.TRUE : Boolean.FALSE, Boolean.FALSE,
+                removeBottom ? Boolean.TRUE : Boolean.FALSE, body);
     }
 
     private void syncDrawer() {
