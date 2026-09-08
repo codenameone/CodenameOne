@@ -13,7 +13,7 @@
     <h1 class="post-title cn1-api__title">
       {{- /* abstract and final are API-significant: whether a type can be
              instantiated or subclassed was not shown anywhere. */ -}}
-      <span class="cn1-api__kind">{{ with $j.modifiers }}{{ . }} {{ end }}{{ $j.kind }}</span>
+      <span class="cn1-api__kind">{{ with $j.modifiers }}{{ . }} {{ end }}{{ $j.keyword | default $j.kind }}</span>
       {{ $j.simple }}{{ $j.typeParameters }}
     </h1>
 

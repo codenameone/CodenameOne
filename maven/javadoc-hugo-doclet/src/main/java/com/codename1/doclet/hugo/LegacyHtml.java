@@ -149,7 +149,37 @@ final class LegacyHtml {
         if (next < text.length() && text.charAt(next) == '/') {
             next++;
         }
-        return next < text.length() && Character.isLetter(text.charAt(next));
+        if (next >= text.length() || !Character.isLetter(text.charAt(next))) {
+            return false;
+        }
+        return !opensAnAutolink(text, index);
+    }
+
+    /**
+     * Whether this is a markdown autolink rather than a tag.
+     *
+     * <p>{@code <https://example.com/x>} starts with a letter too, so a check
+     * for "letter after the angle bracket" claimed it and escaped it:
+     * com.codename1.security.Otp documents the key URI format that way and the
+     * page showed the URL as literal angle-bracketed text instead of a link.
+     * CommonMark's rule is a scheme followed by a colon, which is what this
+     * looks for.
+     */
+    private static boolean opensAnAutolink(String text, int index) {
+        int i = index + 1;
+        int start = i;
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            if (c == ':') {
+                return i > start && i - start <= 32;
+            }
+            boolean schemeChar = Character.isLetterOrDigit(c) || c == '+' || c == '.' || c == '-';
+            if (!schemeChar) {
+                return false;
+            }
+            i++;
+        }
+        return false;
     }
 
     /**

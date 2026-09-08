@@ -48,6 +48,7 @@ import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
@@ -211,9 +212,20 @@ public final class HugoDoclet implements Doclet {
         }
     }
 
-    /** Whether an element carries {@code @hidden}, which removes it from the API entirely. */
+    /**
+     * Whether an element carries {@code @hidden}, which removes it from the API
+     * entirely.
+     *
+     * <p>Reads the block tags directly rather than going through
+     * {@link DocReader}. Reading an element there renders its whole comment,
+     * which resolves the links in it -- and this runs during indexing, while the
+     * set of published types is still being filled in. The rendered text is then
+     * cached, so a reference to a type indexed later was frozen as an unlinked
+     * code span: com.codename1.annotations.AppIntent linked [IntentEntity] and
+     * not [IntentParam], purely because of the order the two were reached.
+     */
     private boolean isHidden(Element element) {
-        return docReader != null && docReader.read(element).hidden;
+        return isHiddenByTag(element);
     }
 
     /**
@@ -289,7 +301,11 @@ public final class HugoDoclet implements Doclet {
         api.put("kind", kindOf(type));
         api.put("qualified", type.getQualifiedName().toString());
         api.put("simple", Refs.nestedDisplayName(type));
-        api.put("modifiers", TypeNames.modifiers(type));
+        // "public final enum E" and "public abstract annotation A" are not
+        // declarations Java would accept: final is implicit on an enum and
+        // abstract on an annotation, and the keyword is @interface.
+        api.put("modifiers", TypeNames.declarationModifiers(type));
+        api.put("keyword", keywordOf(type));
         // @Target and @Retention define how an annotation may be used at all, and
         // AppIntent published neither. Only annotations that ask to be documented
         // are shown, which is the rule javadoc follows.
@@ -448,6 +464,17 @@ public final class HugoDoclet implements Doclet {
         return false;
     }
 
+    /** The keyword a declaration of this type would actually use. */
+    private static String keywordOf(TypeElement type) {
+        return switch (type.getKind()) {
+            case INTERFACE -> "interface";
+            case ENUM -> "enum";
+            case ANNOTATION_TYPE -> "@interface";
+            case RECORD -> "record";
+            default -> "class";
+        };
+    }
+
     private String kindOf(TypeElement type) {
         return switch (type.getKind()) {
             case INTERFACE -> "interface";
@@ -469,7 +496,15 @@ public final class HugoDoclet implements Doclet {
                     || !seen.add(element.getQualifiedName().toString())) {
                 break;
             }
-            chain.add(typeNames.reference(current));
+            // A package private implementation class cannot be named by a
+            // consumer and has no page, and the standard doclet leaves it out of
+            // the tree: PoseDetector's hierarchy is Object then PoseDetector, not
+            // Object then AbstractVisionAnalyzer<Pose> then PoseDetector. The
+            // walk still goes through it, so the substitution it carries reaches
+            // the next visible ancestor.
+            if (documented.containsKey(element.getQualifiedName().toString())) {
+                chain.add(typeNames.reference(current));
+            }
             // Step through the mirror rather than the declaration. Asking the
             // element for its superclass answers with the type variables as
             // declared, so the substitution is lost one level up and everything
@@ -611,16 +646,24 @@ public final class HugoDoclet implements Doclet {
                 continue;
             }
             Map<String, Object> row = baseRow(member, doc, owner);
+            // As a member of THIS type, not as declared. A promoted method comes
+            // from a supertype that may bind its type parameters here:
+            // PoseDetector promotes AbstractVisionAnalyzer<T>.process and returns
+            // AsyncResource<Pose>, though PoseDetector declares no T at all.
+            ExecutableType asMember = asMemberOf(owner, member);
             row.put("typeParameters", typeNames.typeParameters(member.getTypeParameters()));
             row.put("returnType", member.getKind() == ElementKind.CONSTRUCTOR
-                    ? null : typeNames.reference(member.getReturnType()));
-            row.put("parameters", parameterRows(member, doc));
+                    ? null
+                    : typeNames.reference(asMember == null
+                            ? member.getReturnType() : asMember.getReturnType()));
+            row.put("parameters", parameterRows(member, doc, asMember));
             row.put("throws", throwsRows(member, doc));
             // Only what the signature actually declares. The rows above also
             // carry exceptions a comment documented without declaring, which
             // belong in the prose but not in the declaration.
             List<Map<String, Object>> declaredThrows = new ArrayList<>();
-            for (TypeMirror thrown : member.getThrownTypes()) {
+            for (TypeMirror thrown : asMember == null
+                    ? member.getThrownTypes() : asMember.getThrownTypes()) {
                 declaredThrows.add(typeNames.reference(thrown));
             }
             row.put("declaredThrows", declaredThrows);
@@ -673,15 +716,33 @@ public final class HugoDoclet implements Doclet {
         return (declaring == null ? owner : declaring).getSimpleName().toString();
     }
 
-    private List<Map<String, Object>> parameterRows(ExecutableElement member, ElementDoc doc) {
+    /** The member's type as seen through the type whose page this is, or null. */
+    private ExecutableType asMemberOf(TypeElement owner, ExecutableElement member) {
+        if (owner == null || !(owner.asType() instanceof DeclaredType declared)) {
+            return null;
+        }
+        try {
+            return (ExecutableType) types.asMemberOf(declared, member);
+        } catch (IllegalArgumentException notAMember) {
+            // Not reachable from this type after all; the declaration stands.
+            return null;
+        }
+    }
+
+    private List<Map<String, Object>> parameterRows(ExecutableElement member, ElementDoc doc,
+                                                    ExecutableType asMember) {
         List<Map<String, Object>> out = new ArrayList<>();
         List<? extends VariableElement> parameters = member.getParameters();
+        List<? extends TypeMirror> substituted =
+                asMember == null ? null : asMember.getParameterTypes();
         for (int i = 0; i < parameters.size(); i++) {
             VariableElement parameter = parameters.get(i);
             String name = parameter.getSimpleName().toString();
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("name", name);
-            Map<String, Object> reference = typeNames.reference(parameter.asType());
+            TypeMirror parameterType = substituted != null && i < substituted.size()
+                    ? substituted.get(i) : parameter.asType();
+            Map<String, Object> reference = typeNames.reference(parameterType);
             if (member.isVarArgs() && i == parameters.size() - 1) {
                 // The declared type is an array; the source spelling is an ellipsis.
                 String label = String.valueOf(reference.get("label"));

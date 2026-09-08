@@ -113,6 +113,33 @@ final class TypeNames {
         return null;
     }
 
+    /**
+     * The modifiers a declaration would actually write.
+     *
+     * <p>The model reports the implicit ones too, and writing them out produces
+     * source no compiler would take: an enum is always final, an interface and
+     * an annotation are always abstract, and a nested one is always static.
+     */
+    static String declarationModifiers(Element type) {
+        String all = modifiers(type);
+        return switch (type.getKind()) {
+            case ENUM -> strip(all, "final", "static");
+            case INTERFACE, ANNOTATION_TYPE -> strip(all, "abstract", "static");
+            case RECORD -> strip(all, "final", "static");
+            default -> all;
+        };
+    }
+
+    private static String strip(String modifiers, String... implicit) {
+        List<String> kept = new ArrayList<>();
+        for (String word : modifiers.split(" ")) {
+            if (!word.isEmpty() && !List.of(implicit).contains(word)) {
+                kept.add(word);
+            }
+        }
+        return String.join(" ", kept);
+    }
+
     /** The declared modifiers in the order the language writes them. */
     static String modifiers(Element element) {
         List<String> ordered = new ArrayList<>();
@@ -169,8 +196,11 @@ final class TypeNames {
             return text;
         }
         // ![alt](url) and [label](url) both reduce to the text a reader sees.
-        text = text.replaceAll("!\\[([^\\]]*)\\]\\([^)]*\\)", "$1");
-        text = text.replaceAll("\\[([^\\]]*)\\]\\([^)]*\\)", "$1");
+        // Scanned rather than matched with a regex: a member URL ends in a
+        // signature, so its destination contains balanced parentheses and
+        // stopping at the first ")" left one behind -- AdError arrived in the
+        // index as "AdListener.onFailedToLoad(AdError))".
+        text = unlink(text);
         // A reference link written as [Type] names that type.
         text = text.replaceAll("\\[([^\\]]*)\\]", "$1");
         text = text.replace("`", "");
@@ -179,6 +209,48 @@ final class TypeNames {
         // A marker with no partner left is not emphasis, it is a stray asterisk.
         text = text.replace("**", "");
         return text.strip();
+    }
+
+    /** Replaces every [label](destination) with its label, parentheses balanced. */
+    private static String unlink(String text) {
+        StringBuilder out = new StringBuilder(text.length());
+        int i = 0;
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            if (c != '[' && !(c == '!' && i + 1 < text.length() && text.charAt(i + 1) == '[')) {
+                out.append(c);
+                i++;
+                continue;
+            }
+            int open = c == '!' ? i + 1 : i;
+            int close = text.indexOf(']', open);
+            if (close < 0 || close + 1 >= text.length() || text.charAt(close + 1) != '(') {
+                out.append(c);
+                i++;
+                continue;
+            }
+            int depth = 0;
+            int j = close + 1;
+            while (j < text.length()) {
+                if (text.charAt(j) == '(') {
+                    depth++;
+                } else if (text.charAt(j) == ')') {
+                    depth--;
+                    if (depth == 0) {
+                        break;
+                    }
+                }
+                j++;
+            }
+            if (j >= text.length()) {
+                out.append(c);
+                i++;
+                continue;
+            }
+            out.append(text, open + 1, close);
+            i = j + 1;
+        }
+        return out.toString();
     }
 
     /**

@@ -113,6 +113,23 @@ class LegacyHtmlTest {
     }
 
     @Test
+    void leavesAMarkdownAutolinkAlone() {
+        // com.codename1.security.Otp documents the key URI format as an
+        // autolink. It starts with a letter after the angle bracket, so a tag
+        // check that looks only at that claimed it and escaped it, and the page
+        // showed the URL as literal angle-bracketed text.
+        String source = "The format is documented at\n<https://github.com/google/x/wiki/Key-Uri-Format>";
+        assertEquals(source, LegacyHtml.convert(source));
+        assertEquals("<mailto:a@b.example>", LegacyHtml.convert("<mailto:a@b.example>"));
+    }
+
+    @Test
+    void stillEscapesSomethingThatIsReallyATag() {
+        assertTrue(LegacyHtml.convert("see <metadata>;<body>").contains("&lt;metadata"),
+                "a placeholder is still not markup");
+    }
+
+    @Test
     void leavesFencedCodeAlone() {
         String source = "before\n```java\nString s = \"<b>not markup</b>\";\n```\nafter";
         assertEquals(source, LegacyHtml.convert(source));

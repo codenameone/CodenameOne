@@ -71,6 +71,17 @@ class TypeNamesTest {
     }
 
     @Test
+    void keepsBalancedParenthesesInsideALinkDestination() {
+        // A member URL ends in a signature, so its destination holds balanced
+        // parentheses. Stopping at the first one left it behind: AdError arrived
+        // in the search index as "AdListener.onFailedToLoad(AdError))".
+        assertEquals("Raised by AdListener.onFailedToLoad(AdError).",
+                TypeNames.plainSummary(
+                        "Raised by [AdListener.onFailedToLoad(AdError)]"
+                        + "(/javadoc/com/codename1/ads/AdListener/#onFailedToLoad(int))."));
+    }
+
+    @Test
     void leavesArithmeticAloneInAPlainSummary() {
         // WebMercator writes "tileSize * 2^zoom", which is multiplication rather
         // than emphasis and has to survive intact.
