@@ -33,10 +33,23 @@ public class LayoutBuilderElement extends SingleChildRenderElement {
     /// Whether one unbounded pass has already been sat out; see performLayout.
     private boolean skippedUnbounded;
 
-    /// Whether either axis is unbounded, which is what a measurement looks like
-    /// and what a builder must not be allowed to latch onto.
-    private static boolean isUnbounded(BoxConstraints c) {
-        return Double.isInfinite(c.maxWidth()) || Double.isInfinite(c.maxHeight());
+    /**
+     * Whether these constraints are a speculative MEASUREMENT rather than a box
+     * the child will occupy.
+     *
+     * <p>Unbounded on its own is not the signal, and reading it that way is a
+     * bug: a viewport's child is legitimately unbounded along the scroll axis
+     * and Flutter hands it infinity too. What separates the two is the CROSS
+     * axis. A viewport gives its child a tight cross-axis extent -- a vertical
+     * list hands down a tight width -- whereas "how big would you like to be"
+     * is loose in both directions. Sitting out a real viewport pass returns a
+     * zero size that the list then keeps, which silently emptied the reply
+     * study's entire mail list while the diff score went DOWN, because blank
+     * background differs from the reference less than mis-rendered cards do.</p>
+     */
+    private static boolean isSpeculativeMeasurement(BoxConstraints c) {
+        boolean unbounded = Double.isInfinite(c.maxWidth()) || Double.isInfinite(c.maxHeight());
+        return unbounded && !c.hasTightWidth() && !c.hasTightHeight();
     }
 
     private static long builderMs;
@@ -89,7 +102,7 @@ public class LayoutBuilderElement extends SingleChildRenderElement {
         // of the route. Sit out one unbounded pass. If the next one is unbounded
         // too then this really is an unbounded layout -- a viewport's child, say
         // -- and the builder runs against it as Flutter would.
-        if (builtFor == null && !skippedUnbounded && isUnbounded(logical)) {
+        if (builtFor == null && !skippedUnbounded && isSpeculativeMeasurement(logical)) {
             skippedUnbounded = true;
             // The next pass can carry these same constraints, and the layout
             // cache would hand it this placeholder instead of running the

@@ -65,6 +65,24 @@ class LayoutBuilderLatchTest {
     }
 
     @Test
+    void aViewportChildBuildsIMMEDIATELY() {
+        // The regression this pins. A vertical list hands its child a TIGHT
+        // width and an unbounded height, and Flutter runs the builder against
+        // exactly that. Sitting it out returns a zero size the list then keeps,
+        // which emptied the reply study's whole mail list -- while the diff
+        // score went DOWN, because blank background differs from the reference
+        // less than mis-rendered cards do.
+        LayoutBuilder lb = recordingBuilder();
+        RenderHost host = new RenderHost();
+        FlutterUI.mount(lb, host, new BuildOwner());
+        RenderElement r = host.rootRenderElement();
+
+        r.layout(new BoxConstraints(367, 367, 0, Double.POSITIVE_INFINITY));
+        assertEquals(1, seen.size(), "a viewport child must not be sat out");
+        assertEquals(367.0, seen.get(0).maxWidth(), 0.001);
+    }
+
+    @Test
     void aGenuinelyUnboundedLayoutStillBuilds() {
         // A viewport's child really is unbounded and Flutter runs the builder
         // against infinity, so sitting out MUST NOT mean never building.
