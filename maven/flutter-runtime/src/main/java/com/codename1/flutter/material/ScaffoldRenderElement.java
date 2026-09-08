@@ -458,9 +458,27 @@ public class ScaffoldRenderElement extends RenderElement {
             setChildOffset(fabRender,
                     fabX(scaffold().getFloatingActionButtonLocation(), self.width(), fs.width()),
                     fabY(scaffold().getFloatingActionButtonLocation(), self.height(),
-                            fs.height(), navHeight + bottomSafeAreaPx()));
+                            fs.height(), contentInsetPx(navHeight)));
         }
         return self;
+    }
+
+    /**
+     * How far the content stops short of the bottom of the scaffold.
+     *
+     * <p>The bottom strip when there is one, and the display's own bottom
+     * padding when there is not. NOT both: a bottom bar is what holds the
+     * content off the edge, so adding the inset on top double-counts it. That
+     * lifted the reply study's docked button clear of its bar and into the mail
+     * list, where it disappeared behind a card.</p>
+     */
+    private double contentInsetPx(double navHeight) {
+        return contentInset(navHeight, bottomSafeAreaPx());
+    }
+
+    /** @see #contentInsetPx(double) */
+    static double contentInset(double navHeight, double bottomSafeArea) {
+        return navHeight > 0 ? navHeight : bottomSafeArea;
     }
 
     /**

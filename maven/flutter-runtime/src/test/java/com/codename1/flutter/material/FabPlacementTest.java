@@ -86,6 +86,17 @@ class FabPlacementTest {
     }
 
     @Test
+    void theContentStopsAtTheBarWhenThereIsOne() {
+        // A bottom bar is what holds the content off the edge of the display,
+        // so the safe-area inset is NOT added on top of it. Adding both lifted
+        // the reply study's docked button clear of its own bar and into the mail
+        // list, where a card painted over it and it vanished.
+        assertEquals(80.0, ScaffoldRenderElement.contentInset(80, 102), 0.001);
+        // With no bar, the display's own padding is what the content stops at.
+        assertEquals(102.0, ScaffoldRenderElement.contentInset(0, 102), 0.001);
+    }
+
+    @Test
     void aTopFabSitsAtTheTop() {
         assertEquals(Dp.px(16), y(FloatingActionButtonLocation.centerTop), 0.001);
     }
