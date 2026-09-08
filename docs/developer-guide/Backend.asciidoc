@@ -139,8 +139,13 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/D
 ----
 
 There is no JDBC driver involved. SQLite is linked into the binary, and the
-PostgreSQL and MySQL clients speak their wire protocols directly. `DbPool` holds
-connections when more than one request needs the database at a time.
+PostgreSQL and MySQL clients speak their wire protocols directly.
+
+`DbPool` pools SQLite connections, and only those: it opens them from a file
+path. There is no pool for the server engines yet. A `Database` over PostgreSQL
+or MySQL owns one wire connection and doesn't serialize access to it, so two
+handlers sharing one interleave their prepared-statement exchanges on the same
+socket. Give each request its own connection until there is a pool for them.
 
 === Sharing the contract with the app
 

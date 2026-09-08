@@ -365,22 +365,38 @@ public final class S3 {
         }
     }
 
+    /**
+     * Whether THIS bucket has to be addressed path style.
+     *
+     * A dotted name cannot go in front of the endpoint over TLS. The wildcard
+     * certificate for `*.s3.<region>.amazonaws.com` matches exactly one label, so
+     * "photos.example" would need it to match two and every request -- and every
+     * presigned URL handed to a client -- fails hostname verification. The name
+     * is perfectly legal; it is the addressing that cannot carry it, so the
+     * request takes the path form instead of failing.
+     */
+    private boolean usesPathStyle(String bucket) {
+        return pathStyle || (secure && bucket != null && bucket.indexOf('.') >= 0);
+    }
+
     private String hostFor(String bucket) {
-        if(!pathStyle) {
+        if(!usesPathStyle(bucket)) {
             requireDnsBucket(bucket);
+            return bucket + "." + endpoint;
         }
-        return pathStyle ? endpoint : bucket + "." + endpoint;
+        return endpoint;
     }
 
     private String pathFor(String bucket, String key) {
-        if(pathStyle) {
-            // Checked here rather than only in send(): presign() calls hostFor and
-            // pathFor directly, so a check on the send path alone would leave the
-            // two presigning entry points unguarded.
-            requirePathSafeBucket(bucket);
-        }
         String suffix = key == null ? "" : key;
-        return pathStyle ? "/" + bucket + "/" + suffix : "/" + suffix;
+        if(!usesPathStyle(bucket)) {
+            return "/" + suffix;
+        }
+        // Checked here rather than only in send(): presign() calls hostFor and
+        // pathFor directly, so a check on the send path alone would leave the two
+        // presigning entry points unguarded.
+        requirePathSafeBucket(bucket);
+        return "/" + bucket + "/" + suffix;
     }
 
     /**

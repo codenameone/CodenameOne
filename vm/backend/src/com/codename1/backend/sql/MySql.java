@@ -51,7 +51,6 @@ import com.codename1.backend.Tcp;
 public final class MySql {
     /** Capability bits, from the protocol's CLIENT_* set. */
     private static final int CLIENT_LONG_PASSWORD = 0x00000001;
-    private static final int CLIENT_FOUND_ROWS = 0x00000002;
     private static final int CLIENT_LONG_FLAG = 0x00000004;
     private static final int CLIENT_CONNECT_WITH_DB = 0x00000008;
     private static final int CLIENT_LOCAL_FILES = 0x00000080;
@@ -140,7 +139,12 @@ public final class MySql {
             useTls = false;
         }
 
-        int capabilities = CLIENT_LONG_PASSWORD | CLIENT_FOUND_ROWS | CLIENT_LONG_FLAG
+        // Deliberately NOT CLIENT_FOUND_ROWS. With it MySQL reports the rows an
+        // UPDATE MATCHED rather than the rows it changed, so an update that found
+        // its row and altered nothing answers 1 where Database.execute documents
+        // "the number of rows changed" and where SQLite and Postgres both answer
+        // 0. Code that reads 0 as "no such row" would have been told it succeeded.
+        int capabilities = CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG
                 | CLIENT_PROTOCOL_41 | CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION
                 | CLIENT_PLUGIN_AUTH | CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA;
         if(database != null && database.length() > 0) {
