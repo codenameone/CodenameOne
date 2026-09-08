@@ -40,6 +40,12 @@ Just like in Java SE, the entries within the "JAR" are read and can't be modifie
 
 === Storage
 
+Codename One gives you four places to keep data, and picking the wrong one is
+the usual source of trouble later:
+
+.What each store is for, and what it isn't
+image::img/storage-model.svg[The four Codename One data stores and what each is for,scaledwidth=85%]
+
 https://www.codenameone.com/javadoc/com/codename1/io/Storage.html[Storage] is accessed through the `Storage` class. It's a flat, filesystem-like interface that can list, delete, and write named storage entries.
 
 The `Storage` API also provides convenient methods to write objects to `Storage` and read them back with `readObject` and `writeObject`.
