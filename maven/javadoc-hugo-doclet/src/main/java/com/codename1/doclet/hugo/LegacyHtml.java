@@ -84,29 +84,31 @@ final class LegacyHtml {
             return markdown;
         }
 
-        StringBuilder out = new StringBuilder(markdown.length() + 32);
+        String text = fencePreBlocks(markdown);
+        StringBuilder out = new StringBuilder(text.length() + 32);
+        String markdownText = text;
         int i = 0;
-        int n = markdown.length();
+        int n = markdownText.length();
         while (i < n) {
-            char c = markdown.charAt(i);
+            char c = markdownText.charAt(i);
 
-            int fence = fenceLength(markdown, i);
+            int fence = fenceLength(markdownText, i);
             if (fence > 0) {
-                int end = markdown.indexOf(markdown.substring(i, i + fence), i + fence);
+                int end = markdownText.indexOf(markdownText.substring(i, i + fence), i + fence);
                 int stop = end < 0 ? n : end + fence;
-                out.append(markdown, i, stop);
+                out.append(markdownText, i, stop);
                 i = stop;
                 continue;
             }
             if (c == '`') {
                 int ticks = 0;
-                while (i + ticks < n && markdown.charAt(i + ticks) == '`') {
+                while (i + ticks < n && markdownText.charAt(i + ticks) == '`') {
                     ticks++;
                 }
                 String delimiter = "`".repeat(ticks);
-                int end = markdown.indexOf(delimiter, i + ticks);
+                int end = markdownText.indexOf(delimiter, i + ticks);
                 int stop = end < 0 ? n : end + ticks;
-                out.append(markdown, i, stop);
+                out.append(markdownText, i, stop);
                 i = stop;
                 continue;
             }
@@ -117,18 +119,18 @@ final class LegacyHtml {
             }
 
             // A bare "<" is arithmetic, not markup: "a < b" must stay as written.
-            if (!opensATag(markdown, i)) {
+            if (!opensATag(markdownText, i)) {
                 out.append(c);
                 i++;
                 continue;
             }
-            int close = markdown.indexOf('>', i);
+            int close = markdownText.indexOf('>', i);
             if (close < 0) {
                 out.append(c);
                 i++;
                 continue;
             }
-            String raw = markdown.substring(i, close + 1);
+            String raw = markdownText.substring(i, close + 1);
             String replacement = replacementFor(raw);
             if (replacement == null) {
                 // Not structural markup: show it as the author wrote it.
@@ -148,6 +150,59 @@ final class LegacyHtml {
             next++;
         }
         return next < text.length() && Character.isLetter(text.charAt(next));
+    }
+
+    /**
+     * Turns each {@code <pre>} block into a fenced code block.
+     *
+     * <p>Mapping the tags to blank lines kept the text but lost the formatting
+     * that was the whole point of the tag: {@code CommerceManager}'s multi-line
+     * usage example collapsed into a paragraph. Content that is already fenced
+     * -- which is what {@code <pre>{@code ...}</pre>} becomes once the comment
+     * renderer has been through it -- is passed along instead of being wrapped
+     * again, because a fence inside a fence is not a code block.
+     */
+    private static String fencePreBlocks(String markdown) {
+        String lower = markdown.toLowerCase(Locale.ROOT);
+        if (!lower.contains("<pre>")) {
+            return markdown;
+        }
+        StringBuilder out = new StringBuilder(markdown.length() + 32);
+        int i = 0;
+        while (true) {
+            int open = lower.indexOf("<pre>", i);
+            if (open < 0) {
+                out.append(markdown, i, markdown.length());
+                return out.toString();
+            }
+            int close = lower.indexOf("</pre>", open);
+            if (close < 0) {
+                out.append(markdown, i, markdown.length());
+                return out.toString();
+            }
+            out.append(markdown, i, open);
+            String inner = markdown.substring(open + "<pre>".length(), close);
+            if (inner.contains("```")) {
+                out.append('\n').append(inner.strip()).append('\n');
+            } else {
+                out.append("\n```\n").append(trimBlankLines(inner)).append("\n```\n");
+            }
+            i = close + "</pre>".length();
+        }
+    }
+
+    /** Drops leading and trailing blank lines without touching indentation. */
+    private static String trimBlankLines(String text) {
+        String[] lines = text.split("\n", -1);
+        int start = 0;
+        int end = lines.length;
+        while (start < end && lines[start].isBlank()) {
+            start++;
+        }
+        while (end > start && lines[end - 1].isBlank()) {
+            end--;
+        }
+        return String.join("\n", java.util.Arrays.asList(lines).subList(start, end));
     }
 
     /** The markdown for a tag, or null when it should be escaped instead. */

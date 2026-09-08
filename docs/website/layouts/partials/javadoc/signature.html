@@ -17,6 +17,10 @@
       {{- end -}}
     {{- end -}}
     <span class="cn1-api-punct">)</span>
+    {{- with .declaredThrows }}
+      <span class="cn1-api-mod"> throws </span>
+      {{- range $i, $t := . }}{{ if $i }}<span class="cn1-api-punct">, </span>{{ end }}{{ partial "javadoc/type-ref.html" $t }}{{ end -}}
+    {{- end }}
     {{- with .defaultValue }}<span class="cn1-api-punct"> default </span><span class="cn1-api-const">{{ . }}</span>{{ end -}}
   {{- else -}}
     {{- with .fieldType }}{{ partial "javadoc/type-ref.html" . }} {{ end -}}

@@ -28,8 +28,10 @@ import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -318,6 +320,9 @@ public final class HugoDoclet implements Doclet {
         // constants -- CENTER, TOP, the cursor values -- even though this page
         // links references to them.
         api.put("inheritedFields", inheritedFields(type, hidden));
+        // A public nested type is addressable through a subtype, and javadoc
+        // lists it: Dialog omitted Form.TabIterator entirely.
+        api.put("inheritedNested", inheritedNested(type, hidden));
 
         Map<String, Object> frontMatter = new LinkedHashMap<>();
         frontMatter.put("title", Refs.nestedDisplayName(type));
@@ -452,13 +457,41 @@ public final class HugoDoclet implements Doclet {
         return out;
     }
 
+    /**
+     * The subtypes a page advertises.
+     *
+     * <p>Direct children for a class, which is javadoc's "Direct Known
+     * Subclasses", and the whole subtype graph for an interface, which is its
+     * "All Known Subinterfaces" and "All Known Implementing Classes". Listing
+     * only direct children of an interface hides most of what a reader is
+     * looking for: java.util.Collection named four types where the standard page
+     * names Deque, NavigableSet, ArrayList, Vector and the rest.
+     */
     private List<Map<String, Object>> subclassesOf(TypeElement type) {
-        List<Map<String, Object>> out = new ArrayList<>();
-        List<TypeElement> children =
-                new ArrayList<>(subtypes.getOrDefault(type.getQualifiedName().toString(), List.of()));
+        List<TypeElement> children = type.getKind() == ElementKind.INTERFACE
+                ? transitiveSubtypes(type)
+                : new ArrayList<>(subtypes.getOrDefault(type.getQualifiedName().toString(), List.of()));
         children.sort(Comparator.comparing(child -> child.getQualifiedName().toString()));
+
+        List<Map<String, Object>> out = new ArrayList<>();
         for (TypeElement child : children) {
             out.add(Map.of("label", Refs.nestedDisplayName(child), "url", Refs.typeUrl(child)));
+        }
+        return out;
+    }
+
+    private List<TypeElement> transitiveSubtypes(TypeElement type) {
+        List<TypeElement> out = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        Deque<TypeElement> queue = new ArrayDeque<>(
+                subtypes.getOrDefault(type.getQualifiedName().toString(), List.of()));
+        while (!queue.isEmpty()) {
+            TypeElement next = queue.removeFirst();
+            if (!seen.add(next.getQualifiedName().toString())) {
+                continue;
+            }
+            out.add(next);
+            queue.addAll(subtypes.getOrDefault(next.getQualifiedName().toString(), List.of()));
         }
         return out;
     }
@@ -515,6 +548,14 @@ public final class HugoDoclet implements Doclet {
                     ? null : typeNames.reference(member.getReturnType()));
             row.put("parameters", parameterRows(member, doc));
             row.put("throws", throwsRows(member, doc));
+            // Only what the signature actually declares. The rows above also
+            // carry exceptions a comment documented without declaring, which
+            // belong in the prose but not in the declaration.
+            List<Map<String, Object>> declaredThrows = new ArrayList<>();
+            for (TypeMirror thrown : member.getThrownTypes()) {
+                declaredThrows.add(typeNames.reference(thrown));
+            }
+            row.put("declaredThrows", declaredThrows);
             row.put("returns", doc.returns);
             // An annotation element without its default reads as required when it
             // is not: IntentParam.required() defaults to true and
@@ -931,6 +972,49 @@ public final class HugoDoclet implements Doclet {
                 row.put("name", method.getSimpleName().toString());
                 String url = urlOf(method);
                 row.put("url", url);
+                members.add(row);
+            }
+            if (members.isEmpty()) {
+                continue;
+            }
+            Map<String, Object> group = new LinkedHashMap<>();
+            group.put("from", Refs.nestedDisplayName(parent));
+            group.put("url", documented.containsKey(parent.getQualifiedName().toString())
+                    ? Refs.typeUrl(parent) : null);
+            group.put("members", members);
+            out.add(group);
+        }
+        return out;
+    }
+
+    /** The same grouping as {@link #inheritedMembers}, for nested types. */
+    private List<Map<String, Object>> inheritedNested(TypeElement type, List<TypeElement> promoted) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        Set<String> declared = new LinkedHashSet<>();
+        for (TypeElement nested : ElementFilter.typesIn(type.getEnclosedElements())) {
+            declared.add(nested.getSimpleName().toString());
+        }
+        Set<String> promotedNames = new LinkedHashSet<>();
+        for (TypeElement supertype : promoted) {
+            promotedNames.add(supertype.getQualifiedName().toString());
+        }
+
+        Set<String> visited = new LinkedHashSet<>();
+        for (TypeMirror supertype : allSupertypes(type.asType(), visited)) {
+            if (!(supertype instanceof DeclaredType declaredType)
+                    || !(declaredType.asElement() instanceof TypeElement parent)
+                    || promotedNames.contains(parent.getQualifiedName().toString())) {
+                continue;
+            }
+            List<Map<String, Object>> members = new ArrayList<>();
+            for (TypeElement nested : ElementFilter.typesIn(parent.getEnclosedElements())) {
+                if (!isVisible(nested) || !declared.add(nested.getSimpleName().toString())
+                        || !documented.containsKey(nested.getQualifiedName().toString())) {
+                    continue;
+                }
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("name", Refs.nestedDisplayName(nested));
+                row.put("url", Refs.typeUrl(nested));
                 members.add(row);
             }
             if (members.isEmpty()) {

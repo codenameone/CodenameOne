@@ -76,6 +76,43 @@ class LegacyHtmlTest {
     }
 
     @Test
+    void turnsAPreBlockIntoAFencedCodeBlock() {
+        // com.codename1.payment.CommerceManager's usage example collapsed into a
+        // paragraph when the tags were dropped: two-space indentation is not a
+        // markdown code block, and the line breaks went with it.
+        String out = LegacyHtml.convert(String.join("\n",
+                "Typical use:",
+                "<pre>",
+                "  CommerceManager cm = CommerceManager.getInstance();",
+                "  cm.subscribe(\"pro_monthly\");",
+                "</pre>"));
+
+        assertTrue(out.contains("```"), out);
+        assertTrue(out.contains("  cm.subscribe(\"pro_monthly\");"),
+                "the indentation inside the block survives");
+        assertFalse(out.contains("<pre>"), "the tag itself does not");
+    }
+
+    @Test
+    void doesNotWrapAlreadyFencedPreContent() {
+        // <pre>{@code ...}</pre> arrives here already fenced, because a multi-line
+        // {@code} is rendered as a code block. A fence inside a fence is not one.
+        String out = LegacyHtml.convert("<pre>\n```\nString s = \"x\";\n```\n</pre>");
+
+        assertEquals(1, countOccurrences(out, "```") / 2, "exactly one fenced block: " + out);
+    }
+
+    private static int countOccurrences(String text, String needle) {
+        int count = 0;
+        int at = text.indexOf(needle);
+        while (at >= 0) {
+            count++;
+            at = text.indexOf(needle, at + needle.length());
+        }
+        return count;
+    }
+
+    @Test
     void leavesFencedCodeAlone() {
         String source = "before\n```java\nString s = \"<b>not markup</b>\";\n```\nafter";
         assertEquals(source, LegacyHtml.convert(source));

@@ -103,6 +103,19 @@ final class CommentRenderer {
 
     /** Wraps text in enough backticks that its own backticks survive. */
     private void appendCode(StringBuilder out, String body) {
+        // A {@code} spanning lines is a code block, and the javadoc idiom for one
+        // is <pre>{@code ... }</pre>. Rendering it as an inline span put the whole
+        // example on one line between backticks.
+        if (body.indexOf('\n') >= 0) {
+            String fence = "```";
+            while (body.contains(fence)) {
+                fence += "`";
+            }
+            out.append('\n').append(fence).append('\n')
+                    .append(body.strip())
+                    .append('\n').append(fence).append('\n');
+            return;
+        }
         int longest = 0;
         int run = 0;
         for (int i = 0; i < body.length(); i++) {

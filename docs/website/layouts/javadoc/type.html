@@ -94,6 +94,23 @@
   {{ partial "javadoc/summary-table.html" (dict "rows" $j.constructors "title" "Constructors" "page" .) }}
   {{ partial "javadoc/summary-table.html" (dict "rows" $j.methods "title" "Methods" "page" .) }}
 
+  {{- if $j.inheritedNested }}
+  <section class="cn1-api-summary cn1-api-inherited">
+    <h2 class="cn1-api-summary__title">Inherited nested types</h2>
+    {{- range $j.inheritedNested }}
+    <div class="cn1-api-inherited__group">
+      <h3 class="cn1-api-inherited__from">From
+        {{- if .url }} <a href="{{ .url }}">{{ .from }}</a>{{ else }} {{ .from }}{{ end }}</h3>
+      <p class="cn1-api-inherited__list">
+        {{- range $i, $m := .members }}{{ if $i }}, {{ end -}}
+          {{- if $m.url }}<a href="{{ $m.url }}"><code>{{ $m.name }}</code></a>{{ else }}<code>{{ $m.name }}</code>{{ end -}}
+        {{- end }}
+      </p>
+    </div>
+    {{- end }}
+  </section>
+  {{- end }}
+
   {{- if $j.inheritedFields }}
   <section class="cn1-api-summary cn1-api-inherited">
     <h2 class="cn1-api-summary__title">Inherited fields</h2>
