@@ -30,6 +30,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.Toolbar;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.ui.util.Resources;
@@ -77,7 +78,21 @@ public final class GuideFigureRenderer {
                 Display.getInstance().setDarkMode(Boolean.valueOf(variant.darkMode()));
                 UIManager.getInstance().refreshTheme();
 
-                Form form = variant.figure().build();
+                // Figures are built one after another in one process, so anything
+                // a sample leaves set globally lands on every figure after it and
+                // the output starts depending on the order of the manifest. The
+                // toolbar sample calls Toolbar.setGlobalToolbar(true), which gave
+                // a toolbar to the nine figures registered below it whose own
+                // samples never asked for one. Snapshot and restore rather than
+                // patching that one sample, because the next such flag would
+                // otherwise repeat this silently.
+                boolean globalToolbar = Toolbar.isGlobalToolbar();
+                Form form;
+                try {
+                    form = variant.figure().build();
+                } finally {
+                    Toolbar.setGlobalToolbar(globalToolbar);
+                }
                 prepare(form, device);
                 verifyAppearance(variant, form);
                 write(sink, variant.fileName(), form, device);
