@@ -2494,6 +2494,17 @@ static JAVA_BOOLEAN cn1GcRecoverAfterDrop(CODENAME_ONE_THREAD_STATE) {
         return cn1GcRetainAllReferences(threadStateData);   // no emergency: retain freely
     }
     JAVA_BOOLEAN marked = JAVA_FALSE;
+    // QUIESCE BEFORE READING ANY TOUCH STAMP. The drop counter becomes visible when an
+    // enqueue fails, which is BEFORE the accessor reaches its stamp -- so entering here on
+    // that signal and reading touchAgeField immediately can see "not touched" for a getter
+    // that is mid-load and about to stamp. Clearing on that reading hands the sweep an
+    // object the getter is being given, and this path deliberately does not record
+    // clearedReferent, so nothing downstream could recover it.
+    //
+    // Every getter registers across its whole load, stamp included, so an in-flight count
+    // of zero means every getter that overlapped has finished and published. That is what
+    // makes the stamp readable as evidence rather than as a race.
+    cn1SatbBulkQuiesce();
     for(;;) {
         long before = cn1RefDiscoveredTop;
         long beforeEmergency = atomic_load_explicit(&cn1RefEmergencyTop, memory_order_relaxed);
@@ -2502,7 +2513,16 @@ static JAVA_BOOLEAN cn1GcRecoverAfterDrop(CODENAME_ONE_THREAD_STATE) {
             struct CN1RefEntry* e = &cn1RefDiscovered[i];
             JAVA_OBJECT r = __atomic_load_n(e->referentField, __ATOMIC_RELAXED);
             if(r != JAVA_NULL && !CN1_IS_TAGGED(r)) {
-                if(e->strength == CN1_REF_SOFT
+                // A referent already marked, or fresh, is reachable some other way -- a
+                // strong edge or a root -- and a SoftReference may only be cleared when
+                // its referent is SOFTLY reachable. The other emergency path applies this
+                // same test; omitting it here would clear an application's cache entry for
+                // an object it also holds in an ordinary field.
+                int rm = __atomic_load_n(&r->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+                JAVA_BOOLEAN reachableOtherwise =
+                    (rm == currentGcMarkValue || rm == -1) ? JAVA_TRUE : JAVA_FALSE;
+                if(!reachableOtherwise
+                   && e->strength == CN1_REF_SOFT
                    && __atomic_load_n(e->touchAgeField, __ATOMIC_RELAXED) != CN1_REF_TOUCHED) {
                     // Condemned by the emergency, and not being read: clear it, which is
                     // the whole point of the emergency. Not recorded in clearedReferent --
