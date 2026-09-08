@@ -1,27 +1,4 @@
 /*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Codename One through http://www.codenameone.com/ if you
- * need additional information or have any questions.
- */
-
-/*
  * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
@@ -44,7 +21,7 @@
  * need additional information or have any questions.
  */
 
-package com.codenameone.developerguide.screenshots;
+package com.codenameone.developerguide.snippets.generated;
 
 import com.codename1.gpu.*;
 import com.codename1.ui.*;
@@ -77,8 +54,7 @@ import java.io.*;
 import java.util.*;
 
 
-class ComponentsDialogBlurFigure implements GuideFigure {
-
+class WorkingWithJavascriptJava006Snippet {
 
     Object context;
     Object url;
@@ -102,25 +78,20 @@ class ComponentsDialogBlurFigure implements GuideFigure {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    
-
-    @Override
-    public String id() {
-        return "components-dialog-blur";
-    }
-
-    /// The tagged region is what the chapter includes, so the listing beside the
-    /// picture is the code that drew it.
-    @Override
-    public Form build() {
-        // tag::the-components-of-codename-one-java-011[]
-        Form hi = new Form("Blur Dialog", new BoxLayout(BoxLayout.Y_AXIS));
-        Dialog.setDefaultBlurBackgroundRadius(8);
-        Button showDialog = new Button("Blur");
-        showDialog.addActionListener((e) -> Dialog.show("Blur", "Is On/* omitted */", "OK", null));
-        hi.add(showDialog);
-        hi.show();
-        // end::the-components-of-codename-one-java-011[]
-        return hi;
+    void snippet() throws Exception {
+        // tag::working-with-javascript-java-006[]
+        Form f = new Form("Test Before Unload", BoxLayout.y());
+        CheckBox enableBeforeUnload = new CheckBox("Enable Before Unload");
+        enableBeforeUnload.setSelected(true);
+        enableBeforeUnload.addActionListener(e->{
+            if (enableBeforeUnload.isSelected()) {
+                CN.setProperty("platformHint.javascript.beforeUnloadMessage", "Are you sure you want to leave this page?  It might be bad");
+            } else {
+                CN.setProperty("platformHint.javascript.beforeUnloadMessage", null);
+            }
+        });
+        f.add(enableBeforeUnload);
+        f.show();
+        // end::working-with-javascript-java-006[]
     }
 }

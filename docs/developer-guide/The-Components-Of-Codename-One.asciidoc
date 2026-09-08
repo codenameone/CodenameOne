@@ -229,11 +229,11 @@ NOTE: Not all device types support blur you can test if your device supports it 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsDialogBlurFigure.java[tag=the-components-of-codename-one-java-011,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava011Snippet.java[tag=the-components-of-codename-one-java-011,indent=0]
 ----
 
 .The blur effect coupled with the OS default tint
-image::img/generated/components-dialog-blur.png[The blur effect coupled with the OS default tint,scaledwidth=20%]
+image::img/components-dialog-blur.png[The blur effect coupled with the OS default tint,scaledwidth=20%]
 
 It might be a bit hard to notice the blur effect with the tinting so here is the same code with tinting disabled:
 
@@ -252,11 +252,11 @@ A popup dialog is a common mobile paradigm showing a `Dialog` that points at a s
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsDialogPopupFigure.java[tag=the-components-of-codename-one-java-144,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava144Snippet.java[tag=the-components-of-codename-one-java-144,indent=0]
 ----
 
 .Popup Dialog
-image::img/generated/components-dialog-popup.png[Popup Dialog,scaledwidth=20%]
+image::img/components-dialog-popup.png[Popup Dialog,scaledwidth=20%]
 
 The popup dialog accepts a https://www.codenameone.com/javadoc/com/codename1/ui/Component.html[Component] or https://www.codenameone.com/javadoc/com/codename1/ui/geom/Rectangle.html[Rectangle] to point at and handles the rest.
 
@@ -1661,14 +1661,14 @@ You can use the `ImageViewer` as a tool to view a single image which allows you 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsImageviewerFigure.java[tag=the-components-of-codename-one-java-187,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava187Snippet.java[tag=the-components-of-codename-one-java-187,indent=0]
 ----
 
 TIP: You can simulate pinch to zoom on the simulator by dragging the right button away from the top left corner to zoom in and towards the top left corner to zoom out. On Mac touchpads you can drag two fingers to achieve that.
 
 
 .ImageViewer as the demo loads with the image from the default icon
-image::img/generated/components-imageviewer.png[ImageViewer as the demo loads with the image from the default icon,scaledwidth=20%]
+image::img/components-imageviewer.png[ImageViewer as the demo loads with the image from the default icon,scaledwidth=20%]
 
 .ImageViewer zoomed in
 image::img/components-imageviewer-zoomed-in.png[ImageViewer zoomed in,scaledwidth=20%]
@@ -1677,11 +1677,11 @@ You can work with a list of images to produce a swiping effect for the image vie
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsImageviewerMultiFigure.java[tag=the-components-of-codename-one-java-085,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava085Snippet.java[tag=the-components-of-codename-one-java-085,indent=0]
 ----
 
 .An ImageViewer with many elements is indistinguishable from a single ImageViewer except for swipe
-image::img/generated/components-imageviewer-multi.png[An ImageViewer with many elements is indistinguishable from a single ImageViewer except for swipe,scaledwidth=20%]
+image::img/components-imageviewer-multi.png[An ImageViewer with many elements is indistinguishable from a single ImageViewer except for swipe,scaledwidth=20%]
 
 Notice that you use a https://www.codenameone.com/javadoc/com/codename1/ui/list/ListModel.html[ListModel] to allow swiping between images.
 
@@ -1707,11 +1707,11 @@ You can dynamically download images directly into the `ImageViewer` with a custo
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsImageviewerDynamicFigure.java[tag=the-components-of-codename-one-java-189,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava189Snippet.java[tag=the-components-of-codename-one-java-189,indent=0]
 ----
 
 .Dynamically fetching an image URL from the internet footnote:[Image was fetched from https://awoiaf.westeros.org/index.php/Portal:Books]
-image::img/generated/components-imageviewer-dynamic.png[Dynamically fetching an image URL from the internet,scaledwidth=20%]
+image::img/components-imageviewer-dynamic.png[Dynamically fetching an image URL from the internet,scaledwidth=20%]
 
 This fetches the images in the URL asynchronously and fires a data change event when the data arrives to automatically refresh the `ImageViewer` when that happens.
 
@@ -2252,7 +2252,7 @@ The following source code presents an autocomplete text field with images in the
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/AutoCompleteWithPicturesFigure.java[tag=the-components-of-codename-one-java-121,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava121Snippet.java[tag=the-components-of-codename-one-java-121,indent=0]
 ----
 
 <1> you have duplicate arrays that are partial for clarity. This is a separate list of data element but you can fetch the more data from anywhere
@@ -2260,7 +2260,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/screenshot
 <3> In a renderer it's important to always set the value if you don't have a value in place
 
 .Auto complete with images
-image::img/generated/auto-complete-with-pictures.png[Auto complete with images,scaledwidth=20%]
+image::img/auto-complete-with-pictures.png[Auto complete with images,scaledwidth=20%]
 
 
 [[picker-section]]

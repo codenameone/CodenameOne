@@ -1,27 +1,4 @@
 /*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Codename One through http://www.codenameone.com/ if you
- * need additional information or have any questions.
- */
-
-/*
  * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
@@ -44,7 +21,7 @@
  * need additional information or have any questions.
  */
 
-package com.codenameone.developerguide.screenshots;
+package com.codenameone.developerguide.snippets.generated;
 
 import com.codename1.gpu.*;
 import com.codename1.ui.*;
@@ -77,8 +54,7 @@ import java.io.*;
 import java.util.*;
 
 
-class ComponentsImageviewerMultiFigure implements GuideFigure {
-
+class MiscellaneousFeaturesJava024Snippet {
 
     Object context;
     Object url;
@@ -102,29 +78,37 @@ class ComponentsImageviewerMultiFigure implements GuideFigure {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    
+    void snippet() throws Exception {
+        // tag::miscellaneous-features-java-024[]
+        Form hi = new Form("Capture", new BorderLayout());
+        hi.setToolbar(new Toolbar());
+        Style s = UIManager.getInstance().getComponentStyle("Title");
+        FontImage icon = FontImage.createMaterial(FontImage.MATERIAL_CAMERA, s);
 
-    @Override
-    public String id() {
-        return "components-imageviewer-multi";
-    }
+        ImageViewer iv = new ImageViewer(icon);
 
-    /// The tagged region is what the chapter includes, so the listing beside the
-    /// picture is the code that drew it.
-    @Override
-    public Form build() {
-        // tag::the-components-of-codename-one-java-085[]
-        Form hi = new Form("ImageViewer", new BorderLayout());
+        hi.getToolbar().addCommandToRightBar("", icon, (ev) -> {
+            String filePath = Capture.capturePhoto();
+            if(filePath != null) {
+                try {
+                    DefaultListModel<Image> m = (DefaultListModel<Image>)iv.getImageList();
+                    Image img = Image.createImage(filePath);
+                    if(m == null) {
+                        m = new DefaultListModel<>(img);
+                        iv.setImageList(m);
+                        iv.setImage(img);
+                    } else {
+                        m.addItem(img);
+                    }
+                    m.setSelectedIndex(m.getSize() - 1);
+                } catch(IOException err) {
+                    Log.e(err);
+                }
+            }
+        });
 
-        Image red = Image.createImage(100, 100, 0xffff0000);
-        Image green = Image.createImage(100, 100, 0xff00ff00);
-        Image blue = Image.createImage(100, 100, 0xff0000ff);
-        Image gray = Image.createImage(100, 100, 0xffcccccc);
-
-        ImageViewer iv = new ImageViewer(red);
-        iv.setImageList(new DefaultListModel<>(red, green, blue, gray));
         hi.add(BorderLayout.CENTER, iv);
-        // end::the-components-of-codename-one-java-085[]
-        return hi;
+        hi.show();
+        // end::miscellaneous-features-java-024[]
     }
 }

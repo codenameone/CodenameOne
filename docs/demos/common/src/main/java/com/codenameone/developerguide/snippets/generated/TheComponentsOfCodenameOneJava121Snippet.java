@@ -1,27 +1,4 @@
 /*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Codename One through http://www.codenameone.com/ if you
- * need additional information or have any questions.
- */
-
-/*
  * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
@@ -44,7 +21,7 @@
  * need additional information or have any questions.
  */
 
-package com.codenameone.developerguide.screenshots;
+package com.codenameone.developerguide.snippets.generated;
 
 import com.codename1.gpu.*;
 import com.codename1.ui.*;
@@ -77,8 +54,7 @@ import java.io.*;
 import java.util.*;
 
 
-class AutoCompleteWithPicturesFigure implements GuideFigure {
-
+class TheComponentsOfCodenameOneJava121Snippet {
 
     Object context;
     Object url;
@@ -102,21 +78,11 @@ class AutoCompleteWithPicturesFigure implements GuideFigure {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    
-
-    @Override
-    public String id() {
-        return "auto-complete-with-pictures";
-    }
-
-    /// The tagged region is what the chapter includes, so the listing beside the
-    /// picture is the code that drew it.
-    @Override
-    public Form build() {
+    void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-121[]
         final String[] characters = { "Tyrion Lannister", "Jaime Lannister", "Cersei Lannister", "Daenerys Targaryen",
-        "Jon Snow", "Petyr Baelish", "Jorah Mormont", "Sansa Stark", "Arya Stark", "Theon Greyjoy"
-        // snipped the rest for clarity
+            "Jon Snow", "Petyr Baelish", "Jorah Mormont", "Sansa Stark", "Arya Stark", "Theon Greyjoy"
+            // snipped the rest for clarity
         };
 
         Form current = new Form("AutoComplete", BoxLayout.y());
@@ -128,46 +94,45 @@ class AutoCompleteWithPicturesFigure implements GuideFigure {
 
         final String[] actors = { "Peter Dinklage", "Nikolaj Coster-Waldau", "Lena Headey"}; // <1>
         final Image[] pictures = {
-        URLImage.createToStorage(placeholder, "tyrion","http://i.lv3.hbo.com/assets/images/series/game-of-thrones/character/s5/tyrion-lannister-512x512.jpg"),
-        URLImage.createToStorage(placeholder, "jaime","http://i.lv3.hbo.com/assets/images/series/game-of-thrones/character/s5/jamie-lannister-512x512.jpg"),
-        URLImage.createToStorage(placeholder, "cersei","http://i.lv3.hbo.com/assets/images/series/game-of-thrones/character/s5/cersei-lannister-512x512.jpg")
+            URLImage.createToStorage(placeholder, "tyrion","http://i.lv3.hbo.com/assets/images/series/game-of-thrones/character/s5/tyrion-lannister-512x512.jpg"),
+            URLImage.createToStorage(placeholder, "jaime","http://i.lv3.hbo.com/assets/images/series/game-of-thrones/character/s5/jamie-lannister-512x512.jpg"),
+            URLImage.createToStorage(placeholder, "cersei","http://i.lv3.hbo.com/assets/images/series/game-of-thrones/character/s5/cersei-lannister-512x512.jpg")
         };
 
         ac.setCompletionRenderer(new ListCellRenderer() {
-        private final Label focus = new Label(); // <2>
-        private final Label line1 = new Label(characters[0]);
-        private final Label line2 = new Label(actors[0]);
-        private final Label icon = new Label(pictures[0]);
-        private final Container selection = BorderLayout.center(
-        BoxLayout.encloseY(line1, line2)).add(BorderLayout.EAST, icon);
+            private final Label focus = new Label(); // <2>
+            private final Label line1 = new Label(characters[0]);
+            private final Label line2 = new Label(actors[0]);
+            private final Label icon = new Label(pictures[0]);
+            private final Container selection = BorderLayout.center(
+                    BoxLayout.encloseY(line1, line2)).add(BorderLayout.EAST, icon);
 
-        @Override
-        public Component getListCellRendererComponent(com.codename1.ui.List list, Object value, int index, boolean isSelected) {
-        for(int iter = 0 ; iter < characters.length ; iter++) {
-        if(characters[iter].equals(value)) {
-        line1.setText(characters[iter]);
-        if(actors.length > iter) {
-        line2.setText(actors[iter]);
-        icon.setIcon(pictures[iter]);
-        } else {
-        line2.setText(""); // <3>
-        icon.setIcon(placeholder);
-        }
-        break;
-        }
-        }
-        return selection;
-        }
+            @Override
+            public Component getListCellRendererComponent(com.codename1.ui.List list, Object value, int index, boolean isSelected) {
+                for(int iter = 0 ; iter < characters.length ; iter++) {
+                    if(characters[iter].equals(value)) {
+                        line1.setText(characters[iter]);
+                        if(actors.length > iter) {
+                            line2.setText(actors[iter]);
+                            icon.setIcon(pictures[iter]);
+                        } else {
+                            line2.setText(""); // <3>
+                            icon.setIcon(placeholder);
+                        }
+                        break;
+                    }
+                }
+                return selection;
+            }
 
-        @Override
-        public Component getListFocusComponent(com.codename1.ui.List list) {
-        return focus;
-        }
+            @Override
+            public Component getListFocusComponent(com.codename1.ui.List list) {
+                return focus;
+            }
         });
         current.add(ac);
 
         current.show();
         // end::the-components-of-codename-one-java-121[]
-        return current;
     }
 }
