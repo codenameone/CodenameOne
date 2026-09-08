@@ -104,13 +104,23 @@ final class NativeDebuggerHarness {
     }
 
     /**
-     * java.lang.Integer's clazz and the tagged-int proxy are emitted by the
-     * translator into the app's own sources. The debugger unit references both
+     * The boxed classes and the tagged-value proxy table are emitted by the
+     * translator into the app's own sources. The debugger unit references them
      * by symbol, so a host build has to supply them.
+     *
+     * The proxy table must be POPULATED, not merely defined: cn1_debugger_class_of
+     * resolves a tagged reference through CN1_CLASS_OF, which reads it. An all-zero
+     * table would make every tagged reference resolve to a null class and quietly
+     * turn the tagged tests into assertions about nothing.
      */
     private static final String GENERATED_SYMBOLS =
             "#include \"cn1_globals.h\"\n"
           + "struct clazz class__java_lang_Integer = { 0 };\n"
+          + "struct clazz class__java_lang_Long = { 0 };\n"
+          + "struct clazz class__java_lang_Double = { 0 };\n"
+          + "struct clazz class__java_lang_Float = { 0 };\n"
+          + "struct clazz class__java_lang_Character = { 0 };\n"
+          + "struct clazz class__java_lang_Short = { 0 };\n"
           // The collector's mark entry point. Records whether a nominated
           // reference was reached, rather than buffering every mark -- the
           // table can hold thousands, so a fixed buffer would answer "was it
@@ -124,7 +134,14 @@ final class NativeDebuggerHarness {
           + "    if (o == cn1MarkRootTarget) cn1MarkRootTargetSeen = 1;\n"
           + "}\n"
           + "#if CN1_TAGGED_ACTIVE\n"
-          + "struct JavaObjectPrototype cn1TaggedProxy = { 0 };\n"
+          + "struct JavaObjectPrototype cn1TaggedProxy[CN1_TAG_COUNT] = {\n"
+          + "    [CN1_TAG_INTEGER]   = { .__codenameOneParentClsReference = &class__java_lang_Integer },\n"
+          + "    [CN1_TAG_LONG]      = { .__codenameOneParentClsReference = &class__java_lang_Long },\n"
+          + "    [CN1_TAG_DOUBLE]    = { .__codenameOneParentClsReference = &class__java_lang_Double },\n"
+          + "    [CN1_TAG_FLOAT]     = { .__codenameOneParentClsReference = &class__java_lang_Float },\n"
+          + "    [CN1_TAG_CHARACTER] = { .__codenameOneParentClsReference = &class__java_lang_Character },\n"
+          + "    [CN1_TAG_SHORT]     = { .__codenameOneParentClsReference = &class__java_lang_Short }\n"
+          + "};\n"
           + "#endif\n";
 
     private static Path runtimeInclude() {

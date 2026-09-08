@@ -248,8 +248,17 @@ final class JavascriptReachability {
         seedRuntimeDispatched("java_util_HashMap", "containsKeyImpl", "(Ljava/lang/Object;)Z");
         seedRuntimeDispatched("java_util_HashMap", "clearImpl", "()V");
         seedRuntimeDispatched("java_lang_StringBuilder", "toStringImpl", "()Ljava/lang/String;");
-        // valueOfHeap is STATIC: virtual seeding does not resolve it
+        // valueOfHeap is STATIC: virtual seeding does not resolve it. One per tagged box --
+        // every type whose valueOf became a native to return an immediate on the C targets
+        // delegates to its heap twin here, and the JS port has no immediates so it ALWAYS
+        // takes that path. Miss one and the cull removes it, and the fixture dies with a
+        // ReferenceError that surfaces only as a wrong return value.
         enqueueResolved("java_lang_Integer", "valueOfHeap", "(I)Ljava/lang/Integer;", true);
+        enqueueResolved("java_lang_Long", "valueOfHeap", "(J)Ljava/lang/Long;", true);
+        enqueueResolved("java_lang_Double", "valueOfHeap", "(D)Ljava/lang/Double;", true);
+        enqueueResolved("java_lang_Float", "valueOfHeap", "(F)Ljava/lang/Float;", true);
+        enqueueResolved("java_lang_Character", "valueOfHeap", "(C)Ljava/lang/Character;", true);
+        enqueueResolved("java_lang_Short", "valueOfHeap", "(S)Ljava/lang/Short;", true);
     }
 
     /**

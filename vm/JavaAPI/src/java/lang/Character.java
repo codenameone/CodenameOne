@@ -230,8 +230,16 @@ public final class Character implements Comparable<Character>{
      * Returns the value of this Character object.
      */
     public char charValue(){
-        return value; 
+        return cn1Value();
     }
+
+    /**
+     * Returns this Character's value, transparently handling both heap-allocated and
+     * tagged-immediate representations. All value reads route here -- Character is final, so
+     * a plain `return value;` getter would be inlined into a raw field load off a tagged
+     * pointer, which has no fields.
+     */
+    private native char cn1Value();
 
     /**
      * Returns the numeric value of the character ch in the specified radix.
@@ -278,14 +286,14 @@ public final class Character implements Comparable<Character>{
      * Compares this object against the specified object. The result is true if and only if the argument is not null and is a Character object that represents the same char value as this object.
      */
     public boolean equals(java.lang.Object obj){
-        return obj != null && obj.getClass() == getClass() && ((Character)obj).value == value;
+        return obj != null && obj.getClass() == getClass() && ((Character)obj).cn1Value() == cn1Value();
     }
 
     /**
      * Returns a hash code for this Character.
      */
     public int hashCode(){
-        return value; 
+        return cn1Value();
     }
     
     static boolean isLetterCompat(char ch) {
@@ -539,7 +547,7 @@ public final class Character implements Comparable<Character>{
      * Returns a String object representing this character's value. Converts this Character object to a string. The result is a string whose length is 1. The string's sole component is the primitive char value represented by this object.
      */
     public java.lang.String toString(){
-        return new String(new char[] {value});
+        return new String(new char[] {cn1Value()});
     }
 
     /**
@@ -1287,7 +1295,11 @@ public final class Character implements Comparable<Character>{
      * @param i the primitive
      * @return object instance
      */
-    public static Character valueOf(char i) {
+    // Native so the tagged build can return an immediate without allocating. The off path
+    // (and 32-bit-pointer targets) calls valueOfHeap, preserving the cache.
+    public static native Character valueOf(char i);
+
+    static Character valueOfHeap(char i) {
         if (i <= 127) {
             return CharacterCache.cache[i];
         }
@@ -1487,7 +1499,10 @@ public final class Character implements Comparable<Character>{
     }
 
     public int compareTo(Character another) {
-        return toString().compareTo(String.valueOf(another.value));
+        // Was toString().compareTo(String.valueOf(another.value)), which allocated two
+        // Strings per comparison -- on the TreeMap path, for every probe. String.compareTo
+        // of two length-one strings IS c1 - c2, so this is the same value with no garbage.
+        return cn1Value() - another.cn1Value();
     }
 
     private static String _codepointToString(int cp) {

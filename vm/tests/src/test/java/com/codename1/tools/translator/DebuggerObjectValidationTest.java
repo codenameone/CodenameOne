@@ -86,6 +86,24 @@ class DebuggerObjectValidationTest {
         assertEquals("rejected", probe("INT_AS_REFERENCE"));
     }
 
+    /**
+     * A machine word whose low three bits spell a tag code is INDISTINGUISHABLE from a
+     * genuine boxed immediate -- they are the same bit pattern by construction -- so the
+     * debugger reports a boxed value rather than a rejection. That is not a regression in
+     * safety: it never dereferences the word, which is the property issue #5333 was about,
+     * and it is not new either, since an odd word was already a tagged Integer when the tag
+     * was one bit. Widening the tag to three bits only widens the fraction of arbitrary
+     * words this covers, from one in two to seven in eight.
+     *
+     * The GC is unaffected. cn1ConservativeResolve rejects any word with a bit set in
+     * (sizeof(void*) - 1), which is the same three bits, so a misread int was never a root
+     * before this change and is not one now.
+     */
+    @Test
+    void anIntSlotThatLooksLikeAnImmediateIsReportedWithoutBeingDereferenced() throws Exception {
+        assertEquals("accepted", probe("INT_AS_IMMEDIATE"));
+    }
+
     /** An address in no mapping at all must come back as a rejection, not a signal. */
     @Test
     void anUnmappedAddressIsRejectedWithoutFaulting() throws Exception {
@@ -127,6 +145,19 @@ class DebuggerObjectValidationTest {
     }
 
     /** Its value comes from the tag, since there is no field to read. */
+    @Test
+    void everyTaggedTypeReportsItsOwnClass() throws Exception {
+        // Naming Integer directly was right only while Integer was the sole tagged type.
+        // A Long reported as an Integer would show a garbage value in the debugger with
+        // nothing thrown, so each code has to resolve to its own class.
+        assertEquals("111111", probe("TAGGED_CLASSES"));
+    }
+
+    @Test
+    void everyTaggedTypeDecodesToItsWireTypeAndValue() throws Exception {
+        assertEquals("ok", probe("TAGGED_DECODE"));
+    }
+
     @Test
     void aTaggedIntegerCarriesItsValueInTheReference() throws Exception {
         assertEquals("42", probe("TAGGED_INT_VALUE"));
@@ -407,7 +438,7 @@ class DebuggerObjectValidationTest {
     @Test
     void noCandidateEverCrashesTheProcess() throws Exception {
         List<String> cases = Arrays.asList("REGISTERED", "ARRAY", "IMPOSTOR",
-                "INT_AS_REFERENCE", "WILD_POINTER", "MISALIGNED", "NULL_PAGE",
+                "INT_AS_REFERENCE", "INT_AS_IMMEDIATE", "WILD_POINTER", "MISALIGNED", "NULL_PAGE",
                 "NULL", "NO_CLASS_WORD", "TAGGED_INT", "TAGGED_INT_CLASS",
                 "TAGGED_INT_VALUE", "WIRE_ID_ISSUED", "WIRE_ID_AFTER_RESUME",
                 "WIRE_ID_NEVER_ISSUED", "WIRE_ID_TAGGED", "ISSUE_MANY",
@@ -490,7 +521,19 @@ class DebuggerObjectValidationTest {
             "    } else if (strcmp(which, \"NO_CLASS_WORD\") == 0) {\n" +
             "        candidate = &object;\n" +
             "    } else if (strcmp(which, \"INT_AS_REFERENCE\") == 0) {\n" +
-            "        /* The issue #5333 shape: eight bytes read over a four-byte local. */\n" +
+            "        /* The issue #5333 shape: eight bytes read over a four-byte local.\n" +
+            "           The value has its low three bits CLEAR so the word is\n" +
+            "           pointer-shaped and has to be rejected on its address rather than\n" +
+            "           on its tag -- which is the path this test exists to cover. A value\n" +
+            "           whose low bits form a tag code is a different case, below. */\n" +
+            "        volatile JAVA_INT slot = 40;\n" +
+            "        candidate = *(JAVA_OBJECT*)(void*)&slot;\n" +
+            "    } else if (strcmp(which, \"INT_AS_IMMEDIATE\") == 0) {\n" +
+            "        /* The same misread, but the value's low three bits happen to spell a\n" +
+            "           tag code. Nothing can tell this from a genuine boxed immediate --\n" +
+            "           they are the same bit pattern -- so the debugger reports a boxed\n" +
+            "           value. What matters is that it does so WITHOUT dereferencing, which\n" +
+            "           is the property issue #5333 was about. */\n" +
             "        volatile JAVA_INT slot = 42;\n" +
             "        candidate = *(JAVA_OBJECT*)(void*)&slot;\n" +
             "    } else if (strcmp(which, \"WILD_POINTER\") == 0) {\n" +
@@ -721,8 +764,40 @@ class DebuggerObjectValidationTest {
             "    } else if (strcmp(which, \"TAGGED_INT_NEGATIVE\") == 0) {\n" +
             "        printf(\"%d\\n\", cn1_debugger_tagged_int_value(CN1_TAG_INT(-7)));\n" +
             "        return 0;\n" +
+            "    } else if (strcmp(which, \"TAGGED_CLASSES\") == 0) {\n" +
+            "        printf(\"%d%d%d%d%d%d\\n\",\n" +
+            "            cn1_debugger_class_of(CN1_TAG_INT(1)) == &class__java_lang_Integer,\n" +
+            "            cn1_debugger_class_of(CN1_TAG_LONG_VAL(1)) == &class__java_lang_Long,\n" +
+            "            cn1_debugger_class_of(CN1_TAG_DOUBLE_BITS(0x3FF0000000000000ULL))\n" +
+            "                == &class__java_lang_Double,\n" +
+            "            cn1_debugger_class_of(CN1_TAG_FLOAT_BITS(0x3F800000U))\n" +
+            "                == &class__java_lang_Float,\n" +
+            "            cn1_debugger_class_of(CN1_TAG_CHAR_VAL(65)) == &class__java_lang_Character,\n" +
+            "            cn1_debugger_class_of(CN1_TAG_SHORT_VAL(-3)) == &class__java_lang_Short);\n" +
+            "        return 0;\n" +
+            "    } else if (strcmp(which, \"TAGGED_DECODE\") == 0) {\n" +
+            "        char t; uint64_t v; int ok = 1;\n" +
+            "        ok &= cn1_debugger_tagged_value(CN1_TAG_INT(-7), &t, &v)\n" +
+            "              && t == 'I' && (int32_t)(uint32_t)v == -7;\n" +
+            "        ok &= cn1_debugger_tagged_value(CN1_TAG_LONG_VAL(-99), &t, &v)\n" +
+            "              && t == 'J' && (int64_t)v == -99;\n" +
+            "        ok &= cn1_debugger_tagged_value(CN1_TAG_DOUBLE_BITS(0x3FF0000000000000ULL), &t, &v)\n" +
+            "              && t == 'D' && v == 0x3FF0000000000000ULL;\n" +
+            "        ok &= cn1_debugger_tagged_value(CN1_TAG_FLOAT_BITS(0x3F800000U), &t, &v)\n" +
+            "              && t == 'F' && v == 0x3F800000U;\n" +
+            "        ok &= cn1_debugger_tagged_value(CN1_TAG_CHAR_VAL(65535), &t, &v)\n" +
+            "              && t == 'C' && v == 65535;\n" +
+            "        ok &= cn1_debugger_tagged_value(CN1_TAG_SHORT_VAL(-32768), &t, &v)\n" +
+            "              && t == 'S' && (int32_t)(uint32_t)v == -32768;\n" +
+            "        ok &= cn1_debugger_tagged_int_value(CN1_TAG_LONG_VAL(5)) == 0;\n" +
+            "        printf(\"%s\\n\", ok ? \"ok\" : \"bad\");\n" +
+            "        return 0;\n" +
             "    } else if (strcmp(which, \"MISALIGNED\") == 0) {\n" +
-            "        candidate = (JAVA_OBJECT)(((uintptr_t)&object) | 2);\n" +
+            "        // Tag code 7 is reserved -- no valueOf produces it and its proxy slot\n" +
+            "        // carries no class -- so this stays an impossible reference. `| 2`\n" +
+            "        // was used here until the tag widened to three bits, at which point it\n" +
+            "        // became a perfectly valid tagged Long.\n" +
+            "        candidate = (JAVA_OBJECT)(((uintptr_t)&object) | 7);\n" +
             "    } else if (strcmp(which, \"NULL_PAGE\") == 0) {\n" +
             "        candidate = (JAVA_OBJECT)(uintptr_t)0x18;\n" +
             "    } else if (strcmp(which, \"NULL\") == 0) {\n" +

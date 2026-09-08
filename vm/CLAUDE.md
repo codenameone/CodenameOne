@@ -1,5 +1,386 @@
 # vm/ (ParparVM)
 
+## Tagged immediates: six boxed types, two of them partial
+
+`valueOf` on `Integer`, `Long`, `Double`, `Float`, `Character` and `Short` returns an
+**immediate** rather than a heap object: the value packed into the pointer word with a type
+code in the **low three bits**. `cn1_globals.h` holds the whole encoding; everything else
+consumes it.
+
+Three bits, not one, because 8-byte object alignment was **already load-bearing** --
+`cn1ConservativeResolve` rejects any word with a bit set in `sizeof(void*) - 1`, and
+conservative roots are on by default, so an object at a 4-byte address would already be
+invisible to the root scan and freed under a live pointer. Widening the tag rests on an
+invariant the collector enforces rather than adding one. `TagProbe` checks it anyway, over
+380,000 allocations across 19 shapes (BiBOP bump, the legacy calloc above
+`CN1_BIBOP_MAX_OBJECT`, arrays, fused String/StringBuilder, class objects): all 8-aligned.
+
+| code | type | representable |
+|---|---|---|
+| 0 | an ordinary heap pointer | -- |
+| 1 | `Integer` | every value |
+| 2 | `Long` | **partial**: `[-2^60, 2^60)` |
+| 3 | `Double` | **partial**: bit patterns with three clear low mantissa bits |
+| 4 | `Float` | every value (raw 32-bit pattern) |
+| 5 | `Character` | every value |
+| 6 | `Short` | every value |
+| 7 | reserved | -- |
+
+`Byte` and `Boolean` are deliberately NOT tagged: a 256-entry and a 2-entry cache already
+never allocate.
+
+`Double` needs no shifting at all. Requiring three clear low mantissa bits means the
+immediate IS the bit pattern -- tag is `| 3`, untag is `& ~7` -- and the representable set is
+every small integer, half, quarter and eighth, which is what JSON numbers overwhelmingly are.
+`0.1` and `3.14` fall out of it and take the heap path.
+
+### A partial encoding must report its coverage, not just its speedup
+
+This is the trap the whole design turns on. Measured on a *mixed* distribution, `Long` is
+**78%** taggable and `Double` **56%**. An earlier `jsonLikeParse` used only integers and
+exact quarters and reported **100%** for both -- a benchmark measuring the best case and
+calling it the case. `BoxBench` now prints a `COVERAGE` line beside its timings and its
+numeric mix is deliberately unhelpful (a quarter money values, a quarter irrational).
+
+The `CN1_ALLOC_CENSUS` figure is the one to trust, because it confirms coverage from an
+independent instrument. Normalised by a work unit tagging cannot affect (HashMaps allocated),
+`jsonLikeParse` goes from **24.02 boxed objects per map to 5.24**. It puts 12 Longs and 12
+Doubles per map, so theory says 24 and `12 x 0.44 = 5.28`. `Long` allocations over the run:
+346,545 -> **1**.
+
+### What it is worth, and what it costs
+
+`ab-tagged.sh` runs three arms so the two questions stay separate: `HEAP`
+(`-DCN1_DISABLE_TAGGED_INT`), `INT` (`-DCN1_DISABLE_TAGGED_VALUES`, i.e. what shipped when
+only Integer was tagged) and `ALL`. **Arm 1 is the baseline that matters** -- `HEAP` vs `INT`
+re-measures a win that was already taken.
+
+Best-of-6 interleaved, `ALL` against `INT`: `longKeyMap` **2.3x**, `charBoxing` 1.54x,
+`doubleListReduce` 1.43x, `mixedBoxedChurn` 1.28x, `jsonLikeParse` 1.14x at 56% coverage.
+On `Bench`/`CommonWorkloads` the ratio is **1.00 on every workload** -- the five extra types
+cost nothing where they are not used, and `hashMapChurn`'s existing 3.3x from Integer tagging
+is untouched.
+
+Peak RSS from `ru_maxrss` did **not** discriminate here (identical to a tenth of a MB across
+all three arms); it is cumulative across children in that harness. Use the census.
+
+### The type index is an addressing mode, not a lookup
+
+The worry that self-describing tags cost a table probe is unfounded. `cn1ClassOf` compiles to:
+
+```
+and  x8, x1, #7            ; tag code, computed once
+cmp  x8, #1                ; the Integer fast path reuses it
+add  x9, x9, x8, lsl #4    ; &cn1TaggedProxy[code] -- a shifted add, NOT a load
+cmp  x8, #0
+csel x8, x1, x9, eq        ; select a VALID pointer first
+ldr  x8, [x8]              ; the single header load
+```
+
+The `csel`-before-`ldr` shape is not stylistic: a plain ternary lets clang speculate the
+faulting `tagged->header` load above the tag test, which was an observed SIGSEGV in interface
+dispatch. Do not simplify it into a conditional over the loaded value.
+
+**And the tag is not optional.** The recurring suggestion is that the callsite already knows
+the type. It does not: a value is boxed *precisely because* it is flowing through an
+`Object`/`Number`/`Comparable` slot, and `map.get(k).hashCode()` has no static type to
+consult. Where the callsite does know -- an autobox immediately unboxed -- the fix is
+peephole elision, which `scalarReplaceStackAllocations` already does and which never needed a
+tag.
+
+### The four choke points, and the one that fails silently
+
+`CN1_IS_TAGGED` masks all three bits, so **every existing call site is correct unedited** --
+`gcMarkObject`, `findPointerPosInHeap`, `removeObjectFromHeapCollection`, the SATB barriers.
+`cn1ClassOf` covers instanceof, checkcast, aastore, virtual and interface dispatch,
+`getClass`, `isInstance` and `String.equals` in one place. Per type there is a `valueOf`
+native and a `cn1Value` native.
+
+`cn1Value` **must** be a native. These classes are `final`, so `Invoke.asInlinableFieldAccess`
+folds a trivial `return value;` getter into a raw `GETFIELD` -- off a pointer with no fields.
+Every read of the boxed value routes through it; there is a scan in the commit that proves
+none was missed.
+
+The sharp edge is `BytecodeMethod.java`'s inline `hashCode`/`equals` fast path, which is
+emitted into **every** class's thunk. It tests `CN1_TAG_CODE(o) == CN1_TAG_INTEGER`, not "is
+tagged", because every other type has a different hashCode contract -- `Long` folds its
+halves, `Float`/`Double` go through `*ToIntBits`. Widening it to any tagged receiver returns
+a **wrong hash with no crash**, which is the worst thing this scheme can do. The other five
+reach the right implementation through the vtable, which is slower and always correct.
+`equals` stays Integer-only for a second reason: pointer equality implies value equality for
+every tag, but the converse fails for `Float` and `Double`, where two NaN encodings must
+compare equal.
+
+`BoxEdge` exists for exactly this and is **proven non-vacuous**: re-widening that guard makes
+it diverge on 115 lines, starting with a Double whose hash silently becomes 0.
+
+### identityHashCode has to fold a tagged word, and only a tagged word
+
+`System.identityHashCode` is a truncation to the low 32 bits. That is right for a heap
+pointer -- `IdentityHashMap`'s indexing is tuned around exactly that distribution, see the
+`IdmProbe` note above -- and wrong for a tagged **Double**, which carries the raw IEEE
+pattern whose distinguishing bits for 1.0, 2.0, 3.0 all live in the HIGH word. Every
+integral double therefore truncated to the same int: measured **1 distinct identity hash
+across 4096 values**, which turns that map's linear probe quadratic. `Long` and `Float`
+shift their payload up and survive a truncation; only `Double` is exposed, because it is the
+only encoding that does not shift.
+
+The fold is applied to tagged values only, and `TagProbe` asserts the spread (4096/4096 with
+it, 1/4096 without). Folding heap pointers too would re-randomise the near-perfect placement
+`IdmProbe` exists to protect.
+
+**This is why the CI witness cannot read tag bits.** `identityHashCode(x) & 7` was how
+`BoxEdge` and `TagProbe` reported which arm they were in; the fold destroys that. Both now
+detect an immediate by its observable consequence -- `valueOf(v) == valueOf(v)` at a value
+outside every `-128..127` cache -- which is a better test anyway, and whose one failure mode
+(a compiler CSEing the two calls) the untagged arm's expected `000000` catches.
+
+### Monitors on tagged values are never reclaimed, and that is accepted
+
+A monitor lives in an address-keyed side table and is removed when its object dies. A tagged
+value never dies, so `synchronized (Float.valueOf(i))` over a loop leaks one entry per
+distinct value. Tagging five more types genuinely widens this -- those used to be heap boxes
+whose monitors *were* reclaimed.
+
+It is still not fixed, and the reasoning is recorded at `monitorEnter` in `nativeMethods.m`:
+the shape was already unbounded for Integer, nothing in this VM reclaims a monitor at
+`monitorExit` so removal would be a new mechanism for every monitor rather than a tagged-only
+patch, and it would be built in the subsystem that already carries the documented three-way
+`monitorEnter` deadlock.
+
+**`BytecodeComplianceMojo` is a partial mitigation, not a proof of unreachability**, and the
+first version of that comment said otherwise. It rejects `MONITORENTER` whose operand is
+*statically typed* as a wrapper, which is intra-procedural and types-only -- hand the box to
+a helper taking `Object` and synchronize on the parameter and the build passes; a field, an
+array or a collection defeats it the same way. It is a gate against the obvious mistake. The
+leak is therefore reachable from application code and accepted, bounded by the number of
+distinct boxed values a program ever locks on, which is zero for anything following the rule.
+
+The rule always named all eight wrappers, but its test only ever exercised Integer. It is a
+loop over all eight now -- not `@ParameterizedTest`, because that module carries
+`junit-jupiter-api` and `-engine` only and adding `junit-jupiter-params` to a Maven plugin's
+pom for one test is not worth it. Its generator also hardcoded `ICONST_1`, so a `(J)`/`(D)`/
+`(F)` `valueOf` would have produced a type-incorrect method and asserted nothing.
+
+Framework and JavaAPI code is not scanned by that mojo at all; there is no `synchronized` on
+a boxed value anywhere in `CodenameOne/src`, `vm/JavaAPI/src` or `Ports` today.
+
+### The nursery guard belongs in cn1InNursery, and -DCN1_NURSERY did not compile
+
+Every caller of `cn1InNursery` dereferences the header the instant it answers true --
+`cn1InNursery(o) && o->__heapPosition == -1` is the shape at all six sites, in the minor
+collection's stack-root scan, its `currentThreadObject` and `exception` roots, the promote
+path and the write barrier. A tagged `Double` carries a raw IEEE pattern and a tagged `Long`
+a shifted payload, either of which can land inside the arena range by coincidence, and the
+read that follows is an unaligned load off a word with no header. The guard therefore lives
+in `cn1InNursery` itself; guarding only the write barrier -- which is what the first version
+of this work did -- left the other five exposed.
+
+**Reachable by construction, not observed.** Instrumenting the range check to count tagged
+values that fall inside the arena gives **0** on `BoxEdge`, `GcStress` and `MtStress`: a
+tagged Long is `v << 3` and a tagged Double's bit pattern is astronomically larger than a
+heap address, so the overlap needs an unusual value. Real, narrow, and cheap to exclude.
+
+**`-DCN1_NURSERY` had not compiled for as long as the bulk SATB barrier has existed.** The
+`cn1SatbBulkBegin` / `cn1SatbEnqueueRangeLocked` / `cn1SatbBulkEnd` declarations sat inside
+the no-nursery `#else` while `nativeMethods.m` calls all three unconditionally from
+`java_lang_System_arraycopy`, so the build died on three implicit declarations. The functions
+were always defined; only the declarations were misplaced. That silently retired an ablation
+arm this file documents, and it is the reason the missing tag guard could not be caught by
+building the configuration it affects. Hoisted above the split, and the configuration now
+builds and runs `BoxEdge` byte-identically plus `GcStress`/`MtStress` clean.
+
+### The gate has to be in CI, and it has to know which arm it ran
+
+`BoxEdge` first lived only in `run-gauntlet.sh` -- and **no workflow runs the gauntlet**, so
+the feature shipped on by default with nothing in CI exercising it.
+`TaggedValueIntegrationTest` closes that: it drives the *same* `BoxEdge` source (read from
+`vm/benchmarks`, not copied, so the two cannot drift) through the translator and cmake, builds
+it twice from one translation, and compares both against a real JVM. About 67s.
+
+The subtle part is that byte-identity **cannot** tell a correct tagged build from one where
+tagging never happened -- the two representations are required to be indistinguishable, which
+is the whole contract. So `BoxEdge` prints `[TAGCODES]`, the tag code each type actually got,
+and the test asserts `123456` for the default build and `000000` for
+`-DCN1_DISABLE_TAGGED_INT`. Compiling the extra types out and re-running proves this is load
+bearing: the two byte-identity assertions still **pass**, and only the witness fails, with
+`expected: <123456> but was: <100000>`.
+
+Two mechanics worth knowing before touching it:
+
+- **Stderr is not a way to keep a diagnostic out of the compared stream.** On the clean target
+  `System.err` also reaches fd 1. The `[`-prefix convention is the answer, and
+  `run-gauntlet.sh` now applies that filter to **both** sides -- it used to filter only the
+  target, so any torture emitting a diagnostic diverged against its own host run.
+- **The reference JVM must be JDK 19+.** JDK 19 replaced `Double.toString`/`Float.toString`
+  with the shortest round-tripping representation (JDK-4511638) and ParparVM implements the
+  new algorithm, so an older reference reports divergences that are the reference being out of
+  date: `4.6116860184273879E18` from JDK 17 against `4.611686018427388E18` from ParparVM and
+  JDK 19+. Both round-trip; only the second is the shortest such string. The test selects its
+  reference JDK independently of the toolchain that drives the translator, and skips if none
+  is new enough.
+
+### Three defects this work surfaced, none of them caused by it
+
+All three were pre-existing and are fixed here, and all three were found by `BoxEdge` on its
+first run against the host JVM -- which is the argument for a byte-identical torture over an
+assertion suite: nobody thought to assert any of them.
+
+- **`Short.equals` had no null guard** where every other wrapper did, so
+  `Short.valueOf(1).equals(null)` dereferenced null -- a hard SIGSEGV on any target that
+  installs no signal handler, which is every one except iOS.
+- **`Float.toString` never got the fixes `Double.toString` has.** No NaN branch (NaN fell
+  through to the scientific-notation path, since every comparison against a NaN is false) and
+  no signed-zero branch, so `Float.toString(-0.0f)` printed `0.0` while `Float.compare`,
+  `Float.equals` and `Arrays.sort` all still honoured the sign. Confirmed pre-existing by
+  reproducing it with `-DCN1_DISABLE_TAGGED_INT`.
+- **`Short.compareTo` returned the sign, not the difference.** The JDK defines it as
+  `Short.compare`, which -- unlike `Integer.compare` and `Long.compare`, which really do
+  return -1/0/1 -- is `x - y`. It disagreed with the JDK and with this class's own
+  `compare(short, short)` directly above it.
+
+### An arbitrary word is now a boxed value seven times in eight
+
+A machine word whose low three bits spell a tag code is **indistinguishable** from a genuine
+immediate; they are the same bit pattern. The iOS debugger therefore reports a boxed value
+for a misread int slot rather than rejecting it. That is a fidelity cost, not a safety one --
+it never dereferences, which is the property issue #5333 was about -- and it is not new,
+since an odd word was already a tagged Integer when the tag was one bit. Widening to three
+bits takes the affected fraction from one in two to seven in eight.
+
+**The GC is completely unaffected by that**, and this is the fact to reach for when the
+question comes up: `cn1ConservativeResolve` rejects a word with a bit set in
+`sizeof(void*) - 1` -- the same three bits -- so a misread int was never a root before and is
+not one now.
+
+Two consequences that did need edits: `DebuggerObjectValidationTest`'s `MISALIGNED` probe
+used `ptr | 2`, which is now a valid tagged `Long`, so it uses the reserved code 7; and
+`NativeDebuggerHarness` stubbed `cn1TaggedProxy` as all zeros, which -- now that
+`cn1_debugger_class_of` resolves through `CN1_CLASS_OF` -- would have made every tagged
+assertion an assertion about nothing.
+
+## Narrowing a float to an int is SATURATING, and C's cast is not
+
+JLS 5.1.3: converting a `float` or `double` to an `int` or `long` clamps -- NaN becomes 0,
+anything at or above the target's maximum becomes `MAX_VALUE`, anything at or below its
+minimum becomes `MIN_VALUE`. A C cast is **undefined** out of range, and the two
+architectures this VM ships on disagree about what it actually does:
+
+| | `(int) Double.MAX_VALUE` |
+|---|---|
+| arm64 (`fcvtzs`) | 2147483647 -- accidentally correct |
+| x86-64 (`cvttsd2si`) | **-2147483648** -- the "integer indefinite" value |
+
+So this was right on Apple silicon and wrong everywhere else, for every app, silently. It was
+found by running `BoxEdge` under CI's x86 Linux after it had passed on an M-series Mac.
+
+**There are THREE emission sites, and patching two of them looks like it works.** The two
+obvious ones are `BC_{F2I,F2L,D2I,D2L}` in `cn1_globals.h` and the statement forms in
+`BasicInstruction.java`. The third is `ArithmeticExpression.java`, which renders a conversion
+as a raw cast *inside a composed expression* -- and that is the one the optimizer actually
+uses for the common shapes, so a fix to the first two changes nothing you can see. All three
+now call `cn1SaturateToInt` / `cn1SaturateToLong`. Note `L2I` sits beside them and is NOT one
+of these: long-to-int is defined truncation.
+
+`-DCN1_NO_SATURATING_NARROWING` restores the old cast; because all three sites route through
+the two helpers, that single macro ablates the whole change and an A/B needs no second
+translator build. `vm/benchmarks/ab-narrowing.sh` interleaves the arms: **geomean 1.0073**,
+every workload within 3.4%, i.e. free.
+
+**That number had to be re-measured to be believed, and the first attempt was worthless.**
+Comparing the new build against ms figures recorded earlier in the same session reported a
+uniform 9-14% regression -- including on `intArithmetic` and `stringBuilding`, which perform
+no narrowing at all. A slowdown that appears on workloads the change cannot touch is the
+host, not the code; this machine cannot resolve 5% across runs minutes apart. Interleave the
+arms inside one process-pair or do not quote a number.
+
+### Dimension and Rectangle: investigated, and tagging is the wrong mechanism
+
+The obvious next thought is to extend this to framework value types. It does not work, and
+the reasons are worth writing down so it is not re-proposed.
+
+- **`Rectangle` is not a flat value at all.** Its fields are `x`, `y`, a `Dimension size`
+  **object reference** and a `GeneralPath path` **object reference** -- an object graph, not
+  four ints. It also has a static instance pool, so it has deliberately recycled identity.
+- **`Dimension` does not fit.** Two ints is 64 bits against a 61-bit payload, so it would
+  need narrowing to 30+30 plus a range fallback.
+- **Both are mutable** (`setWidth`, `setHeight`, `setBounds`, `setX`, `setY`). An immediate
+  has no storage, so a mutation through one alias is invisible to every other. That is not
+  fixable within the scheme.
+- **`new` guarantees identity.** `Integer.valueOf` has an explicit spec exemption to return a
+  shared instance; `new Dimension(1,2) != new Dimension(1,2)` is guaranteed by the JLS.
+
+The mechanism that would pay off is **codegen, not tagging**, and most of it is already here.
+`scalarReplaceStackAllocations` turns `NEW X; DUP; args; <init>; ASTORE` into a pure C local
+with no allocation, no tag, no lookup and no fallback -- strictly better than tagging wherever
+it applies. `Dimension` already passes `srPrimitiveOnlyDirectObject` (it extends `Object`
+directly, has no `__CLINIT__` and holds only ints); `Rectangle` fails it on both its object
+fields and its static pool.
+
+What stops `Dimension` is `srValidateLocalUses`, which requires every use of the local to be
+`ALOAD n; GETFIELD` and bails on a return, an argument pass or a field store --
+and `Component.getPreferredSize()` returns one. There are 127 `new Dimension(` sites and 108
+`new Rectangle(` sites in `CodenameOne/src`.
+
+So the follow-up worth scoping is an `@ImmutableValue` contract -- `BytecodeComplianceMojo`
+enforcing final fields, no setters and no identity-sensitive use, so the translator may treat
+the class as copyable and let scalar replacement survive a return. That is a separate change,
+and the thing to measure FIRST is a `CN1_ALLOC_CENSUS` profile of a real app: if `Dimension`
+and `Rectangle` are not near the top of it, the answer is no and it cost one run to find out.
+
+### Forcing a boxed class's clinit needs release/acquire, not `volatile`
+
+A tagged value never allocates, so nothing else runs its class's `<clinit>` -- and that is
+what fills the vtable a later `hashCode`/`equals`/`compareTo` on the immediate dispatches
+through. Each `valueOf` forces it once, behind a flag.
+
+That flag is a fast path only: `__STATIC_INITIALIZER_X` is already double-checked behind the
+class monitor. What it does affect is **publication**. `volatile` in C is neither atomic nor
+ordered, so a plain flag lets a second thread observe 1 while the initializer's vtable writes
+are still invisible to it on a weak-memory target, and the next virtual call dispatches
+through stale class state. `CN1_FORCE_BOX_CLINIT` publishes with `__ATOMIC_RELEASE` and reads
+with `__ATOMIC_ACQUIRE`, the same pairing `CN1_CONSTANT_POOL_LOAD` documents. Verified in the
+emitted arm64: `ldapr` on the read, `stlr` on the publish.
+
+Release/acquire only carries what the PUBLISHING thread saw, and
+`__STATIC_INITIALIZER_X` is **not** a reliable synchronisation point: its generated fast path
+is `if(__X_LOADED__) return;`, a plain load, and the matching `__X_LOADED__=1` is a plain
+store placed AFTER `monitorExitBlock`. A thread returning through that path has taken no lock
+and may hold none of the initialising thread's writes. So the slow path takes the class
+monitor before publishing, which makes the publisher synchronise-with whoever ran the body;
+monitors are reentrant, so the initializer's own enter nests harmlessly. One uncontended lock
+per class per process, and the hot path stays a single `ldapr`.
+
+**That fixes the six boxed classes, not the VM.** `__X_LOADED__` is a plain-load/plain-store
+double-check on *every* generated class initializer, which predates tagging. Fixing it means
+making that flag acquire/release in `ByteCodeClass`, which touches codegen for every class in
+every app -- its own change, with its own measurement.
+
+The original defect was in the Integer native and this work copied it to five more types; all
+six are converted together, because half a memory-model fix is worse than none.
+
+### Adding a seventh type
+
+Only one code is left, so spend it deliberately. The work is: a proxy entry, `valueOf` +
+`cn1Value` natives (each forcing its class's `__STATIC_INITIALIZER_` once, because a tagged
+value never allocates and nothing else triggers the clinit that fills the vtable), routing
+every value read in the Java class through `cn1Value`, the debugger's
+`cn1_debugger_tagged_value` switch, and `BoxEdge` cases. `ByteCodeClass` already force-retains
+all six wrapper classes from dead-code elimination.
+
+**And FOUR JavaScript files, not one.** The JS port has no immediates, so `valueOf` binds
+straight through to `valueOfHeap` -- which is static and reached only from
+`parparvm_runtime.js`, so bytecode-only reachability never sees the edge and the cull deletes
+it. All four are needed: `parparvm_runtime.js` (the `bindNative`),
+`JavascriptNativeRegistry.RUNTIME_IMPLEMENTED` (the native), and both
+`JavascriptReachability.enqueueResolved` and
+`JavascriptNativeRegistry.RUNTIME_DELEGATE_TARGETS` (the heap twin). Missing the last two
+does not produce a recognisable error -- the fixture returns a wrong value, and
+`JavascriptRuntimeSemanticsTest`'s coverage assertion is one of the few in that class that
+does not print `rawMessage`/`errorMessage`. `JavascriptNativeAuditTest` is inert and catches
+none of it.
+
+
 ## The compact HashMap: benchmark the MISS, not the hit
 
 `java.util.HashMap` here is open-addressed over three parallel arrays with linear probing

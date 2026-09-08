@@ -53,15 +53,28 @@ public final class Short extends Number implements Comparable<Short> {
      * Compares this object to the specified object.
      */
     public boolean equals(java.lang.Object obj){
-        return obj.getClass() == getClass() && ((Short)obj).value == value;
+        // instanceof rather than a null check plus getClass(): Short is final, so it is
+        // exact, and it needs no header -- which is what a tagged immediate has none of.
+        // The missing null guard here was a real defect: equals(null) is specified to return
+        // false, and dereferencing obj was a hard SIGSEGV on targets that install no signal
+        // handler. Every other wrapper in this package already guarded it.
+        return (obj instanceof Short) && ((Short)obj).cn1Value() == cn1Value();
     }
 
     /**
      * Returns a hashcode for this Short.
      */
     public int hashCode(){
-        return value;
+        return cn1Value();
     }
+
+    /**
+     * Returns this Short's value, transparently handling both heap-allocated and
+     * tagged-immediate representations. All value reads route here -- Short is final, so a
+     * plain `return value;` getter would be inlined into a raw field load off a tagged
+     * pointer, which has no fields.
+     */
+    private native short cn1Value();
 
     /**
      * Assuming the specified String represents a short, returns that short's value. Throws an exception if the String cannot be parsed as a short. The radix is assumed to be 10.
@@ -81,14 +94,14 @@ public final class Short extends Number implements Comparable<Short> {
      * Returns the value of this Short as a short.
      */
     public short shortValue(){
-        return value; //TODO codavaj!!
+        return cn1Value();
     }
 
     /**
      * Returns a String object representing this Short's value.
      */
     public java.lang.String toString(){
-        return Integer.toString(value);
+        return Integer.toString(cn1Value());
     }
 
     /**
@@ -96,7 +109,11 @@ public final class Short extends Number implements Comparable<Short> {
      * @param i the primitive
      * @return object instance
      */
-    public static Short valueOf(short i) {
+    // Native so the tagged build can return an immediate without allocating. The off path
+    // (and 32-bit-pointer targets) calls valueOfHeap, preserving the cache.
+    public static native Short valueOf(short i);
+
+    static Short valueOfHeap(short i) {
         if (i >= -128 && i <= 127) {
             return ShortCache.cache[i + 128];
         }
@@ -116,22 +133,22 @@ public final class Short extends Number implements Comparable<Short> {
 
     @Override
     public int intValue() {
-        return value;
+        return cn1Value();
     }
 
     @Override
     public long longValue() {
-        return value;
+        return cn1Value();
     }
 
     @Override
     public float floatValue() {
-        return value;
+        return cn1Value();
     }
 
     @Override
     public double doubleValue() {
-        return value;
+        return cn1Value();
     }
 
     public static int compare(short f1, short f2) {
@@ -139,6 +156,10 @@ public final class Short extends Number implements Comparable<Short> {
     }
 
     public int compareTo(Short another) {
-        return value < another.value ? -1 : value > another.value ? 1 : 0;
+        // The JDK specifies Short.compareTo as Short.compare(a, b), and Short.compare is the
+        // DIFFERENCE, not the sign -- unlike Integer.compare and Long.compare, which really
+        // do return -1/0/1. This returned the sign, so it disagreed with the JDK and with
+        // this class's own compare(short, short) directly above.
+        return cn1Value() - another.cn1Value();
     }
 }
