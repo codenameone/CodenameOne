@@ -5607,6 +5607,17 @@ public abstract class CodenameOneImplementation {
     ///
     /// a caching object or null  if caching isn't supported
     public Object createSoftWeakRef(Object o) {
+        // STILL A WeakReference, DELIBERATELY, and not an oversight now that ParparVM has
+        // a real SoftReference with a ranked retention policy behind it.
+        //
+        // Switching this method -- and deleting the iOS override, which pins every entry
+        // in a Hashtable until a memory warning replaces the whole map -- changes the
+        // lifetime of every decoded image, gradient and resource cache in every app on
+        // every platform. That wants its own change and its own bisect point, because
+        // each call site also needs deciding individually rather than mechanically: a
+        // rebuildable cache wants a SoftReference, while a lifetime tracker such as
+        // JavascriptContext reads a null extract as PROOF the wrapper was collected and
+        // would leak, or worse, under one that outlives its referent.
         return new WeakReference(o);
     }
 

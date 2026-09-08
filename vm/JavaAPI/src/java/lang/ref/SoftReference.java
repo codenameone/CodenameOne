@@ -49,6 +49,15 @@ package java.lang.ref;
  * of its time in the grace pass.</p>
  */
 public class SoftReference extends java.lang.ref.Reference{
+    // NOTHING IN THE PORTS CONSTRUCTS ONE YET, and that is the intended state here.
+    // Display.createSoftWeakRef still answers with a WeakReference, and the iOS port still
+    // overrides it with a Hashtable that pins entries until a memory warning; migrating
+    // those is a separate change, for the reasons recorded at
+    // CodenameOneImplementation.createSoftWeakRef. What this class and the collector work
+    // beside it deliver is the mechanism and the measurement that justifies it -- an
+    // application may construct one today and get the ranked behaviour.
+
+
     /**
      * Creates a new soft reference that refers to the given object.
      */
