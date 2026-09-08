@@ -89,6 +89,34 @@ public class CustomPaintRenderElement extends SingleChildRenderElement {
             run(g, paintWidget().getForegroundPainter());
         }
 
+        /**
+         * Gives the painter back the ground an ancestor Transform took away.
+         *
+         * <p>Flutter does not clip a CustomPainter to the box it was handed --
+         * an ancestor ClipRect does that -- so a painter may draw well outside
+         * its own size. Codename One clips every component to its bounds, and
+         * when an ancestor Transform has shifted the origin those bounds move
+         * with it, so the part of the drawing the shift brings into view is cut
+         * off instead. The 2D-transformations demo centres a board wider than
+         * the screen by translating it, and lost a strip down the right-hand
+         * side exactly as wide as the shift.</p>
+         *
+         * <p>The shift is recoverable: a graphics being painted through has
+         * accumulated its ancestors' offsets, so without a transform its
+         * translation plus this component's parent-relative position is its
+         * absolute position. Whatever that identity is out by IS the transform.
+         * Clip to the box this component occupies ON SCREEN rather than to the
+         * one the shift moved it to.</p>
+         */
+        private void unclipFromAncestorTransform(Graphics g) {
+            int[] box = CustomPaintRenderElement.onScreenClip(g.getTranslateX(), g.getTranslateY(),
+                    getX(), getY(), getAbsoluteX(), getAbsoluteY(),
+                    getWidth(), getHeight());
+            if (box != null) {
+                g.setClip(box[0], box[1], box[2], box[3]);
+            }
+        }
+
         private void run(Graphics g, CustomPainter painter) {
             if (painter == null) {
                 return;
@@ -104,6 +132,7 @@ public class CustomPaintRenderElement extends SingleChildRenderElement {
             int color = g.getColor();
             int alpha = g.getAlpha();
             try {
+                unclipFromAncestorTransform(g);
                 // the painter's box, in the logical pixels it expects
                 Size logical = new Size(getWidth() / dpr, getHeight() / dpr);
                 // The origin is this component's PARENT-RELATIVE position, because a Graphics
@@ -123,5 +152,25 @@ public class CustomPaintRenderElement extends SingleChildRenderElement {
                 g.setAlpha(alpha);
             }
         }
+    }
+
+    /**
+     * The component's ON-SCREEN box in the coordinates the graphics is
+     * currently painting in, or null when no ancestor transform has moved
+     * it and the clip already in force is the right one.
+     *
+     * <p>Without a transform, a graphics being painted through has
+     * accumulated exactly the ancestors' offsets, so its translation plus
+     * this component's parent-relative position is its absolute position.
+     * Whatever that identity is out by IS the transform's shift.</p>
+     */
+    static int[] onScreenClip(int translateX, int translateY, int x, int y,
+            int absoluteX, int absoluteY, int width, int height) {
+        int extraX = translateX + x - absoluteX;
+        int extraY = translateY + y - absoluteY;
+        if (extraX == 0 && extraY == 0) {
+            return null;
+        }
+        return new int[] {x - extraX, y - extraY, width, height};
     }
 }
