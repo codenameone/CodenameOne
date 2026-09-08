@@ -377,12 +377,12 @@ public class BackendPackageMojo extends AbstractMojo {
                         if (nativeTarget == null) {
                             continue;
                         }
-                        destination = new File(nativeTarget,
-                                name.substring("cn1-native/".length()));
+                        destination = resolveInside(nativeTarget,
+                                name.substring("cn1-native/".length()), jar, name);
                     } else if (name.startsWith("META-INF/")) {
                         continue;
                     } else {
-                        destination = new File(javaTarget, name);
+                        destination = resolveInside(javaTarget, name, jar, name);
                     }
                     mkdirs(destination.getParentFile());
                     InputStream in = zip.getInputStream(entry);
@@ -398,6 +398,33 @@ public class BackendPackageMojo extends AbstractMojo {
         } catch (IOException err) {
             throw new MojoExecutionException("Could not unpack " + jar, err);
         }
+    }
+
+    /**
+     * The entry's destination, proven to be inside the directory it unpacks into.
+     *
+     * An archive entry name is attacker-controlled data, not a path this build
+     * chose: an entry called `../../../../etc/whatever` makes `new File(root, name)`
+     * resolve outside `root`, so unpacking writes wherever the entry says. That is
+     * Zip Slip, and here it would run with the developer's privileges during an
+     * ordinary `mvn package` against whatever jar the coordinates resolved to.
+     *
+     * Compared after canonicalisation rather than on the raw string, because `..`
+     * is not the only way out -- a symlinked parent resolves elsewhere too, and the
+     * textual check passes for both. The separator is appended to the root so a
+     * sibling whose name merely starts with it ("/tmp/outdir-evil" against
+     * "/tmp/outdir") cannot satisfy the prefix test.
+     */
+    private static File resolveInside(File root, String relative, File jar, String entryName)
+            throws IOException {
+        File destination = new File(root, relative);
+        String prefix = root.getCanonicalPath() + File.separator;
+        String resolved = destination.getCanonicalPath();
+        if (!resolved.startsWith(prefix)) {
+            throw new IOException("Refusing to unpack " + jar + ": entry \"" + entryName
+                    + "\" resolves to " + resolved + ", outside " + root.getCanonicalPath());
+        }
+        return destination;
     }
 
     private static void copy(InputStream in, File destination) throws IOException {
