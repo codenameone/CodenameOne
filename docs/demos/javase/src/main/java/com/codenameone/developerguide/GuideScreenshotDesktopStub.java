@@ -76,6 +76,19 @@ public final class GuideScreenshotDesktopStub implements Runnable {
         // Display.init, because the implementation reads them as it comes up.
         Locale.setDefault(Locale.US);
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+
+        // A simulator skin decides platform name, fonts, geometry and device class,
+        // and it is selected from these two properties: JavaSEPort.hasSkins() is
+        // "skin != null || dskin != null", and every skin path sits behind it, the
+        // stored preference included. Whoever launches the generator could have
+        // either set -- from a shell, an IDE run configuration, an inherited
+        // environment -- and the figures would then be rendered against that
+        // device's state while still being written to the same golden files. The
+        // renderer refuses an iOS skin by platform name, but an Android skin
+        // reports "and" and would pass that check while changing everything.
+        // Clearing both is what actually guarantees no skin loads.
+        System.clearProperty("skin");
+        System.clearProperty("dskin");
         if (!MODE_SCHEMATIC.equals(mode)) {
             FigureDevice device = FigureDevice.fromKey(mode);
             System.setProperty("cn1.javase.pixelMilliRatio",
