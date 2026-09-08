@@ -1,16 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="820" height="610" viewBox="0 0 820 610">
-  <rect x="0" y="0" width="820" height="610" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="624" viewBox="0 0 820 624">
+  <rect x="0" y="0" width="820" height="624" fill="#ffffff"/>
   <text x="410" y="26" font-family="Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#222222">A network request, and which thread each callback runs on</text>
   <text x="410" y="44" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Every box is conditional. The label under each one says when it is taken.</text>
-  <rect x="24" y="58" width="772" height="84" rx="6" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
+  <rect x="24" y="58" width="772" height="90" rx="6" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
   <text x="410" y="78" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a6fa5">Your code</text>
-  <rect x="48" y="88" width="340" height="44" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
+  <rect x="48" y="88" width="340" height="50" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
   <text x="218" y="106" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">addToQueue(request)</text>
   <text x="218" y="122" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">returns at once, request runs in the background</text>
-  <rect x="432" y="88" width="340" height="44" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
+  <rect x="432" y="88" width="340" height="50" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
   <text x="602" y="106" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">addToQueueAndWait(request)</text>
-  <text x="602" y="122" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">on the EDT it waits via invokeAndBlock; off it, the caller blocks</text>
-  <path d="M 410 142 L 410 160" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="602" y="120" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">on the EDT it waits via invokeAndBlock; off it, the caller blocks</text>
+  <text x="602" y="131" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#a56a3a">never call it from a network callback below</text>
+  <path d="M 410 148 L 410 160" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <path d="M 405 154 L 410 160 L 415 154" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <rect x="24" y="164" width="772" height="250" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
   <text x="410" y="184" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a7a3d">Network thread</text>
@@ -48,7 +49,7 @@
   <text x="410" y="398" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">The queue is sorted by priority, so a request can overtake one already waiting. Nothing here is on the EDT.</text>
   <path d="M 410 414 L 410 432" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
   <path d="M 405 426 L 410 432 L 415 426" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
-  <rect x="24" y="436" width="772" height="164" rx="6" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
+  <rect x="24" y="436" width="772" height="178" rx="6" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
   <text x="410" y="456" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#a56a3a">EDT</text>
   <rect x="40" y="466" width="236" height="40" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
   <text x="158" y="482" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">postResponse()</text>
@@ -63,5 +64,6 @@
   <text x="410" y="540" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">goes to the request's own responseCodeListeners if it has any, and then stops; a NetworkManager listener sees it</text>
   <text x="410" y="554" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">only when there are none, failSilently is off and handleErrorCodesInGlobalErrorHandler is true. An exception runs</text>
   <text x="410" y="568" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">the other way round: the global listener first, and the request's own handler only if it did not consume the event.</text>
-  <text x="410" y="582" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">A 304 from cache, readResponseForErrors=false, or kill() all end the request before postResponse is reached.</text>
+  <text x="410" y="582" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">A 304 from cache, readResponseForErrors=false, an onRedirect override returning true, or kill() all end the</text>
+  <text x="410" y="596" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">request before postResponse is reached. With one worker, waiting from a network callback deadlocks: nothing is left to run the request.</text>
 </svg>
