@@ -1425,13 +1425,13 @@ The data of the `Tree` arrives from a model for example: this:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/TreeFigure.java[tag=the-components-of-codename-one-java-182,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava182Snippet.java[tag=the-components-of-codename-one-java-182,indent=0]
 ----
 
 Will result in this:
 
 .Tree
-image::img/generated/tree.png[Tree,scaledwidth=20%]
+image::img/tree.png[Tree,scaledwidth=20%]
 
 NOTE: Since `Tree` is hierarchy based you can't have a simple model like you've for the `Table` as deep hierarchy is harder to represent with arrays.
 
@@ -1728,11 +1728,11 @@ Here is a simple example that also shows the difference between the `scale to fi
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsScaleimageFigure.java[tag=the-components-of-codename-one-java-190,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava190Snippet.java[tag=the-components-of-codename-one-java-190,indent=0]
 ----
 
 .ScaleImageLabel/Button, the top row includes scale to fit versions (the default) whereas the bottom row includes the scale to fill versions
-image::img/generated/components-scaleimage.png[ScaleImageLabel/Button the top row includes scale to fit versions (the default) whereas the bottom row includes the scale to fill versions,scaledwidth=25%]
+image::img/components-scaleimage.png[ScaleImageLabel/Button the top row includes scale to fit versions (the default) whereas the bottom row includes the scale to fill versions,scaledwidth=25%]
 
 
 WARNING: When styling these components keep in mind that changing attributes such as background behavior might cause an issue with their functionality or might not work.
@@ -2222,11 +2222,11 @@ For example: This is a trivial use case that can work well for smaller sample si
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsAutocompleteFigure.java[tag=the-components-of-codename-one-java-119,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava119Snippet.java[tag=the-components-of-codename-one-java-119,indent=0]
 ----
 
 .Autocomplete Text Field
-image::img/generated/components-autocomplete.png[Autocomplete Text Field,scaledwidth=30%]
+image::img/components-autocomplete.png[Autocomplete Text Field,scaledwidth=30%]
 
 
 For example, if you wish to query a database or a web service you will need to derive the class and perform more advanced filtering by overriding the `filter` method:
@@ -2589,11 +2589,11 @@ Simple usage of the `Accordion` class looks like:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsAccordionFigure.java[tag=the-components-of-codename-one-java-136,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava136Snippet.java[tag=the-components-of-codename-one-java-136,indent=0]
 ----
 
 .The Accordion Component
-image::img/generated/components-accordion.png[The Accordion Component,scaledwidth=30%]
+image::img/components-accordion.png[The Accordion Component,scaledwidth=30%]
 
 === Floating hint
 

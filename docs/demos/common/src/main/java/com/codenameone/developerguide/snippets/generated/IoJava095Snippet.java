@@ -1,27 +1,4 @@
 /*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Codename One through http://www.codenameone.com/ if you
- * need additional information or have any questions.
- */
-
-/*
  * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
@@ -43,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.developerguide.screenshots;
+package com.codenameone.developerguide.snippets.generated;
 
 import com.codename1.gpu.*;
 import com.codename1.ui.*;
@@ -86,8 +63,7 @@ import com.codename1.io.services.*;
 import java.util.*;
 
 
-class FilesystemTreeFigure implements GuideFigure {
-
+class IoJava095Snippet {
 
 
     Object context;
@@ -129,72 +105,61 @@ class FilesystemTreeFigure implements GuideFigure {
     java.io.InputStream input;
     java.io.OutputStream outputStream;
     
-    
-
-    @Override
-    public String id() {
-        return "filesystem-tree";
-    }
-
-    /// The tagged region is what the chapter includes, so the listing beside the
-    /// picture is the code that drew it.
-    @Override
-    public Form build() {
+    void snippet() throws Exception {
         // tag::io-java-095[]
         Form hi = new Form("FileSystemTree", new BorderLayout());
         TreeModel tm = new TreeModel() {
-        @Override
-        public Vector getChildren(Object parent) {
-        String[] files;
-        if(parent == null) {
-        files = FileSystemStorage.getInstance().getRoots();
-        return new Vector<Object>(Arrays.asList(files));
-        } else {
-        try {
-        files = FileSystemStorage.getInstance().listFiles((String)parent);
-        } catch(IOException err) {
-        Log.e(err);
-        files = null;
-        }
-        if(files == null) {
-        // the directory went away or cannot be read
-        files = new String[0];
-        }
-        }
-        String p = (String)parent;
-        Vector result = new Vector();
-        for(String s : files) {
-        result.add(p + FileSystemStorage.getInstance().getFileSystemSeparator() + s);
-        }
-        return result;
-        }
+            @Override
+            public Vector getChildren(Object parent) {
+                String[] files;
+                if(parent == null) {
+                    files = FileSystemStorage.getInstance().getRoots();
+                    return new Vector<Object>(Arrays.asList(files));
+                } else {
+                    try {
+                        files = FileSystemStorage.getInstance().listFiles((String)parent);
+                    } catch(IOException err) {
+                        Log.e(err);
+                        files = null;
+                    }
+                    if(files == null) {
+                        // the directory went away or cannot be read
+                        files = new String[0];
+                    }
+                }
+                String p = (String)parent;
+                Vector result = new Vector();
+                for(String s : files) {
+                    result.add(p + FileSystemStorage.getInstance().getFileSystemSeparator() + s);
+                }
+                return result;
+            }
 
-        @Override
-        public boolean isLeaf(Object node) {
-        return !FileSystemStorage.getInstance().isDirectory((String)node);
-        }
+            @Override
+            public boolean isLeaf(Object node) {
+                return !FileSystemStorage.getInstance().isDirectory((String)node);
+            }
         };
         Tree t = new Tree(tm) {
-        @Override
-        protected String childToDisplayLabel(Object child) {
-        String n = (String)child;
-        // the paths above are built with the platform separator, which is
-        // a backslash on Windows
-        char sep = FileSystemStorage.getInstance().getFileSystemSeparator();
-        // roots arrive with a trailing separator
-        while(n.length() > 1 && n.charAt(n.length() - 1) == sep) {
-        n = n.substring(0, n.length() - 1);
-        }
-        int pos = n.lastIndexOf(sep);
-        if(pos < 0 || pos == n.length() - 1) {
-        return n; // a bare root has no basename to show
-        }
-        return n.substring(pos + 1);
-        }
+            @Override
+            protected String childToDisplayLabel(Object child) {
+                String n = (String)child;
+                // the paths above are built with the platform separator, which is
+                // a backslash on Windows
+                char sep = FileSystemStorage.getInstance().getFileSystemSeparator();
+                // roots arrive with a trailing separator
+                while(n.length() > 1 && n.charAt(n.length() - 1) == sep) {
+                    n = n.substring(0, n.length() - 1);
+                }
+                int pos = n.lastIndexOf(sep);
+                if(pos < 0 || pos == n.length() - 1) {
+                    return n; // a bare root has no basename to show
+                }
+                return n.substring(pos + 1);
+            }
         };
         hi.add(BorderLayout.CENTER, t);
         hi.show();
         // end::io-java-095[]
-        return hi;
     }
 }

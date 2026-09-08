@@ -60,7 +60,7 @@
 ///
 /// ### AutoCompleteTextField
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/generated/components-autocomplete.png)
+/// ![](https://www.codenameone.com/developer-guide/img/components-autocomplete.png)
 /// `com.codename1.ui.AutoCompleteTextField` provides suggestions as you type into the text
 /// field
 ///
@@ -294,7 +294,7 @@
 ///
 /// ### Accordion
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/generated/components-accordion.png)
+/// ![](https://www.codenameone.com/developer-guide/img/components-accordion.png)
 /// `com.codename1.components.Accordion` displays collapsible content panels
 ///
 /// ### FloatingHint

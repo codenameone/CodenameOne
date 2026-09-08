@@ -258,11 +258,11 @@ viewing.
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/EditorsCodeFigure.java[tag=the-components-of-codename-one-java-117,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava117Snippet.java[tag=the-components-of-codename-one-java-117,indent=0]
 ----
 
 .CodeEditor with Java syntax highlighting and line numbers
-image::img/generated/editors-code.png[CodeEditor showing highlighted Java source,scaledwidth=30%]
+image::img/editors-code.png[CodeEditor showing highlighted Java source,scaledwidth=30%]
 
 Choose the language with `setLanguage(...)`, select `"light"` or `"dark"` with `setTheme(...)`, toggle
 the gutter with `setShowLineNumbers(...)`, and configure indentation with `setTabSize(...)`.

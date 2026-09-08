@@ -134,11 +134,11 @@ A more advanced usage of the `FileSystemStorage` API can be a `FileSystemStorage
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/FilesystemTreeFigure.java[tag=io-java-095,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava095Snippet.java[tag=io-java-095,indent=0]
 ----
 
 .Simple sample of a tree for the FileSystemStorage API
-image::img/generated/filesystem-tree.png[Simple sample of a tree for the FileSystemStorage API,scaledwidth=20%]
+image::img/filesystem-tree.png[Simple sample of a tree for the FileSystemStorage API,scaledwidth=20%]
 
 // vale-skip: Microsoft.HeadingPunctuation: "vs." is an abbreviation for "versus" — the period belongs to the abbreviation, not to a heading-end terminator.
 ==== Storage vs. file system

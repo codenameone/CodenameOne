@@ -168,17 +168,22 @@ public final class GuideFigureRenderer {
     /// Height to keep, so a figure is the part of the screen that has something
     /// on it rather than a phone-shaped picture that is four fifths empty.
     ///
-    /// Measured from the laid-out components instead of being configured per
-    /// figure: whatever the theme does to spacing, the crop follows it.
+    /// Measured from what the content PREFERS, not from where it was laid out.
+    /// prepare() sizes the content pane to the whole device, and a form whose
+    /// child sits in BorderLayout.CENTER has that child stretched to fill it --
+    /// so reading the child's bounds reported the full height for every such
+    /// figure and cropped nothing at all, which is how the table, CSV and tree
+    /// figures came out 409x917 with most of the page blank.
     private static int figureHeight(Form form, FigureDevice device) {
         Container content = form.getContentPane();
+        int preferred = content.getPreferredH();
         int bottom = 0;
         for (int i = 0; i < content.getComponentCount(); i++) {
             Component child = content.getComponentAt(i);
-            bottom = Math.max(bottom, child.getY() + child.getHeight());
+            bottom = Math.max(bottom, child.getY() + child.getPreferredH());
         }
-        int padding = content.getStyle().getPaddingBottom();
-        int used = content.getAbsoluteY() + bottom + padding;
+        int used = content.getAbsoluteY() + Math.min(Math.max(preferred, bottom), device.height())
+                + content.getStyle().getPaddingBottom();
         return Math.min(device.height(), Math.max(1, used));
     }
 
