@@ -2696,16 +2696,25 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     //    means a waiter can be parked outside the table mutex holding monitor data
     //    a remover is about to free. That is a correctness risk taken on for a
     //    leak, which is the wrong trade.
-    //  - The reachable case is already refused at BUILD time.
-    //    BytecodeComplianceMojo rejects MONITORENTER whose receiver is any of the
-    //    eight primitive wrappers, so an application cannot express the loop above
-    //    and still build; BytecodeComplianceMojoTest proves it fires for each type
-    //    rather than for Integer alone.
+    //  - The DIRECT form is refused at BUILD time. BytecodeComplianceMojo rejects
+    //    MONITORENTER whose operand is statically typed as one of the eight primitive
+    //    wrappers, and BytecodeComplianceMojoTest proves it fires for each type rather
+    //    than for Integer alone.
     //
-    // What is NOT covered is framework and JavaAPI code, which that mojo does not
-    // scan. There is none today -- no `synchronized` on a boxed value anywhere in
-    // CodenameOne/src, vm/JavaAPI/src or Ports -- and adding one would reintroduce
-    // this. Use a dedicated lock object.
+    // That build check is a PARTIAL mitigation and should not be described as more.
+    // The analysis is intra-procedural and types-only, so passing Float.valueOf(i) to a
+    // helper that takes Object and synchronizing on the parameter walks straight past
+    // it -- the operand is typed Object and the build passes. Storing the box in a
+    // field, an array or a collection defeats it the same way. Tracking erased wrapper
+    // origins would catch the easiest of those and lose to the rest, which is why it is
+    // a gate against the obvious mistake rather than a proof of unreachability.
+    //
+    // So the leak IS reachable from application code, and it is accepted rather than
+    // solved. It is bounded by the number of distinct boxed values a program ever uses
+    // as a lock, which is zero for every program that follows the rule the gate states.
+    // Framework and JavaAPI code is not scanned by that mojo at all; there is no
+    // `synchronized` on a boxed value anywhere in CodenameOne/src, vm/JavaAPI/src or
+    // Ports today, and adding one would reintroduce this. Use a dedicated lock object.
     int err = 0;
     // Double-checked locking for the lazily allocated per-object monitor. The fast-path
     // read MUST be an acquire load and the publishing store (inside the critical section)

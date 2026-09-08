@@ -1273,6 +1273,21 @@ struct TryBlock {
 #define CN1_THREAD_STACK_BYTES (16 * 1024 * 1024)
 #endif
 
+// The SATB entry points are DEFINED unconditionally in cn1_globals.m, and nativeMethods.m
+// calls the bulk trio from java_lang_System_arraycopy with no #ifdef around it -- so these
+// declarations have to be visible in both branches below. They used to sit inside the
+// no-nursery #else, which meant a -DCN1_NURSERY build failed to compile on three implicit
+// declarations and had done for as long as the bulk barrier has existed. That silently
+// retired an ablation arm this tree documents, and it is why the missing tag guard in the
+// nursery root scan could not be caught by building the configuration it affects.
+extern volatile int gcSatbActive;
+extern void cn1SatbEnqueue(JAVA_OBJECT old);
+extern volatile int gcSatbTerminating;
+extern JAVA_BOOLEAN cn1SatbBulkBegin(void);
+extern void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count);
+extern void cn1SatbBulkEnd(void);
+extern void cn1SatbBulkQuiesce(void);
+
 #ifdef CN1_NURSERY
 // Tunables (override with -D). Block size and arena size trade footprint against
 // how long churn lives before a minor collection (the bigger the nursery, the more
@@ -1322,6 +1337,17 @@ struct ThreadLocalData;
 extern JAVA_OBJECT cn1NurseryAlloc(struct ThreadLocalData* threadStateData, int size, struct clazz* parent);
 extern void cn1NurseryWriteBarrier(JAVA_OBJECT target, JAVA_OBJECT value);
 static inline JAVA_BOOLEAN cn1InNursery(void* p) {
+    // A tagged immediate is a VALUE, not an address, and EVERY caller of this dereferences
+    // the header the moment it answers true -- `cn1InNursery(o) && o->__heapPosition == -1`
+    // is the shape at all six call sites. So the guard belongs here rather than at each of
+    // them: a Double carries the raw IEEE pattern and a Long a shifted payload, either of
+    // which can land inside the arena range by coincidence, and the read that follows is
+    // then an unaligned load off a word that has no object header. With a ONE-bit tag this
+    // survived on the range check happening to exclude small odd addresses; with three bits
+    // and five more types it does not.
+    if(CN1_IS_TAGGED(p)) {
+        return JAVA_FALSE;
+    }
     return (char*)p >= cn1NurseryArenaStart && (char*)p < cn1NurseryArenaEnd;
 }
 // Emitted by the translator before an object-reference store into a heap location.
@@ -1330,13 +1356,12 @@ static inline JAVA_BOOLEAN cn1InNursery(void* p) {
 // check with no call and no getThreadLocalData() TLS lookup. This matters enormously
 // for store-heavy code (HashMap internals, etc.) and makes the barrier ~free whenever
 // the nursery isn't holding the value (including while bypassed).
-// The CN1_IS_TAGGED guard is not decoration: cn1NurseryWriteBarrier dereferences
-// value->__heapPosition, and a tagged immediate has no header. With a one-bit tag this
-// survived on cn1InNursery's range check happening to exclude small odd addresses; a tagged
-// Long or Double is an ordinary-looking large word that can land inside an arena.
+// Tagged immediates are excluded by cn1InNursery itself -- see the note there; this used
+// to carry its own CN1_IS_TAGGED test, which fixed the barrier and left the five other
+// call sites that dereference straight after it still exposed.
 #define CN1_WRITE_BARRIER(target, value) \
     do { JAVA_OBJECT cn1__bv = (JAVA_OBJECT)(value); \
-         if(cn1__bv != JAVA_NULL && !CN1_IS_TAGGED(cn1__bv) && cn1InNursery(cn1__bv)) { \
+         if(cn1__bv != JAVA_NULL && cn1InNursery(cn1__bv)) { \
              cn1NurseryWriteBarrier((JAVA_OBJECT)(target), cn1__bv); } } while(0)
 #else
 // No nursery: repurpose the (already-emitted-at-every-object-store) write barrier as the
@@ -1345,13 +1370,6 @@ static inline JAVA_BOOLEAN cn1InNursery(void* p) {
 // into is a fresh grace object not yet reachable (the residual Property->Double /
 // container->content crash). Pairs with CN1_SATB_DELETE (the deletion half) for a
 // complete snapshot + incremental barrier. Off-mark: one predicted-not-taken flag load.
-extern volatile int gcSatbActive;
-extern void cn1SatbEnqueue(JAVA_OBJECT old);
-extern volatile int gcSatbTerminating;
-extern JAVA_BOOLEAN cn1SatbBulkBegin(void);
-extern void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count);
-extern void cn1SatbBulkEnd(void);
-extern void cn1SatbBulkQuiesce(void);
 #if defined(CN1_DISABLE_SATB)
 #define CN1_WRITE_BARRIER(target, value) do { } while(0)
 #else

@@ -146,14 +146,49 @@ It is still not fixed, and the reasoning is recorded at `monitorEnter` in `nativ
 the shape was already unbounded for Integer, nothing in this VM reclaims a monitor at
 `monitorExit` so removal would be a new mechanism for every monitor rather than a tagged-only
 patch, and it would be built in the subsystem that already carries the documented three-way
-`monitorEnter` deadlock. The reachable case is refused at BUILD time instead --
-`BytecodeComplianceMojo` rejects `MONITORENTER` on any of the eight primitive wrappers.
+`monitorEnter` deadlock.
 
-That rule always named all eight, but its test only ever exercised Integer. It is
-parameterised across every wrapper now, because a rule proven for one of the types it claims
-to cover is not a rule to lean on. What the mojo does **not** scan is framework and JavaAPI
-code; there is no `synchronized` on a boxed value anywhere in `CodenameOne/src`,
-`vm/JavaAPI/src` or `Ports` today, and adding one would reintroduce this.
+**`BytecodeComplianceMojo` is a partial mitigation, not a proof of unreachability**, and the
+first version of that comment said otherwise. It rejects `MONITORENTER` whose operand is
+*statically typed* as a wrapper, which is intra-procedural and types-only -- hand the box to
+a helper taking `Object` and synchronize on the parameter and the build passes; a field, an
+array or a collection defeats it the same way. It is a gate against the obvious mistake. The
+leak is therefore reachable from application code and accepted, bounded by the number of
+distinct boxed values a program ever locks on, which is zero for anything following the rule.
+
+The rule always named all eight wrappers, but its test only ever exercised Integer. It is a
+loop over all eight now -- not `@ParameterizedTest`, because that module carries
+`junit-jupiter-api` and `-engine` only and adding `junit-jupiter-params` to a Maven plugin's
+pom for one test is not worth it. Its generator also hardcoded `ICONST_1`, so a `(J)`/`(D)`/
+`(F)` `valueOf` would have produced a type-incorrect method and asserted nothing.
+
+Framework and JavaAPI code is not scanned by that mojo at all; there is no `synchronized` on
+a boxed value anywhere in `CodenameOne/src`, `vm/JavaAPI/src` or `Ports` today.
+
+### The nursery guard belongs in cn1InNursery, and -DCN1_NURSERY did not compile
+
+Every caller of `cn1InNursery` dereferences the header the instant it answers true --
+`cn1InNursery(o) && o->__heapPosition == -1` is the shape at all six sites, in the minor
+collection's stack-root scan, its `currentThreadObject` and `exception` roots, the promote
+path and the write barrier. A tagged `Double` carries a raw IEEE pattern and a tagged `Long`
+a shifted payload, either of which can land inside the arena range by coincidence, and the
+read that follows is an unaligned load off a word with no header. The guard therefore lives
+in `cn1InNursery` itself; guarding only the write barrier -- which is what the first version
+of this work did -- left the other five exposed.
+
+**Reachable by construction, not observed.** Instrumenting the range check to count tagged
+values that fall inside the arena gives **0** on `BoxEdge`, `GcStress` and `MtStress`: a
+tagged Long is `v << 3` and a tagged Double's bit pattern is astronomically larger than a
+heap address, so the overlap needs an unusual value. Real, narrow, and cheap to exclude.
+
+**`-DCN1_NURSERY` had not compiled for as long as the bulk SATB barrier has existed.** The
+`cn1SatbBulkBegin` / `cn1SatbEnqueueRangeLocked` / `cn1SatbBulkEnd` declarations sat inside
+the no-nursery `#else` while `nativeMethods.m` calls all three unconditionally from
+`java_lang_System_arraycopy`, so the build died on three implicit declarations. The functions
+were always defined; only the declarations were misplaced. That silently retired an ablation
+arm this file documents, and it is the reason the missing tag guard could not be caught by
+building the configuration it affects. Hoisted above the split, and the configuration now
+builds and runs `BoxEdge` byte-identically plus `GcStress`/`MtStress` clean.
 
 ### The gate has to be in CI, and it has to know which arm it ran
 
