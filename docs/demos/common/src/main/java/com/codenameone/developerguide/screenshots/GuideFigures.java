@@ -75,7 +75,7 @@ public final class GuideFigures {
             new FigureVariant(new ComponentsAccordionFigure(), FigureDevice.ANDROID, false, "components-accordion.png"),
             new FigureVariant(new ComponentsFloatinghintFigure(), FigureDevice.ANDROID, false, "components-floatinghint.png"),
             new FigureVariant(new BadgeFloatingButtonFigure(), FigureDevice.ANDROID, false, "badge-floating-button.png"),
-            new FigureVariant(new GraphicsHiworldFigure(), FigureDevice.ANDROID, false, "graphics-hiworld.png"),
+            new FigureVariant(new GraphicsHiworldFigure(), FigureDevice.IOS, false, "graphics-hiworld.png"),
             new FigureVariant(new GraphicsGlasspaneFigure(), FigureDevice.ANDROID, false, "graphics-glasspane.png"),
             new FigureVariant(new GraphicsFontimageFixedFigure(), FigureDevice.ANDROID, false, "graphics-fontimage-fixed.png"),
             new FigureVariant(new GraphicsFontimageStyleFigure(), FigureDevice.ANDROID, false, "graphics-fontimage-style.png"),

@@ -60,7 +60,7 @@
 ///
 /// ### AutoCompleteTextField
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-autocomplete.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-autocomplete.png)
 /// `com.codename1.ui.AutoCompleteTextField` provides suggestions as you type into the text
 /// field
 ///
@@ -79,7 +79,7 @@
 ///
 /// ### Link Button
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-link-button.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-link-button.png)
 /// `com.codename1.ui.Button` can also be used as a hyperlink
 ///
 /// ### Calendar
@@ -109,7 +109,7 @@
 ///
 /// ### Command
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-toolbar.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-toolbar.png)
 /// `com.codename1.ui.Command` & `com.codename1.ui.Toolbar` provide deep customization
 /// of the title area and allow us to place elements in the side menu (hamburger), overflow menu etc.
 ///
@@ -136,7 +136,7 @@
 ///
 /// ### Label
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-label-text-position.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-label-text-position.png)
 /// `com.codename1.ui.Label` displays text and/or icons to the user
 ///
 /// ### List
@@ -199,7 +199,7 @@
 ///
 /// ### Table
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-table-pinstripe.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-table-pinstripe.png)
 /// `com.codename1.ui.table.Table` displays optionally editable tabular data to the user
 ///
 /// ### Tree
@@ -264,7 +264,7 @@
 ///
 /// ### SpanButton
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-spanbutton.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-spanbutton.png)
 /// `com.codename1.components.SpanButton` a button that "seamlessly" breaks lines
 ///
 /// ### Picker (Date)
@@ -287,19 +287,19 @@
 ///
 /// ### SignatureComponent
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-signature2.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-signature2.png)
 /// `com.codename1.components.SignatureComponent` shows a dialog that allows the user to "sign"
 /// using the touch screen
 ///
 ///
 /// ### Accordion
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-accordion.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-accordion.png)
 /// `com.codename1.components.Accordion` displays collapsible content panels
 ///
 /// ### FloatingHint
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-floatinghint.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-floatinghint.png)
 /// `com.codename1.components.FloatingHint` animates the text field hint into a label on top of
 /// the text field and visa versa
 ///

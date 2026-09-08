@@ -32,6 +32,16 @@ on:
       - 'native-themes/**'
       - 'maven/css-compiler/**'
       - 'scripts/build-native-themes.sh'
+      # The figures are rendered by the framework itself, so a change to how a
+      # component paints, how a layout measures, or how the JavaSE port
+      # rasterizes changes every generated PNG without touching docs/ at all.
+      # The comparison is byte-exact, so without these the committed figures go
+      # stale silently and some later docs or release build is the one that
+      # fails.
+      - 'CodenameOne/**'
+      - 'Ports/JavaSE/**'
+      - 'maven/core/**'
+      - 'maven/javase/**'
   release:
     types: [published]
   workflow_dispatch:
@@ -83,6 +93,12 @@ jobs:
               - 'native-themes/**'
               - 'maven/css-compiler/**'
               - 'scripts/build-native-themes.sh'
+              # Same reason, and the same two-lists rule: the figure comparison
+              # step is gated on this filter as well as on the trigger.
+              - 'CodenameOne/**'
+              - 'Ports/JavaSE/**'
+              - 'maven/core/**'
+              - 'maven/javase/**'
             workflow:
               - '.github/workflows/developer-guide-docs.yml'
 

@@ -37,8 +37,8 @@ A paint method can be implemented as such:
 include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/GraphicsHiworldFigure.java[tag=graphics-java-001,indent=0]
 ----
 
-.Hi world demo code, notice that the blue bar on top is the iOS7+ status bar
-image::img/generated/graphics-hiworld.png[Hi world demo code, notice that the blue bar on top is the iOS7+ status bar,scaledwidth=20%]
+.Hi world demo code under the iOS theme; the paint fills the form and the status bar strip above it belongs to the platform
+image::img/generated/graphics-hiworld.png[Hi world demo code under the iOS theme,scaledwidth=20%]
 
 ==== Painting with gradients
 
