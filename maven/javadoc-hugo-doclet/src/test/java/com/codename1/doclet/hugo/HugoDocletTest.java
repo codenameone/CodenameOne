@@ -152,7 +152,13 @@ class HugoDocletTest {
                 "///",
                 "/// - #ALIGN",
                 "/// - #greet()",
-                "public class Child extends Other {}",
+                "public class Child extends Other {",
+                "    // Deliberately no documentation comment: an override with none",
+                "    // takes its parent's whole doc, which is the path that was",
+                "    // dropping the text when the parameter had been renamed.",
+                "    @Override",
+                "    public void accept(String renamed) {}",
+                "}",
                 ""), StandardCharsets.UTF_8);
 
         Files.writeString(sources.resolve("Other.java"), String.join("\n",
@@ -163,6 +169,12 @@ class HugoDocletTest {
                 "    public void greet() {}",
                 "    /// A constant subclasses refer to as #ALIGN",
                 "    public static final int ALIGN = 3;",
+                "    /// Takes a value.",
+                "    ///",
+                "    /// #### Parameters",
+                "    ///",
+                "    /// - `original`: what the parent called it",
+                "    public void accept(String original) {}",
                 "}",
                 "",
                 "/// Inherits everything and refers to it locally.",
@@ -435,6 +447,19 @@ class HugoDocletTest {
         String page = page("Listener.md");
         assertFalse(page.contains("\"from\": \"Object\""),
                 "an interface inherits nothing from Object");
+    }
+
+    @Test
+    void inheritsParameterDocumentationByPosition() throws IOException {
+        // An override may rename a parameter, and an override with no comment of
+        // its own takes the parent's whole documentation. Looking the text up
+        // under the child's name then found nothing:
+        // GridBagLayout.addLayoutComponent says "constraints" where Layout says
+        // "value", and that one parameter printed "Not documented".
+        String page = page("Child.md");
+        assertTrue(page.contains("what the parent called it"),
+                "the inherited text reaches the renamed parameter");
+        assertTrue(page.contains("\"renamed\""), "under the override's own name");
     }
 
     @Test

@@ -41,6 +41,7 @@ import java.util.Map;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
@@ -111,7 +112,7 @@ final class DocReader {
             // An undocumented override still documents itself through its parent,
             // which is the behaviour every Java developer expects from javadoc.
             ElementDoc inherited = inherit(element, depth);
-            ElementDoc result = inherited == null ? doc : inherited;
+            ElementDoc result = inherited == null ? doc : adoptParameterNames(element, inherited);
             markAnnotationDeprecation(element, result);
             return result;
         }
@@ -138,6 +139,61 @@ final class DocReader {
         markAnnotationDeprecation(element, doc);
         resolveInheritDoc(element, doc, depth);
         return doc;
+    }
+
+    /**
+     * Re-labels an inherited doc with this element's own parameter names.
+     *
+     * <p>An override with no comment of its own takes its parent's whole
+     * documentation, and the parent named the parameters as it saw fit.
+     * {@code GridBagLayout.addLayoutComponent} calls its first parameter
+     * "constraints" where {@code Layout} calls it "value", so the page looked up
+     * "constraints", found nothing, and printed "Not documented" beside it while
+     * the other two inherited normally.
+     *
+     * <p>Copies rather than edits: the doc handed back belongs to the parent and
+     * is its own cached answer.
+     */
+    private ElementDoc adoptParameterNames(Element element, ElementDoc inherited) {
+        if (!(element instanceof ExecutableElement executable)) {
+            return inherited;
+        }
+        ExecutableElement overridden = findOverridden(executable);
+        if (overridden == null) {
+            return inherited;
+        }
+        List<? extends VariableElement> mine = executable.getParameters();
+        List<? extends VariableElement> theirs = overridden.getParameters();
+
+        ElementDoc copy = new ElementDoc();
+        copy.description = inherited.description;
+        copy.returns = inherited.returns;
+        copy.deprecated = inherited.deprecated;
+        copy.deprecatedText = inherited.deprecatedText;
+        copy.hidden = inherited.hidden;
+        copy.exceptions.addAll(inherited.exceptions);
+        copy.seeAlso.addAll(inherited.seeAlso);
+
+        for (int i = 0; i < mine.size(); i++) {
+            String name = mine.get(i).getSimpleName().toString();
+            String text = i < theirs.size()
+                    ? inherited.parameterText(theirs.get(i).getSimpleName().toString())
+                    : null;
+            if (text == null) {
+                text = inherited.parameterText(name);
+            }
+            if (text != null) {
+                copy.addParameter(new MarkdownSections.NamedText(name, text));
+            }
+        }
+        // Anything the parent documented that is not a parameter of this method
+        // -- a type parameter, most often -- carries over as written.
+        for (MarkdownSections.NamedText parameter : inherited.parameters) {
+            if (parameter.name().startsWith("<")) {
+                copy.addParameter(parameter);
+            }
+        }
+        return copy;
     }
 
     /**
@@ -253,19 +309,34 @@ final class DocReader {
             doc.returns = parent.returns;
         }
         if (element instanceof ExecutableElement executable) {
-            for (var parameter : executable.getParameters()) {
-                String name = parameter.getSimpleName().toString();
+            // Paired by position, not by name. An override is free to rename a
+            // parameter, and looking the parent's text up under the child's name
+            // then finds nothing: GridBagLayout.addLayoutComponent calls its
+            // first parameter "constraints" where Layout calls it "value", and
+            // that one parameter came out undocumented while the rest inherited.
+            ExecutableElement overridden = findOverridden(executable);
+            List<? extends VariableElement> parameters = executable.getParameters();
+            for (int i = 0; i < parameters.size(); i++) {
+                String name = parameters.get(i).getSimpleName().toString();
                 String own = doc.parameterText(name);
                 if (own != null && !isInheritDoc(own)) {
                     continue;
                 }
-                String inherited = parent.parameterText(name);
+                String inherited = null;
+                if (overridden != null && i < overridden.getParameters().size()) {
+                    inherited = parent.parameterText(
+                            overridden.getParameters().get(i).getSimpleName().toString());
+                }
+                if (inherited == null) {
+                    inherited = parent.parameterText(name);
+                }
+                final String finalName = name;
                 if (inherited != null) {
-                    doc.parameters.removeIf(existing -> existing.name().equals(name));
+                    doc.parameters.removeIf(existing -> existing.name().equals(finalName));
                     doc.addParameter(new MarkdownSections.NamedText(name, inherited));
                 } else if (own != null) {
                     // Nothing to inherit: drop the marker rather than publish it.
-                    doc.parameters.removeIf(existing -> existing.name().equals(name));
+                    doc.parameters.removeIf(existing -> existing.name().equals(finalName));
                 }
             }
         }

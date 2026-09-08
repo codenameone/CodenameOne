@@ -8,7 +8,9 @@
       <a href="{{ $j.package.url }}">{{ $j.package.name }}</a>
     </nav>
     <h1 class="post-title cn1-api__title">
-      <span class="cn1-api__kind">{{ $j.kind }}</span>
+      {{- /* abstract and final are API-significant: whether a type can be
+             instantiated or subclassed was not shown anywhere. */ -}}
+      <span class="cn1-api__kind">{{ with $j.modifiers }}{{ . }} {{ end }}{{ $j.kind }}</span>
       {{ $j.simple }}{{ $j.typeParameters }}
     </h1>
 

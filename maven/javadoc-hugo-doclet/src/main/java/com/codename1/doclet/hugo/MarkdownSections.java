@@ -407,6 +407,30 @@ public final class MarkdownSections {
      */
     static NamedText splitNamed(String item) {
         String text = item.strip();
+        // A markdown reference link is how JEP 467 comments name a Java element,
+        // and the renderer has already turned it into [`Name`](url) by the time
+        // this sees it. com.codename1.nfc.NdefMessage.parse documents its
+        // exception that way: without this the bullet produced a nameless entry
+        // holding the prose, and the declared exception was then listed again
+        // with no documentation at all.
+        if (text.startsWith("[")) {
+            int close = text.indexOf(']');
+            if (close > 1) {
+                String label = text.substring(1, close).replace("`", "").strip();
+                String rest = text.substring(close + 1);
+                if (rest.startsWith("(")) {
+                    int url = matchingParen(rest);
+                    if (url > 0) {
+                        rest = rest.substring(url + 1);
+                    }
+                }
+                int lastDot = label.lastIndexOf('.');
+                String simple = lastDot < 0 ? label : label.substring(lastDot + 1);
+                if (isIdentifierish(simple)) {
+                    return new NamedText(label, stripSeparator(rest));
+                }
+            }
+        }
         if (text.startsWith("`")) {
             int close = text.indexOf('`', 1);
             if (close > 1) {
@@ -473,6 +497,23 @@ public final class MarkdownSections {
             rest = rest.substring(2).stripLeading();
         }
         return rest;
+    }
+
+    /** The index of the parenthesis closing the one at position 0, or -1. */
+    private static int matchingParen(String text) {
+        int depth = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
     }
 
     /** Whether a candidate name could be a parameter or an exception type. */

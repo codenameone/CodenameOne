@@ -317,6 +317,25 @@ class MarkdownSectionsTest {
     }
 
     @Test
+    void namesAnExceptionWrittenAsAMarkdownLink() {
+        // JEP 467 comments name a Java element with [Name], and the renderer has
+        // already turned it into [`Name`](url) by the time this sees it.
+        // NdefMessage.parse documents its exception that way, and the bullet was
+        // producing a nameless entry holding the prose while the declared
+        // exception was listed again with nothing.
+        MarkdownSections.Result r = MarkdownSections.parse(String.join("\n",
+                "Parses a message.",
+                "",
+                "#### Throws",
+                "",
+                "- [`NfcException`](/javadoc/com/codename1/nfc/NfcException.html) when the input is bad"));
+
+        assertEquals(1, r.exceptions().size());
+        assertEquals("NfcException", r.exceptions().get(0).name());
+        assertEquals("when the input is bad", r.exceptions().get(0).text());
+    }
+
+    @Test
     void passesThroughABodyWithNoStructure() {
         String body = "Just prose.\n\nWith a second paragraph.";
         MarkdownSections.Result r = MarkdownSections.parse(body);
