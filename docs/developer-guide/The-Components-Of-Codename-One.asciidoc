@@ -43,6 +43,13 @@ You can learn more about lead components in <<lead-component-section,here>>.
 
 === Form
 
+A `Form` isn't one surface. It's a title area, a content pane and any number of
+layered panes. Knowing which of them receives a component explains most of what
+happens next:
+
+.The parts of a Form, and which accessor reaches each one
+image::img/form-anatomy.svg[The parts of a Form: title area, content pane, layered pane and safe area,scaledwidth=85%]
+
 https://www.codenameone.com/javadoc/com/codename1/ui/Form.html[Form] is the top-level container in Codename One. `Form` derives from `Container` and is the element the app shows. Only one form can be visible at any given time. You can get the visible `Form` with the code:
 
 [source,java]

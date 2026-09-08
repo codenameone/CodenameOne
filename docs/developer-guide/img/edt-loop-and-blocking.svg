@@ -15,15 +15,15 @@
   <rect x="44" y="146" width="210" height="34" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
   <text x="149" y="167" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">deliver input events</text>
 
-  <rect x="44" y="194" width="210" height="46" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="2"/>
-  <text x="149" y="213" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#222222">run serial calls</text>
-  <text x="149" y="230" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">everything callSerially queued</text>
+  <rect x="44" y="194" width="210" height="34" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
+  <text x="149" y="215" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">paint what is dirty</text>
 
-  <rect x="44" y="254" width="210" height="34" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
-  <text x="149" y="275" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">advance animations</text>
+  <rect x="44" y="242" width="210" height="34" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
+  <text x="149" y="263" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">advance animations</text>
 
-  <rect x="44" y="302" width="210" height="34" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
-  <text x="149" y="323" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">paint the form</text>
+  <rect x="44" y="290" width="210" height="46" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="2"/>
+  <text x="149" y="309" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#222222">run serial calls</text>
+  <text x="149" y="326" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">everything callSerially queued</text>
 
   <path d="M 44 336 L 30 336 L 30 115 L 44 115" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <path d="M 40 110 L 44 115 L 40 120" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
@@ -40,10 +40,10 @@
   <path d="M 610 112 L 616 117 L 610 122" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
   <rect x="620" y="96" width="156" height="42" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1"/>
   <text x="698" y="113" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">serial call queue</text>
-  <text x="698" y="129" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">drained by the step above</text>
+  <text x="698" y="129" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">drained at the end of a cycle</text>
   <text x="563" y="160" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">Returns at once. The Runnable executes on a later cycle,</text>
   <text x="563" y="176" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">which is how off-EDT code touches the UI safely.</text>
-  <text x="563" y="196" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Called while already on the EDT it still queues, so it defers rather than recurses.</text>
+  <text x="563" y="196" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Serial calls run after that cycle has painted, so work queued from an event is drawn on the next one.</text>
 
   <rect x="330" y="228" width="466" height="178" rx="6" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
   <text x="563" y="250" font-family="Arial, sans-serif" font-size="13" font-weight="bold"
@@ -60,6 +60,6 @@
   <path d="M 420 314 L 425 308 L 430 314" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
   <text x="563" y="350" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">Your line of code is suspended, but the EDT is not: it keeps</text>
   <text x="563" y="366" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">looping, so input and painting carry on while you wait.</text>
-  <text x="563" y="386" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Execution resumes on the EDT once the Runnable returns. This is what every</text>
-  <text x="563" y="400" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">andWait() method in the framework is built on.</text>
+  <text x="563" y="386" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Execution resumes on the EDT once the Runnable returns. Note callSeriallyAndWait is NOT</text>
+  <text x="563" y="400" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">this: it waits on a lock and refuses to run on the EDT at all.</text>
 </svg>
