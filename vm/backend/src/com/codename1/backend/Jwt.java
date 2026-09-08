@@ -84,6 +84,16 @@ public final class Jwt {
         if(token == null || secret == null) {
             throw new InvalidTokenException("No token");
         }
+        // The same floor issue() enforces. Verifying with a short secret is the
+        // dangerous half: an empty or guessable key lets anyone compute a valid
+        // HS256 signature over claims of their choosing, and this would have
+        // accepted it. Not an InvalidTokenException, because the token is not
+        // what is wrong -- the deployment is, and it should fail closed and say
+        // so rather than read as a client sending a bad token.
+        if(secret.length < 32) {
+            throw new IOException("The verification secret must be at least 32 "
+                    + "bytes; a shorter one is forgeable");
+        }
         int firstDot = token.indexOf('.');
         int secondDot = firstDot < 0 ? -1 : token.indexOf('.', firstDot + 1);
         if(firstDot <= 0 || secondDot <= firstDot || token.indexOf('.', secondDot + 1) >= 0) {

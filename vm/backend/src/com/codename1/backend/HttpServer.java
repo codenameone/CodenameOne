@@ -1005,7 +1005,14 @@ public final class HttpServer {
         this.workerCount = workerCount;
         this.handler = handler;
         this.tls = tls;
-        this.virtualThreads = VIRTUAL_THREADS && tls == null;
+        // Derived from the decision the caller actually made, not recomputed from
+        // the statics behind it. Recomputing was right while "plaintext" was the
+        // only condition, but a server can now fall back to the pool for a second
+        // reason -- another server already holds the single virtual-thread slot --
+        // and a server that recomputed would have run on this pool while believing
+        // itself virtual, which changes parking, keep-alive linger, ownership and
+        // teardown. No pool means virtual threads; that is the whole of it.
+        this.virtualThreads = workers == null;
     }
 
     /**
@@ -1093,6 +1100,22 @@ public final class HttpServer {
         // WORKERS=4 survived 6 of 6. Throughput was unaffected when it did not
         // crash (265k either way), so this buys robustness rather than speed.
         boolean useVirtualThreads = VIRTUAL_THREADS && tls == null;
+        // The native virtual thread carries the accepted descriptor and nothing
+        // else, so the Java side finds its server through one process-global. A
+        // second virtual-thread server would replace it, and every connection the
+        // FIRST listener had accepted would then be served by the second one's
+        // handler and ownership maps -- an administrative port answering public
+        // requests, and neither able to shut down what it owns. Only one server
+        // can hold that slot; the next takes the pool, which is per instance and
+        // has no such ambiguity. Claimed before the server is built so two
+        // starting at once cannot both win it.
+        if(useVirtualThreads && !VT_SLOT_TAKEN.compareAndSet(false, true)) {
+            System.out.println("another virtual-thread server is already running in "
+                    + "this process, so this one runs on a thread pool: an accepted "
+                    + "descriptor is all a virtual thread carries, and it cannot say "
+                    + "which server to hand it to.");
+            useVirtualThreads = false;
+        }
         if(VIRTUAL_THREADS && tls != null) {
             System.out.println("TLS is configured, so this server runs on a thread "
                     + "pool rather than virtual threads: the TLS layer cannot park a "
@@ -1278,6 +1301,7 @@ public final class HttpServer {
         // process about to exit does not care about and a use-after-free is not
         // a trade for.
         if(inFlightRequests.get() > 0) {
+            releaseVirtualThreadSlot();
             synchronized(stopped) {
                 fullyStopped = true;
                 stopped.notifyAll();
@@ -1317,9 +1341,22 @@ public final class HttpServer {
         if(tls != null) {
             tls.close();
         }
+        releaseVirtualThreadSlot();
         synchronized(stopped) {
             fullyStopped = true;
             stopped.notifyAll();
+        }
+    }
+
+    /**
+     * Hands the single virtual-thread slot back, so a server started later in this
+     * process can have it. Only the holder releases it: a second server that fell
+     * back to the pool must not free the running one's claim when it stops.
+     */
+    private void releaseVirtualThreadSlot() {
+        if(virtualThreads) {
+            ACTIVE_SERVER = null;
+            VT_SLOT_TAKEN.set(false);
         }
     }
 
@@ -1373,6 +1410,10 @@ public final class HttpServer {
      * server per process is the shape every backend binary has.
      */
     private static volatile HttpServer ACTIVE_SERVER;
+
+    /** Guards ACTIVE_SERVER: exactly one server per process may use virtual threads. */
+    private static final java.util.concurrent.atomic.AtomicBoolean VT_SLOT_TAKEN =
+            new java.util.concurrent.atomic.AtomicBoolean();
 
     /**
      * What a connection's virtual thread runs. Reached from native code only,
@@ -3166,9 +3207,28 @@ public final class HttpServer {
         // one" -- which an empty buffer alone cannot say.
         conn.parsedFromBuffer = false;
         int headerEnd = indexOfHeaderEnd(conn.buffer, conn.pos);
+        // An ABSOLUTE bound on the head, not a per-read one. SO_RCVTIMEO restarts
+        // on every successful read, so a client sending one byte just inside each
+        // window holds its worker for as long as it likes -- and in pool mode,
+        // which is what TLS falls back to, the default sixteen such connections
+        // are the whole server. Armed by the first byte rather than on entry: a
+        // kept-alive connection may legitimately sit idle between requests, and
+        // that idleness is the socket timeout's business, not this one.
+        //
+        // The head only. A body is bounded by MAX_BODY_BYTES and by the socket
+        // timeout between reads, and a wall-clock bound on it would refuse a
+        // large upload over a slow link, which is a real client rather than an
+        // attack.
+        long headDeadline = 0;
         while(headerEnd < 0) {
             if(conn.available() > MAX_HEADER_BYTES) {
                 throw new ProtocolException(431, "request head too large");
+            }
+            if(conn.available() > 0 && headDeadline == 0) {
+                headDeadline = System.currentTimeMillis() + SOCKET_TIMEOUT_MILLIS;
+            }
+            if(headDeadline != 0 && System.currentTimeMillis() > headDeadline) {
+                throw new ProtocolException(408, "the request head did not arrive in time");
             }
             if(!conn.fill(scratch)) {
                 return null;

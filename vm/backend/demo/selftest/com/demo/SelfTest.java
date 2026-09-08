@@ -277,6 +277,18 @@ public class SelfTest {
         check("token has two dots", "2", String.valueOf(countChar(token, '.')));
 
         Map verified = Jwt.verify(token, secret);
+        // issue() has always refused a secret under 32 bytes as forgeable; verify()
+        // took any. A deployment configured with an empty one would have accepted a
+        // signature anybody could compute over claims of their choosing, so the
+        // dangerous half was the one that failed open.
+        boolean refusedShortSecret = false;
+        try {
+            Jwt.verify(token, new byte[0]);
+        } catch (Exception expected) {
+            refusedShortSecret = true;
+        }
+        check("verifying with a short secret is refused", "true",
+                String.valueOf(refusedShortSecret));
         check("subject survives", "shai", String.valueOf(verified.get("sub")));
         check("expiry is set", "true", String.valueOf(verified.get("exp") instanceof Number));
 

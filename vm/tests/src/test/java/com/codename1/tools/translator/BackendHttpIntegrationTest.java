@@ -587,6 +587,49 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("a head dribbled a byte at a time is cut off rather than held forever")
+    void aDribbledRequestHeadIsCutOff() throws Exception {
+        Socket socket = new Socket();
+        socket.connect(new InetSocketAddress("127.0.0.1", port), 5000);
+        socket.setSoTimeout(30000);
+        try {
+            OutputStream out = socket.getOutputStream();
+            out.write("GET /healthz HTTP/1.1\r\nHost: x\r\n".getBytes(StandardCharsets.UTF_8));
+            out.flush();
+            // A byte inside every socket-timeout window. SO_RCVTIMEO restarts on
+            // each one, so this alone would keep its worker for as long as the
+            // client cared to continue; only a deadline measured from the head's
+            // FIRST byte ends it.
+            long started = System.currentTimeMillis();
+            String filler = "X-Pad: ";
+            boolean closed = false;
+            for (int i = 0; i < 40 && !closed; i++) {
+                try {
+                    out.write(filler.charAt(i % filler.length()));
+                    out.flush();
+                } catch (IOException dropped) {
+                    closed = true;
+                    break;
+                }
+                Thread.sleep(500);
+                if (socket.getInputStream().available() > 0) {
+                    closed = true;
+                }
+            }
+            long elapsed = System.currentTimeMillis() - started;
+            assertTrue(closed, "the server accepted a head dribbled for " + elapsed
+                    + "ms without ever ending it");
+            // CN1_HTTP_TIMEOUT_MS is 4000 for this fixture, so the deadline should
+            // land well inside this. Generous, because a loaded runner is slow.
+            assertTrue(elapsed < 20000, "the head was cut off, but only after "
+                    + elapsed + "ms");
+        } finally {
+            socket.close();
+        }
+        assertEquals(200, status(request("GET", "/healthz", null, null)));
+    }
+
+    @Test
     @DisplayName("clients that never finish a request do not starve the ones that do")
     void partialRequestsDoNotStarveOtherClients() throws Exception {
         // Comfortably more than the worker pool, so if a half-written request
