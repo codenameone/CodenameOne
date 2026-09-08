@@ -172,6 +172,9 @@ class HugoDocletTest {
                 "    // dropping the text when the parameter had been renamed.",
                 "    @Override",
                 "    public void accept(String renamed) {}",
+                "    // No comment and no @Deprecated of its own.",
+                "    @Override",
+                "    public void legacy() {}",
                 "}",
                 ""), StandardCharsets.UTF_8);
 
@@ -181,6 +184,21 @@ class HugoDocletTest {
                 "public class Other {",
                 "    /// Says hello",
                 "    public void greet() {}",
+                "    /// The old way.",
+                "    ///",
+                "    /// #### Deprecated",
+                "    ///",
+                "    // A real @deprecated BLOCK TAG, which is what the framework writes",
+                "    // under that heading. Everything after it is inside the tag as far",
+                "    // as the JDK is concerned, which is the whole point of the test: a",
+                "    // #### Deprecated heading alone is split by the ordinary parser and",
+                "    // would pass with the fix removed.",
+                "    /// @deprecated use the other one",
+                "    ///",
+                "    /// #### See also",
+                "    ///",
+                "    /// - Shared",
+                "    public void legacy() {}",
                 "    /// A constant subclasses refer to as #ALIGN",
                 "    public static final int ALIGN = 3;",
                 "    /// Takes a value.",
@@ -585,6 +603,33 @@ class HugoDocletTest {
         assertTrue(index.contains("chunks(byte[]...)"),
                 "an array varargs keeps one set of brackets and the ellipsis");
         assertFalse(index.contains("chunks(byte[][])"), "not two sets of brackets");
+    }
+
+    @Test
+    void doesNotInheritDeprecationOntoAnOverride() throws IOException {
+        // Java does not inherit @Deprecated and neither do the standard pages:
+        // ScaleImageLabel's setPreferredH carries only @Override and was being
+        // given its parent's Deprecated banner along with the prose.
+        String page = page("Child.md");
+        int at = page.indexOf("\"legacy\"");
+        assertTrue(at > 0, "the override is on the page");
+        assertTrue(page.indexOf("\"deprecated\": false", at) > 0
+                        && page.indexOf("\"deprecated\": false", at) < at + 400,
+                "and is not marked deprecated: " + page.substring(at, Math.min(page.length(), at + 400)));
+    }
+
+    @Test
+    void splitsTrailingSectionsOutOfADeprecationBody() throws IOException {
+        // The convention writes @deprecated under "#### Deprecated", and what
+        // follows is still inside the tag as far as the JDK is concerned. Storing
+        // the body whole put the See-also heading inside the banner and lost the
+        // references: CellRenderer and ImageDownloadService had none at all.
+        String page = page("Other.md");
+        int at = page.indexOf("\"legacy\"");
+        assertTrue(at > 0, "the method is on the page");
+        String row = page.substring(at, Math.min(page.length(), at + 900));
+        assertFalse(row.contains("#### See also"), "the heading is not in the banner: " + row);
+        assertTrue(row.contains("/javadoc/p/Shared/"), "and the reference resolved: " + row);
     }
 
     @Test

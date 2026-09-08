@@ -551,7 +551,12 @@ public final class HugoDoclet implements Doclet {
             if (isInterface && !seen.add(element.getQualifiedName().toString())) {
                 continue;
             }
-            if (isInterface) {
+            // A package private interface is not part of a contract a consumer
+            // can use, has no page, and the standard reference leaves it out:
+            // GameView listed SpriteRenderer.Updatable and Ads listed
+            // CSSParserCallback, both unlinked. The traversal still goes through
+            // them, so their public superinterfaces are still found.
+            if (isInterface && documented.containsKey(element.getQualifiedName().toString())) {
                 out.add(typeNames.reference(supertype));
             }
             queue.addAll(types.directSupertypes(supertype));

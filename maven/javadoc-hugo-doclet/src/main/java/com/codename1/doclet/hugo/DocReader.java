@@ -135,7 +135,7 @@ final class DocReader {
             doc.deprecatedText = sections.deprecated();
         }
 
-        readBlockTags(comment, path, doc);
+        readBlockTags(element, comment, path, doc);
         markAnnotationDeprecation(element, doc);
         resolveInheritDoc(element, doc, depth);
         return doc;
@@ -168,8 +168,12 @@ final class DocReader {
         ElementDoc copy = new ElementDoc();
         copy.description = inherited.description;
         copy.returns = inherited.returns;
-        copy.deprecated = inherited.deprecated;
-        copy.deprecatedText = inherited.deprecatedText;
+        // Deprecation is deliberately NOT carried over. Java does not inherit
+        // @Deprecated and neither do the standard pages: ScaleImageLabel's
+        // setPreferredH and setPreferredW carry only @Override, and taking the
+        // parent's flag with its prose put a Deprecated banner on both. The
+        // override's own tag or annotation decides, and markAnnotationDeprecation
+        // runs after this.
         copy.hidden = inherited.hidden;
         copy.exceptions.addAll(inherited.exceptions);
         copy.seeAlso.addAll(inherited.seeAlso);
@@ -223,7 +227,8 @@ final class DocReader {
         }
     }
 
-    private void readBlockTags(DocCommentTree comment, DocTreePath path, ElementDoc doc) {
+    private void readBlockTags(Element element, DocCommentTree comment, DocTreePath path,
+                               ElementDoc doc) {
         for (DocTree tag : comment.getBlockTags()) {
             switch (tag.getKind()) {
                 case PARAM -> {
@@ -255,9 +260,29 @@ final class DocReader {
                 }
                 case DEPRECATED -> {
                     doc.deprecated = true;
-                    String text = renderer.render(((DeprecatedTree) tag).getBody(), path).strip();
+                    // The house convention writes @deprecated under a
+                    // "#### Deprecated" heading, and anything that follows --
+                    // "#### See also" and its bullets -- is still inside the tag
+                    // as far as the JDK is concerned. Storing the body whole put
+                    // those headings inside the deprecation banner and left the
+                    // references unresolved: CellRenderer and
+                    // ImageDownloadService both lost their See-also entirely.
+                    String body = renderer.render(((DeprecatedTree) tag).getBody(), path);
+                    MarkdownSections.Result split =
+                            MarkdownSections.parse(body, element instanceof ExecutableElement);
+                    String text = split.description().strip();
                     if (!text.isEmpty()) {
                         doc.deprecatedText = text;
+                    }
+                    doc.seeAlso.addAll(split.seeAlso());
+                    for (MarkdownSections.NamedText parameter : split.parameters()) {
+                        doc.addParameter(parameter);
+                    }
+                    for (MarkdownSections.NamedText thrown : split.exceptions()) {
+                        doc.addException(thrown);
+                    }
+                    if (doc.returns == null) {
+                        doc.returns = split.returns();
                     }
                 }
                 case HIDDEN -> doc.hidden = true;
