@@ -70,7 +70,19 @@ public class LocationButtonApiTest extends BaseTest {
         final boolean platformSupported =
                 com.codename1.ui.Display.getInstance().isLocationButtonSupported();
         com.codename1.io.Log.p("LocationButtonApiTest: platformSupported="
-                + platformSupported);
+                + platformSupported + " androidSeventeen=" + androidSeventeenOrNewer());
+
+        // Support detection is part of what this test covers, so it cannot also
+        // BE the expectation: a regressed class name, SDK floor or reflective
+        // lookup would make isLocationButtonSupported() false, and a test that
+        // derived its expectation from it would quietly accept the fallback and
+        // pass. The device's own OS release is an independent answer -- it comes
+        // from Build.VERSION.RELEASE, while the detection reads SDK_INT and
+        // looks up android.app.permissionui classes.
+        if (androidSeventeenOrNewer() && !platformSupported) {
+            fail("Android 17 reports no location button support; detection regressed");
+            return true;
+        }
 
         button = new LocationButton(LocationButton.TEXT_USE_PRECISE_LOCATION);
         if (button.getTextType() != LocationButton.TEXT_USE_PRECISE_LOCATION) {
@@ -163,6 +175,32 @@ public class LocationButtonApiTest extends BaseTest {
             return;
         }
         done();
+    }
+
+    /// Whether this device is Android 17 or newer, decided without asking the
+    /// code under test.
+    ///
+    /// `OSVer` is documented as a user-readable string rather than a number, so
+    /// only the leading integer is read and anything unparseable answers false
+    /// -- this may only ever ADD an assertion, never remove one.
+    private static boolean androidSeventeenOrNewer() {
+        if (!"and".equals(com.codename1.ui.Display.getInstance().getPlatformName())) {
+            return false;
+        }
+        String version =
+                com.codename1.ui.Display.getInstance().getProperty("OSVer", "");
+        int end = 0;
+        while (end < version.length() && Character.isDigit(version.charAt(end))) {
+            end++;
+        }
+        if (end == 0) {
+            return false;
+        }
+        try {
+            return Integer.parseInt(version.substring(0, end)) >= 17;
+        } catch (NumberFormatException notANumber) {
+            return false;
+        }
     }
 
     private static Component childOf(LocationButton b) {

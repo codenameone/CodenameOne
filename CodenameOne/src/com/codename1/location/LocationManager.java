@@ -164,6 +164,22 @@ public abstract class LocationManager {
                 LL l = new LL();
                 l.timeout = timeout;
                 l.bind();
+                // Timed out. Both of LL's callbacks clear the listener when
+                // they fire, but run() only breaks its wait loop, so a request
+                // that never got a fix left this one installed: the platform
+                // keeps its location updates registered, and the NEXT call
+                // takes the listener != null branch below and answers from
+                // getCurrentLocation() instead of waiting for a fresh fix. Only
+                // ours is cleared -- a callback that arrived in the meantime has
+                // already replaced it.
+                //
+                // Asked of LL rather than by comparing listeners: `finished` is
+                // set by exactly the two callbacks that clear it, so "not
+                // finished" IS "still installed", and it says so without a
+                // reference comparison the static-analysis gates reject.
+                if (!l.finished) {
+                    setLocationListener(null);
+                }
                 return l.result;
             }
             return getCurrentLocation();

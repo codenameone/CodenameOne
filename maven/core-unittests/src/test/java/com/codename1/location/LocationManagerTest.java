@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.location;
 
 import com.codename1.junit.FormTest;
@@ -38,6 +60,41 @@ class LocationManagerTest extends UITestBase {
         assertEquals(1, manager.bindCount);
         assertEquals(LocationManager.TEMPORARILY_UNAVAILABLE, manager.getStatus());
         assertNull(manager.getStoredRequest());
+    }
+
+    /// A request that times out has to leave the manager as it found it. Both
+    /// of LL's callbacks clear the listener; run() only breaks its wait loop, so
+    /// without this the platform keeps its location updates registered and the
+    /// next call answers from getCurrentLocation() instead of waiting for a
+    /// fresh fix.
+    @FormTest
+    void getCurrentLocationSyncClearsTheListenerWhenItTimesOut() {
+        manager.notifyOnBind = false;
+        manager.setCurrentLocation(null);
+
+        Location result = manager.getCurrentLocationSync(50);
+
+        assertNull(result, "a request that never got a fix has no location");
+        assertNull(manager.getCurrentListener(),
+                "the timed-out listener must not stay installed");
+        assertEquals(1, manager.clearCount, "and the platform must be told once");
+    }
+
+    /// The follow-up the leak would have broken: a second request still binds a
+    /// fresh listener rather than taking the already-listening shortcut.
+    @FormTest
+    void aRequestAfterATimeoutStillWaitsForAFreshFix() {
+        manager.notifyOnBind = false;
+        manager.getCurrentLocationSync(50);
+        int bindsAfterTimeout = manager.bindCount;
+
+        manager.notifyOnBind = true;
+        Location expected = new Location(5.0, 6.0);
+        manager.setCurrentLocation(expected);
+
+        assertSame(expected, manager.getCurrentLocationSync(1000));
+        assertEquals(bindsAfterTimeout + 1, manager.bindCount,
+                "the second request must bind again, not reuse a stale listener");
     }
 
     @FormTest
