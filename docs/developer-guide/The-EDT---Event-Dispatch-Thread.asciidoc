@@ -33,6 +33,12 @@ Codename One includes helper methods in the https://www.codenameone.com/javadoc/
 
 `isEDT()` is useful for generic code that needs to test whether the current code is executing on the EDT.
 
+The two methods that hand work to the EDT do quite different things, and the
+difference is easiest to see against the cycle they feed:
+
+.The EDT's cycle, and where callSerially and invokeAndBlock enter it
+image::img/edt-loop-and-blocking.svg[The EDT cycle and how callSerially and invokeAndBlock hand work to it,scaledwidth=85%]
+
 === Call Serially (And Wait)
 
 `callSerially(Runnable)` should normally be called off the EDT (in a separate thread), the run method within the submitted runnable will be invoked on the EDT.
