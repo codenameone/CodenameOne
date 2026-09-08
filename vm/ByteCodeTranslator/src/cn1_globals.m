@@ -2428,6 +2428,39 @@ static JAVA_BOOLEAN cn1RefRecoverEmergency(CODENAME_ONE_THREAD_STATE) {
     return any;
 }
 
+// Mark every referent the collector knows about -- discovered, and emergency-cleared --
+// until a drain stops finding more. The safe direction whenever clearing cannot be
+// justified: it costs a cycle's reclaim and can never hand out a freed pointer.
+static JAVA_BOOLEAN cn1GcRetainAllReferences(CODENAME_ONE_THREAD_STATE) {
+    JAVA_BOOLEAN marked = JAVA_FALSE;
+    for(;;) {
+        long before = cn1RefDiscoveredTop;
+        JAVA_BOOLEAN round = JAVA_FALSE;
+        for(long i = 0 ; i < before ; i++) {
+            JAVA_OBJECT r = __atomic_load_n(cn1RefDiscovered[i].referentField, __ATOMIC_RELAXED);
+            if(r != JAVA_NULL && !CN1_IS_TAGGED(r)) {
+                gcMarkObject(threadStateData, r, JAVA_FALSE);
+                round = JAVA_TRUE;
+            }
+            JAVA_OBJECT was = cn1RefDiscovered[i].clearedReferent;
+            if(was != JAVA_NULL && !CN1_IS_TAGGED(was)) {
+                gcMarkObject(threadStateData, was, JAVA_FALSE);
+                round = JAVA_TRUE;
+            }
+        }
+        if(cn1RefRecoverEmergency(threadStateData)) {
+            round = JAVA_TRUE;
+        }
+        if(round) {
+            marked = JAVA_TRUE;
+            gcMarkDrain(threadStateData);
+        }
+        if(cn1RefDiscoveredTop == before) {
+            return marked;
+        }
+    }
+}
+
 // Recompute the soft budget and drop the previous cycle's discoveries. Called from
 // codenameOneGCMark before anything can mark.
 static void cn1RefBeginCycle(void) {
@@ -4068,19 +4101,27 @@ void codenameOneGCMark() {
                         gcMarkDrain(d);
                     }
                 }
-                // REFERENCES ONE LAST TIME. Those drains can newly mark an object whose
-                // graph contains a Reference, and its generated mark function then appends
-                // a discovery -- after the only reference pass this cycle has run. Leaving
-                // through here without another pass means that reachable reference keeps an
-                // unmarked referent the sweep goes on to free, which is the dangling
-                // pointer the whole pass exists to prevent, reached by the one exit that
-                // skipped it.
+                // REFERENCES ONE LAST TIME, and RETAINED rather than cleared.
                 //
-                // The barrier is already down on this path, so a get() racing this pass
-                // cannot log -- which is exactly the weaker invariant the cap falls back
-                // on, and it is no weaker for references than for anything else the cap
-                // gives up on.
-                cn1GcProcessReferences(d);
+                // The drains above can newly mark an object whose graph contains a
+                // Reference, whose mark function then appends a discovery after the only
+                // reference pass this cycle has run -- so leaving here without doing
+                // anything would let the sweep free a referent a reachable Reference still
+                // points at.
+                //
+                // An earlier revision called cn1GcProcessReferences here and justified it
+                // by saying the barrier was already down so a racing get() could not log.
+                // THAT WAS WRONG: cn1SatbBulkBegin answers gcSatbActive OR
+                // gcSatbTerminating, and gcSatbTerminating stays raised until after this
+                // loop, so a getter here enqueues successfully -- into a log this path then
+                // never takes again. Clearing on that basis could free an object a getter
+                // was in the middle of being handed.
+                //
+                // Retaining needs none of that reasoning. Nothing is cleared, so nothing
+                // can dangle however the race falls; the cost is one cycle of reclaim on a
+                // path reached only when a mutator has stormed the barrier past
+                // CN1_SATB_MAX_REOPENS, which measures 0-4 against a cap of 32.
+                cn1GcRetainAllReferences(d);
                 break;
             }
         }
