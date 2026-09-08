@@ -24,6 +24,8 @@ package com.codename1.backend;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -399,6 +401,24 @@ public final class Json {
             out.put(']');
             return;
         }
+        if(value instanceof Collection) {
+            // A Set is a JSON array too. Falling through to the String branch below
+            // wrote its toString() as a quoted "[a, b]", which parses as a string and
+            // is silently the wrong shape rather than an error. Indexed above because
+            // a List answers get(i) without building an iterator.
+            out.put('[');
+            Iterator it = ((Collection)value).iterator();
+            boolean first = true;
+            while(it.hasNext()) {
+                if(!first) {
+                    out.put(',');
+                }
+                first = false;
+                writeValue(out, it.next());
+            }
+            out.put(']');
+            return;
+        }
         if(value instanceof byte[]) {
             writeString(out, Base64Url.encode((byte[])value));
             return;
@@ -521,6 +541,21 @@ public final class Json {
                     out.append(',');
                 }
                 writeValue(out, list.get(iter));
+            }
+            out.append(']');
+            return;
+        }
+        if(value instanceof Collection) {
+            // As above: the two writers have to agree on what a Set is.
+            out.append('[');
+            Iterator it = ((Collection)value).iterator();
+            boolean first = true;
+            while(it.hasNext()) {
+                if(!first) {
+                    out.append(',');
+                }
+                first = false;
+                writeValue(out, it.next());
             }
             out.append(']');
             return;

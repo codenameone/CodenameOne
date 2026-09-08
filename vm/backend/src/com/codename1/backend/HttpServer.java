@@ -654,6 +654,15 @@ public final class HttpServer {
     private final Map sessions = java.util.Collections.synchronizedMap(new java.util.HashMap());
     /** fd to HTTP/2 session, for connections where ALPN settled on h2. */
     private final Map http2Sessions = java.util.Collections.synchronizedMap(new java.util.HashMap());
+    /**
+     * Every accepted descriptor that has not been dropped yet.
+     *
+     * The TLS and HTTP/2 maps only hold the connections that have one of those, so
+     * a plaintext connection appeared in neither and stop() had nothing to close it
+     * with. It would stay open past the drain deadline while the server reported
+     * itself fully stopped.
+     */
+    private final Map liveConnections = java.util.Collections.synchronizedMap(new java.util.HashMap());
     private volatile boolean running = true;
     private Thread loop;
     /** Released only when stop() has finished draining. See awaitTermination. */
@@ -953,6 +962,18 @@ public final class HttpServer {
         }
         // Whatever is still open at the deadline is an idle keep-alive connection or
         // a request that overran; both get closed rather than held forever.
+        //
+        // Through drop(), which is the one place that closes a served connection: it
+        // releases the HTTP/2 session, the TLS session and the descriptor together,
+        // and keeps the open count honest. Closing only the session objects -- which
+        // is what this did -- left every plaintext socket open and freed a session a
+        // worker past the deadline could still be inside.
+        java.util.Iterator live = new java.util.ArrayList(liveConnections.keySet()).iterator();
+        while(live.hasNext()) {
+            drop(((Integer)live.next()).intValue());
+        }
+        // Belt and braces: a session recorded for a descriptor that was already
+        // dropped would otherwise never be freed.
         synchronized(sessions) {
             java.util.Iterator it = new java.util.ArrayList(sessions.keySet()).iterator();
             while(it.hasNext()) {
@@ -1489,6 +1510,7 @@ public final class HttpServer {
                 ServerSocket.setBlocking(fd, false);
                 ServerSocket.setTimeout(fd, SOCKET_TIMEOUT_MILLIS);
                 armConnection(fd, true);
+                liveConnections.put(new Integer(fd), Boolean.TRUE);
                 vtAccepts.incrementAndGet();
                 openConnections.incrementAndGet();
                 connectionsAccepted.incrementAndGet();
@@ -1582,6 +1604,7 @@ public final class HttpServer {
         if(session != null) {
             Tls.closeSession(((Long)session).longValue());
         }
+        liveConnections.remove(new Integer(fd));
         ServerSocket.closeFd(fd);
         openConnections.decrementAndGet();
     }
@@ -2475,7 +2498,19 @@ public final class HttpServer {
      */
     private byte[] responseBodyFor(Response response, boolean headOnly) throws IOException {
         if(response.fileFd < 0) {
-            return headOnly ? new byte[0] : response.body;
+            if(headOnly) {
+                return new byte[0];
+            }
+            if(response.hasDeferredJson) {
+                // respondJson and jsonValue leave the value unserialised so the HTTP/1.1
+                // writer can render it straight into the connection's reusable buffer.
+                // There is no such buffer here -- the bytes have to become DATA frames --
+                // so they are built as their own array. Without this the body is empty,
+                // and the same handler that works over HTTP/1.1 answers HTTP/2 with
+                // nothing at all.
+                return Response.bytes(Json.write(response.deferredJson));
+            }
+            return response.body;
         }
         try {
             if(headOnly) {

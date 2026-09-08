@@ -399,7 +399,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             if ("path".equals(p.bindKind)) {
                 int idx = placeholderIndex(template, p.bindName);
                 sb.append(idx < 0 ? fromText(p.javaType, "null")
-                        : fromText(p.javaType, "decode(seg[" + idx + "])"));
+                        : fromText(p.javaType, "decodePath(seg[" + idx + "])"));
             } else if ("query".equals(p.bindKind)) {
                 sb.append(fromText(p.javaType, "queryParam(query, \""
                         + RestClientAnnotationProcessor.escape(p.bindName) + "\")"));
@@ -524,6 +524,11 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         if (javaType.startsWith("java.util.List<") || javaType.startsWith("java.util.Set<")) {
             String element = javaType.substring(javaType.indexOf('<') + 1, javaType.length() - 1);
             if (element.startsWith("java.")) {
+                // Handed to the writer as it stands, Set included: Json.write emits any
+                // Collection as an array. Converting a Set to a List here would fix this
+                // one expression and leave a Set reached through a Map or a DTO field
+                // still writing itself as a quoted toString(), so the writer is where
+                // that belongs.
                 return expr;
             }
             return "listToMaps(" + expr + ", new ToMap() {\n"
@@ -591,7 +596,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        String[] pairs = splitOn(query, '&');\n");
         sb.append("        for(int i = 0 ; i < pairs.length ; i++) {\n");
         sb.append("            int eq = pairs[i].indexOf('=');\n");
-        sb.append("            if(eq > 0 && pairs[i].substring(0, eq).equals(name)) return decode(pairs[i].substring(eq + 1));\n");
+        sb.append("            if(eq > 0 && pairs[i].substring(0, eq).equals(name)) return decodeQuery(pairs[i].substring(eq + 1));\n");
         sb.append("        }\n");
         sb.append("        return null;\n");
         sb.append("    }\n\n");
@@ -618,7 +623,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        for(int i = 0 ; i < pairs.length ; i++) {\n");
         sb.append("            String pair = pairs[i].trim();\n");
         sb.append("            int eq = pair.indexOf('=');\n");
-        sb.append("            if(eq > 0 && pair.substring(0, eq).trim().equals(name)) return decode(pair.substring(eq + 1));\n");
+        sb.append("            if(eq > 0 && pair.substring(0, eq).trim().equals(name)) return decodeQuery(pair.substring(eq + 1));\n");
         sb.append("        }\n");
         sb.append("        return null;\n");
         sb.append("    }\n\n");
@@ -636,9 +641,17 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        return out;\n");
         sb.append("    }\n\n");
         sb.append("    /** Percent-decoding, plus '+' as space in query values. */\n");
-        sb.append("    private static String decode(String value) {\n");
+        // '+' means a space only in application/x-www-form-urlencoded, which is what a
+        // query string and a cookie are. In a PATH segment it is an ordinary character,
+        // so /items/a+b names "a+b" and decoding it to "a b" hands the handler an id the
+        // client never sent.
+        sb.append("    /** A path segment. '+' is literal here, per RFC 3986. */\n");
+        sb.append("    private static String decodePath(String value) { return decode(value, false); }\n\n");
+        sb.append("    /** A query or cookie value, which is form-encoded: '+' is a space. */\n");
+        sb.append("    private static String decodeQuery(String value) { return decode(value, true); }\n\n");
+        sb.append("    private static String decode(String value, boolean plusIsSpace) {\n");
         sb.append("        if(value == null) return null;\n");
-        sb.append("        if(value.indexOf('%') < 0 && value.indexOf('+') < 0) return value;\n");
+        sb.append("        if(value.indexOf('%') < 0 && !(plusIsSpace && value.indexOf('+') >= 0)) return value;\n");
         // A run of escapes is one UTF-8 sequence, not one character each. Appending
         // %C3%A9 as two chars produced "\u00c3\u00a9" where the client sent one
         // accented letter, so consecutive escapes are gathered as bytes and decoded
@@ -659,7 +672,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("                out.append(decodeUtf8(pending, pendingLen));\n");
         sb.append("                pendingLen = 0;\n");
         sb.append("            }\n");
-        sb.append("            if(c == '+') { out.append(' '); continue; }\n");
+        sb.append("            if(plusIsSpace && c == '+') { out.append(' '); continue; }\n");
         sb.append("            out.append(c);\n");
         sb.append("        }\n");
         sb.append("        if(pendingLen > 0) out.append(decodeUtf8(pending, pendingLen));\n");

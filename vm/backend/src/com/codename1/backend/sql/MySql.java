@@ -498,14 +498,17 @@ public final class MySql {
     private static Object readBinaryValue(Reader reader, Column column) throws IOException {
         switch(column.type) {
             case 0x01: // TINY
-                return Long.valueOf(reader.u8());
+                return Long.valueOf(column.unsigned ? reader.u8() : (byte)reader.u8());
             case 0x02: // SHORT
             case 0x0d: // YEAR
-                return Long.valueOf((short)reader.u16());
+                return Long.valueOf(column.unsigned ? reader.u16() : (short)reader.u16());
             case 0x03: // LONG
             case 0x09: // INT24
-                return Long.valueOf(reader.i32());
+                return Long.valueOf(column.unsigned ? (reader.i32() & 0xffffffffL) : reader.i32());
             case 0x08: // LONGLONG
+                // BIGINT UNSIGNED above Long.MAX_VALUE has no long that holds it, and
+                // this API returns Long. Such a value wraps to a negative number; the
+                // widths below it are exact, which is where the corruption actually was.
                 return Long.valueOf(reader.i64());
             case 0x04: // FLOAT
                 return Double.valueOf(Float.intBitsToFloat(reader.i32()));
@@ -582,6 +585,11 @@ public final class MySql {
         column.binary = reader.u16() == 63; // character set 63 is "binary"
         reader.skip(4);                     // column length
         column.type = reader.u8();
+        // The flags follow the type, and 0x0020 is UNSIGNED. Skipping them meant every
+        // integer was decoded at one fixed signedness, so a signed TINYINT of -1 came
+        // back as 255 and a SMALLINT UNSIGNED of 65535 came back as -1. Nothing fails;
+        // the row is simply wrong, which is the worst way for this to be wrong.
+        column.unsigned = (reader.u16() & 0x0020) != 0;
         return column;
     }
 
@@ -589,6 +597,7 @@ public final class MySql {
         String name;
         int type;
         boolean binary;
+        boolean unsigned;
     }
 
     // ---------------- packets ----------------

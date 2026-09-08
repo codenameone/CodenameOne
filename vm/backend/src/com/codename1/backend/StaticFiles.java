@@ -195,7 +195,7 @@ public final class StaticFiles implements HttpServer.Handler {
             long length = size;
             int status = 200;
             String range = request.getHeader("range");
-            if(range != null) {
+            if(range != null && rangeIsFresh(request, etag, modified)) {
                 long[] parsed = parseRange(range, size);
                 if(parsed == null) {
                     headers.put("Content-Range", "bytes */" + size);
@@ -225,6 +225,37 @@ public final class StaticFiles implements HttpServer.Handler {
         // The separator matters: "/srv/wwwroot-evil" starts with "/srv/www" but is
         // not inside it.
         return real.startsWith(root.endsWith("/") ? root : root + "/");
+    }
+
+    /**
+     * True when a Range may be honoured: either the client sent no If-Range, or the
+     * validator it sent still describes this file.
+     *
+     * A resumed download sends back the validator it received with the first part. If
+     * the file has changed since, answering 206 out of the new one lets the client
+     * staple fresh bytes onto a stale prefix and call the result a complete download.
+     * HTTP's answer is to ignore the range and send the whole current representation,
+     * which costs one download and saves a corrupt file.
+     */
+    private static boolean rangeIsFresh(HttpServer.Request request, String etag, long modified) {
+        String ifRange = request.getHeader("if-range");
+        if(ifRange == null) {
+            return true;
+        }
+        String value = ifRange.trim();
+        if(value.length() == 0) {
+            return false;
+        }
+        if(value.charAt(0) == '"') {
+            return value.equals(etag);
+        }
+        if(value.startsWith("W/") || value.startsWith("w/")) {
+            // If-Range requires a strong comparison, and a weak tag cannot supply one.
+            return false;
+        }
+        long parsed = Http1Date.parse(value);
+        // Second granularity on the wire, as in isNotModified.
+        return parsed >= 0 && parsed / 1000 == modified / 1000;
     }
 
     private static boolean isNotModified(HttpServer.Request request, String etag, long modified) {
