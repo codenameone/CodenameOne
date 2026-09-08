@@ -312,11 +312,73 @@ public final class S3 {
                 pathFor(bucket, key), query, headers, body, null, secure);
     }
 
+    /**
+     * Refuses a bucket name that could change the host this request goes to.
+     *
+     * Virtual-hosted addressing puts the name in front of the endpoint and the
+     * result is concatenated straight after "https://", so a name carrying a
+     * slash -- "attacker.example/ignored" -- makes the authority the attacker's
+     * host and the rest a path. The request then carries the signed access key
+     * identifier and session token there. A caller that derives the name from
+     * tenant or request input is the case this exists for; one that hard-codes
+     * it loses nothing, because a name that fails this could not have resolved
+     * as a hostname anyway.
+     *
+     * These are S3's own rules for a DNS-compatible name: 3 to 63 characters of
+     * lowercase letter, digit, dot or hyphen, beginning and ending with a letter
+     * or digit, and no two dots in a row.
+     */
+    private static void requireDnsBucket(String bucket) {
+        int length = bucket == null ? 0 : bucket.length();
+        boolean ok = length >= 3 && length <= 63;
+        for(int iter = 0 ; ok && iter < length ; iter++) {
+            char c = bucket.charAt(iter);
+            boolean alnum = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+            if(!alnum && c != '.' && c != '-') {
+                ok = false;
+            } else if((iter == 0 || iter == length - 1) && !alnum) {
+                ok = false;
+            } else if(c == '.' && iter > 0 && bucket.charAt(iter - 1) == '.') {
+                ok = false;
+            }
+        }
+        if(!ok) {
+            throw new IllegalArgumentException("Not a DNS-compatible S3 bucket "
+                    + "name, so it cannot be addressed virtual-hosted: " + bucket);
+        }
+    }
+
+    /**
+     * Refuses a bucket name that could change the PATH this request addresses.
+     *
+     * Deliberately narrower than the DNS rules above. Path style is what a bucket
+     * that cannot satisfy those rules uses -- the legacy us-east-1 names with
+     * uppercase and underscores are exactly that -- so applying them here would
+     * refuse the buckets this addressing mode exists to serve. What matters when
+     * the name goes into the path is only that it stays one segment.
+     */
+    private static void requirePathSafeBucket(String bucket) {
+        if(bucket == null || bucket.length() == 0 || bucket.indexOf('/') >= 0
+                || bucket.indexOf('\\') >= 0 || bucket.indexOf("..") >= 0) {
+            throw new IllegalArgumentException("An S3 bucket name cannot contain a "
+                    + "path separator or \"..\": " + bucket);
+        }
+    }
+
     private String hostFor(String bucket) {
+        if(!pathStyle) {
+            requireDnsBucket(bucket);
+        }
         return pathStyle ? endpoint : bucket + "." + endpoint;
     }
 
     private String pathFor(String bucket, String key) {
+        if(pathStyle) {
+            // Checked here rather than only in send(): presign() calls hostFor and
+            // pathFor directly, so a check on the send path alone would leave the
+            // two presigning entry points unguarded.
+            requirePathSafeBucket(bucket);
+        }
         String suffix = key == null ? "" : key;
         return pathStyle ? "/" + bucket + "/" + suffix : "/" + suffix;
     }

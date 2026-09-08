@@ -723,10 +723,31 @@ public class BackendPackageMojo extends AbstractMojo {
         }
     }
 
-    /** Removes each directory and its contents, so the caller can recreate it empty. */
-    private static void emptyDirs(File... dirs) {
+    /**
+     * Removes each directory and its contents, and refuses to continue if one
+     * survives.
+     *
+     * The emptiness is the point, and it used to be assumed: File.delete returns
+     * false for a locked file on Windows or anything under a read-only directory,
+     * nothing looked at that, and the stale .class stayed where ClassScanner,
+     * requireMainClass and the translator would all find it. A controller or an
+     * entry point deleted from the source tree is then still packaged, so the
+     * build ships the previous implementation and says nothing. Checking the
+     * result rather than each delete catches every reason one can survive.
+     */
+    private static void emptyDirs(File... dirs) throws MojoExecutionException {
         for (File dir : dirs) {
             deleteTree(dir);
+            if (dir == null || !dir.exists()) {
+                continue;
+            }
+            String[] left = dir.list();
+            if (left != null && left.length > 0) {
+                throw new MojoExecutionException("Could not empty " + dir
+                        + ": " + left.length + " entr" + (left.length == 1 ? "y" : "ies")
+                        + " could not be deleted, and building over them would package "
+                        + "classes that are no longer in the source tree.");
+            }
         }
     }
 
@@ -740,8 +761,10 @@ public class BackendPackageMojo extends AbstractMojo {
                 deleteTree(child);
             }
         }
-        // Left to the caller to notice: a directory that cannot be removed here shows
-        // up as the stale content it holds, which is the failure this is preventing.
+        // The result is checked by emptyDirs, which looks at what actually
+        // survived rather than at each delete: a directory that could not be
+        // removed but is empty is harmless, and one that still holds a class is
+        // not, whatever the reason.
         file.delete();
     }
 

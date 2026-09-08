@@ -39,6 +39,8 @@ import com.codename1.backend.Jwt;
 import com.codename1.backend.ServerSocket;
 import com.codename1.backend.Tcp;
 import com.codename1.backend.Web;
+import com.codename1.backend.aws.Credentials;
+import com.codename1.backend.aws.S3;
 
 /**
  * Unit tests for the backend runtime, run INSIDE a translated binary.
@@ -398,6 +400,34 @@ public class SelfTest {
         }
         check("a raw control character in a string is refused", "true",
                 String.valueOf(refusedControl));
+
+        // A bucket name is interpolated into the request URL, so one carrying a
+        // slash steers it: into the path here, and into the HOST -- taking the
+        // signed access key id and session token to a server of the caller's
+        // choosing -- under virtual-hosted addressing. presign computes locally
+        // and sends nothing, which is what makes this checkable here.
+        //
+        // forEndpoint is path style, so this covers that guard. The virtual-hosted
+        // one needs forRegion, which resolves real credentials, so it is not
+        // reachable from a self-test that must run with none.
+        S3 s3 = S3.forEndpoint(new Credentials("AKIDEXAMPLE", "secret", null),
+                "us-east-1", "s3.us-east-1.amazonaws.com");
+        boolean refusedBucket = false;
+        try {
+            s3.presignGet("attacker.example/ignored", "k", 60);
+        } catch (Exception expected) {
+            refusedBucket = true;
+        }
+        check("a bucket name that rewrites the host is refused", "true",
+                String.valueOf(refusedBucket));
+        boolean signedOrdinary = false;
+        try {
+            signedOrdinary = s3.presignGet("ordinary-bucket", "k", 60)
+                    .indexOf("/ordinary-bucket/k") > 0;
+        } catch (Exception err) {
+            signedOrdinary = false;
+        }
+        check("an ordinary bucket still signs", "true", String.valueOf(signedOrdinary));
         check("the same character escaped is accepted", "a\nb",
                 String.valueOf(Json.parseObject("{\"s\":\"a\\nb\"}").get("s")));
 

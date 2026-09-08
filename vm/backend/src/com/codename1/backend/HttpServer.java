@@ -1269,6 +1269,21 @@ public final class HttpServer {
                 break;
             }
         }
+        // The wait above ends on the count reaching zero OR on the grace period
+        // expiring, and only the first of those means nothing is running. A
+        // handler still inside a request holds the very TLS and HTTP/2 sessions
+        // the sweeps below free, and would then write its response through freed
+        // native memory -- so when the window expired with work outstanding, the
+        // sessions are left alone. That leaks one per live connection, which a
+        // process about to exit does not care about and a use-after-free is not
+        // a trade for.
+        if(inFlightRequests.get() > 0) {
+            synchronized(stopped) {
+                fullyStopped = true;
+                stopped.notifyAll();
+            }
+            return;
+        }
         // Anything still registered had no worker to take it down -- an idle
         // connection in reactor mode, where nothing runs for it once its descriptor
         // is gone. With no request in flight there is no one left to race, so these
