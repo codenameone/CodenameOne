@@ -15,6 +15,9 @@ name: Test Android build scripts
       - 'scripts/ci/retry.sh'
       - 'scripts/build-android-port.sh'
       - 'scripts/build-android-app.sh'
+      - 'scripts/verify-android-app-compile-sdk.sh'
+      - 'scripts/check-android-api-removals.py'
+      - 'scripts/android/newest-platform-package.sh'
       - 'scripts/run-android-instrumentation-tests.sh'
       - 'scripts/generate-android-coverage-report.sh'
       - 'scripts/android/lib/**/*.java'
@@ -45,6 +48,9 @@ name: Test Android build scripts
       - 'scripts/ci/retry.sh'
       - 'scripts/build-android-port.sh'
       - 'scripts/build-android-app.sh'
+      - 'scripts/verify-android-app-compile-sdk.sh'
+      - 'scripts/check-android-api-removals.py'
+      - 'scripts/android/newest-platform-package.sh'
       - 'scripts/run-android-instrumentation-tests.sh'
       - 'scripts/generate-android-coverage-report.sh'
       - 'scripts/android/lib/**/*.java'
@@ -190,6 +196,54 @@ jobs:
         run: bash scripts/ci/retry.sh ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build Android port
         run: bash scripts/ci/retry.sh ./scripts/build-android-port.sh -q -DskipTests
+      # Only on the default leg. What this compares is the platform jar, not the
+      # JDK, so running it three times would answer the same question three
+      # times.
+      - name: Install Android platforms 36 and 37
+        if: matrix.id == 'default'
+        run: |
+          set -euo pipefail
+          # SDK-root copy first: a sdkmanager on PATH can belong to a
+          # different SDK root and install where the build never looks.
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          [ -x "$SDKMANAGER" ] || SDKMANAGER="$(command -v sdkmanager)"
+          # The NEWEST stable revision of 37, not its .0. An API level is not
+          # one platform from 37 onward, a removal can land in any revision of
+          # it, and the builder gives a developer whichever revision their SDK
+          # has -- so pinning the .0 here would let a regression introduced in
+          # 37.1 or 37.2 merge green.
+          # Checked explicitly, not left to `set -e`: a failing command
+          # substitution in an assignment does not reliably abort, and an
+          # empty package name here would read as a successful resolution.
+          if ! TARGET_PACKAGE=$(scripts/android/newest-platform-package.sh 37); then
+            echo "could not determine the newest API 37 platform" >&2
+            exit 1
+          fi
+          test -n "$TARGET_PACKAGE"
+          echo "Newest stable API 37 platform: $TARGET_PACKAGE"
+          # The baseline stays the unsuffixed 36 deliberately: it has to sit
+          # UNDER the whole range of removals being watched, and a later
+          # revision of 36 could itself have removed something.
+          #
+          # `yes` dies of SIGPIPE once sdkmanager stops reading prompts, so its
+          # status says nothing; assert on the jars that had to appear instead.
+          yes | "$SDKMANAGER" "platforms;android-36" "$TARGET_PACKAGE" > /dev/null || true
+          test -f "$ANDROID_SDK_ROOT/platforms/android-36/android.jar"
+          test -f "$ANDROID_SDK_ROOT/platforms/${TARGET_PACKAGE#platforms;}/android.jar"
+      - name: Check the Android port against API 37
+        if: matrix.id == 'default'
+        run: |
+          set -euo pipefail
+          # For JAVA17_HOME, which setup-workspace.sh writes here rather than
+          # exporting into the job.
+          source "${RUNNER_TEMP}/codenameone-tools/tools/env.sh"
+          # No classpath is passed: the script finds the cn1-binaries jars and
+          # the built core itself, and the comparison does not need more than
+          # that -- anything unresolved fails against both platforms and
+          # cancels out. Resolving the port's real classpath through Maven was
+          # tried and is wrong here, because -Pcompile-android reads its jars
+          # from maven/target/cn1-binaries, which this job never stages.
+          python3 scripts/check-android-api-removals.py --require-all
       - name: Build Hello Codename One Android app
         id: build-android-app
         run: |
@@ -209,6 +263,14 @@ jobs:
           target: google_apis
           disk-size: 2048M
           script: ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
+      # After the emulator, deliberately: the instrumentation suite runs against
+      # the APK the primary build produced, and this rewrites that project in
+      # place. It is the end-to-end half of the API 37 coverage -- the offline
+      # check above sees javac only, while this one also puts AAPT, the manifest
+      # merger, aar metadata and packaging through the newer platform.
+      - name: Rebuild the generated app at API 37
+        if: matrix.id == 'default'
+        run: ./scripts/verify-android-app-compile-sdk.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}" 37
       - name: Upload Android port status
         if: always() && matrix.id == 'default'
         uses: actions/upload-artifact@v7

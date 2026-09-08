@@ -88,12 +88,12 @@ class PromisesJava002Snippet {
         Promise<String> name = Promise.resolve("ada");
         name.then(
                 n -> ((String)n).toUpperCase(),
-                // a then() given no rejection functor installs one that casts
-                // to RuntimeException, turning a checked reason into a
-                // ClassCastException, so supply one. Rethrow wrapped rather
-                // than returning a value: anything returned here RESOLVES the
-                // rest of the chain, so returning null would run the steps
-                // below on a failure
+                // a rejection functor is optional -- omit it and the reason
+                // passes through untouched to the next handler. Supply one, as
+                // here, and it has to rethrow: anything RETURNED from it
+                // RESOLVES the rest of the chain, so returning null would run
+                // the steps below on a failure. Functor.call declares no
+                // checked exception, hence the wrap
                 err -> { throw new RuntimeException((Throwable)err); })
             .then(upper -> "Hello " + upper)
             .ready(

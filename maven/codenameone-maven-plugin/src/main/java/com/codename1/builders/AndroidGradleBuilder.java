@@ -897,6 +897,16 @@ public class AndroidGradleBuilder extends Executor {
     private boolean playServicesWallet;
     private boolean playServicesWear;
     private String xPermissions, xQueries;
+    /**
+     * The names of the installed platforms, as sdkmanager reports them.
+     *
+     * <p>Names, not levels, because from API 37 the two differ: the level is
+     * 37 and the name is android-37.0, android-37.1 or android-37.2. Every
+     * numeric decision in this class uses the level; only the value written as
+     * {@code compileSdkVersion} needs the name, and it needs it exactly.</p>
+     */
+    private final List<String> installedPlatformNames = new ArrayList<>();
+
     private int buildToolsVersionInt;
     private String buildToolsVersion;
     private boolean useAndroidX;
@@ -1282,6 +1292,21 @@ public class AndroidGradleBuilder extends Executor {
                     }
 
                     installedPlatforms.add(platform);
+                    // Only genuinely installed rows here. sdkmanager --list
+                    // prints the installed packages with a fourth column
+                    // holding their location and the available ones with
+                    // three, and the branch above accepts either -- so
+                    // installedPlatforms has always carried platforms nobody
+                    // has. That is survivable where the answer is only a
+                    // number, because AGP downloads a level it is asked for.
+                    // It is not survivable here: this list is used to name an
+                    // exact platform, and naming one that was merely on offer
+                    // turns a working build into a download, or into a
+                    // failure with no network. The build-tools branch above
+                    // already requires the fourth column for the same reason.
+                    if (columns.length >= 4) {
+                        installedPlatformNames.add(platform);
+                    }
                 }
             }
         }
@@ -1313,6 +1338,19 @@ public class AndroidGradleBuilder extends Executor {
             maxPlatformVersion = "31";
         }
 
+        // sdkmanager reports a platform by its full name, and from API 37 that
+        // name always carries a minor: there is no "platforms;android-37", only
+        // android-37.0, android-37.1 and android-37.2. The string above is
+        // therefore "37.2" where every earlier release gave "36", and it is fed
+        // to Integer.parseInt in three places that predate minor SDKs -- the
+        // targetSdkVersion below throws NumberFormatException outright, and
+        // compileSdkInt answers 0, which every caller reads as "could not be
+        // determined". Reduce it to the API level once, here, so the rest of
+        // the builder keeps seeing the integer form it was written against.
+        // The gradle8 branch below already did exactly this and so was never
+        // exposed; doing it unconditionally is what covers the legacy path.
+        maxPlatformVersion = "" + maxPlatformVersionInt;
+
         if (maxBuildToolsVersionInt == 0) {
             maxBuildToolsVersionInt = 31;
             maxBuildToolsVersion = "31";
@@ -1325,6 +1363,8 @@ public class AndroidGradleBuilder extends Executor {
             maxBuildToolsVersion = "" + maxBuildToolsVersionInt;
 
             maxPlatformVersionInt = Math.max(36, maxPlatformVersionInt);
+            // Re-derived because the floor above may have raised it; the
+            // minor-version reduction itself already happened for every path.
             maxPlatformVersion = "" + maxPlatformVersionInt;
         }
 
@@ -7212,7 +7252,7 @@ public class AndroidGradleBuilder extends Executor {
                 usesCustomTunnel));
         String supportLibVersion = maxPlatformVersion;
         String[] supportLadder = {"28", "29", "30", "31", "32", "33", "34",
-            "35", "36"};
+            "35", "36", "37"};
         for (int i = 0; i < supportLadder.length; i++) {
             if (buildToolsVersion.startsWith(supportLadder[i])) {
                 supportLibVersion = "28";
@@ -7361,7 +7401,9 @@ public class AndroidGradleBuilder extends Executor {
                 + "\n"
                 + "android {\n"
                 + request.getArg("android.gradle.androidx", "") + "\n"
-                + "    compileSdkVersion " + compileSdkVersion + "\n"
+                + "    compileSdkVersion "
+                + compileSdkGradleValue(compileSdkVersion,
+                        installedPlatformNames) + "\n"
                 // For maven builder explicitly specifying buildtools version caused some problems
                 // leave it out and just let Android studio choose the version installed.
                 //+ "    buildToolsVersion " + quotedBuildToolsVersion + "\n"
@@ -7551,7 +7593,10 @@ public class AndroidGradleBuilder extends Executor {
         }
         Integer compileSdkInt = parseSdkInt(compileSdkVersion);
         if (compileSdkInt != null && compileSdkInt >= 35) {
-            gradlePropertiesObject.setProperty("android.suppressUnsupportedCompileSdk", String.valueOf(compileSdkInt));
+            gradlePropertiesObject.setProperty("android.suppressUnsupportedCompileSdk",
+                    suppressUnsupportedCompileSdkValue(compileSdkInt,
+                            compileSdkPlatformName(compileSdkInt,
+                                    installedPlatformNames)));
         }
 
         // Configure R8 optimization mode to prevent reflection issues
@@ -10543,11 +10588,161 @@ public class AndroidGradleBuilder extends Executor {
         return compileSdkVersion;
     }
 
+    /**
+     * The installed platform this build should compile against, by name.
+     *
+     * <p>{@code compileSdkVersion 37} is a request for the platform whose hash
+     * string is {@code android-37}, and AGP does not fall back to another
+     * revision of the level: with only android-37.2 installed it fails with
+     * "Failed to find target with hash string 'android-37'" rather than using
+     * it. Measured against AGP 8.13.2. Since API 37 ships only as
+     * android-37.0, -37.1 and -37.2, and {@code sdkmanager
+     * "platforms;android-37.2"} is an ordinary thing to have run, the bare
+     * number can name a platform nobody has.</p>
+     *
+     * @param compileSdk the API level this build compiles against
+     * @param installed  the platform names the SDK reports, e.g. "36", "37.2"
+     * @return the name to compile against, or null when the level is not
+     *         installed at all -- in which case the caller should keep asking
+     *         for the bare number and let AGP fetch it
+     */
+    static String compileSdkPlatformName(int compileSdk, List<String> installed) {
+        if (installed == null) {
+            return null;
+        }
+        String bare = String.valueOf(compileSdk);
+        String best = null;
+        int bestMinor = -1;
+        for (String name : installed) {
+            if (name == null) {
+                continue;
+            }
+            String trimmed = name.trim();
+            if (trimmed.equals(bare)) {
+                // The unsuffixed platform is installed, which is the case for
+                // every level up to 36 and for any SDK that took android-37.0.
+                // Nothing to do: the number AGP was going to resolve is there.
+                return bare;
+            }
+            Integer level = parseSdkInt(trimmed);
+            if (level == null || level != compileSdk) {
+                continue;
+            }
+            int dot = trimmed.indexOf('.');
+            String minorText = dot >= 0 ? trimmed.substring(dot + 1) : "";
+            int minor = 0;
+            try {
+                minor = Integer.parseInt(minorText);
+            } catch (NumberFormatException notANumber) {
+                continue;
+            }
+            if (minor > bestMinor) {
+                bestMinor = minor;
+                best = trimmed;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * The value to write after {@code compileSdkVersion} in build.gradle.
+     *
+     * <p>The bare number wherever the unsuffixed platform exists, which is
+     * every level up to 36 and keeps those builds byte-identical. Where the
+     * level is installed only as a minor revision this switches to the quoted
+     * hash string -- {@code 'android-37.2'} -- which AGP 8.13.2 accepts and
+     * resolves to that exact platform. The int property has no way to say
+     * "37.2" (compileSdkMinor is AGP 9), so the hash string is the only
+     * spelling available.</p>
+     *
+     * <p>Worth being blunt about the reach of that: from API 37 there is no
+     * unsuffixed platform at all, so the quoted form is what an API 37 build
+     * gets, not a rare fallback. Anything that reads the generated
+     * {@code compileSdkVersion} back has to cope with it -- {@code
+     * PatchGradleFiles}, which the build scripts use to re-pin a generated
+     * project, matched only digits and so inserted a second declaration
+     * instead of replacing this one, leaving the original later in the block
+     * where Groovy let it win.</p>
+     *
+     * @param compileSdkVersion the compile SDK settled on, as a string
+     * @param installed         the platform names the SDK reports
+     * @return the Groovy literal to emit
+     */
+    static String compileSdkGradleValue(String compileSdkVersion,
+            List<String> installed) {
+        Integer compileSdk = parseSdkInt(compileSdkVersion);
+        if (compileSdk == null) {
+            return compileSdkVersion;
+        }
+        String name = compileSdkPlatformName(compileSdk, installed);
+        if (name == null || name.indexOf('.') < 0) {
+            return String.valueOf(compileSdk);
+        }
+        return "'android-" + name + "'";
+    }
+
+    /**
+     * The value {@code android.suppressUnsupportedCompileSdk} has to carry to
+     * silence AGP for a given compile SDK.
+     *
+     * <p>AGP compares the property against the name of the platform it
+     * <em>resolved</em>, not against the number the build asked for, and from
+     * API 37 those differ: there is no {@code platforms;android-37}, so
+     * {@code compileSdkVersion 37} resolves to android-37.0 and AGP asks for
+     * {@code 37.0}. Compiling against android-37.2 it asks for {@code 37.2}.
+     * Writing the bare {@code 37} the build requested left the "We recommend
+     * using a newer Android Gradle plugin" warning in every API 37 build log
+     * -- all three spellings measured against AGP 8.13.2, which is what
+     * {@link #ANDROID_GRADLE_PLUGIN_8_VERSION} pins.</p>
+     *
+     * <p>The property takes a comma-separated list, so rather than predict
+     * which spelling AGP will resolve to, emit every one this build could
+     * produce. The redundant entries are inert: AGP does not warn about an
+     * entry that matches nothing.</p>
+     *
+     * @param compileSdk   the API level this build compiles against
+     * @param platformName the platform name it will resolve to, or null
+     * @return the property value, covering every spelling of that level
+     */
+    static String suppressUnsupportedCompileSdkValue(int compileSdk,
+            String platformName) {
+        StringBuilder value = new StringBuilder();
+        value.append(compileSdk).append(',').append(compileSdk).append(".0");
+        if (platformName != null && platformName.indexOf('.') > 0
+                && !platformName.equals(compileSdk + ".0")) {
+            value.append(',').append(platformName);
+        }
+        return value.toString();
+    }
+
+    /**
+     * The API level named by a compile or target SDK string.
+     *
+     * <p>Accepts the spellings the SDK and the build hints actually produce:
+     * a bare {@code 36}, the quoted {@code android-36} the legacy Gradle
+     * files use, and -- since Android 17 -- a platform name carrying a minor,
+     * {@code 37.2}. Only the major matters to every caller: AGP's
+     * {@code compileSdk} is an API level, and the minor selects which
+     * revision of that level the platform is.</p>
+     *
+     * <p>The minor is dropped before the digits are gathered rather than
+     * after, because gathering first turns "37.2" into 372 -- an API level
+     * three hundred short of anything real, which compares greater than every
+     * floor in this class and so would silently defeat all of them.</p>
+     *
+     * @param value the SDK string, or null
+     * @return the API level, or null when there is no number in it
+     */
     private static Integer parseSdkInt(String value) {
         if (value == null) {
             return null;
         }
-        String digits = value.replaceAll("\\D", "");
+        String major = value.trim();
+        int dot = major.indexOf('.');
+        if (dot >= 0) {
+            major = major.substring(0, dot);
+        }
+        String digits = major.replaceAll("\\D", "");
         if (digits.isEmpty()) {
             return null;
         }
@@ -10638,7 +10833,8 @@ public class AndroidGradleBuilder extends Executor {
             boolean usesAnyNearby, boolean usesCallVoip,
             boolean usesCustomTunnel) {
         String compileSdkVersion = maxPlatformVersion;
-        String[] ladder = {"28", "29", "30", "31", "32", "33", "34", "35", "36"};
+        String[] ladder = {"28", "29", "30", "31", "32", "33", "34", "35", "36",
+            "37"};
         for (int i = 0; i < ladder.length; i++) {
             if (buildToolsVersion != null
                     && buildToolsVersion.startsWith(ladder[i])) {
@@ -10678,11 +10874,13 @@ public class AndroidGradleBuilder extends Executor {
         // requires the attribute has already made it writable. The daemon
         // copy raises to the target only inside its container path, which is
         // why it needs the rule stated separately.
-        try {
-            return Integer.parseInt(compileSdkVersion.trim());
-        } catch (NumberFormatException notANumber) {
-            return 0;
-        }
+        // Through parseSdkInt rather than Integer.parseInt: a platform name
+        // with a minor in it ("37.2") is a NumberFormatException here, and the
+        // 0 that catch returns reads to every caller as "could not be
+        // determined" -- so an API 37 build lost the compile SDK that the
+        // manifest fragments check their attribute values against.
+        Integer parsed = parseSdkInt(compileSdkVersion);
+        return parsed == null ? 0 : parsed;
     }
 
 }

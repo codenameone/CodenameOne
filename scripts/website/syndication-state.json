@@ -1946,6 +1946,16 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-06T00:02:16+00:00"
+      },
+      "devto": {
+        "id": 4589012,
+        "url": "https://dev.to/codenameone/uwb-and-nearby-devices-distance-direction-association-and-transport-196i",
+        "syndicated_at": "2026-09-06T16:14:40.614Z",
+        "recovered": true
+      },
+      "medium": {
+        "url": "https://medium.com/p/84ed4e153efd/edit",
+        "syndicated_at": "2026-09-07T19:01:15+00:00"
       }
     },
     "watch-complications-wear-companion": {
@@ -1958,6 +1968,22 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-07T00:01:12+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/bdf6a214ade4/edit",
+        "syndicated_at": "2026-09-07T19:02:37+00:00"
+      }
+    },
+    "rootless-jailbreak-detection": {
+      "hashnode": {
+        "url": "https://debugagent.com/rootless-jailbreak-detection-updating-the-signals-not-the-claim",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a9f500e29ad489e4c757d8f",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-08T00:01:09+00:00"
       }
     }
   }

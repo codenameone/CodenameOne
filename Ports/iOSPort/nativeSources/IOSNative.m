@@ -1726,7 +1726,7 @@ void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int
 #endif // !TARGET_OS_WATCH
 #endif
 }
-#ifdef INCLUDE_CN1_PUSH_2
+#ifdef INCLUDE_CN1_PUSH2
 typedef void (^CN1PushCompletionHandlerType)(void);
 
 // One record per notification rather than one global.
@@ -1852,7 +1852,7 @@ void CN1PushCompletionReleaseOldest(void) {
 #endif
 
 void com_codename1_impl_ios_IOSNative_firePushCompletionHandler___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG completionId) {
-#ifdef INCLUDE_CN1_PUSH_2
+#ifdef INCLUDE_CN1_PUSH2
     long long cid = (long long)completionId;
     dispatch_async(dispatch_get_main_queue(), ^{
         CN1PushCompletionRelease(cid);
@@ -1861,7 +1861,7 @@ void com_codename1_impl_ios_IOSNative_firePushCompletionHandler___long(CN1_THREA
 }
 
 void com_codename1_impl_ios_IOSNative_releaseOldestPushCompletionHandler__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-#ifdef INCLUDE_CN1_PUSH_2
+#ifdef INCLUDE_CN1_PUSH2
     dispatch_async(dispatch_get_main_queue(), ^{
         CN1PushCompletionReleaseOldest();
     });

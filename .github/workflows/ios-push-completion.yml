@@ -1,0 +1,36 @@
+name: iOS push completion contract
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'Ports/iOSPort/nativeSources/IOSNative.m'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_GLAppDelegate.m'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java'
+      - 'scripts/ios/push-completion-tests/**'
+      - '.github/workflows/ios-push-completion.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'Ports/iOSPort/nativeSources/IOSNative.m'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_GLAppDelegate.m'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java'
+      - 'scripts/ios/push-completion-tests/**'
+      - '.github/workflows/ios-push-completion.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-push-completion-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-contract:
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Compile, link, and exercise push completion with push enabled and disabled
+        run: python3 scripts/ios/push-completion-tests/check.py
