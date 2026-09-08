@@ -3178,10 +3178,25 @@ extern void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, J
 #define CN1_REF_LOAD_END()   do { } while(0)
 #define CN1_SATB_REF_KEEP(active, refVal) do { (void)(active); (void)(refVal); } while(0)
 #else
+// -DCN1_REF_NO_LOAD_BARRIER compiles the registration and the enqueue out, leaving the
+// touch stamp and the load. It is UNSOUND -- it is the arm that measures what the barrier
+// costs, not a configuration to ship -- and exists because "is get() too expensive?" has to
+// be answered with a number rather than an intuition.
+#if defined(CN1_REF_NO_LOAD_BARRIER)
+#define CN1_REF_LOAD_BEGIN() JAVA_FALSE
+#define CN1_REF_LOAD_END()   do { } while(0)
+#else
 #define CN1_REF_LOAD_BEGIN() cn1SatbBulkBegin()
 #define CN1_REF_LOAD_END()   cn1SatbBulkEnd()
+#endif
+#ifdef CN1_GC_CONFORM
+extern _Atomic long cn1RefGets;
+#define CN1_REF_COUNT_GET() atomic_fetch_add_explicit(&cn1RefGets, 1, memory_order_relaxed)
+#else
+#define CN1_REF_COUNT_GET() do { } while(0)
+#endif
 #define CN1_SATB_REF_KEEP(active, refVal) \
-    do { JAVA_OBJECT cn1__r = (refVal); \
+    do { CN1_REF_COUNT_GET(); JAVA_OBJECT cn1__r = (refVal); \
          if((active) && cn1__r != JAVA_NULL && !CN1_IS_TAGGED(cn1__r)) { \
              int cn1__m = __atomic_load_n(&cn1__r->__codenameOneGcMark, __ATOMIC_RELAXED); \
              int cn1__e = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed); \

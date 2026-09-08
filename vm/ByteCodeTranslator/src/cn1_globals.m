@@ -2372,6 +2372,7 @@ _Atomic long cn1RefWeak = 0;          // of those, weak
 _Atomic long cn1RefRetained = 0;      // soft referents kept by the policy
 _Atomic long cn1RefKeptTouched = 0;   // kept by the racing-get() rule in the clear pass
 _Atomic long cn1RefCleared = 0;       // referents handed to the sweep
+_Atomic long cn1RefGets = 0;          // Reference.get() calls, for costing the load barrier
 long long cn1RefPhaseNs = 0;          // GC thread only: time in cn1GcProcessReferences
 long cn1RefPasses = 0;                // clear passes run this cycle (>1 == SATB reopen)
 #endif
@@ -2390,6 +2391,8 @@ static void cn1RefBeginCycle(void) {
     atomic_store_explicit(&cn1RefRetained, 0, memory_order_relaxed);
     atomic_store_explicit(&cn1RefKeptTouched, 0, memory_order_relaxed);
     atomic_store_explicit(&cn1RefCleared, 0, memory_order_relaxed);
+    // cn1RefGets is NOT reset: it is a whole-run total, because the question it answers
+    // ("how often does a real workload call get()?") is about the run, not the cycle.
     cn1RefPhaseNs = 0;
     cn1RefPasses = 0;
 #endif
@@ -12860,7 +12863,8 @@ void cn1GcProbeCycle(double markMs, double sweepMs, int threw) {
     // silently takes.
     fprintf(stderr,
         "[GCREF] v=1 cyc=%d tMs=%lld discovered=%ld weak=%ld retained=%ld"
-        " keptTouched=%ld cleared=%ld passes=%ld refMs=%.3f softBudget=%d listCap=%ld\n",
+        " keptTouched=%ld cleared=%ld passes=%ld refMs=%.3f softBudget=%d listCap=%ld"
+        " getsTotal=%ld\n",
         currentGcMarkValue, cn1GcProbeElapsedMs(),
         atomic_load_explicit(&cn1RefDiscoveries, memory_order_relaxed),
         atomic_load_explicit(&cn1RefWeak, memory_order_relaxed),
@@ -12869,7 +12873,8 @@ void cn1GcProbeCycle(double markMs, double sweepMs, int threw) {
         atomic_load_explicit(&cn1RefCleared, memory_order_relaxed),
         cn1RefPasses, cn1RefPhaseNs / 1e6,
         atomic_load_explicit(&cn1SoftRetainCycles, memory_order_relaxed),
-        cn1RefDiscoveredCap);
+        cn1RefDiscoveredCap,
+        atomic_load_explicit(&cn1RefGets, memory_order_relaxed));
     fflush(stderr);
     // Per-CYCLE, so reset after reporting. A running total cannot show a trend.
     cn1GcProbeResetPhases();
@@ -13271,6 +13276,20 @@ static void cn1ReportAllocProfile(void) {
 }
 #endif
 
+// Reference.get() calls for the WHOLE run, printed at exit.
+//
+// The per-cycle [GCREF] line cannot answer "how often does this workload call get()":
+// it only prints when a collection happens, so a get()-heavy but allocation-light phase
+// -- exactly the shape that costs the load barrier the most -- leaves the last line
+// stranded early in the run. Costing the barrier off that number understates the call
+// count and therefore overstates the nanoseconds per call; measured, it read 153,408 for
+// a run that made millions.
+static void cn1ReportRefGets(void) {
+    fprintf(stderr, "[GCREF-TOTAL] gets=%ld\n",
+            atomic_load_explicit(&cn1RefGets, memory_order_relaxed));
+    fflush(stderr);
+}
+
 static void cn1ReportStalls(void) {
     long long wallMs = cn1GcProbeElapsedMs();
     // Mutator-only, to match the thread count it is divided by; the per-cause table below
@@ -13586,6 +13605,8 @@ void initConstantPool() {
 #ifdef CN1_GC_CONFORM
     atexit(cn1ReportAllocProfile);
 #endif
+
+    atexit(cn1ReportRefGets);
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     // The self test sorts the conservative extent table, which only exists on
     // this arm. Calling it under CN1_GC_CONFORM alone does not compile, so
