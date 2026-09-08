@@ -233,6 +233,51 @@ public class TextFieldRenderElement extends RenderElement {
     // leaving it alone: Crane's rows went from 17.33% wrong to 17.80%. The size
     // is the thing to fix first, and it is not a styling problem.
 
+    /**
+     * Flutter's {@code InputDecoration.applyDefaults}: every field the widget
+     * leaves unset falls back to the ambient inputDecorationTheme.
+     *
+     * <p>{@code filled} is a primitive on both sides, so "unset" and "false"
+     * cannot be told apart; a theme that asks for a fill therefore wins over a
+     * decoration that simply did not mention one, which is the case the studies
+     * exercise. Rally names its dark fill once on the theme rather than on each
+     * of its login fields, and without this they rendered as white blocks on a
+     * dark page.</p>
+     */
+    static boolean resolveFilled(InputDecoration d, InputDecorationThemeData themed) {
+        if (d != null && d.isFilled()) {
+            return true;
+        }
+        return themed != null && themed.isFilled();
+    }
+
+    /** The fill colour, the decoration's before the theme's. */
+    static com.codename1.flutter.Color resolveFill(InputDecoration d,
+            InputDecorationThemeData themed) {
+        if (d != null && d.getFillColor() != null) {
+            return d.getFillColor();
+        }
+        return themed == null ? null : themed.getFillColor();
+    }
+
+    /** The content padding, the decoration's before the theme's. */
+    static com.codename1.flutter.EdgeInsetsGeometry resolvePadding(InputDecoration d,
+            InputDecorationThemeData themed) {
+        if (d != null && d.getContentPadding() != null) {
+            return d.getContentPadding();
+        }
+        return themed == null ? null : themed.getContentPadding();
+    }
+
+    /// The ambient {@code inputDecorationTheme}, or null when there is none.
+    private InputDecorationThemeData inputDecorationTheme() {
+        try {
+            return Theme.of(this).inputDecorationTheme();
+        } catch (Throwable noTheme) {
+            return null;
+        }
+    }
+
     /** One style's size, weight and colour onto one Codename One style. */
     private static void applyOne(com.codename1.ui.plaf.Style target,
             com.codename1.flutter.TextStyle ts) {
@@ -274,8 +319,14 @@ public class TextFieldRenderElement extends RenderElement {
      */
     private void applyDecoration(Component target, InputDecoration d) {
         com.codename1.ui.plaf.Style all = target.getAllStyles();
-        if (d.isFilled()) {
-            com.codename1.flutter.Color fill = d.getFillColor();
+        // Flutter resolves a decoration through InputDecoration.applyDefaults:
+        // each field the widget leaves unset falls back to the ambient
+        // inputDecorationTheme. That theme was held opaquely and never read, so
+        // Rally's login fields -- a dark fill named once on the theme rather
+        // than on each field -- rendered as white blocks on a dark page.
+        InputDecorationThemeData themed = inputDecorationTheme();
+        if (resolveFilled(d, themed)) {
+            com.codename1.flutter.Color fill = resolveFill(d, themed);
             if (fill == null) {
                 try {
                     fill = Theme.of(this).colorScheme().surfaceVariant();
@@ -298,7 +349,7 @@ public class TextFieldRenderElement extends RenderElement {
         } else if (d.getBorder() == com.codename1.flutter.InputBorder.none) {
             all.setBorder(com.codename1.ui.plaf.Border.createEmpty());
         }
-        com.codename1.flutter.EdgeInsets pad = insetsOf(d.getContentPadding());
+        com.codename1.flutter.EdgeInsets pad = insetsOf(resolvePadding(d, themed));
         if (pad != null) {
             all.setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
             all.setPadding((int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.top())),

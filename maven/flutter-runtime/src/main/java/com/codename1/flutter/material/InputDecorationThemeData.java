@@ -38,6 +38,18 @@ public class InputDecorationThemeData {
     private boolean alignLabelWithHint;
     private Object constraints;
 
+    /** Whether descendant fields paint a fill by default. */
+    public boolean isFilled() { return filled; }
+
+    /** The default fill colour for descendant fields. */
+    public Color getFillColor() { return fillColor; }
+
+    /** The default content padding for descendant fields. */
+    public EdgeInsetsGeometry getContentPadding() { return contentPadding; }
+
+    /** The default type for descendant fields' labels. */
+    public TextStyle getLabelStyle() { return labelStyle; }
+
     public void labelStyle(TextStyle v) { this.labelStyle = v; }
     public void floatingLabelStyle(TextStyle v) { this.floatingLabelStyle = v; }
     public void helperStyle(TextStyle v) { this.helperStyle = v; }

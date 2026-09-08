@@ -112,6 +112,18 @@ public class ThemeData {
     public void navigationRailTheme(NavigationRailThemeData v) { this.navigationRailTheme = v; }
     public void snackBarTheme(Object v) { this.snackBarTheme = v; }
     public void inputDecorationTheme(Object v) { this.inputDecorationTheme = v; }
+
+    /**
+     * {@code inputDecorationTheme}, when it is one this runtime understands.
+     *
+     * <p>Held opaquely because most of it is borders this port cannot draw, but
+     * the fill IS drawable and the studies depend on it: Rally's login fields
+     * are a dark fill on a dark page and rendered as white blocks without it.</p>
+     */
+    public InputDecorationThemeData inputDecorationTheme() {
+        return inputDecorationTheme instanceof InputDecorationThemeData
+                ? (InputDecorationThemeData) inputDecorationTheme : null;
+    }
     public void radioTheme(Object v) { this.radioTheme = v; }
     public void switchTheme(Object v) { this.switchTheme = v; }
     public void tooltipTheme(Object v) { this.tooltipTheme = v; }
