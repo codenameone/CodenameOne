@@ -96,8 +96,6 @@ public final class HugoDoclet implements Doclet {
     private final Map<String, List<TypeElement>> subtypes = new LinkedHashMap<>();
     /** Rows for the search index. */
     private final List<Map<String, Object>> searchRows = new ArrayList<>();
-    /** Lower cased directory path of every documented package, for alias collisions. */
-    private final Set<String> packageDirs = new LinkedHashSet<>();
 
     @Override
     public void init(Locale locale, Reporter reporter) {
@@ -169,10 +167,6 @@ public final class HugoDoclet implements Doclet {
             if (element instanceof TypeElement type) {
                 collectType(type);
             }
-        }
-        for (TypeElement type : documented.values()) {
-            packageDirs.add(Refs.packageOf(type).getQualifiedName().toString()
-                    .replace('.', '/').toLowerCase(Locale.ROOT));
         }
         for (TypeElement type : documented.values()) {
             recordSubtypeEdges(type);
@@ -355,40 +349,16 @@ public final class HugoDoclet implements Doclet {
         frontMatter.put("url", Refs.typeUrl(type));
         frontMatter.put("description", TypeNames.summary(doc.description));
         frontMatter.put("layout", "type");
-        // The directory spelling of the same page, so that a link written without
-        // the .html suffix redirects instead of 404ing. The old embed script
-        // refused anything that did not end in .html, and roughly 2200 links in
-        // this shape already exist across the site content and the developer
-        // guide, every one of them broken until now.
-        frontMatter.put("aliases", directoryAlias(type));
+        // No alias: the .html spelling redirects here on its own, and the
+        // directory spelling IS this page now.
+        frontMatter.put("aliases", List.of());
         frontMatter.put("javadoc", api);
 
         write(contentRoot.resolve(Refs.typeContentPath(type)), Json.write(frontMatter));
         addSearchRows(type, doc, owned);
     }
 
-    /**
-     * The directory spelling of a type's URL, unless a package already owns that
-     * directory.
-     *
-     * <p>{@code com.codename1.ui.List} is a class and {@code com.codename1.ui.list}
-     * is a package, so the alias directory {@code ui/List/} and the package
-     * directory {@code ui/list/} are the same directory on a case insensitive
-     * filesystem. On macOS the package's pages were being written into the
-     * alias's directory and the whole package went missing from the site, while
-     * the same build on Linux was correct -- a difference that would only ever
-     * have been noticed by whoever previewed the site on a Mac. Dropping the
-     * alias for the colliding type keeps the output identical everywhere; it
-     * costs two types their optional second URL.
-     */
-    private List<String> directoryAlias(TypeElement type) {
-        String alias = Refs.typeUrl(type).replaceAll("\\.html$", "/");
-        String directory = alias.substring("/javadoc/".length(), alias.length() - 1);
-        return packageDirs.contains(directory.toLowerCase(Locale.ROOT))
-                ? List.of() : List.of(alias);
-    }
-
-    /**
+/**
      * Every supertype we publish no page for, anywhere in the hierarchy.
      *
      * <p>The walk continues through documented supertypes rather than stopping
@@ -1278,6 +1248,12 @@ public final class HugoDoclet implements Doclet {
             frontMatter.put("url", Refs.packageUrl(pkg));
             frontMatter.put("description", TypeNames.summary(doc.description));
             frontMatter.put("layout", "package");
+            // Deliberately no alias on the bare package directory. It would put an
+            // index.html in com/codename1/ui/list/, which is the same directory as
+            // the com.codename1.ui.List type page on a case insensitive filesystem,
+            // and one silently overwrote the other. Nothing links to a bare package
+            // directory anyway; the summary is what the guide and javadoc name.
+            frontMatter.put("aliases", List.of());
             frontMatter.put("javadoc", api);
 
             write(contentRoot.resolve(Refs.packageContentPath(pkg)), Json.write(frontMatter));

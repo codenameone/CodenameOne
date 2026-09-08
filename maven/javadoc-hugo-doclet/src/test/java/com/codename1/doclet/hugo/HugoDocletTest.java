@@ -367,10 +367,15 @@ class HugoDocletTest {
     }
 
     @Test
-    void publishesTheJavadocUrlAndItsDirectoryAlias() throws IOException {
+    void publishesTheDirectoryUrlThatCloudflareCanActuallyServe() throws IOException {
+        // Not Sample.html: Cloudflare Pages redirects /x.html to /x before any
+        // asset is considered, so a page published at the extension is a page
+        // nobody can reach. The javadoc spelling still lands here by redirect,
+        // which scripts/website/check-javadoc-urls.sh proves against the real
+        // Pages runtime rather than asserting it here.
         String page = page("Sample.md");
-        assertTrue(page.contains("\"/javadoc/p/Sample.html\""), "the canonical URL");
-        assertTrue(page.contains("\"/javadoc/p/Sample/\""), "the directory alias");
+        assertTrue(page.contains("\"/javadoc/p/Sample/\""), "the canonical URL is the directory");
+        assertFalse(page.contains("\"/javadoc/p/Sample.html\""), "and not the extension");
     }
 
     @Test
@@ -390,7 +395,7 @@ class HugoDocletTest {
 
     @Test
     void linksSeeAlsoEntriesThatNameSomethingPublished() throws IOException {
-        assertTrue(page("Sample.md").contains("/javadoc/p/Other.html"),
+        assertTrue(page("Sample.md").contains("/javadoc/p/Other/"),
                 "a bare type name under #### See also resolves to its page");
     }
 
@@ -427,13 +432,13 @@ class HugoDocletTest {
         // #clear(int) against a type that declares clear() first. Linking to the
         // wrong overload is worse than not linking: the reader follows it.
         String page = page("Sample.md");
-        assertTrue(page.contains("/javadoc/p/Sample.html#clear(int)"),
+        assertTrue(page.contains("/javadoc/p/Sample/#clear(int)"),
                 "the named overload, not the first member of that name");
     }
 
     @Test
     void linksQualifiedSeeAlsoMembers() throws IOException {
-        assertTrue(page("Sample.md").contains("/javadoc/p/Other.html#greet()"),
+        assertTrue(page("Sample.md").contains("/javadoc/p/Other/#greet()"),
                 "Type#member() must resolve to the member, not fail a type lookup");
     }
 
@@ -455,9 +460,9 @@ class HugoDocletTest {
         // references that name something real are inherited like this, so a
         // resolver that searches only the enclosing type leaves them dead.
         String page = page("Child.md");
-        assertTrue(page.contains("/javadoc/p/Other.html#ALIGN"),
+        assertTrue(page.contains("/javadoc/p/Other/#ALIGN"),
                 "an inherited field links to the page that declares it");
-        assertTrue(page.contains("/javadoc/p/Other.html#greet()"),
+        assertTrue(page.contains("/javadoc/p/Other/#greet()"),
                 "and so does an inherited method");
     }
 
@@ -467,9 +472,9 @@ class HugoDocletTest {
         // Arrays#sort(Object[], int, int) to the byte[] overload. A wrong link is
         // worse than none: the reader follows it.
         String page = page("Sample.md");
-        assertTrue(page.contains("/javadoc/p/Sample.html#erase(java.lang.Object)"),
+        assertTrue(page.contains("/javadoc/p/Sample/#erase(java.lang.Object)"),
                 "the Object overload, not the int one");
-        assertFalse(page.contains("\"url\": \"/javadoc/p/Sample.html#erase(int)\""),
+        assertFalse(page.contains("\"url\": \"/javadoc/p/Sample/#erase(int)\""),
                 "must not link the reference to the wrong overload");
     }
 
@@ -489,12 +494,12 @@ class HugoDocletTest {
         // widget. The link resolved, so no link check could see it -- only
         // reading the page showed it was the wrong class.
         String fromP = Files.readString(content.resolve("p/UsesShared.md"), StandardCharsets.UTF_8);
-        assertTrue(fromP.contains("/javadoc/p/Shared.html"), "p sees p.Shared");
-        assertFalse(fromP.contains("/javadoc/q/Shared.html"), "and not q.Shared");
+        assertTrue(fromP.contains("/javadoc/p/Shared/"), "p sees p.Shared");
+        assertFalse(fromP.contains("/javadoc/q/Shared/"), "and not q.Shared");
 
         String fromQ = Files.readString(content.resolve("q/UsesShared.md"), StandardCharsets.UTF_8);
-        assertTrue(fromQ.contains("/javadoc/q/Shared.html"), "q sees q.Shared");
-        assertFalse(fromQ.contains("/javadoc/p/Shared.html"), "and not p.Shared");
+        assertTrue(fromQ.contains("/javadoc/q/Shared/"), "q sees q.Shared");
+        assertFalse(fromQ.contains("/javadoc/p/Shared/"), "and not p.Shared");
     }
 
     @Test

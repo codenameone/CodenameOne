@@ -79,6 +79,10 @@ def check_search_index(hugo: pathlib.Path, index: pathlib.Path) -> int:
         if not url.startswith("/javadoc/"):
             continue
         target = url[len("/javadoc/"):] or "index.html"
+        # Same normalisation the link pass does: a directory URL is served by the
+        # index.html inside it. Without this every entry looked broken.
+        if target.endswith("/") or not target:
+            target += "index.html"
         checked += 1
         if target not in pages:
             missing[url] += 1
@@ -253,23 +257,41 @@ CHROME_ID_RE = re.compile(
 PROSE_ID_RE = re.compile(r"^[a-z0-9-]+-heading\d*$")
 
 
-def pages(root: pathlib.Path, drop_alias_indexes: bool = False) -> set[str]:
+def pages(root: pathlib.Path, hugo: bool = False) -> set[str]:
+    """The API pages a tree publishes, keyed by the standard doclet's spelling.
+
+    The two trees spell the same page differently and have to. Cloudflare Pages
+    will not serve a .html URL at all -- its own html_handling redirects /x.html
+    to /x before an asset is considered, and the site's redirect table maps
+    /*.html to /:splat/ on top of that -- so the Hugo pages are published at
+    Label/index.html and the javadoc spelling reaches them by redirect. Comparing
+    the raw filenames would report all 2272 pages missing.
+    """
     found = set()
     for path in root.rglob("*.html"):
         relative = path.relative_to(root).as_posix()
+        # Normalise BEFORE the filters, not after: every Hugo page is named
+        # index.html, and index.html is in CHROME_PAGES, so filtering first
+        # discarded the entire tree and the comparison silently had nothing left
+        # to do. The floor in main() is what caught that.
+        if hugo and relative.endswith("/index.html"):
+            relative = relative[: -len("/index.html")] + ".html"
         if relative.split("/")[-1] in CHROME_PAGES:
             continue
         if relative.startswith(CHROME_DIRS):
             continue
         if relative.endswith(SKIPPED_PAGE_SUFFIX):
             continue
-        # The Hugo build adds a directory spelling of each type page as an alias,
-        # which the standard doclet has no equivalent for. Extra addresses are
-        # not a compatibility problem, so they are not compared.
-        if drop_alias_indexes and relative.endswith("/index.html"):
-            continue
         found.add(relative)
     return found
+
+
+def hugo_path(hugo: pathlib.Path, page: str) -> pathlib.Path:
+    """The file behind a standard-doclet page name in the Hugo tree."""
+    direct = hugo / page
+    if direct.exists():
+        return direct
+    return hugo / page[: -len(".html")] / "index.html"
 
 
 def anchors(path: pathlib.Path) -> set[str]:
@@ -296,7 +318,7 @@ def main(argv: list[str]) -> int:
             return 2
 
     standard_pages = pages(standard)
-    hugo_pages = pages(hugo, drop_alias_indexes=True)
+    hugo_pages = pages(hugo, hugo=True)
 
     failures = 0
 
@@ -313,7 +335,7 @@ def main(argv: list[str]) -> int:
     checked_anchors = 0
     for page in sorted(standard_pages & hugo_pages):
         expected = anchors(standard / page)
-        actual = anchors(hugo / page)
+        actual = anchors(hugo_path(hugo, page))
         checked_anchors += len(expected)
         gap = sorted(expected - actual)
         if not gap:

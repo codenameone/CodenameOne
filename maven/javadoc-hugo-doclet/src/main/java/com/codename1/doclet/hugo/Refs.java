@@ -124,18 +124,29 @@ final class Refs {
     /**
      * The site path of a documented type's page.
      *
-     * <p>Nested types live beside their outer type as {@code Outer.Inner.html},
-     * which is what javadoc writes and therefore what existing links point at.
+     * <p>The directory form, not {@code Outer.Inner.html}, because Cloudflare
+     * Pages will not serve a {@code .html} URL: its own html_handling redirects
+     * {@code /x.html} to {@code /x} before any asset is considered, and the
+     * site's redirect table separately maps {@code /*.html} to {@code /:splat/}.
+     * Publishing the page at the extension was therefore a page nobody could
+     * reach -- every API link 301'd away from it, and the alias it landed on
+     * bounced the reader onto the production domain.
+     *
+     * <p>The javadoc spelling still works and still lands here: the redirect
+     * table turns {@code /javadoc/com/codename1/ui/Label.html} into
+     * {@code /javadoc/com/codename1/ui/Label/}, fragment intact, which is this
+     * URL. That is checked end to end against the Pages runtime rather than
+     * assumed; see scripts/website/check-javadoc-urls.sh.
      */
     static String typeUrl(TypeElement type) {
         PackageElement pkg = packageOf(type);
         String dir = pkg.isUnnamed() ? "" : pkg.getQualifiedName().toString().replace('.', '/') + "/";
-        return "/javadoc/" + dir + fileName(type) + ".html";
+        return "/javadoc/" + dir + fileName(type) + "/";
     }
 
-    /** The site path of a package's summary page. */
+    /** The site path of a package's summary page, in the same directory form. */
     static String packageUrl(PackageElement pkg) {
-        return "/javadoc/" + pkg.getQualifiedName().toString().replace('.', '/') + "/package-summary.html";
+        return "/javadoc/" + pkg.getQualifiedName().toString().replace('.', '/') + "/package-summary/";
     }
 
     /** The content file a type's page is generated into, relative to the content root. */

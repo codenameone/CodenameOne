@@ -752,6 +752,14 @@ if [ "${WEBSITE_INCLUDE_JAVADOCS}" = "true" ]; then
     "${PYTHON_BIN}" "${REPO_ROOT}/scripts/website/check-javadoc-parity.py" \
       "${REPO_ROOT}/CodenameOne/dist/javadoc" \
       "${WEBSITE_DIR}/public/javadoc"
+
+    # Comparing files is not enough. Cloudflare Pages redirects /x.html to /x
+    # before it considers an asset, so a page can be present on disk, pass every
+    # comparison, and still be unreachable on the deployed site -- which is
+    # exactly what shipped once. This asks the Pages runtime instead.
+    if [ "${WEBSITE_CHECK_JAVADOC_URLS:-true}" = "true" ]; then
+      "${REPO_ROOT}/scripts/website/check-javadoc-urls.sh" "${WEBSITE_DIR}/public"
+    fi
   else
     echo "Warning: python3 not found; skipping JavaDoc URL parity check." >&2
   fi
