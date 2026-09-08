@@ -2,42 +2,42 @@
   <rect x="0" y="0" width="820" height="504" fill="#ffffff"/>
   <text x="410" y="26" font-family="Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#222222">Picking a layout manager</text>
   <text x="410" y="44" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Every Container has one, and the default is FlowLayout. Each cell says what the layout is for.</text>
-  <rect x="24" y="60" width="276" height="124" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
-  <text x="162" y="84" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a7a3d">FlowLayout</text>
-  <text x="162" y="104" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">components in a row, wrapping</text>
-  <text x="162" y="128" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">each at its preferred width while it fits;</text>
-  <text x="162" y="143" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">top left for LTR languages</text>
-  <rect x="272" y="60" width="276" height="124" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
+  <rect x="24" y="60" width="248" height="124" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="148" y="84" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a7a3d">FlowLayout</text>
+  <text x="148" y="104" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">components in a row, wrapping</text>
+  <text x="148" y="128" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">each at its preferred width while</text>
+  <text x="148" y="143" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">it fits; top left for LTR</text>
+  <rect x="286" y="60" width="248" height="124" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
   <text x="410" y="84" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a7a3d">BoxLayout</text>
-  <text x="410" y="104" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">one row or one column</text>
-  <text x="410" y="128" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">X_AXIS keeps each width, fills the height</text>
-  <text x="410" y="143" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Y_AXIS keeps each height, fills the width</text>
-  <rect x="520" y="60" width="276" height="124" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
-  <text x="658" y="84" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a7a3d">BorderLayout</text>
-  <text x="658" y="104" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">one component per edge</text>
-  <text x="658" y="128" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">NORTH, SOUTH, EAST, WEST, CENTER;</text>
-  <text x="658" y="143" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">the centre scales by default</text>
-  <rect x="24" y="196" width="276" height="124" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
-  <text x="162" y="220" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a7a3d">GridLayout</text>
-  <text x="162" y="240" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">equal cells in a grid</text>
-  <text x="162" y="264" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">cell size is the container divided by the</text>
-  <text x="162" y="279" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">row and column count, or autoFit()</text>
-  <rect x="272" y="196" width="276" height="124" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="410" y="104" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">one row or one column</text>
+  <text x="410" y="128" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">X_AXIS keeps each width, fills height</text>
+  <text x="410" y="143" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">Y_AXIS keeps each height, fills width</text>
+  <rect x="548" y="60" width="248" height="124" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="672" y="84" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a7a3d">BorderLayout</text>
+  <text x="672" y="104" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">one component per edge</text>
+  <text x="672" y="128" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">NORTH, SOUTH, EAST, WEST, CENTER;</text>
+  <text x="672" y="143" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">the centre scales by default</text>
+  <rect x="24" y="196" width="248" height="124" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="148" y="220" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a7a3d">GridLayout</text>
+  <text x="148" y="240" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">equal cells in a grid</text>
+  <text x="148" y="264" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">the container divided by the row and</text>
+  <text x="148" y="279" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">column count, or autoFit()</text>
+  <rect x="286" y="196" width="248" height="124" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
   <text x="410" y="220" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a7a3d">LayeredLayout</text>
-  <text x="410" y="240" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">one on top of another</text>
-  <text x="410" y="264" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">each child fills the container; only its</text>
-  <text x="410" y="279" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">preferred size follows the largest child</text>
-  <rect x="520" y="196" width="276" height="124" rx="6" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
-  <text x="658" y="220" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a6fa5">TableLayout</text>
-  <text x="658" y="240" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">rows and columns with spans</text>
-  <text x="658" y="264" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">constraint based, with alignment and</text>
-  <text x="658" y="279" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">span. Lives in com.codename1.ui.table</text>
+  <text x="410" y="240" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">one on top of another</text>
+  <text x="410" y="264" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">without insets a child fills the parent;</text>
+  <text x="410" y="279" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">setInsets() sizes and places it instead</text>
+  <rect x="548" y="196" width="248" height="124" rx="6" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="672" y="220" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a6fa5">TableLayout</text>
+  <text x="672" y="240" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">rows and columns with spans</text>
+  <text x="672" y="264" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">constraint based, with alignment</text>
+  <text x="672" y="279" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">and span. In com.codename1.ui.table</text>
   <rect x="24" y="336" width="772" height="58" rx="6" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
   <text x="410" y="356" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#a56a3a">Ported from Swing, and kept for code that already uses them</text>
   <text x="410" y="376" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">GridBagLayout, GroupLayout and MigLayout all exist. GridBagLayout's own javadoc recommends TableLayout instead for new code.</text>
   <rect x="24" y="406" width="772" height="82" rx="6" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
   <text x="410" y="426" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Most of these begin from each component's preferred size. A GridLayout with fixed rows and columns does not: it splits the</text>
   <text x="410" y="440" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">container into equal cells whatever the children ask for. Its autoFit() form does read them, to choose how many columns fit.</text>
-  <text x="410" y="458" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Every preferred size here holds only while there is room. In a container that cannot scroll, FlowLayout and</text>
-  <text x="410" y="472" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">BoxLayout clamp what does not fit, and BoxLayout leaves later children with no space at all.</text>
+  <text x="410" y="460" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Every preferred size here holds only while there is room. In a container that cannot scroll, FlowLayout and</text>
+  <text x="410" y="474" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">BoxLayout clamp what does not fit, and BoxLayout leaves later children with no space at all.</text>
 </svg>

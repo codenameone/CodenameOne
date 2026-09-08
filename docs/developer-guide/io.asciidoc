@@ -534,7 +534,7 @@ One of the more common problems in Network programming is spawning a new thread 
 
 That convenience comes with one rule worth learning before the API: the
 callbacks that read and write the request run on a network thread, while
-`postResponse` and any error listener you register run on the EDT.
+`postResponse`, a response listener and an error listener all run on the EDT.
 
 .A request through the queue, and the thread each callback arrives on
 image::img/network-request-lifecycle.svg[A network request and which thread each of its callbacks runs on,scaledwidth=85%]
