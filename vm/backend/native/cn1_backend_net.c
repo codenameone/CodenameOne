@@ -53,6 +53,7 @@ typedef int cn1_socklen;
 #include <unistd.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <signal.h>
 #define CN1_CLOSE_SOCKET close
 typedef socklen_t cn1_socklen;
 #endif
@@ -98,6 +99,34 @@ static int cn1ConnectPending(void) {
  * can take the timeout once for each -- which is the point, since the reachable
  * one is usually not the first.
  */
+/* MSG_NOSIGNAL where the platform has it, as the listener's write path uses. */
+#ifndef _WIN32
+#ifdef MSG_NOSIGNAL
+#define CN1_OUT_SEND_FLAGS MSG_NOSIGNAL
+#else
+#define CN1_OUT_SEND_FLAGS 0
+#endif
+
+/*
+ * Ignores SIGPIPE, whose default action is to KILL the process.
+ *
+ * The listener does this when it binds, and Signals.installShutdownHandler does
+ * it too, but a packaged runtime need do neither: LambdaRuntime.run() only makes
+ * outbound connections. In that process a database or Runtime API peer that went
+ * away between one write and the next took the whole runtime down instead of
+ * raising an IOException. Done on connect because it has to precede any write,
+ * and it covers the TLS client as well -- SSL_write goes through write(2), where
+ * MSG_NOSIGNAL cannot reach. Idempotent, so calling it per connection is free.
+ */
+static void cn1IgnoreSigPipe(void) {
+    signal(SIGPIPE, SIG_IGN);
+}
+#else
+#define CN1_OUT_SEND_FLAGS 0
+static void cn1IgnoreSigPipe(void) {
+}
+#endif
+
 static int cn1ConnectWithTimeout(int fd, const struct sockaddr* addr, cn1_socklen len,
                                  int timeoutMillis) {
     int err = 0;
@@ -167,6 +196,7 @@ JAVA_LONG com_codename1_backend_Tcp_connectImpl___java_lang_String_int_int_R_lon
     if(getaddrinfo(h, portStr, &hints, &res) != 0) {
         return 0;
     }
+    cn1IgnoreSigPipe();
     CN1_YIELD_THREAD;
     for(it = res ; it != 0 ; it = it->ai_next) {
         fd = (int)socket(it->ai_family, it->ai_socktype, it->ai_protocol);
@@ -235,7 +265,8 @@ JAVA_INT com_codename1_backend_Tcp_writeImpl___long_byte_1ARRAY_int_int_R_int(CO
     /* send() may accept less than asked; loop so the Java side can treat a short
        write as a hard failure rather than having to retry it itself. */
     while(written < length) {
-        long n = (long)send(fd, (const char*)&data[offset + written], (size_t)(length - written), 0);
+        long n = (long)send(fd, (const char*)&data[offset + written],
+                (size_t)(length - written), CN1_OUT_SEND_FLAGS);
         if(n <= 0) {
             CN1_RESUME_THREAD;
             return -1;

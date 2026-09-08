@@ -298,6 +298,25 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aVariableMayContainTheLiteralThatFollowsIt() throws Exception {
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/download/{name}.json\")\n"
+                + "    public String get(@PathVariable(\"name\") String name) { return name; }\n"
+                + "}\n");
+        assertEquals("foo", router.text("GET", "/download/foo.json"));
+        // The value itself ends in the literal. Taking the first occurrence left
+        // ".json" unconsumed and rejected a request this route does match.
+        assertEquals("foo.json", router.text("GET", "/download/foo.json.json"));
+        // Still one segment, and still anchored at the end.
+        assertNull(router.call("GET", "/download/a/b.json", null));
+        assertNull(router.call("GET", "/download/foo.jsonx", null));
+    }
+
+    @Test
     public void twoControllersOfTheSameShapeAreRefused() throws Exception {
         // The bootstrap chains the routers and returns the first non-null answer,
         // so a collision ACROSS controllers hides the later one exactly as a
