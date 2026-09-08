@@ -39,6 +39,13 @@ public class TextFieldRenderElement extends RenderElement {
 
     private boolean applying;
     private TextEditingController boundController;
+    /// The editor itself. When the decoration carries a prefix icon this is a
+    /// CHILD of the component this element owns, so every read and write has to
+    /// go through here rather than through {@link #component()}.
+    private com.codename1.ui.TextField field;
+    /// The icon-plus-editor container, when the decoration has a prefix icon.
+    /// The decoration's surface belongs to this, not to the editor inside it.
+    private com.codename1.ui.Container decoratedRow;
 
     public TextFieldRenderElement(TextField widget) {
         super(widget);
@@ -74,13 +81,97 @@ public class TextFieldRenderElement extends RenderElement {
                 }
             }
         });
+        field = tf;
+        Component out = decorated(tf);
         apply(tf);
-        return tf;
+        return out;
+    }
+
+    /**
+     * The editor, or the editor beside its prefix icon.
+     *
+     * <p>{@code InputDecoration.prefixIcon} was stored and never read, so
+     * Crane's search form -- four rows whose whole affordance is the glyph that
+     * says what the row is for -- rendered as four bare capsules. Codename One's
+     * text field has no icon slot, so the icon and the editor share a container
+     * and the decoration's surface moves onto it: in Flutter the fill and the
+     * border enclose the icon too.</p>
+     */
+    private Component decorated(com.codename1.ui.TextField tf) {
+        char glyph = prefixIconChar();
+        if (glyph == 0) {
+            return tf;
+        }
+        com.codename1.ui.Container row =
+                new com.codename1.ui.Container(new com.codename1.ui.layouts.BorderLayout());
+        row.setUIID("FlutterTextField");
+        decoratedRow = row;
+        com.codename1.ui.Label icon = new com.codename1.ui.Label("", "Container");
+        com.codename1.ui.plaf.Style glyphStyle =
+                new com.codename1.ui.plaf.Style(icon.getUnselectedStyle());
+        com.codename1.flutter.Color tint = prefixIconColor();
+        if (tint != null) {
+            glyphStyle.setFgColor(tint.rgb());
+            icon.getAllStyles().setFgColor(tint.rgb());
+        }
+        glyphStyle.setBgTransparency(0);
+        try {
+            // Dp.mm, because FontImage sizes glyphs in MILLIMETRES. Handing it
+            // logical pixels asked for a 24mm glyph and drew an icon taller than
+            // the row it sits in.
+            icon.setIcon(com.codename1.ui.FontImage.createMaterial(glyph, glyphStyle,
+                    Dp.mm(PREFIX_ICON_LP)));
+        } catch (Exception headlessOrNoFont) {
+            // the row still reserves the space
+        }
+        row.add(com.codename1.ui.layouts.BorderLayout.WEST, icon);
+        row.add(com.codename1.ui.layouts.BorderLayout.CENTER, tf);
+        // The surface belongs to the row now; a second one behind the editor
+        // would draw a filled block inside the filled block.
+        tf.setUIID("Container");
+        tf.getAllStyles().setBgTransparency(0);
+        tf.getAllStyles().setBorder(com.codename1.ui.plaf.Border.createEmpty());
+        return row;
+    }
+
+    /** Material's prefix icon size. */
+    private static final double PREFIX_ICON_LP = 24;
+
+    /// The material code point of {@code decoration.prefixIcon}, or 0 when there
+    /// is none and when it is not an {@code Icon} -- the only form this can draw.
+    private char prefixIconChar() {
+        com.codename1.flutter.widgets.Icon icon = prefixIcon();
+        return icon == null || icon.getIcon() == null ? 0 : icon.getIcon().codePoint();
+    }
+
+    /// The icon's own colour, or the ambient IconTheme's -- the same chain
+    /// {@code IconRenderElement} follows. Without the fallback the glyph is
+    /// painted in the default ink, which on Crane's purple rows is black.
+    private com.codename1.flutter.Color prefixIconColor() {
+        com.codename1.flutter.widgets.Icon icon = prefixIcon();
+        if (icon != null && icon.getColor() != null) {
+            return icon.getColor();
+        }
+        try {
+            IconThemeData themed = IconTheme.of(this);
+            return themed == null ? null : themed.color();
+        } catch (Throwable noTheme) {
+            return null;
+        }
+    }
+
+    private com.codename1.flutter.widgets.Icon prefixIcon() {
+        InputDecoration d = textField().getDecoration();
+        Widget w = d == null ? null : d.getPrefixIcon();
+        return w instanceof com.codename1.flutter.widgets.Icon
+                ? (com.codename1.flutter.widgets.Icon) w : null;
     }
 
     @Override
     protected void updateComponent(Component c) {
-        apply((com.codename1.ui.TextField) c);
+        if (field != null) {
+            apply(field);
+        }
     }
 
     @Override
@@ -103,6 +194,8 @@ public class TextFieldRenderElement extends RenderElement {
             if (d != null) {
                 String hint = d.getLabelText() != null ? d.getLabelText() : d.getHintText();
                 tf.setHint(hint == null ? "" : hint);
+                applyTextStyle(tf, d);
+                applyDecoration(decoratedRow != null ? (Component) decoratedRow : (Component) tf, d);
             }
             rebindController();
             if (boundController != null && !eq(tf.getText(), boundController.text())) {
@@ -111,6 +204,127 @@ public class TextFieldRenderElement extends RenderElement {
         } finally {
             applying = false;
         }
+    }
+
+    /**
+     * The type the field's own text is set in.
+     *
+     * <p>{@code TextField.style} was stored and never read, so a field rendered
+     * at whatever size Codename One's default font happens to be.</p>
+     *
+     * <p>Deliberately NOT applied to the hint. Flutter builds the hint from
+     * hintStyle over the theme's hintColor, not from the input's colour -- and
+     * a field whose input colour is white, which is every row of Crane's search
+     * form, would otherwise show a white placeholder on a light fill.</p>
+     */
+    private void applyTextStyle(com.codename1.ui.TextField tf, InputDecoration d) {
+        applyOne(tf.getAllStyles(), textField().getStyle());
+        com.codename1.flutter.TextStyle hint = d == null ? null : d.getHintStyle();
+        if (hint != null && tf.getHintLabel() != null) {
+            applyOne(tf.getHintLabel().getAllStyles(), hint);
+        }
+    }
+
+    // The placeholder keeps Codename One's own hint styling for now. Flutter
+    // builds it from titleMedium merged with the field's style and recoloured
+    // with the theme's hintColor, but applying that chain here changed only the
+    // colour -- Codename One's hint label did not take the derived font -- and a
+    // recoloured placeholder still set half again too large measured WORSE than
+    // leaving it alone: Crane's rows went from 17.33% wrong to 17.80%. The size
+    // is the thing to fix first, and it is not a styling problem.
+
+    /** One style's size, weight and colour onto one Codename One style. */
+    private static void applyOne(com.codename1.ui.plaf.Style target,
+            com.codename1.flutter.TextStyle ts) {
+        if (ts == null) {
+            return;
+        }
+        if (ts.getFontSize() != null || ts.getFontWeight() != null) {
+            com.codename1.ui.Font base = target.getFont();
+            if (base == null) {
+                base = com.codename1.ui.Font.getDefaultFont();
+            }
+            if (base != null) {
+                float sizePx = ts.getFontSize() != null
+                        ? (float) Dp.px(ts.getFontSize())
+                        : (base.getPixelSize() > 0 ? base.getPixelSize() : base.getHeight());
+                int weight = ts.getFontWeight() != null && ts.getFontWeight().isBold()
+                        ? com.codename1.ui.Font.STYLE_BOLD : com.codename1.ui.Font.STYLE_PLAIN;
+                try {
+                    target.setFont(base.derive(sizePx, weight));
+                } catch (Exception cannotDerive) {
+                    // keep the base font
+                }
+            }
+        }
+        if (ts.getColor() != null) {
+            target.setFgColor(ts.getColor().rgb());
+        }
+    }
+
+    /**
+     * The decoration's SURFACE: its fill, its outline and its content padding.
+     *
+     * <p>All three were accepted and discarded, so a field that asks to be a
+     * solid rounded block — which is what Crane's search form is, four purple
+     * capsules on a purple back layer — rendered as the theme's default
+     * outlined box on white. The decoration is the whole visual identity of a
+     * Material text field; ignoring it leaves the field looking like no design
+     * at all.</p>
+     */
+    private void applyDecoration(Component target, InputDecoration d) {
+        com.codename1.ui.plaf.Style all = target.getAllStyles();
+        if (d.isFilled()) {
+            com.codename1.flutter.Color fill = d.getFillColor();
+            if (fill == null) {
+                try {
+                    fill = Theme.of(this).colorScheme().surfaceVariant();
+                } catch (Throwable ignore) {
+                    fill = null;
+                }
+            }
+            if (fill != null) {
+                all.setBgColor(fill.rgb());
+                all.setBgTransparency(255);
+            }
+        }
+        int radiusPx = outlineRadiusPx(d.getBorder());
+        if (radiusPx > 0) {
+            com.codename1.ui.plaf.RoundRectBorder b = com.codename1.ui.plaf.RoundRectBorder.create()
+                    .cornerRadius(radiusPx / com.codename1.ui.Display.getInstance().convertToPixels(1f))
+                    .strokeOpacity(0)
+                    .shadowOpacity(0);
+            all.setBorder(b);
+        } else if (d.getBorder() == com.codename1.flutter.InputBorder.none) {
+            all.setBorder(com.codename1.ui.plaf.Border.createEmpty());
+        }
+        com.codename1.flutter.EdgeInsets pad = insetsOf(d.getContentPadding());
+        if (pad != null) {
+            all.setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+            all.setPadding((int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.top())),
+                    (int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.bottom())),
+                    (int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.left())),
+                    (int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.right())));
+        }
+    }
+
+    /** The outline's corner radius in device pixels, or 0 when it has none. */
+    private static int outlineRadiusPx(com.codename1.flutter.InputBorder border) {
+        if (!(border instanceof com.codename1.flutter.OutlineInputBorder)) {
+            return 0;
+        }
+        com.codename1.flutter.BorderRadius r =
+                ((com.codename1.flutter.OutlineInputBorder) border).borderRadius();
+        if (r == null || r.topLeft() == null) {
+            return 0;
+        }
+        return (int) Math.round(com.codename1.flutter.rendering.Dp.px(r.topLeft().x()));
+    }
+
+    private static com.codename1.flutter.EdgeInsets insetsOf(
+            com.codename1.flutter.EdgeInsetsGeometry g) {
+        return g instanceof com.codename1.flutter.EdgeInsets
+                ? (com.codename1.flutter.EdgeInsets) g : null;
     }
 
     private void rebindController() {
@@ -146,8 +360,7 @@ public class TextFieldRenderElement extends RenderElement {
      * The component's live text, or null when headless.
      */
     String componentText() {
-        Component c = component();
-        return c == null ? null : ((TextArea) c).getText();
+        return field == null ? null : field.getText();
     }
 
     /**
@@ -155,13 +368,12 @@ public class TextFieldRenderElement extends RenderElement {
      * data-changed feedback loop).
      */
     void applyControllerText(String v) {
-        Component c = component();
-        if (c == null) {
+        if (field == null) {
             return;
         }
         applying = true;
         try {
-            ((TextArea) c).setText(v == null ? "" : v);
+            field.setText(v == null ? "" : v);
         } finally {
             applying = false;
         }

@@ -93,6 +93,36 @@ public class InputDecoration {
         return labelText;
     }
 
+    /** Whether the field paints a solid fill behind its content. */
+    public boolean isFilled() {
+        return filled != null && filled.booleanValue();
+    }
+
+    /** The fill colour, or null to take the theme's. */
+    public com.codename1.flutter.Color getFillColor() {
+        return fillColor;
+    }
+
+    /** The glyph shown before the content, or null. */
+    /** {@code hintStyle} -- the type the placeholder is set in. */
+    public com.codename1.flutter.TextStyle getHintStyle() {
+        return hintStyle;
+    }
+
+    public com.codename1.flutter.Widget getPrefixIcon() {
+        return prefixIcon;
+    }
+
+    /** The requested border, or null for the theme's. */
+    public com.codename1.flutter.InputBorder getBorder() {
+        return border;
+    }
+
+    /** The requested content padding, or null. */
+    public com.codename1.flutter.EdgeInsetsGeometry getContentPadding() {
+        return contentPadding;
+    }
+
     public String getHintText() {
         return hintText;
     }
