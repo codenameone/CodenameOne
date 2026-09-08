@@ -11,6 +11,13 @@
     </h1>
   </header>
 
+  {{- if $j.deprecated }}
+  <div class="cn1-api-deprecated cn1-api-deprecated--type" role="note">
+    <strong>Deprecated.</strong>
+    {{- with $j.deprecatedText }} {{ $.RenderString . }}{{ end }}
+  </div>
+  {{- end }}
+
   {{- with $j.description }}
   <div class="cn1-api-prose cn1-api__description">{{ $.RenderString . }}</div>
   {{- end }}

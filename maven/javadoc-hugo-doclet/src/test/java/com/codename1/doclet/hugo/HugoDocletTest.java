@@ -194,6 +194,15 @@ class HugoDocletTest {
                 "public class UsesShared {}",
                 ""), StandardCharsets.UTF_8);
 
+        Files.writeString(sources.resolve("Listener.java"), String.join("\n",
+                "package p;",
+                "/// An interface, which inherits nothing from Object.",
+                "public interface Listener {",
+                "    /// Called back",
+                "    void fired();",
+                "}",
+                ""), StandardCharsets.UTF_8);
+
         Path other = workspace.resolve("src/q");
         Files.createDirectories(other);
         Files.writeString(other.resolve("Shared.java"), String.join("\n",
@@ -217,6 +226,7 @@ class HugoDocletTest {
                     sources.resolve("Sample.java"), sources.resolve("Other.java"),
                     sources.resolve("Child.java"),
                     sources.resolve("Shared.java"), sources.resolve("UsesShared.java"),
+                    sources.resolve("Listener.java"),
                     other.resolve("Shared.java"), other.resolve("UsesShared.java"));
             boolean ok = tool.getTask(null, files, null, HugoDoclet.class,
                     List.of("-d", content.toString(),
@@ -415,6 +425,16 @@ class HugoDocletTest {
         String fromQ = Files.readString(content.resolve("q/UsesShared.md"), StandardCharsets.UTF_8);
         assertTrue(fromQ.contains("/javadoc/q/Shared.html"), "q sees q.Shared");
         assertFalse(fromQ.contains("/javadoc/p/Shared.html"), "and not p.Shared");
+    }
+
+    @Test
+    void doesNotGiveAnInterfaceObjectsMethods() throws IOException {
+        // types.directSupertypes() hands an interface java.lang.Object, which the
+        // language does not. SuccessCallback claimed ten inherited Object
+        // methods, protected clone() among them.
+        String page = page("Listener.md");
+        assertFalse(page.contains("\"from\": \"Object\""),
+                "an interface inherits nothing from Object");
     }
 
     @Test

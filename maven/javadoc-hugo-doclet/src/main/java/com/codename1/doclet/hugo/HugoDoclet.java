@@ -887,14 +887,19 @@ public final class HugoDoclet implements Doclet {
     private List<Map<String, Object>> inheritedMembers(TypeElement type, List<TypeElement> promoted) {
         List<Map<String, Object>> out = new ArrayList<>();
         Set<String> declared = new LinkedHashSet<>();
+        // Bucketed by simple name so the override test below only ever compares
+        // methods that could possibly be the same one.
+        Map<String, List<ExecutableElement>> seenByName = new LinkedHashMap<>();
         for (ExecutableElement method : ElementFilter.methodsIn(type.getEnclosedElements())) {
             declared.add(signatureKey(method));
+            remember(seenByName, method);
         }
         Set<String> promotedNames = new LinkedHashSet<>();
         for (TypeElement supertype : promoted) {
             promotedNames.add(supertype.getQualifiedName().toString());
             for (ExecutableElement method : ElementFilter.methodsIn(supertype.getEnclosedElements())) {
                 declared.add(signatureKey(method));
+                remember(seenByName, method);
             }
         }
 
@@ -913,6 +918,15 @@ public final class HugoDoclet implements Doclet {
                 if (!isVisible(method) || !declared.add(signatureKey(method))) {
                     continue;
                 }
+                // The erased signature is not enough once generics are
+                // substituted along the hierarchy: Enum.compareTo(E) erases to
+                // compareTo(java.lang.Enum) and Comparable.compareTo(T) to
+                // compareTo(java.lang.Object), so every enum listed compareTo
+                // twice even though the first implements the second.
+                if (overridesSomethingSeen(seenByName, method, type)) {
+                    continue;
+                }
+                remember(seenByName, method);
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("name", method.getSimpleName().toString());
                 String url = urlOf(method);
@@ -979,16 +993,44 @@ public final class HugoDoclet implements Doclet {
 
     private List<TypeMirror> allSupertypes(TypeMirror type, Set<String> visited) {
         List<TypeMirror> out = new ArrayList<>();
+        // types.directSupertypes() hands an interface java.lang.Object, which the
+        // language does not: an interface inherits none of its methods, and the
+        // standard pages list none. Without this an interface page such as
+        // SuccessCallback claimed ten inherited Object methods, protected
+        // clone() among them.
+        boolean isInterface = type instanceof DeclaredType declaredType
+                && declaredType.asElement().getKind() == ElementKind.INTERFACE;
         for (TypeMirror supertype : types.directSupertypes(type)) {
             if (!(supertype instanceof DeclaredType declared)
-                    || !(declared.asElement() instanceof TypeElement element)
-                    || !visited.add(element.getQualifiedName().toString())) {
+                    || !(declared.asElement() instanceof TypeElement element)) {
+                continue;
+            }
+            if (isInterface && element.getQualifiedName().contentEquals("java.lang.Object")) {
+                continue;
+            }
+            if (!visited.add(element.getQualifiedName().toString())) {
                 continue;
             }
             out.add(supertype);
             out.addAll(allSupertypes(supertype, visited));
         }
         return out;
+    }
+
+    private static void remember(Map<String, List<ExecutableElement>> seen, ExecutableElement method) {
+        seen.computeIfAbsent(method.getSimpleName().toString(), key -> new ArrayList<>()).add(method);
+    }
+
+    /** Whether a method already listed implements or overrides this one. */
+    private boolean overridesSomethingSeen(Map<String, List<ExecutableElement>> seen,
+                                           ExecutableElement candidate, TypeElement type) {
+        for (ExecutableElement earlier : seen.getOrDefault(
+                candidate.getSimpleName().toString(), List.of())) {
+            if (elements.overrides(earlier, candidate, type)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Name plus erased parameter types: what makes one method the same as another. */
@@ -1032,6 +1074,12 @@ public final class HugoDoclet implements Doclet {
             Map<String, Object> api = new LinkedHashMap<>();
             api.put("kind", "package");
             api.put("qualified", entry.getKey());
+            // A package can be deprecated, and com.codename1.ui.layouts.mig is:
+            // its comment warns not to rely on the integration in production.
+            // DocReader lifts that out of the description, so omitting the fields
+            // here dropped the warning off the page entirely.
+            api.put("deprecated", doc.deprecated);
+            api.put("deprecatedText", doc.deprecatedText);
             api.put("description", doc.description);
             api.put("types", rows);
 

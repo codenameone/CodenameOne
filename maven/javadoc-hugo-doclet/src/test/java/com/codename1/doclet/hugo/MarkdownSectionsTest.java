@@ -278,6 +278,45 @@ class MarkdownSectionsTest {
     }
 
     @Test
+    void keepsAParametersSectionAsProseOutsideAMethod() {
+        // com.codename1.db's package documentation has a "Parameters" section
+        // describing how the database binds its arguments. A package has no
+        // parameters, so claiming it lifted the section out of the page and then
+        // dropped it -- a package page has nowhere to put a parameter table.
+        String body = String.join("\n",
+                "Database access.",
+                "",
+                "## Parameters",
+                "",
+                "The `Object[]` forms bind by runtime type:",
+                "",
+                "| type | binding |",
+                "| ---- | ------- |");
+
+        MarkdownSections.Result asPackage = MarkdownSections.parse(body, false);
+        assertTrue(asPackage.description().contains("bind by runtime type"),
+                "the section stays in the prose");
+        assertTrue(asPackage.parameters().isEmpty(), "and is not claimed as structure");
+
+        MarkdownSections.Result asMethod = MarkdownSections.parse(body, true);
+        assertTrue(!asMethod.parameters().isEmpty(),
+                "on a method the same heading is still structure");
+    }
+
+    @Test
+    void stillLiftsDeprecationOutsideAMethod() {
+        // A package can be deprecated: com.codename1.ui.layouts.mig is.
+        MarkdownSections.Result r = MarkdownSections.parse(String.join("\n",
+                "An experimental integration.",
+                "",
+                "#### Deprecated",
+                "",
+                "do not rely on it for production"), false);
+
+        assertEquals("do not rely on it for production", r.deprecated());
+    }
+
+    @Test
     void passesThroughABodyWithNoStructure() {
         String body = "Just prose.\n\nWith a second paragraph.";
         MarkdownSections.Result r = MarkdownSections.parse(body);

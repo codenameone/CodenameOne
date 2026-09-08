@@ -60,6 +60,22 @@ public final class MarkdownSections {
     private static final List<String> STRUCTURAL =
             List.of("parameters", "returns", "throws", "see also", "deprecated", "since");
 
+    /**
+     * The headings that only mean anything on a method or a constructor.
+     *
+     * <p>A package and a type have no parameters, no return value and throw
+     * nothing, so a heading of that name in one of their comments is prose about
+     * something else. {@code com.codename1.db}'s package documentation has a
+     * "Parameters" section describing how the database binds its arguments, and
+     * claiming it lifted the whole section out of the page and then dropped it,
+     * because a package page has nowhere to put a parameter table.
+     *
+     * <p>Deprecation and See-also stay structural everywhere: a package can be
+     * deprecated, and does refer to other API.
+     */
+    private static final List<String> EXECUTABLE_ONLY =
+            List.of("parameters", "returns", "throws");
+
     /** Parsed result: the prose that stays, plus whatever structure was lifted out of it. */
     public static final class Result {
         private final String description;
@@ -121,6 +137,15 @@ public final class MarkdownSections {
      *         result whose description is the input and whose lists are empty
      */
     public static Result parse(String markdown) {
+        return parse(markdown, true);
+    }
+
+    /**
+     * @param executable whether the comment documents a method or constructor;
+     *                   false for a package, a type or a field, whose comments
+     *                   cannot carry parameters, a return value or exceptions
+     */
+    public static Result parse(String markdown, boolean executable) {
         if (markdown == null || markdown.isBlank()) {
             return new Result("", List.of(), List.of(), List.of(), null, null);
         }
@@ -160,7 +185,8 @@ public final class MarkdownSections {
 
             int level = headingLevel(line);
             String key = level > 0 ? headingKey(line, level) : null;
-            if (key == null || !STRUCTURAL.contains(key)) {
+            if (key == null || !STRUCTURAL.contains(key)
+                    || (!executable && EXECUTABLE_ONLY.contains(key))) {
                 prose.add(line);
                 i++;
                 continue;

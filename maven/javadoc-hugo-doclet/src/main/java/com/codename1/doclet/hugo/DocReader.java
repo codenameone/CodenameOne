@@ -122,7 +122,8 @@ final class DocReader {
         // before anything else reads the body.
         doc.description = LegacyHtml.convert(renderer.render(comment.getFullBody(), path));
 
-        MarkdownSections.Result sections = MarkdownSections.parse(doc.description);
+        MarkdownSections.Result sections =
+                MarkdownSections.parse(doc.description, element instanceof ExecutableElement);
         doc.description = sections.description();
         doc.parameters.addAll(sections.parameters());
         doc.exceptions.addAll(sections.exceptions());
