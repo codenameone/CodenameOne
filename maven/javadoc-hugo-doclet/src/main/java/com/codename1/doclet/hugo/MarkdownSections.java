@@ -233,11 +233,25 @@ public final class MarkdownSections {
         return lines.size();
     }
 
-    /** The fence marker a line opens or closes, or null when the line is not a fence. */
+    /**
+     * The fence marker a line opens or closes, or null when the line is not a
+     * fence.
+     *
+     * <p>A backtick fence's info string may not itself contain a backtick, so a
+     * line that opens with a run and closes it again further along is an inline
+     * code span, not a fence. {@code LocalNotification.setAlertSound} writes one
+     * of exactly that shape, and treating it as an opener left the parser inside
+     * a fence for the rest of the comment: the {@code #### Parameters} heading
+     * below it was never recognised and the parameter lost its documentation.
+     */
     private static String fenceOpener(String line) {
         String trimmed = line.stripLeading();
         if (trimmed.startsWith("```")) {
-            return "```";
+            int run = 0;
+            while (run < trimmed.length() && trimmed.charAt(run) == '`') {
+                run++;
+            }
+            return trimmed.indexOf('`', run) >= 0 ? null : "```";
         }
         if (trimmed.startsWith("~~~")) {
             return "~~~";

@@ -163,6 +163,17 @@ final class TypeNames {
         return Character.isHighSurrogate(text.charAt(limit - 1)) ? limit - 1 : limit;
     }
 
+    /** Whether cutting here would leave a code span open. */
+    private static boolean unbalancedCodeSpan(String text, int cut) {
+        int ticks = 0;
+        for (int i = 0; i < cut; i++) {
+            if (text.charAt(i) == '`') {
+                ticks++;
+            }
+        }
+        return ticks % 2 != 0;
+    }
+
     /**
      * The first sentence of a description, for summary tables.
      *
@@ -180,14 +191,32 @@ final class TypeNames {
             text = text.substring(0, blank);
         }
         text = text.replace('\n', ' ').strip();
+        // A full stop inside a code span does not end a sentence. Cutting there
+        // leaves the span unterminated, and the summary is rendered as markdown
+        // on the package page and shown raw in search: JSONWriter.ArrayBuilder
+        // opens "Fluent builder for `[ ..., ..., ... ]`." and was cut mid span.
+        boolean inCode = false;
         for (int i = 0; i < text.length() - 1; i++) {
-            if (text.charAt(i) == '.' && Character.isWhitespace(text.charAt(i + 1))) {
+            char c = text.charAt(i);
+            if (c == '`') {
+                inCode = !inCode;
+                continue;
+            }
+            if (!inCode && c == '.' && Character.isWhitespace(text.charAt(i + 1))) {
                 return text.substring(0, i + 1);
             }
         }
         if (text.endsWith(".")) {
             return text;
         }
-        return text.length() > 240 ? text.substring(0, safeCut(text, 240)).strip() + "..." : text;
+        if (text.length() <= 240) {
+            return text;
+        }
+        // The same rule applies to the hard length cap.
+        int cut = safeCut(text, 240);
+        while (cut > 0 && unbalancedCodeSpan(text, cut)) {
+            cut--;
+        }
+        return text.substring(0, cut).strip() + "...";
     }
 }

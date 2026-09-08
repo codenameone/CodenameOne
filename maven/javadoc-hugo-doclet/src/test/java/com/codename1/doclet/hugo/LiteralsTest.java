@@ -66,6 +66,14 @@ class LiteralsTest {
     }
 
     @Test
+    void writesAnArrayDefaultInJavaSyntax() {
+        // "String[] options() default {}" is written {} in source; a list's
+        // toString is not something Java would recognise.
+        assertEquals("{}", Literals.of(java.util.List.of()));
+        assertEquals("{\"a\", \"b\"}", Literals.of(java.util.List.of("a", "b")));
+    }
+
+    @Test
     void passesNullThroughSoTheTemplateCanTestIt() {
         assertNull(Literals.of(null));
     }

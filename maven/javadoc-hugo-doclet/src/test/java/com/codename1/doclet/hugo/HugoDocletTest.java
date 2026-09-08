@@ -130,6 +130,14 @@ class HugoDocletTest {
                 "    public static final String UNIT = \"\\u001f\";",
                 "    /// A long constant",
                 "    public static final long BIG = 5L;",
+                "    /// Overloads that differ by type, not arity",
+                "    ///",
+                "    /// #### See also",
+                "    ///",
+                "    /// - #erase(Object)",
+                "    public void erase(int index) {}",
+                "    /// The other overload",
+                "    public void erase(Object value) {}",
                 "    /// Annotated but never tagged",
                 "    @Deprecated",
                 "    public void annotatedOnly() {}",
@@ -332,6 +340,27 @@ class HugoDocletTest {
                 "an inherited field links to the page that declares it");
         assertTrue(page.contains("/javadoc/p/Other.html#greet()"),
                 "and so does an inherited method");
+    }
+
+    @Test
+    void matchesAnOverloadByTypeRatherThanByArity() throws IOException {
+        // Vector#remove(Object) resolved to remove(int) on arity alone, and
+        // Arrays#sort(Object[], int, int) to the byte[] overload. A wrong link is
+        // worse than none: the reader follows it.
+        String page = page("Sample.md");
+        assertTrue(page.contains("/javadoc/p/Sample.html#erase(java.lang.Object)"),
+                "the Object overload, not the int one");
+        assertFalse(page.contains("\"url\": \"/javadoc/p/Sample.html#erase(int)\""),
+                "must not link the reference to the wrong overload");
+    }
+
+    @Test
+    void listsFieldsInheritedFromADocumentedSupertype() throws IOException {
+        // Label showed none of Component's constants -- CENTER, TOP, the cursor
+        // values -- while the standard pages list them.
+        String page = page("Child.md");
+        assertTrue(page.contains("\"inheritedFields\""), "the block exists");
+        assertTrue(page.contains("ALIGN"), "and carries the inherited constant");
     }
 
     @Test

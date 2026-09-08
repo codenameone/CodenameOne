@@ -55,6 +55,23 @@ final class Literals {
         if (constant instanceof String text) {
             return quote(text, '"');
         }
+        // An annotation element's array default arrives as a list of
+        // AnnotationValue. Rendering it with toString gives Java nothing it would
+        // recognise; "String[] options() default {}" is written {} in source.
+        if (constant instanceof java.util.List<?> values) {
+            StringBuilder out = new StringBuilder("{");
+            for (int i = 0; i < values.size(); i++) {
+                if (i > 0) {
+                    out.append(", ");
+                }
+                Object element = values.get(i);
+                if (element instanceof javax.lang.model.element.AnnotationValue annotation) {
+                    element = annotation.getValue();
+                }
+                out.append(of(element));
+            }
+            return out.append('}').toString();
+        }
         if (constant instanceof Character character) {
             return quote(String.valueOf(character), '\'');
         }

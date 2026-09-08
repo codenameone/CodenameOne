@@ -17,6 +17,7 @@
       {{- end -}}
     {{- end -}}
     <span class="cn1-api-punct">)</span>
+    {{- with .defaultValue }}<span class="cn1-api-punct"> default </span><span class="cn1-api-const">{{ . }}</span>{{ end -}}
   {{- else -}}
     {{- with .fieldType }}{{ partial "javadoc/type-ref.html" . }} {{ end -}}
     <span class="cn1-api-name">{{ .name }}</span>

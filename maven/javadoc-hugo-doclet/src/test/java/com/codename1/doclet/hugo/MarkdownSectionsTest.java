@@ -239,6 +239,45 @@ class MarkdownSectionsTest {
     }
 
     @Test
+    void doesNotMistakeASameLineCodeSpanForAFence() {
+        // com.codename1.notifications.LocalNotification.setAlertSound writes a
+        // whole example between two runs of five backticks on one line. Reading
+        // that as a fence opener left the parser inside a fence for the rest of
+        // the comment, so the heading below was never seen and the parameter
+        // lost its documentation.
+        MarkdownSections.Result r = MarkdownSections.parse(String.join("\n",
+                "Sets the alert sound.",
+                "",
+                "`````LocalNotification n = new LocalNotification(); n.setAlertSound(\"a.mp3\");`````",
+                "",
+                "#### Parameters",
+                "",
+                "- `alertSound`: the alertSound to set"));
+
+        assertEquals(1, r.parameters().size());
+        assertEquals("the alertSound to set", r.parameters().get(0).text());
+        assertTrue(!r.description().contains("#### Parameters"),
+                "the heading must be lifted, not left in the prose");
+    }
+
+    @Test
+    void stillTreatsARealFenceAsAFence() {
+        MarkdownSections.Result r = MarkdownSections.parse(String.join("\n",
+                "Shows a thing.",
+                "",
+                "```java",
+                "// #### Parameters",
+                "```",
+                "",
+                "#### Returns",
+                "",
+                "the thing"));
+
+        assertEquals("the thing", r.returns());
+        assertTrue(r.parameters().isEmpty());
+    }
+
+    @Test
     void passesThroughABodyWithNoStructure() {
         String body = "Just prose.\n\nWith a second paragraph.";
         MarkdownSections.Result r = MarkdownSections.parse(body);

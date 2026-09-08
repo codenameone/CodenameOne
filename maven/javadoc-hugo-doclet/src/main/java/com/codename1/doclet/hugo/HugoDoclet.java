@@ -313,6 +313,11 @@ public final class HugoDoclet implements Doclet {
                 ElementFilter.constructorsIn(type.getEnclosedElements()), type));
         api.put("methods", executableRows(dedupeBySignature(ElementFilter.methodsIn(owned)), type));
         api.put("inherited", inheritedMembers(type, hidden));
+        // javadoc renders "Fields inherited from class X" beside the methods
+        // block. Without it a subtype such as Label showed none of Component's
+        // constants -- CENTER, TOP, the cursor values -- even though this page
+        // links references to them.
+        api.put("inheritedFields", inheritedFields(type, hidden));
 
         Map<String, Object> frontMatter = new LinkedHashMap<>();
         frontMatter.put("title", Refs.nestedDisplayName(type));
@@ -511,6 +516,11 @@ public final class HugoDoclet implements Doclet {
             row.put("parameters", parameterRows(member, doc));
             row.put("throws", throwsRows(member, doc));
             row.put("returns", doc.returns);
+            // An annotation element without its default reads as required when it
+            // is not: IntentParam.required() defaults to true and
+            // AppIntent.timeoutSeconds() to 20, and neither was shown anywhere.
+            javax.lang.model.element.AnnotationValue fallback = member.getDefaultValue();
+            row.put("defaultValue", fallback == null ? null : Literals.of(fallback.getValue()));
             out.add(row);
         }
         return out;
@@ -740,11 +750,16 @@ public final class HugoDoclet implements Doclet {
             }
             // The reference may spell the types simply where the identifier spells
             // them fully -- Component#paintShadows(Graphics, int, int) against
-            // paintShadows(com.codename1.ui.Graphics,int,int) -- so fall back to
-            // the argument count, which still separates the overloads.
+            // paintShadows(com.codename1.ui.Graphics,int,int) -- so compare the
+            // types by their simple names.
+            //
+            // Arity alone is not enough, and settling for it was worse than not
+            // linking at all: Vector#remove(Object) resolved to remove(int), and
+            // Arrays#sort(Object[], int, int) to the byte[] overload. Both send
+            // the reader to a method the author did not mean.
             for (Element candidate : candidates) {
                 if (candidate instanceof ExecutableElement executable
-                        && executable.getParameters().size() == reference.parameters().size()) {
+                        && sameParameterTypes(executable, reference.parameters())) {
                     return anchorUrl(owner, candidate);
                 }
             }
@@ -756,6 +771,42 @@ public final class HugoDoclet implements Doclet {
             return null;
         }
         return anchorUrl(owner, candidates.get(0));
+    }
+
+    /**
+     * Whether a method's parameters are the ones a reference names, compared by
+     * simple type name so that an imported spelling matches a qualified one.
+     */
+    private boolean sameParameterTypes(ExecutableElement method, List<String> written) {
+        List<? extends VariableElement> parameters = method.getParameters();
+        if (parameters.size() != written.size()) {
+            return false;
+        }
+        for (int i = 0; i < parameters.size(); i++) {
+            String actual = simpleName(typeNames.label(parameters.get(i).asType()));
+            String wanted = simpleName(written.get(i).strip());
+            if (method.isVarArgs() && i == parameters.size() - 1) {
+                // The declaration is an array; the reference may write either.
+                actual = actual.endsWith("[]") ? actual.substring(0, actual.length() - 2) : actual;
+                wanted = wanted.endsWith("...") ? wanted.substring(0, wanted.length() - 3)
+                        : wanted.endsWith("[]") ? wanted.substring(0, wanted.length() - 2) : wanted;
+            }
+            if (!stripGenerics(actual).equals(stripGenerics(wanted))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Drops a type argument list, which a reference may or may not write. */
+    private static String stripGenerics(String label) {
+        int open = label.indexOf('<');
+        if (open < 0) {
+            return label;
+        }
+        int close = label.lastIndexOf('>');
+        String tail = close >= 0 && close + 1 < label.length() ? label.substring(close + 1) : "";
+        return label.substring(0, open) + tail;
     }
 
     private void collectNamed(TypeElement type, String name, List<Element> out) {
@@ -821,6 +872,51 @@ public final class HugoDoclet implements Doclet {
                 row.put("name", method.getSimpleName().toString());
                 String url = urlOf(method);
                 row.put("url", url);
+                members.add(row);
+            }
+            if (members.isEmpty()) {
+                continue;
+            }
+            Map<String, Object> group = new LinkedHashMap<>();
+            group.put("from", Refs.nestedDisplayName(parent));
+            group.put("url", documented.containsKey(parent.getQualifiedName().toString())
+                    ? Refs.typeUrl(parent) : null);
+            group.put("members", members);
+            out.add(group);
+        }
+        return out;
+    }
+
+    /** The same grouping as {@link #inheritedMembers}, for fields. */
+    private List<Map<String, Object>> inheritedFields(TypeElement type, List<TypeElement> promoted) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        Set<String> declared = new LinkedHashSet<>();
+        for (VariableElement field : ElementFilter.fieldsIn(type.getEnclosedElements())) {
+            declared.add(field.getSimpleName().toString());
+        }
+        Set<String> promotedNames = new LinkedHashSet<>();
+        for (TypeElement supertype : promoted) {
+            promotedNames.add(supertype.getQualifiedName().toString());
+            for (VariableElement field : ElementFilter.fieldsIn(supertype.getEnclosedElements())) {
+                declared.add(field.getSimpleName().toString());
+            }
+        }
+
+        Set<String> visited = new LinkedHashSet<>();
+        for (TypeMirror supertype : allSupertypes(type.asType(), visited)) {
+            if (!(supertype instanceof DeclaredType declaredType)
+                    || !(declaredType.asElement() instanceof TypeElement parent)
+                    || promotedNames.contains(parent.getQualifiedName().toString())) {
+                continue;
+            }
+            List<Map<String, Object>> members = new ArrayList<>();
+            for (VariableElement field : ElementFilter.fieldsIn(parent.getEnclosedElements())) {
+                if (!isVisible(field) || !declared.add(field.getSimpleName().toString())) {
+                    continue;
+                }
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("name", field.getSimpleName().toString());
+                row.put("url", urlOf(field));
                 members.add(row);
             }
             if (members.isEmpty()) {
