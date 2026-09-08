@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="820" height="452" viewBox="0 0 820 452">
-  <rect x="0" y="0" width="820" height="452" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="466" viewBox="0 0 820 466">
+  <rect x="0" y="0" width="820" height="466" fill="#ffffff"/>
 
   <text x="410" y="26" font-family="Arial, sans-serif" font-size="15" font-weight="bold"
         text-anchor="middle" fill="#222222">Four places to put data, and what each one is for</text>
@@ -48,12 +48,13 @@
   <path d="M 307 252 L 312 246 L 317 252" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <text x="214" y="284" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Preferences is built on Storage, so it is not a separate store</text>
 
-  <rect x="24" y="300" width="772" height="136" rx="6" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
+  <rect x="24" y="300" width="772" height="150" rx="6" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
   <text x="410" y="322" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#a56a3a">Choosing between them</text>
   <text x="410" y="342" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">Settings go in Preferences. Objects your app alone reads go in Storage. Files another API opens</text>
   <text x="410" y="358" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">by path go in FileSystemStorage. Size alone does not call for a Database: both of those stream,</text>
   <text x="410" y="374" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">so reach for a Database when you need to QUERY structured data rather than read it whole.</text>
   <text x="410" y="392" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">None of these is reclaimed behind your back, with one exception: files under FileSystemStorage.getCachesDir() are a platform cache the system may delete.</text>
   <text x="410" y="406" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#a56a3a">All four are plaintext by default: a Database takes a DatabaseConfig to encrypt it, and Storage can be wrapped through setStorageInstance. For auth</text>
-  <text x="410" y="420" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#a56a3a">tokens, refresh tokens and API keys, reach for SecureStorage instead: it keeps them in the platform keychain rather than in app storage at all.</text>
+  <text x="410" y="420" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#a56a3a">tokens, refresh tokens and API keys, reach for SecureStorage: it encrypts them under a key the platform keystore holds, though on Android the</text>
+  <text x="410" y="434" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#a56a3a">ciphertext still sits in app storage. A port without support stores nothing and returns false from set(), so check what it gives back.</text>
 </svg>
