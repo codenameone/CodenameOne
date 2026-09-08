@@ -2574,10 +2574,20 @@ public final class HttpServer {
                         Object key = it.next();
                         Object value = response.extraHeaders.get(key);
                         if(key != null && value != null) {
-                            extra.add(String.valueOf(key) + ": " + String.valueOf(value));
+                            String name = String.valueOf(key);
+                            String text = String.valueOf(value);
+                            // The native side splits this block on '\n', so a newline
+                            // here is another field exactly as it is over HTTP/1.1.
+                            if(isHeaderSafe(name) && isHeaderSafe(text)) {
+                                extra.add(name + ": " + text);
+                            } else {
+                                System.err.println("dropped a response header containing "
+                                        + "a control character: " + sanitizeForLog(name));
+                            }
                         }
                     }
                 }
+                String contentType = safeContentType(response.contentType);
                 if(response.fileFd >= 0 && !headOnly) {
                     // Streamed frame by frame out of the descriptor. Reading the file
                     // in first cost its whole size in the heap plus the same again in
@@ -2585,10 +2595,10 @@ public final class HttpServer {
                     // into an OutOfMemoryError -- which the catch above does not catch,
                     // because it is an Error. The descriptor belongs to the session
                     // from here, so nothing on this side closes it.
-                    h2.respondFile(stream.getId(), response.status, response.contentType,
+                    h2.respondFile(stream.getId(), response.status, contentType,
                             extra, response.fileFd, response.fileOffset, response.fileLength);
                 } else {
-                    h2.respond(stream.getId(), response.status, response.contentType, extra,
+                    h2.respond(stream.getId(), response.status, contentType, extra,
                             responseBodyFor(response, headOnly));
                 }
                 requestsServed.incrementAndGet();
@@ -2682,6 +2692,28 @@ public final class HttpServer {
         } finally {
             StaticFiles.closeFile(response.fileFd);
         }
+    }
+
+    /**
+     * The content type to serialise: the handler's, or the default.
+     *
+     * Validated with the same rule as every other header value. Response.respond and
+     * the public Response constructor both take this from the handler, so it can
+     * carry request-derived text just as extraHeaders can -- guarding one and not
+     * the other left the same response-splitting hole open through a different
+     * argument. A rejected type falls back rather than being dropped, because a
+     * response without Content-Type is its own problem.
+     */
+    private static String safeContentType(String contentType) {
+        if(contentType == null) {
+            return DEFAULT_CONTENT_TYPE;
+        }
+        if(isHeaderSafe(contentType)) {
+            return contentType;
+        }
+        System.err.println("replaced a content type containing a control character: "
+                + sanitizeForLog(contentType));
+        return DEFAULT_CONTENT_TYPE;
     }
 
     /**
@@ -3139,7 +3171,13 @@ public final class HttpServer {
                             throw new ProtocolException(400, "chunk trailer too long");
                         }
                         if(!conn.fill(scratch)) {
-                            return body.toByteArray();
+                            // EOF before the blank line that ends the trailers: the
+                            // chunked framing never finished, so this is a truncated
+                            // message, not a complete one. Returning the body here
+                            // ran the handler on it -- and for a mutating request
+                            // that means committing half a message. The fixed-length
+                            // and chunk-data paths both return null; so does this.
+                            return null;
                         }
                         trailerEnd = indexOfCrLf(conn.buffer, conn.pos);
                     }
@@ -3280,8 +3318,7 @@ public final class HttpServer {
             // handler pass null, and reaching putContentType with it threw an NPE that
             // dropped the connection without a response -- so one handler behaved two
             // ways depending on the protocol it happened to be answering.
-            conn.putContentType(response.contentType == null
-                    ? DEFAULT_CONTENT_TYPE : response.contentType);
+            conn.putContentType(safeContentType(response.contentType));
             // RFC 9110 6.6.1: an origin server with a clock MUST send Date.
             conn.put(H_DATE, 0, H_DATE.length);
             conn.put(currentHttpDateBytes(), 0, HTTP_DATE_LENGTH);

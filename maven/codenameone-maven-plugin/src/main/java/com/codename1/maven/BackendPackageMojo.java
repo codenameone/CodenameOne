@@ -259,23 +259,30 @@ public class BackendPackageMojo extends AbstractMojo {
      * build time; the resource was just not there at runtime.
      *
      * Everything EXCEPT .class is taken, which is exactly the resources and none of
-     * the JDK-compiled code. Maven's processed copy is preferred over the raw source
-     * directories, so filtering that has already been applied is what ships; the raw
-     * directories are the fallback for a goal invoked on its own, where nothing has
-     * processed them yet.
+     * the JDK-compiled code.
+     *
+     * ONLY Maven's processed output, never the raw resource directories. Those
+     * directories are what a <includes>/<excludes> selects FROM, so copying them
+     * wholesale packaged the files the build was configured to leave out -- an
+     * environment file or a secret excluded on purpose would have gone into the
+     * executable, and the later overlay could not remove it. The processed copy is
+     * the answer Maven already computed.
      */
-    private void stageResources(File classes) {
-        for (Object resource : project.getBuild().getResources()) {
-            try {
-                java.lang.reflect.Method directory =
-                        resource.getClass().getMethod("getDirectory");
-                copyNonClasses(new File(String.valueOf(directory.invoke(resource))), classes);
-            } catch (Exception ignored) {
-                // An unusual resource entry is not a reason to fail the package; the
-                // processed copy below is the one that normally supplies these.
+    private void stageResources(File classes) throws MojoExecutionException {
+        File processed = new File(project.getBuild().getOutputDirectory());
+        if (!processed.isDirectory()) {
+            // Nothing has processed the resources, so there are none to stage and
+            // nothing to guess at. Said out loud, because a resource silently absent
+            // from the binary is the failure this whole step exists to prevent.
+            if (!project.getBuild().getResources().isEmpty()) {
+                getLog().warn("cn1: this module declares resources but "
+                        + processed + " does not exist, so none are packaged. Run "
+                        + "process-resources first, or invoke this through the "
+                        + "lifecycle rather than as a bare goal.");
             }
+            return;
         }
-        copyNonClasses(new File(project.getBuild().getOutputDirectory()), classes);
+        copyNonClasses(processed, classes);
     }
 
     private void copyNonClasses(File from, File to) {

@@ -32,10 +32,12 @@ import java.util.Map;
 /**
  * The server side of this app.
  *
- * Run it with `mvn -pl backend cn1:backend` while developing: it starts on this
+ * Run it with `mvn -pl backend -Dcodename1.platform=backend cn1:backend` while
+ * developing: it starts on this
  * JVM in a couple of seconds against the minute and a half a native build takes,
  * and the protocol layer underneath is the same source that ships. Package it with
- * `mvn -pl backend cn1:backend-package` to get a single native binary with no JVM
+ * `mvn -pl backend -Dcodename1.platform=backend cn1:backend-package` to get a
+ * single native binary with no JVM
  * to install beneath it.
  *
  * The local run deliberately does not terminate TLS, and therefore does not serve

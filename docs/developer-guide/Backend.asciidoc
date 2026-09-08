@@ -97,8 +97,10 @@ threads are detached, so a `main` that returned would exit the process with no m
 Two commands matter:
 
 ----
-mvn -pl backend cn1:backend           run it on this JVM, in seconds
-mvn -pl backend cn1:backend-package   build the native binary
+# the property is not optional: the backend module lives in a profile, and
+# without it Maven cannot see it in the reactor at all
+mvn -pl backend -Dcodename1.platform=backend cn1:backend           # run it on this JVM
+mvn -pl backend -Dcodename1.platform=backend cn1:backend-package   # build the native binary
 ----
 
 The first is the development loop. Both run the same protocol code -- there is one

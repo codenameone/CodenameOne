@@ -18,8 +18,14 @@
 
       Two commands matter here:
 
-        mvn -pl backend cn1:backend           runs it on this JVM, in seconds
-        mvn -pl backend cn1:backend-package   builds a native binary to deploy
+        The property is not optional: the backend module lives in a profile, so
+        without it Maven reports "Could not find the selected project in the
+        reactor" -- the module is not in the default one.
+
+        mvn -pl backend -Dcodename1.platform=backend cn1:backend
+            runs it on this JVM, in seconds
+        mvn -pl backend -Dcodename1.platform=backend cn1:backend-package
+            builds a native binary to deploy
 
       The first is the development loop. The second produces a single executable
       with no runtime to install, which is what lets the deployed container be the
