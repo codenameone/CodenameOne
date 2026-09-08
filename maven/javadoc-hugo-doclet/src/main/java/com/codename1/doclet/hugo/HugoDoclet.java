@@ -256,6 +256,12 @@ public final class HugoDoclet implements Doclet {
         api.put("deprecatedText", doc.deprecatedText);
         api.put("description", doc.description);
         api.put("seeAlso", seeAlsoRefs(doc, type));
+        // Type parameter documentation has nowhere to sit in the declaration
+        // string, so it was being read and then dropped. Exactly one tag in the
+        // tree carries any text today (VisionCameraView<T>); the other two are
+        // empty. Kept anyway, because silently discarding what an author wrote is
+        // the defect, not the size of it.
+        api.put("typeParameterDocs", typeParameterDocs(doc));
 
         // javadoc documents a package private supertype's members on the visible
         // subclass rather than dropping them, because the supertype has no page
@@ -358,6 +364,21 @@ public final class HugoDoclet implements Doclet {
         return out;
     }
 
+    /** The documented type parameters, as {@code <T>} entries lifted by the reader. */
+    private List<Map<String, Object>> typeParameterDocs(ElementDoc doc) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (MarkdownSections.NamedText parameter : doc.parameters) {
+            if (!parameter.name().startsWith("<") || parameter.text().isBlank()) {
+                continue;
+            }
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("name", parameter.name());
+            row.put("doc", parameter.text());
+            out.add(row);
+        }
+        return out;
+    }
+
     private String kindOf(TypeElement type) {
         return switch (type.getKind()) {
             case INTERFACE -> "interface";
@@ -434,7 +455,7 @@ public final class HugoDoclet implements Doclet {
             Map<String, Object> row = baseRow(field, doc);
             row.put("fieldType", typeNames.reference(field.asType()));
             Object constant = field.getConstantValue();
-            row.put("constant", constant == null ? null : String.valueOf(constant));
+            row.put("constant", Literals.of(constant));
             out.add(row);
         }
         return out;
@@ -558,41 +579,142 @@ public final class HugoDoclet implements Doclet {
     /**
      * See-also entries, resolved to links where they name something we publish.
      *
-     * <p>The markdown convention writes these as bare text: a type name, or a
-     * {@code #member} reference into the same type. Block tag entries have already
-     * been rendered to markdown by the comment renderer and are passed through.
+     * <p>These are markdown bullets rather than {@code @see} tags, so nothing has
+     * resolved them and {@link SeeAlsoRef} has to read the reference out of the
+     * text. Three shapes matter, in descending order of how often they occur:
+     * a local member ({@code #drawRoundRect}), a qualified member
+     * ({@code Display#supportsNativeImageCache()}) and a bare type name.
      */
     private List<Map<String, Object>> seeAlsoRefs(ElementDoc doc, TypeElement context) {
         List<Map<String, Object>> out = new ArrayList<>();
         for (String entry : doc.seeAlso) {
-            String text = entry.strip();
+            SeeAlsoRef reference = SeeAlsoRef.parse(entry);
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("label", text);
-            row.put("url", null);
-            if (text.startsWith("#") && context != null) {
-                row.put("label", text.substring(1));
-                row.put("url", memberUrl(context, text.substring(1)));
-            } else if (!text.contains("[") && !text.contains(" ")) {
-                row.put("url", urlOfTypeNamed(text));
+            if (!reference.isReference()) {
+                // Prose, or a markdown link that is already a link.
+                row.put("label", reference.label());
+                row.put("url", null);
+                row.put("note", "");
+                out.add(row);
+                continue;
             }
+
+            TypeElement owner = reference.type().isEmpty()
+                    ? context
+                    : lookupType(reference.type());
+            String url = null;
+            if (owner != null) {
+                url = reference.member().isEmpty()
+                        ? Refs.typeUrl(owner)
+                        : memberUrl(owner, reference);
+            }
+            row.put("label", reference.text());
+            row.put("url", url);
+            // The trailing sentence a third of these carry, kept beside the link
+            // rather than folded into it: it is prose about the reference, not
+            // part of the name being linked.
+            row.put("note", reference.label());
             out.add(row);
         }
         return out;
     }
 
-    /** The URL of a member named in a see-also reference, matched by name alone. */
-    private String memberUrl(TypeElement owner, String reference) {
-        String name = reference;
-        int paren = name.indexOf('(');
-        if (paren > 0) {
-            name = name.substring(0, paren);
+    /** A documented type named either fully or by its simple name. */
+    private TypeElement lookupType(String name) {
+        TypeElement exact = documented.get(name);
+        if (exact != null) {
+            return exact;
         }
-        for (Element member : owner.getEnclosedElements()) {
-            if (member.getSimpleName().contentEquals(name) && isVisible(member)) {
-                return Refs.typeUrl(owner) + "#" + refs.anchors(member).get(0);
+        String suffix = "." + name;
+        for (Map.Entry<String, TypeElement> entry : documented.entrySet()) {
+            if (entry.getKey().endsWith(suffix)) {
+                return entry.getValue();
             }
         }
         return null;
+    }
+
+    /**
+     * The URL of the member a reference names, matched as precisely as the
+     * reference allows.
+     *
+     * <p>Name alone is not enough. {@code #clear(int)} against a type that
+     * declares {@code clear()} first would otherwise link to the wrong overload,
+     * which is worse than not linking at all: the reader follows it and lands on
+     * a method that is not the one the author meant. So an exact identifier match
+     * is tried first, then the argument count, and only a reference that wrote no
+     * parameter list at all falls back to the first member of that name.
+     */
+    private String memberUrl(TypeElement owner, SeeAlsoRef reference) {
+        // A reference is written against the type the reader is looking at, but
+        // the member is very often declared further up: "#CENTER" on Label means
+        // Component.CENTER, and "#getEditingDelegate()" on Picker likewise. Over
+        // the framework that is roughly half of the member references that named
+        // something real, so searching only the enclosing type leaves them dead.
+        List<Element> candidates = new ArrayList<>();
+        collectNamed(owner, reference.member(), candidates);
+        Set<String> visited = new LinkedHashSet<>();
+        for (TypeMirror supertype : allSupertypes(owner.asType(), visited)) {
+            if (supertype instanceof DeclaredType declared
+                    && declared.asElement() instanceof TypeElement parent) {
+                collectNamed(parent, reference.member(), candidates);
+            }
+        }
+        if (candidates.isEmpty()) {
+            return null;
+        }
+
+        if (reference.hasParameterList()) {
+            String wanted = reference.member() + "(" + String.join(",", reference.parameters()) + ")";
+            for (Element candidate : candidates) {
+                if (refs.anchors(candidate).contains(wanted)) {
+                    return anchorUrl(owner, candidate);
+                }
+            }
+            // The reference may spell the types simply where the identifier spells
+            // them fully -- Component#paintShadows(Graphics, int, int) against
+            // paintShadows(com.codename1.ui.Graphics,int,int) -- so fall back to
+            // the argument count, which still separates the overloads.
+            for (Element candidate : candidates) {
+                if (candidate instanceof ExecutableElement executable
+                        && executable.getParameters().size() == reference.parameters().size()) {
+                    return anchorUrl(owner, candidate);
+                }
+            }
+            // A parameter list that matches no overload is a stale reference --
+            // Transform documents "#setScale()" and declares only the two and
+            // three argument forms. Linking to an arbitrary overload would hide
+            // that and send the reader to a method the author did not mean, so it
+            // stays unlinked, which is what the standard pages showed anyway.
+            return null;
+        }
+        return anchorUrl(owner, candidates.get(0));
+    }
+
+    private void collectNamed(TypeElement type, String name, List<Element> out) {
+        for (Element member : type.getEnclosedElements()) {
+            if (isVisible(member) && !(member instanceof TypeElement)
+                    && member.getSimpleName().contentEquals(name)) {
+                out.add(member);
+            }
+        }
+    }
+
+    /**
+     * The page a member is addressed on.
+     *
+     * <p>An inherited member lives on the page of the type that declares it, the
+     * way javadoc links it. The exception is a member promoted off an
+     * undocumented supertype: that type has no page, so the member was rendered
+     * onto the referring type and is addressed there.
+     */
+    private String anchorUrl(TypeElement referring, Element member) {
+        TypeElement home = Refs.enclosingType(member);
+        String anchor = refs.anchors(member).get(0);
+        if (home != null && documented.containsKey(home.getQualifiedName().toString())) {
+            return Refs.typeUrl(home) + "#" + anchor;
+        }
+        return Refs.typeUrl(referring) + "#" + anchor;
     }
 
     /**

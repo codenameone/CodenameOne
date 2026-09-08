@@ -48,9 +48,25 @@
     <h4 class="cn1-api-block__title">See also</h4>
     <ul class="cn1-api-see">
       {{- range $j.seeAlso }}
-      <li>{{ if .url }}<a href="{{ .url }}"><code>{{ .label }}</code></a>{{ else }}<code>{{ .label }}</code>{{ end }}</li>
+      <li>
+        {{- if .url }}<a href="{{ .url }}"><code>{{ .label }}</code></a>
+        {{- else }}<code>{{ .label }}</code>{{ end }}
+        {{- with .note }} <span class="cn1-api-see__note">{{ . }}</span>{{ end -}}
+      </li>
       {{- end }}
     </ul>
+  </div>
+  {{- end }}
+
+  {{- if $j.typeParameterDocs }}
+  <div class="cn1-api-block">
+    <h4 class="cn1-api-block__title">Type parameters</h4>
+    <dl class="cn1-api-params">
+      {{- range $j.typeParameterDocs }}
+      <dt><code>{{ .name }}</code></dt>
+      <dd>{{ $.RenderString .doc }}</dd>
+      {{- end }}
+    </dl>
   </div>
   {{- end }}
 

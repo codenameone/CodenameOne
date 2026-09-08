@@ -111,7 +111,9 @@ final class DocReader {
             // An undocumented override still documents itself through its parent,
             // which is the behaviour every Java developer expects from javadoc.
             ElementDoc inherited = inherit(element, depth);
-            return inherited == null ? doc : inherited;
+            ElementDoc result = inherited == null ? doc : inherited;
+            markAnnotationDeprecation(element, result);
+            return result;
         }
 
         DocTreePath path = pathOf(element, comment);
@@ -129,8 +131,28 @@ final class DocReader {
         }
 
         readBlockTags(comment, path, doc);
+        markAnnotationDeprecation(element, doc);
         resolveInheritDoc(element, doc, depth);
         return doc;
+    }
+
+    /**
+     * Marks an element deprecated because it is annotated, tag or no tag.
+     *
+     * <p>{@code @Deprecated} and {@code @deprecated} are independent: the
+     * annotation is what the compiler warns on, the tag is what explains it, and
+     * an API may carry either. 23 files here carry the annotation, and
+     * {@code com.codename1.ui.util.MutableResouce} carries it with no tag at all,
+     * so reading only the documentation lost its deprecated marking entirely
+     * while the standard pages showed it.
+     *
+     * <p>Only ever sets the flag. A comment that documented a deprecation keeps
+     * whatever text it gave.
+     */
+    private void markAnnotationDeprecation(Element element, ElementDoc doc) {
+        if (elements.isDeprecated(element)) {
+            doc.deprecated = true;
+        }
     }
 
     private void readBlockTags(DocCommentTree comment, DocTreePath path, ElementDoc doc) {

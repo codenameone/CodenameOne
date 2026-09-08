@@ -74,6 +74,8 @@ class HugoDocletTest {
                 "",
                 "/// A sample type.",
                 "///",
+                "/// @param <T> the analyzer's result type",
+                "///",
                 "/// #### See also",
                 "///",
                 "/// - Other",
@@ -112,19 +114,63 @@ class HugoDocletTest {
                 "    public void secret() {}",
                 "    /// Nested",
                 "    public static class Inner {}",
+                "    /// The no-argument overload, declared first on purpose",
+                "    public void clear() {}",
+                "    /// The overload a reference names explicitly",
+                "    ///",
+                "    /// #### See also",
+                "    ///",
+                "    /// - #clear(int)",
+                "    /// - Other#greet() with a trailing sentence",
+                "    /// - #missing(int,int,int)",
+                "    public void clear(int index) {}",
+                "    /// A string constant",
+                "    public static final String PATTERN = \"EEE, dd MMM\";",
+                "    /// A constant holding a control character",
+                "    public static final String UNIT = \"\\u001f\";",
+                "    /// A long constant",
+                "    public static final long BIG = 5L;",
+                "    /// Annotated but never tagged",
+                "    @Deprecated",
+                "    public void annotatedOnly() {}",
                 "}",
+                ""), StandardCharsets.UTF_8);
+
+        Files.writeString(sources.resolve("Child.java"), String.join("\n",
+                "package p;",
+                "/// A subclass that refers to inherited members without qualifying them.",
+                "///",
+                "/// #### See also",
+                "///",
+                "/// - #ALIGN",
+                "/// - #greet()",
+                "public class Child extends Other {}",
                 ""), StandardCharsets.UTF_8);
 
         Files.writeString(sources.resolve("Other.java"), String.join("\n",
                 "package p;",
                 "/// Another type.",
-                "public class Other {}",
+                "public class Other {",
+                "    /// Says hello",
+                "    public void greet() {}",
+                "    /// A constant subclasses refer to as #ALIGN",
+                "    public static final int ALIGN = 3;",
+                "}",
+                "",
+                "/// Inherits everything and refers to it locally.",
+                "///",
+                "/// #### See also",
+                "///",
+                "/// - #ALIGN",
+                "/// - #greet()",
+                "class Ignored {}",
                 ""), StandardCharsets.UTF_8);
 
         DocumentationTool tool = ToolProvider.getSystemDocumentationTool();
         try (StandardJavaFileManager files = tool.getStandardFileManager(null, null, null)) {
             Iterable<? extends JavaFileObject> units = files.getJavaFileObjects(
-                    sources.resolve("Sample.java"), sources.resolve("Other.java"));
+                    sources.resolve("Sample.java"), sources.resolve("Other.java"),
+                    sources.resolve("Child.java"));
             boolean ok = tool.getTask(null, files, null, HugoDoclet.class,
                     List.of("-d", content.toString(),
                             "-sourcepath", workspace.resolve("src").toString(),
@@ -219,6 +265,73 @@ class HugoDocletTest {
     void linksSeeAlsoEntriesThatNameSomethingPublished() throws IOException {
         assertTrue(page("Sample.md").contains("/javadoc/p/Other.html"),
                 "a bare type name under #### See also resolves to its page");
+    }
+
+    @Test
+    void keepsTypeParameterDocumentation() throws IOException {
+        // Read into doc.parameters and then never serialized, so the one tag in
+        // the framework that carries text (VisionCameraView<T>) was dropped.
+        assertTrue(page("Sample.md").contains("the analyzer's result type"),
+                "type parameter documentation must reach the page");
+    }
+
+    @Test
+    void marksAnAnnotatedElementDeprecatedWithoutATag() throws IOException {
+        // com.codename1.ui.util.MutableResouce carries @Deprecated and no tag.
+        String page = page("Sample.md");
+        int at = page.indexOf("annotatedOnly");
+        assertTrue(at > 0, "the member is on the page");
+        assertTrue(page.indexOf("\"deprecated\": true", at) > 0
+                        && page.indexOf("\"deprecated\": true", at) < at + 400,
+                "the annotation alone must set the deprecated flag");
+    }
+
+    @Test
+    void rendersConstantsAsJavaLiterals() throws IOException {
+        String page = page("Sample.md");
+        assertTrue(page.contains("\\\"EEE, dd MMM\\\""), "a String constant keeps its quotes");
+        assertTrue(page.contains("5L"), "a long constant keeps its suffix");
+        assertFalse(page.contains("\u001f"),
+                "a control character must be escaped, never emitted raw");
+    }
+
+    @Test
+    void linksTheSeeAlsoOverloadThatWasActuallyNamed() throws IOException {
+        // #clear(int) against a type that declares clear() first. Linking to the
+        // wrong overload is worse than not linking: the reader follows it.
+        String page = page("Sample.md");
+        assertTrue(page.contains("/javadoc/p/Sample.html#clear(int)"),
+                "the named overload, not the first member of that name");
+    }
+
+    @Test
+    void linksQualifiedSeeAlsoMembers() throws IOException {
+        assertTrue(page("Sample.md").contains("/javadoc/p/Other.html#greet()"),
+                "Type#member() must resolve to the member, not fail a type lookup");
+    }
+
+    @Test
+    void leavesAStaleSeeAlsoOverloadUnlinked() throws IOException {
+        // #missing(int,int,int) matches no overload. Linking it anywhere would
+        // hide that the reference is stale.
+        String page = page("Sample.md");
+        int at = page.indexOf("#missing(int, int, int)");
+        assertTrue(at > 0, "the entry is still listed");
+        assertTrue(page.indexOf("\"url\": null", at) > 0
+                        && page.indexOf("\"url\": null", at) < at + 200,
+                "with no link");
+    }
+
+    @Test
+    void resolvesAnInheritedSeeAlsoMemberToItsDeclaringPage() throws IOException {
+        // "#CENTER" on Label means Component.CENTER. Roughly half the member
+        // references that name something real are inherited like this, so a
+        // resolver that searches only the enclosing type leaves them dead.
+        String page = page("Child.md");
+        assertTrue(page.contains("/javadoc/p/Other.html#ALIGN"),
+                "an inherited field links to the page that declares it");
+        assertTrue(page.contains("/javadoc/p/Other.html#greet()"),
+                "and so does an inherited method");
     }
 
     @Test

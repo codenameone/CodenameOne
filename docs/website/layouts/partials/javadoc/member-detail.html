@@ -61,7 +61,11 @@
     <h4 class="cn1-api-block__title">See also</h4>
     <ul class="cn1-api-see">
       {{- range $m.seeAlso }}
-      <li>{{ if .url }}<a href="{{ .url }}"><code>{{ .label }}</code></a>{{ else }}<code>{{ .label }}</code>{{ end }}</li>
+      <li>
+        {{- if .url }}<a href="{{ .url }}"><code>{{ .label }}</code></a>
+        {{- else }}<code>{{ .label }}</code>{{ end }}
+        {{- with .note }} <span class="cn1-api-see__note">{{ . }}</span>{{ end -}}
+      </li>
       {{- end }}
     </ul>
   </div>

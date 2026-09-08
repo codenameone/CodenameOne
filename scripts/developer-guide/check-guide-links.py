@@ -528,7 +528,20 @@ def javadoc_path_exists(target: str) -> bool:
     """
     if _JAVADOC_ROOT is None:
         return True
-    path = target[len("/javadoc/"):] if target.startswith("/javadoc/") else target
+    # The root arrives here in two spellings and both have to reduce to "". The
+    # caller strips a trailing slash before resolving, so "/javadoc/" becomes
+    # "/javadoc", which does not start with "/javadoc/" and so kept the whole
+    # string as the path -- "javadoc" -- and was reported as a directory the
+    # generator never creates. That went unnoticed while content/api.md put
+    # /javadoc in the content tree, because a path found there never reaches this
+    # function; deleting that page in favour of a generated overview is what
+    # exposed it, and the guide links to the root nine times.
+    if target in ("/javadoc", "/javadoc/"):
+        path = ""
+    elif target.startswith("/javadoc/"):
+        path = target[len("/javadoc/"):]
+    else:
+        path = target
     path = path.strip("/")
     packages, classes = javadoc_index(_JAVADOC_ROOT)
     if not path.endswith(".html"):

@@ -21,12 +21,40 @@ Usage:
 
 from __future__ import annotations
 
-import html
 import pathlib
 import re
 import sys
+from html.parser import HTMLParser
 
-ID_RE = re.compile(r'id="([^"]*)"')
+class _IdCollector(HTMLParser):
+    """Collects every element's id attribute.
+
+    A real parser rather than a regex over the text, because only one side of
+    this comparison is minified and a pattern that copes with both is a pattern
+    that reads too much. The site is built with --minify and the minifier drops
+    the quotes wherever HTML allows -- `id=top`, and a parenthesised signature is
+    legal unquoted too -- so a quotes-only pattern saw almost no fragments on the
+    minified side and reported 27784 of 29583 as missing on a build that was
+    correct. Widening it to accept unquoted values then matched Java source
+    inside <pre> blocks: `int id = row.getInteger(0);` is not an attribute.
+
+    HTMLParser knows the difference between markup and text, which is the whole
+    problem, and it resolves character references on the way through.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.ids: set[str] = set()
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        for name, value in attrs:
+            if name == "id" and value:
+                self.ids.add(value)
+
+    # Void and self-closing elements arrive here instead.
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.handle_starttag(tag, attrs)
+
 
 # Pages javadoc writes for its own machinery rather than for an API element.
 # None of these is a documented type, and the site provides its own equivalents
@@ -100,14 +128,14 @@ def pages(root: pathlib.Path, drop_alias_indexes: bool = False) -> set[str]:
 
 
 def anchors(path: pathlib.Path) -> set[str]:
-    text = path.read_text(errors="replace")
-    found = set()
-    for raw in ID_RE.findall(text):
-        value = html.unescape(raw)
-        if CHROME_ID_RE.match(value) or PROSE_ID_RE.match(value):
-            continue
-        found.add(value)
-    return found
+    collector = _IdCollector()
+    collector.feed(path.read_text(errors="replace"))
+    collector.close()
+    return {
+        value
+        for value in collector.ids
+        if not CHROME_ID_RE.match(value) and not PROSE_ID_RE.match(value)
+    }
 
 
 def main(argv: list[str]) -> int:

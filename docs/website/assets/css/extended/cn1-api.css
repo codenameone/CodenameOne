@@ -443,3 +443,10 @@ a.cn1-api-type,
     margin-bottom: 0.5rem;
   }
 }
+
+/* The sentence that a third of the See-also entries carry after the reference.
+   It is prose about the link, not part of the name, so it is not inside it. */
+.cn1-api-see__note {
+  color: var(--cn1-muted);
+  font-size: 0.9em;
+}
