@@ -283,6 +283,21 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aBodyThatIsNotJsonIsRefused() throws Exception {
+        Router router = generate(CONTROLLER_SOURCE);
+        // bodyAsMap answers null both for "no body" and for "not JSON", so the
+        // controller used to be called with null and the client saw a 404, a 500,
+        // or a side effect performed on an argument it never sent.
+        Object bad = router.call("POST", "/api/notes", "{not json");
+        assertNotNull("POST /api/notes matched no route", bad);
+        assertEquals(400, Router.statusOf(bad));
+        // A body that is valid JSON still reaches the handler with its status.
+        Object good = router.call("POST", "/api/notes", "{\"a\":1}");
+        assertNotNull(good);
+        assertEquals(201, Router.statusOf(good));
+    }
+
+    @Test
     public void twoControllersOfTheSameShapeAreRefused() throws Exception {
         // The bootstrap chains the routers and returns the first non-null answer,
         // so a collision ACROSS controllers hides the later one exactly as a

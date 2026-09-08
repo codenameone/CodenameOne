@@ -135,6 +135,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String defaultValue;
         /** From the annotation. A request missing a required binding is refused. */
         boolean required;
+        /** Set when the body is decoded into a local before the call. */
+        String local;
         int variableIndex = -1;
     }
 
@@ -566,6 +568,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         }
 
         emitRequiredGuards(sb, route, pad);
+        emitBodyLocals(sb, route, pad);
 
         StringBuilder args = new StringBuilder();
         for (int i = 0; i < route.params.size(); i++) {
@@ -645,6 +648,39 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         }
     }
 
+    /**
+     * Decodes a structured body into a local, and refuses one that will not parse.
+     *
+     * bodyAsMap/bodyAsList answer null both for "there was no body" and for "the
+     * body was not JSON", and the call site could not tell those apart: malformed
+     * client JSON was handed to the controller as a null argument, so it surfaced
+     * as a 404, as a 500 from dereferencing it, or as a side effect performed with
+     * an argument the client never sent. Only the second case is a 400, so the
+     * emptiness test comes first and an absent body stays null for a binding that
+     * allows it.
+     */
+    private static void emitBodyLocals(StringBuilder sb, Route route, String pad) {
+        for (int i = 0; i < route.params.size(); i++) {
+            Param p = route.params.get(i);
+            if (!"BODY".equals(p.kind) || "java.lang.String".equals(p.javaType)) {
+                continue;
+            }
+            boolean map = "java.util.Map".equals(p.javaType);
+            String type = map ? "java.util.Map" : "java.util.List";
+            String decoder = map ? "bodyAsMap" : "bodyAsList";
+            p.local = "body" + i;
+            sb.append(pad).append(type).append(' ').append(p.local).append(" = null;\n");
+            sb.append(pad).append("if (request.getBody() != null && request.getBody().length() > 0) {\n");
+            sb.append(pad).append("    ").append(p.local).append(" = ").append(decoder)
+              .append("(request.getBody());\n");
+            sb.append(pad).append("    if (").append(p.local).append(" == null) {\n");
+            sb.append(pad).append("        return request.respond(400, \"text/plain; charset=utf-8\",\n");
+            sb.append(pad).append("                utf8(\"The request body is not valid JSON\"));\n");
+            sb.append(pad).append("    }\n");
+            sb.append(pad).append("}\n");
+        }
+    }
+
     private static String argumentExpression(Param p) {
         if ("REQUEST".equals(p.kind)) {
             return "request";
@@ -665,6 +701,9 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private static String bodyExpression(Param p) {
         if ("java.lang.String".equals(p.javaType)) {
             return "request.getBody()";
+        }
+        if (p.local != null) {
+            return p.local;
         }
         if ("java.util.Map".equals(p.javaType)) {
             return "bodyAsMap(request.getBody())";

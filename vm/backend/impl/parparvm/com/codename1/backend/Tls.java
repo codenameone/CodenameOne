@@ -85,6 +85,7 @@ public final class Tls {
 
     /** -1 at end of stream, as InputStream does. */
     static int read(long session, byte[] buffer, int offset, int length) throws IOException {
+        checkRange(buffer, offset, length);
         int n = readImpl(session, buffer, offset, length);
         if(n < -1) {
             throw new IOException("TLS read failed");
@@ -93,6 +94,7 @@ public final class Tls {
     }
 
     static void write(long session, byte[] buffer, int offset, int length) throws IOException {
+        checkRange(buffer, offset, length);
         if(writeImpl(session, buffer, offset, length) != length) {
             throw new IOException("TLS write failed");
         }
@@ -113,6 +115,27 @@ public final class Tls {
     private static native String negotiatedProtocolImpl(long session);
     private static native void freeContextImpl(long handle);
     private static native long acceptImpl(long context, int fd);
+
+    /**
+     * Refuses a slice that does not lie inside the array.
+     *
+     * The natives below index the array through the pointer they are handed and
+     * ParparVM adds no bounds check of its own, so a bad offset is a native read
+     * or write of whatever is next in the heap rather than an exception. The
+     * JavaSE arm gets this free from its stream APIs, which is why such a bug is
+     * invisible on the simulator and only appears once packaged. The subtraction
+     * avoids the overflow that `offset + length` has.
+     */
+    private static void checkRange(byte[] buffer, int offset, int length) {
+        if(buffer == null) {
+            throw new NullPointerException("buffer");
+        }
+        if(offset < 0 || length < 0 || length > buffer.length - offset) {
+            throw new IndexOutOfBoundsException("offset " + offset + ", length "
+                    + length + ", buffer " + buffer.length);
+        }
+    }
+
     private static native int readImpl(long session, byte[] buffer, int offset, int length);
     private static native int writeImpl(long session, byte[] buffer, int offset, int length);
     private static native void closeImpl(long session);

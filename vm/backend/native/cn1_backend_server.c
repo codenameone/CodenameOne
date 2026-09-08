@@ -130,6 +130,33 @@ JAVA_INT com_codename1_backend_ServerSocket_bindImpl___java_lang_String_int_int_
         return -1;
     }
 
+    /* A null host means "every interface", and that has to include the v6 ones:
+       an AF_INET socket cannot accept an IPv6 client, so the default binding was
+       unreachable in an IPv6-only deployment while an explicitly named host --
+       which takes the getaddrinfo path above -- worked. A v6 socket with
+       V6ONLY cleared serves both families through one descriptor. Falling back
+       to AF_INET keeps hosts with no IPv6 at all working exactly as before. */
+    {
+        struct sockaddr_in6 addr6;
+        int off = 0;
+        fd = socket(AF_INET6, SOCK_STREAM, 0);
+        if(fd >= 0) {
+            setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char*)&on, sizeof(on));
+            if(setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (const char*)&off,
+                    sizeof(off)) == 0) {
+                memset(&addr6, 0, sizeof(addr6));
+                addr6.sin6_family = AF_INET6;
+                addr6.sin6_port = htons((unsigned short)port);
+                addr6.sin6_addr = in6addr_any;
+                if(bind(fd, (struct sockaddr*)&addr6, sizeof(addr6)) == 0
+                        && listen(fd, backlog) == 0) {
+                    return fd;
+                }
+            }
+            close(fd);
+        }
+    }
+
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if(fd < 0) {
         return -1;

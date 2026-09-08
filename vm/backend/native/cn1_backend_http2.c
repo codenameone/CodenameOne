@@ -53,6 +53,12 @@
    CONTINUATION frames, and again on each stream its SETTINGS allows at once.
    HTTP/1 has always refused that; this is the same ceiling for HTTP/2. */
 #define CN1_H2_MAX_HEADER_BYTES (64 * 1024)
+/* The per-stream limit bounds ONE upload; it says nothing about how many run at
+   once. With the advertised concurrency a single connection could hold a hundred
+   nearly-complete 8 MiB bodies -- some 800 MiB of native buffers that live until
+   each stream completes or resets, and nothing stopped a second connection doing
+   the same. This is the ceiling for everything one session is holding. */
+#define CN1_H2_MAX_SESSION_BODY_BYTES (4 * CN1_H2_MAX_BODY_BYTES)
 /* Mirrors HttpServer.MAX_BODY_BYTES: the HTTP/1 paths refuse a larger body and
    HTTP/2 must agree, or the limit is only as good as the protocol chosen. */
 #define CN1_H2_MAX_BODY_BYTES (8 * 1024 * 1024)
@@ -333,6 +339,29 @@ static int cn1H2OnData(nghttp2_session* session, uint8_t flags, int32_t streamId
        one oversized upload is that request's problem, not the session's. */
     if(r->bodyLength + length > CN1_H2_MAX_BODY_BYTES) {
         return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+    }
+    {
+        /* Walked rather than counted in a running total: the total would have to
+           be decremented everywhere a request is freed, and one missed path
+           leaks budget until the session refuses everything. Both lists hold
+           bodies -- open ones are still arriving, ready ones are waiting for
+           Java to read them -- and neither is longer than the concurrency
+           setting. r is on the open list, so its own bodyLength is already in
+           the sum and only the new bytes are added. */
+        size_t total = length;
+        CN1H2Request* other = s->open;
+        while(other != NULL) {
+            total += other->bodyLength;
+            other = other->next;
+        }
+        other = s->readyHead;
+        while(other != NULL) {
+            total += other->bodyLength;
+            other = other->next;
+        }
+        if(total > CN1_H2_MAX_SESSION_BODY_BYTES) {
+            return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+        }
     }
     if(r->bodyLength + length > r->bodyCapacity) {
         size_t grown = (r->bodyLength + length) * 2 + 1024;

@@ -159,6 +159,7 @@ public final class ServerSocket {
     }
 
     public static int read(int fd, byte[] buffer, int offset, int length) throws IOException {
+        checkRange(buffer, offset, length);
         int n = readImpl(fd, buffer, offset, length);
         if(n == -3) {
             throw new TimeoutException("Read timed out on fd " + fd);
@@ -170,6 +171,7 @@ public final class ServerSocket {
     }
 
     public static void write(int fd, byte[] buffer, int offset, int length) throws IOException {
+        checkRange(buffer, offset, length);
         if(writeImpl(fd, buffer, offset, length) != length) {
             throw new IOException("Write failed on fd " + fd);
         }
@@ -205,6 +207,27 @@ public final class ServerSocket {
 
 
     private static native int awaitReadableImpl(int fd, int timeoutMillis);
+
+    /**
+     * Refuses a slice that does not lie inside the array.
+     *
+     * The natives below index the array through the pointer they are handed and
+     * ParparVM adds no bounds check of its own, so a bad offset is a native read
+     * or write of whatever is next in the heap rather than an exception. The
+     * JavaSE arm gets this free from its stream APIs, which is why such a bug is
+     * invisible on the simulator and only appears once packaged. The subtraction
+     * avoids the overflow that `offset + length` has.
+     */
+    private static void checkRange(byte[] buffer, int offset, int length) {
+        if(buffer == null) {
+            throw new NullPointerException("buffer");
+        }
+        if(offset < 0 || length < 0 || length > buffer.length - offset) {
+            throw new IndexOutOfBoundsException("offset " + offset + ", length "
+                    + length + ", buffer " + buffer.length);
+        }
+    }
+
     private static native int readImpl(int fd, byte[] buffer, int offset, int length);
     private static native int writeImpl(int fd, byte[] buffer, int offset, int length);
     private static native void closeFdImpl(int fd);

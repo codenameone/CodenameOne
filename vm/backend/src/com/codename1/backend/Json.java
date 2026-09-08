@@ -542,6 +542,23 @@ public final class Json {
             out.append("null");
             return;
         }
+        // Before the String branch, and for the same reason the sink writer checks
+        // it first: a Writable is a DTO carrying its own generated writer. Without
+        // this it reached the quoting branch below and was emitted as the JSON
+        // STRING of its toString(), so one handler returned an object over HTTP/1.1
+        // and unusable text over HTTP/2 -- the two writers disagreeing about a
+        // value's type, exactly as they did over Short and Byte.
+        if(value instanceof Writable) {
+            ByteSink sink = new ByteSink(256);
+            ((Writable)value).writeTo(sink);
+            try {
+                out.append(new String(sink.bytes(), 0, sink.length(), "UTF-8"));
+            } catch (java.io.UnsupportedEncodingException never) {
+                // UTF-8 is required of every VM.
+                throw new IllegalStateException(never.toString());
+            }
+            return;
+        }
         if(value instanceof String) {
             writeString(out, (String)value);
             return;

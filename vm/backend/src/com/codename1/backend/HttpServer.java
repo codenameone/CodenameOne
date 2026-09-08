@@ -516,8 +516,8 @@ public final class HttpServer {
             // generated code shows why that is not free: each character costs a
             // cn1InlStrCharAt (which re-checks the string's coder) plus a foldAscii
             // call, against a plain array read on the other side.
-            int needle = foldedSlot(name);
-            if(needle < 0) {
+            byte[] needle = foldedBytes(name);
+            if(needle == null) {
                 // Not ASCII-foldable, so the general path is the only correct one.
                 for(int iter = 0 ; iter < headerCount ; iter++) {
                     int base = iter * 4;
@@ -3858,70 +3858,83 @@ public final class HttpServer {
      * what lets it stay lock-free.
      */
     private static final int FOLD_CACHE_SLOTS = 16;
-    /**
-     * Each slot owns its own bytes, at slot * FOLD_SLOT_BYTES.
-     *
-     * They used to share one 512-byte store filled end to end, which wrapped to zero
-     * once it was full without retiring the slots whose bytes it was about to
-     * overwrite. Thirteen distinct forty-character names was enough: a later lookup
-     * matched its key, compared against whatever name had since taken those bytes,
-     * and getHeader reported a header that was present as absent. Nothing throws --
-     * the request is simply answered as though the header had not been sent.
-     *
-     * A name longer than a slot takes the general path instead. Every name this
-     * server looks up is far shorter, and being uncached is only slower.
-     */
-    private static final int FOLD_SLOT_BYTES = 32;
-    private static final String[] foldKeys = new String[FOLD_CACHE_SLOTS];
-    private static final int[] foldLength = new int[FOLD_CACHE_SLOTS];
-    private static final byte[] foldStore = new byte[FOLD_CACHE_SLOTS * FOLD_SLOT_BYTES];
-    private static int foldNext;
 
     /**
-     * Folds `ascii` into {@link #foldStore} and returns its slot, or -1 when the
-     * name is not ASCII (the caller then takes the general path).
+     * One cached fold. Both fields are final, which is the whole point.
+     *
+     * The cache used to be three parallel static arrays and a rotating index, and
+     * a lookup returned the SLOT it had matched. The caller then compared against
+     * that slot while walking the request's headers -- a window in which another
+     * worker could retire the slot and write a different name into its bytes. Two
+     * names of equal length are then indistinguishable, so getHeader answered
+     * with the wrong field, or reported a header that was sent as absent, and
+     * nothing threw. Clearing the key first does not help a reader that already
+     * holds the index.
+     *
+     * Handing back an immutable entry closes that by construction: what the
+     * caller compares against cannot be rewritten, because nothing ever writes to
+     * a published entry.
      */
-    static int foldedSlot(String ascii) {
-        for(int iter = 0 ; iter < FOLD_CACHE_SLOTS ; iter++) {
-            if(foldKeys[iter] == ascii) {
-                return iter;
-            }
+    private static final class Folded {
+        final String key;
+        final byte[] bytes;
+
+        Folded(String key, byte[] bytes) {
+            this.key = key;
+            this.bytes = bytes;
         }
-        int length = ascii.length();
-        if(length > FOLD_SLOT_BYTES) {
-            return -1;
-        }
-        // Checked before anything is written, so an unfoldable name cannot leave a
-        // slot half rewritten.
-        for(int iter = 0 ; iter < length ; iter++) {
-            if(ascii.charAt(iter) > 127) {
-                return -1;
-            }
-        }
-        int slot = foldNext;
-        foldNext = (slot + 1) % FOLD_CACHE_SLOTS;
-        int at = slot * FOLD_SLOT_BYTES;
-        // Retire the old key BEFORE its bytes are replaced: a lookup must not be able
-        // to match a key whose bytes are being rewritten underneath it.
-        foldKeys[slot] = null;
-        for(int iter = 0 ; iter < length ; iter++) {
-            foldStore[at + iter] = (byte) foldAscii(ascii.charAt(iter));
-        }
-        // Length before key, so a reader that matches the key sees it complete.
-        foldLength[slot] = length;
-        foldKeys[slot] = ascii;
-        return slot;
     }
 
-    /** Case-insensitive compare of a slice against an already-folded cache slot. */
-    static boolean sliceEqualsFolded(byte[] data, int start, int length, int slot) {
-        int needle = foldLength[slot];
-        if(length != needle) {
+    /**
+     * Published by replacement, never by mutation, so a reader either sees an
+     * entry complete or does not see it at all. Two threads that fold the same
+     * name at once may lose one of the two writes; that costs a later refold and
+     * nothing else, which is what keeps this lock free.
+     */
+    private static volatile Folded[] foldCache = new Folded[0];
+
+    /**
+     * The folded bytes of `ascii`, or null when it cannot be cached -- not ASCII,
+     * or the cache is full. Null means the caller takes the general path, which
+     * is only slower.
+     */
+    static byte[] foldedBytes(String ascii) {
+        Folded[] snapshot = foldCache;
+        for(int iter = 0 ; iter < snapshot.length ; iter++) {
+            // Identity, not equals: a given call site hands over the same constant
+            // every time, so this is a pointer compare and the fold happens once
+            // for the life of the process.
+            if(snapshot[iter].key == ascii) {
+                return snapshot[iter].bytes;
+            }
+        }
+        if(snapshot.length >= FOLD_CACHE_SLOTS) {
+            return null;
+        }
+        int length = ascii.length();
+        for(int iter = 0 ; iter < length ; iter++) {
+            if(ascii.charAt(iter) > 127) {
+                return null;
+            }
+        }
+        byte[] bytes = new byte[length];
+        for(int iter = 0 ; iter < length ; iter++) {
+            bytes[iter] = (byte) foldAscii(ascii.charAt(iter));
+        }
+        Folded[] grown = new Folded[snapshot.length + 1];
+        System.arraycopy(snapshot, 0, grown, 0, snapshot.length);
+        grown[snapshot.length] = new Folded(ascii, bytes);
+        foldCache = grown;
+        return bytes;
+    }
+
+    /** Case-insensitive compare of a slice against already-folded needle bytes. */
+    static boolean sliceEqualsFolded(byte[] data, int start, int length, byte[] needle) {
+        if(length != needle.length) {
             return false;
         }
-        int at = slot * FOLD_SLOT_BYTES;
         for(int iter = 0 ; iter < length ; iter++) {
-            if(foldAscii(data[start + iter] & 0xff) != foldStore[at + iter]) {
+            if(foldAscii(data[start + iter] & 0xff) != needle[iter]) {
                 return false;
             }
         }

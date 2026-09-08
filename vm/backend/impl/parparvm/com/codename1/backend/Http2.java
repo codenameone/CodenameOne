@@ -114,6 +114,7 @@ public final class Http2 {
 
     /** Feeds received bytes to the session. */
     public void receive(byte[] buffer, int offset, int length) throws IOException {
+        checkRange(buffer, offset, length);
         if(receiveImpl(session, buffer, offset, length) < 0) {
             throw new IOException("HTTP/2 framing error");
         }
@@ -215,6 +216,27 @@ public final class Http2 {
     }
 
     private static native long createImpl();
+
+    /**
+     * Refuses a slice that does not lie inside the array.
+     *
+     * The natives below index the array through the pointer they are handed and
+     * ParparVM adds no bounds check of its own, so a bad offset is a native read
+     * or write of whatever is next in the heap rather than an exception. The
+     * JavaSE arm gets this free from its stream APIs, which is why such a bug is
+     * invisible on the simulator and only appears once packaged. The subtraction
+     * avoids the overflow that `offset + length` has.
+     */
+    private static void checkRange(byte[] buffer, int offset, int length) {
+        if(buffer == null) {
+            throw new NullPointerException("buffer");
+        }
+        if(offset < 0 || length < 0 || length > buffer.length - offset) {
+            throw new IndexOutOfBoundsException("offset " + offset + ", length "
+                    + length + ", buffer " + buffer.length);
+        }
+    }
+
     private static native int receiveImpl(long session, byte[] buffer, int offset, int length);
     private static native int pumpImpl(long session);
     private static native int pendingOutputImpl(long session);

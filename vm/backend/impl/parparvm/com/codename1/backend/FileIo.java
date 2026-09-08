@@ -81,6 +81,7 @@ public final class FileIo {
     }
 
     public static int read(int fd, byte[] buffer, int offset, int length) {
+        checkRange(buffer, offset, length);
         return readImpl(fd, buffer, offset, length);
     }
 
@@ -103,6 +104,27 @@ public final class FileIo {
     private static native int statImpl(int fd, long[] out);
     private static native long sendFileImpl(int socketFd, int fileFd, long offset, long count);
     private static native boolean hasSendFileImpl();
+
+    /**
+     * Refuses a slice that does not lie inside the array.
+     *
+     * The natives below index the array through the pointer they are handed and
+     * ParparVM adds no bounds check of its own, so a bad offset is a native read
+     * or write of whatever is next in the heap rather than an exception. The
+     * JavaSE arm gets this free from its stream APIs, which is why such a bug is
+     * invisible on the simulator and only appears once packaged. The subtraction
+     * avoids the overflow that `offset + length` has.
+     */
+    private static void checkRange(byte[] buffer, int offset, int length) {
+        if(buffer == null) {
+            throw new NullPointerException("buffer");
+        }
+        if(offset < 0 || length < 0 || length > buffer.length - offset) {
+            throw new IndexOutOfBoundsException("offset " + offset + ", length "
+                    + length + ", buffer " + buffer.length);
+        }
+    }
+
     private static native int readImpl(int fd, byte[] buffer, int offset, int length);
     private static native String realPathImpl(String path);
     private static native void closeImpl(int fd);
