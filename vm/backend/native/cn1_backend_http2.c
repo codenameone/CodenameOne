@@ -287,11 +287,18 @@ static int cn1H2OnHeader(nghttp2_session* session, const nghttp2_frame* frame,
     if(nameLen > 0 && name[0] == ':') {
         return 0; /* an unknown pseudo-header; nghttp2 has already validated it */
     }
-    if(r->headerCount < CN1_H2_MAX_HEADERS) {
-        r->headers[r->headerCount].name = cn1H2Dup(name, nameLen);
-        r->headers[r->headerCount].value = cn1H2Dup(value, valueLen);
-        r->headerCount++;
+    if(r->headerCount >= CN1_H2_MAX_HEADERS) {
+        /* Reset the stream rather than keep the first CN1_H2_MAX_HEADERS and report
+           success, which handed the handler a request with a later cookie,
+           content-type or tracing header simply missing -- and nothing anywhere said
+           so. TEMPORAL_CALLBACK_FAILURE fails this one stream and leaves the
+           connection up; the client sees the request fail, which is the honest
+           answer and the closest thing HTTP/2 has to HTTP/1's 431. */
+        return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
     }
+    r->headers[r->headerCount].name = cn1H2Dup(name, nameLen);
+    r->headers[r->headerCount].value = cn1H2Dup(value, valueLen);
+    r->headerCount++;
     return 0;
 }
 

@@ -51,12 +51,103 @@ typedef int cn1_socklen;
 #include <sys/socket.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <poll.h>
 #define CN1_CLOSE_SOCKET close
 typedef socklen_t cn1_socklen;
 #endif
 
 static int cn1BackendFd(JAVA_LONG handle) {
     return handle <= 0 ? -1 : (int)(handle - 1);
+}
+
+static int cn1SetNonBlocking(int fd, int on) {
+#ifdef _WIN32
+    u_long mode = on ? 1 : 0;
+    return ioctlsocket(fd, FIONBIO, &mode) == 0 ? 0 : -1;
+#else
+    int flags = fcntl(fd, F_GETFL, 0);
+    if(flags < 0) {
+        return -1;
+    }
+    flags = on ? (flags | O_NONBLOCK) : (flags & ~O_NONBLOCK);
+    return fcntl(fd, F_SETFL, flags) == 0 ? 0 : -1;
+#endif
+}
+
+static int cn1ConnectPending(void) {
+#ifdef _WIN32
+    return WSAGetLastError() == WSAEWOULDBLOCK;
+#else
+    return errno == EINPROGRESS;
+#endif
+}
+
+/*
+ * connect() that gives up when the caller said to.
+ *
+ * A blocking connect ignores the timeout entirely and waits out the OS TCP
+ * timeout, which is minutes when an address silently drops packets rather than
+ * refusing. A database URL's ten-second default then means nothing on the device
+ * while meaning exactly ten seconds in the JavaSE runtime, so the same
+ * misconfiguration looks like a slow start in development and a hung process in
+ * production.
+ *
+ * The socket goes back to blocking before returning: every read and write after
+ * this expects that. The deadline is per address, so a host resolving to several
+ * can take the timeout once for each -- which is the point, since the reachable
+ * one is usually not the first.
+ */
+static int cn1ConnectWithTimeout(int fd, const struct sockaddr* addr, cn1_socklen len,
+                                 int timeoutMillis) {
+    int err = 0;
+    cn1_socklen errLen = (cn1_socklen)sizeof(err);
+    int rc;
+    if(timeoutMillis <= 0 || cn1SetNonBlocking(fd, 1) != 0) {
+        /* No deadline asked for, or the socket refused to go non-blocking: the
+           blocking connect is still the right answer, just without a deadline. */
+        return connect(fd, addr, len) == 0 ? 0 : -1;
+    }
+    rc = connect(fd, addr, len);
+    if(rc != 0) {
+        if(!cn1ConnectPending()) {
+            cn1SetNonBlocking(fd, 0);
+            return -1;
+        }
+#ifdef _WIN32
+        {
+            fd_set writable;
+            struct timeval tv;
+            FD_ZERO(&writable);
+            FD_SET((SOCKET)fd, &writable);
+            tv.tv_sec = timeoutMillis / 1000;
+            tv.tv_usec = (timeoutMillis % 1000) * 1000;
+            rc = select(0, 0, &writable, 0, &tv);
+        }
+#else
+        {
+            /* poll rather than select: a server with many open connections hands
+               out descriptors above FD_SETSIZE, and select is undefined there. */
+            struct pollfd waiting;
+            waiting.fd = fd;
+            waiting.events = POLLOUT;
+            waiting.revents = 0;
+            do {
+                rc = poll(&waiting, 1, timeoutMillis);
+            } while(rc < 0 && errno == EINTR);
+        }
+#endif
+        if(rc <= 0) {
+            cn1SetNonBlocking(fd, 0);
+            return -1;                  /* timed out, or the wait itself failed */
+        }
+        if(getsockopt(fd, SOL_SOCKET, SO_ERROR, (char*)&err, &errLen) != 0 || err != 0) {
+            cn1SetNonBlocking(fd, 0);
+            return -1;
+        }
+    }
+    cn1SetNonBlocking(fd, 0);
+    return 0;
 }
 
 JAVA_LONG com_codename1_backend_Tcp_connectImpl___java_lang_String_int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT host, JAVA_INT port, JAVA_INT timeoutMillis) {
@@ -66,7 +157,6 @@ JAVA_LONG com_codename1_backend_Tcp_connectImpl___java_lang_String_int_int_R_lon
     char portStr[16];
     int fd = -1;
     const char* h = host == JAVA_NULL ? 0 : stringToUTF8(threadStateData, host);
-    (void)timeoutMillis; /* blocking connect; a deadline needs the non-blocking dance */
     if(!h) {
         return 0;
     }
@@ -83,7 +173,8 @@ JAVA_LONG com_codename1_backend_Tcp_connectImpl___java_lang_String_int_int_R_lon
         if(fd < 0) {
             continue;
         }
-        if(connect(fd, it->ai_addr, (cn1_socklen)it->ai_addrlen) == 0) {
+        if(cn1ConnectWithTimeout(fd, it->ai_addr, (cn1_socklen)it->ai_addrlen,
+                                 (int)timeoutMillis) == 0) {
             break;
         }
         CN1_CLOSE_SOCKET(fd);

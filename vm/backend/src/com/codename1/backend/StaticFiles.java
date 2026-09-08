@@ -292,6 +292,13 @@ public final class StaticFiles implements HttpServer.Handler {
         }
         String fromText = value.substring(0, dash).trim();
         String toText = value.substring(dash + 1).trim();
+        if(size == 0) {
+            // No range over a zero-length representation can be satisfied, and the
+            // suffix form quietly produced one: "bytes=-1" clamped to a length of 0
+            // and answered 206 with "Content-Range: bytes 0--1/0", which is not a
+            // header any client can read. 416 is the whole of the correct answer.
+            return null;
+        }
         try {
             if(fromText.length() == 0) {
                 // "-N" is the last N bytes.

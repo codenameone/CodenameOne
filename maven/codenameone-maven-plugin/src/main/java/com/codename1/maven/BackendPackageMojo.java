@@ -147,6 +147,14 @@ public class BackendPackageMojo extends AbstractMojo {
         File runtimeSources = new File(work, "runtime-src");
         File nativeSources = new File(work, "native");
         File translated = new File(work, "translated");
+        // Emptied, not just created. Every one of these is derived, and nothing here
+        // removes a file that stopped being produced: a renamed or deleted source
+        // left its old .class behind, the translator still read it, and even
+        // requireMainClass accepted a main class the module no longer had -- so the
+        // package that came out was the previous implementation. Rebuilding from
+        // clean costs nothing, since neither the javac nor the clang pass below was
+        // ever incremental.
+        emptyDirs(classes, javaApi, runtimeSources, nativeSources, translated);
         mkdirs(work, classes, javaApi, runtimeSources, nativeSources, translated);
 
         // The version of the runtime THIS MODULE compiles against, not the
@@ -553,6 +561,28 @@ public class BackendPackageMojo extends AbstractMojo {
             Thread.currentThread().interrupt();
             throw new MojoExecutionException("Interrupted while trying to " + what, err);
         }
+    }
+
+    /** Removes each directory and its contents, so the caller can recreate it empty. */
+    private static void emptyDirs(File... dirs) {
+        for (File dir : dirs) {
+            deleteTree(dir);
+        }
+    }
+
+    private static void deleteTree(File file) {
+        if (file == null || !file.exists()) {
+            return;
+        }
+        File[] children = file.listFiles();
+        if (children != null) {
+            for (File child : children) {
+                deleteTree(child);
+            }
+        }
+        // Left to the caller to notice: a directory that cannot be removed here shows
+        // up as the stale content it holds, which is the failure this is preventing.
+        file.delete();
     }
 
     private static void mkdirs(File... dirs) {

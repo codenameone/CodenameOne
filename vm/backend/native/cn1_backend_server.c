@@ -40,6 +40,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <signal.h>
 #ifndef _WIN32
 #include <poll.h>
 #endif
@@ -70,6 +71,12 @@
 #define CN1_EVENT_WRITE 2
 #define CN1_EVENT_ONESHOT 4
 
+#ifdef MSG_NOSIGNAL
+#define CN1_SEND_FLAGS MSG_NOSIGNAL
+#else
+#define CN1_SEND_FLAGS 0
+#endif
+
 JAVA_INT com_codename1_backend_ServerSocket_bindImpl___java_lang_String_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT host, JAVA_INT port, JAVA_INT backlog) {
 #ifdef _WIN32
     (void)host; (void)port; (void)backlog;
@@ -79,6 +86,13 @@ JAVA_INT com_codename1_backend_ServerSocket_bindImpl___java_lang_String_int_int_
     int fd;
     int on = 1;
     const char* h = host == JAVA_NULL ? NULL : stringToUTF8(threadStateData, host);
+
+    /* SIGPIPE's default action is to kill the process, and a client that goes away
+       mid-response makes send() raise it. Ignoring it here rather than only inside
+       Signals.installShutdownHandler(): that call is optional, so a server that
+       never made it died the first time a browser closed a tab. Setting it once at
+       bind costs nothing and cannot be skipped by a server that listens. */
+    signal(SIGPIPE, SIG_IGN);
 
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if(fd < 0) {
@@ -559,7 +573,11 @@ JAVA_INT com_codename1_backend_ServerSocket_writeImpl___int_byte_1ARRAY_int_int_
     data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
     CN1_YIELD_THREAD;
     while(written < length) {
-        long n = (long)send(fd, (const char*)&data[offset + written], (size_t)(length - written), 0);
+        /* MSG_NOSIGNAL where it exists, so this write cannot raise SIGPIPE even if
+           the disposition were somehow restored. It is 0 on platforms without it --
+           macOS among them -- where the SIG_IGN set at bind is what covers this. */
+        long n = (long)send(fd, (const char*)&data[offset + written],
+                            (size_t)(length - written), CN1_SEND_FLAGS);
         if(n < 0 && errno == EINTR) {
             continue;
         }

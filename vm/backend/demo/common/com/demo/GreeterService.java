@@ -28,6 +28,7 @@ import java.util.Map;
 
 import com.codename1.backend.Crypto;
 import com.codename1.backend.Db;
+import com.codename1.backend.DbPool;
 import com.codename1.backend.Jwt;
 import com.codename1.backend.Web;
 
@@ -39,11 +40,36 @@ import com.codename1.backend.Web;
 public class GreeterService implements GreeterApiServer {
     private static final long TOKEN_TTL_SECONDS = 3600;
 
-    private final Db db;
+    /**
+     * Exactly one of these is set.
+     *
+     * `pool` is the normal case: every call borrows a connection and gives it back,
+     * so two requests never share one. Holding a single borrowed connection for the
+     * life of the service -- which this used to do -- leaves the rest of the pool
+     * unused AND lets one request's statements land inside another's transaction, so
+     * a concurrent addPet could be rolled back by an unrelated addPets that failed.
+     *
+     * `shared` is the in-memory case, where pooling is not possible: each connection
+     * to ":memory:" would be its own empty database. SQLite serialises the one
+     * connection, so sharing it is correct there rather than merely convenient.
+     */
+    private final DbPool pool;
+    private final Db shared;
     private final byte[] signingSecret;
 
     public GreeterService(Db db) throws Exception {
         this(db, Crypto.randomBytes(32));
+    }
+
+    public GreeterService(DbPool pool) throws Exception {
+        this(pool, Crypto.randomBytes(32));
+    }
+
+    public GreeterService(DbPool pool, byte[] signingSecret) throws Exception {
+        this.pool = pool;
+        this.shared = null;
+        this.signingSecret = signingSecret;
+        createSchema();
     }
 
     /**
@@ -52,32 +78,57 @@ public class GreeterService implements GreeterApiServer {
      *   generated-per-process default is right for a demo and wrong for a fleet.
      */
     public GreeterService(Db db, byte[] signingSecret) throws Exception {
-        this.db = db;
+        this.pool = null;
+        this.shared = db;
         this.signingSecret = signingSecret;
-        db.execute("CREATE TABLE IF NOT EXISTS pet ("
-                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                + "name TEXT NOT NULL,"
-                + "species TEXT,"
-                + "weight REAL,"
-                + "good INTEGER,"
-                + "photo BLOB)", null);
-        db.execute("CREATE TABLE IF NOT EXISTS account ("
-                + "username TEXT PRIMARY KEY,"
-                + "password TEXT NOT NULL)", null);
-        // A demo account. Stored as a PBKDF2 verifier, never as the password.
-        if(db.query("SELECT username FROM account WHERE username = ?",
-                new Object[]{"shai"}).isEmpty()) {
-            db.execute("INSERT INTO account (username, password) VALUES (?, ?)",
-                    new Object[]{"shai", Crypto.hashPassword("hunter2")});
-        }
+        createSchema();
+    }
+
+    private void createSchema() throws Exception {
+        withConnection(new Db.Work() {
+            public Object run(Db db) throws Exception {
+                db.execute("CREATE TABLE IF NOT EXISTS pet ("
+                        + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                        + "name TEXT NOT NULL,"
+                        + "species TEXT,"
+                        + "weight REAL,"
+                        + "good INTEGER,"
+                        + "photo BLOB)", null);
+                db.execute("CREATE TABLE IF NOT EXISTS account ("
+                        + "username TEXT PRIMARY KEY,"
+                        + "password TEXT NOT NULL)", null);
+                // A demo account. Stored as a PBKDF2 verifier, never as the password.
+                if(db.query("SELECT username FROM account WHERE username = ?",
+                        new Object[]{"shai"}).isEmpty()) {
+                    db.execute("INSERT INTO account (username, password) VALUES (?, ?)",
+                            new Object[]{"shai", Crypto.hashPassword("hunter2")});
+                }
+                return null;
+            }
+        });
+    }
+
+    /** One borrowed connection for the duration of `body`, returned afterwards. */
+    private Object withConnection(Db.Work body) throws Exception {
+        return pool == null ? body.run(shared) : pool.withConnection(body);
+    }
+
+    /** As {@link #withConnection}, with the work wrapped in a transaction. */
+    private Object inTransaction(Db.Work body) throws Exception {
+        return pool == null ? shared.transaction(body) : pool.inTransaction(body);
     }
 
     public String login(Credentials credentials) throws Exception {
         if(credentials == null || credentials.username == null) {
             throw new IllegalArgumentException("username and password are required");
         }
-        List rows = db.query("SELECT password FROM account WHERE username = ?",
-                new Object[]{credentials.username});
+        final String username = credentials.username;
+        List rows = (List) withConnection(new Db.Work() {
+            public Object run(Db db) throws Exception {
+                return db.query("SELECT password FROM account WHERE username = ?",
+                        new Object[]{username});
+            }
+        });
         // The same rejection for an unknown user and a wrong password: telling them
         // apart turns the login endpoint into a list of valid usernames.
         String stored = rows.isEmpty() ? null : str(((Map)rows.get(0)).get("password"));
@@ -144,16 +195,30 @@ public class GreeterService implements GreeterApiServer {
         if(pet == null || pet.name == null || pet.name.length() == 0) {
             throw new IllegalArgumentException("a pet needs a name");
         }
-        db.execute("INSERT INTO pet (name, species, weight, good) VALUES (?, ?, ?, ?)",
-                new Object[]{pet.name, pet.species, new Double(pet.weight),
-                        Boolean.valueOf(pet.good)});
-        pet.id = db.lastInsertId();
+        final Pet inserting = pet;
+        // The insert and lastInsertId have to run on ONE connection: the id belongs
+        // to the connection that did the insert, so reading it from another is a
+        // different row or none at all.
+        pet.id = ((Long) withConnection(new Db.Work() {
+            public Object run(Db db) throws Exception {
+                db.execute("INSERT INTO pet (name, species, weight, good) VALUES (?, ?, ?, ?)",
+                        new Object[]{inserting.name, inserting.species,
+                                new Double(inserting.weight),
+                                Boolean.valueOf(inserting.good)});
+                return new Long(db.lastInsertId());
+            }
+        })).longValue();
         return pet;
     }
 
     public Pet getPet(long id) throws Exception {
-        List rows = db.query("SELECT id, name, species, weight, good FROM pet WHERE id = ?",
-                new Object[]{new Long(id)});
+        final long wanted = id;
+        List rows = (List) withConnection(new Db.Work() {
+            public Object run(Db db) throws Exception {
+                return db.query("SELECT id, name, species, weight, good FROM pet WHERE id = ?",
+                        new Object[]{new Long(wanted)});
+            }
+        });
         if(rows.isEmpty()) {
             return null;
         }
@@ -161,13 +226,17 @@ public class GreeterService implements GreeterApiServer {
     }
 
     public List<Pet> listPets(String species) throws Exception {
-        List rows;
-        if(species == null || species.length() == 0) {
-            rows = db.query("SELECT id, name, species, weight, good FROM pet ORDER BY id", null);
-        } else {
-            rows = db.query("SELECT id, name, species, weight, good FROM pet "
-                    + "WHERE species = ? ORDER BY id", new Object[]{species});
-        }
+        final String wanted = species;
+        List rows = (List) withConnection(new Db.Work() {
+            public Object run(Db db) throws Exception {
+                if(wanted == null || wanted.length() == 0) {
+                    return db.query("SELECT id, name, species, weight, good FROM pet "
+                            + "ORDER BY id", null);
+                }
+                return db.query("SELECT id, name, species, weight, good FROM pet "
+                        + "WHERE species = ? ORDER BY id", new Object[]{wanted});
+            }
+        });
         List<Pet> out = new ArrayList<Pet>();
         for(int iter = 0 ; iter < rows.size() ; iter++) {
             out.add(toPet((Map)rows.get(iter)));
@@ -177,8 +246,14 @@ public class GreeterService implements GreeterApiServer {
 
     public String setPhoto(long id, String data) throws Exception {
         byte[] bytes = data == null ? new byte[0] : data.getBytes("UTF-8");
-        int changed = db.execute("UPDATE pet SET photo = ? WHERE id = ?",
-                new Object[]{bytes, new Long(id)});
+        final byte[] stored = bytes;
+        final long target = id;
+        int changed = ((Integer) withConnection(new Db.Work() {
+            public Object run(Db db) throws Exception {
+                return new Integer(db.execute("UPDATE pet SET photo = ? WHERE id = ?",
+                        new Object[]{stored, new Long(target)}));
+            }
+        })).intValue();
         if(changed == 0) {
             throw new IllegalArgumentException("no pet " + id);
         }
@@ -186,7 +261,13 @@ public class GreeterService implements GreeterApiServer {
     }
 
     public String getPhoto(long id) throws Exception {
-        List rows = db.query("SELECT photo FROM pet WHERE id = ?", new Object[]{new Long(id)});
+        final long wanted = id;
+        List rows = (List) withConnection(new Db.Work() {
+            public Object run(Db db) throws Exception {
+                return db.query("SELECT photo FROM pet WHERE id = ?",
+                        new Object[]{new Long(wanted)});
+            }
+        });
         if(rows.isEmpty()) {
             return null;
         }
@@ -205,7 +286,7 @@ public class GreeterService implements GreeterApiServer {
         if(pets == null || pets.isEmpty()) {
             throw new IllegalArgumentException("no pets given");
         }
-        Object inserted = db.transaction(new Db.Work() {
+        Object inserted = inTransaction(new Db.Work() {
             public Object run(Db conn) throws Exception {
                 int count = 0;
                 for(int iter = 0 ; iter < pets.size() ; iter++) {
@@ -240,7 +321,13 @@ public class GreeterService implements GreeterApiServer {
 
     public String deletePet(String authorization, long id) throws Exception {
         requireCaller(authorization);
-        int changed = db.execute("DELETE FROM pet WHERE id = ?", new Object[]{new Long(id)});
+        final long target = id;
+        int changed = ((Integer) withConnection(new Db.Work() {
+            public Object run(Db db) throws Exception {
+                return new Integer(db.execute("DELETE FROM pet WHERE id = ?",
+                        new Object[]{new Long(target)}));
+            }
+        })).intValue();
         return changed > 0 ? "deleted" : "not found";
     }
 

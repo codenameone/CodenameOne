@@ -49,18 +49,22 @@ public class PetServer {
         int workers = envInt("CN1_WORKERS", 16);
         String dbPath = System.getenv("CN1_DB_PATH");
 
-        final Db db;
         final DbPool pool;
+        final GreeterService service;
         if(dbPath == null || ":memory:".equals(dbPath)) {
             // An in-memory database cannot be pooled: each connection would get its
             // own. One shared connection is correct here, and SQLite serializes it.
             pool = null;
-            db = Db.open(":memory:");
+            service = new GreeterService(Db.open(":memory:"));
         } else {
+            // The POOL, not one connection out of it. Borrowing one here and sharing
+            // it left the rest of the pool idle and let concurrent requests interleave
+            // on the same connection -- a plain insert could land inside another
+            // request's transaction and be rolled back with it.
             pool = DbPool.open(dbPath, Math.max(2, workers / 4), 5000);
-            db = pool.borrow();
+            service = new GreeterService(pool);
         }
-        final GreeterApiDispatcher dispatcher = new GreeterApiDispatcher(new GreeterService(db));
+        final GreeterApiDispatcher dispatcher = new GreeterApiDispatcher(service);
 
         // Static files are served from CN1_STATIC_ROOT when it is set. They are
         // tried only AFTER the API, so a file can never shadow a route.
