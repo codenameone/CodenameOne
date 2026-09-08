@@ -90,6 +90,8 @@
         <module>svg-transcoder</module>
         <module>lottie-transcoder</module>
         <module>sqlite-jdbc</module>
+        <!-- The backend runtime, after sqlite-jdbc because it depends on it. -->
+        <module>backend</module>
         <module>javase</module>
         <module>javase-svg</module>
         <!-- Depends on javase (JavaSEPort/CN1Bootstrap for CEF rasterization),
