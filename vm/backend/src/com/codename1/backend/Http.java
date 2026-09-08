@@ -149,7 +149,137 @@ public final class Http {
         int bodyStart = headerEnd + 4;
         byte[] bodyBytes = new byte[all.length - bodyStart];
         System.arraycopy(all, bodyStart, bodyBytes, 0, bodyBytes.length);
-        return new Response(status, names, values, bodyBytes);
+        return new Response(status, names, values, decodeBody(bodyBytes, names, values));
+    }
+
+    /**
+     * Strips whatever Transfer-Encoding the peer applied, which is usually none.
+     *
+     * Reading to EOF is not the same as reading the body: `Connection: close` ends
+     * the message but does not remove chunk framing, so a server that answers
+     * chunked hands back size lines and terminators mixed into the payload. The
+     * Lambda Runtime API sends Content-Length today, which is the reason to handle
+     * this rather than a reason not to -- nothing here fails until the day it does.
+     *
+     * A coding this client cannot undo is an error rather than a pass-through. The
+     * one outcome worth ruling out is returning framed bytes as though they were
+     * the body, because the handler then parses garbage and blames its own input.
+     */
+    private static byte[] decodeBody(byte[] body, List names, List values) throws IOException {
+        String encoding = joinedHeader(names, values, "Transfer-Encoding");
+        if(encoding == null) {
+            return body;
+        }
+        String[] codings = split(encoding, ",");
+        boolean chunked = false;
+        for(int iter = 0 ; iter < codings.length ; iter++) {
+            String coding = codings[iter].trim();
+            if(coding.length() == 0 || coding.equalsIgnoreCase("identity")) {
+                continue;
+            }
+            // Case folding a protocol token with toLowerCase() is locale sensitive and
+            // wrong on a Turkish device; equalsIgnoreCase compares character by
+            // character and is not.
+            if(coding.equalsIgnoreCase("chunked") && iter == codings.length - 1) {
+                chunked = true;
+                continue;
+            }
+            throw new IOException("Unsupported Transfer-Encoding: " + encoding);
+        }
+        return chunked ? dechunk(body) : body;
+    }
+
+    /**
+     * Every value sent under one header name, joined the way a single line would
+     * have read. A field may legally arrive split across repeated lines.
+     */
+    private static String joinedHeader(List names, List values, String name) {
+        StringBuilder joined = null;
+        for(int iter = 0 ; iter < names.size() ; iter++) {
+            if(((String)names.get(iter)).equalsIgnoreCase(name)) {
+                if(joined == null) {
+                    joined = new StringBuilder();
+                } else {
+                    joined.append(',');
+                }
+                joined.append((String)values.get(iter));
+            }
+        }
+        return joined == null ? null : joined.toString();
+    }
+
+    /** Reassembles a chunked body, dropping the framing and any trailer section. */
+    private static byte[] dechunk(byte[] data) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int pos = 0;
+        while(true) {
+            int eol = indexOfCrLf(data, pos);
+            if(eol < 0) {
+                throw new IOException("Truncated chunked response: no chunk size line");
+            }
+            int end = pos;
+            while(end < eol && data[end] != ';') {
+                end++;
+            }
+            int size = parseChunkSize(data, pos, end);
+            pos = eol + 2;
+            if(size == 0) {
+                // Trailers may follow. They are header fields, not body bytes, and
+                // this client has no caller that reads them.
+                return out.toByteArray();
+            }
+            if(size > data.length - pos) {
+                throw new IOException("Truncated chunked response: chunk runs past the body");
+            }
+            out.write(data, pos, size);
+            pos += size;
+            if(pos + 2 > data.length || data[pos] != '\r' || data[pos + 1] != '\n') {
+                throw new IOException("Malformed chunked response: chunk not terminated");
+            }
+            pos += 2;
+        }
+    }
+
+    private static int indexOfCrLf(byte[] data, int from) {
+        for(int iter = from ; iter + 1 < data.length ; iter++) {
+            if(data[iter] == '\r' && data[iter + 1] == '\n') {
+                return iter;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * A chunk size is hexadecimal and unsigned. Parsed by hand because the sizes
+     * this guards against are exactly the ones that overflow a signed parse.
+     */
+    private static int parseChunkSize(byte[] data, int from, int to) throws IOException {
+        int size = 0;
+        int digits = 0;
+        for(int iter = from ; iter < to ; iter++) {
+            int c = data[iter] & 0xff;
+            int digit;
+            if(c >= '0' && c <= '9') {
+                digit = c - '0';
+            } else if(c >= 'a' && c <= 'f') {
+                digit = c - 'a' + 10;
+            } else if(c >= 'A' && c <= 'F') {
+                digit = c - 'A' + 10;
+            } else if((c == ' ' || c == '\t') && digits > 0) {
+                break;
+            } else {
+                throw new IOException("Malformed chunk size");
+            }
+            if(size > (Integer.MAX_VALUE - digit) / 16) {
+                throw new IOException("Chunk size out of range");
+            }
+            size = size * 16 + digit;
+            digits++;
+        }
+        if(digits == 0) {
+            throw new IOException("Malformed chunk size: empty");
+        }
+        return size;
     }
 
     private static int indexOfHeaderEnd(byte[] data) {

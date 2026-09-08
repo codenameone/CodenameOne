@@ -171,6 +171,7 @@ public class BackendPackageMojo extends AbstractMojo {
         unzip(javaApiJar, javaApi, null);
 
         compile(jdk8, javaApi, runtimeSources, classes);
+        requireMainClass(classes);
         translate(jdk8, compilerJar, javaApi, classes, nativeSources, translated);
         File binary = output != null ? output
                 : new File(project.getBuild().getDirectory(), project.getArtifactId());
@@ -182,6 +183,30 @@ public class BackendPackageMojo extends AbstractMojo {
      * Compiles the module's sources and the runtime's against the JavaAPI as the
      * BOOTCLASSPATH. See the class comment for why that matters.
      */
+    /**
+     * Fails here, with the reason, rather than inside the translator.
+     *
+     * The compile below reads .java and only .java, on purpose: recompiling against
+     * the JavaAPI bootclasspath is what turns "this backend uses a class the runtime
+     * does not have" into a compile error instead of a link failure on the device,
+     * and reusing the jar Maven already built would give that up. The cost is that a
+     * main class written in Kotlin -- which `cn1:backend` runs happily, because that
+     * goal is a JVM launch -- never reaches this directory, and the translator's own
+     * complaint about it names neither Kotlin nor the reason. So say it plainly. The
+     * developer guide's "Limits worth knowing" carries the same statement.
+     */
+    private void requireMainClass(File classes) throws MojoFailureException {
+        if (new File(classes, mainClass.replace('.', '/') + ".class").isFile()) {
+            return;
+        }
+        throw new MojoFailureException("The main class " + mainClass + " was not "
+                + "produced by the backend compile. This goal compiles Java sources "
+                + "against the backend class library, so a main class written in "
+                + "Kotlin or generated into the build output is not visible to it "
+                + "yet -- write the entry point in Java, or keep it on the JVM with "
+                + "cn1:backend");
+    }
+
     private void compile(File jdk8, File javaApi, File runtimeSources, File classes)
             throws MojoExecutionException, MojoFailureException {
         List<String> sources = new ArrayList<String>();
@@ -288,10 +313,19 @@ public class BackendPackageMojo extends AbstractMojo {
             throws MojoExecutionException, MojoFailureException {
         String simpleName = mainClass.substring(mainClass.lastIndexOf('.') + 1);
         File sourceDir = new File(translated, "dist/" + simpleName + "-src");
+        // Kept as a loud failure rather than dropped: the parameter names a real
+        // capability, and silently ignoring -Dcn1.backend.target would hand back a
+        // host binary labelled as a cross-compiled one. The script named here lives in
+        // the Codename One repository, not in a generated project, which is why the
+        // message says where it is instead of assuming it is on hand.
         if (target != null && target.length() > 0) {
-            throw new MojoFailureException("Cross-target builds go through "
-                    + "vm/backend/package.sh, which needs the builder images; "
-                    + "cn1.backend.target is not supported from this goal yet");
+            throw new MojoFailureException("cn1.backend.target is not supported from "
+                    + "this goal yet: it builds for the machine it runs on. The "
+                    + "cross-compiled targets (musl-x86_64, musl-arm64, glibc-x86_64, "
+                    + "glibc-arm64) are produced by package.sh in the Codename One "
+                    + "repository, which drives one container image per target; run "
+                    + "this goal inside a container of the target flavour to get the "
+                    + "same artifact here");
         }
         List<String> command = new ArrayList<String>(Arrays.asList(
                 "clang", "-O3", "-w",
