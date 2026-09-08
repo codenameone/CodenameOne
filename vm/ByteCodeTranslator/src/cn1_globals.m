@@ -2772,6 +2772,25 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
     // of memory, and it does NOT disable the emergency drop, which clears at DISCOVERY and
     // never touches the log.
     if(atomic_load_explicit(&cn1SatbDrops, memory_order_relaxed) != cn1RefDropsAtCycleStart) {
+        // RETAIN, do not merely decline to clear. Returning here leaves every discovered
+        // referent unmarked AND its field non-null, so the sweep frees objects that live
+        // References still point at -- which is the dangling read this pass exists to
+        // prevent, produced by the code meant to prevent it.
+        //
+        // This is the second time on this branch that "skip the clear" was mistaken for
+        // "keep the referent alive"; the note on the unrecorded-discovery path says the
+        // same thing. Not clearing a weak field does not retain anything, because nothing
+        // else marks a weak referent -- that is what makes the edge weak.
+        for(long i = 0 ; i < cn1RefDiscoveredTop ; i++) {
+            JAVA_OBJECT r = __atomic_load_n(cn1RefDiscovered[i].referentField, __ATOMIC_RELAXED);
+            if(r != JAVA_NULL && !CN1_IS_TAGGED(r)) {
+                gcMarkObject(threadStateData, r, JAVA_FALSE);
+                marked = JAVA_TRUE;
+            }
+        }
+        if(marked) {
+            gcMarkDrain(threadStateData);
+        }
 #ifdef CN1_GC_CONFORM
         cn1RefPhaseNs += cn1GcNowNs() - __r0;
 #endif
