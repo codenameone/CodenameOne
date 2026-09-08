@@ -3189,18 +3189,6 @@ extern void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, J
 #define CN1_REF_LOAD_BEGIN() cn1SatbBulkBegin()
 #define CN1_REF_LOAD_END()   cn1SatbBulkEnd()
 #endif
-// bibopGcEpoch is DEFINED inside cn1_globals.m's #ifndef CN1_DISABLE_BIBOP block, so
-// naming it unguarded here broke -DCN1_DISABLE_BIBOP outright -- a supported A/B and
-// fallback configuration -- with an undefined _bibopGcEpoch at link time. The epoch is
-// only a filter, and dropping it merely enqueues referents that would have been skipped:
-// more work, never less safety. A value the mark word can never equal keeps the single
-// comparison below rather than branching on the configuration.
-#ifdef CN1_DISABLE_BIBOP
-#define CN1_REF_EPOCH_NOW() (-2)
-#else
-#define CN1_REF_EPOCH_NOW() atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed)
-#endif
-
 #ifdef CN1_GC_CONFORM
 extern _Atomic long cn1RefGets;
 #define CN1_REF_COUNT_GET() atomic_fetch_add_explicit(&cn1RefGets, 1, memory_order_relaxed)
@@ -3211,7 +3199,8 @@ extern _Atomic long cn1RefGets;
     do { CN1_REF_COUNT_GET(); JAVA_OBJECT cn1__r = (refVal); \
          if((active) && cn1__r != JAVA_NULL && !CN1_IS_TAGGED(cn1__r)) { \
              int cn1__m = __atomic_load_n(&cn1__r->__codenameOneGcMark, __ATOMIC_RELAXED); \
-             if(cn1__m != -1 && cn1__m != CN1_REF_EPOCH_NOW()) cn1SatbEnqueue(cn1__r); \
+             int cn1__e = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed); \
+             if(cn1__m != -1 && cn1__m != cn1__e) cn1SatbEnqueue(cn1__r); \
          } } while(0)
 #endif
 

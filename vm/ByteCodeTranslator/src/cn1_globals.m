@@ -4909,6 +4909,16 @@ int mallocWhileSuspended = 0;
 BOOL isAppSuspended = 0;
 #endif
 
+// DEFINED UNCONDITIONALLY, unlike the rest of the BiBOP state below it. It is a plain
+// mirror of currentGcMarkValue for mutator-side reads, and the Reference.get() load
+// barrier consults it on every call -- so leaving it inside the BiBOP guard meant
+// -DCN1_DISABLE_BIBOP failed to link with an undefined _bibopGcEpoch. Hoisting it here is
+// the whole fix, and it removes the configuration-dependent macro the barrier briefly
+// carried instead. With BiBOP disabled nothing advances it, which costs the barrier some
+// extra enqueues and no correctness: the epoch is a filter, and a stale one only ever
+// declines to skip.
+_Atomic int bibopGcEpoch = 1;
+
 #ifndef CN1_DISABLE_BIBOP
 // =========================================================================
 // BiBOP: non-moving segregated-fits page heap + mark-sweep for SMALL non-array
@@ -5067,7 +5077,6 @@ static pthread_once_t  bibopOnce  = PTHREAD_ONCE_INIT;
 // Non-static: also read/written by the inlined bump fast path (cn1_globals.h).
 _Atomic long bibopBytesSinceGc = 0;
 _Atomic long bibopGcTriggerBytes = CN1_BIBOP_GC_TRIGGER_BYTES;
-_Atomic int bibopGcEpoch = 1;
 _Atomic int bibopBypassGeneration[CN1_BIBOP_NUM_CLASSES];
 static long bibopCycleAllocatedBytes = 0;
 // LEGACY bytes charged to the cycle that is starting -- the twin of
