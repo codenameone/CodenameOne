@@ -136,12 +136,20 @@ fi
 # reported violations=0 for exactly that reason. The dangling direction is
 # clearing LESS.
 printf '%-16s ' "self-test3"
-# UNCONDITIONALLY, like every driver above. Reusing a binary left by an earlier build or
-# checkout means a regression in the reference-verifier hook can still produce a green
-# self-test by exercising stale code -- which is the same "a gate that cannot fail" problem
-# this self-test was added to solve, reintroduced in the way the self-test is built.
-./translate-and-build.sh RefPolicy target/bin/RefPolicy-verify -DCN1_GC_VERIFY \
-    > target/bin/RefPolicy-selftest-build.log 2>&1 || true
+# REMOVE FIRST, THEN BUILD, AND CHECK THE STATUS. Three things are needed and only the
+# third is obvious. Rebuilding unconditionally is not enough on its own: translate-and-build
+# replaces its output only after the final compiler run succeeds, so a failed rebuild leaves
+# the PREVIOUS binary in place. Nor is `|| true` harmless: it discards the status, and the
+# -x test below then accepts that stale executable. Either way the self-test runs old code
+# and reports green -- the "gate that cannot fail" problem this self-test exists to prevent,
+# reintroduced in how the self-test is built.
+rm -f ./target/bin/RefPolicy-verify
+if ! ./translate-and-build.sh RefPolicy target/bin/RefPolicy-verify -DCN1_GC_VERIFY \
+        > target/bin/RefPolicy-selftest-build.log 2>&1; then
+    echo "BROKEN -- could not build RefPolicy for the reference self-test"
+    tail -25 target/bin/RefPolicy-selftest-build.log
+    fail=1
+fi
 if [ ! -x ./target/bin/RefPolicy-verify ]; then
     echo "BROKEN -- could not build RefPolicy for the reference self-test"
     fail=1

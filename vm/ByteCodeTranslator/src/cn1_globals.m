@@ -2920,37 +2920,16 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
         // "keep the referent alive"; the note on the unrecorded-discovery path says the
         // same thing. Not clearing a weak field does not retain anything, because nothing
         // else marks a weak referent -- that is what makes the edge weak.
-        // TO A FIXPOINT, for the same reason sub-pass A runs to one: marking a retained
-        // referent traces it, and an object kept alive only that way can itself hold
-        // further references whose mark functions register late. Marking the list once and
-        // draining discovers those AFTER the loop has finished, and the recovery would
-        // return leaving a newly reachable Reference holding an unmarked referent -- the
-        // dangling pointer this recovery exists to avoid, one level deeper.
-        for(;;) {
-            long before = cn1RefDiscoveredTop;
-            JAVA_BOOLEAN markedThisRound = JAVA_FALSE;
-            for(long i = 0 ; i < before ; i++) {
-                JAVA_OBJECT r = __atomic_load_n(cn1RefDiscovered[i].referentField, __ATOMIC_RELAXED);
-                if(r != JAVA_NULL && !CN1_IS_TAGGED(r)) {
-                    gcMarkObject(threadStateData, r, JAVA_FALSE);
-                    markedThisRound = JAVA_TRUE;
-                }
-            }
-            // AND THE EMERGENCY CLEARS. Those referents are gone from their fields
-            // already, so cn1RefDiscovered cannot reach them -- they exist only in the
-            // recovery array. This early return happens before the post-clear recovery
-            // below, so without this they would be retained nowhere and swept under a
-            // getter that had already been handed one.
-            if(cn1RefRecoverEmergency(threadStateData)) {
-                markedThisRound = JAVA_TRUE;
-            }
-            if(markedThisRound) {
-                marked = JAVA_TRUE;
-                gcMarkDrain(threadStateData);
-            }
-            if(cn1RefDiscoveredTop == before) {
-                break;
-            }
+        // THE SAME RETAIN-TO-FIXPOINT the capped path uses, called rather than copied.
+        //
+        // This was a second hand-written copy of that walk, and it drifted exactly where a
+        // copy does: the helper was taught that discovery advances TWO counters -- the
+        // emergency path clears a referent into cn1RefEmergencyCleared without touching
+        // cn1RefDiscoveredTop, because it exists for when that list cannot grow -- and this
+        // copy was left comparing the list length alone. It therefore read "nothing new"
+        // over a freshly written recovery slot and returned without marking what it held.
+        if(cn1GcRetainAllReferences(threadStateData)) {
+            marked = JAVA_TRUE;
         }
 #ifdef CN1_GC_CONFORM
         cn1RefPhaseNs += cn1GcNowNs() - __r0;
