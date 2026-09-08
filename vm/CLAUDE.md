@@ -114,6 +114,47 @@ compare equal.
 `BoxEdge` exists for exactly this and is **proven non-vacuous**: re-widening that guard makes
 it diverge on 115 lines, starting with a Double whose hash silently becomes 0.
 
+### identityHashCode has to fold a tagged word, and only a tagged word
+
+`System.identityHashCode` is a truncation to the low 32 bits. That is right for a heap
+pointer -- `IdentityHashMap`'s indexing is tuned around exactly that distribution, see the
+`IdmProbe` note above -- and wrong for a tagged **Double**, which carries the raw IEEE
+pattern whose distinguishing bits for 1.0, 2.0, 3.0 all live in the HIGH word. Every
+integral double therefore truncated to the same int: measured **1 distinct identity hash
+across 4096 values**, which turns that map's linear probe quadratic. `Long` and `Float`
+shift their payload up and survive a truncation; only `Double` is exposed, because it is the
+only encoding that does not shift.
+
+The fold is applied to tagged values only, and `TagProbe` asserts the spread (4096/4096 with
+it, 1/4096 without). Folding heap pointers too would re-randomise the near-perfect placement
+`IdmProbe` exists to protect.
+
+**This is why the CI witness cannot read tag bits.** `identityHashCode(x) & 7` was how
+`BoxEdge` and `TagProbe` reported which arm they were in; the fold destroys that. Both now
+detect an immediate by its observable consequence -- `valueOf(v) == valueOf(v)` at a value
+outside every `-128..127` cache -- which is a better test anyway, and whose one failure mode
+(a compiler CSEing the two calls) the untagged arm's expected `000000` catches.
+
+### Monitors on tagged values are never reclaimed, and that is accepted
+
+A monitor lives in an address-keyed side table and is removed when its object dies. A tagged
+value never dies, so `synchronized (Float.valueOf(i))` over a loop leaks one entry per
+distinct value. Tagging five more types genuinely widens this -- those used to be heap boxes
+whose monitors *were* reclaimed.
+
+It is still not fixed, and the reasoning is recorded at `monitorEnter` in `nativeMethods.m`:
+the shape was already unbounded for Integer, nothing in this VM reclaims a monitor at
+`monitorExit` so removal would be a new mechanism for every monitor rather than a tagged-only
+patch, and it would be built in the subsystem that already carries the documented three-way
+`monitorEnter` deadlock. The reachable case is refused at BUILD time instead --
+`BytecodeComplianceMojo` rejects `MONITORENTER` on any of the eight primitive wrappers.
+
+That rule always named all eight, but its test only ever exercised Integer. It is
+parameterised across every wrapper now, because a rule proven for one of the types it claims
+to cover is not a rule to lean on. What the mojo does **not** scan is framework and JavaAPI
+code; there is no `synchronized` on a boxed value anywhere in `CodenameOne/src`,
+`vm/JavaAPI/src` or `Ports` today, and adding one would reintroduce this.
+
 ### The gate has to be in CI, and it has to know which arm it ran
 
 `BoxEdge` first lived only in `run-gauntlet.sh` -- and **no workflow runs the gauntlet**, so

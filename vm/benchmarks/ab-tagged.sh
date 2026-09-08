@@ -34,19 +34,39 @@ rounds = int(sys.argv[1])
 ARMS = [0, 1, 2]
 NAMES = {0: "HEAP", 1: "INT", 2: "ALL"}
 
+# ru_maxrss from RUSAGE_CHILDREN is a cumulative HIGH-WATER MARK over every child this
+# process has reaped, not the peak of the one just run -- so measuring it here would let
+# the heaviest arm set a floor under every later arm and every later round. Each sample
+# therefore runs the binary from a FRESH python, whose children are only that one binary.
+# (This is the same correction run-bibop-adaptive.sh already carries.)
+RSS_PROBE = (
+    "import subprocess,resource,sys;"
+    "p=subprocess.run([sys.argv[1]],capture_output=True,text=True);"
+    "sys.stderr.write(str(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss));"
+    "sys.stdout.write(p.stdout);"
+    "sys.exit(p.returncode)"
+)
+
 def run(binpath):
-    before = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
-    p = subprocess.run([binpath], capture_output=True, text=True)
-    after = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+    p = subprocess.run([sys.executable, "-c", RSS_PROBE, binpath],
+                       capture_output=True, text=True)
+    # A benchmark that dies part way still prints the BENCH lines it reached, and comparing
+    # those silently reports a partial result set as a result. Refuse it.
+    if p.returncode != 0:
+        raise SystemExit("%s exited %d; refusing to compare a partial run:\n%s"
+                         % (binpath, p.returncode, p.stdout[-2000:]))
+    rss = int(p.stderr.strip() or 0)
     r, cov = {}, None
     for m in re.finditer(r'BENCH (\w+) rep \d+ ns=(\d+) checksum=(-?\d+)', p.stdout):
         r.setdefault(m.group(1), {"ns": [], "ck": set()})
         r[m.group(1)]["ns"].append(int(m.group(2)))
         r[m.group(1)]["ck"].add(m.group(3))
+    if not r:
+        raise SystemExit("%s produced no BENCH lines" % binpath)
     c = re.search(r'^COVERAGE .*$', p.stdout, re.M)
     if c:
         cov = c.group(0)
-    return r, after, cov
+    return r, rss, cov
 
 best = {a: {} for a in ARMS}
 cks = {a: {} for a in ARMS}
@@ -63,6 +83,9 @@ for rnd in range(rounds):
             cks[a].setdefault(k, set()).update(v["ck"])
     print(f"round {rnd+1}/{rounds}", flush=True)
 
+names_per_arm = {x: set(best[x]) for x in ARMS}
+if len(set(map(frozenset, names_per_arm.values()))) != 1:
+    print("ARMS DISAGREE ON WHICH WORKLOADS RAN: %s" % names_per_arm); sys.exit(1)
 bad = [k for k in best[0] if any(cks[x].get(k) != cks[0].get(k) for x in ARMS)]
 if bad:
     print(f"\nCHECKSUM MISMATCH across arms (correctness bug, not a perf result): {bad}")

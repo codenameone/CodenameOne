@@ -82,10 +82,11 @@ public final class BoxEdge {
     }
 
     /**
-     * Which tag code each boxed type actually got in THIS build, on stderr.
+     * Whether each boxed type's valueOf returns an IMMEDIATE in this build, one digit per
+     * type in the order Integer Long Double Float Character Short.
      *
      * It carries the `[` prefix this tree uses for diagnostics ([GCPROBE], [ALLOC:...]),
-     * because that is what `run-gauntlet.sh` filters out of BOTH sides before comparing --
+     * because that is what run-gauntlet.sh filters out of BOTH sides before comparing --
      * stdout has to stay byte-identical to a host JVM and this line is target-specific by
      * construction. Note stderr is NOT a way out: on the clean target System.err also
      * reaches fd 1, so a stderr diagnostic still lands in the compared stream.
@@ -94,18 +95,33 @@ public final class BoxEdge {
      * on a build where tagging never happened -- that is the point, the two representations
      * must be indistinguishable -- so without a witness saying which arm ran, a green
      * BoxEdge cannot tell "the tagged path is correct" from "the tagged path never
-     * executed". Expect 123456 in a default build and 000000 with -DCN1_DISABLE_TAGGED_INT.
+     * executed". Expect 111111 in a default build and 000000 with -DCN1_DISABLE_TAGGED_INT.
+     *
+     * The test is valueOf(v) == valueOf(v) at a value outside every -128..127 cache, rather
+     * than a read of the pointer bits: identityHashCode folds a tagged word's two halves
+     * now, so the tag code is no longer recoverable from it. If a compiler ever CSEs the two
+     * calls into one this would report 1 unconditionally -- which the untagged arm's
+     * expected 000000 catches, so the two-arm assertion is what keeps the witness honest.
      */
     static void reportTagCodes() {
         StringBuilder sb = new StringBuilder();
-        sb.append(System.identityHashCode(Integer.valueOf(1)) & 7);
-        sb.append(System.identityHashCode(Long.valueOf(1L)) & 7);
-        sb.append(System.identityHashCode(Double.valueOf(1.0)) & 7);
-        sb.append(System.identityHashCode(Float.valueOf(1.0f)) & 7);
-        sb.append(System.identityHashCode(Character.valueOf('a')) & 7);
-        sb.append(System.identityHashCode(Short.valueOf((short) 1)) & 7);
-        System.out.println("[TAGCODES] " + sb);
+        sb.append(Integer.valueOf(IMM_I) == Integer.valueOf(IMM_I) ? 1 : 0);
+        sb.append(Long.valueOf(IMM_J) == Long.valueOf(IMM_J) ? 1 : 0);
+        sb.append(Double.valueOf(IMM_D) == Double.valueOf(IMM_D) ? 1 : 0);
+        sb.append(Float.valueOf(IMM_F) == Float.valueOf(IMM_F) ? 1 : 0);
+        sb.append(Character.valueOf(IMM_C) == Character.valueOf(IMM_C) ? 1 : 0);
+        sb.append(Short.valueOf(IMM_S) == Short.valueOf(IMM_S) ? 1 : 0);
+        System.out.println("[TAGGED] " + sb);
     }
+
+    // Deliberately outside every wrapper cache (-128..127, and 0..127 for Character), so a
+    // true from == means an immediate rather than a shared cache entry.
+    static final int IMM_I = 1000;
+    static final long IMM_J = 1000L;
+    static final double IMM_D = 1.5;
+    static final float IMM_F = 1.5f;
+    static final char IMM_C = (char) 1000;
+    static final short IMM_S = (short) 1000;
 
     /* ---- getClass / instanceof / isInstance, on tagged and heap boxes alike ---- */
     static void classIdentity() {

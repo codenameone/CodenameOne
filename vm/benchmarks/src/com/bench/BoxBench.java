@@ -181,17 +181,25 @@ public final class BoxBench {
     /**
      * How much of the workload's own data the partial encodings can actually represent.
      * Printed, never checksummed: it is a property of the target, not of the computation.
+     *
+     * Detected by its observable consequence -- two separately-obtained boxes of one value
+     * are the same reference only for an immediate -- and NOT by reading tag bits out of
+     * identityHashCode, which folds a tagged word's halves and no longer exposes them. The
+     * values here are all far outside the -128..127 caches, so a shared cache entry cannot
+     * be mistaken for an immediate.
      */
     static void reportCoverage() {
         int longHits = 0, longTotal = 0, dblHits = 0, dblTotal = 0;
         for (int doc = 0; doc < 20000; doc++) {
             for (int i = 0; i < 24; i++) {
                 if ((i & 1) == 0) {
+                    long v = doc * 31L + i;
                     longTotal++;
-                    if ((System.identityHashCode(Long.valueOf(doc * 31L + i)) & 7) == 2) longHits++;
+                    if (Long.valueOf(v) == Long.valueOf(v)) longHits++;
                 } else {
+                    double d = jsonNumber(doc, i);
                     dblTotal++;
-                    if ((System.identityHashCode(Double.valueOf(jsonNumber(doc, i))) & 7) == 3) dblHits++;
+                    if (Double.valueOf(d) == Double.valueOf(d)) dblHits++;
                 }
             }
         }

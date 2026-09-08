@@ -4015,6 +4015,23 @@ JAVA_INT java_lang_System_gcIdleWaitMillis___R_int(CODENAME_ONE_THREAD_STATE) {
 }
 
 JAVA_INT java_lang_System_identityHashCode___java_lang_Object_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+#if CN1_TAGGED_ACTIVE
+    // A tagged immediate has to fold its HIGH half down, which a heap pointer does not.
+    // The Double encoding is the reason: it carries the raw IEEE pattern, so every value
+    // whose mantissa is zero in the low word -- 1.0, 2.0, 3.0, every integral double --
+    // truncates to the same JAVA_INT and lands in one IdentityHashMap bucket, turning its
+    // linear probe quadratic. Long and Float shift their payload up and would survive a
+    // truncation, but they fold too: one rule is cheaper to keep right than four.
+    //
+    // Heap pointers deliberately keep the plain truncation. Their low bits are a
+    // size-class-aligned address, and IdentityHashMap's indexing is tuned around exactly
+    // that distribution (see the IdmProbe note in vm/CLAUDE.md) -- folding them too
+    // re-randomises a near-perfect placement into collisions.
+    if(CN1_IS_TAGGED(__cn1Arg1)) {
+        uintptr_t cn1__w = (uintptr_t)__cn1Arg1;
+        return (JAVA_INT)(cn1__w ^ (cn1__w >> 32));
+    }
+#endif
     return (JAVA_INT)__cn1Arg1;
 }
 

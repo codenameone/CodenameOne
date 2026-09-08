@@ -20,12 +20,21 @@ rounds = int(sys.argv[1])
 ARMS = {"OFF": "target/ab/narrow-off", "ON": "target/ab/narrow-on"}
 
 def run(p):
-    out = subprocess.run([p], capture_output=True, text=True).stdout
+    # A benchmark that dies part way still prints the BENCH lines it reached. Comparing
+    # those reports a partial run as a result, and if both arms die at the same point their
+    # partial checksums even agree -- so the parity check would pass on nothing.
+    proc = subprocess.run([p], capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise SystemExit("%s exited %d; refusing to compare a partial run:\n%s"
+                         % (p, proc.returncode, proc.stdout[-2000:]))
+    out = proc.stdout
     r = {}
     for m in re.finditer(r'BENCH (\w+) rep \d+ ns=(\d+) checksum=(-?\d+)', out):
         r.setdefault(m.group(1), {"ns": [], "ck": set()})
         r[m.group(1)]["ns"].append(int(m.group(2)))
         r[m.group(1)]["ck"].add(m.group(3))
+    if not r:
+        raise SystemExit("%s produced no BENCH lines" % p)
     return r
 
 best = {a: {} for a in ARMS}
@@ -37,6 +46,9 @@ for i in range(rounds):
             cks[a].setdefault(k, set()).update(v["ck"])
     print("round %d/%d" % (i + 1, rounds), flush=True)
 
+if set(best["OFF"]) != set(best["ON"]):
+    print("ARMS DISAGREE ON WHICH WORKLOADS RAN: %s vs %s"
+          % (sorted(best["OFF"]), sorted(best["ON"]))); sys.exit(1)
 bad = [k for k in best["OFF"] if cks["OFF"].get(k) != cks["ON"].get(k)]
 if bad:
     print("CHECKSUM MISMATCH between arms: %s" % bad); sys.exit(1)

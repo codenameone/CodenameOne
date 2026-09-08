@@ -2677,11 +2677,35 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     // wait()/notify() on the value dereferenced nonexistent monitor data.
     // Equal tagged values share one monitor (identical bit pattern), which is
     // the JDK's own -128..127 Integer-cache behavior extended to the whole
-    // tagged range -- legal and deterministic. Monitors created for tagged
-    // values are never reclaimed (there is no object death to trigger removal);
-    // they are bounded by the number of DISTINCT integer values a program ever
-    // synchronizes on, which is negligible in practice. The only header-touching
-    // step, cn1BibopNoteMonitorAttached, skips tagged values internally.
+    // tagged range -- legal and deterministic. The only header-touching step,
+    // cn1BibopNoteMonitorAttached, skips tagged values internally.
+    //
+    // MONITORS ON TAGGED VALUES ARE NEVER RECLAIMED. There is no object death to
+    // trigger removal, so `synchronized (Float.valueOf(i))` over a loop leaves one
+    // side-table entry per distinct value, forever. Now that Long, Double, Float,
+    // Character and Short are tagged too, that reaches five types whose monitors a
+    // heap box did used to get reclaimed -- so this is a real widening, not just a
+    // restatement of the Integer case. Reviewers reasonably ask for lifecycle
+    // tracking; deliberately not done, for three reasons:
+    //
+    //  - The shape is ALREADY unbounded for Integer and always has been. Removal
+    //    would be a new mechanism for every monitor in the VM, not a tagged-only
+    //    patch, because nothing here reclaims a monitor at monitorExit today.
+    //  - This subsystem is where the documented three-way monitorEnter deadlock
+    //    lives (see the first-creation branch below). Adding exit-time removal
+    //    means a waiter can be parked outside the table mutex holding monitor data
+    //    a remover is about to free. That is a correctness risk taken on for a
+    //    leak, which is the wrong trade.
+    //  - The reachable case is already refused at BUILD time.
+    //    BytecodeComplianceMojo rejects MONITORENTER whose receiver is any of the
+    //    eight primitive wrappers, so an application cannot express the loop above
+    //    and still build; BytecodeComplianceMojoTest proves it fires for each type
+    //    rather than for Integer alone.
+    //
+    // What is NOT covered is framework and JavaAPI code, which that mojo does not
+    // scan. There is none today -- no `synchronized` on a boxed value anywhere in
+    // CodenameOne/src, vm/JavaAPI/src or Ports -- and adding one would reintroduce
+    // this. Use a dedicated lock object.
     int err = 0;
     // Double-checked locking for the lazily allocated per-object monitor. The fast-path
     // read MUST be an acquire load and the publishing store (inside the critical section)

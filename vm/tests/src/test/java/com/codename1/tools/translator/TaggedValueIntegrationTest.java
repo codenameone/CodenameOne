@@ -138,11 +138,12 @@ class TaggedValueIntegrationTest {
 
         // The witness. Without it every assertion above is satisfiable by a build in which
         // tagging never happened, which is exactly the failure this gate exists to exclude.
-        assertEquals("123456", witness(tagged),
-                "A default build must tag all six boxed types (Integer/Long/Double/Float/"
-                        + "Character/Short in tag-code order). If this reads 100000 the five types "
-                        + "added after Integer are not on; if it reads 000000 nothing is tagged and "
-                        + "the comparison above proved nothing about the tagged path.");
+        assertEquals("111111", witness(tagged),
+                "A default build must return an immediate from valueOf for all six boxed types "
+                        + "(Integer/Long/Double/Float/Character/Short, in that order). If this reads "
+                        + "100000 the five types added after Integer are not on; if it reads 000000 "
+                        + "nothing is tagged and the comparison above proved nothing about the tagged "
+                        + "path, because the two representations are required to be indistinguishable.");
         assertEquals("000000", witness(untagged),
                 "-DCN1_DISABLE_TAGGED_INT must disable every tagged type, or the arms are not "
                         + "actually being compared");
@@ -159,14 +160,14 @@ class TaggedValueIntegrationTest {
         return sb.toString();
     }
 
-    /** The tag code each boxed type got, as reported by the run itself. */
+    /** Whether each boxed type became an immediate, as reported by the run itself. */
     private static String witness(String output) {
         for (String line : output.split("\n", -1)) {
-            if (line.startsWith("[TAGCODES] ")) {
-                return line.substring("[TAGCODES] ".length()).trim();
+            if (line.startsWith("[TAGGED] ")) {
+                return line.substring("[TAGGED] ".length()).trim();
             }
         }
-        return "<no [TAGCODES] line: the fixture did not run to completion>";
+        return "<no [TAGGED] line: the fixture did not run to completion>";
     }
 
     private static String buildAndRun(Path distDir, String label, String cFlags) throws Exception {
