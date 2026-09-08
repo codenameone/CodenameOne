@@ -778,11 +778,11 @@ To parse a CSV use the https://www.codenameone.com/javadoc/com/codename1/io/CSVP
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava113Snippet.java[tag=io-java-113,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/CsvParsingFigure.java[tag=io-java-113,indent=0]
 ----
 
 .CSV parsing results, notice the escaped parentheses and comma
-image::img/csv-parsing.png[CSV parsing results notice the escaped parentheses and comma,scaledwidth=30%]
+image::img/generated/csv-parsing.png[CSV parsing results notice the escaped parentheses and comma,scaledwidth=30%]
 
 The data contains a two-dimensional array of the CSV content. You can change the delimiter character by using the `CSVParser` constructor that accepts a character.
 

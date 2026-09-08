@@ -340,11 +340,11 @@ https://www.codenameone.com/javadoc/com/codename1/ui/Label.html[Label] represent
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava146Snippet.java[tag=the-components-of-codename-one-java-146,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsLabelTextPositionFigure.java[tag=the-components-of-codename-one-java-146,indent=0]
 ----
 
 .Label positions
-image::img/components-label-text-position.png[Label positions,scaledwidth=20%]
+image::img/generated/components-label-text-position.png[Label positions,scaledwidth=20%]
 
 `Label` allows a single line of text, line breaking is an expensive operation on mobile devices footnote:[String width is the real expensive part here, the complexity of font kerning and the recursion required to reflow text is a big performance hurdle] and so the `Label` class doesn't support it.
 
@@ -622,18 +622,22 @@ Here is a trivial hello world style `Button`:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava030Snippet.java[tag=the-components-of-codename-one-java-030,indent=0]
 ----
 
-.Simple button in the iOS styling, notice iOS doesn't have borders on buttons...
-image::img/components-button.png[Simple button in the iOS styling, notice iOS doesn't have borders on buttons...,scaledwidth=40%]
+The same three buttons under the two modern native themes. A button takes its
+shape, fill and font from the theme, so the platform difference costs no code:
+
+.The same buttons under iOS Modern (left) and Android Material (right)
+image:img/generated/components-button-ios.png[iOS Modern,scaledwidth=45%]
+image:img/generated/components-button-android.png[Android Material,scaledwidth=45%]
 
 Such a button can be styled to look like a link using code like this or by making these settings in the theme and using code such as `btn.setUIID("Hyperlink")`:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava031Snippet.java[tag=the-components-of-codename-one-java-031,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsLinkButtonFigure.java[tag=the-components-of-codename-one-java-031,indent=0]
 ----
 
 .Button styled to look like a link
-image::img/components-link-button.png[Button styled to look like a link,scaledwidth=40%]
+image::img/generated/components-link-button.png[Button styled to look like a link,scaledwidth=40%]
 
 ==== Uppercase buttons
 
@@ -696,11 +700,11 @@ Notice in the sample below that you associate all the radio buttons with a group
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava155Snippet.java[tag=the-components-of-codename-one-java-155,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/CheckBoxFigure.java[tag=the-components-of-codename-one-java-155,indent=0]
 ----
 
 .RadioButton & CheckBox usage
-image::img/components-radiobutton-checkbox.png[RadioButton & CheckBox usage,scaledwidth=20%]
+image::img/generated/components-radiobutton-checkbox.png[RadioButton & CheckBox usage,scaledwidth=20%]
 
 Both of these components can be displayed as toggle buttons (see the toggle button section below), or use the default check mark/filled circle appearance based on the type/OS.
 
@@ -783,11 +787,11 @@ A common source of confusion in the `MultiButton` is the difference between the 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava158Snippet.java[tag=the-components-of-codename-one-java-158,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/MultiButtonFigure.java[tag=the-components-of-codename-one-java-158,indent=0]
 ----
 
 .Multiple usage scenarios for the MultiButton
-image::img/components-multibutton.png[Multiple usage scenarios for the MultiButton,scaledwidth=20%]
+image::img/generated/components-multibutton.png[Multiple usage scenarios for the MultiButton,scaledwidth=20%]
 
 ==== Styling the MultiButton
 
@@ -808,11 +812,11 @@ Unlike the `MultiButton` it uses the `TextArea` internally to break lines seamle
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava159Snippet.java[tag=the-components-of-codename-one-java-159,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsSpanbuttonFigure.java[tag=the-components-of-codename-one-java-159,indent=0]
 ----
 
 .The SpanButton Component
-image::img/components-spanbutton.png[The SpanButton Component,scaledwidth=20%]
+image::img/generated/components-spanbutton.png[The SpanButton Component,scaledwidth=20%]
 
 TIP: `SpanButton` is slower than both `Button` and `MultiButton`. Recommend using it when there is a genuine need for its functionality.
 
@@ -827,11 +831,11 @@ One of the features of label that moved into `SpanLabel` to some extent is the a
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava160Snippet.java[tag=the-components-of-codename-one-java-160,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/SpanLabelFigure.java[tag=the-components-of-codename-one-java-160,indent=0]
 ----
 
 .The SpanLabel Component
-image::img/components-spanlabel.png[The SpanLabel Component,scaledwidth=20%]
+image::img/generated/components-spanlabel.png[The SpanLabel Component,scaledwidth=20%]
 
 TIP: `SpanLabel` is slower than `Label`. Recommend using it when there is a genuine need for its functionality.
 
@@ -1348,11 +1352,11 @@ Here is a trivial sample of using the standard table component:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava068Snippet.java[tag=the-components-of-codename-one-java-068,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTableFigure.java[tag=the-components-of-codename-one-java-068,indent=0]
 ----
 
 .Simple Table usage
-image::img/components-table.png[Simple Table usage,scaledwidth=20%]
+image::img/generated/components-table.png[Simple Table usage,scaledwidth=20%]
 
 NOTE: In the sample above the title area and first column aren't editable. The other two columns are editable.
 
@@ -1362,11 +1366,11 @@ For example:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava069Snippet.java[tag=the-components-of-codename-one-java-069,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTableWithSpanningFigure.java[tag=the-components-of-codename-one-java-069,indent=0]
 ----
 
 .Table with spanning & fixed widths to 33%
-image::img/components-table-with-spanning.png[Table with spanning and fixed widths to 33%,scaledwidth=20%]
+image::img/generated/components-table-with-spanning.png[Table with spanning and fixed widths to 33%,scaledwidth=20%]
 
 To customize the table cell behavior you can derive the `Table` to create a "renderer like" widget, but unlike the list this component is "kept" and used as is. This means you can bind listeners to this component and work with it as you would with any other component in Codename One.
 
@@ -1374,11 +1378,11 @@ The example above can be extended to include far more capabilities:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava070Snippet.java[tag=the-components-of-codename-one-java-070,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTablePinstripeFigure.java[tag=the-components-of-codename-one-java-070,indent=0]
 ----
 
 .Table with customize cells using the pinstripe effect
-image::img/components-table-pinstripe.png[Table with customize cells using the pinstripe effect,scaledwidth=20%]
+image::img/generated/components-table-pinstripe.png[Table with customize cells using the pinstripe effect,scaledwidth=20%]
 
 .Picker table cell during edit
 image::img/components-table-pinstripe-edit.png[Picker table cell during edit,scaledwidth=20%]
@@ -1757,11 +1761,11 @@ The code below provides a brief overview of these options:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava191Snippet.java[tag=the-components-of-codename-one-java-191,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsToolbarFigure.java[tag=the-components-of-codename-one-java-191,indent=0]
 ----
 
 .The Toolbar
-image::img/components-toolbar.png[The Toolbar,scaledwidth=25%]
+image::img/generated/components-toolbar.png[The Toolbar,scaledwidth=25%]
 
 
 .The default sidemenu of the Toolbar
@@ -2636,13 +2640,13 @@ The code below adds a simple badge to a chat button:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava140Snippet.java[tag=the-components-of-codename-one-java-140,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/BadgeFloatingButtonFigure.java[tag=the-components-of-codename-one-java-140,indent=0]
 ----
 
 The code above results in this, notice you can type into the text field to change the badge value:
 
 .Badge floating button in action
-image::img/badge-floating-button.png[Badge floating button in action,scaledwidth=20%]
+image::img/generated/badge-floating-button.png[Badge floating button in action,scaledwidth=20%]
 
 === SplitPane
 

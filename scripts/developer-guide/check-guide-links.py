@@ -1049,9 +1049,33 @@ def main() -> int:
         )
         return 1
 
+    # Java sources embed absolute URLs to guide figures -- com.codename1.ui's
+    # package documentation carries 37 of them -- and those URLs are derived from
+    # the file layout, because the site build rsyncs docs/developer-guide/ to
+    # /developer-guide/. Moving or renaming a figure therefore breaks them
+    # silently: nothing else here reads a Java file, and the javadoc renders a
+    # missing image without complaint. It has drifted three times, so it is
+    # checked rather than remembered.
+    figure_url = re.compile(
+        r"codenameone\.com/developer-guide/img/([A-Za-z0-9/._-]+\.(?:png|jpg|gif))"
+    )
+    guide_img = Path("docs/developer-guide/img")
+    dangling = []
+    for source in sorted(Path("CodenameOne/src").rglob("*.java")):
+        text = source.read_text(encoding="utf-8", errors="replace")
+        for relative in figure_url.findall(text):
+            if not (guide_img / relative).is_file():
+                dangling.append(f"{source}: img/{relative}")
+    if dangling:
+        for entry in dangling:
+            print(f"::error::figure URL points at a file that does not ship: {entry}", file=sys.stderr)
+        print(f"\n{len(dangling)} dangling figure URL(s) in Java sources.", file=sys.stderr)
+        return 1
+
     print(
         f"Links: {sum(current.values())} known bad link(s) against {len(known)} known site paths "
-        f"and {len(patterns)} redirect rule(s); none new, none stale."
+        f"and {len(patterns)} redirect rule(s); none new, none stale. "
+        f"Every figure URL embedded in a Java source resolves."
     )
     return 0
 
