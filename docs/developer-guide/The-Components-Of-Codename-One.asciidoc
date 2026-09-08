@@ -203,11 +203,11 @@ By default a `Dialog` uses a platform specific tint color when it's showing for 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsDialogTintFigure.java[tag=the-components-of-codename-one-java-009,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava009Snippet.java[tag=the-components-of-codename-one-java-009,indent=0]
 ----
 
 .Dialog with tinted background
-image::img/generated/components-dialog-tint.png[Dialog with tinted background,scaledwidth=20%]
+image::img/components-dialog-tint.png[Dialog with tinted background,scaledwidth=20%]
 
 The tint color can be manipulated on the parent form, you can set it to any AARRGGBB value to set any color using the `setTintColor` method. Notice that this is invoked on the parent form and not on the `Dialog`!
 
@@ -217,11 +217,11 @@ You can also manipulate this default value globally using the theme constant `ti
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsDialogGreenTintFigure.java[tag=the-components-of-codename-one-java-010,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava010Snippet.java[tag=the-components-of-codename-one-java-010,indent=0]
 ----
 
 .Dialog with green tinted background
-image::img/generated/components-dialog-green-tint.png[Dialog with green tinted background,scaledwidth=20%]
+image::img/components-dialog-green-tint.png[Dialog with green tinted background,scaledwidth=20%]
 
 You can apply Gaussian blur to the background of a dialog to highlight the foreground further and produce an attractive effect. You can use the `setDefaultBlurBackgroundRadius` to apply this globally, you can use the theme constant `dialogBlurRadiusInt` to do the same or you can do this on a per `Dialog` basis using `setBlurBackgroundRadius`.
 
@@ -570,16 +570,16 @@ A picker can work with your existing sample using code like this:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/PixelPerfectTextFieldPickerIosFigure.java[tag=the-components-of-codename-one-java-154,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava154Snippet.java[tag=the-components-of-codename-one-java-154,indent=0]
 ----
 
 This produces the following which looks pretty standard:
 
 .Picker component taking place in iOS
-image::img/generated/pixel-perfect-text-field-picker-ios.png[Picker component taking place in iOS,scaledwidth=30%]
+image::img/pixel-perfect-text-field-picker-ios.png[Picker component taking place in iOS,scaledwidth=30%]
 
 .And in Android
-image::img/generated/pixel-perfect-text-field-picker-android.png[And in Android,scaledwidth=30%]
+image::img/pixel-perfect-text-field-picker-android.png[And in Android,scaledwidth=30%]
 
 The one tiny thing you should notice with the `PickerComponent` is that you don't construct the picker component using `new PickerComponent()`. Instead you use create methods such as `PickerComponent.createDate(new Date())`. The reason for that's that you have many types of pickers and it wouldn't make sense to have one constructor.
 
@@ -1385,13 +1385,13 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/screenshot
 image::img/generated/components-table-pinstripe.png[Table with customize cells using the pinstripe effect,scaledwidth=20%]
 
 .Picker table cell during edit
-image::img/generated/components-table-pinstripe-edit.png[Picker table cell during edit,scaledwidth=20%]
+image::img/components-table-pinstripe-edit.png[Picker table cell during edit,scaledwidth=20%]
 
 To line wrap table cells you can override the `createCell` method and return a https://www.codenameone.com/javadoc/com/codename1/ui/TextArea.html[TextArea] instead of a https://www.codenameone.com/javadoc/com/codename1/ui/TextField.html[TextField] since the `TextArea` defaults to the multi-line behavior this should work seamlessly. For example:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTableMultilinePortraitFigure.java[tag=the-components-of-codename-one-java-071,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava071Snippet.java[tag=the-components-of-codename-one-java-071,indent=0]
 ----
 
 TIP: Notice that you don't need to do anything else as binding to the `TextArea` is built-in to the `Table`.
@@ -1399,10 +1399,10 @@ TIP: Notice that you don't need to do anything else as binding to the `TextArea`
 IMPORTANT: You must set the column width constraint when you want multi-line to work. Otherwise the preferred size of the column might be too wide and the remaining columns might not have space left.
 
 .Multiline table cell in portrait mode
-image::img/generated/components-table-multiline-portrait.png[Multiline table cell in portrait mode,scaledwidth=20%]
+image::img/components-table-multiline-portrait.png[Multiline table cell in portrait mode,scaledwidth=20%]
 
 .Multiline table cell in landscape mode. Notice the cell row count adapts seamlessly
-image::img/generated/components-table-multiline-landscape.png[Multiline table cell in landscape mode. Notice the cell row count adapts seamlessly,scaledwidth=20%]
+image::img/components-table-multiline-landscape.png[Multiline table cell in landscape mode. Notice the cell row count adapts seamlessly,scaledwidth=20%]
 
 ==== Sorting tables
 
@@ -1476,7 +1476,7 @@ image::img/generated/components-sharebutton.png[The share button running on the 
 IMPORTANT: `ShareButton` behaves differently on the device...
 
 .The share button running on the Android device and screenshot sent into twitter
-image::img/generated/components-sharebutton-android.png[The share button running on the Android device and screenshot sent into twitter,scaledwidth=50%]
+image::img/components-sharebutton-android.png[The share button running on the Android device and screenshot sent into twitter,scaledwidth=50%]
 
 
 IMPORTANT: The `ShareButton` features some share service classes to allow plugging in more share services. For example, this functionality is relevant to devices where native sharing isn't supported. This code isn't used on iOS/Android...
@@ -1671,7 +1671,7 @@ TIP: You can simulate pinch to zoom on the simulator by dragging the right butto
 image::img/generated/components-imageviewer.png[ImageViewer as the demo loads with the image from the default icon,scaledwidth=20%]
 
 .ImageViewer zoomed in
-image::img/generated/components-imageviewer-zoomed-in.png[ImageViewer zoomed in,scaledwidth=20%]
+image::img/components-imageviewer-zoomed-in.png[ImageViewer zoomed in,scaledwidth=20%]
 
 You can work with a list of images to produce a swiping effect for the image viewer where you can swipe from one image to the next and also zoom in/out on a specific image:
 
@@ -1769,10 +1769,10 @@ image::img/generated/components-toolbar.png[The Toolbar,scaledwidth=25%]
 
 
 .The default sidemenu of the Toolbar
-image::img/generated/components-toolbar-sidemenu.png[The default sidemenu of the Toolbar,scaledwidth=30%]
+image::img/components-toolbar-sidemenu.png[The default sidemenu of the Toolbar,scaledwidth=30%]
 
 .The overflow menu of the Toolbar
-image::img/generated/components-toolbar-overflow-menu.png[The overflow menu of the Toolbar,scaledwidth=25%]
+image::img/components-toolbar-overflow-menu.png[The overflow menu of the Toolbar,scaledwidth=25%]
 
 You can set a title with a `String` but if you would want the component to be a text field or a multi
 line label you can use `setTitleComponent(Component)` which allows you to install any component into the
@@ -1851,17 +1851,17 @@ The code below shows off an attractive title based on a book by GRRM on top of t
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsToolbarAnimation1Figure.java[tag=the-components-of-codename-one-java-093,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava093Snippet.java[tag=the-components-of-codename-one-java-093,indent=0]
 ----
 
 .The Toolbar starts with the large URLImage fetched from the web
-image::img/generated/components-toolbar-animation-1.png[The Toolbar starts with the large URLImage fetched from the web,scaledwidth=20%]
+image::img/components-toolbar-animation-1.png[The Toolbar starts with the large URLImage fetched from the web,scaledwidth=20%]
 
 .As you scroll down the image fades and the title shrinks in size returning to the default UIID look
-image::img/generated/components-toolbar-animation-2.png[As you scroll down the image fades and the title shrinks in size returning to the default UIID look,scaledwidth=20%]
+image::img/components-toolbar-animation-2.png[As you scroll down the image fades and the title shrinks in size returning to the default UIID look,scaledwidth=20%]
 
 .As scrolling continues the title reaches standard size
-image::img/generated/components-toolbar-animation-3.png[As scrolling continues the title reaches standard size,scaledwidth=20%]
+image::img/components-toolbar-animation-3.png[As scrolling continues the title reaches standard size,scaledwidth=20%]
 
 Most the code above creates the "look" of the application. The key piece of code above is this:
 
@@ -1966,15 +1966,15 @@ The `shouldNavigate` indicates to the native code whether navigation should proc
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsBrowsercomponentCallbackBeforeFigure.java[tag=the-components-of-codename-one-java-098,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava098Snippet.java[tag=the-components-of-codename-one-java-098,indent=0]
 ----
 
 
 .Before the link is clicked for the "shouldNavigate" call
-image::img/generated/components-browsercomponent-callback-before.png[Before the link is clicked for the "shouldNavigate" call,scaledwidth=25%]
+image::img/components-browsercomponent-callback-before.png[Before the link is clicked for the "shouldNavigate" call,scaledwidth=25%]
 
 .After the link is clicked for the "shouldNavigate" call
-image::img/generated/components-browsercomponent-callback-after.png[After the link is clicked for the "shouldNavigate" call,scaledwidth=25%]
+image::img/components-browsercomponent-callback-after.png[After the link is clicked for the "shouldNavigate" call,scaledwidth=25%]
 
 NOTE: The JavaScript Bridge is implemented on top of the `BrowserNavigationCallback`.
 
@@ -2166,11 +2166,11 @@ You can access JavaScript variables from the context by using code like this:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsBrowsercomponentContextFigure.java[tag=the-components-of-codename-one-java-205,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava205Snippet.java[tag=the-components-of-codename-one-java-205,indent=0]
 ----
 
 .The contents were copied from the DOM and placed in the south position of the form
-image::img/generated/components-browsercomponent-context.png[The contents were copied from the DOM and placed in the south position of the form,scaledwidth=20%]
+image::img/components-browsercomponent-context.png[The contents were copied from the DOM and placed in the south position of the form,scaledwidth=20%]
 
 Notice that when you work with numeric values or anything related to the types mentioned above your code must be aware of the typing. For example: in this case the type is `Double` and not `String`:
 
@@ -2293,11 +2293,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/screenshot
 image::img/generated/components-picker.png[The various picker components,scaledwidth=30%]
 
 .The date & time picker on the simulator
-image::img/generated/components-picker-date-time-on-simulator.png[The date & time picker on the simulator,scaledwidth=30%]
+image::img/components-picker-date-time-on-simulator.png[The date & time picker on the simulator,scaledwidth=30%]
 
 
 .The date picker component on the Android device
-image::img/generated/components-picker-date-android.png[The date picker component on the Android device,scaledwidth=15%]
+image::img/components-picker-date-android.png[The date picker component on the Android device,scaledwidth=15%]
 
 .Date & time picker on Android. Notice it didn't use a built-in widget since there is none
 image::img/components-picker-date-time-android.png[Date and time picker on Android. Notice it didn't use a built-in widget since there is none,scaledwidth=20%]

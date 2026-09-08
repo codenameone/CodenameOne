@@ -471,14 +471,14 @@ For example: this is a sample usage of `TextModeLayout`:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/PixelPerfectTextFieldReasonableOnIosFigure.java[tag=basics-java-024,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava024Snippet.java[tag=basics-java-024,indent=0]
 ----
 
 .TextModeLayout on iOS
-image::img/generated/pixel-perfect-text-field-reasonable-on-ios.png[TextModeLayout on iOS,scaledwidth=30%]
+image::img/pixel-perfect-text-field-reasonable-on-ios.png[TextModeLayout on iOS,scaledwidth=30%]
 
 .TextModeLayout on Android with the same code
-image::img/generated/pixel-perfect-text-field-android-codenameone-font.png[TextModeLayout on Android with the same code,scaledwidth=30%]
+image::img/pixel-perfect-text-field-android-codenameone-font.png[TextModeLayout on Android with the same code,scaledwidth=30%]
 
 As you can see from the code and samples above there is a lot going on under the hood. On Android you want a layout that's like `TableLayout` so you can "`pack`" the entries. On iOS you want a box layout Y kind of layout but you also want the labels/text to align...
 

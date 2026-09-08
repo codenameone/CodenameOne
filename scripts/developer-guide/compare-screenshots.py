@@ -120,6 +120,27 @@ def main() -> int:
             )
         return 1
 
+    # Two generated figures with identical bytes mean one of them is showing
+    # something its caption does not describe. It happens whenever a sample only
+    # SETS UP an interaction -- attaches a dialog to a button, defines a callback,
+    # names a menu -- and the harness photographs the launch form instead of the
+    # state the caption promises. Nothing else catches it: each such figure
+    # renders successfully, is not blank, and matches its own committed copy, so
+    # both the render and the comparison pass while the guide shows the reader
+    # the same picture twice under two different captions.
+    by_bytes: dict[bytes, list[str]] = {}
+    for image in produced:
+        by_bytes.setdefault(image.read_bytes(), []).append(image.name)
+    clashes = [names for names in by_bytes.values() if len(names) > 1]
+    if clashes:
+        for names in clashes:
+            print(
+                "::error::these figures are byte-identical, so at least one does not "
+                "show what its caption says: " + ", ".join(sorted(names)),
+                file=sys.stderr,
+            )
+        return 1
+
     failures = 0
     tolerated = 0
     for image in produced:
