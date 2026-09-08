@@ -84,6 +84,25 @@ def run(arm, ceiling_mb):
     if p.returncode != 0:
         raise SystemExit(f"{arm}@{ceiling_mb}MB: exited {p.returncode}; sample rejected\n"
                          + p.stdout[-2000:] + "\n" + p.stderr[-2000:])
+    # THE WEAK PHASE MUST ACTUALLY HAVE CLEARED SOMETHING (or, for noweak, nothing).
+    # The checksums are deliberately independent of retention policy, so they agree just
+    # as well when an arm silently keeps every referent strong -- which is precisely the
+    # regression that matters here, and it would have published medians and exited 0.
+    # Asserting on the numerator being nonzero rather than on 256/256: clearing is
+    # best-effort by construction, since a stale word on the conservative native stack
+    # pins a referent, and the observed figure is 255/256.
+    m = re.search(r'^WEAK_DEAD_CLEARED=(\d+)/(\d+)', p.stdout, re.M)
+    if not m:
+        raise SystemExit(f"{arm}@{ceiling_mb}MB: no WEAK_DEAD_CLEARED in output")
+    got = int(m.group(1))
+    if arm == "noweak" and got != 0:
+        raise SystemExit(f"noweak@{ceiling_mb}MB: cleared {got} referent(s); with "
+                         f"CN1_NO_WEAK_REFS the referent is a strong edge and nothing "
+                         f"may be cleared -- the arm is not the control it is read as")
+    if arm != "noweak" and got == 0:
+        raise SystemExit(f"{arm}@{ceiling_mb}MB: cleared 0 of {m.group(2)} dead "
+                         f"referents; this arm never exercised clearing, so its hit rate "
+                         f"and footprint describe no policy")
     out = p.stdout
     def num(key, default=None):
         m = re.search(rf'^{key}=(-?\d+)', out, re.M)

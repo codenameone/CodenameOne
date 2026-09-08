@@ -2315,6 +2315,19 @@ struct CN1RefEntry {
     // becomes visible AFTER the store can still keep the object alive. Clearing is a
     // destructive publish and cannot be taken back; marking the old value can.
     JAVA_OBJECT clearedReferent;
+    // WHICH PASS cleared it, which is what makes clearedReferent recoverable without being
+    // permanently retained. cn1GcRecoverAfterDrop owes a recovery mark to clears made by an
+    // EARLIER pass -- those predate the drop that brought it here -- and owes nothing to the
+    // ones it has just decided itself, after its own quiesce. Without this the two are
+    // indistinguishable, so it marked every referent it had condemned one statement earlier
+    // and reclaimed nothing, which is the blanket retention it exists to avoid.
+    //
+    // A drop count cannot answer this. The getter this record defends against fails its
+    // enqueue BEFORE the clear stamps anything, so the count at the clear already includes
+    // it and "the count moved since" is false exactly when the recovery is owed. Pass
+    // identity is exact, and the drop count is then used once, for the whole pass, after a
+    // quiesce that bounds the window.
+    long clearedAtPass;
 };
 static struct CN1RefEntry* cn1RefDiscovered = 0;
 static long cn1RefDiscoveredTop = 0;
@@ -2363,6 +2376,11 @@ static int cn1RefAgedCycle = 0;
 // pass runs, some referent handed to a mutator never reached the log and the pass has no
 // sound basis for clearing anything.
 static long cn1RefDropsAtCycleStart = 0;
+// Identifies one run of the reference machinery, so an entry can say which pass cleared it.
+// Bumped once per cn1GcProcessReferences, which is also the only caller of
+// cn1GcRecoverAfterDrop -- the two never clear within the same pass, because the recovery
+// path returns before the main loop. Read on the collector only.
+static long cn1RefPass = 0;
 
 // Referents cleared by the EMERGENCY path, which runs at discovery and has no list entry
 // to remember them in -- that path exists precisely because the list could not grow.
@@ -2505,6 +2523,12 @@ static JAVA_BOOLEAN cn1GcRecoverAfterDrop(CODENAME_ONE_THREAD_STATE) {
     // of zero means every getter that overlapped has finished and published. That is what
     // makes the stamp readable as evidence rather than as a race.
     cn1SatbBulkQuiesce();
+    // READ AFTER THE QUIESCE, DELIBERATELY. Every getter in flight when this pass began has
+    // now finished and published, so a drop counted from here belongs to one that started
+    // afterwards -- the only kind that can still be holding a referent this pass is about
+    // to condemn. Taken before the quiesce it would also count drops the quiesce has
+    // already accounted for, and the post-loop check would retain on every one of them.
+    long dropsAfterQuiesce = atomic_load_explicit(&cn1SatbDrops, memory_order_relaxed);
     for(;;) {
         long before = cn1RefDiscoveredTop;
         long beforeEmergency = atomic_load_explicit(&cn1RefEmergencyTop, memory_order_relaxed);
@@ -2553,6 +2577,7 @@ static JAVA_BOOLEAN cn1GcRecoverAfterDrop(CODENAME_ONE_THREAD_STATE) {
                     // common case, where no further drop occurs, the clear stands and the
                     // reclaim happens.
                     e->clearedReferent = r;
+                    e->clearedAtPass = cn1RefPass;
                     __atomic_store_n(e->referentField, JAVA_NULL, __ATOMIC_RELAXED);
 #ifdef CN1_GC_CONFORM
                     atomic_fetch_add_explicit(&cn1RefCleared, 1, memory_order_relaxed);
@@ -2562,8 +2587,21 @@ static JAVA_BOOLEAN cn1GcRecoverAfterDrop(CODENAME_ONE_THREAD_STATE) {
                     round = JAVA_TRUE;
                 }
             }
+            // RECOVER ONLY WHAT A LATER DROP CALLED INTO QUESTION. This block used to
+            // mark every clearedReferent unconditionally, and the clear above records one
+            // -- so an entry condemned by this very loop was marked one statement later,
+            // its object survived the sweep, and the emergency reclaimed nothing. That is
+            // the blanket retention this function exists to avoid: the caller reaches it
+            // precisely when soft-referenced data is what is exhausting memory, and
+            // retaining it there is what lets the allocator spin.
+            //
+            // The clear is still recoverable, which is the point of recording it. A drop
+            // that becomes visible after the store means a getter may have taken the
+            // referent without the collector seeing the keep-alive, and the comparison
+            // below is what tells that apart from the drop that brought us here -- which
+            // the clear decision above already accounted for, after its own quiesce.
             JAVA_OBJECT was = e->clearedReferent;
-            if(was != JAVA_NULL && !CN1_IS_TAGGED(was)) {
+            if(was != JAVA_NULL && !CN1_IS_TAGGED(was) && e->clearedAtPass != cn1RefPass) {
                 gcMarkObject(threadStateData, was, JAVA_FALSE);
                 round = JAVA_TRUE;
             }
@@ -2577,9 +2615,22 @@ static JAVA_BOOLEAN cn1GcRecoverAfterDrop(CODENAME_ONE_THREAD_STATE) {
         }
         if(cn1RefDiscoveredTop == before
            && atomic_load_explicit(&cn1RefEmergencyTop, memory_order_relaxed) == beforeEmergency) {
-            return marked;
+            break;
         }
     }
+    // THE SAME RE-CHECK THE MAIN PASS MAKES, and for the same reason. The fixpoint above
+    // exits on the discovery counters, which a drop does not move, so without this a drop
+    // raised while this pass was clearing would be recovered only if some LATER call
+    // happened to run -- and the final cn1GcProcessReferences of a cycle has none after
+    // it. The clears stand either way; what this restores is the mark, so the sweep cannot
+    // free an object a getter took while the log was dropping.
+    cn1SatbBulkQuiesce();
+    if(atomic_load_explicit(&cn1SatbDrops, memory_order_relaxed) != dropsAfterQuiesce) {
+        if(cn1GcRetainAllReferences(threadStateData)) {
+            marked = JAVA_TRUE;
+        }
+    }
+    return marked;
 }
 
 // Recompute the soft budget and drop the previous cycle's discoveries. Called from
@@ -2786,6 +2837,7 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
         e->touchAgeField = touchAgeField;
         e->strength = strength;
         e->clearedReferent = JAVA_NULL;
+        e->clearedAtPass = 0;
         recorded = JAVA_TRUE;
     }
     pthread_mutex_unlock(&cn1RefMutex);
@@ -2940,6 +2992,10 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
         return JAVA_FALSE;
     }
     JAVA_BOOLEAN marked = JAVA_FALSE;
+    // AFTER the early exit, so the identity only advances on a pass that can actually
+    // clear something. Bumping it above would be harmless but would let the counter run in
+    // applications that hold no Reference at all, which is the case the exit exists for.
+    cn1RefPass++;
 #ifdef CN1_GC_CONFORM
     long long __r0 = cn1GcNowNs();
     cn1RefPasses++;
@@ -3148,6 +3204,7 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
         // inside it returns a referent that is still valid, because the same read arms the
         // barrier and resurrects the object for this cycle.
         e->clearedReferent = r;
+        e->clearedAtPass = cn1RefPass;
         __atomic_store_n(e->referentField, JAVA_NULL, __ATOMIC_RELAXED);
 #ifdef CN1_GC_CONFORM
         atomic_fetch_add_explicit(&cn1RefCleared, 1, memory_order_relaxed);

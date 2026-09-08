@@ -307,6 +307,19 @@ public class RefPolicy {
         }
         System.out.println("ALIAS_SPLIT=" + split + "/" + groups);
         System.out.println("ALIAS_CLEARED_GROUPS=" + clearedGroups + "/" + groups);
+        // A SPLIT IS A FAILURE, not a statistic: all cleared and all kept both satisfy the
+        // contract, one alias cleared beside a live one does not.
+        //
+        // Do NOT read this exit as making the phase a detector for that violation. The
+        // class javadoc records the measurement: with -DCN1_REF_NO_ALIAS_ATOMICITY putting
+        // the single-loop bug back, three runs still reported ALIAS_SPLIT=0/256, because
+        // catching it needs a get() inside a window microseconds wide. The assertion
+        // costs nothing and is right to make, but a green run remains evidence of nothing,
+        // and the ablation above is what actually has to be re-run to test this path.
+        if (split != 0) {
+            System.out.println("FAIL: " + split + " group(s) left partly cleared");
+            System.exit(2);
+        }
     }
 
     // ---------------------------------------------------------------- phase B
