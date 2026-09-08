@@ -1989,6 +1989,10 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-08T00:01:09+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/7c2081802a30/edit",
+        "syndicated_at": "2026-09-08T19:01:31+00:00"
       }
     }
   }
