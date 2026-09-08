@@ -59,7 +59,11 @@ public final class GuideFigures {
             new FigureVariant(new ComponentsLabelTextPositionFigure(), FigureDevice.ANDROID, false, "components-label-text-position.png"),
             new FigureVariant(new ComponentsLinkButtonFigure(), FigureDevice.ANDROID, false, "components-link-button.png"),
             new FigureVariant(new ComponentsToggleButtonsFigure(), FigureDevice.ANDROID, false, "components-toggle-buttons.png"),
-            new FigureVariant(new ComponentsToggleButtonsComponentGroupFigure(), FigureDevice.ANDROID, false, "components-toggle-buttons-component-group.png"),
+            // ComponentGroup does nothing unless the theme sets ComponentGroupBool, which
+            // the iOS theme does by default and Android Material does not -- rendered on
+            // Android the sample comes out as plain separate rows, which is the opposite
+            // of what the section demonstrates.
+            new FigureVariant(new ComponentsToggleButtonsComponentGroupFigure(), FigureDevice.IOS, false, "components-toggle-buttons-component-group.png"),
             new FigureVariant(new ComponentsSpanbuttonFigure(), FigureDevice.ANDROID, false, "components-spanbutton.png"),
             new FigureVariant(new ComponentsTableFigure(), FigureDevice.ANDROID, false, "components-table.png"),
             new FigureVariant(new ComponentsTableWithSpanningFigure(), FigureDevice.ANDROID, false, "components-table-with-spanning.png"),
