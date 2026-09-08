@@ -113,10 +113,19 @@ final class SeeAlsoRef {
             return new SeeAlsoRef("", "", List.of(), false, "");
         }
 
-        // A markdown link is already a link; leave it whole for the caller to pass
-        // through rather than trying to read a Java reference out of it.
+        // A markdown link is already a link; leave it whole for the caller to
+        // render as markdown rather than trying to read a Java reference out of
+        // it. Nine entries take this shape, all of them pointing at MDN.
         if (text.startsWith("[") || text.contains("](")) {
             return new SeeAlsoRef("", "", List.of(), false, text);
+        }
+
+        // Six entries wrap the reference in backticks, which is how a reference
+        // is written everywhere else in a markdown comment. Without stripping
+        // them the leading backtick is not a Java identifier start, so the whole
+        // entry falls through to prose and renders with the backticks showing.
+        if (text.length() > 1 && text.startsWith("`") && text.endsWith("`")) {
+            text = text.substring(1, text.length() - 1).strip();
         }
 
         int split = referenceEnd(text);

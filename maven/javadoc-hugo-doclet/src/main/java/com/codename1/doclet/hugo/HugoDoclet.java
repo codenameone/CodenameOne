@@ -591,10 +591,13 @@ public final class HugoDoclet implements Doclet {
             SeeAlsoRef reference = SeeAlsoRef.parse(entry);
             Map<String, Object> row = new LinkedHashMap<>();
             if (!reference.isReference()) {
-                // Prose, or a markdown link that is already a link.
+                // Prose, or a markdown link that is already a link. Flagged so the
+                // template renders it as markdown; wrapping it in a code span
+                // showed the nine MDN links as literal [text](url).
                 row.put("label", reference.label());
                 row.put("url", null);
                 row.put("note", "");
+                row.put("prose", true);
                 out.add(row);
                 continue;
             }
@@ -610,6 +613,7 @@ public final class HugoDoclet implements Doclet {
             }
             row.put("label", reference.text());
             row.put("url", url);
+            row.put("prose", false);
             // The trailing sentence a third of these carry, kept beside the link
             // rather than folded into it: it is prose about the reference, not
             // part of the name being linked.

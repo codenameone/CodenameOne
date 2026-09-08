@@ -50,6 +50,7 @@
       {{- range $j.seeAlso }}
       <li>
         {{- if .url }}<a href="{{ .url }}"><code>{{ .label }}</code></a>
+        {{- else if .prose }}{{ $.RenderString .label }}
         {{- else }}<code>{{ .label }}</code>{{ end }}
         {{- with .note }} <span class="cn1-api-see__note">{{ . }}</span>{{ end -}}
       </li>

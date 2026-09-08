@@ -99,6 +99,20 @@ class SeeAlsoRefTest {
     }
 
     @Test
+    void stripsBackticksAroundAReference() {
+        // Six entries wrap the reference the way a markdown comment writes any
+        // other code span. The backtick is not a Java identifier start, so
+        // without stripping it the entry falls through to prose.
+        SeeAlsoRef type = SeeAlsoRef.parse("`com.codename1.router.PopGuard`");
+        assertEquals("com.codename1.router.PopGuard", type.type());
+        assertTrue(type.isReference());
+
+        SeeAlsoRef member = SeeAlsoRef.parse("`#translate(int, int)`");
+        assertEquals("translate", member.member());
+        assertEquals(List.of("int", "int"), member.parameters());
+    }
+
+    @Test
     void distinguishesAnEmptyListFromNoList() {
         // "#clear()" names the no-argument overload; "#clear" names the method.
         assertTrue(SeeAlsoRef.parse("#clear()").hasParameterList());
