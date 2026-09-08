@@ -20,13 +20,13 @@
   <text x="110" y="248" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">nothing else set the body</text>
   <rect x="192" y="214" width="140" height="44" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
   <text x="262" y="232" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#222222">readErrorCodeHeaders</text>
-  <text x="262" y="248" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">any status outside 200-300</text>
+  <text x="262" y="248" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">outside 200-300, no cached 304</text>
   <rect x="344" y="214" width="140" height="44" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
   <text x="414" y="232" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#222222">handleErrorResponseCode</text>
   <text x="414" y="248" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">and not redirected away</text>
   <rect x="496" y="214" width="140" height="44" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1"/>
   <text x="566" y="232" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#222222">readHeaders</text>
-  <text x="566" y="248" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">read requests only</text>
+  <text x="566" y="248" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">once the branches above pass</text>
   <rect x="648" y="214" width="140" height="44" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1"/>
   <text x="718" y="232" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#222222">readResponse</text>
   <text x="718" y="248" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">read requests only</text>
@@ -41,7 +41,7 @@
   <text x="410" y="282" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">A followed redirect leaves after the second box: 301, 302, 303 and 307 with followRedirects on retry the new</text>
   <text x="410" y="296" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">URL without reaching the hook or either read. Everything else outside 200-300 continues into the hook, so a</text>
   <text x="410" y="310" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">3xx with followRedirects off, or a 308, arrives there. An override may read error headers in the second box,</text>
-  <text x="410" y="324" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">but nothing after the hook sees the parsed body. setReadRequest(false) skips both reads entirely.</text>
+  <text x="410" y="324" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">but nothing after the hook sees the parsed body. setReadRequest(false) skips readResponse, not readHeaders.</text>
   <text x="410" y="348" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">A throw stops the request at whichever stage threw; the stages before it have already run. The request's</text>
   <text x="410" y="362" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">exception handlers take over from there, unless failSilently is set, which logs and runs no handler at all.</text>
   <text x="410" y="384" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">The queue is sorted by priority, so a request can overtake one already waiting. Nothing here is on the EDT.</text>
