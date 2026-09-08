@@ -7,6 +7,9 @@
       <span aria-hidden="true">/</span>
       <a href="{{ $j.package.url }}">{{ $j.package.name }}</a>
     </nav>
+    {{- with $j.annotations }}
+    <p class="cn1-api__annotations">{{ range . }}<code>{{ . }}</code> {{ end }}</p>
+    {{- end }}
     <h1 class="post-title cn1-api__title">
       {{- /* abstract and final are API-significant: whether a type can be
              instantiated or subclassed was not shown anywhere. */ -}}
@@ -46,6 +49,12 @@
 
   {{- with $j.description }}
   <div class="cn1-api-prose cn1-api__description">{{ $.RenderString . }}</div>
+  {{- end }}
+
+  {{- range $j.warnings }}
+  <div class="cn1-api-warning" role="note">
+    <strong>Warning.</strong> {{ $.RenderString . }}
+  </div>
   {{- end }}
 
   {{- if $j.seeAlso }}

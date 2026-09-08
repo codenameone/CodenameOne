@@ -450,3 +450,30 @@ a.cn1-api-type,
   color: var(--cn1-muted);
   font-size: 0.9em;
 }
+
+/* The repository's own @warning tag: a safety note, not prose. */
+.cn1-api-warning {
+  border-left: 3px solid var(--cn1-accent);
+  background: var(--cn1-surface-soft);
+  border-radius: 0 var(--cn1-radius-sm) var(--cn1-radius-sm) 0;
+  padding: 0.6rem 0.9rem;
+  margin: 0.6rem 0;
+  font-size: 0.92rem;
+}
+
+.cn1-api-warning p {
+  margin: 0;
+  display: inline;
+}
+
+.cn1-api__annotations {
+  font-family: var(--cn1-mono);
+  font-size: 0.82rem;
+  color: var(--cn1-muted);
+  margin: 0 0 0.2rem;
+}
+
+.cn1-api__annotations code {
+  background: none;
+  padding: 0;
+}

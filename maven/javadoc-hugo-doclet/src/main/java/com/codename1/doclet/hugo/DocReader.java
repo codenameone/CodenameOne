@@ -261,16 +261,63 @@ final class DocReader {
                     }
                 }
                 case HIDDEN -> doc.hidden = true;
-                // @author, @version and @since carry no weight on a published page.
-                // @since is dropped on purpose; see the class comment.
-                default -> {
-                    if (tag instanceof BlockTagTree named && "hidden".equals(named.getTagName())) {
-                        doc.hidden = true;
-                    }
-                }
+                default -> readUnknownTag(tag, path, doc);
             }
         }
     }
+
+    /**
+     * Tags with no case of their own.
+     *
+     * <p>Silence here loses content. This repository writes its own
+     * {@code @warning} tag -- 22 of them, and they are safety notes:
+     * {@code Body.createFixture} warns that the function is locked during
+     * callbacks -- and every one was being dropped on the floor because the tag
+     * is not one javadoc knows.
+     *
+     * <p>Only the tags that are deliberately not published are discarded, and
+     * they are named. Anything else keeps its text.
+     */
+    private void readUnknownTag(DocTree tag, DocTreePath path, ElementDoc doc) {
+        if (!(tag instanceof BlockTagTree named)) {
+            return;
+        }
+        String name = named.getTagName();
+        if ("hidden".equals(name)) {
+            doc.hidden = true;
+            return;
+        }
+        // @author and @version are not published, and @since is rejected in
+        // sources outright by scripts/check-since-tags.sh: a guessed version is
+        // worse than none. Serial tags describe a mechanism this toolkit has no
+        // support for at all.
+        if (DROPPED_TAGS.contains(name)) {
+            return;
+        }
+
+        String body = tag.toString();
+        int at = body.indexOf('@');
+        if (at >= 0) {
+            int space = body.indexOf(' ', at);
+            body = space < 0 ? "" : body.substring(space + 1);
+        }
+        body = body.strip();
+        if (body.isEmpty()) {
+            return;
+        }
+        if ("warning".equals(name)) {
+            doc.warnings.add(body);
+        } else {
+            // Keep it visible rather than lose it; the page has no better place.
+            doc.description = doc.description.isBlank()
+                    ? body
+                    : doc.description + "\n\n" + body;
+        }
+    }
+
+    /** Tags this generator publishes nowhere, on purpose. */
+    private static final java.util.Set<String> DROPPED_TAGS = java.util.Set.of(
+            "author", "version", "since", "serial", "serialData", "serialField");
 
     /**
      * Fills in whatever the element left to its parent.

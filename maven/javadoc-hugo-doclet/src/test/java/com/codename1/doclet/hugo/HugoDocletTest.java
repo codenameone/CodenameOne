@@ -80,6 +80,10 @@ class HugoDocletTest {
                 "///",
                 "/// - Other",
                 "public class Sample<T> {",
+                "    /// Adds a fixture.",
+                "    ///",
+                "    /// @warning This function is locked during callbacks.",
+                "    public void addFixture() {}",
                 "    /// A constant",
                 "    public static final int LIMIT = 7;",
                 "    /// Builds one",
@@ -212,6 +216,27 @@ class HugoDocletTest {
                 "public class UsesShared {}",
                 ""), StandardCharsets.UTF_8);
 
+        Files.writeString(sources.resolve("Holder.java"), String.join("\n",
+                "package p;",
+                "/// Holds one value.",
+                "public class Holder<T> {}",
+                ""), StandardCharsets.UTF_8);
+        // The middle class must itself be generic, which is what makes the
+        // substitution something that can be lost: HashMap<K, V> extends
+        // AbstractMap<K, V>, and asking the ELEMENT for its superclass answers
+        // with K and V rather than the arguments bound one level down. A middle
+        // class that spelled its parent concretely would pass either way.
+        Files.writeString(sources.resolve("Middle.java"), String.join("\n",
+                "package p;",
+                "/// Passes its argument straight up.",
+                "public class Middle<T> extends Holder<T> {}",
+                ""), StandardCharsets.UTF_8);
+        Files.writeString(sources.resolve("Ints.java"), String.join("\n",
+                "package p;",
+                "/// Binds the argument, two levels below where it is declared.",
+                "public class Ints extends Middle<Integer> {}",
+                ""), StandardCharsets.UTF_8);
+
         Files.writeString(sources.resolve("Listener.java"), String.join("\n",
                 "package p;",
                 "/// An interface, which inherits nothing from Object.",
@@ -244,7 +269,8 @@ class HugoDocletTest {
                     sources.resolve("Sample.java"), sources.resolve("Other.java"),
                     sources.resolve("Child.java"),
                     sources.resolve("Shared.java"), sources.resolve("UsesShared.java"),
-                    sources.resolve("Listener.java"),
+                    sources.resolve("Listener.java"), sources.resolve("Holder.java"),
+                    sources.resolve("Middle.java"), sources.resolve("Ints.java"),
                     other.resolve("Shared.java"), other.resolve("UsesShared.java"));
             boolean ok = tool.getTask(null, files, null, HugoDoclet.class,
                     List.of("-d", content.toString(),
@@ -477,6 +503,25 @@ class HugoDocletTest {
         String page = page("Sample.md");
         assertTrue(page.contains("the value type"), "the type parameter's text is kept");
         assertTrue(page.contains("\"<V>\""), "under its own name");
+    }
+
+    @Test
+    void keepsTheRepositorysOwnWarningTag() throws IOException {
+        // @warning is not a tag javadoc knows, and every one of the 22 in the
+        // framework was being dropped on the floor -- they are safety notes.
+        assertTrue(page("Sample.md").contains("locked during callbacks"),
+                "an unknown block tag must not be discarded silently");
+    }
+
+    @Test
+    void substitutesGenericsAllTheWayUpTheChain() throws IOException {
+        // com.codename1.io.Properties extends HashMap<String, String> and its
+        // ancestry read AbstractMap<K, V>, naming variables that mean nothing
+        // there. Asking the element for its superclass loses the substitution.
+        String page = page("Ints.md");
+        assertTrue(page.contains("Holder<Integer>"),
+                "the concrete argument survives one level up: " + page);
+        assertFalse(page.contains("Holder<T>"), "not the declaration's own variable");
     }
 
     @Test

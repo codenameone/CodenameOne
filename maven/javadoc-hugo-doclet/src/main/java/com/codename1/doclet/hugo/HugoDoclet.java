@@ -275,6 +275,10 @@ public final class HugoDoclet implements Doclet {
         api.put("qualified", type.getQualifiedName().toString());
         api.put("simple", Refs.nestedDisplayName(type));
         api.put("modifiers", TypeNames.modifiers(type));
+        // @Target and @Retention define how an annotation may be used at all, and
+        // AppIntent published neither. Only annotations that ask to be documented
+        // are shown, which is the rule javadoc follows.
+        api.put("annotations", documentedAnnotations(type));
         api.put("typeParameters", typeNames.typeParameters(type.getTypeParameters()));
 
         PackageElement pkg = Refs.packageOf(type);
@@ -289,6 +293,7 @@ public final class HugoDoclet implements Doclet {
         api.put("deprecated", doc.deprecated);
         api.put("deprecatedText", doc.deprecatedText);
         api.put("description", doc.description);
+        api.put("warnings", List.copyOf(doc.warnings));
         api.put("seeAlso", seeAlsoRefs(doc, type));
         // Type parameter documentation has nowhere to sit in the declaration
         // string, so it was being read and then dropped. Exactly one tag in the
@@ -421,6 +426,37 @@ public final class HugoDoclet implements Doclet {
         return out;
     }
 
+    /** The declaration's annotations that carry {@code @Documented}. */
+    private List<String> documentedAnnotations(TypeElement type) {
+        List<String> out = new ArrayList<>();
+        for (javax.lang.model.element.AnnotationMirror mirror : type.getAnnotationMirrors()) {
+            Element annotation = mirror.getAnnotationType().asElement();
+            if (!(annotation instanceof TypeElement declared)) {
+                continue;
+            }
+            String name = declared.getQualifiedName().toString();
+            // Deprecation already has a banner of its own on the page.
+            if (name.equals("java.lang.Deprecated") || !isDocumented(declared)) {
+                continue;
+            }
+            // javadoc writes @Retention(CLASS); the mirror's toString is fully
+            // qualified, which buries the name it is worth showing.
+            out.add(mirror.toString().replace("@" + name, "@" + declared.getSimpleName()));
+        }
+        return out;
+    }
+
+    private static boolean isDocumented(TypeElement annotation) {
+        for (javax.lang.model.element.AnnotationMirror mirror : annotation.getAnnotationMirrors()) {
+            Element element = mirror.getAnnotationType().asElement();
+            if (element instanceof TypeElement declared
+                    && declared.getQualifiedName().contentEquals("java.lang.annotation.Documented")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private String kindOf(TypeElement type) {
         return switch (type.getKind()) {
             case INTERFACE -> "interface";
@@ -443,10 +479,27 @@ public final class HugoDoclet implements Doclet {
                 break;
             }
             chain.add(typeNames.reference(current));
-            current = element.getSuperclass();
+            // Step through the mirror rather than the declaration. Asking the
+            // element for its superclass answers with the type variables as
+            // declared, so the substitution is lost one level up and everything
+            // above it: com.codename1.io.Properties extends HashMap<String,
+            // String>, and its ancestry read AbstractMap<K, V>, naming variables
+            // that mean nothing there.
+            current = superclassOf(current);
         }
         java.util.Collections.reverse(chain);
         return chain;
+    }
+
+    /** The superclass of a parameterized type, with its arguments substituted in. */
+    private TypeMirror superclassOf(TypeMirror type) {
+        for (TypeMirror supertype : types.directSupertypes(type)) {
+            if (supertype instanceof DeclaredType declared
+                    && declared.asElement().getKind() != ElementKind.INTERFACE) {
+                return supertype;
+            }
+        }
+        return null;
     }
 
     private List<Map<String, Object>> interfacesOf(TypeElement type) {
@@ -585,6 +638,7 @@ public final class HugoDoclet implements Doclet {
         // no page, so resolving its references against that type produced links
         // into a file the generator deliberately never writes.
         row.put("seeAlso", seeAlsoRefs(doc, owner));
+        row.put("warnings", List.copyOf(doc.warnings));
         return row;
     }
 

@@ -32,6 +32,8 @@ final class ElementDoc {
     final List<MarkdownSections.NamedText> parameters = new ArrayList<>();
     final List<MarkdownSections.NamedText> exceptions = new ArrayList<>();
     final List<String> seeAlso = new ArrayList<>();
+    /** Bodies of {@code @warning}, the repository's own safety-note tag. */
+    final List<String> warnings = new ArrayList<>();
     String returns;
     boolean deprecated;
     String deprecatedText = "";
@@ -39,7 +41,7 @@ final class ElementDoc {
 
     boolean isEmpty() {
         return description.isBlank() && parameters.isEmpty() && exceptions.isEmpty()
-                && seeAlso.isEmpty() && returns == null && !deprecated;
+                && seeAlso.isEmpty() && warnings.isEmpty() && returns == null && !deprecated;
     }
 
     /** Adds a parameter unless one of that name is already documented. */

@@ -47,6 +47,17 @@ class TypeNamesTest {
     }
 
     @Test
+    void doesNotEndTheSummaryAtAnAbbreviation() {
+        // AdError.CODE_INVALID_REQUEST was cut at the "g." of "e.g.", leaving the
+        // summary ending mid-parenthesis in the package table and in search.
+        assertEquals("Error code used when the request was rejected as invalid (e.g. a bad ad unit id).",
+                TypeNames.summary(
+                        "Error code used when the request was rejected as invalid (e.g. a bad ad unit id)."));
+        assertEquals("Use the other one, i.e. the new API.",
+                TypeNames.summary("Use the other one, i.e. the new API. More prose."));
+    }
+
+    @Test
     void stopsAtABlankLineSoAListDoesNotBecomeATableCell() {
         assertEquals("Intro", TypeNames.summary("Intro\n\n- one\n- two"));
     }

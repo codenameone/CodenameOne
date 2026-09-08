@@ -25,6 +25,7 @@ package com.codename1.doclet.hugo;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.Modifier;
@@ -163,6 +164,41 @@ final class TypeNames {
         return Character.isHighSurrogate(text.charAt(limit - 1)) ? limit - 1 : limit;
     }
 
+    /**
+     * Whether the full stop at this index belongs to an abbreviation.
+     *
+     * <p>"(e.g. a bad ad unit id)" is one sentence, and AdError's constants were
+     * being cut at the "g." -- leaving the summary ending mid-parenthesis in the
+     * package table and in search.
+     */
+    private static boolean isAbbreviation(String text, int dot) {
+        int start = dot;
+        while (start > 0 && !Character.isWhitespace(text.charAt(start - 1))) {
+            start--;
+        }
+        String word = text.substring(start, dot).toLowerCase(Locale.ROOT);
+        // "e.g", "i.e" and friends, plus any single letter: the "e." of "e.g."
+        // is itself a full stop followed by a space in some house styles.
+        return word.length() <= 1 || ABBREVIATIONS.contains(word);
+    }
+
+    private static final java.util.Set<String> ABBREVIATIONS = java.util.Set.of(
+            "e.g", "i.e", "etc", "cf", "vs", "approx", "resp", "al", "fig", "no");
+
+    /** Whether every parenthesis opened before this point has been closed. */
+    private static boolean parenthesesBalanced(String text, int end) {
+        int depth = 0;
+        for (int i = 0; i < end; i++) {
+            char c = text.charAt(i);
+            if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+            }
+        }
+        return depth <= 0;
+    }
+
     /** Whether cutting here would leave a code span open. */
     private static boolean unbalancedCodeSpan(String text, int cut) {
         int ticks = 0;
@@ -202,7 +238,8 @@ final class TypeNames {
                 inCode = !inCode;
                 continue;
             }
-            if (!inCode && c == '.' && Character.isWhitespace(text.charAt(i + 1))) {
+            if (!inCode && c == '.' && Character.isWhitespace(text.charAt(i + 1))
+                    && !isAbbreviation(text, i) && parenthesesBalanced(text, i + 1)) {
                 return text.substring(0, i + 1);
             }
         }

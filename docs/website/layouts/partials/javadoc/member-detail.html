@@ -21,6 +21,12 @@
   <div class="cn1-api-prose">{{ $page.RenderString . }}</div>
   {{- end }}
 
+  {{- range $m.warnings }}
+  <div class="cn1-api-warning" role="note">
+    <strong>Warning.</strong> {{ $page.RenderString . }}
+  </div>
+  {{- end }}
+
   {{- if $m.parameters }}
   {{- $documented := false }}
   {{- range $m.parameters }}{{ if .doc }}{{ $documented = true }}{{ end }}{{ end }}
