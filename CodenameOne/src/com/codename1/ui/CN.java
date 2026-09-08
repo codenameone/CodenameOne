@@ -596,6 +596,37 @@ public class CN extends CN1Constants {
         Display.INSTANCE.exitApplication();
     }
 
+    /// Exits the application and removes it from the platform's list of recent tasks, so the
+    /// user cannot bring it back by picking it out of the task switcher. This maps to Android's
+    /// `Activity.finishAndRemoveTask()`; platforms that expose no equivalent (iOS, the desktop
+    /// ports and the simulator among them) fall back to `#exitApplication()`, which is why the
+    /// call is always safe to make. Use `#isExitAndClearTaskSupported()` when the behavior
+    /// matters enough to branch on.
+    ///
+    /// #### See also
+    ///
+    /// - `#exitApplication()`
+    ///
+    /// - `#isExitAndClearTaskSupported()`
+    public static void exitAndClearTask() {
+        Display.INSTANCE.exitAndClearTask();
+    }
+
+    /// Indicates whether this platform can remove the application from its list of recent tasks
+    /// on exit. When this returns false `#exitAndClearTask()` is still legal, it just behaves
+    /// exactly like `#exitApplication()`.
+    ///
+    /// #### Returns
+    ///
+    /// true if the task can be cleared, false if the call degrades to a plain exit
+    ///
+    /// #### See also
+    ///
+    /// - `#exitAndClearTask()`
+    public static boolean isExitAndClearTaskSupported() {
+        return Display.INSTANCE.isExitAndClearTaskSupported();
+    }
+
     /// Returns the property from the underlying platform deployment or the default
     /// value if no deployment values are supported. This is equivalent to the
     /// getAppProperty from the jad file.

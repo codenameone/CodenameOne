@@ -5055,6 +5055,33 @@ public abstract class CodenameOneImplementation {
         exitApplication();
     }
 
+    /// Exits the application and removes it from the platform's list of recent tasks, so the
+    /// user cannot resume it by picking it out of the task switcher. Platforms that expose no
+    /// such concept fall back to a plain `#exitApplication()`.
+    public void exitApplicationAndClearTask() {
+        exitApplication();
+    }
+
+    /// Exits the application and removes it from the platform's list of recent tasks, invoking
+    /// the exit callback first exactly as `#exit()` does.
+    public void exitAndClearTask() {
+        if (onExit != null) {
+            onExit.run();
+        }
+        exitApplicationAndClearTask();
+    }
+
+    /// Indicates whether this platform can remove the application from its list of recent tasks
+    /// on exit. When this returns false `#exitAndClearTask()` still works, it just behaves
+    /// identically to `#exit()`.
+    ///
+    /// #### Returns
+    ///
+    /// true if the task can be cleared, false if the call degrades to a plain exit
+    public boolean isExitAndClearTaskSupported() {
+        return false;
+    }
+
     /// Returns the property from the underlying platform deployment or the default
     /// value if no deployment values are supported. This is equivalent to the
     /// getAppProperty from the jad file.
