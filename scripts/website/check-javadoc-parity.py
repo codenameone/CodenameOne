@@ -21,10 +21,88 @@ Usage:
 
 from __future__ import annotations
 
+import collections
 import pathlib
 import re
 import sys
+import urllib.parse
 from html.parser import HTMLParser
+
+class _LinkCollector(HTMLParser):
+    """Collects ids and internal API hrefs from one page."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.ids: set[str] = set()
+        self.hrefs: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = dict(attrs)
+        identifier = values.get("id")
+        if identifier:
+            self.ids.add(identifier)
+        href = values.get("href")
+        if tag == "a" and href and href.startswith("/javadoc/"):
+            self.hrefs.append(href)
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.handle_starttag(tag, attrs)
+
+
+def check_internal_links(hugo: pathlib.Path) -> int:
+    """Every /javadoc/ link on the site must land on a page and an id that exist.
+
+    Separate from the parity comparison, and worth its own pass: the generator
+    mints these addresses itself rather than copying them, so it can invent one
+    that resolves to nothing while still reproducing every address javadoc
+    publishes. Both defects this caught were of that shape -- a member promoted
+    off a package private supertype linking into the page that supertype would
+    have had, and a constructor fragment mangled by markdown because "<init>"
+    reads as a delimiter inside a link destination.
+    """
+    pages = {p.relative_to(hugo).as_posix() for p in hugo.rglob("*.html")}
+    parsed: dict[str, _LinkCollector] = {}
+    for path in hugo.rglob("*.html"):
+        collector = _LinkCollector()
+        collector.feed(path.read_text(errors="replace"))
+        collector.close()
+        parsed[path.relative_to(hugo).as_posix()] = collector
+
+    missing_pages: collections.Counter = collections.Counter()
+    missing_anchors: collections.Counter = collections.Counter()
+    checked = 0
+    for collector in parsed.values():
+        for href in collector.hrefs:
+            path_part, _, fragment = href.partition("#")
+            target = path_part[len("/javadoc/"):] or "index.html"
+            if target.endswith("/"):
+                target += "index.html"
+            if target not in pages:
+                missing_pages[target] += 1
+                continue
+            if not fragment:
+                continue
+            checked += 1
+            # A fragment is compared after percent decoding, which is why
+            # encoding one is safe in the first place.
+            if urllib.parse.unquote(fragment) not in parsed[target].ids:
+                missing_anchors[f"{target}#{urllib.parse.unquote(fragment)}"] += 1
+
+    total = sum(missing_pages.values()) + sum(missing_anchors.values())
+    print(f"internal links checked: {checked} fragment link(s) across {len(pages)} page(s)")
+    if not total:
+        print("OK: every internal API link resolves")
+        return 0
+    if missing_pages:
+        print(f"{sum(missing_pages.values())} link(s) to a page that does not exist:")
+        for target, count in missing_pages.most_common(15):
+            print(f"  {count:5d}  /javadoc/{target}")
+    if missing_anchors:
+        print(f"{sum(missing_anchors.values())} link(s) to an id that does not exist:")
+        for target, count in missing_anchors.most_common(15):
+            print(f"  {count:5d}  /javadoc/{target}")
+    return 1
+
 
 class _IdCollector(HTMLParser):
     """Collects every element's id attribute.
@@ -206,7 +284,9 @@ def main(argv: list[str]) -> int:
         print(f"FAILED: {len(missing_pages)} missing page(s), {missing_anchors} missing fragment(s)")
         return 1
     print("OK: every published API address is answered by the site")
-    return 0
+
+    print()
+    return check_internal_links(hugo)
 
 
 if __name__ == "__main__":

@@ -134,7 +134,7 @@ final class CommentRenderer {
             out.append(text);
             return;
         }
-        out.append('[').append(text).append("](").append(url).append(')');
+        out.append('[').append(text).append("](").append(markdownUrl(url)).append(')');
     }
 
     /** The URL a reference points at, or null when it resolves to nothing we publish. */
@@ -184,6 +184,24 @@ final class CommentRenderer {
             return simpleType;
         }
         return simpleType.isEmpty() ? member : simpleType + "." + member;
+    }
+
+    /**
+     * Makes a URL safe to sit in a markdown link destination.
+     *
+     * <p>A constructor's fragment is {@code #<init>(...)}, and markdown reads
+     * angle brackets in a destination as a delimiter of its own, so
+     * {@code [x](/p/T.html#<init>(int))} comes out mangled -- the one link on the
+     * site that pointed at a constructor from inside a comment arrived as
+     * {@code &amp;lt;init&gt;}. Percent encoding them is transparent to the
+     * browser, which decodes a fragment before matching it against an id.
+     *
+     * <p>Parentheses are deliberately left alone: they are balanced in every
+     * signature javadoc emits, and CommonMark allows balanced parentheses in a
+     * destination.
+     */
+    private static String markdownUrl(String url) {
+        return url.replace("<", "%3C").replace(">", "%3E").replace(" ", "%20");
     }
 
     /** Escapes the characters markdown would otherwise treat as syntax. */

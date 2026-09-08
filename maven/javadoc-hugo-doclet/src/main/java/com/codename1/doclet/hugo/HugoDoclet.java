@@ -200,6 +200,30 @@ public final class HugoDoclet implements Doclet {
     }
 
     /**
+     * The same question asked straight off the comment's block tags.
+     *
+     * <p>{@link #urlOf} cannot go through {@link DocReader}: reading an element
+     * renders its comment, rendering resolves the links in it, and resolving a
+     * link calls back here. Two elements referring to each other is enough to
+     * recurse until the stack ends, and the whole generation dies with a
+     * StackOverflowError rather than a message anyone could act on. This reads
+     * the tags and renders nothing.
+     */
+    private boolean isHiddenByTag(Element element) {
+        com.sun.source.doctree.DocCommentTree comment =
+                environment.getDocTrees().getDocCommentTree(element);
+        if (comment == null) {
+            return false;
+        }
+        for (com.sun.source.doctree.DocTree tag : comment.getBlockTags()) {
+            if (tag.getKind() == com.sun.source.doctree.DocTree.Kind.HIDDEN) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Whether an element is part of the published API.
      *
      * <p>The generator runs javadoc with {@code -protected}, so javadoc has already
@@ -225,6 +249,14 @@ public final class HugoDoclet implements Doclet {
         }
         TypeElement owner = Refs.enclosingType(target);
         if (owner == null || !documented.containsKey(owner.getQualifiedName().toString())) {
+            return null;
+        }
+        // A reference can resolve to a member the page does not render, and a
+        // link to an anchor that was never written is a link that goes nowhere.
+        // The generator runs javadoc with -protected, so a {@link #position}
+        // landing on a private field -- com.codename1.maps.MarkerOptions has one
+        // beside a public method of the same name -- produced exactly that.
+        if (!isVisible(target) || isHiddenByTag(target)) {
             return null;
         }
         List<String> anchors = refs.anchors(target);
