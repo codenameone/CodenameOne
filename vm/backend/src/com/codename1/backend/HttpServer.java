@@ -2912,8 +2912,12 @@ public final class HttpServer {
                 // whatever the handler added -- and a handler cannot make up for it,
                 // because "date" is refused as server-owned. Caches were left without
                 // the timestamp they compute freshness and age from.
-                extra.add("date");
-                extra.add(currentHttpDate());
+                // ONE entry, and a complete line: Http2.headerLines() treats every
+                // element as "name: value" and the native parser drops anything
+                // without a colon. Added as two elements this produced two lines it
+                // ignored, so the header was still absent and nothing failed -- no
+                // test asserted it, which is why the first attempt looked right.
+                extra.add("date: " + currentHttpDate());
                 if(response.extraHeaders != null) {
                     java.util.Iterator it = response.extraHeaders.keySet().iterator();
                     while(it.hasNext()) {

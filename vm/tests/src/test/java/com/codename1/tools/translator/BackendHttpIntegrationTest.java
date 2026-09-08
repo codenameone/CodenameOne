@@ -804,6 +804,13 @@ class BackendHttpIntegrationTest {
                     assertTrue(payload.length > 0, "an empty HEADERS payload is not a response");
                     assertEquals((byte) 0x88, payload[0],
                             "expected an indexed :status 200 as the first header");
+                    // RFC 9110 6.6.1 wants Date on every response, and the HTTP/1
+                    // writer sends it. This asserts the h2 path does too: a first
+                    // attempt added the name and the value as separate entries,
+                    // which Http2.headerLines() turned into two colonless lines the
+                    // native parser dropped, and nothing here noticed.
+                    assertTrue(hpackNameIndices(payload).contains(Integer.valueOf(33)),
+                            "the HEADERS block carries no date (static name index 33)");
                 } else if (type == 0) {
                     sawData = true;
                     data = new String(payload, StandardCharsets.UTF_8);
@@ -828,6 +835,92 @@ class BackendHttpIntegrationTest {
     }
 
     /** An HTTP/2 frame: 3-byte length, type, flags, 4-byte stream id, payload. */
+    /**
+     * The HPACK static name indices used by a HEADERS block.
+     *
+     * Walks the field representations rather than searching for a byte, because a
+     * Huffman-encoded value can contain any byte it likes. Only the shapes nghttp2
+     * emits for a response are handled; anything else ends the walk.
+     */
+    private static java.util.Set<Integer> hpackNameIndices(byte[] block) {
+        java.util.Set<Integer> names = new java.util.HashSet<Integer>();
+        int at = 0;
+        while (at < block.length) {
+            int b = block[at] & 0xff;
+            int prefixBits;
+            boolean hasValue;
+            if ((b & 0x80) != 0) {
+                prefixBits = 7;                 // indexed field: name AND value
+                hasValue = false;
+            } else if ((b & 0xC0) == 0x40) {
+                prefixBits = 6;                 // literal, incremental indexing
+                hasValue = true;
+            } else if ((b & 0xE0) == 0x20) {
+                prefixBits = 5;                 // dynamic table size update
+                hasValue = false;
+            } else {
+                prefixBits = 4;                 // literal, without / never indexed
+                hasValue = true;
+            }
+            int[] cursor = { at };
+            int index = hpackInteger(block, cursor, prefixBits);
+            if (index < 0) {
+                break;
+            }
+            names.add(Integer.valueOf(index));
+            at = cursor[0];
+            if (index == 0) {
+                at = hpackSkipString(block, at);    // the name is spelled out
+                if (at < 0) {
+                    break;
+                }
+            }
+            if (hasValue) {
+                at = hpackSkipString(block, at);
+                if (at < 0) {
+                    break;
+                }
+            }
+        }
+        return names;
+    }
+
+    /** RFC 7541 5.1, with the cursor left just past the integer. */
+    private static int hpackInteger(byte[] block, int[] cursor, int prefixBits) {
+        int at = cursor[0];
+        if (at >= block.length) {
+            return -1;
+        }
+        int mask = (1 << prefixBits) - 1;
+        int value = block[at++] & mask;
+        if (value == mask) {
+            int shift = 0;
+            for (;;) {
+                if (at >= block.length) {
+                    return -1;
+                }
+                int next = block[at++] & 0xff;
+                value += (next & 0x7f) << shift;
+                shift += 7;
+                if ((next & 0x80) == 0) {
+                    break;
+                }
+            }
+        }
+        cursor[0] = at;
+        return value;
+    }
+
+    /** Skips a length-prefixed (possibly Huffman) string, or -1 if it runs out. */
+    private static int hpackSkipString(byte[] block, int at) {
+        int[] cursor = { at };
+        int length = hpackInteger(block, cursor, 7);
+        if (length < 0 || cursor[0] + length > block.length) {
+            return -1;
+        }
+        return cursor[0] + length;
+    }
+
     private static byte[] frame(int type, int flags, int streamId, byte[] payload) {
         byte[] out = new byte[9 + payload.length];
         out[0] = (byte) ((payload.length >>> 16) & 0xff);

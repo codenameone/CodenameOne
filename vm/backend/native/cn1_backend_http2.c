@@ -413,6 +413,29 @@ static int cn1H2OnStreamClose(nghttp2_session* session, int32_t streamId,
         /* Reset before it completed: drop it rather than leak the stream state. */
         cn1H2Unlink(&s->open, r);
         cn1H2FreeRequest(r);
+    } else {
+        /* Not open, so it may be COMPLETE and waiting for Java to take it. Looking
+           only at the open list left a cancelled request queued: serveHttp2() then
+           ran its handler and tried to respond on a stream nghttp2 had already
+           closed, and that failure reached the outer catch and dropped the whole
+           connection -- resetting every other stream multiplexed on it. Not
+           s->current, which Java is reading right now; nextRequest frees that one
+           when it moves on. */
+        CN1H2Request* ready = s->readyHead;
+        while(ready != NULL && ready->streamId != streamId) {
+            ready = ready->next;
+        }
+        if(ready != NULL) {
+            cn1H2Unlink(&s->readyHead, ready);
+            /* cn1H2Unlink does not know about the tail, and this may have BEEN the
+               tail. The list is bounded by the concurrency setting, so finding the
+               new one is cheaper than a second link to keep in step. */
+            s->readyTail = s->readyHead;
+            while(s->readyTail != NULL && s->readyTail->next != NULL) {
+                s->readyTail = s->readyTail->next;
+            }
+            cn1H2FreeRequest(ready);
+        }
     }
     /* A response whose body nghttp2 never read to EOF -- the peer reset the stream,
        or the body limit above reset it -- would otherwise sit on the list until the
