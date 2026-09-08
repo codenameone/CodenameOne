@@ -35,8 +35,10 @@ Codename One includes helper methods in the https://www.codenameone.com/javadoc/
 
 The two methods that coordinate work with the EDT pull in opposite directions,
 and the difference is easiest to see against the cycle itself. `callSerially`
-moves a `Runnable` onto the EDT; `invokeAndBlock` moves one off it, onto a
-pooled thread, so don't touch the UI from inside that one:
+moves a `Runnable` onto the EDT. `invokeAndBlock` moves one the other way:
+called on the EDT it hands the `Runnable` to a pooled thread, and called off
+the EDT it simply runs it on the calling thread. Either way that `Runnable`
+isn't on the EDT, so don't touch the UI from inside it:
 
 .The EDT's cycle, and where callSerially and invokeAndBlock enter it
 image::img/edt-loop-and-blocking.svg[The EDT cycle and how callSerially and invokeAndBlock hand work to it,scaledwidth=85%]
