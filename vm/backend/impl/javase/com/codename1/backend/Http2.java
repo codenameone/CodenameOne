@@ -108,6 +108,16 @@ public final class Http2 {
         return null;
     }
 
+    /**
+     * As {@link #respond}, with the body read from a descriptor rather than the heap.
+     * Unsupported here for the same reason the rest of this class is: the local run
+     * does not terminate TLS, so it never speaks HTTP/2.
+     */
+    public void respondFile(int streamId, int status, String contentType, List extraHeaders,
+            int fd, long offset, long length) throws IOException {
+        throw new IOException(UNSUPPORTED);
+    }
+
     public void respond(int streamId, int status, String contentType, List extraHeaders,
             byte[] body) throws IOException {
         throw new IOException(UNSUPPORTED);

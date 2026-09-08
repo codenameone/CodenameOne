@@ -2418,8 +2418,7 @@ public final class HttpServer {
                     System.err.println("handler failed: " + err);
                     response = Response.text(500, "internal error");
                 }
-                byte[] body = responseBodyFor(response,
-                        "HEAD".equals(stream.getMethod()));
+                boolean headOnly = "HEAD".equals(stream.getMethod());
                 List extra = new java.util.ArrayList();
                 if(response.extraHeaders != null) {
                     java.util.Iterator it = response.extraHeaders.keySet().iterator();
@@ -2431,7 +2430,19 @@ public final class HttpServer {
                         }
                     }
                 }
-                h2.respond(stream.getId(), response.status, response.contentType, extra, body);
+                if(response.fileFd >= 0 && !headOnly) {
+                    // Streamed frame by frame out of the descriptor. Reading the file
+                    // in first cost its whole size in the heap plus the same again in
+                    // the native copy, so a large enough public file turned one request
+                    // into an OutOfMemoryError -- which the catch above does not catch,
+                    // because it is an Error. The descriptor belongs to the session
+                    // from here, so nothing on this side closes it.
+                    h2.respondFile(stream.getId(), response.status, response.contentType,
+                            extra, response.fileFd, response.fileOffset, response.fileLength);
+                } else {
+                    h2.respond(stream.getId(), response.status, response.contentType, extra,
+                            responseBodyFor(response, headOnly));
+                }
                 requestsServed.incrementAndGet();
             }
             flushHttp2(fd, session, h2);
@@ -2516,6 +2527,9 @@ public final class HttpServer {
             if(headOnly) {
                 return new byte[0];
             }
+            // Reached only when the caller has no streaming path to offer. The HTTP/2
+            // caller does -- see respondFile -- and comes here for HEAD alone, where
+            // the point of this branch is the close below.
             return StaticFiles.readAll(response.fileFd, response.fileOffset, response.fileLength);
         } finally {
             StaticFiles.closeFile(response.fileFd);

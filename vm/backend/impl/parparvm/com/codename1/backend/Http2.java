@@ -148,16 +148,32 @@ public final class Http2 {
      */
     public void respond(int streamId, int status, String contentType, List extraHeaders, byte[] body)
             throws IOException {
-        StringBuilder joined = new StringBuilder();
-        joined.append("content-type: ").append(contentType == null
-                ? "application/octet-stream" : contentType);
-        if(extraHeaders != null) {
-            for(int iter = 0 ; iter < extraHeaders.size() ; iter++) {
-                joined.append('\n').append(String.valueOf(extraHeaders.get(iter)));
-            }
-        }
-        if(respondImpl(session, streamId, String.valueOf(status), joined.toString(), body) != 0) {
+        if(respondImpl(session, streamId, String.valueOf(status),
+                headerLines(contentType, extraHeaders), body) != 0) {
             throw new IOException("Could not submit an HTTP/2 response on stream " + streamId);
+        }
+    }
+
+    /**
+     * Responds with a range of an open file, without reading it into the heap.
+     *
+     * HTTP/2 cannot use sendfile -- the bytes have to become DATA frames -- but that
+     * is not a reason to materialise the whole file first. Reading it in cost the
+     * file's size in Java plus the same again in the native copy, so a large enough
+     * public file turned one request into an OutOfMemoryError, which the handler's
+     * `catch (Exception)` does not catch. The provider reads each frame straight out
+     * of the descriptor instead, so the memory is one frame regardless of size, and
+     * nghttp2's flow control decides the pace.
+     *
+     * The descriptor is owned by the session from here: it is closed when the stream
+     * reaches EOF, when it is reset early, and when the session is torn down.
+     */
+    public void respondFile(int streamId, int status, String contentType, List extraHeaders,
+            int fd, long offset, long length) throws IOException {
+        if(respondFileImpl(session, streamId, String.valueOf(status),
+                headerLines(contentType, extraHeaders), fd, offset, length) != 0) {
+            throw new IOException("Could not submit an HTTP/2 file response on stream "
+                    + streamId);
         }
     }
 
@@ -198,6 +214,21 @@ public final class Http2 {
     private static native String headerNameImpl(long session, int index);
     private static native String headerValueImpl(long session, int index);
     private static native byte[] bodyImpl(long session);
+    /** The header block both response forms send, as "name: value" lines. */
+    private static String headerLines(String contentType, List extraHeaders) {
+        StringBuilder joined = new StringBuilder();
+        joined.append("content-type: ").append(contentType == null
+                ? "application/octet-stream" : contentType);
+        if(extraHeaders != null) {
+            for(int iter = 0 ; iter < extraHeaders.size() ; iter++) {
+                joined.append('\n').append(String.valueOf(extraHeaders.get(iter)));
+            }
+        }
+        return joined.toString();
+    }
+
+    private static native int respondFileImpl(long session, int streamId, String status,
+            String headerLines, int fd, long offset, long length);
     private static native int respondImpl(long session, int streamId, String status,
                                           String headerLines, byte[] body);
     private static native boolean wantsMoreImpl(long session);

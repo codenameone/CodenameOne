@@ -42,6 +42,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <unistd.h>
 #include <nghttp2/nghttp2.h>
 
 #define CN1_H2_MAX_HEADERS 64
@@ -82,7 +84,12 @@ typedef struct CN1H2Request {
  */
 typedef struct CN1H2Body {
     int32_t streamId;
+    /* Exactly one of these carries the body. `data` is a buffer this owns; `fd` is
+       an open descriptor this owns and reads each frame out of, which is how a file
+       is served without its size ever existing in the heap. */
     unsigned char* data;
+    int fd;
+    int64_t fileOffset;
     size_t length;
     size_t offset;
     struct CN1H2Body* next;
@@ -111,6 +118,12 @@ static void cn1H2ReleaseBody(CN1H2Session* s, CN1H2Body* body) {
             break;
         }
         link = &(*link)->next;
+    }
+    if(body->fd >= 0) {
+        /* The descriptor became the session's when the response was submitted, so
+           this is the one place that closes it: at EOF, at an early stream reset,
+           and at teardown, all of which arrive here. */
+        close(body->fd);
     }
     free(body->data);
     free(body);
@@ -531,7 +544,31 @@ static ssize_t cn1H2ReadBody(nghttp2_session* session, int32_t streamId, uint8_t
         remaining = length;
     }
     if(remaining > 0) {
-        memcpy(buf, body->data + body->offset, remaining);
+        if(body->fd >= 0) {
+            /* Straight into nghttp2's frame buffer. pread rather than read so the
+               descriptor needs no seek position of its own -- two streams may be
+               serving the same file. */
+            ssize_t got = pread(body->fd, buf, remaining,
+                                (off_t)(body->fileOffset + (int64_t)body->offset));
+            if(got < 0) {
+                if(errno == EINTR || errno == EAGAIN) {
+                    /* Ask nghttp2 to come back rather than failing the stream. */
+                    return NGHTTP2_ERR_DEFERRED;
+                }
+                return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+            }
+            if(got == 0) {
+                /* The file is shorter than Content-Length said -- it was truncated
+                   under us. Ending the stream here sends fewer bytes than promised,
+                   which the client detects; stalling forever would not. */
+                *dataFlags |= NGHTTP2_DATA_FLAG_EOF;
+                cn1H2ReleaseBody(s, body);
+                return 0;
+            }
+            remaining = (size_t)got;
+        } else {
+            memcpy(buf, body->data + body->offset, remaining);
+        }
         body->offset += remaining;
     }
     if(body->offset >= body->length) {
@@ -542,28 +579,30 @@ static ssize_t cn1H2ReadBody(nghttp2_session* session, int32_t streamId, uint8_t
 }
 
 /*
- * Submits a response. headerLines is "name: value" separated by '\n'; the status
- * is passed separately because :status is a pseudo-header nghttp2 requires first.
+ * Builds the response header block shared by both response forms.
+ *
+ * The nva entries point INTO *statusOut and *headerOut, which the caller frees
+ * after submitting -- nghttp2 copies what it needs during the submit call. Returns
+ * the header count, or -1 when the status could not be read.
  */
-JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_java_lang_String_byte_1ARRAY_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_INT streamId, JAVA_OBJECT status, JAVA_OBJECT headerLines, JAVA_OBJECT body) {
-    CN1H2Body* pending;
-    CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
-    nghttp2_nv nva[CN1_H2_MAX_HEADERS + 1];
+static long cn1H2BuildHeaders(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT status,
+                              JAVA_OBJECT headerLines, nghttp2_nv* nva,
+                              char** statusOut, char** headerOut) {
+    char* statusCopy;
     char* headerCopy = NULL;
-    char* statusCopy = NULL;
     size_t count = 0;
-    nghttp2_data_provider provider;
-    int rc;
 
-    if(s == NULL || status == JAVA_NULL) {
-        return -1;
-    }
+    *statusOut = NULL;
+    *headerOut = NULL;
     {
         const char* tmp = stringToUTF8(threadStateData, status);
         if(tmp == NULL) {
             return -1;
         }
         statusCopy = strdup(tmp);
+        if(statusCopy == NULL) {
+            return -1;
+        }
     }
     if(headerLines != JAVA_NULL) {
         const char* tmp = stringToUTF8(threadStateData, headerLines);
@@ -571,6 +610,8 @@ JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_jav
             headerCopy = strdup(tmp);
         }
     }
+    *statusOut = statusCopy;
+    *headerOut = headerCopy;
 
     nva[count].name = (uint8_t*)":status";
     nva[count].namelen = 7;
@@ -619,6 +660,34 @@ JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_jav
             line = nl == NULL ? NULL : nl + 1;
         }
     }
+    return (long)count;
+}
+
+/*
+ * Submits a response. headerLines is "name: value" separated by '\n'; the status
+ * is passed separately because :status is a pseudo-header nghttp2 requires first.
+ */
+JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_java_lang_String_byte_1ARRAY_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_INT streamId, JAVA_OBJECT status, JAVA_OBJECT headerLines, JAVA_OBJECT body) {
+    CN1H2Body* pending;
+    CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
+    nghttp2_nv nva[CN1_H2_MAX_HEADERS + 1];
+    char* headerCopy = NULL;
+    char* statusCopy = NULL;
+    size_t count = 0;
+    nghttp2_data_provider provider;
+    int rc;
+
+    if(s == NULL) {
+        return -1;
+    }
+    {
+        long built = cn1H2BuildHeaders(threadStateData, status, headerLines, nva,
+                                       &statusCopy, &headerCopy);
+        if(built < 0) {
+            return -1;
+        }
+        count = (size_t)built;
+    }
 
     /* A resubmission for the same stream would otherwise leave the old one to be
        freed only at stream close. */
@@ -635,6 +704,8 @@ JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_jav
             } else {
                 memcpy(pending->data, (JAVA_ARRAY_BYTE*)arr->data, (size_t)arr->length);
                 pending->streamId = streamId;
+                pending->fd = -1;
+                pending->fileOffset = 0;
                 pending->length = (size_t)arr->length;
                 pending->offset = 0;
                 pending->next = s->bodies;
@@ -647,6 +718,70 @@ JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_jav
 
     rc = nghttp2_submit_response(s->session, streamId, nva, count,
                                  pending != NULL ? &provider : NULL);
+    free(statusCopy);
+    free(headerCopy);
+    return rc == 0 ? 0 : -1;
+}
+
+/*
+ * Submits a response whose body is a range of an open file.
+ *
+ * The descriptor becomes the session's here, whatever happens: on the failure paths
+ * below and, once submitted, when the body is released at EOF, at an early stream
+ * reset or at teardown. A caller that closed it itself would pull the file out from
+ * under the provider mid-response.
+ */
+JAVA_INT com_codename1_backend_Http2_respondFileImpl___long_int_java_lang_String_java_lang_String_int_long_long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_INT streamId, JAVA_OBJECT status, JAVA_OBJECT headerLines, JAVA_INT fd, JAVA_LONG offset, JAVA_LONG length) {
+    CN1H2Body* pending;
+    CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
+    nghttp2_nv nva[CN1_H2_MAX_HEADERS + 1];
+    char* headerCopy = NULL;
+    char* statusCopy = NULL;
+    size_t count = 0;
+    nghttp2_data_provider provider;
+    int rc;
+
+    if(s == NULL || fd < 0) {
+        if(fd >= 0) {
+            close(fd);
+        }
+        return -1;
+    }
+    {
+        long built = cn1H2BuildHeaders(threadStateData, status, headerLines, nva,
+                                       &statusCopy, &headerCopy);
+        if(built < 0) {
+            close(fd);
+            return -1;
+        }
+        count = (size_t)built;
+    }
+
+    cn1H2ReleaseBodyForStream(s, streamId);
+    pending = (CN1H2Body*)malloc(sizeof(CN1H2Body));
+    if(pending == NULL) {
+        close(fd);
+        free(statusCopy);
+        free(headerCopy);
+        return -1;
+    }
+    pending->streamId = streamId;
+    pending->data = NULL;
+    pending->fd = fd;
+    pending->fileOffset = (int64_t)offset;
+    pending->length = (size_t)length;
+    pending->offset = 0;
+    pending->next = s->bodies;
+    s->bodies = pending;
+
+    provider.source.ptr = pending;
+    provider.read_callback = cn1H2ReadBody;
+
+    rc = nghttp2_submit_response(s->session, streamId, nva, count, &provider);
+    if(rc != 0) {
+        /* The provider will never run, so nothing else will free this. */
+        cn1H2ReleaseBody(s, pending);
+    }
     free(statusCopy);
     free(headerCopy);
     return rc == 0 ? 0 : -1;

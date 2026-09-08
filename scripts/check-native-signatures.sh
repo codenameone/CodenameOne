@@ -51,6 +51,22 @@ fi
 #
 # Not covered: Android and JavaSE run on a real JVM with JNI, whose own name
 # mangling is enforced by javah/the JNI linker rather than by this scheme.
+# Built under target/ rather than in a temp directory because the loop below joins
+# each entry onto REPO_ROOT. Left empty when the compile fails, which makes the
+# entry SKIP with a message instead of passing over nothing.
+BACKEND_CLASSES=""
+if [[ -d "$REPO_ROOT/vm/backend/impl/parparvm" ]] && command -v javac >/dev/null 2>&1; then
+  backend_build="vm/backend/target/parparvm-signature-classes"
+  rm -rf "${REPO_ROOT:?}/$backend_build"
+  mkdir -p "$REPO_ROOT/$backend_build"
+  if find "$REPO_ROOT/vm/backend/src" "$REPO_ROOT/vm/backend/impl/parparvm" -name '*.java' \
+       -print0 | xargs -0 javac -nowarn -d "$REPO_ROOT/$backend_build" >/dev/null 2>&1; then
+    BACKEND_CLASSES="$backend_build"
+  else
+    echo "check-native-signatures: could not compile the backend's ParparVM sources" >&2
+  fi
+fi
+
 PORTS=(
   "ios|maven/ios/target/classes|Ports/iOSPort/nativeSources"
   # The macOS port shares most of its natives with iOS, minus the UIKit-bound
@@ -63,10 +79,22 @@ PORTS=(
   "mac|maven/mac/target/classes|maven/mac/target/generated-natives/mac"
   "windows|maven/windows/target/classes|Ports/WindowsPort/nativeSources"
   "linux|maven/linux/target/classes|Ports/LinuxPort/nativeSources"
+  # The backend is translated by the same ParparVM and mangles names the same way,
+  # so a wrong symbol here is silent in exactly the same fashion: it compiles, it
+  # links, the Java method is dropped as unused and the feature is simply inert.
+  #
+  # Its classes are built below rather than taken from maven/backend/target/classes.
+  # That directory holds the JavaSE half, which has no natives at all, so pointing
+  # at it checked nothing and said so in the same words as a real pass.
+  "backend|$BACKEND_CLASSES|vm/backend/native"
 )
 COMMON_CLASSES=("vm/JavaAPI/target/classes" "maven/core/target/classes")
 COMMON_NATIVES=("vm/ByteCodeTranslator/src")
 
+# The backend publishes its ParparVM half as SOURCE (see maven/backend/pom.xml), so
+# unlike every other port there are no compiled classes to read. Compile them here.
+# Left empty when that fails or when javac is absent, which makes the entry skip
+# with a message rather than pass over nothing.
 status=0
 checked=0
 missing_port=0
