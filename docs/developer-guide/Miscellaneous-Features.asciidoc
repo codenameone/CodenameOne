@@ -511,16 +511,18 @@ The label comes from the text type you pass to the constructor, one of `TEXT_NON
 
 ===== Permissions
 
-Referencing `LocationButton` makes the Android build add `USE_LOCATION_BUTTON` to the manifest, which the platform requires before it will render the control. There is nothing else to configure.
+Nothing to configure. Referencing `LocationButton` makes the Android build add `USE_LOCATION_BUTTON` to the manifest, which the platform requires before it will render the control.
 
-An application whose only use of precise location is transactional can go one step further and say so, which removes the "allow precise location" question from the application entirely. That's a manifest attribute rather than an API, so a build hint sets it:
+The build also decides how to declare `ACCESS_FINE_LOCATION`. An application that uses the button and nothing else from the location or maps packages gets it declared `onlyForLocationButton`, which means the system grants precise location through the button and never any other way: no "allow precise location" question, nothing held between taps, and nothing to justify to Google Play. An application that also tracks, navigates or geofences needs the ordinary grant and gets the ordinary declaration. The class scan the build already runs answers this, so neither case needs a build hint.
+
+The one thing it can't see is native Android code reaching the platform's location APIs directly, because Gradle compiles that after the decision is made. An application like that declares itself:
 
 [source,properties]
 ----
 include::../demos/common/src/main/snippets/developer-guide/miscellaneous-features.properties[tag=miscellaneous-features-properties-002,indent=0]
 ----
 
-WARNING: Don't set that in an application that also tracks, navigates or geofences. The flag takes away the grant those need, and the failure is silent: location requests come back approximate instead of refusing.
+`true` forces the restriction on and `false` forces it off; the default, `auto`, infers it. Force it off when native code needs the ordinary grant -- the failure is otherwise silent, with location requests coming back approximate rather than refusing.
 
 === Background music playback
 

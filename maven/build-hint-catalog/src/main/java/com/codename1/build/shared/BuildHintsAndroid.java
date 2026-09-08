@@ -704,6 +704,21 @@ final class BuildHintsAndroid {
                 .platform("android")
                 .doc("Android's own native map provider, overriding `maps.provider`."));
 
+        h.add(new Hint("android.locationButton.exclusive")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .def("auto")
+                .platform("android")
+                .doc("Whether `ACCESS_FINE_LOCATION` is declared "
+                        + "`onlyForLocationButton`, which means the system grants precise "
+                        + "location through the location button and never any other way. "
+                        + "Defaults to `auto`: the build infers it, declaring the flag when "
+                        + "the application uses `LocationButton` and nothing else from the "
+                        + "location or maps packages. Set `false` when the application "
+                        + "reaches precise location through native Android code, which the "
+                        + "class scan cannot see because Gradle compiles it later, and "
+                        + "`true` to declare it regardless."));
+
         h.add(new Hint("android.mockLocation")
                 .group(HintGroup.ANDROID)
                 .type(HintType.BOOLEAN)

@@ -474,6 +474,14 @@ public class AndroidGradleBuilder extends Executor {
     /// shows one does not carry the permission.
     private boolean locationButtonPermission;
 
+    /// Set when the application uses a location API that needs precise location
+    /// the ordinary way, rather than through the location button.
+    ///
+    /// The two together decide whether `ACCESS_FINE_LOCATION` can be declared
+    /// `onlyForLocationButton`: the button alone means it can, anything else
+    /// means it cannot.
+    private boolean otherLocationUse;
+
     /// What the platform requires before it will render the system location
     /// button. Google Play requires that button for transactional precise
     /// location from Android 17.
@@ -500,6 +508,95 @@ public class AndroidGradleBuilder extends Executor {
     /// #### Returns
     ///
     /// whether the application shows a location button
+    /// The ACCESS_FINE_LOCATION declaration this application gets.
+    ///
+    /// An application whose only precise-location use is the location button
+    /// declares the permission `onlyForLocationButton`, which means the system
+    /// will never grant it any other way: no "allow precise location" question,
+    /// nothing held between taps, and nothing to justify to Play. An
+    /// application that also tracks, navigates or geofences needs the ordinary
+    /// grant and gets the ordinary declaration.
+    ///
+    /// Inferred rather than asked for, because the compiled scan already knows:
+    /// it reports the classes the APPLICATION reaches, and the framework's own
+    /// code is not in it -- LocationButton calls LocationManager internally and
+    /// that call is not attributed to the application. So "uses the button and
+    /// nothing else from the location or maps packages" is exactly the
+    /// question, and it is already answered.
+    ///
+    /// `android.locationButton.exclusive` overrides the inference either way,
+    /// for an application whose location use the scan cannot see -- native
+    /// Android code calling the platform's own location APIs is the case that
+    /// matters, since Gradle compiles it after this decision is made.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request
+    ///
+    /// #### Returns
+    ///
+    /// the manifest line for ACCESS_FINE_LOCATION
+    private String fineLocationPermission(BuildRequest request) {
+        String hint = request.getArg("android.locationButton.exclusive", "auto");
+        boolean exclusive;
+        if ("true".equals(hint)) {
+            exclusive = true;
+        } else if ("false".equals(hint)) {
+            exclusive = false;
+        } else {
+            exclusive = locationButtonPermission && !otherLocationUse;
+        }
+        if (!exclusive) {
+            return "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" android:required=\"false\" />\n";
+        }
+        debug("Declaring ACCESS_FINE_LOCATION onlyForLocationButton");
+        return "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\""
+                + " android:usesPermissionFlags=\"onlyForLocationButton\""
+                + " android:required=\"false\" />\n";
+    }
+
+    /// Whether a class the application references means it needs precise
+    /// location outside the location button.
+    ///
+    /// Three classes in the location package belong to the button's own path
+    /// and do not count: the button, its listener, and the [Location] value the
+    /// listener is handed. Everything else in the package is the ordinary
+    /// location API -- managers, listeners, requests, geofences -- and so is the
+    /// maps package, whose components locate the user.
+    ///
+    /// Anything unrecognised counts as ordinary use on purpose. A class added to
+    /// the package later is then read as "needs the ordinary grant", which costs
+    /// an application the flag it might have qualified for; the other default
+    /// would silently take precise location away from an application that needs
+    /// it, and the whole point of this is that the failure is silent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cls`: an internal class name
+    ///
+    /// #### Returns
+    ///
+    /// whether it rules out a button-only declaration
+    static boolean needsOrdinaryPreciseLocation(String cls) {
+        if (cls == null) {
+            return false;
+        }
+        if (cls.indexOf("com/codename1/maps") == 0) {
+            return true;
+        }
+        if (cls.indexOf("com/codename1/location/") != 0) {
+            return false;
+        }
+        return !isLocationButtonClass(cls)
+                && !isNamed(cls, "com/codename1/location/LocationSharedListener")
+                && !isNamed(cls, "com/codename1/location/Location");
+    }
+
+    /// Whether `cls` is `name` or one of its nested classes.
+    private static boolean isNamed(String cls, String name) {
+        return cls.equals(name) || cls.startsWith(name + "$");
+    }
+
     static boolean isLocationButtonClass(String cls) {
         if (cls == null) {
             return false;
@@ -2111,6 +2208,10 @@ public class AndroidGradleBuilder extends Executor {
                     }
                     if (cls.indexOf("com/codename1/maps") == 0 || cls.indexOf("com/codename1/location") == 0) {
                         gpsPermission = true;
+                    }
+                    if (needsOrdinaryPreciseLocation(cls)) {
+                        debug("Precise location is not button-only because of class " + cls);
+                        otherLocationUse = true;
                     }
                     // Counting the nested classes here does NOT make this fire
                     // for every application, which is the obvious reading of a
@@ -5300,8 +5401,7 @@ public class AndroidGradleBuilder extends Executor {
         if (gpsPermission) {
             permissions += "    <uses-feature android:name=\"android.hardware.location\" android:required=\"false\" />\n"
                     + "    <uses-feature android:name=\"android.hardware.location.gps\" android:required=\"false\" />\n"
-                    + permissionAdd(request, "ACCESS_FINE_LOCATION",
-                    "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" android:required=\"false\" />\n")
+                    + permissionAdd(request, "ACCESS_FINE_LOCATION", fineLocationPermission(request))
                     + permissionAdd(request, "ACCESS_COARSE_LOCATION",
                     "    <uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\"  android:required=\"false\" />\n");
             if(request.getArg("android.mockLocation", "true").equals("true")) {
