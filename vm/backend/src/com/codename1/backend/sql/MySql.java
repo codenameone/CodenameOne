@@ -902,11 +902,21 @@ public final class MySql {
             out.write(0xfc);
             out.write(length & 0xff);
             out.write((length >> 8) & 0xff);
-        } else {
+        } else if(length <= MAX_PACKET_BODY) {
             out.write(0xfd);
             out.write(length & 0xff);
             out.write((length >> 8) & 0xff);
             out.write((length >> 16) & 0xff);
+        } else {
+            // 0xfd carries three bytes of length and stops at 0xffffff. A larger
+            // value needs 0xfe and eight, and writing the small form for it sends a
+            // truncated length: the server then reads the rest of the value as the
+            // next thing in the packet. Fragmenting the packet does not help, because
+            // this prefix is inside it.
+            out.write(0xfe);
+            for(int iter = 0 ; iter < 8 ; iter++) {
+                out.write((int)((long)length >> (8 * iter)) & 0xff);
+            }
         }
         if(length > 0) {
             out.write(data, 0, length);

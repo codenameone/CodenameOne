@@ -476,7 +476,17 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             boolean isSet = javaType.startsWith("java.util.Set<");
             String decoded;
             if (element.startsWith("java.")) {
-                decoded = "bodyAsList(body)";
+                // Converted element by element, not handed over raw. The JSON reader
+                // produces Long for every integer and Double for every real, so a
+                // List<Integer> arrives full of Longs: on the JVM the handler gets a
+                // ClassCastException the first time it reads one, and on the
+                // translated target the cast is unchecked, so it reads an Integer's
+                // fields out of a Long and carries on. The DTO branch below already
+                // converts; this one used not to.
+                decoded = "listOfValues(bodyAsList(body), new FromValue() {\n"
+                        + "                public Object convert(Object v) { return "
+                        + fieldFromJson(element, "v") + "; }\n"
+                        + "            })";
             } else {
                 decoded = "listFromMaps(bodyAsList(body), new FromMap() {\n"
                         + "                public Object convert(java.util.Map m) { return "
@@ -546,6 +556,17 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("    /** Converts one element of a decoded JSON array into a DTO. */\n");
         sb.append("    private interface FromMap { Object convert(java.util.Map m); }\n");
         sb.append("    private interface ToMap { java.util.Map convert(Object o); }\n\n");
+        emitValueCoercion(sb);
+        sb.append("    /** Converts one element of a decoded JSON array to its declared type. */\n");
+        sb.append("    private interface FromValue { Object convert(Object v); }\n\n");
+        sb.append("    private static java.util.List listOfValues(java.util.List raw, FromValue f) {\n");
+        sb.append("        if(raw == null) return null;\n");
+        sb.append("        java.util.List out = new java.util.ArrayList();\n");
+        sb.append("        for(int i = 0 ; i < raw.size() ; i++) {\n");
+        sb.append("            out.add(f.convert(raw.get(i)));\n");
+        sb.append("        }\n");
+        sb.append("        return out;\n");
+        sb.append("    }\n\n");
         sb.append("    private static java.util.List listFromMaps(java.util.List raw, FromMap f) {\n");
         sb.append("        if(raw == null) return null;\n");
         sb.append("        java.util.List out = new java.util.ArrayList();\n");
@@ -841,7 +862,16 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         return codecFor(type) + ".fromMap(asMap(" + expr + "))";
     }
 
-    private static void emitCodecHelpers(StringBuilder sb) {
+    /**
+     * The value coercions both generated classes need.
+     *
+     * Emitted into the dispatcher as well as the codec because the dispatcher
+     * converts collection elements too: a List<Integer> body reaches it as a list of
+     * Longs, and the conversion that fixes that is written in terms of these. They
+     * were in the codec alone, so the dispatcher referred to helpers it did not have
+     * and simply failed to compile.
+     */
+    private static void emitValueCoercion(StringBuilder sb) {
         sb.append("    // The JSON reader produces Long for integers and Double for reals, so every\n");
         sb.append("    // numeric read goes through Number rather than casting to the field's type.\n");
         sb.append("    private static String asString(Object v) { return v == null ? null : String.valueOf(v); }\n");
@@ -863,6 +893,10 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("    private static java.util.Set setFromList(java.util.List v) {\n");
         sb.append("        return v == null ? null : new java.util.LinkedHashSet(v);\n");
         sb.append("    }\n");
+    }
+
+    private static void emitCodecHelpers(StringBuilder sb) {
+        emitValueCoercion(sb);
         sb.append("    private interface ToMapFn { java.util.Map convert(Object o); }\n");
         sb.append("    private interface FromMapFn { Object convert(java.util.Map m); }\n");
         sb.append("    private static java.util.List toValueList(java.util.Collection raw) {\n");

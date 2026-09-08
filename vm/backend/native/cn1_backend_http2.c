@@ -568,13 +568,17 @@ static ssize_t cn1H2ReadBody(nghttp2_session* session, int32_t streamId, uint8_t
             /* Straight into nghttp2's frame buffer. pread rather than read so the
                descriptor needs no seek position of its own -- two streams may be
                serving the same file. */
-            ssize_t got = pread(body->fd, buf, remaining,
-                                (off_t)(body->fileOffset + (int64_t)body->offset));
+            ssize_t got;
+            /* Retried here rather than deferred. NGHTTP2_ERR_DEFERRED suspends the
+               provider until nghttp2_session_resume_data() is called, and nothing
+               calls it -- a single EINTR would have left the download open and
+               silent forever. A regular file never returns EAGAIN, so an error that
+               is not EINTR is a real one. */
+            do {
+                got = pread(body->fd, buf, remaining,
+                            (off_t)(body->fileOffset + (int64_t)body->offset));
+            } while(got < 0 && errno == EINTR);
             if(got < 0) {
-                if(errno == EINTR || errno == EAGAIN) {
-                    /* Ask nghttp2 to come back rather than failing the stream. */
-                    return NGHTTP2_ERR_DEFERRED;
-                }
                 return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
             }
             if(got == 0) {
@@ -731,6 +735,15 @@ JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_jav
                 pending->next = s->bodies;
                 s->bodies = pending;
             }
+        }
+        if(pending == NULL) {
+            /* The body could not be copied. Submitting anyway sends the headers with
+               an EMPTY body and reports success, so the caller ships a 200 whose
+               content silently went missing under memory pressure. Failing here lets
+               it be seen. */
+            free(statusCopy);
+            free(headerCopy);
+            return -1;
         }
     }
     provider.source.ptr = pending;

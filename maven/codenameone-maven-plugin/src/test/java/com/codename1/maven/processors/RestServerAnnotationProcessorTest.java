@@ -43,6 +43,7 @@ import java.util.Arrays;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -107,6 +108,12 @@ public class RestServerAnnotationProcessorTest {
                     + "    void addPet(@Body Pet pet, OnComplete<Response<Pet>> callback);\n"
                     + "    @GET(\"/pets\")\n"
                     + "    void listPets(OnComplete<Response<java.util.List<Pet>>> callback);\n"
+                    + "    @POST(\"/weights\")\n"
+                    + "    void weights(@Body java.util.List<Integer> weights,\n"
+                    + "                 OnComplete<Response<String>> callback);\n"
+                    + "    @POST(\"/labels\")\n"
+                    + "    void labels(@Body java.util.Set<String> labels,\n"
+                    + "                OnComplete<Response<String>> callback);\n"
                     + "}\n";
 
     @Test
@@ -212,6 +219,56 @@ public class RestServerAnnotationProcessorTest {
         assertTrue(!(Boolean) hasRoute.invoke(dispatcher, "GET", "/nope"));
         assertTrue(!(Boolean) hasRoute.invoke(dispatcher, "POST", "/greet/Shai"));
         assertNull(dispatch.invoke(dispatcher, "GET", "/nope", null, null));
+        loader.close();
+    }
+
+    /**
+     * A collection body arrives as its DECLARED element type, not the parser's.
+     *
+     * The JSON reader produces Long for every integer, so a `List<Integer>` handed
+     * over raw is a list of Longs wearing a List<Integer> label. The JVM reveals
+     * that as a ClassCastException the first time the handler reads an element;
+     * ParparVM's CHECKCAST is unchecked, so there it reads an Integer's fields out
+     * of a Long and keeps going. Asserting on the element's runtime class is the
+     * only way to see the difference.
+     */
+    @Test
+    public void convertsScalarElementsInACollectionBody() throws Exception {
+        File classes = compileApi();
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+        URLClassLoader loader = new URLClassLoader(
+                new java.net.URL[]{ classes.toURI().toURL() }, getClass().getClassLoader());
+        Class<?> serverInterface = loader.loadClass("com.example.GreeterApiServer");
+        final Object[] received = new Object[2];
+        Object impl = Proxy.newProxyInstance(loader, new Class<?>[]{ serverInterface },
+                new InvocationHandler() {
+                    public Object invoke(Object proxy, Method method, Object[] args) {
+                        if ("weights".equals(method.getName())) {
+                            received[0] = args[0];
+                        } else if ("labels".equals(method.getName())) {
+                            received[1] = args[0];
+                        }
+                        return "ok";
+                    }
+                });
+        Class<?> dispatcherClass = loader.loadClass("com.example.GreeterApiDispatcher");
+        Object dispatcher = dispatcherClass.getConstructor(serverInterface).newInstance(impl);
+        Method dispatch = dispatcherClass.getMethod("dispatch", String.class, String.class,
+                java.util.Map.class, Object.class);
+
+        dispatch.invoke(dispatcher, "POST", "/weights", null,
+                java.util.Arrays.asList(Long.valueOf(3), Long.valueOf(4)));
+        java.util.List weights = (java.util.List) received[0];
+        assertNotNull("the list body did not reach the handler", weights);
+        assertEquals("an Integer element must not still be a Long",
+                Integer.class, weights.get(0).getClass());
+        assertEquals(Integer.valueOf(3), weights.get(0));
+
+        dispatch.invoke(dispatcher, "POST", "/labels", null,
+                java.util.Arrays.asList("a", "b"));
+        assertTrue("a Set body must arrive as a Set", received[1] instanceof java.util.Set);
+        assertEquals(2, ((java.util.Set) received[1]).size());
         loader.close();
     }
 

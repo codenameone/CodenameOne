@@ -140,6 +140,20 @@ public final class StaticFiles implements HttpServer.Handler {
                 // Directory listings leak names nobody asked to publish.
                 FileIo.close(fd);
                 release = false;
+                String rawTarget = request.getTarget() == null ? "" : request.getTarget();
+                int queryAt = rawTarget.indexOf('?');
+                String rawPath = queryAt < 0 ? rawTarget : rawTarget.substring(0, queryAt);
+                if(!rawPath.endsWith("/")) {
+                    // Redirect first. Serving the index at /static/docs makes a browser
+                    // resolve "style.css" in it against /static/, not /static/docs/, so
+                    // every relative reference in an otherwise valid site points one
+                    // level too high. The query is carried across because it was
+                    // addressed to this resource.
+                    Map moved = new LinkedHashMap();
+                    moved.put("Location", rawPath + "/"
+                            + (queryAt < 0 ? "" : rawTarget.substring(queryAt)));
+                    return HttpServer.Response.empty(301, "text/plain", moved);
+                }
                 String indexPath = stripTrailingSlash(decoded) + "/" + indexFile;
                 int indexFd = beneathProven ? FileIo.openBeneath(root, indexPath)
                                             : FileIo.openRead(root + indexPath);

@@ -458,6 +458,8 @@ public final class HttpServer {
     private static final byte[] EMPTY_BODY = new byte[0];
     /** One instance, so the pooled JSON path does not intern a literal per call. */
     static final String JSON_CONTENT_TYPE = "application/json; charset=utf-8";
+    /** What a Response with no content type is sent as, on either protocol. */
+    static final String DEFAULT_CONTENT_TYPE = "application/octet-stream";
 
     /** "Sat, 29 Aug 2026 07:11:02 GMT" -- RFC 9110 fixes the width. */
     private static final int HTTP_DATE_LENGTH = 29;
@@ -3112,7 +3114,12 @@ public final class HttpServer {
                 conn.put(reason(response.status));
             }
             conn.put(H_CTYPE, 0, H_CTYPE.length);
-            conn.putContentType(response.contentType);
+            // The same default HTTP/2 applies. The public Response constructor lets a
+            // handler pass null, and reaching putContentType with it threw an NPE that
+            // dropped the connection without a response -- so one handler behaved two
+            // ways depending on the protocol it happened to be answering.
+            conn.putContentType(response.contentType == null
+                    ? DEFAULT_CONTENT_TYPE : response.contentType);
             // RFC 9110 6.6.1: an origin server with a clock MUST send Date.
             conn.put(H_DATE, 0, H_DATE.length);
             conn.put(currentHttpDateBytes(), 0, HTTP_DATE_LENGTH);
