@@ -1401,6 +1401,18 @@ static inline JAVA_BOOLEAN cn1InNursery(void* p) {
 // heap ref store), which thread-pausing structurally cannot.
 extern volatile int gcSatbActive;
 extern void cn1SatbEnqueue(JAVA_OBJECT old);
+// DECLARED HERE, not beside the write barrier, because that copy sits in the #else of
+// the CN1_NURSERY split and these four have callers that are not conditional on it:
+// nativeMethods' arraycopy/cloneArray bulk barrier and CN1_REF_LOAD_BEGIN/END. With the
+// declarations behind the nursery #else, -DCN1_NURSERY compiled those calls as implicit
+// C89 declarations returning int, which clang has rejected outright since C99 became the
+// default -- so the nursery build did not compile at all, and nothing noticed because no
+// gate builds that arm. Duplicating an extern is legal and keeps the two halves honest.
+extern volatile int gcSatbTerminating;
+extern JAVA_BOOLEAN cn1SatbBulkBegin(void);
+extern void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count);
+extern void cn1SatbBulkEnd(void);
+extern void cn1SatbBulkQuiesce(void);
 #if defined(CN1_DISABLE_SATB)
 // Escape hatch to A/B the barrier cost or fall back if a regression appears. When
 // disabled, gcSatbActive is never armed (see codenameOneGCMark) AND the per-store

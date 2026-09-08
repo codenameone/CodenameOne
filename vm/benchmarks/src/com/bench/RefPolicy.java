@@ -179,6 +179,18 @@ public class RefPolicy {
         }
 
         System.out.println("WEAK_LIVE_KEPT=" + liveKept + "/" + WEAK_SAMPLES);
+        // AN ASSERTION, not a printed number. A referent still reachable through `live`
+        // must never be cleared, and until this exited nonzero the driver reported a
+        // reduced count and finished successfully: the checksum reads live[] directly so
+        // it does not move, and run-gc-verify cannot see it either, because a field cleared
+        // too early is heap-SAFE -- null dangles nothing. Both advertised validation paths
+        // could therefore stay green while WeakReference was broken in the direction that
+        // silently empties every cache built on it.
+        if (liveKept != WEAK_SAMPLES) {
+            System.out.println("FAIL: " + (WEAK_SAMPLES - liveKept)
+                    + " strongly reachable referent(s) were cleared");
+            System.exit(2);
+        }
         System.out.println("WEAK_DEAD_CLEARED=" + deadCleared + "/" + WEAK_SAMPLES);
     }
 

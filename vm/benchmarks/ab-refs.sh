@@ -77,6 +77,13 @@ def run(arm, ceiling_mb):
     p = subprocess.run([f"target/ab-refs/{arm}"] + os.environ.get("REF_WORKLOAD", "").split(),
                        capture_output=True, text=True, env=env,
                        timeout=float(os.environ.get("REF_TIMEOUT", "600")))
+    # A NONZERO EXIT INVALIDATES THE SAMPLE, however complete the output looks. The metrics
+    # are printed before the process ends, so a VM that corrupts its heap and dies in an
+    # atexit handler still emits RESULT and the whole table -- and without this the harness
+    # would publish checksum-matched medians from a crashed run and exit 0.
+    if p.returncode != 0:
+        raise SystemExit(f"{arm}@{ceiling_mb}MB: exited {p.returncode}; sample rejected\n"
+                         + p.stdout[-2000:] + "\n" + p.stderr[-2000:])
     out = p.stdout
     def num(key, default=None):
         m = re.search(rf'^{key}=(-?\d+)', out, re.M)

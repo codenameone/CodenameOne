@@ -2679,6 +2679,23 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
        || __atomic_load_n(referentField, __ATOMIC_RELAXED) == JAVA_NULL) {
         return;                                    // already cleared: nothing to decide
     }
+#ifdef CN1_NURSERY
+    // A NURSERY PROMOTION IS NOT A WEAK-REFERENCE DECISION. cn1PromoteDrain runs the
+    // generated mark functions with nurseryPromoting raised, and gcMarkObject's promotion
+    // branch is what moves a referenced object out of the block being recycled. Routing the
+    // referent here instead skips that branch entirely: a surviving WeakReference whose
+    // referent sits in a different nursery block would be promoted alone, the minor
+    // collector would recycle the referent's block, and the field -- never cleared, because
+    // this is not a collection cycle -- would be left pointing into it.
+    //
+    // During promotion the referent is therefore treated exactly like any other field. No
+    // clearing happens on this path in any case, so making the edge strong here costs a
+    // promotion and nothing else.
+    if(threadStateData != 0 && threadStateData->nurseryPromoting) {
+        gcMarkObject(threadStateData, __atomic_load_n(referentField, __ATOMIC_RELAXED), force);
+        return;
+    }
+#endif
 #ifdef CN1_GC_VERIFY
     // THE VERIFIER HAS TO SEE THE REFERENT, and it could not.
     //
