@@ -500,6 +500,16 @@ public class LocationButton extends Container {
     /// The alternative is a control that is present, correct and dead, which is
     /// the worst way for this to fail: the build and the manifest are both fine
     /// and nothing says otherwise.
+    ///
+    /// How much this recovers depends on the manifest. An application that
+    /// declared `ACCESS_FINE_LOCATION` `onlyForLocationButton` -- which the
+    /// Android build infers for an application whose only location use is this
+    /// component -- has told the system that precise location comes through the
+    /// button and no other way, so the button that replaces it can only reach an
+    /// approximate location, or none. That is the bargain the restriction makes
+    /// and it is the right one for such an application; there is nothing to do
+    /// about it here, and asking is still better than a control that does
+    /// nothing.
     private void useFallback() {
         platformFailed = true;
         // Nothing else the dead control says is worth hearing.

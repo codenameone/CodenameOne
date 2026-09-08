@@ -536,7 +536,8 @@ public class AndroidGradleBuilder extends Executor {
     /// #### Returns
     ///
     /// the manifest line for ACCESS_FINE_LOCATION
-    private String fineLocationPermission(BuildRequest request, int compileSdk) {
+    private String fineLocationPermission(BuildRequest request, int compileSdk)
+            throws BuildException {
         String hint = request.getArg("android.locationButton.exclusive", "auto");
         boolean asked = "true".equals(hint);
         if (!wantsExclusiveLocation(hint, locationButtonPermission, otherLocationUse)) {
@@ -567,14 +568,13 @@ public class AndroidGradleBuilder extends Executor {
         // declaration anyway.
         if (!compileSdkSupportsExclusiveLocation(compileSdk)) {
             if (asked) {
-                // An explicit request that cannot be honoured. Silently
-                // dropping it is the failure mode this whole flag exists to
-                // avoid, so say it plainly instead.
-                error("android.locationButton.exclusive=true needs a compile SDK of"
-                        + " 37 or newer; this build compiles against " + compileSdk
-                        + ", where AAPT rejects the onlyForLocationButton value.",
-                        new RuntimeException("compile SDK " + compileSdk
-                                + " cannot express onlyForLocationButton"));
+                // THROWN, not logged. Executor.error() only writes to the
+                // logger and returns, so reporting it that way would leave the
+                // build green while quietly shipping an application without the
+                // privacy restriction its developer asked for by hand -- the
+                // exact silent failure this flag exists to prevent, moved from
+                // the manifest into the build log.
+                throw new BuildException(requireExclusiveCompileSdkMessage(compileSdk));
             } else {
                 warn("Not declaring ACCESS_FINE_LOCATION onlyForLocationButton:"
                         + " the compile SDK is " + compileSdk + " and the value"
@@ -626,6 +626,24 @@ public class AndroidGradleBuilder extends Executor {
             return false;
         }
         return buttonUsed && !otherLocationUse;
+    }
+
+    /// What to tell a developer whose explicit restriction the compile SDK
+    /// cannot express.
+    ///
+    /// #### Parameters
+    ///
+    /// - `compileSdk`: the level this build compiles against
+    ///
+    /// #### Returns
+    ///
+    /// the message for the BuildException that stops the build
+    static String requireExclusiveCompileSdkMessage(int compileSdk) {
+        return "android.locationButton.exclusive=true needs a compile SDK of "
+                + EXCLUSIVE_LOCATION_MIN_COMPILE_SDK + " or newer; this build"
+                + " compiles against " + compileSdk + ", where AAPT rejects the"
+                + " onlyForLocationButton value. Raise the compile SDK, or"
+                + " remove the hint to let the build infer the declaration.";
     }
 
     /// Whether a compile SDK can express `onlyForLocationButton` at all.

@@ -524,6 +524,8 @@ include::../demos/common/src/main/snippets/developer-guide/miscellaneous-feature
 
 `true` forces the restriction on and `false` forces it off; the default, `auto`, infers it. Force it off when native code needs the ordinary grant -- the failure is otherwise silent, with location requests coming back approximate rather than refusing.
 
+One consequence is worth knowing. The restriction is what it says: precise location comes through the button and no other way. On an application that carries it, the fallback described above can't recover precise location -- if the system control fails to open, the ordinary button that replaces it asks a question the system won't answer with precise access, and the listener receives an approximate location or none. That's the bargain the restriction makes, and it's the right one for an application whose only use of precise location is the button; it's another reason not to force it on for an application that reaches precise location some other way.
+
 === Background music playback
 
 Codename One supports playing music in the background (for example: when the app is minimized) which is useful for developers building a music player style application.

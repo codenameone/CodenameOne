@@ -167,6 +167,25 @@ class AndroidLocationButtonPermissionTest {
         assertTrue(AndroidGradleBuilder.compileSdkSupportsExclusiveLocation(38));
     }
 
+    /**
+     * An explicit restriction the compile SDK cannot express has to stop the
+     * build. Executor.error() only writes to the logger and returns, so
+     * reporting it that way would leave the build green while shipping an
+     * application without the privacy restriction its developer asked for -- the
+     * silent failure moved from the manifest into the build log. The message
+     * has to name the level and the way out.
+     */
+    @Test
+    void theExplicitRestrictionFailureNamesTheLevelAndTheFix() {
+        String message = AndroidGradleBuilder.requireExclusiveCompileSdkMessage(36);
+        assertTrue(message.contains("36"), "names the level this build has");
+        assertTrue(message.contains("37"), "names the level it needs");
+        assertTrue(message.contains("android.locationButton.exclusive"),
+                "names the hint that caused it");
+        assertTrue(message.contains("onlyForLocationButton"),
+                "names the value AAPT rejects");
+    }
+
     /** Only the restrictive declaration carries the flag. */
     @Test
     void theDeclarationsDifferOnlyInTheFlag() {
