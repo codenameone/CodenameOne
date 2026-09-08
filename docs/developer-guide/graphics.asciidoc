@@ -34,11 +34,11 @@ A paint method can be implemented as such:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava001Snippet.java[tag=graphics-java-001,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/GraphicsHiworldFigure.java[tag=graphics-java-001,indent=0]
 ----
 
 .Hi world demo code, notice that the blue bar on top is the iOS7+ status bar
-image::img/graphics-hiworld.png[Hi world demo code, notice that the blue bar on top is the iOS7+ status bar,scaledwidth=20%]
+image::img/generated/graphics-hiworld.png[Hi world demo code, notice that the blue bar on top is the iOS7+ status bar,scaledwidth=20%]
 
 ==== Painting with gradients
 
@@ -137,11 +137,11 @@ many user interfaces
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava006Snippet.java[tag=graphics-java-006,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/GraphicsGlasspaneFigure.java[tag=graphics-java-006,indent=0]
 ----
 
 .The glass pane draws the warning sign on the border of the component peeking out
-image::img/graphics-glasspane.png[The glass pane draws the warning sign on the border of the component peeking out,scaledwidth=20%]
+image::img/generated/graphics-glasspane.png[The glass pane draws the warning sign on the border of the component peeking out,scaledwidth=20%]
 
 === Shapes & transforms
 
@@ -799,11 +799,11 @@ Icon fonts can be created in 2 basic ways the first is explicitly by defining al
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava032Snippet.java[tag=graphics-java-032,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/GraphicsFontimageFixedFigure.java[tag=graphics-java-032,indent=0]
 ----
 
 .Icon font from material design icons created with the fixed size of display width
-image::img/graphics-fontimage-fixed.png[Icon font from material design icons created with the fixed size of display width,scaledwidth=20%]
+image::img/generated/graphics-fontimage-fixed.png[Icon font from material design icons created with the fixed size of display width,scaledwidth=20%]
 
 NOTE: The samples use the built-in material design icon font. This is for convenience so the sample will work out of the box, for everyone. For example you should be able to do this with any arbitrary icon font off the internet as long as its a valid TTF file.
 
@@ -813,11 +813,11 @@ There are two versions of this method: the first one expects the `Style` object 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava033Snippet.java[tag=graphics-java-033,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/GraphicsFontimageStyleFigure.java[tag=graphics-java-033,indent=0]
 ----
 
 .An image created from the Style object
-image::img/graphics-fontimage-style.png[An image created from the Style object,scaledwidth=20%]
+image::img/generated/graphics-fontimage-style.png[An image created from the Style object,scaledwidth=20%]
 
 WARNING: Notice that for this specific version of the method the size of the font is used to determine the icon size. In the other methods for `FontImage` creation the size of the font is ignored!
 
@@ -833,11 +833,11 @@ To recreate the save icon from above you can do something like:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava034Snippet.java[tag=graphics-java-034,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/GraphicsFontimageMaterialFigure.java[tag=graphics-java-034,indent=0]
 ----
 
 .Material save icon
-image::img/graphics-fontimage-material.png[Material save icon,scaledwidth=20%]
+image::img/generated/graphics-fontimage-material.png[Material save icon,scaledwidth=20%]
 
 NOTE: Notice that the icon is smaller now as it's calculated based on the font size of the `Button` UIID.
 

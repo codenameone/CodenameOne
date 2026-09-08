@@ -536,7 +536,7 @@ NOTE: Some browsers don't allow you to specify the message that's displayed in t
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava006Snippet.java[tag=working-with-javascript-java-006,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/JavascriptPwaAddAppBannerFigure.java[tag=working-with-javascript-java-006,indent=0]
 ----
 
 [id="pwa_deployment", reftext="Deploying as a Progressive Web App"]
@@ -547,7 +547,7 @@ Out of the box, your app is ready to be deployed as a progressive web app (PWA).
 Below is a screenshot from Chrome for Android where the browser is prompting the user to add the app to their home screen.
 
 .Add app to homescreen banner
-image::img/javascript-pwa-add-app-banner.png[Add app to homescreen banner,scaledwidth=20%]
+image::img/generated/javascript-pwa-add-app-banner.png[Add app to homescreen banner,scaledwidth=20%]
 
 If the app is available as a native app, in the Play store, you can indicate this using the `javascript.manifest.related_applications` and `javascript.manifest.prefer_related_applications` build hints. Then, instead of prompting the user to add the web app to their home screen, they'll be prompted to install the native app from the Play store, as shown below.
 

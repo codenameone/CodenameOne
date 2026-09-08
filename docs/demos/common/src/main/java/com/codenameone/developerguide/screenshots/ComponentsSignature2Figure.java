@@ -1,0 +1,133 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codenameone.developerguide.screenshots;
+
+import com.codename1.gpu.*;
+import com.codename1.ui.*;
+import com.codename1.ui.animations.*;
+import com.codename1.ui.events.*;
+import com.codename1.ui.geom.*;
+import com.codename1.ui.layouts.*;
+import com.codename1.ui.list.*;
+import com.codename1.ui.plaf.*;
+import com.codename1.ui.util.*;
+import com.codename1.components.*;
+import com.codename1.charts.models.*;
+import com.codename1.charts.renderers.*;
+import com.codename1.charts.views.*;
+import com.codename1.capture.*;
+import com.codename1.io.*;
+import com.codename1.l10n.*;
+import com.codename1.location.*;
+import com.codename1.maps.*;
+import com.codename1.media.*;
+import com.codename1.messaging.*;
+import com.codename1.payment.*;
+import com.codename1.processing.*;
+import com.codename1.properties.*;
+import com.codename1.push.*;
+import com.codename1.security.*;
+import com.codename1.social.*;
+import com.codename1.ui.spinner.*;
+import java.io.*;
+import java.util.*;
+
+
+class ComponentsSignature2Figure implements GuideFigure {
+
+
+    Object context;
+    Object url;
+    Object value;
+    Object body;
+    Object event;
+    String apiKey = "test-key";
+    String myHttpsURL = "https://example.com";
+    java.util.List<String> validKeysList = new java.util.ArrayList<>();
+    Image myImage;
+    Graphics graphics;
+    Graphics g;
+    GraphicsDevice device;
+    Form form;
+    Form hi;
+    Container cnt;
+    Container myForm;
+    Component component;
+    Button button;
+    MultiButton myMultiButton;
+    Label label;
+    BrowserComponent browserComponent;
+    Resources theme;
+    
+
+    @Override
+    public String id() {
+        return "components-signature2";
+    }
+
+    /// The tagged region is what the chapter includes, so the listing beside the
+    /// picture is the code that drew it.
+    @Override
+    public Form build() {
+        // tag::the-components-of-codename-one-java-135[]
+        Form hi = new Form("Signature Component");
+        hi.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
+        hi.add("Enter Your Name:");
+        hi.add(new TextField());
+        hi.add("Signature:");
+        SignatureComponent sig = new SignatureComponent();
+        sig.addActionListener((evt)-> {
+        System.out.println("The signature was changed");
+        Image img = sig.getSignatureImage();
+        // Now we can do whatever we want with the image of this signature.
+        });
+        hi.addComponent(sig);
+        hi.show();
+        // end::the-components-of-codename-one-java-135[]
+        return hi;
+    }
+}

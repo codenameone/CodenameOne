@@ -67,17 +67,33 @@ public final class GuideFigureRenderer {
         assertNoSkinIsActive();
         installTheme(device.themeResource());
 
+        StringBuilder failures = new StringBuilder();
+        int rendered = 0;
         for (FigureVariant variant : variants) {
             if (variant.device() != device) {
                 continue;
             }
-            Display.getInstance().setDarkMode(Boolean.valueOf(variant.darkMode()));
-            UIManager.getInstance().refreshTheme();
+            try {
+                Display.getInstance().setDarkMode(Boolean.valueOf(variant.darkMode()));
+                UIManager.getInstance().refreshTheme();
 
-            Form form = variant.figure().build();
-            prepare(form, device);
-            verifyAppearance(variant, form);
-            write(sink, variant.fileName(), form, device);
+                Form form = variant.figure().build();
+                prepare(form, device);
+                verifyAppearance(variant, form);
+                write(sink, variant.fileName(), form, device);
+                rendered++;
+            } catch (Throwable err) {
+                // One figure that cannot render must not take the rest with it:
+                // the run reports every failure and then fails, which beats
+                // stopping at the first and rediscovering the next one build
+                // after build.
+                failures.append("\n  ").append(variant.fileName()).append(": ")
+                        .append(err.getClass().getName()).append(": ").append(err.getMessage());
+            }
+        }
+        System.out.println("Rendered " + rendered + " figure(s) for " + device.key());
+        if (failures.length() > 0) {
+            throw new IOException("figures failed to render:" + failures);
         }
     }
 
@@ -116,16 +132,17 @@ public final class GuideFigureRenderer {
             throw new IllegalStateException(variant.fileName() + ": asked for darkMode="
                     + variant.darkMode() + " but Display reports " + reported);
         }
-        int background = form.getStyle().getBgColor();
-        if (variant.darkMode() && isLight(background)) {
+        // Only the dark direction is asserted. The failure worth catching is a
+        // dark render that silently comes out light, which repeats across every
+        // figure and is invisible in review. The converse is not a failure at
+        // all: a figure is free to set a dark background of its own in light
+        // mode, and the image masking figure does exactly that -- a red form,
+        // which a luminance test reads as "dark" and which this used to reject.
+        if (variant.darkMode() && isLight(form.getStyle().getBgColor())) {
             throw new IllegalStateException(variant.fileName()
                     + ": dark mode is set but the form background is "
-                    + Integer.toHexString(background) + ", which is a light colour");
-        }
-        if (!variant.darkMode() && !isLight(background)) {
-            throw new IllegalStateException(variant.fileName()
-                    + ": light mode is set but the form background is "
-                    + Integer.toHexString(background) + ", which is a dark colour");
+                    + Integer.toHexString(form.getStyle().getBgColor())
+                    + ", which is a light colour");
         }
     }
 

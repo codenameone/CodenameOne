@@ -242,11 +242,11 @@ The resource bundle is a map between keys and values for example: the code below
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava016Snippet.java[tag=miscellaneous-features-java-016,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/L10nBasicFigure.java[tag=miscellaneous-features-java-016,indent=0]
 ----
 
 .Localized label
-image::img/l10n-basic.png[Localized label,scaledwidth=30%]
+image::img/generated/l10n-basic.png[Localized label,scaledwidth=30%]
 
 ==== Localization manager
 
@@ -256,11 +256,11 @@ It allows formatting numbers/dates & time based on platform locale. It also prov
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava045Snippet.java[tag=miscellaneous-features-java-045,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/L10nManagerFigure.java[tag=miscellaneous-features-java-045,indent=0]
 ----
 
 .Localization formatting/parsing and information
-image::img/l10n-manager.png[Localization formatting/parsing and information,scaledwidth=20%]
+image::img/generated/l10n-manager.png[Localization formatting/parsing and information,scaledwidth=20%]
 
 ==== RTL/Bidi
 
@@ -527,11 +527,11 @@ You can capture an image from the camera using an API like this:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava024Snippet.java[tag=miscellaneous-features-java-024,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/CapturePhotoFigure.java[tag=miscellaneous-features-java-024,indent=0]
 ----
 
 .Captured photos previewed in the ImageViewer
-image::img/capture-photo.png[Captured photos previewed in the ImageViewer,scaledwidth=20%]
+image::img/generated/capture-photo.png[Captured photos previewed in the ImageViewer,scaledwidth=20%]
 
 You show video capture in the <<mediamanager-section,MediaManager section>>.
 
