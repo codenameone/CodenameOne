@@ -39,13 +39,23 @@ package com.codename1.location;
 /// ```
 public interface LocationSharedListener {
 
-    /// Invoked on the EDT once the button has finished, whether or not it
+    /// Invoked on the EDT once the user has answered, whether or not that
     /// produced a location.
+    ///
+    /// Only a user's answer reaches here. A platform control that fails to open
+    /// does NOT: the component replaces it with an ordinary button and the user
+    /// is asked again there, which is a recovery rather than a result. Reporting
+    /// it as a null location would announce a decline for a request nobody made
+    /// -- the platform opens its session when the control is attached, so the
+    /// failure usually arrives before anyone has touched anything. Nothing is
+    /// left hanging by the silence either, because a tap on the system's control
+    /// is not observable to the application in the first place, so there is no
+    /// pending request to resolve. `LocationButton#isSystemRendered()` is how to
+    /// see which control is on screen.
     ///
     /// #### Parameters
     ///
-    /// - `location`: the location the user shared, or null when the request was
-    ///   declined, no fix arrived before the button's timeout, or the platform's
-    ///   own control failed
+    /// - `location`: the location the user shared, or null when they declined or
+    ///   no fix arrived before the button's timeout
     void locationShared(Location location);
 }

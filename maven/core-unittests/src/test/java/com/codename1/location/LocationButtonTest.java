@@ -339,6 +339,28 @@ class LocationButtonTest extends UITestBase {
         }
     }
 
+    /// A grant that lands after the component has left the form belongs to a
+    /// control the user has navigated away from.
+    @FormTest
+    void aGrantThatLandsAfterTheComponentLeftTheFormIsDropped() {
+        implementation.setLocationButtonSupported(true);
+        manager.currentLocation = new Location(11.0, 12.0);
+        LocationButton button = showButton(new LocationButton());
+        SuccessCallback<Boolean> callback = implementation.getLocationButtonCallback();
+        List<Location> shared = record(button);
+
+        // Off the form, exactly as a navigation would leave it.
+        button.remove();
+        flushSerialCalls();
+
+        callback.onSucess(Boolean.TRUE);
+        flushSerialCalls();
+
+        assertTrue(shared.isEmpty(),
+                "a control the user navigated away from must not deliver a location");
+        assertEquals(0, manager.bindCount, "and must not have asked for one");
+    }
+
     @FormTest
     void colorsReachThePlatform() {
         implementation.setLocationButtonSupported(true);

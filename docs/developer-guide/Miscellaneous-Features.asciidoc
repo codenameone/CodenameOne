@@ -499,7 +499,7 @@ Google Play draws a line between two ways an application uses precise location. 
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava057Snippet.java[tag=miscellaneous-features-java-057,indent=0]
 ----
 
-The listener is called once the user has answered, with a `Location` or with `null`. `null` covers every way the request can end without one: the user declined, no fix arrived before the button's timeout, or the platform couldn't open its control.
+The listener is called once the user has answered, with a `Location` or with `null`. `null` means the user declined, or that no fix arrived before the button's timeout. A platform control that fails to open isn't reported this way: the component replaces it with the ordinary button, so the user is asked again there rather than told no. `isSystemRendered()` is how to see that happened.
 
 ===== Where the system draws it, and where it doesn't
 

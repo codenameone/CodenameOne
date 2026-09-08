@@ -106,7 +106,21 @@ class AndroidLocationButton extends SurfaceView {
     private final SuccessCallback<Boolean> callback;
 
     /// android.app.permissionui.LocationButtonSession, once one is open.
-    private Object session;
+    ///
+    /// Volatile because this one field is read from a second thread. Everything
+    /// else here lives on the Android UI thread, but [#hasSession()] is reached
+    /// from `LocationButton.isSystemRendered()`, which application code calls on
+    /// the Codename One EDT -- a different thread on this port. Without the
+    /// publish there is no happens-before between adopting the surface here and
+    /// observing it there, so a caller could keep seeing "not ready" after the
+    /// control started drawing.
+    ///
+    /// This is not a contradiction of Codename One being single threaded: the
+    /// EDT is still the only thread that runs application code, and this is the
+    /// native boundary, which is exactly where a port is supposed to marshal.
+    /// AndroidGLSurface.lastFrame and AndroidTextureView.created are the same
+    /// shape.
+    private volatile Object session;
 
     /// Set as soon as openSession has been asked for, so a second layout pass
     /// does not ask again while the first request is still in flight.

@@ -436,7 +436,34 @@ public class LocationButton extends Container {
                     // From a control this component has already replaced.
                     return;
                 }
+                if (!isInitialized()) {
+                    // The component left the form between the platform's
+                    // callback and this hop onto the EDT, so the control that
+                    // produced this answer is no longer on screen. Acting would
+                    // start acquiring a location for something the user has
+                    // navigated away from.
+                    //
+                    // isInitialized() rather than "does the peer still have a
+                    // live session", which would also have worked here -- the
+                    // session was measured still open at grant time, the system's
+                    // consent activity pauses the application without closing it.
+                    // But that check reads a state the platform owns, and if a
+                    // platform ever closed its session on the grant itself it
+                    // would drop every result instead of the stale ones. This
+                    // one is ours and cannot misfire that way. Pausing does not
+                    // deinitialize a component, and neither does the rotation
+                    // that detaches and reattaches the native view.
+                    return;
+                }
                 if (granted == null) {
+                    // Deliberately no listener call. A failed session is not an
+                    // answer from the user: it usually arrives before the
+                    // control has been touched at all, so reporting it as a null
+                    // location would announce a decline nobody made. And it
+                    // strands nobody -- a tap on the system's control is not
+                    // observable to the application, so there is no pending
+                    // request waiting to be resolved. What the application can
+                    // see is isSystemRendered(), which now says false.
                     useFallback();
                     return;
                 }
