@@ -2469,6 +2469,74 @@ static JAVA_BOOLEAN cn1GcRetainAllReferences(CODENAME_ONE_THREAD_STATE) {
     }
 }
 
+// Recovery after an SATB loss, which must keep racing loads alive WITHOUT undoing the
+// emergency's reclaim.
+//
+// Retaining everything is the safe reflex and it deadlocks the allocator: the emergency
+// budget is raised by an allocation failure, sustained exhaustion keeps the SATB stack from
+// growing, and if soft-referenced data is what exhausted memory then every retry cycle
+// loses a batch, retains the same data, and codenameOneGcMalloc spins forever on a
+// collection that frees nothing.
+//
+// The emergency decision does not depend on the log. "Drop every soft referent" is a policy
+// choice made from the memory budget at cycle start, not an inference from liveness, so a
+// lost log entry does not invalidate it. What the log WOULD have protected is a referent a
+// mutator is mid-read of -- and the touch stamp records that independently, allocation-free,
+// which is the same signal sub-pass A relies on.
+//
+// So: touched referents are retained, condemned soft referents are still cleared, and
+// everything else is retained. The residual is a get() that loaded a soft referent and was
+// descheduled before stamping; that window is the one the emergency path already accepts
+// and documents, and the alternative to accepting it is an allocator that cannot progress.
+static JAVA_BOOLEAN cn1GcRecoverAfterDrop(CODENAME_ONE_THREAD_STATE) {
+    int budget = atomic_load_explicit(&cn1SoftRetainCycles, memory_order_relaxed);
+    if(budget >= 0) {
+        return cn1GcRetainAllReferences(threadStateData);   // no emergency: retain freely
+    }
+    JAVA_BOOLEAN marked = JAVA_FALSE;
+    for(;;) {
+        long before = cn1RefDiscoveredTop;
+        long beforeEmergency = atomic_load_explicit(&cn1RefEmergencyTop, memory_order_relaxed);
+        JAVA_BOOLEAN round = JAVA_FALSE;
+        for(long i = 0 ; i < before ; i++) {
+            struct CN1RefEntry* e = &cn1RefDiscovered[i];
+            JAVA_OBJECT r = __atomic_load_n(e->referentField, __ATOMIC_RELAXED);
+            if(r != JAVA_NULL && !CN1_IS_TAGGED(r)) {
+                if(e->strength == CN1_REF_SOFT
+                   && __atomic_load_n(e->touchAgeField, __ATOMIC_RELAXED) != CN1_REF_TOUCHED) {
+                    // Condemned by the emergency, and not being read: clear it, which is
+                    // the whole point of the emergency. Not recorded in clearedReferent --
+                    // this recovery IS the last word, and recording it would only cause
+                    // the retention below to undo it.
+                    __atomic_store_n(e->referentField, JAVA_NULL, __ATOMIC_RELAXED);
+#ifdef CN1_GC_CONFORM
+                    atomic_fetch_add_explicit(&cn1RefCleared, 1, memory_order_relaxed);
+#endif
+                } else {
+                    gcMarkObject(threadStateData, r, JAVA_FALSE);
+                    round = JAVA_TRUE;
+                }
+            }
+            JAVA_OBJECT was = e->clearedReferent;
+            if(was != JAVA_NULL && !CN1_IS_TAGGED(was)) {
+                gcMarkObject(threadStateData, was, JAVA_FALSE);
+                round = JAVA_TRUE;
+            }
+        }
+        if(cn1RefRecoverEmergency(threadStateData)) {
+            round = JAVA_TRUE;
+        }
+        if(round) {
+            marked = JAVA_TRUE;
+            gcMarkDrain(threadStateData);
+        }
+        if(cn1RefDiscoveredTop == before
+           && atomic_load_explicit(&cn1RefEmergencyTop, memory_order_relaxed) == beforeEmergency) {
+            return marked;
+        }
+    }
+}
+
 // Recompute the soft budget and drop the previous cycle's discoveries. Called from
 // codenameOneGCMark before anything can mark.
 static void cn1RefBeginCycle(void) {
@@ -2920,7 +2988,9 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
         // "keep the referent alive"; the note on the unrecorded-discovery path says the
         // same thing. Not clearing a weak field does not retain anything, because nothing
         // else marks a weak referent -- that is what makes the edge weak.
-        // THE SAME RETAIN-TO-FIXPOINT the capped path uses, called rather than copied.
+        // RECOVERY, not blanket retention: see cn1GcRecoverAfterDrop. Retaining every
+        // condemned soft referent here is what would let the allocator spin forever when
+        // soft-referenced data is the thing exhausting memory.
         //
         // This was a second hand-written copy of that walk, and it drifted exactly where a
         // copy does: the helper was taught that discovery advances TWO counters -- the
@@ -2928,7 +2998,7 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
         // cn1RefDiscoveredTop, because it exists for when that list cannot grow -- and this
         // copy was left comparing the list length alone. It therefore read "nothing new"
         // over a freshly written recovery slot and returned without marking what it held.
-        if(cn1GcRetainAllReferences(threadStateData)) {
+        if(cn1GcRecoverAfterDrop(threadStateData)) {
             marked = JAVA_TRUE;
         }
 #ifdef CN1_GC_CONFORM
@@ -3017,43 +3087,14 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
     // mutator holds it, so the recovery marks what was cleared rather than restoring it.
     cn1SatbBulkQuiesce();
     if(atomic_load_explicit(&cn1SatbDrops, memory_order_relaxed) != cn1RefDropsAtCycleStart) {
-        // TO A FIXPOINT, like every other recovery here. A referent brought back can hold
-        // a further Reference, whose mark function registers during the drain -- after
-        // these loops have run. Draining once would leave that nested reference reachable
-        // with an unmarked referent, and an empty final take would then let termination
-        // finish over it.
-        for(;;) {
-            long before = cn1RefDiscoveredTop;
-            JAVA_BOOLEAN recovered = JAVA_FALSE;
-            for(long i = 0 ; i < n ; i++) {
-                JAVA_OBJECT was = cn1RefDiscovered[i].clearedReferent;
-                if(was != JAVA_NULL && !CN1_IS_TAGGED(was)) {
-                    gcMarkObject(threadStateData, was, JAVA_FALSE);
-                    recovered = JAVA_TRUE;
-                }
-            }
-            // The emergency path's clears too. They never reached the list -- that is why
-            // they exist -- so they are remembered separately and recovered on the same
-            // signal.
-            if(cn1RefRecoverEmergency(threadStateData)) {
-                recovered = JAVA_TRUE;
-            }
-            // Anything newly discovered by the drain still has to be retained: this pass
-            // is past the point where it could safely clear.
-            for(long i = n ; i < before ; i++) {
-                JAVA_OBJECT r = __atomic_load_n(cn1RefDiscovered[i].referentField, __ATOMIC_RELAXED);
-                if(r != JAVA_NULL && !CN1_IS_TAGGED(r)) {
-                    gcMarkObject(threadStateData, r, JAVA_FALSE);
-                    recovered = JAVA_TRUE;
-                }
-            }
-            if(recovered) {
-                marked = JAVA_TRUE;
-                gcMarkDrain(threadStateData);
-            }
-            if(cn1RefDiscoveredTop == before) {
-                break;
-            }
+        // THE SHARED WALK, not a third hand-written copy. Two earlier copies of this
+        // fixpoint each drifted from the helper in the same way -- watching only
+        // cn1RefDiscoveredTop, while the emergency path advances cn1RefEmergencyTop
+        // instead -- so the loop read "nothing new" over a freshly written recovery slot.
+        // The helper covers discovered referents, referents already cleared this cycle and
+        // the emergency array, and iterates on both counters.
+        if(cn1GcRetainAllReferences(threadStateData)) {
+            marked = JAVA_TRUE;
         }
     }
 
