@@ -121,57 +121,79 @@ public class TextFieldRenderElement extends RenderElement {
      * border enclose the icon too.</p>
      */
     private Component decorated(com.codename1.ui.TextField tf) {
-        char glyph = prefixIconChar();
-        if (glyph == 0) {
+        com.codename1.flutter.widgets.Icon inside = iconAt(true);
+        com.codename1.flutter.widgets.Icon outside = iconAt(false);
+        com.codename1.flutter.widgets.Icon chosen = inside != null ? inside : outside;
+        if (chosen == null || chosen.getIcon() == null) {
             return tf;
         }
         com.codename1.ui.Container row =
                 new com.codename1.ui.Container(new com.codename1.ui.layouts.BorderLayout());
-        row.setUIID("FlutterTextField");
-        decoratedRow = row;
-        com.codename1.ui.Label icon = new com.codename1.ui.Label("", "Container");
+        row.add(com.codename1.ui.layouts.BorderLayout.WEST, glyphLabel(chosen));
+        row.add(com.codename1.ui.layouts.BorderLayout.CENTER, tf);
+        if (inside != null) {
+            // prefixIcon sits INSIDE the decoration, so the fill and the border
+            // move onto the row and enclose the glyph too. A second surface
+            // behind the editor would draw a filled block inside the filled one.
+            row.setUIID("FlutterTextField");
+            decoratedRow = row;
+            tf.setUIID("Container");
+            tf.getAllStyles().setBgTransparency(0);
+            tf.getAllStyles().setBorder(com.codename1.ui.plaf.Border.createEmpty());
+        } else {
+            // `icon` sits OUTSIDE it: the field keeps its own surface and the
+            // glyph stands clear of it, with Material's gap between them.
+            row.setUIID("Container");
+            row.getAllStyles().setBgTransparency(0);
+        }
+        return row;
+    }
+
+    /// The decoration's inside ({@code prefixIcon}) or outside ({@code icon})
+    /// glyph, when it is an Icon -- the only form this can draw.
+    private com.codename1.flutter.widgets.Icon iconAt(boolean inside) {
+        InputDecoration d = textField().getDecoration();
+        Widget w = d == null ? null : (inside ? d.getPrefixIcon() : d.getIcon());
+        return w instanceof com.codename1.flutter.widgets.Icon
+                ? (com.codename1.flutter.widgets.Icon) w : null;
+    }
+
+    /// One material glyph as a label, in the icon's colour or the ambient
+    /// IconTheme's.
+    private com.codename1.ui.Label glyphLabel(com.codename1.flutter.widgets.Icon icon) {
+        com.codename1.ui.Label label = new com.codename1.ui.Label("", "Container");
         com.codename1.ui.plaf.Style glyphStyle =
-                new com.codename1.ui.plaf.Style(icon.getUnselectedStyle());
-        com.codename1.flutter.Color tint = prefixIconColor();
+                new com.codename1.ui.plaf.Style(label.getUnselectedStyle());
+        com.codename1.flutter.Color tint = iconColor(icon);
         if (tint != null) {
             glyphStyle.setFgColor(tint.rgb());
-            icon.getAllStyles().setFgColor(tint.rgb());
+            label.getAllStyles().setFgColor(tint.rgb());
         }
         glyphStyle.setBgTransparency(0);
+        label.getAllStyles().setMarginUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+        label.getAllStyles().setMargin(0, 0, 0, (int) Math.round(Dp.px(ICON_GAP_LP)));
         try {
             // Dp.mm, because FontImage sizes glyphs in MILLIMETRES. Handing it
             // logical pixels asked for a 24mm glyph and drew an icon taller than
             // the row it sits in.
-            icon.setIcon(com.codename1.ui.FontImage.createMaterial(glyph, glyphStyle,
-                    Dp.mm(PREFIX_ICON_LP)));
+            label.setIcon(com.codename1.ui.FontImage.createMaterial(
+                    icon.getIcon().codePoint(), glyphStyle, Dp.mm(PREFIX_ICON_LP)));
         } catch (Exception headlessOrNoFont) {
             // the row still reserves the space
         }
-        row.add(com.codename1.ui.layouts.BorderLayout.WEST, icon);
-        row.add(com.codename1.ui.layouts.BorderLayout.CENTER, tf);
-        // The surface belongs to the row now; a second one behind the editor
-        // would draw a filled block inside the filled block.
-        tf.setUIID("Container");
-        tf.getAllStyles().setBgTransparency(0);
-        tf.getAllStyles().setBorder(com.codename1.ui.plaf.Border.createEmpty());
-        return row;
+        return label;
     }
+
+    /** Material's gap between an outside icon and the field. */
+    private static final double ICON_GAP_LP = 16;
 
     /** Material's prefix icon size. */
     private static final double PREFIX_ICON_LP = 24;
 
-    /// The material code point of {@code decoration.prefixIcon}, or 0 when there
-    /// is none and when it is not an {@code Icon} -- the only form this can draw.
-    private char prefixIconChar() {
-        com.codename1.flutter.widgets.Icon icon = prefixIcon();
-        return icon == null || icon.getIcon() == null ? 0 : icon.getIcon().codePoint();
-    }
-
     /// The icon's own colour, or the ambient IconTheme's -- the same chain
     /// {@code IconRenderElement} follows. Without the fallback the glyph is
     /// painted in the default ink, which on Crane's purple rows is black.
-    private com.codename1.flutter.Color prefixIconColor() {
-        com.codename1.flutter.widgets.Icon icon = prefixIcon();
+    private com.codename1.flutter.Color iconColor(com.codename1.flutter.widgets.Icon icon) {
         if (icon != null && icon.getColor() != null) {
             return icon.getColor();
         }
@@ -181,13 +203,6 @@ public class TextFieldRenderElement extends RenderElement {
         } catch (Throwable noTheme) {
             return null;
         }
-    }
-
-    private com.codename1.flutter.widgets.Icon prefixIcon() {
-        InputDecoration d = textField().getDecoration();
-        Widget w = d == null ? null : d.getPrefixIcon();
-        return w instanceof com.codename1.flutter.widgets.Icon
-                ? (com.codename1.flutter.widgets.Icon) w : null;
     }
 
     @Override

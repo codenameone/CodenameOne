@@ -127,6 +127,17 @@ public class InputDecoration {
     }
 
     /** The glyph shown before the content, or null. */
+    /**
+     * {@code icon} -- the glyph OUTSIDE the decorated box, to its left.
+     *
+     * <p>Distinct from {@code prefixIcon}, which sits inside the fill and the
+     * border. The text-field demo uses this one for the person, phone and
+     * envelope beside its fields.</p>
+     */
+    public com.codename1.flutter.Widget getIcon() {
+        return icon;
+    }
+
     /** {@code hintStyle} -- the type the placeholder is set in. */
     public com.codename1.flutter.TextStyle getHintStyle() {
         return hintStyle;
