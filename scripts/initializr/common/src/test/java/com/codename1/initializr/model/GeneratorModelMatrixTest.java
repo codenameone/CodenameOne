@@ -214,6 +214,23 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(rootPom, "<id>win</id>",
                 "Java 17 root pom should retain the win32 module activation profile");
         assertCodenameOneRepository(rootPom, "Java 17");
+
+        // The backend module ships in every download but builds only when asked for
+        // by -Dcodename1.platform=backend, so a client-only app pays nothing for it.
+        assertNotNull(entries.get("backend/pom.xml"),
+                "projects should bundle the backend module");
+        assertNotNull(entries.get("backend/src/main/java/" + packageName.replace('.', '/') + "/BackendServer.java"),
+                "the backend module should ship a working handler, not an empty module");
+        assertContains(rootPom, "<id>backend</id>",
+                "root pom should carry the backend module activation profile");
+        String backendPom = getText(entries, "backend/pom.xml");
+        assertContains(backendPom, "<artifactId>codenameone-backend</artifactId>",
+                "the backend module should depend on the backend runtime");
+        // A server has no display. Depending on the generated common module would drag
+        // codenameone-core onto a classpath that cannot run it, which is the mistake the
+        // module's own comment warns against -- so assert it is absent rather than trust it.
+        assertFalse(backendPom.indexOf("${cn1app.name}-common") >= 0,
+                "the backend module must not depend on the generated common module");
     }
 
     /**
