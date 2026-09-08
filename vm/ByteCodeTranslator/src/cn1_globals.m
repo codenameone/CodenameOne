@@ -2513,26 +2513,51 @@ static JAVA_BOOLEAN cn1GcRecoverAfterDrop(CODENAME_ONE_THREAD_STATE) {
             struct CN1RefEntry* e = &cn1RefDiscovered[i];
             JAVA_OBJECT r = __atomic_load_n(e->referentField, __ATOMIC_RELAXED);
             if(r != JAVA_NULL && !CN1_IS_TAGGED(r)) {
+                // RESOLVE BEFORE READING THE HEADER. A Reference kept alive by a stale
+                // native-stack word can hold a referent swept in an earlier cycle whose
+                // memory is unmapped, and reading even its mark word faults. The clear
+                // pass and the unrecorded emergency path both guard this; the guard was
+                // omitted here when this mark-word test was added one commit ago.
+                JAVA_BOOLEAN usable = JAVA_TRUE;
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+                if(cn1ConservativeResolve((void*)r) != r && !cn1GcImmortalObjContains(r)) {
+                    usable = JAVA_FALSE;
+                }
+#endif
                 // A referent already marked, or fresh, is reachable some other way -- a
                 // strong edge or a root -- and a SoftReference may only be cleared when
-                // its referent is SOFTLY reachable. The other emergency path applies this
-                // same test; omitting it here would clear an application's cache entry for
-                // an object it also holds in an ordinary field.
-                int rm = __atomic_load_n(&r->__codenameOneGcMark, __ATOMIC_ACQUIRE);
-                JAVA_BOOLEAN reachableOtherwise =
-                    (rm == currentGcMarkValue || rm == -1) ? JAVA_TRUE : JAVA_FALSE;
-                if(!reachableOtherwise
+                // its referent is SOFTLY reachable. Omitting this would clear an
+                // application's cache entry for an object it also holds in a field.
+                JAVA_BOOLEAN reachableOtherwise = JAVA_TRUE;
+                if(usable) {
+                    int rm = __atomic_load_n(&r->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+                    reachableOtherwise =
+                        (rm == currentGcMarkValue || rm == -1) ? JAVA_TRUE : JAVA_FALSE;
+                }
+                if(usable
+                   && !reachableOtherwise
                    && e->strength == CN1_REF_SOFT
                    && __atomic_load_n(e->touchAgeField, __ATOMIC_RELAXED) != CN1_REF_TOUCHED) {
-                    // Condemned by the emergency, and not being read: clear it, which is
-                    // the whole point of the emergency. Not recorded in clearedReferent --
-                    // this recovery IS the last word, and recording it would only cause
-                    // the retention below to undo it.
+                    // RECORDED, even though recording can cost the reclaim.
+                    //
+                    // The quiesce above drains the getters that were in flight when this
+                    // began; it cannot stop a new one registering immediately after, and
+                    // that getter can load r, have its enqueue fail, and be descheduled
+                    // before stamping -- so this loop sees the old stamp and clears a field
+                    // whose referent is being handed out. Without a record nothing later
+                    // could mark it and the sweep would take it.
+                    //
+                    // Saving it means the post-clear recovery marks it when a drop is
+                    // visible, which yields the emergency's reclaim back in exactly the
+                    // situation where safety is uncertain -- the right way round. In the
+                    // common case, where no further drop occurs, the clear stands and the
+                    // reclaim happens.
+                    e->clearedReferent = r;
                     __atomic_store_n(e->referentField, JAVA_NULL, __ATOMIC_RELAXED);
 #ifdef CN1_GC_CONFORM
                     atomic_fetch_add_explicit(&cn1RefCleared, 1, memory_order_relaxed);
 #endif
-                } else {
+                } else if(usable) {
                     gcMarkObject(threadStateData, r, JAVA_FALSE);
                     round = JAVA_TRUE;
                 }
