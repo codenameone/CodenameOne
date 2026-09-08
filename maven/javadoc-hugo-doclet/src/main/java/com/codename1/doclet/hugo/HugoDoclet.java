@@ -296,7 +296,7 @@ public final class HugoDoclet implements Doclet {
         frontMatter.put("javadoc", api);
 
         write(contentRoot.resolve(Refs.typeContentPath(type)), Json.write(frontMatter));
-        addSearchRows(type, doc);
+        addSearchRows(type, doc, owned);
     }
 
     /**
@@ -452,7 +452,7 @@ public final class HugoDoclet implements Doclet {
             if (doc.hidden) {
                 continue;
             }
-            Map<String, Object> row = baseRow(field, doc);
+            Map<String, Object> row = baseRow(field, doc, owner);
             row.put("fieldType", typeNames.reference(field.asType()));
             Object constant = field.getConstantValue();
             row.put("constant", Literals.of(constant));
@@ -472,7 +472,7 @@ public final class HugoDoclet implements Doclet {
             if (doc.hidden) {
                 continue;
             }
-            Map<String, Object> row = baseRow(member, doc);
+            Map<String, Object> row = baseRow(member, doc, owner);
             row.put("typeParameters", typeNames.typeParameters(member.getTypeParameters()));
             row.put("returnType", member.getKind() == ElementKind.CONSTRUCTOR
                     ? null : typeNames.reference(member.getReturnType()));
@@ -484,10 +484,10 @@ public final class HugoDoclet implements Doclet {
         return out;
     }
 
-    private Map<String, Object> baseRow(Element member, ElementDoc doc) {
+    private Map<String, Object> baseRow(Element member, ElementDoc doc, TypeElement owner) {
         List<String> anchors = refs.anchors(member);
         Map<String, Object> row = new LinkedHashMap<>();
-        row.put("name", member.getSimpleName().toString());
+        row.put("name", displayName(member, owner));
         row.put("anchor", anchors.get(0));
         // Javadoc answers to both the declared and the erased spelling of a
         // signature containing a type variable, and links in the wild use both.
@@ -497,8 +497,28 @@ public final class HugoDoclet implements Doclet {
         row.put("deprecatedText", doc.deprecatedText);
         row.put("description", doc.description);
         row.put("summary", TypeNames.summary(doc.description));
-        row.put("seeAlso", seeAlsoRefs(doc, Refs.enclosingType(member)));
+        // C: the page being written, not the member's declaring type. A member
+        // promoted off a package private supertype is declared somewhere that has
+        // no page, so resolving its references against that type produced links
+        // into a file the generator deliberately never writes.
+        row.put("seeAlso", seeAlsoRefs(doc, owner));
         return row;
+    }
+
+    /**
+     * What a member is called on the page.
+     *
+     * <p>{@code getSimpleName()} answers {@code <init>} for a constructor, which
+     * is the JVM's name for it and not something to show a reader: every class
+     * page listed its constructors as {@code <init>(String)}. The anchor keeps
+     * that spelling, because javadoc's fragment really is {@code <init>()}.
+     */
+    private static String displayName(Element member, TypeElement owner) {
+        if (member.getKind() != ElementKind.CONSTRUCTOR) {
+            return member.getSimpleName().toString();
+        }
+        TypeElement declaring = Refs.enclosingType(member);
+        return (declaring == null ? owner : declaring).getSimpleName().toString();
     }
 
     private List<Map<String, Object>> parameterRows(ExecutableElement member, ElementDoc doc) {
@@ -537,9 +557,14 @@ public final class HugoDoclet implements Doclet {
 
     private List<Map<String, Object>> throwsRows(ExecutableElement member, ElementDoc doc) {
         List<Map<String, Object>> out = new ArrayList<>();
+        // Matched on the simple name as well as the written one: a Throws section
+        // routinely names java.io.IOException where the signature, having
+        // imported it, declares IOException. Comparing the strings as written
+        // listed the same exception twice, once with prose and once without.
         Set<String> named = new LinkedHashSet<>();
         for (MarkdownSections.NamedText documented : doc.exceptions) {
             named.add(documented.name());
+            named.add(simpleName(documented.name()));
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("name", documented.name());
             row.put("url", urlOfTypeNamed(documented.name()));
@@ -549,7 +574,7 @@ public final class HugoDoclet implements Doclet {
         // A declared exception with no prose still belongs in the throws list.
         for (TypeMirror thrown : member.getThrownTypes()) {
             String label = typeNames.label(thrown);
-            if (named.contains(label)) {
+            if (named.contains(label) || named.contains(simpleName(label))) {
                 continue;
             }
             Map<String, Object> row = new LinkedHashMap<>();
@@ -559,6 +584,12 @@ public final class HugoDoclet implements Doclet {
             out.add(row);
         }
         return out;
+    }
+
+    /** The last segment of a dotted name. */
+    private static String simpleName(String name) {
+        int dot = name.lastIndexOf('.');
+        return dot < 0 ? name : name.substring(dot + 1);
     }
 
     /** Resolves a bare exception name from a markdown Throws bullet to a page. */
@@ -880,7 +911,7 @@ public final class HugoDoclet implements Doclet {
 
     // -------------------------------------------------------------- search
 
-    private void addSearchRows(TypeElement type, ElementDoc doc) {
+    private void addSearchRows(TypeElement type, ElementDoc doc, List<Element> owned) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("n", Refs.nestedDisplayName(type));
         row.put("p", Refs.packageOf(type).getQualifiedName().toString());
@@ -895,18 +926,27 @@ public final class HugoDoclet implements Doclet {
         // download to answer one search. Grouping removes the repetition and
         // dropping member summaries removes the bulk; the type summaries stay,
         // because those are what a result list actually shows.
+        // The same list the page renders, promoted members included. Scanning
+        // only the type's own elements left InterstitialAd searchable by its
+        // constructor alone, while its page showed load(), isLoaded() and show()
+        // at anchors nothing could find.
         List<Object> members = new ArrayList<>();
-        for (Element member : type.getEnclosedElements()) {
+        Set<String> seen = new LinkedHashSet<>();
+        for (Element member : owned) {
             if (!isVisible(member) || member instanceof TypeElement) {
                 continue;
             }
             if (docReader.read(member).hidden) {
                 continue;
             }
+            String anchor = refs.anchors(member).get(0);
+            if (!seen.add(anchor)) {
+                continue;
+            }
             String label = member instanceof ExecutableElement executable
-                    ? member.getSimpleName() + "(" + parameterLabels(executable) + ")"
+                    ? displayName(member, type) + "(" + parameterLabels(executable) + ")"
                     : member.getSimpleName().toString();
-            members.add(List.of(label, refs.anchors(member).get(0)));
+            members.add(List.of(label, anchor));
         }
         row.put("m", members);
         searchRows.add(row);

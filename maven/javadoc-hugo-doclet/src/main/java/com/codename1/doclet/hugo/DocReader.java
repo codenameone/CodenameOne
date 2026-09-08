@@ -224,7 +224,14 @@ final class DocReader {
      */
     private void resolveInheritDoc(Element element, ElementDoc doc, int depth) {
         boolean wantsDescription = containsInheritDoc(element) || doc.description.isBlank();
-        boolean wantsDetail = doc.returns == null || hasUndocumentedParameter(element, doc);
+        // A marker inside a structured section is a request too. An override that
+        // writes "#### Returns" with {@inheritDoc} under it leaves doc.returns
+        // non-null, so testing only for null published the marker itself --
+        // BubbleTransition.copy and FlipTransition.copy both showed a literal
+        // {@inheritDoc} where the parent's text belonged.
+        boolean wantsDetail = doc.returns == null
+                || isInheritDoc(doc.returns)
+                || hasUndocumentedParameter(element, doc);
         if (!wantsDescription && !wantsDetail) {
             return;
         }
@@ -241,19 +248,28 @@ final class DocReader {
                 doc.description = doc.description.replace(INHERIT_DOC_MARKER, parent.description);
             }
         }
-        if (doc.returns == null) {
+        if (doc.returns == null || isInheritDoc(doc.returns)) {
             doc.returns = parent.returns;
         }
         if (element instanceof ExecutableElement executable) {
             for (var parameter : executable.getParameters()) {
                 String name = parameter.getSimpleName().toString();
-                if (doc.parameterText(name) == null) {
-                    String inherited = parent.parameterText(name);
-                    if (inherited != null) {
-                        doc.addParameter(new MarkdownSections.NamedText(name, inherited));
-                    }
+                String own = doc.parameterText(name);
+                if (own != null && !isInheritDoc(own)) {
+                    continue;
+                }
+                String inherited = parent.parameterText(name);
+                if (inherited != null) {
+                    doc.parameters.removeIf(existing -> existing.name().equals(name));
+                    doc.addParameter(new MarkdownSections.NamedText(name, inherited));
+                } else if (own != null) {
+                    // Nothing to inherit: drop the marker rather than publish it.
+                    doc.parameters.removeIf(existing -> existing.name().equals(name));
                 }
             }
+        }
+        if (doc.returns != null && isInheritDoc(doc.returns)) {
+            doc.returns = null;
         }
         for (MarkdownSections.NamedText exception : parent.exceptions) {
             doc.addException(exception);
@@ -281,6 +297,11 @@ final class DocReader {
      * inheritance knowledge.
      */
     private static final String INHERIT_DOC_MARKER = "{@inheritDoc}";
+
+    /** Whether a documented value is nothing but an inherit marker. */
+    private static boolean isInheritDoc(String text) {
+        return text != null && text.strip().equals(INHERIT_DOC_MARKER);
+    }
 
     private boolean containsInheritDoc(Element element) {
         DocCommentTree comment = trees.getDocCommentTree(element);

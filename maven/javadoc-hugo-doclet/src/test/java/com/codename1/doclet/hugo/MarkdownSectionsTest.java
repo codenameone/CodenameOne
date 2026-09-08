@@ -198,6 +198,47 @@ class MarkdownSectionsTest {
     }
 
     @Test
+    void stripsATagTheConversionDuplicatedIntoTheBulletText() {
+        // com.codename1.ui.animations.Transition.copy, verbatim. 1157 bullets
+        // across 184 files name the parameter twice like this, and the standard
+        // pages show the second one as prose.
+        MarkdownSections.Result r = MarkdownSections.parse(String.join("\n",
+                "Create a copy of the transition.",
+                "",
+                "#### Parameters",
+                "",
+                "- `reverse`: @param reverse creates a new transition instance"));
+
+        assertEquals("creates a new transition instance", r.parameters().get(0).text());
+    }
+
+    @Test
+    void stripsADuplicatedThrowsTagAndItsDash() {
+        MarkdownSections.Result r = MarkdownSections.parse(String.join("\n",
+                "Reads a value.",
+                "",
+                "#### Throws",
+                "",
+                "- `ArrayIndexOutOfBoundsException`: @throws ArrayIndexOutOfBoundsException - if the index is bad"));
+
+        assertEquals("if the index is bad", r.exceptions().get(0).text());
+    }
+
+    @Test
+    void leavesATagNamingSomethingElseAlone() {
+        // Only a tag naming the same thing as the bullet is residue; anything
+        // else is the author's text and must survive.
+        MarkdownSections.Result r = MarkdownSections.parse(String.join("\n",
+                "Does a thing.",
+                "",
+                "#### Parameters",
+                "",
+                "- `first`: @param second is documented elsewhere"));
+
+        assertEquals("@param second is documented elsewhere", r.parameters().get(0).text());
+    }
+
+    @Test
     void passesThroughABodyWithNoStructure() {
         String body = "Just prose.\n\nWith a second paragraph.";
         MarkdownSections.Result r = MarkdownSections.parse(body);

@@ -20,7 +20,10 @@
     {{- end }}
 
     {{- if $j.interfaces }}
-    <p class="cn1-api__relations"><span>Implements</span>
+    {{- /* TypeElement.getInterfaces() returns the SUPERINTERFACES of an
+           interface, so "Collection<E> extends Iterable<E>" was being shown as
+           "Implements Iterable<E>". Only a class implements. */ -}}
+    <p class="cn1-api__relations"><span>{{ if eq $j.kind "interface" }}Extends{{ else }}Implements{{ end }}</span>
       {{- range $i, $t := $j.interfaces }}{{ if $i }}, {{ end }}{{ partial "javadoc/type-ref.html" $t }}{{ end }}
     </p>
     {{- end }}
