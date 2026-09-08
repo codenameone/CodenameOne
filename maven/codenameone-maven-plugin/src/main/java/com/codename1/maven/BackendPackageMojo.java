@@ -245,6 +245,78 @@ public class BackendPackageMojo extends AbstractMojo {
         }
         command.addAll(sources);
         run(command, project.getBasedir(), "compile the backend sources");
+        stageResources(classes);
+    }
+
+    /**
+     * Copies the module's resources in beside the classes just compiled.
+     *
+     * This directory is emptied and then filled from .java alone, and the project's
+     * own output directory is excluded from the translator input on purpose -- its
+     * classes were built against a JDK. The consequence was that anything read from
+     * the classpath, a properties or configuration file, was present under
+     * cn1:backend and simply absent from the packaged binary. Nothing failed at
+     * build time; the resource was just not there at runtime.
+     *
+     * Everything EXCEPT .class is taken, which is exactly the resources and none of
+     * the JDK-compiled code. Maven's processed copy is preferred over the raw source
+     * directories, so filtering that has already been applied is what ships; the raw
+     * directories are the fallback for a goal invoked on its own, where nothing has
+     * processed them yet.
+     */
+    private void stageResources(File classes) {
+        for (Object resource : project.getBuild().getResources()) {
+            try {
+                java.lang.reflect.Method directory =
+                        resource.getClass().getMethod("getDirectory");
+                copyNonClasses(new File(String.valueOf(directory.invoke(resource))), classes);
+            } catch (Exception ignored) {
+                // An unusual resource entry is not a reason to fail the package; the
+                // processed copy below is the one that normally supplies these.
+            }
+        }
+        copyNonClasses(new File(project.getBuild().getOutputDirectory()), classes);
+    }
+
+    private void copyNonClasses(File from, File to) {
+        if (from == null || !from.isDirectory()) {
+            return;
+        }
+        File[] children = from.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File child : children) {
+            File target = new File(to, child.getName());
+            if (child.isDirectory()) {
+                target.mkdirs();
+                copyNonClasses(child, target);
+            } else if (!child.getName().endsWith(".class")) {
+                try {
+                    copyFile(child, target);
+                } catch (IOException err) {
+                    getLog().warn("cn1: could not stage " + child + ": " + err.getMessage());
+                }
+            }
+        }
+    }
+
+    private static void copyFile(File from, File to) throws IOException {
+        InputStream in = new java.io.FileInputStream(from);
+        try {
+            OutputStream out = new java.io.FileOutputStream(to);
+            try {
+                byte[] chunk = new byte[8192];
+                int n;
+                while ((n = in.read(chunk)) > 0) {
+                    out.write(chunk, 0, n);
+                }
+            } finally {
+                out.close();
+            }
+        } finally {
+            in.close();
+        }
     }
 
     private List<String> compileClasspathWithoutRuntime() throws MojoExecutionException {

@@ -858,7 +858,15 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             // which is why this converts in one place at the end instead.
             boolean isSet = type.startsWith("java.util.Set<");
             if (element.startsWith("java.")) {
-                String decoded = "asList(" + expr + ")";
+                // Each element converted, exactly as the DTO branch below does. The
+                // parser produces Long for every integer, so a List<Integer> FIELD
+                // arrived full of Longs -- the same defect the collection body had,
+                // one level further in, and the same silent misread on a target whose
+                // CHECKCAST does not check.
+                String decoded = "fromValueList(" + expr + ", new FromValueFn() {\n"
+                        + "            public Object convert(Object v) { return "
+                        + fieldFromJson(element, "v") + "; }\n"
+                        + "        })";
                 if (isSet) {
                     decoded = "setFromList(" + decoded + ")";
                 }
@@ -939,6 +947,17 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         emitValueCoercion(sb);
         sb.append("    private interface ToMapFn { java.util.Map convert(Object o); }\n");
         sb.append("    private interface FromMapFn { Object convert(java.util.Map m); }\n");
+        sb.append("    private interface FromValueFn { Object convert(Object v); }\n");
+        sb.append("    /** Converts each element of a decoded array to the field's element type. */\n");
+        sb.append("    private static java.util.List fromValueList(Object raw, FromValueFn f) {\n");
+        sb.append("        java.util.List in = asList(raw);\n");
+        sb.append("        if(in == null) return null;\n");
+        sb.append("        java.util.List out = new java.util.ArrayList();\n");
+        sb.append("        for(int i = 0 ; i < in.size() ; i++) {\n");
+        sb.append("            out.add(f.convert(in.get(i)));\n");
+        sb.append("        }\n");
+        sb.append("        return out;\n");
+        sb.append("    }\n");
         sb.append("    private static java.util.List toValueList(java.util.Collection raw) {\n");
         sb.append("        if(raw == null) return null;\n");
         sb.append("        java.util.List out = new java.util.ArrayList();\n");

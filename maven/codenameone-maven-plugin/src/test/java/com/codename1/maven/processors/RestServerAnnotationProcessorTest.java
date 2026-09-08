@@ -76,6 +76,7 @@ public class RestServerAnnotationProcessorTest {
                     + "    public boolean good;\n"
                     + "    public double weight;\n"
                     + "    public java.util.List<Tag> tags;\n"
+                    + "    public java.util.List<Integer> weights;\n"
                     + "    public Pet() {}\n"
                     + "}\n";
 
@@ -219,6 +220,55 @@ public class RestServerAnnotationProcessorTest {
         assertTrue(!(Boolean) hasRoute.invoke(dispatcher, "GET", "/nope"));
         assertTrue(!(Boolean) hasRoute.invoke(dispatcher, "POST", "/greet/Shai"));
         assertNull(dispatch.invoke(dispatcher, "GET", "/nope", null, null));
+        loader.close();
+    }
+
+    /**
+     * A DTO's collection FIELD arrives as its declared element type too.
+     *
+     * The body-parameter case was fixed first; this is the same defect one level in,
+     * where the elements land in a field rather than an argument. A List<Integer>
+     * full of Longs is a ClassCastException on the JVM at the first read, and on the
+     * translated target a Long read as an Integer with no complaint at all.
+     */
+    @Test
+    public void convertsScalarElementsInADtoCollectionField() throws Exception {
+        File classes = compileApi();
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+        URLClassLoader loader = new URLClassLoader(
+                new java.net.URL[]{classes.toURI().toURL(), testClassesDir().toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> serverItf = loader.loadClass("com.example.GreeterApiServer");
+        final Object[] received = new Object[1];
+        Object handler = Proxy.newProxyInstance(loader, new Class<?>[]{serverItf},
+                new InvocationHandler() {
+                    public Object invoke(Object proxy, Method m, Object[] args) {
+                        if ("addPet".equals(m.getName())) {
+                            received[0] = args[0];
+                            return args[0];
+                        }
+                        return null;
+                    }
+                });
+        Class<?> dispatcherClass = loader.loadClass("com.example.GreeterApiDispatcher");
+        Object dispatcher = dispatcherClass.getConstructor(serverItf).newInstance(handler);
+        Method dispatch = dispatcherClass.getMethod("dispatch",
+                String.class, String.class, java.util.Map.class, Object.class);
+
+        java.util.Map body = new java.util.LinkedHashMap();
+        body.put("name", "Rex");
+        // What the JSON reader really produces for [3, 4].
+        body.put("weights", java.util.Arrays.asList(Long.valueOf(3), Long.valueOf(4)));
+        dispatch.invoke(dispatcher, "POST", "/pet", null, body);
+
+        assertNotNull("the DTO never reached the handler", received[0]);
+        java.util.List weights = (java.util.List)
+                received[0].getClass().getField("weights").get(received[0]);
+        assertNotNull("the collection field was not decoded", weights);
+        assertEquals("an Integer element must not still be a Long",
+                Integer.class, weights.get(0).getClass());
+        assertEquals(Integer.valueOf(3), weights.get(0));
         loader.close();
     }
 

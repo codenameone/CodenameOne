@@ -1538,6 +1538,13 @@ public final class HttpServer {
             setVtOwner(fd, host);
             vtHosts[host].poller.add(fd, CONN_EVENTS);
             vtHosts[host].setArmed(fd, true);
+            // Its clock starts NOW, not when it first parks. A connection that sends
+            // nothing never becomes readable, so advance() never runs for it and the
+            // deadline it would have set never exists -- and SO_RCVTIMEO does not
+            // close a socket that is only sitting in a poller. Without this, opening
+            // connections and saying nothing fills MAX_CONNECTIONS and the server
+            // starts refusing real ones.
+            vtHosts[host].setDeadline(fd, System.currentTimeMillis() + SOCKET_TIMEOUT_MILLIS);
             return;
         }
         // Re-arm has to name the SAME poller: an epoll set that does not hold
@@ -2209,7 +2216,23 @@ public final class HttpServer {
     private void serveOne(int fd) {
         long session;
         try {
-            ServerSocket.setBlocking(fd, true);
+            // A POOL worker owns its descriptor and blocks on it: there is no one to
+            // hand its host thread to. A virtual thread is the opposite, and blocking
+            // here defeated the whole design -- readImpl reaches its park path only
+            // when recv returns EAGAIN, which a blocking descriptor never does. So the
+            // virtual thread never parked and the host OS thread sat in the kernel
+            // until SO_RCVTIMEO. A load generator never shows this, because the bytes
+            // are always already there; a client sending one byte per timeout pins a
+            // host and starves every connection scheduled on it.
+            //
+            // TLS is the exception, and stays blocking below: Tls.readImpl maps
+            // SSL_ERROR_WANT_READ to a hard error rather than parking, so a
+            // non-blocking descriptor would break TLS reads outright. Giving the TLS
+            // layer a park path is the real fix and is not this change.
+            boolean parking = VIRTUAL_THREADS && tls == null;
+            if(!parking) {
+                ServerSocket.setBlocking(fd, true);
+            }
             if(tls != null && sessionOf(fd) == 0) {
                 // The handshake runs here, on the worker, because the descriptor is
                 // blocking here and a handshake is several round trips. On the

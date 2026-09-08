@@ -226,12 +226,9 @@ public final class ServerSocket {
             throw new IOException("Not a socket: " + fd);
         }
         SocketChannel channel = (SocketChannel)entry;
-        ByteBuffer source = ByteBuffer.wrap(buffer, offset, length);
-        while(source.hasRemaining()) {
-            if(channel.write(source) < 0) {
-                throw new IOException("Write failed on " + fd);
-            }
-        }
+        // Through the deadline, as reads are. A client that stops reading otherwise
+        // parks this worker in write() indefinitely.
+        Deadlines.writeWithDeadline(fd, channel, ByteBuffer.wrap(buffer, offset, length));
     }
 
     public static void closeFd(int fd) {

@@ -82,4 +82,57 @@ final class Deadlines {
             }
         }
     }
+
+    /**
+     * Writes the whole buffer, or gives up when the descriptor's deadline passes.
+     *
+     * A blocking write has no timeout of its own, so a client that requests a large
+     * response and then stops reading fills its receive window and parks the worker
+     * in write() for as long as it likes. Enough of them and every worker is held by
+     * a client that is doing nothing -- the native server has SO_SNDTIMEO for exactly
+     * this, and this runtime had nothing.
+     */
+    static void writeWithDeadline(int fd, SocketChannel channel, ByteBuffer source)
+            throws IOException {
+        Integer timeout = TIMEOUTS.get(Integer.valueOf(fd));
+        if(timeout == null || timeout.intValue() <= 0) {
+            while(source.hasRemaining()) {
+                if(channel.write(source) < 0) {
+                    throw new IOException("Write failed on " + fd);
+                }
+            }
+            return;
+        }
+        boolean wasBlocking = channel.isBlocking();
+        Selector selector = null;
+        try {
+            channel.configureBlocking(false);
+            while(source.hasRemaining()) {
+                int n = channel.write(source);
+                if(n < 0) {
+                    throw new IOException("Write failed on " + fd);
+                }
+                if(n > 0) {
+                    // Progress restarts the clock, so a slow but moving client is not
+                    // cut off; only one that has stopped entirely is.
+                    continue;
+                }
+                if(selector == null) {
+                    selector = Selector.open();
+                    channel.register(selector, SelectionKey.OP_WRITE);
+                }
+                if(selector.select(timeout.intValue()) == 0) {
+                    throw new ServerSocket.TimeoutException("Write timed out on " + fd);
+                }
+                selector.selectedKeys().clear();
+            }
+        } finally {
+            if(selector != null) {
+                selector.close();
+            }
+            if(wasBlocking && channel.isOpen()) {
+                channel.configureBlocking(true);
+            }
+        }
+    }
 }
