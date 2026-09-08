@@ -342,8 +342,22 @@ through stale class state. `CN1_FORCE_BOX_CLINIT` publishes with `__ATOMIC_RELEA
 with `__ATOMIC_ACQUIRE`, the same pairing `CN1_CONSTANT_POOL_LOAD` documents. Verified in the
 emitted arm64: `ldapr` on the read, `stlr` on the publish.
 
-The bug was in the original Integer native and was copied to all five new types; all six are
-fixed together, because half a memory-model fix is worse than none.
+Release/acquire only carries what the PUBLISHING thread saw, and
+`__STATIC_INITIALIZER_X` is **not** a reliable synchronisation point: its generated fast path
+is `if(__X_LOADED__) return;`, a plain load, and the matching `__X_LOADED__=1` is a plain
+store placed AFTER `monitorExitBlock`. A thread returning through that path has taken no lock
+and may hold none of the initialising thread's writes. So the slow path takes the class
+monitor before publishing, which makes the publisher synchronise-with whoever ran the body;
+monitors are reentrant, so the initializer's own enter nests harmlessly. One uncontended lock
+per class per process, and the hot path stays a single `ldapr`.
+
+**That fixes the six boxed classes, not the VM.** `__X_LOADED__` is a plain-load/plain-store
+double-check on *every* generated class initializer, which predates tagging. Fixing it means
+making that flag acquire/release in `ByteCodeClass`, which touches codegen for every class in
+every app -- its own change, with its own measurement.
+
+The original defect was in the Integer native and this work copied it to five more types; all
+six are converted together, because half a memory-model fix is worse than none.
 
 ### Adding a seventh type
 

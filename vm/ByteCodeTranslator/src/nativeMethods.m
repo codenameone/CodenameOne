@@ -2839,19 +2839,37 @@ JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
 // that initializer is what fills the vtable a later hashCode/equals/compareTo on the
 // immediate dispatches through. Each valueOf below therefore forces it once.
 //
-// The flag is only a FAST PATH. __STATIC_INITIALIZER_X is already properly double-checked
-// behind the class monitor, so correctness never depended on this; what it does depend on
-// is publication. `volatile` in C is neither atomic nor ordered, so a plain flag lets a
-// second thread observe 1 while the initializer's vtable and static-field writes are still
+// The flag is a FAST PATH, and both of its edges have to be ordered.
+//
+// Publication: `volatile` in C is neither atomic nor ordered, so a plain flag lets a second
+// thread observe 1 while the initializer's vtable and static-field writes are still
 // invisible to it on a weak-memory target, and the next virtual call dispatches through
 // stale class state. Release on publish, acquire on read -- the same pairing
 // CN1_CONSTANT_POOL_LOAD documents in cn1_globals.h, and for the same reason.
+//
+// Acquisition: release/acquire only carries what the PUBLISHING thread itself observed, and
+// __STATIC_INITIALIZER_X is not a reliable synchronisation point. Its generated fast path
+// (ByteCodeClass.emitClassInitializer) is `if(__X_LOADED__) return;` -- a plain load -- and
+// the matching `__X_LOADED__=1` is a plain store placed AFTER monitorExitBlock. A thread
+// that returns through that path has taken no lock and may hold none of the initialising
+// thread's writes, so publishing our flag from it would hand a stale view to everyone who
+// acquires it. Taking the class monitor here makes the publisher synchronise-with whoever
+// actually ran the body; monitors are reentrant (see monitorEnter's ownerThread check), so
+// the initializer's own enter nests harmlessly. It costs one uncontended lock per class per
+// process -- the flag short-circuits every call after the first -- and the hot path is
+// unchanged at a single acquire load.
+//
+// This closes the hole for the six boxed classes only. `__X_LOADED__` is a plain-load,
+// plain-store double-check on EVERY generated class initializer in the VM, which predates
+// tagging and is not fixed here.
 #if CN1_TAGGED_ACTIVE
 #define CN1_FORCE_BOX_CLINIT(cls) \
     do { \
         static int cn1__clinit_##cls = 0; \
         if(!__atomic_load_n(&cn1__clinit_##cls, __ATOMIC_ACQUIRE)) { \
+            monitorEnterBlock(threadStateData, (JAVA_OBJECT)&class__##cls); \
             __STATIC_INITIALIZER_##cls(threadStateData); \
+            monitorExitBlock(threadStateData, (JAVA_OBJECT)&class__##cls); \
             __atomic_store_n(&cn1__clinit_##cls, 1, __ATOMIC_RELEASE); \
         } \
     } while(0)
