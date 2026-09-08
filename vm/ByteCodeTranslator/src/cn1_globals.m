@@ -2712,7 +2712,22 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
         // Under genuine exhaustion the residue is a spurious cache miss on an object that
         // stays alive, against an allocator that otherwise cannot make progress.
         JAVA_BOOLEAN alreadyLive = JAVA_FALSE;
-        if(r != JAVA_NULL && !CN1_IS_TAGGED(r)) {
+        JAVA_BOOLEAN resolvable = (r != JAVA_NULL && !CN1_IS_TAGGED(r)) ? JAVA_TRUE : JAVA_FALSE;
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+        // RESOLVE BEFORE DEREFERENCING, exactly as the clear pass does. A dead Reference
+        // kept alive by a stale native-stack word can hold a referent that was swept in an
+        // earlier cycle and whose memory is now unmapped -- and gcMarkObject's own comment
+        // says reading even the mark word of such a pointer faults. The clear pass guards
+        // for this; this fallback read its header first and reached gcMarkObject's
+        // validation only afterwards, so a collection under memory pressure could take the
+        // process down. An unresolvable pointer is treated as not-live, which is what it
+        // is: garbage, or an object allocated after this cycle's extent snapshot and
+        // therefore kept by the grace rule regardless.
+        if(resolvable && cn1ConservativeResolve((void*)r) != r && !cn1GcImmortalObjContains(r)) {
+            resolvable = JAVA_FALSE;
+        }
+#endif
+        if(resolvable) {
             int rm = __atomic_load_n(&r->__codenameOneGcMark, __ATOMIC_ACQUIRE);
             alreadyLive = (rm == currentGcMarkValue || rm == -1) ? JAVA_TRUE : JAVA_FALSE;
         }
@@ -2723,6 +2738,7 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
         // emergency wanted back, which is a worse outcome than clearing and a far better
         // one than a dangling read.
         if(!alreadyLive
+           && resolvable
            && strength == CN1_REF_SOFT
            && atomic_load_explicit(&cn1SoftRetainCycles, memory_order_relaxed) < 0
            && __atomic_load_n(touchAgeField, __ATOMIC_RELAXED) != CN1_REF_TOUCHED

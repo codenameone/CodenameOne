@@ -136,10 +136,12 @@ fi
 # reported violations=0 for exactly that reason. The dangling direction is
 # clearing LESS.
 printf '%-16s ' "self-test3"
-if [ ! -x ./target/bin/RefPolicy-verify ]; then
-    ./translate-and-build.sh RefPolicy target/bin/RefPolicy-verify -DCN1_GC_VERIFY \
-        > target/bin/RefPolicy-selftest-build.log 2>&1 || true
-fi
+# UNCONDITIONALLY, like every driver above. Reusing a binary left by an earlier build or
+# checkout means a regression in the reference-verifier hook can still produce a green
+# self-test by exercising stale code -- which is the same "a gate that cannot fail" problem
+# this self-test was added to solve, reintroduced in the way the self-test is built.
+./translate-and-build.sh RefPolicy target/bin/RefPolicy-verify -DCN1_GC_VERIFY \
+    > target/bin/RefPolicy-selftest-build.log 2>&1 || true
 if [ ! -x ./target/bin/RefPolicy-verify ]; then
     echo "BROKEN -- could not build RefPolicy for the reference self-test"
     fail=1
