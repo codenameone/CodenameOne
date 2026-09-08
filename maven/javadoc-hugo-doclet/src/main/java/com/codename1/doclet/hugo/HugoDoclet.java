@@ -1328,7 +1328,10 @@ public final class HugoDoclet implements Doclet {
         row.put("p", Refs.packageOf(type).getQualifiedName().toString());
         row.put("u", Refs.typeUrl(type));
         row.put("k", kindOf(type));
-        row.put("s", TypeNames.summary(doc.description));
+        // Plain text: the results list escapes what it is given rather than
+        // rendering it, which is right for a value that came out of a comment,
+        // so markdown left here is displayed as its own source.
+        row.put("s", TypeNames.plainSummary(doc.description));
 
         // Members are two strings each -- the label to show and the fragment to
         // jump to -- nested under their type rather than repeated as standalone

@@ -58,6 +58,46 @@ class TypeNamesTest {
     }
 
     @Test
+    void reducesMarkdownToWordsForTheSearchIndex() {
+        // The results list escapes what it is given, so a summary still carrying
+        // markdown shows its own source: 622 of the 2096 types displayed
+        // backticks, emphasis markers or a whole link destination.
+        assertEquals("Default PII scrubber for CrashProtection uploads.",
+                TypeNames.plainSummary("Default PII scrubber for `CrashProtection` uploads."));
+        assertEquals("See the guide for details.",
+                TypeNames.plainSummary("See the [guide](/developer-guide/) for details."));
+        assertEquals("Important: read this.",
+                TypeNames.plainSummary("**Important**: read this."));
+    }
+
+    @Test
+    void leavesArithmeticAloneInAPlainSummary() {
+        // WebMercator writes "tileSize * 2^zoom", which is multiplication rather
+        // than emphasis and has to survive intact.
+        assertEquals("The world spans tileSize * 2^zoom pixels.",
+                TypeNames.plainSummary("The world spans tileSize * 2^zoom pixels."));
+    }
+
+    @Test
+    void closesASpanTheLengthCapWouldLeaveOpen() {
+        // BrowserNavigationCallback opens with a bold note that runs past the
+        // cap. Backing out of it would leave nothing, so the cut closes it.
+        String bold = "**" + "Important, and rather long. ".repeat(12) + "**";
+        String summary = TypeNames.summary(bold);
+        assertEquals(0, countOf(summary, "**") % 2, "the emphasis is balanced: " + summary);
+    }
+
+    private static int countOf(String text, String needle) {
+        int n = 0;
+        int at = text.indexOf(needle);
+        while (at >= 0) {
+            n++;
+            at = text.indexOf(needle, at + needle.length());
+        }
+        return n;
+    }
+
+    @Test
     void stopsAtABlankLineSoAListDoesNotBecomeATableCell() {
         assertEquals("Intro", TypeNames.summary("Intro\n\n- one\n- two"));
     }

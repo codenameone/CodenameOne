@@ -153,6 +153,35 @@ final class TypeNames {
     }
 
     /**
+     * A summary with its markdown reduced to the words it was marking up.
+     *
+     * <p>The search results list is plain text -- the page escapes what it is
+     * given rather than rendering it, which is right for a value that came out
+     * of a comment -- so a summary still carrying markdown shows its own source:
+     * 622 of the 2096 types displayed backticks, emphasis markers or a whole
+     * link destination in the results list.
+     *
+     * <p>The page-side summaries stay markdown, because Hugo renders those.
+     */
+    static String plainSummary(String markdown) {
+        String text = summary(markdown);
+        if (text.isEmpty()) {
+            return text;
+        }
+        // ![alt](url) and [label](url) both reduce to the text a reader sees.
+        text = text.replaceAll("!\\[([^\\]]*)\\]\\([^)]*\\)", "$1");
+        text = text.replaceAll("\\[([^\\]]*)\\]\\([^)]*\\)", "$1");
+        // A reference link written as [Type] names that type.
+        text = text.replaceAll("\\[([^\\]]*)\\]", "$1");
+        text = text.replace("`", "");
+        text = text.replaceAll("\\*\\*([^*]+)\\*\\*", "$1");
+        text = text.replaceAll("(?<![A-Za-z0-9])[*_]([^*_]+)[*_](?![A-Za-z0-9])", "$1");
+        // A marker with no partner left is not emphasis, it is a stray asterisk.
+        text = text.replace("**", "");
+        return text.strip();
+    }
+
+    /**
      * A cut index that never falls between the halves of a surrogate pair.
      *
      * <p>Cutting one in half produces a lone surrogate, which is not
@@ -199,15 +228,15 @@ final class TypeNames {
         return depth <= 0;
     }
 
-    /** Whether cutting here would leave a code span open. */
-    private static boolean unbalancedCodeSpan(String text, int cut) {
-        int ticks = 0;
-        for (int i = 0; i < cut; i++) {
-            if (text.charAt(i) == '`') {
-                ticks++;
-            }
+    /** Whether a delimiter appears an odd number of times, so a span is left open. */
+    private static boolean unbalanced(String text, String delimiter) {
+        int count = 0;
+        int at = text.indexOf(delimiter);
+        while (at >= 0) {
+            count++;
+            at = text.indexOf(delimiter, at + delimiter.length());
         }
-        return ticks % 2 != 0;
+        return count % 2 != 0;
     }
 
     /**
@@ -232,13 +261,22 @@ final class TypeNames {
         // on the package page and shown raw in search: JSONWriter.ArrayBuilder
         // opens "Fluent builder for `[ ..., ..., ... ]`." and was cut mid span.
         boolean inCode = false;
+        boolean inBold = false;
         for (int i = 0; i < text.length() - 1; i++) {
             char c = text.charAt(i);
             if (c == '`') {
                 inCode = !inCode;
                 continue;
             }
-            if (!inCode && c == '.' && Character.isWhitespace(text.charAt(i + 1))
+            // A full stop inside "**...**" is inside the span, and cutting there
+            // leaves the emphasis open: BrowserNavigationCallback and Dictionary
+            // both open with a bold note whose first sentence ends inside it.
+            if (!inCode && c == '*' && i + 1 < text.length() && text.charAt(i + 1) == '*') {
+                inBold = !inBold;
+                i++;
+                continue;
+            }
+            if (!inCode && !inBold && c == '.' && Character.isWhitespace(text.charAt(i + 1))
                     && !isAbbreviation(text, i) && parenthesesBalanced(text, i + 1)) {
                 return text.substring(0, i + 1);
             }
@@ -249,11 +287,17 @@ final class TypeNames {
         if (text.length() <= 240) {
             return text;
         }
-        // The same rule applies to the hard length cap.
-        int cut = safeCut(text, 240);
-        while (cut > 0 && unbalancedCodeSpan(text, cut)) {
-            cut--;
+        // The hard cap can land inside a span too, and walking back until it does
+        // not is the wrong repair: BrowserNavigationCallback opens with a bold
+        // note that runs past the cap, so backing out of it would leave nothing.
+        // Closing what the cut opened keeps the text and the markup valid.
+        String cropped = text.substring(0, safeCut(text, 240)).strip() + "...";
+        if (unbalanced(cropped, "**")) {
+            cropped += "**";
         }
-        return text.substring(0, cut).strip() + "...";
+        if (unbalanced(cropped, "`")) {
+            cropped += "`";
+        }
+        return cropped;
     }
 }
