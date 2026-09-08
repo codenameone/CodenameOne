@@ -100,7 +100,25 @@ public final class LambdaRuntime {
         }
         try {
             byte[] payload = (result == null ? "null" : result).getBytes("UTF-8");
-            Http.post(host, port, API_VERSION + "/invocation/" + requestId + "/response", payload);
+            // The status matters: the Runtime API REJECTS a result it will not take
+            // -- 413 for a payload over the response limit is the ordinary case --
+            // and answers rather than throwing. Discarding it meant the handler's
+            // work was dropped and the loop went straight back to polling, with the
+            // caller left waiting for a reply that was never accepted and nothing
+            // anywhere saying why.
+            Http.Response posted = Http.post(host, port,
+                    API_VERSION + "/invocation/" + requestId + "/response", payload);
+            if(posted == null || posted.getStatus() < 200 || posted.getStatus() >= 300) {
+                System.err.println("The Lambda runtime API refused the response for "
+                        + requestId + " with status "
+                        + (posted == null ? "none" : String.valueOf(posted.getStatus()))
+                        + "; the result of " + payload.length + " byte(s) was not "
+                        + "delivered. Reporting it as an error so the invocation "
+                        + "does not simply hang.");
+                reportError(host, port, requestId, new java.io.IOException(
+                        "the runtime API refused the response with status "
+                        + (posted == null ? "none" : String.valueOf(posted.getStatus()))));
+            }
         } catch (Exception err) {
             System.err.println("Failed to post the response for " + requestId + ": " + err);
         }
@@ -113,7 +131,16 @@ public final class LambdaRuntime {
             // malformed error and masks the real failure.
             String json = "{\"errorType\":\"" + escape(cause.getClass().getName())
                     + "\",\"errorMessage\":" + quote(cause.getMessage()) + "}";
-            Http.post(host, port, API_VERSION + "/invocation/" + requestId + "/error", json.getBytes("UTF-8"));
+            Http.Response posted = Http.post(host, port,
+                    API_VERSION + "/invocation/" + requestId + "/error",
+                    json.getBytes("UTF-8"));
+            // Nothing left to escalate to if even this is refused, but a silent
+            // failure here is how an invocation disappears without a trace.
+            if(posted == null || posted.getStatus() < 200 || posted.getStatus() >= 300) {
+                System.err.println("The Lambda runtime API refused the error report for "
+                        + requestId + " with status "
+                        + (posted == null ? "none" : String.valueOf(posted.getStatus())));
+            }
         } catch (Exception err) {
             System.err.println("Failed to report the error for " + requestId + ": " + err);
         }

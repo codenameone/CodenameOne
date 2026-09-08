@@ -9880,8 +9880,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 try { appCtx.unregisterReceiver(this); } catch (Throwable ignore) {}
                 String pkg = null;
                 try {
-                    android.content.ComponentName cn = intent.getParcelableExtra(Intent.EXTRA_CHOSEN_COMPONENT);
-                    if (cn != null) pkg = cn.getPackageName();
+                    // Taken as a Parcelable and tested, rather than assigned straight
+                    // to ComponentName: that assignment compiles to a CHECKCAST whose
+                    // failure this catch would have to handle, and ParparVM does not
+                    // throw for a failed cast, so the gate refuses that shape. The
+                    // extra is whatever the sending application chose to put there.
+                    android.os.Parcelable chosen =
+                            intent.getParcelableExtra(Intent.EXTRA_CHOSEN_COMPONENT);
+                    if (chosen instanceof android.content.ComponentName) {
+                        pkg = ((android.content.ComponentName) chosen).getPackageName();
+                    }
                 } catch (Throwable ignore) {}
                 listener.onResult(com.codename1.share.ShareResult.sharedTo(pkg));
             }

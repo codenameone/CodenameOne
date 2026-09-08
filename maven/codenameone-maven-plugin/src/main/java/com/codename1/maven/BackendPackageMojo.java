@@ -363,10 +363,18 @@ public class BackendPackageMojo extends AbstractMojo {
             }
             return;
         }
-        copyNonClasses(processed, classes);
+        try {
+            copyNonClasses(processed, classes);
+        } catch (IOException err) {
+            // A resource that cannot be staged is a packaging failure, not a note:
+            // the executable would be reported as built while missing something
+            // cn1:backend has, and the difference would first appear in production.
+            throw new MojoExecutionException("Could not stage the processed resources "
+                    + "from " + processed + " into " + classes, err);
+        }
     }
 
-    private void copyNonClasses(File from, File to) {
+    private void copyNonClasses(File from, File to) throws IOException {
         if (from == null || !from.isDirectory()) {
             return;
         }
@@ -380,11 +388,10 @@ public class BackendPackageMojo extends AbstractMojo {
                 target.mkdirs();
                 copyNonClasses(child, target);
             } else if (!child.getName().endsWith(".class")) {
-                try {
-                    copyFile(child, target);
-                } catch (IOException err) {
-                    getLog().warn("cn1: could not stage " + child + ": " + err.getMessage());
-                }
+                // Not a warning: the executable this produces would be reported
+                // as built while silently missing a resource that cn1:backend has,
+                // so the difference shows up after deployment rather than here.
+                copyFile(child, target);
             }
         }
     }

@@ -395,6 +395,29 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("a body on a 204 is suppressed rather than desynchronising the connection")
+    void bodilessStatusDoesNotDesyncTheConnection() throws Exception {
+        // /nocontent returns a 204 WITH bytes, which a handler is free to build.
+        // RFC 9110 ends such a response at the header section, so writing them
+        // would leave the client reading "junk" as the start of the second reply
+        // and everything after that misframed. Both requests go out together so
+        // that a desync is visible as a wrong reply rather than a slow one.
+        byte[] response = raw("GET /nocontent HTTP/1.1\r\nHost: x\r\n\r\n"
+                + "GET /healthz HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
+        String text = new String(response, StandardCharsets.UTF_8);
+        assertTrue(text.startsWith("HTTP/1.1 204"), "the first reply should be a 204:\n" + text);
+        assertEquals(-1, text.indexOf("junk"),
+                "a 204 must not carry a body:\n" + text);
+        assertEquals(2, countOccurrences(text, "HTTP/1.1 "),
+                "both replies must be readable back to back:\n" + text);
+        // RFC 9110 6.4.1 makes Content-Length a MUST NOT on a 204, and sending one
+        // is its own desync: a keep-alive client would wait for bytes never sent.
+        String head = text.substring(0, text.indexOf("\r\n\r\n") + 4);
+        assertEquals(-1, head.toLowerCase().indexOf("content-length"),
+                "a 204 must not carry Content-Length:\n" + head);
+    }
+
+    @Test
     @DisplayName("Content-Length together with Transfer-Encoding is refused")
     void refusesConflictingFraming() throws Exception {
         // Two framings in one request is how a request is smuggled past a proxy

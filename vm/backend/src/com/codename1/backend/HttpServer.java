@@ -2853,7 +2853,10 @@ public final class HttpServer {
                     }
                 }
                 String contentType = safeContentType(response.contentType);
-                if(response.fileFd >= 0 && !headOnly) {
+                // The same rule as HTTP/1: a 204, 304 or 1xx carries no body, so
+                // a DATA frame must not follow the headers here either.
+                boolean noBody = headOnly || statusForbidsBody(response.status);
+                if(response.fileFd >= 0 && !noBody) {
                     // Streamed frame by frame out of the descriptor. Reading the file
                     // in first cost its whole size in the heap plus the same again in
                     // the native copy, so a large enough public file turned one request
@@ -2864,7 +2867,7 @@ public final class HttpServer {
                             extra, response.fileFd, response.fileOffset, response.fileLength);
                 } else {
                     h2.respond(stream.getId(), response.status, contentType, extra,
-                            responseBodyFor(response, headOnly));
+                            responseBodyFor(response, noBody));
                 }
                 requestsServed.incrementAndGet();
                 } finally {
@@ -2938,6 +2941,30 @@ public final class HttpServer {
      * have to be produced here -- so it is read in, and the descriptor is released
      * either way.
      */
+    /**
+     * Whether this status ends the response at the header section.
+     *
+     * RFC 9110: a 1xx, 204 or 304 response carries no body, and a client stops
+     * reading at the blank line. Writing one anyway does not merely waste bytes
+     * -- on a keep-alive connection the client reads those bytes as the start of
+     * the NEXT response, and everything after that on the connection is
+     * misframed. Only HEAD used to be treated this way.
+     */
+    static boolean statusForbidsBody(int status) {
+        return status == 204 || status == 304 || (status >= 100 && status < 200);
+    }
+
+    /**
+     * Whether this status must not carry Content-Length at all.
+     *
+     * RFC 9110 6.4.1 makes that a MUST NOT for 1xx and 204. Note 304 is NOT in
+     * this set: like a HEAD, it reports the length the body would have had, which
+     * is what lets a cache validate against it.
+     */
+    static boolean statusForbidsLength(int status) {
+        return status == 204 || (status >= 100 && status < 200);
+    }
+
     private byte[] responseBodyFor(Response response, boolean headOnly) throws IOException {
         if(response.fileFd < 0) {
             if(headOnly) {
@@ -3598,6 +3625,9 @@ public final class HttpServer {
         }
         long bodyLength = response.fileFd >= 0 ? response.fileLength
                 : (deferred != null ? deferredLength : response.body.length);
+        // HEAD is not the only thing that suppresses a body; see statusForbidsBody.
+        boolean noBody = headOnly || statusForbidsBody(response.status);
+        boolean noLength = statusForbidsLength(response.status);
 
         // Assembled into the connection's own buffer, as bytes, with no
         // intermediate String. See Conn.out: the StringBuilder-to-String-to-bytes
@@ -3631,9 +3661,12 @@ public final class HttpServer {
             conn.put(H_DATE, 0, H_DATE.length);
             conn.put(currentHttpDateBytes(), 0, HTTP_DATE_LENGTH);
             // Always an explicit length: without it a keep-alive client waits for
-            // a close that is not coming.
-            conn.put(H_CLEN, 0, H_CLEN.length);
-            conn.putNumber(bodyLength);
+            // a close that is not coming. The exception is a status the spec says
+            // must not carry one, where the absent header IS the framing.
+            if(!noLength) {
+                conn.put(H_CLEN, 0, H_CLEN.length);
+                conn.putNumber(bodyLength);
+            }
             if(keepAlive) {
                 conn.put(H_KEEPALIVE, 0, H_KEEPALIVE.length);
             } else {
@@ -3654,8 +3687,10 @@ public final class HttpServer {
             conn.put(safeContentType(response.contentType));
             conn.put("\r\nDate: ");
             conn.put(currentHttpDateBytes(), 0, HTTP_DATE_LENGTH);
-            conn.put("\r\nContent-Length: ");
-            conn.putNumber(bodyLength);
+            if(!noLength) {
+                conn.put("\r\nContent-Length: ");
+                conn.putNumber(bodyLength);
+            }
             conn.put(keepAlive ? "\r\nConnection: keep-alive" : "\r\nConnection: close");
         }
         if(response.extraHeaders != null) {
@@ -3702,13 +3737,13 @@ public final class HttpServer {
         // would cost more than the syscall it saves, and a file body never enters
         // user space at all -- both keep the two-write path.
         if(deferred != null) {
-            if(!headOnly && deferredLength > 0) {
+            if(!noBody && deferredLength > 0) {
                 conn.put(deferred, 0, deferredLength);
             }
             writeTo(fd, session, conn.out, 0, conn.outLength);
             return;
         }
-        if(response.fileFd < 0 && !headOnly
+        if(response.fileFd < 0 && !noBody
                 && response.body.length > 0
                 && response.body.length <= COMBINED_WRITE_LIMIT) {
             conn.put(response.body, 0, response.body.length);
@@ -3719,7 +3754,7 @@ public final class HttpServer {
 
         if(response.fileFd >= 0) {
             try {
-                if(!headOnly) {
+                if(!noBody) {
                     StaticFiles.sendBody(fd, session, response.fileFd, response.fileOffset, response.fileLength);
                 }
             } finally {
@@ -3730,7 +3765,7 @@ public final class HttpServer {
             }
             return;
         }
-        if(!headOnly && response.body.length > 0) {
+        if(!noBody && response.body.length > 0) {
             writeTo(fd, session, response.body, 0, response.body.length);
         }
     }

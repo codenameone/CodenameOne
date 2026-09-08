@@ -441,6 +441,18 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         }
         Controller first = controllers.values().iterator().next();
         String bootstrap = qualify(first.packageName, "BackendApplication");
+        // A class of this name already in that package would be OVERWRITTEN in the
+        // output directory by the one compiled below -- silently, because the
+        // generated source compiles perfectly well. The packaged application then
+        // runs this bootstrap instead of the developer's own, dropping whatever
+        // startup it did: TLS, middleware, pooling. Refusing is the only safe
+        // answer, since there is no way to tell which one they meant.
+        if (ctx.lookup(bootstrap.replace('.', '/')) != null) {
+            ctx.error(first.packageName + ".BackendApplication already "
+                    + "exists, and the generated entry point would replace it. Rename "
+                    + "that class, or move the controllers into another package.");
+            return;
+        }
         sources.put(bootstrap, generateBootstrap(first.packageName));
         try {
             List<File> cp = new ArrayList<File>();

@@ -96,6 +96,15 @@ public class PetServer {
                 if("/healthz".equals(stripQuery(target))) {
                     return HttpServer.Response.json(200, Json.write(serverRef[0].getMetrics()));
                 }
+                // Deliberately a body on a status that cannot carry one. A handler
+                // is allowed to build this -- the Response constructor takes any
+                // status and any bytes -- and suppressing it is the server's job,
+                // because writing it would leave the client reading those bytes as
+                // the start of the next reply on a keep-alive connection.
+                if("/nocontent".equals(stripQuery(target))) {
+                    return new HttpServer.Response(204, "text/plain",
+                            "junk".getBytes("UTF-8"));
+                }
                 if(!dispatcher.hasRoute(method, target)) {
                     if(files != null) {
                         HttpServer.Response served = files.handle(request);
