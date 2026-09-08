@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>${groupId}</groupId>
+        <artifactId>${rootArtifactId}</artifactId>
+        <version>${version}</version>
+    </parent>
+    <groupId>${groupId}</groupId>
+    <artifactId>${artifactId}</artifactId>
+    <version>${version}</version>
+    <packaging>jar</packaging>
+
+    <name>${artifactId}</name>
+
+    <!--
+      The server side of this app, in the same language as the rest of it.
+
+      Two commands matter here:
+
+        mvn -pl backend cn1:backend           runs it on this JVM, in seconds
+        mvn -pl backend cn1:backend-package   builds a native binary to deploy
+
+      The first is the development loop. The second produces a single executable
+      with no runtime to install, which is what lets the deployed container be the
+      size of the binary and a serverless cold start be a process exec.
+
+      This module deliberately does NOT depend on codenameone-core: a server has no
+      display, and the compiler saying so at the point of the import is more useful
+      than a crash at start-up. Share types with the app by putting them in a module
+      both depend on, or by declaring a @RestClient contract: the same interface
+      generates the app's client and this module's dispatcher.
+    -->
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-backend</artifactId>
+            <version>${cn1.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-maven-plugin</artifactId>
+                <version>${cn1.plugin.version}</version>
+                <configuration>
+                    <mainClass>${package}.BackendServer</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

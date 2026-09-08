@@ -219,6 +219,23 @@
             </modules>
         </profile>
         <profile>
+            <!--
+              The server side. Not built by default: a client-only app should not
+              pay for it, and `mvn -Dcodename1.platform=backend package` is what
+              asks for it. `mvn -pl backend cn1:backend` runs it on this JVM.
+            -->
+            <id>backend</id>
+            <activation>
+                <property>
+                    <name>codename1.platform</name>
+                    <value>backend</value>
+                </property>
+            </activation>
+            <modules>
+                <module>backend</module>
+            </modules>
+        </profile>
+        <profile>
             <id>android</id>
             <activation>
                 <property>
