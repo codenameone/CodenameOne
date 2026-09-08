@@ -4035,6 +4035,21 @@ void codenameOneGCMark() {
             cn1GcSatbEntries += n;
 #endif
             if(n == 0) {
+                // A ZERO HERE IS NOT ALWAYS "NOTHING SLIPPED IN". cn1SatbTake reports an
+                // empty batch both when the log was empty and when it could not grow its
+                // scratch buffer and threw the entries away -- it records the second case
+                // in cn1SatbDrops, but this catch runs AFTER cn1GcProcessReferences made
+                // its last drop check, so nothing would otherwise look at the new value.
+                // A getter that logged successfully and had its batch discarded here would
+                // then keep a pointer the following sweep frees.
+                //
+                // Retaining is the answer rather than another clear pass: the barrier is
+                // coming down, so there is no sound basis left for deciding anything is
+                // dead.
+                if(atomic_load_explicit(&cn1SatbDrops, memory_order_relaxed)
+                       != cn1RefDropsAtCycleStart) {
+                    cn1GcRetainAllReferences(d);
+                }
                 break;                       // nothing slipped in: closed, barrier down
             }
             // The ONLY way out of this loop is the empty catch above. There is deliberately
