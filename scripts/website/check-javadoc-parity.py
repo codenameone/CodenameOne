@@ -22,6 +22,7 @@ Usage:
 from __future__ import annotations
 
 import collections
+import json
 import pathlib
 import re
 import sys
@@ -47,6 +48,56 @@ class _LinkCollector(HTMLParser):
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         self.handle_starttag(tag, attrs)
+
+
+def check_search_index(hugo: pathlib.Path, index: pathlib.Path) -> int:
+    """Every entry in the API search index must land on a page and an id.
+
+    Its own pass because the index is JSON, not markup: the link checker walks
+    <a href> attributes and cannot see it at all. That blind spot shipped a real
+    defect -- constructors promoted from an undocumented superclass were indexed
+    against <init> fragments on the subclass page, which does not render them --
+    so search offered results that went nowhere.
+    """
+    if not index.exists():
+        print(f"search index not found at {index}; skipping")
+        return 0
+
+    pages = {p.relative_to(hugo).as_posix() for p in hugo.rglob("*.html")}
+    ids: dict[str, set[str]] = {}
+    for path in hugo.rglob("*.html"):
+        collector = _LinkCollector()
+        collector.feed(path.read_text(errors="replace"))
+        collector.close()
+        ids[path.relative_to(hugo).as_posix()] = collector.ids
+
+    payload = json.loads(index.read_text())
+    missing: collections.Counter = collections.Counter()
+    checked = 0
+    for entry in payload.get("types", []):
+        url = entry.get("u", "")
+        if not url.startswith("/javadoc/"):
+            continue
+        target = url[len("/javadoc/"):] or "index.html"
+        checked += 1
+        if target not in pages:
+            missing[url] += 1
+            continue
+        for member in entry.get("m", []) or []:
+            if len(member) != 2:
+                continue
+            checked += 1
+            if member[1] not in ids[target]:
+                missing[f"{url}#{member[1]}"] += 1
+
+    print(f"search index entries checked: {checked}")
+    if not missing:
+        print("OK: every search result lands on something that exists")
+        return 0
+    print(f"{sum(missing.values())} search entr(ies) pointing at nothing:")
+    for target, count in missing.most_common(15):
+        print(f"  {count:5d}  {target}")
+    return 1
 
 
 def check_internal_links(hugo: pathlib.Path) -> int:
@@ -298,7 +349,11 @@ def main(argv: list[str]) -> int:
     print("OK: every published API address is answered by the site")
 
     print()
-    return check_internal_links(hugo)
+    if check_internal_links(hugo):
+        return 1
+
+    print()
+    return check_search_index(hugo, hugo.parent / "javadoc-search.json")
 
 
 if __name__ == "__main__":

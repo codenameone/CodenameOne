@@ -175,13 +175,34 @@ public final class HugoDoclet implements Doclet {
                     .replace('.', '/').toLowerCase(Locale.ROOT));
         }
         for (TypeElement type : documented.values()) {
-            for (TypeMirror supertype : types.directSupertypes(type.asType())) {
-                if (supertype instanceof DeclaredType declared
-                        && declared.asElement() instanceof TypeElement parent
-                        && documented.containsKey(parent.getQualifiedName().toString())) {
-                    subtypes.computeIfAbsent(parent.getQualifiedName().toString(),
-                            key -> new ArrayList<>()).add(type);
-                }
+            recordSubtypeEdges(type);
+        }
+    }
+
+    /**
+     * Records this type under its nearest published ancestors.
+     *
+     * <p>Stopping at a direct parent that happens to have no page breaks the
+     * graph: the package private AbstractVisionAnalyzer sits between
+     * VisionAnalyzer and all seven of its public implementations, and every one
+     * of them was invisible from the interface's page. An unpublished type is
+     * walked through rather than treated as the end of the line.
+     */
+    private void recordSubtypeEdges(TypeElement type) {
+        Deque<TypeMirror> queue = new ArrayDeque<>(types.directSupertypes(type.asType()));
+        Set<String> visited = new LinkedHashSet<>();
+        while (!queue.isEmpty()) {
+            TypeMirror supertype = queue.removeFirst();
+            if (!(supertype instanceof DeclaredType declared)
+                    || !(declared.asElement() instanceof TypeElement parent)
+                    || !visited.add(parent.getQualifiedName().toString())) {
+                continue;
+            }
+            if (documented.containsKey(parent.getQualifiedName().toString())) {
+                subtypes.computeIfAbsent(parent.getQualifiedName().toString(),
+                        key -> new ArrayList<>()).add(type);
+            } else {
+                queue.addAll(types.directSupertypes(supertype));
             }
         }
     }
@@ -502,11 +523,35 @@ public final class HugoDoclet implements Doclet {
         return null;
     }
 
+    /**
+     * Every interface in the type's contract, the way the standard reference
+     * lists them under "All Implemented Interfaces".
+     *
+     * <p>Reading only the declaration hides everything a class gets from its
+     * superclass: CheckBox declares none of its own, so it was published with no
+     * interfaces at all while it really carries ActionSource, TextHolder,
+     * SelectableIconHolder, Animation and more.
+     */
     private List<Map<String, Object>> interfacesOf(TypeElement type) {
         List<Map<String, Object>> out = new ArrayList<>();
-        for (TypeMirror implemented : type.getInterfaces()) {
-            out.add(typeNames.reference(implemented));
+        Set<String> seen = new LinkedHashSet<>();
+        Deque<TypeMirror> queue = new ArrayDeque<>(types.directSupertypes(type.asType()));
+        while (!queue.isEmpty()) {
+            TypeMirror supertype = queue.removeFirst();
+            if (!(supertype instanceof DeclaredType declared)
+                    || !(declared.asElement() instanceof TypeElement element)) {
+                continue;
+            }
+            boolean isInterface = element.getKind() == ElementKind.INTERFACE;
+            if (isInterface && !seen.add(element.getQualifiedName().toString())) {
+                continue;
+            }
+            if (isInterface) {
+                out.add(typeNames.reference(supertype));
+            }
+            queue.addAll(types.directSupertypes(supertype));
         }
+        out.sort(Comparator.comparing(row -> String.valueOf(row.get("label"))));
         return out;
     }
 
@@ -1302,6 +1347,14 @@ public final class HugoDoclet implements Doclet {
             if (!isVisible(member) || member instanceof TypeElement) {
                 continue;
             }
+            // Constructors are not inherited and the page renders only its own,
+            // so a promoted one is a search hit pointing at an <init> fragment
+            // that does not exist: ComponentAnimation.UIMutation was offering
+            // CompoundAnimation's two constructors.
+            if (member.getKind() == ElementKind.CONSTRUCTOR
+                    && !type.equals(Refs.enclosingType(member))) {
+                continue;
+            }
             if (docReader.read(member).hidden) {
                 continue;
             }
@@ -1318,10 +1371,23 @@ public final class HugoDoclet implements Doclet {
         searchRows.add(row);
     }
 
+    /**
+     * Parameter types as a reader would write them, for the search index.
+     *
+     * <p>The last parameter of a varargs method is an array in the model, so
+     * asList(T... array) was offered as asList(T[]) -- and byte[]... as
+     * byte[][], which says something different. 1198 labels carried the array
+     * spelling and none carried an ellipsis.
+     */
     private String parameterLabels(ExecutableElement executable) {
+        List<VariableElement> parameters = new ArrayList<>(executable.getParameters());
         List<String> out = new ArrayList<>();
-        for (VariableElement parameter : executable.getParameters()) {
-            out.add(typeNames.label(parameter.asType()));
+        for (int i = 0; i < parameters.size(); i++) {
+            String label = typeNames.label(parameters.get(i).asType());
+            if (executable.isVarArgs() && i == parameters.size() - 1 && label.endsWith("[]")) {
+                label = label.substring(0, label.length() - 2) + "...";
+            }
+            out.add(label);
         }
         return String.join(", ", out);
     }

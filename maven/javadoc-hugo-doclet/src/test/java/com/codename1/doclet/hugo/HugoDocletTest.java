@@ -60,12 +60,14 @@ class HugoDocletTest {
     static Path workspace;
 
     private static Path content;
+    private static Path searchIndex;
 
     @BeforeAll
     static void generate() throws IOException {
         Path sources = workspace.resolve("src/p");
         Files.createDirectories(sources);
         content = workspace.resolve("content");
+        searchIndex = workspace.resolve("javadoc-search.json");
 
         Files.writeString(sources.resolve("Sample.java"), String.join("\n",
                 "package p;",
@@ -100,6 +102,8 @@ class HugoDocletTest {
                 "    public void arrays(byte[] a, int[][] b) {}",
                 "    /// Varargs keep the ellipsis",
                 "    public void varargs(String... parts) {}",
+                "    /// Varargs over an array type",
+                "    public void chunks(byte[]... blocks) {}",
                 "    /// A type variable is spelt twice",
                 "    public void variable(T value) {}",
                 "    /// A varargs type variable is spelt twice as well",
@@ -216,10 +220,29 @@ class HugoDocletTest {
                 "public class UsesShared {}",
                 ""), StandardCharsets.UTF_8);
 
+        Files.writeString(sources.resolve("Marker.java"), String.join("\n",
+                "package p;",
+                "/// A marker interface inherited by everything below Holder.",
+                "public interface Marker {}",
+                ""), StandardCharsets.UTF_8);
+
+        // Marker <- Hidden (package private) <- Visible. The edge from Marker to
+        // Visible only exists if the walk goes through a type with no page.
+        Files.writeString(sources.resolve("Hidden.java"), String.join("\n",
+                "package p;",
+                "/// Not published: package private.",
+                "abstract class Hidden implements Marker {}",
+                ""), StandardCharsets.UTF_8);
+        Files.writeString(sources.resolve("Visible.java"), String.join("\n",
+                "package p;",
+                "/// Published, and only reachable from Marker through Hidden.",
+                "public class Visible extends Hidden {}",
+                ""), StandardCharsets.UTF_8);
+
         Files.writeString(sources.resolve("Holder.java"), String.join("\n",
                 "package p;",
                 "/// Holds one value.",
-                "public class Holder<T> {}",
+                "public class Holder<T> implements Marker {}",
                 ""), StandardCharsets.UTF_8);
         // The middle class must itself be generic, which is what makes the
         // substitution something that can be lost: HashMap<K, V> extends
@@ -269,11 +292,14 @@ class HugoDocletTest {
                     sources.resolve("Sample.java"), sources.resolve("Other.java"),
                     sources.resolve("Child.java"),
                     sources.resolve("Shared.java"), sources.resolve("UsesShared.java"),
-                    sources.resolve("Listener.java"), sources.resolve("Holder.java"),
+                    sources.resolve("Listener.java"), sources.resolve("Marker.java"),
+                    sources.resolve("Hidden.java"), sources.resolve("Visible.java"),
+                    sources.resolve("Holder.java"),
                     sources.resolve("Middle.java"), sources.resolve("Ints.java"),
                     other.resolve("Shared.java"), other.resolve("UsesShared.java"));
             boolean ok = tool.getTask(null, files, null, HugoDoclet.class,
                     List.of("-d", content.toString(),
+                            "--search-index", searchIndex.toString(),
                             "-sourcepath", workspace.resolve("src").toString(),
                             "-protected", "-quiet"),
                     units).call();
@@ -522,6 +548,38 @@ class HugoDocletTest {
         assertTrue(page.contains("Holder<Integer>"),
                 "the concrete argument survives one level up: " + page);
         assertFalse(page.contains("Holder<T>"), "not the declaration's own variable");
+    }
+
+    @Test
+    void reachesSubtypesThroughAnUnpublishedParent() throws IOException {
+        // The intermediate has to be package private for anything to be lost:
+        // AbstractVisionAnalyzer sits between VisionAnalyzer and all seven of its
+        // public implementations, and every one was invisible from the
+        // interface's page. A published middle would list its own children and
+        // the test would pass either way.
+        String marker = page("Marker.md");
+        assertTrue(marker.contains("Visible"),
+                "a subtype behind a package private parent is still listed: " + marker);
+    }
+
+    @Test
+    void listsInterfacesInheritedFromASuperclass() throws IOException {
+        // CheckBox declares none of its own and was published with no interfaces
+        // at all, while it really carries several through Component.
+        assertTrue(page("Ints.md").contains("Marker"),
+                "an interface inherited through the superclass chain is listed");
+    }
+
+    @Test
+    void spellsVarargsWithAnEllipsisInTheSearchIndex() throws IOException {
+        // The last parameter is an array in the model, so asList(T... array) was
+        // offered as asList(T[]) and byte[]... as byte[][], which says something
+        // different. 1198 labels carried the array spelling and none an ellipsis.
+        String index = Files.readString(searchIndex, StandardCharsets.UTF_8);
+        assertTrue(index.contains("varargs(String...)"), "a plain varargs: " + index);
+        assertTrue(index.contains("chunks(byte[]...)"),
+                "an array varargs keeps one set of brackets and the ellipsis");
+        assertFalse(index.contains("chunks(byte[][])"), "not two sets of brackets");
     }
 
     @Test
