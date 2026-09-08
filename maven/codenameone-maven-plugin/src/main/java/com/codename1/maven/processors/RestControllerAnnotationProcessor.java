@@ -437,7 +437,19 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         }
         Map<String, String> sources = new LinkedHashMap<String, String>();
         for (Controller c : controllers.values()) {
-            sources.put(qualify(c.packageName, c.routerSimpleName), generateRouter(c));
+            String router = qualify(c.packageName, c.routerSimpleName);
+            // The same check the bootstrap gets below, for the same reason: a class
+            // of this name already in that package is overwritten in the output
+            // directory by the one compiled here, silently, because what is
+            // generated compiles perfectly well. Guarding only the bootstrap left
+            // every <Controller>Router able to replace a real class.
+            if (ctx.lookup(router.replace('.', '/')) != null) {
+                ctx.error(router + " already exists, and the router generated for "
+                        + c.binaryName + " would replace it. Rename that class, or "
+                        + "rename the controller.");
+                return;
+            }
+            sources.put(router, generateRouter(c));
         }
         Controller first = controllers.values().iterator().next();
         String bootstrap = qualify(first.packageName, "BackendApplication");

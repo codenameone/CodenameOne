@@ -306,6 +306,23 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             String inner = t.substring(lt + 1, t.length() - 1);
             if ("java.util.List".equals(outer) || "java.util.Set".equals(outer)) {
                 collectDtos(inner, ctx);
+            } else if ("java.util.Map".equals(outer)) {
+                // A Map of JDK values round-trips; a Map whose values are a DTO
+                // does not, and does so QUIETLY. Only List and Set recursed here,
+                // so no codec was generated for the value type: the decoder does a
+                // guarded Map cast and leaves a decoded Map in a field declared as
+                // that DTO, and the encoder writes its toString() as a JSON string.
+                // Both halves compile and neither works, so the shape is refused
+                // rather than mistranslated. Generating conversions for it is a
+                // feature, not a fix for this.
+                String value = mapValueType(inner);
+                if (namesADto(value, ctx)) {
+                    ctx.error("A transferred field typed " + t + " cannot be encoded: "
+                            + "the generated codec round-trips a Map of JDK values "
+                            + "only, and " + value + " would be silently replaced by "
+                            + "a plain Map on the way in. Use a list of a DTO that "
+                            + "carries the key, or a Map with JDK value types.");
+                }
             }
             return;
         }
@@ -319,6 +336,41 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             if (f.isStatic() || !f.isPublic()) continue;
             collectDtos(fieldJavaType(f), ctx);
         }
+    }
+
+    /** The value half of a Map's type arguments, honouring nested generics. */
+    private static String mapValueType(String inner) {
+        int depth = 0;
+        for (int i = 0; i < inner.length(); i++) {
+            char c = inner.charAt(i);
+            if (c == '<') {
+                depth++;
+            } else if (c == '>') {
+                depth--;
+            } else if (c == ',' && depth == 0) {
+                return inner.substring(i + 1).trim();
+            }
+        }
+        return inner.trim();
+    }
+
+    /** Whether a type, or anything inside its type arguments, is one of ours. */
+    private static boolean namesADto(String javaType, ProcessorContext ctx) {
+        if (javaType == null) {
+            return false;
+        }
+        String[] tokens = javaType.split("[<>,]");
+        for (int i = 0; i < tokens.length; i++) {
+            String token = tokens[i].trim();
+            if (token.length() == 0 || token.startsWith("java.") || token.indexOf('.') < 0) {
+                continue;
+            }
+            AnnotatedClass cls = ctx.lookup(token.replace('.', '/'));
+            if (cls != null && !cls.isInterface() && !cls.isEnum()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String fieldJavaType(FieldInfo f) {

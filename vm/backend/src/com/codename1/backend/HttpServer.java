@@ -687,6 +687,15 @@ public final class HttpServer {
     private static final int SESSION_RELEASE_GRACE_MILLIS = 2000;
 
     private static final int MAX_HEADER_BYTES = 64 * 1024;
+
+    /**
+     * How much response body one HTTP/2 turn may hold before it drains.
+     *
+     * Not a limit on any response, which MAX_BODY_BYTES governs: a limit on how
+     * many of them may sit copied into native buffers at once while this loop
+     * keeps answering the next ready stream.
+     */
+    private static final long MAX_QUEUED_H2_BODY_BYTES = 4L * 1024 * 1024;
     private static final int MAX_BODY_BYTES = 8 * 1024 * 1024;
     private static final int READY_CAPACITY = 256;
 
@@ -924,6 +933,17 @@ public final class HttpServer {
      * wrong, and stop() waiting on it meant one idle keep-alive client held shutdown
      * for the entire drain window.
      */
+    /**
+     * HTTP/2 turns inside nghttp2, which stop() has to wait for as well.
+     *
+     * Separate from inFlightRequests rather than folded into it: that one is what
+     * getMetrics reports as active requests, and a connection pumping control
+     * frames or flushing after its last stream is not a request in flight -- but
+     * it IS a reason not to free the session under it.
+     */
+    private final java.util.concurrent.atomic.AtomicInteger http2Turns =
+            new java.util.concurrent.atomic.AtomicInteger();
+
     private final java.util.concurrent.atomic.AtomicInteger inFlightRequests =
             new java.util.concurrent.atomic.AtomicInteger();
 
@@ -1284,7 +1304,8 @@ public final class HttpServer {
         // while one is still inside it is the thing being avoided, so the sweep below
         // waits for the count to reach zero rather than assuming it has.
         long freeBy = System.currentTimeMillis() + SESSION_RELEASE_GRACE_MILLIS;
-        while(System.currentTimeMillis() < freeBy && inFlightRequests.get() > 0) {
+        while(System.currentTimeMillis() < freeBy
+                && (inFlightRequests.get() > 0 || http2Turns.get() > 0)) {
             try {
                 Thread.sleep(20);
             } catch (InterruptedException err) {
@@ -1300,7 +1321,7 @@ public final class HttpServer {
         // sessions are left alone. That leaks one per live connection, which a
         // process about to exit does not care about and a use-after-free is not
         // a trade for.
-        if(inFlightRequests.get() > 0) {
+        if(inFlightRequests.get() > 0 || http2Turns.get() > 0) {
             releaseVirtualThreadSlot();
             synchronized(stopped) {
                 fullyStopped = true;
@@ -2823,6 +2844,13 @@ public final class HttpServer {
      */
     private void serveHttp2(int fd, long session, byte[] pending, int pendingLength) {
         Http2 h2;
+        // Held for the WHOLE turn, not just while a handler runs. The per-stream
+        // count below drops to zero as the last response is submitted, and the
+        // flush and the liveness check after the loop still call into nghttp2 and
+        // the TLS session -- so stop() could see nothing in flight and free both
+        // underneath this thread. A turn with no completed request at all, one
+        // that only pumped control frames, was never counted by anything.
+        http2Turns.incrementAndGet();
         try {
             Object existing = http2Sessions.get(new Integer(fd));
             if(existing == null) {
@@ -2847,6 +2875,14 @@ public final class HttpServer {
                 h2.receive(scratch, 0, n);
             }
 
+            // Every submitted body is COPIED into a native buffer that lives until
+            // the flush after this loop, so a connection completing many streams at
+            // once holds all of them at the same time: with the concurrency this
+            // server advertises and an endpoint returning a large body, one client
+            // could hold hundreds of megabytes of native response buffers on top of
+            // the Java ones. Draining when enough has piled up bounds that without
+            // paying a syscall per response.
+            long queuedBodyBytes = 0;
             Http2.Stream stream;
             while((stream = h2.nextRequest()) != null) {
                 // :authority is what Host is in HTTP/1.1, so the handler sees a
@@ -2907,10 +2943,16 @@ public final class HttpServer {
                     h2.respondFile(stream.getId(), response.status, contentType,
                             extra, response.fileFd, response.fileOffset, response.fileLength);
                 } else {
+                    byte[] h2Body = responseBodyFor(response, noBody);
+                    queuedBodyBytes += h2Body == null ? 0 : h2Body.length;
                     h2.respond(stream.getId(), response.status, contentType, extra,
-                            responseBodyFor(response, noBody));
+                            h2Body);
                 }
                 requestsServed.incrementAndGet();
+                if(queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES) {
+                    flushHttp2(fd, session, h2);
+                    queuedBodyBytes = 0;
+                }
                 } finally {
                     // Held until the response has been SUBMITTED, not merely produced.
                     // Releasing it after the handler let stop() see no work in flight
@@ -2930,6 +2972,8 @@ public final class HttpServer {
         } catch (Exception err) {
             trace("fd=" + fd + " http/2 failed: " + err);
             drop(fd);
+        } finally {
+            http2Turns.decrementAndGet();
         }
     }
 
@@ -3286,6 +3330,12 @@ public final class HttpServer {
         int targetLength = secondSpace - targetStart;
         // The origin-form target when it had to be built rather than pointed at.
         String synthesized = null;
+        // The authority of an absolute-form target. RFC 9112 3.2.2 says a server
+        // receiving one MUST use it and IGNORE the Host field, so keeping it lets
+        // the two be compared: a proxy sending "GET http://public.example/p" with
+        // "Host: internal.example" would otherwise leave getHeader("host") saying
+        // internal.example to whatever routes or authorizes on it.
+        String absoluteAuthority = null;
         // Absolute-form ("GET http://host/path"), which a request through a proxy
         // uses and RFC 9112 requires a server to accept.
         if(sliceStartsWithIgnoreCase(raw, targetStart, targetLength, "http://")
@@ -3298,6 +3348,13 @@ public final class HttpServer {
             // Whichever comes first ends the authority. Looking only for '/' drops the
             // query of "http://host?a=b" on the floor, and reads a '/' INSIDE a query
             // value as the start of the path.
+            int authorityEnd = end;
+            if(slash >= 0 && (question < 0 || slash < question)) {
+                authorityEnd = slash;
+            } else if(question >= 0) {
+                authorityEnd = question;
+            }
+            absoluteAuthority = asciiString(raw, authority, authorityEnd - authority);
             if(slash >= 0 && (question < 0 || slash < question)) {
                 targetLength = end - slash;
                 targetStart = slash;
@@ -3409,6 +3466,7 @@ public final class HttpServer {
         boolean chunked = false;
         String transferEncoding = null;
         int hostCount = 0;
+        String hostValue = null;
         for(int iter = 0 ; iter < headerCount ; iter++) {
             int base = iter * 4;
             if(sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], CONTENT_LENGTH_BYTES)) {
@@ -3433,6 +3491,9 @@ public final class HttpServer {
                         : transferEncoding + "," + value;
             } else if(sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], HOST_BYTES)) {
                 hostCount++;
+                if(hostValue == null) {
+                    hostValue = asciiString(raw, slices[base + 2], slices[base + 3]);
+                }
             }
         }
         if(transferEncoding != null) {
@@ -3447,6 +3508,15 @@ public final class HttpServer {
         // request reaches the wrong virtual host.
         if("HTTP/1.1".equals(version) && hostCount == 0) {
             throw new ProtocolException(400, "missing Host header");
+        }
+        // Refused rather than silently preferred one of the two. The authority is
+        // what this server must act on, but a handler reading getHeader("host")
+        // would still see the other, and a request that carries two different
+        // answers to "which host did you mean" has no honest interpretation.
+        if(absoluteAuthority != null && hostValue != null
+                && !absoluteAuthority.equalsIgnoreCase(hostValue)) {
+            throw new ProtocolException(400,
+                    "the request target's authority and the Host header disagree");
         }
         // RFC 9112 3.2: more than one Host is a 400. Accepting it lets the two
         // request APIs disagree -- getHeader returns the first, getHeaders keeps the
