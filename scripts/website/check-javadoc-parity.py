@@ -79,6 +79,10 @@ CHROME_PAGES = {
 
 CHROME_DIRS = ("legal/", "resource-files/", "script-dir/", "resources/")
 
+# Floors that make a vacuous pass impossible. See the check in main().
+MINIMUM_PAGES = 1000
+MINIMUM_FRAGMENTS = 10000
+
 # Per-package class hierarchy pages. Not generated: the type pages carry the
 # inheritance chain and the known subtypes, which is what a reader wanted from
 # them, and no link in the tree points at one.
@@ -182,8 +186,21 @@ def main(argv: list[str]) -> int:
 
     failures += missing_anchors
 
+    # A comparison that compared almost nothing reports nothing missing, which
+    # reads exactly like success. The API is roughly 2270 pages and 29500
+    # fragments, so these floors are far below any real tree and only trip when
+    # one side failed to generate or the parser stopped recognising anything --
+    # which is precisely what a quotes-only id pattern did against the minified
+    # build, silently on the passing side.
+    compared = len(standard_pages & hugo_pages)
+    if compared < MINIMUM_PAGES or checked_anchors < MINIMUM_FRAGMENTS:
+        print(f"only {compared} page(s) and {checked_anchors} fragment(s) were compared; "
+              f"expected at least {MINIMUM_PAGES} and {MINIMUM_FRAGMENTS}. "
+              "One side did not generate, or nothing was parsed out of it.")
+        return 1
+
     print()
-    print(f"pages compared:    {len(standard_pages & hugo_pages)}")
+    print(f"pages compared:    {compared}")
     print(f"fragments checked: {checked_anchors}")
     if failures:
         print(f"FAILED: {len(missing_pages)} missing page(s), {missing_anchors} missing fragment(s)")
