@@ -1714,6 +1714,17 @@ volatile int gcSatbActive = 0;
 volatile int gcSatbTerminating = 0;
 static JAVA_OBJECT* gcSatbStack = 0;
 static long gcSatbTop = 0;                 // guarded by gcSatbMutex
+
+/*
+ * The take-side staging buffer, and the high-water mark both it and the log are
+ * trimmed against. File scope rather than a static inside cn1SatbTake so
+ * cn1SatbTrim can reach it: it grows exactly like the log and was never shrunk
+ * either, so the two together held ~28MB of EMPTY buffer on a backend that had
+ * seen one busy period. All three are guarded by gcSatbMutex.
+ */
+static JAVA_OBJECT* gcSatbScratch = 0;
+static long gcSatbScratchCap = 0;
+static long gcSatbPeak = 0;                // largest batch since the last trim
 static long gcSatbCap = 0;
 static pthread_mutex_t gcSatbMutex = PTHREAD_MUTEX_INITIALIZER;
 // Monotonic count of objects transitioned unmarked->marked this process; the SATB
@@ -2099,17 +2110,72 @@ void cn1SatbEnqueue(JAVA_OBJECT old) {
 static long cn1SatbTake(JAVA_OBJECT** out) {
     pthread_mutex_lock(&gcSatbMutex);
     long n = gcSatbTop;
-    static JAVA_OBJECT* scratch = 0; static long scratchCap = 0;
-    if(n > scratchCap) {
-        long nc = n < 8192 ? 8192 : n;
-        scratch = (JAVA_OBJECT*)realloc(scratch, (size_t)nc * sizeof(JAVA_OBJECT));
-        scratchCap = nc;
+    if(n > gcSatbPeak) {
+        gcSatbPeak = n;                    // what the log actually had to hold
     }
-    if(n > 0 && scratch != 0) memcpy(scratch, gcSatbStack, (size_t)n * sizeof(JAVA_OBJECT));
+    if(n > gcSatbScratchCap) {
+        long nc = n < 8192 ? 8192 : n;
+        JAVA_OBJECT* ns = (JAVA_OBJECT*)realloc(gcSatbScratch, (size_t)nc * sizeof(JAVA_OBJECT));
+        if(ns != 0) {
+            gcSatbScratch = ns;
+            gcSatbScratchCap = nc;
+        }
+    }
+    if(n > 0 && gcSatbScratch != 0) memcpy(gcSatbScratch, gcSatbStack, (size_t)n * sizeof(JAVA_OBJECT));
     gcSatbTop = 0;
     pthread_mutex_unlock(&gcSatbMutex);
-    *out = scratch;
-    return (scratch != 0) ? n : 0;
+    *out = gcSatbScratch;
+    return (gcSatbScratch != 0) ? n : 0;
+}
+
+/*
+ * Give back the write-barrier log once the burst that sized it is over.
+ *
+ * gcSatbCap only ever DOUBLED. Nothing shrank it, so a backend that saw one busy
+ * period kept the peak for the life of the process: measured on the plaintext
+ * benchmark, 8MB of log and a matching staging buffer against a 12MB RSS -- two
+ * thirds of the process was an empty buffer, and the /json DTO route reached
+ * 16MB. gcSatbTop was 0 every time it was sampled, so none of it was in use.
+ *
+ * Trimmed against the high-water batch since the last trim rather than against
+ * the instantaneous depth, which is 0 here by construction (the sweep runs after
+ * a drain) and would shrink to the floor every cycle and re-grow through several
+ * reallocs on the next burst. The 4x slack and the doubling target mean a steady
+ * workload reaches a size it keeps, and only a workload whose peak genuinely fell
+ * pays a realloc.
+ *
+ * Called from the sweep, where the collector is already doing bulk work and one
+ * more pair of reallocs does not show. A failed shrink keeps the existing buffer:
+ * realloc is not required to succeed just because the block is getting smaller.
+ */
+#ifndef CN1_SATB_TRIM_FLOOR
+#define CN1_SATB_TRIM_FLOOR 8192           /* the size the log starts at: 64KB */
+#endif
+static void cn1SatbTrim(void) {
+    pthread_mutex_lock(&gcSatbMutex);
+    long peak = gcSatbPeak;
+    long want = peak * 2;
+    if(want < CN1_SATB_TRIM_FLOOR) {
+        want = CN1_SATB_TRIM_FLOOR;
+    }
+    /* Only when the log is idle -- a non-empty log is live data the mark phase
+       has not taken yet, and shrinking under it would drop tracked references. */
+    if(gcSatbTop == 0 && gcSatbCap > want * 4) {
+        JAVA_OBJECT* n = (JAVA_OBJECT*)realloc(gcSatbStack, (size_t)want * sizeof(JAVA_OBJECT));
+        if(n != 0) {
+            gcSatbStack = n;
+            gcSatbCap = want;
+        }
+    }
+    if(gcSatbScratchCap > want * 4) {
+        JAVA_OBJECT* n = (JAVA_OBJECT*)realloc(gcSatbScratch, (size_t)want * sizeof(JAVA_OBJECT));
+        if(n != 0) {
+            gcSatbScratch = n;
+            gcSatbScratchCap = want;
+        }
+    }
+    gcSatbPeak = 0;
+    pthread_mutex_unlock(&gcSatbMutex);
 }
 
 void cn1RefreshFreeMemCache(void);   // defined near cn1BibopMaybeGc; drives the dynamic pacing cap
@@ -6875,6 +6941,9 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     // pool this sweep just refilled, and outside the per-page loop so the madvise
     // work is batched rather than interleaved with the walk.
     cn1BibopTrimFreePool();
+    // Same idea one buffer over: the write-barrier log is sized by the busiest
+    // burst the process ever saw and was never given back.
+    cn1SatbTrim();
 }
 
 #ifdef CN1_GRACE_AUDIT
