@@ -517,7 +517,14 @@ public class BackendPackageMojo extends AbstractMojo {
             throw new MojoExecutionException("The translator produced nothing in " + sourceDir);
         }
         for (File file : cFiles) {
-            if (file.getName().endsWith(".c")) {
+            String name = file.getName();
+            // .S as well as .c, which is what vm/backend/build.sh compiles. The
+            // translator always emits cn1_virtual_thread_asm.S, and
+            // cn1_virtual_thread.c calls cn1VirtualThreadSwitch out of it, so a
+            // command that passed only .c reached the linker with that symbol
+            // undefined and this goal could not produce a binary at all.
+            // Generated resource assembly is in the same position.
+            if (name.endsWith(".c") || name.endsWith(".S") || name.endsWith(".s")) {
                 command.add(file.getAbsolutePath());
             }
         }

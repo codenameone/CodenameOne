@@ -297,6 +297,26 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         }
     }
 
+    /**
+     * Refuses to generate over a class the project already has.
+     *
+     * What is compiled here lands in the same output directory, so a name that
+     * already exists is simply overwritten -- silently, because what is generated
+     * compiles perfectly well. Every family generated here needs this, not just
+     * the first one somebody thought of: the server interface, the dispatcher and
+     * each DTO codec are all derived names a developer could have used.
+     */
+    private boolean wouldReplaceAnExistingClass(String binaryName, String what,
+            ProcessorContext ctx) {
+        if (ctx.lookup(binaryName.replace('.', '/')) == null) {
+            return false;
+        }
+        ctx.error(binaryName + " already exists, and the " + what + " generated for "
+                + "this API would replace it. Rename that class, or rename the "
+                + "interface the name is derived from.");
+        return true;
+    }
+
     private void collectDtos(String javaType, ProcessorContext ctx) {
         if (javaType == null) return;
         String t = javaType.trim();
@@ -396,13 +416,23 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         if (!isEnabled() || ctx.hasErrors() || accepted.isEmpty()) return;
         Map<String, String> sources = new LinkedHashMap<String, String>();
         for (Api api : accepted.values()) {
-            sources.put(qualify(api.packageName, api.serverSimpleName), generateServerInterface(api));
-            sources.put(qualify(api.packageName, api.dispatcherSimpleName), generateDispatcher(api));
+            String server = qualify(api.packageName, api.serverSimpleName);
+            String dispatcher = qualify(api.packageName, api.dispatcherSimpleName);
+            if (wouldReplaceAnExistingClass(server, "server interface", ctx)
+                    || wouldReplaceAnExistingClass(dispatcher, "dispatcher", ctx)) {
+                return;
+            }
+            sources.put(server, generateServerInterface(api));
+            sources.put(dispatcher, generateDispatcher(api));
         }
         for (Map.Entry<String, AnnotatedClass> e : dtos.entrySet()) {
             String pkg = RestClientAnnotationProcessor.packageOf(e.getKey());
             String simple = RestClientAnnotationProcessor.simpleName(e.getKey()) + "Json";
-            sources.put(qualify(pkg, simple), generateDtoCodec(e.getKey(), e.getValue()));
+            String codec = qualify(pkg, simple);
+            if (wouldReplaceAnExistingClass(codec, "JSON codec", ctx)) {
+                return;
+            }
+            sources.put(codec, generateDtoCodec(e.getKey(), e.getValue()));
         }
         try {
             List<java.io.File> cp = new ArrayList<java.io.File>();

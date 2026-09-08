@@ -114,9 +114,12 @@ public class RestControllerAnnotationProcessorTest {
                 router.text("GET", "/api/notes/42/tags/red"));
         assertEquals("{\"q\":\"hi\",\"page\":7}", router.text("GET", "/api/search?q=hi"));
         assertEquals("{\"q\":\"hi\",\"page\":3}", router.text("GET", "/api/search?q=hi&page=3"));
-        // A query string is user input: an unparseable number takes the default
-        // rather than failing the request.
-        assertEquals("{\"q\":\"hi\",\"page\":7}", router.text("GET", "/api/search?q=hi&page=zz"));
+        // Not the default: defaultValue is documented as "used when the request
+        // omits it", and "zz" is not an omission. Binding it to 7 handed the
+        // handler a page the client never asked for, and neither could tell.
+        Object malformed = router.call("GET", "/api/search?q=hi&page=zz", null);
+        assertNotNull(malformed);
+        assertEquals(400, Router.statusOf(malformed));
         assertEquals("[\"a\",\"b\"]", router.text("GET", "/api/tags"));
     }
 

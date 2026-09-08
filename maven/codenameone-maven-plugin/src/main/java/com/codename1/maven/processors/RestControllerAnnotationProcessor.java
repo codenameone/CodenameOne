@@ -106,6 +106,9 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      */
     private final Map<String, String> routeShapes = new LinkedHashMap<String, String>();
 
+    /** Which controller claimed each shape, so a clash names the other one. */
+    private final Map<String, String> routeOwners = new LinkedHashMap<String, String>();
+
     private static final class Controller {
         String binaryName;
         String packageName;
@@ -249,9 +252,71 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                         + "paths, or one method.");
                 return false;
             }
+            // Within one controller a literal route is emitted before any variable
+            // route that would swallow it -- see the comparator in generateRouter.
+            // ACROSS controllers nothing orders them: the bootstrap tries the
+            // routers in turn and takes the first non-null, so a variable route in
+            // an alphabetically earlier controller answers a literal route's own
+            // path and that method never runs. There is no ordering to fix, since
+            // a router is a set of routes rather than a single pattern, so the
+            // ambiguity is reported instead of being resolved arbitrarily.
+            String clash = crossControllerClash(controller, route, shape);
+            if (clash != null) {
+                ctx.error(cls, clash);
+                return false;
+            }
             routeShapes.put(shape, controller.binaryName + "." + route.javaMethod);
+            routeOwners.put(shape, controller.binaryName);
         }
         return true;
+    }
+
+    /**
+     * Whether a route from another controller and this one can answer each other's
+     * paths, and the message saying so.
+     *
+     * Only ACROSS controllers: inside one, generateRouter's comparator already
+     * emits the literal route first.
+     */
+    private String crossControllerClash(Controller controller, Route route, String shape) {
+        String mine = controller.binaryName;
+        for (Map.Entry<String, String> e : routeOwners.entrySet()) {
+            if (mine.equals(e.getValue())) {
+                continue;
+            }
+            String other = e.getKey();
+            if (!swallows(other, shape) && !swallows(shape, other)) {
+                continue;
+            }
+            return mine + "." + route.javaMethod + " answers " + shape + ", which "
+                    + e.getValue() + " also answers as " + other + ". The routers are "
+                    + "tried one after another, so whichever controller happens to "
+                    + "come first takes the request and the other method never runs. "
+                    + "Put both routes in one controller, where the more specific one "
+                    + "is matched first, or give them different paths.";
+        }
+        return null;
+    }
+
+    /** Whether `pattern` (which may hold {} wildcards) matches the literal `other`. */
+    private static boolean swallows(String pattern, String other) {
+        if (pattern.indexOf("{}") < 0 || other.indexOf("{}") >= 0) {
+            return false;
+        }
+        StringBuilder regex = new StringBuilder();
+        for (int i = 0; i < pattern.length(); i++) {
+            if (pattern.startsWith("{}", i)) {
+                regex.append("[^/]+");
+                i++;
+            } else {
+                char c = pattern.charAt(i);
+                if ("\\.[]{}()*+-?^$|".indexOf(c) >= 0) {
+                    regex.append('\\');
+                }
+                regex.append(c);
+            }
+        }
+        return other.matches(regex.toString());
     }
 
     /**
@@ -592,6 +657,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         }
 
         emitRequiredGuards(sb, route, pad);
+        emitScalarGuards(sb, route, pad);
         emitBodyLocals(sb, route, pad);
 
         StringBuilder args = new StringBuilder();
@@ -683,6 +749,59 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      * emptiness test comes first and an absent body stays null for a binding that
      * allows it.
      */
+    /**
+     * Refuses a scalar binding whose value is present but is not that type.
+     *
+     * "page=zz" for an int used to bind the annotation's defaultValue, so a client
+     * sending a typo got a different page rather than an error, and the handler
+     * could not tell the two apart. The annotation says defaultValue is "used when
+     * the request omits it", and a malformed value is not an omission -- the same
+     * shape of bug as an annotation element nothing reads.
+     *
+     * Numeric types only. toBoolean maps several spellings to true and everything
+     * else to false, which is a convention rather than a parse that can fail.
+     */
+    private static void emitScalarGuards(StringBuilder sb, Route route, String pad) {
+        for (int i = 0; i < route.params.size(); i++) {
+            Param p = route.params.get(i);
+            String checker = numericChecker(p.javaType);
+            if (checker == null) {
+                continue;
+            }
+            String raw;
+            String what;
+            if ("PATH".equals(p.kind)) {
+                raw = "bound[" + p.variableIndex + "]";
+                what = "path variable " + p.name;
+            } else if ("QUERY".equals(p.kind)) {
+                raw = "request.queryParam(" + quote(p.name) + ")";
+                what = "query parameter " + p.name;
+            } else if ("HEADER".equals(p.kind)) {
+                raw = "request.getHeader(" + quote(p.name) + ")";
+                what = "header " + p.name;
+            } else {
+                continue;
+            }
+            sb.append(pad).append("if (!").append(checker).append('(').append(raw)
+              .append(")) {\n");
+            sb.append(pad).append("    return request.respond(400, \"text/plain; charset=utf-8\",\n");
+            sb.append(pad).append("            utf8(").append(quote("The " + what + " is not a valid "
+                    + p.javaType)).append("));\n");
+            sb.append(pad).append("}\n");
+        }
+    }
+
+    /** The generated "does this parse" helper for a numeric type, or null. */
+    private static String numericChecker(String javaType) {
+        if ("int".equals(javaType)) return "parsesInt";
+        if ("long".equals(javaType)) return "parsesLong";
+        if ("double".equals(javaType)) return "parsesDouble";
+        if ("float".equals(javaType)) return "parsesFloat";
+        if ("short".equals(javaType)) return "parsesShort";
+        if ("byte".equals(javaType)) return "parsesByte";
+        return null;
+    }
+
     private static void emitBodyLocals(StringBuilder sb, Route route, String pad) {
         for (int i = 0; i < route.params.size(); i++) {
             Param p = route.params.get(i);
@@ -887,6 +1006,22 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append("            return ").append(numeric[i][2]).append("(value.trim());\n");
             sb.append("        } catch (NumberFormatException err) {\n");
             sb.append("            return fallback;\n");
+            sb.append("        }\n");
+            sb.append("    }\n\n");
+            // The companion the guard uses. to<Type> answers the fallback for a
+            // value that is absent AND for one that is malformed, which is exactly
+            // the distinction a caller needs to make: defaultValue is documented as
+            // "used when the request omits it", and "zz" is not an omission.
+            sb.append("    private static boolean parses").append(numeric[i][0])
+              .append("(String value) {\n");
+            sb.append("        if (value == null || value.length() == 0) {\n");
+            sb.append("            return true;\n");
+            sb.append("        }\n");
+            sb.append("        try {\n");
+            sb.append("            ").append(numeric[i][2]).append("(value.trim());\n");
+            sb.append("            return true;\n");
+            sb.append("        } catch (NumberFormatException err) {\n");
+            sb.append("            return false;\n");
             sb.append("        }\n");
             sb.append("    }\n\n");
         }
