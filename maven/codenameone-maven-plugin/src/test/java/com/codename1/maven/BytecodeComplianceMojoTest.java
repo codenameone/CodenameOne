@@ -24,8 +24,6 @@ package com.codename1.maven;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.apache.maven.artifact.DefaultArtifact;
 import org.apache.maven.artifact.handler.DefaultArtifactHandler;
 import org.apache.maven.project.MavenProject;
@@ -353,37 +351,48 @@ class BytecodeComplianceMojoTest {
      * refusal is the only thing standing between an application and an unbounded
      * side-table leak. A rule that is only proven for one of the types it claims to cover
      * is not a rule anyone should rely on, so prove it for each.
+     *
+     * A loop rather than @ParameterizedTest: this module depends on junit-jupiter-api and
+     * -engine only, and adding junit-jupiter-params to a Maven plugin's pom for one test is
+     * not worth it. The assertion message carries the wrapper so a failure still names it.
      */
-    @ParameterizedTest
-    @CsvSource({
-            "java/lang/Integer,   (I)Ljava/lang/Integer;",
-            "java/lang/Long,      (J)Ljava/lang/Long;",
-            "java/lang/Double,    (D)Ljava/lang/Double;",
-            "java/lang/Float,     (F)Ljava/lang/Float;",
-            "java/lang/Character, (C)Ljava/lang/Character;",
-            "java/lang/Short,     (S)Ljava/lang/Short;",
-            "java/lang/Byte,      (B)Ljava/lang/Byte;",
-            "java/lang/Boolean,   (Z)Ljava/lang/Boolean;"
-    })
-    void rejectsSynchronizationOnEveryPrimitiveWrapper(String owner, String descriptor,
-            @TempDir Path tempDir) throws Exception {
-        Path outputDir = tempDir.resolve("classes");
-        Path allowedDir = tempDir.resolve("allowed");
-        Files.createDirectories(outputDir);
-        Files.createDirectories(allowedDir);
+    @Test
+    void rejectsSynchronizationOnEveryPrimitiveWrapper(@TempDir Path tempDir) throws Exception {
+        String[][] wrappers = {
+                { "java/lang/Integer", "(I)Ljava/lang/Integer;" },
+                { "java/lang/Long", "(J)Ljava/lang/Long;" },
+                { "java/lang/Double", "(D)Ljava/lang/Double;" },
+                { "java/lang/Float", "(F)Ljava/lang/Float;" },
+                { "java/lang/Character", "(C)Ljava/lang/Character;" },
+                { "java/lang/Short", "(S)Ljava/lang/Short;" },
+                { "java/lang/Byte", "(B)Ljava/lang/Byte;" },
+                { "java/lang/Boolean", "(Z)Ljava/lang/Boolean;" }
+        };
+        for (int i = 0; i < wrappers.length; i++) {
+            String owner = wrappers[i][0];
+            String descriptor = wrappers[i][1];
+            String simpleName = owner.substring(owner.lastIndexOf('/') + 1);
 
-        writeJavaLangObject(allowedDir);
-        writePrimitiveWrapperApi(allowedDir, owner, "valueOf", descriptor);
-        writePrimitiveWrapperSynchronizedClass(outputDir,
-                "app/" + owner.substring(owner.lastIndexOf('/') + 1) + "LockUser",
-                owner, "valueOf", descriptor);
+            Path outputDir = tempDir.resolve(simpleName + "-classes");
+            Path allowedDir = tempDir.resolve(simpleName + "-allowed");
+            Files.createDirectories(outputDir);
+            Files.createDirectories(allowedDir);
 
-        BytecodeComplianceMojo mojo = new BytecodeComplianceMojo();
-        Map<String, ?> allowedIndex = buildClassIndex(mojo, Collections.singletonList(allowedDir.toFile()));
-        List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex, Collections.<String, Object>emptyMap());
+            writeJavaLangObject(allowedDir);
+            writePrimitiveWrapperApi(allowedDir, owner, "valueOf", descriptor);
+            writePrimitiveWrapperSynchronizedClass(outputDir, "app/" + simpleName + "LockUser",
+                    owner, "valueOf", descriptor);
 
-        assertTrue(hasViolationForReferencePrefix(violations, "Synchronization on primitive wrapper " + owner),
-                "Expected synchronization on " + owner + " to be rejected");
+            BytecodeComplianceMojo mojo = new BytecodeComplianceMojo();
+            Map<String, ?> allowedIndex = buildClassIndex(mojo,
+                    Collections.singletonList(allowedDir.toFile()));
+            List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex,
+                    Collections.<String, Object>emptyMap());
+
+            assertTrue(hasViolationForReferencePrefix(violations,
+                            "Synchronization on primitive wrapper " + owner),
+                    "Expected synchronization on " + owner + " to be rejected");
+        }
     }
 
     @Test
