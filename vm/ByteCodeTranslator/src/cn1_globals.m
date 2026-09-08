@@ -3986,6 +3986,10 @@ void codenameOneGCMark() {
     // repeats when it marked something NEW, and marks are monotonic and bounded by the live
     // set. The common case costs one extra empty cn1SatbTake.
     int reopens = 0;
+    // The drop count this cycle has already recovered from. Comparing against the
+    // cycle-start baseline instead would re-trigger the recovery on every pass, because
+    // that baseline never moves once a drop has happened.
+    long recoveredDrops = cn1RefDropsAtCycleStart;
     __atomic_store_n(&gcSatbTerminating, 1, __ATOMIC_SEQ_CST);
     for(;;) {
         for(;;) {
@@ -4046,9 +4050,32 @@ void codenameOneGCMark() {
                 // Retaining is the answer rather than another clear pass: the barrier is
                 // coming down, so there is no sound basis left for deciding anything is
                 // dead.
-                if(atomic_load_explicit(&cn1SatbDrops, memory_order_relaxed)
-                       != cn1RefDropsAtCycleStart) {
-                    cn1GcRetainAllReferences(d);
+                {
+                    long dropsNow = atomic_load_explicit(&cn1SatbDrops, memory_order_relaxed);
+                    if(dropsNow != recoveredDrops) {
+                        // RE-ARM BEFORE TRACING. Retaining marks referents that were white
+                        // and gcMarkDrain then scans them, so with the barrier down those
+                        // objects are grey and unwatched -- and a mutator moving an old
+                        // child out of one in that window logs nothing on either side, which
+                        // is the exact hazard the trial-clear comment above describes. The
+                        // clear is a TRIAL for this reason; recovery is one more thing that
+                        // can turn out to mark something new, so it goes back through the
+                        // fixpoint rather than running underneath a lowered barrier.
+                        recoveredDrops = dropsNow;
+                        __atomic_store_n(&gcSatbActive, 1, __ATOMIC_SEQ_CST);
+                        reopens++;
+#ifdef CN1_GC_CONFORM
+                        atomic_fetch_add_explicit(&cn1GcSatbReopens, 1, memory_order_relaxed);
+#endif
+                        cn1GcRetainAllReferences(d);
+                        if(reopens < CN1_SATB_MAX_REOPENS) {
+                            continue;        // round again with the barrier back up
+                        }
+                        // At the cap: fall through to the same weaker invariant the cap
+                        // documents, with the barrier lowered again below.
+                        __atomic_store_n(&gcSatbActive, 0, __ATOMIC_SEQ_CST);
+                        cn1SatbBulkQuiesce();
+                    }
                 }
                 break;                       // nothing slipped in: closed, barrier down
             }
