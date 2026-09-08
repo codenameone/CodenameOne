@@ -49,6 +49,7 @@ public class ScaffoldRenderElement extends RenderElement {
     private Element fabChild;
     private Element drawerChild;
     private Element bottomNavChild;
+    private Element footerChild;
 
     private boolean rootMode;
     private RenderHost toolbarHost;
@@ -240,10 +241,59 @@ public class ScaffoldRenderElement extends RenderElement {
     @Override
     protected void syncChildren() {
         appBarChild = updateChild(appBarChild, scaffold().getAppBar(), 0);
-        bodyChild = updateChild(bodyChild, scaffold().getBody(), 1);
-        fabChild = updateChild(fabChild, scaffold().getFloatingActionButton(), 2);
+        bodyChild = updateChild(bodyChild, bodyWidget(), 1);
+        footerChild = updateChild(footerChild, footerWidget(), 5);
         syncDrawer();
         syncBottomNav();
+        // LAST, because components attach in mount order and that is this host's
+        // paint order. Flutter's _ScaffoldSlot puts the FAB after the persistent
+        // footer and the bottom navigation bar, so it floats over both; mounted
+        // before them it is painted under them, and a DOCKED fab -- which
+        // straddles the bar's top edge by design -- loses its whole bottom half.
+        fabChild = updateChild(fabChild, scaffold().getFloatingActionButton(), 2);
+    }
+
+    /**
+     * {@code Scaffold.persistentFooterButtons} as a row pinned above the bottom
+     * of the scaffold — Flutter aligns them to the end over a divider.
+     *
+     * <p>They were captured and never rendered, so the 2D-transformations demo
+     * lost its reset and edit controls along with the strip they sit on.</p>
+     */
+    private com.codename1.flutter.Widget footerWidget() {
+        dart.core.DartList<com.codename1.flutter.Widget> buttons =
+                scaffold().getPersistentFooterButtons();
+        if (buttons == null || buttons.isEmpty()) {
+            return null;
+        }
+        com.codename1.flutter.widgets.Row row = new com.codename1.flutter.widgets.Row();
+        row.children(buttons);
+        row.mainAxisAlignment(com.codename1.flutter.MainAxisAlignment.end);
+        row.mainAxisSize(com.codename1.flutter.MainAxisSize.max);
+        com.codename1.flutter.widgets.Padding pad = new com.codename1.flutter.widgets.Padding();
+        pad.padding(com.codename1.flutter.EdgeInsets.symmetric(8, 8));
+        pad.child(row);
+        return pad;
+    }
+
+    /**
+     * The body, with the top safe-area inset already spent when this scaffold
+     * has an app bar.
+     *
+     * <p>Flutter's Scaffold does the same. The app bar is what clears the notch,
+     * so anything below it — including a nested Scaffold with an app bar of its
+     * own — must not clear it a second time. The gallery nests exactly that way:
+     * a demo page's Scaffold sits in the body of the page's own Scaffold, and
+     * without this its bar would be pushed down by a notch that has already been
+     * accounted for.</p>
+     */
+    private com.codename1.flutter.Widget bodyWidget() {
+        com.codename1.flutter.Widget body = scaffold().getBody();
+        if (body == null || scaffold().getAppBar() == null) {
+            return body;
+        }
+        return com.codename1.flutter.MediaQuery.removePadding(this, Boolean.FALSE,
+                Boolean.TRUE, Boolean.FALSE, Boolean.FALSE, body);
     }
 
     private void syncDrawer() {
@@ -288,14 +338,19 @@ public class ScaffoldRenderElement extends RenderElement {
         if (bodyChild != null) {
             visitor.call(bodyChild);
         }
-        if (fabChild != null) {
-            visitor.call(fabChild);
-        }
         if (drawerChild != null) {
             visitor.call(drawerChild);
         }
         if (bottomNavChild != null) {
             visitor.call(bottomNavChild);
+        }
+        if (footerChild != null) {
+            visitor.call(footerChild);
+        }
+        // Visited last for the same reason it is mounted last: this order is
+        // the host's paint order, and the FAB floats over the bottom strip.
+        if (fabChild != null) {
+            visitor.call(fabChild);
         }
     }
 
@@ -331,21 +386,35 @@ public class ScaffoldRenderElement extends RenderElement {
             width = Math.max(width, ns.width());
         }
 
+        // Persistent footer buttons sit above the bottom strip.
+        double footerHeight = 0;
+        RenderElement footerRender = renderOf(footerChild);
+        if (footerRender != null) {
+            Size fs = footerRender.layout(new BoxConstraints(
+                    constraints.hasBoundedWidth() ? width : 0,
+                    constraints.hasBoundedWidth() ? width : Double.POSITIVE_INFINITY,
+                    0, Double.POSITIVE_INFINITY));
+            footerHeight = fs.height();
+            width = Math.max(width, fs.width());
+        }
+
         // Body fills the remaining area.
         RenderElement bodyRender = renderOf(bodyChild);
         if (bodyRender != null) {
             BoxConstraints bodyConstraints;
             if (constraints.hasBoundedWidth() && constraints.hasBoundedHeight()) {
                 bodyConstraints = BoxConstraints.tight(width,
-                        Math.max(0, height - appBarHeight - navHeight));
+                        Math.max(0, height - appBarHeight - navHeight - footerHeight));
             } else {
                 bodyConstraints = constraints.loosen().deflate(
-                        com.codename1.flutter.EdgeInsets.only(0, appBarHeight, 0, navHeight));
+                        com.codename1.flutter.EdgeInsets.only(0, appBarHeight, 0,
+                                navHeight + footerHeight));
             }
             Size bs = bodyRender.layout(bodyConstraints);
             setChildOffset(bodyRender, 0, appBarHeight);
             width = Math.max(width, bs.width());
-            height = Math.max(height, appBarHeight + bs.height() + navHeight);
+            height = Math.max(height,
+                    appBarHeight + bs.height() + navHeight + footerHeight);
         }
 
         Size self = constraints.constrain(new Size(width, height));
@@ -354,17 +423,66 @@ public class ScaffoldRenderElement extends RenderElement {
         if (navRender != null && !rootMode) {
             setChildOffset(navRender, 0, Math.max(0, self.height() - navHeight));
         }
+        if (footerRender != null) {
+            footerRender.layout(BoxConstraints.tight(self.width(), footerHeight));
+            setChildOffset(footerRender, 0,
+                    Math.max(0, self.height() - navHeight - footerHeight));
+        }
 
-        // FAB overlays bottom-right with a 16lp margin, above the bottom strip.
         RenderElement fabRender = renderOf(fabChild);
         if (fabRender != null) {
             Size fs = fabRender.layout(BoxConstraints.loose(self.width(), self.height()));
-            double margin = Dp.px(FAB_MARGIN_LP);
             setChildOffset(fabRender,
-                    Math.max(0, self.width() - fs.width() - margin),
-                    Math.max(0, self.height() - fs.height() - margin - navHeight));
+                    fabX(scaffold().getFloatingActionButtonLocation(), self.width(), fs.width()),
+                    fabY(scaffold().getFloatingActionButtonLocation(), self.height(),
+                            fs.height(), navHeight));
         }
         return self;
+    }
+
+    /**
+     * Where the FAB sits horizontally, from its
+     * {@code FloatingActionButtonLocation} -- start, center or end, with
+     * Flutter's 16 logical pixel margin at either edge.
+     */
+    static double fabX(FloatingActionButtonLocation where, double scaffoldWidth, double fabWidth) {
+        double margin = Dp.px(FAB_MARGIN_LP);
+        if (where != null && where.name().indexOf("enter") >= 0) {
+            return Math.max(0, (scaffoldWidth - fabWidth) / 2);
+        }
+        if (where != null && where.name().startsWith("start")) {
+            return margin;
+        }
+        if (where != null && where.name().startsWith("miniStart")) {
+            return margin;
+        }
+        // Flutter's default is endFloat.
+        return Math.max(0, scaffoldWidth - fabWidth - margin);
+    }
+
+    /**
+     * Where the FAB sits vertically.
+     *
+     * <p>A FLOATING fab clears the bottom strip by Flutter's margin. A DOCKED
+     * one straddles the strip's top edge -- its centre sits exactly on it,
+     * which is what lets a notched BottomAppBar cut a hole for it. Reply's
+     * compose button is centreDocked, and with the location discarded it drew
+     * as an ordinary bottom-right float, in the corner, over the bar.</p>
+     */
+    static double fabY(FloatingActionButtonLocation where, double scaffoldHeight,
+            double fabHeight, double navHeight) {
+        double margin = Dp.px(FAB_MARGIN_LP);
+        String name = where == null ? "endFloat" : where.name();
+        double contentBottom = scaffoldHeight - navHeight;
+        if (name.indexOf("Top") >= 0) {
+            return margin;
+        }
+        if (name.indexOf("Docked") >= 0) {
+            // Never below the screen, which is Flutter's own clamp.
+            return Math.max(0, Math.min(contentBottom - fabHeight / 2,
+                    scaffoldHeight - fabHeight - margin));
+        }
+        return Math.max(0, contentBottom - fabHeight - margin);
     }
 
     /**

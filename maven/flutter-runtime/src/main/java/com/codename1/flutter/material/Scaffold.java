@@ -18,6 +18,7 @@ public class Scaffold extends Widget {
     private Widget appBar;
     private Widget body;
     private Widget floatingActionButton;
+    private FloatingActionButtonLocation floatingActionButtonLocation;
     private Widget drawer;
     private Widget bottomNavigationBar;
     private Color backgroundColor;
@@ -47,6 +48,12 @@ public class Scaffold extends Widget {
     }
 
     public void floatingActionButtonLocation(FloatingActionButtonLocation v) {
+        this.floatingActionButtonLocation = v;
+    }
+
+    /** Where the FAB sits; null means Flutter's default, {@code endFloat}. */
+    public FloatingActionButtonLocation getFloatingActionButtonLocation() {
+        return floatingActionButtonLocation;
     }
 
     /** Whether the body extends behind the bottom navigation bar — Flutter's {@code extendBody}. */

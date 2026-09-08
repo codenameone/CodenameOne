@@ -379,6 +379,21 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
     }
 
     private double cornerRadiusLp() {
+        if (material().getShape() instanceof com.codename1.flutter.CircleBorder) {
+            // A CircleBorder is the circle inscribed in the box, which as a
+            // rounded rectangle is a corner radius of half the shorter side.
+            // The shape was unrecognised and fell through to a radius of zero,
+            // so a surface wearing one drew square: Reply's compose button is
+            // an OpenContainer with closedShape: CircleBorder(), and it
+            // rendered as an orange block sitting on the bottom bar.
+            com.codename1.flutter.rendering.Size box = size();
+            if (box == null || box.width() <= 0 || box.height() <= 0) {
+                return 0;
+            }
+            double scale = com.codename1.flutter.rendering.Dp.scale();
+            double shorterPx = Math.min(box.width(), box.height());
+            return scale > 0 ? shorterPx / 2 / scale : 0;
+        }
         Object r = material().getShape() instanceof com.codename1.flutter.RoundedRectangleBorder
                 ? ((com.codename1.flutter.RoundedRectangleBorder) material().getShape()).getBorderRadius()
                 : material().getBorderRadius();
