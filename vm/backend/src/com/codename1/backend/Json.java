@@ -71,19 +71,46 @@ public final class Json {
         return value;
     }
 
+    /**
+     * How deep a document may nest before it is refused.
+     *
+     * The parser is recursive, so nesting depth is stack depth, and a body is
+     * whatever the client sent. Without a bound a few kilobytes of "[[[[..." reach
+     * StackOverflowError -- which is an Error, so neither the handler's catch nor
+     * the server's catch of Exception sees it, and the thread dies rather than the
+     * request failing. 512 is far past any real document and far short of the
+     * stack.
+     */
+    private static final int MAX_DEPTH = 512;
+
+    private int depth;
+
     private Object readValue() throws IOException {
         if(pos >= src.length()) {
             throw new IOException("Unexpected end of JSON");
         }
         char c = src.charAt(pos);
         switch(c) {
-            case '{': return readObject();
-            case '[': return readArray();
+            case '{': return readNested(true);
+            case '[': return readNested(false);
             case '"': return readString();
             case 't': return readLiteral("true", Boolean.TRUE);
             case 'f': return readLiteral("false", Boolean.FALSE);
             case 'n': return readLiteral("null", null);
             default: return readNumber();
+        }
+    }
+
+    /** Depth is counted here so both containers share one bound and one release. */
+    private Object readNested(boolean object) throws IOException {
+        if(depth >= MAX_DEPTH) {
+            throw new IOException("JSON nested deeper than " + MAX_DEPTH);
+        }
+        depth++;
+        try {
+            return object ? (Object)readObject() : (Object)readArray();
+        } finally {
+            depth--;
         }
     }
 

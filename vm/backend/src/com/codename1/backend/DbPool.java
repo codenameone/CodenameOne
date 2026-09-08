@@ -88,6 +88,13 @@ public final class DbPool {
      * finally, or prefer {@link #withConnection}, which cannot leak one.
      */
     public synchronized Db borrow() throws IOException {
+        // Checked before the idle list, not only when it is empty. close() can run
+        // while a borrower still holds a connection, and that borrower's finally
+        // releases afterwards -- so the list can be non-empty after closing, and a
+        // check that only guards the empty case hands out a closed connection.
+        if(closed) {
+            throw new IOException("Pool is closed");
+        }
         while(idle.isEmpty()) {
             if(closed) {
                 throw new IOException("Pool is closed");
@@ -104,6 +111,14 @@ public final class DbPool {
 
     public synchronized void release(Db db) {
         if(db == null) {
+            return;
+        }
+        // A release that arrives after close() belongs to a borrower that was still
+        // running when the pool shut down. close() has already closed every
+        // connection, so putting this one back would repopulate an idle list nobody
+        // may draw from again.
+        if(closed) {
+            db.close();
             return;
         }
         idle.add(db);

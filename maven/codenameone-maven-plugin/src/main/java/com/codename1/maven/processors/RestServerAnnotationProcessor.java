@@ -772,15 +772,30 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
     private static String fieldFromJson(String type, String expr) {
         if (type.startsWith("java.util.List<") || type.startsWith("java.util.Set<")) {
             String element = type.substring(type.indexOf('<') + 1, type.length() - 1);
-            if (element.startsWith("java.")) return "(" + type + ")(Object)asList(" + expr + ")";
+            // Both branches below produce a List, so a Set-typed field has to be
+            // converted rather than cast -- the same fix the request-body path
+            // needed. Review named the java.* branch; the DTO branch had it too,
+            // which is why this converts in one place at the end instead.
+            boolean isSet = type.startsWith("java.util.Set<");
+            if (element.startsWith("java.")) {
+                String decoded = "asList(" + expr + ")";
+                if (isSet) {
+                    decoded = "setFromList(" + decoded + ")";
+                }
+                return "(" + type + ")(Object)" + decoded;
+            }
             // Each element is converted through the element codec. Returning the
             // decoded Maps as-is -- which this used to do -- gives the handler a
             // List whose elements are Maps typed as DTOs: a lie the JVM catches at
             // the first field read and ParparVM does not catch at all.
-            return "(" + type + ")(Object)fromMapList(" + expr + ", new FromMapFn() {\n"
+            String decodedDtos = "fromMapList(" + expr + ", new FromMapFn() {\n"
                     + "            public Object convert(java.util.Map m) { return "
                     + codecFor(element) + ".fromMap(m); }\n"
                     + "        })";
+            if (isSet) {
+                decodedDtos = "setFromList(" + decodedDtos + ")";
+            }
+            return "(" + type + ")(Object)" + decodedDtos;
         }
         if ("java.lang.String".equals(type)) return "asString(" + expr + ")";
         if ("int".equals(type))     return "asInt(" + expr + ")";

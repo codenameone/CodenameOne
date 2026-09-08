@@ -46,19 +46,47 @@ import com.codename1.backend.Web;
  * server, which is most of the reason to use object storage from an app.
  */
 public final class S3 {
-    private final Credentials credentials;
+    /**
+     * How long before expiry to fetch again. Long enough that a request signed now
+     * is still valid when it arrives, short enough not to refresh constantly.
+     */
+    private static final long CREDENTIAL_REFRESH_MARGIN = 5 * 60 * 1000L;
+
+    private Credentials credentials;
     private final String region;
     private final String endpoint;
     private final boolean pathStyle;
     private final boolean secure;
+    private final boolean fromEnvironment;
 
     private S3(Credentials credentials, String region, String endpoint, boolean pathStyle,
-            boolean secure) {
+            boolean secure, boolean fromEnvironment) {
         this.credentials = credentials;
         this.region = region;
         this.endpoint = endpoint;
         this.pathStyle = pathStyle;
         this.secure = secure;
+        this.fromEnvironment = fromEnvironment;
+    }
+
+    /**
+     * The credentials to sign with, resolved again when a temporary one is near expiry.
+     *
+     * The role credentials ECS, EKS, EC2 and Lambda hand out live for minutes to
+     * hours, so a server that captured one at startup would spend the rest of its
+     * life signing with a credential the service has already forgotten. Only the
+     * environment-resolved case can be refreshed: a credential passed to
+     * {@link #forEndpoint} is the caller's, and there is no provider to ask again.
+     *
+     * Two request threads can resolve at once here and one of the two answers is
+     * dropped. That is harmless -- both are valid credentials, and the cost of the
+     * duplicate call is one metadata round trip an hour.
+     */
+    private Credentials credentials() throws IOException {
+        if(fromEnvironment && credentials.isExpiring(CREDENTIAL_REFRESH_MARGIN)) {
+            credentials = Credentials.resolve();
+        }
+        return credentials;
     }
 
     /**
@@ -78,7 +106,7 @@ public final class S3 {
             throw new IOException("No AWS region: pass one, or set AWS_REGION");
         }
         return new S3(Credentials.resolve(), resolved,
-                "s3." + resolved + ".amazonaws.com", false, true);
+                "s3." + resolved + ".amazonaws.com", false, true, true);
     }
 
     /**
@@ -101,7 +129,8 @@ public final class S3 {
         while(host.endsWith("/")) {
             host = host.substring(0, host.length() - 1);
         }
-        return new S3(credentials, region == null ? "us-east-1" : region, host, true, useTls);
+        return new S3(credentials, region == null ? "us-east-1" : region, host, true, useTls,
+                false);
     }
 
     /**
@@ -112,7 +141,7 @@ public final class S3 {
      * shell script that speaks a protocol this class already speaks.
      */
     public void createBucket(String bucket) throws IOException {
-        Web.Result result = send("PUT", bucket, "", null, null, new byte[0]);
+        Web.Result result = send("PUT", bucket, "", null, null, createBucketBody());
         if(result.isSuccess()) {
             return;
         }
@@ -214,13 +243,13 @@ public final class S3 {
      * round trip and can be handed straight to a client.
      */
     public String presignGet(String bucket, String key, int seconds) throws IOException {
-        return Aws.presign(credentials, region, "s3", "GET", hostFor(bucket),
+        return Aws.presign(credentials(), region, "s3", "GET", hostFor(bucket),
                 pathFor(bucket, key), null, seconds, null, secure);
     }
 
     /** The upload counterpart: a URL a client can PUT to, for `seconds`. */
     public String presignPut(String bucket, String key, int seconds) throws IOException {
-        return Aws.presign(credentials, region, "s3", "PUT", hostFor(bucket),
+        return Aws.presign(credentials(), region, "s3", "PUT", hostFor(bucket),
                 pathFor(bucket, key), null, seconds, null, secure);
     }
 
@@ -254,9 +283,28 @@ public final class S3 {
         }
     }
 
+    /**
+     * CreateBucket's body names the region, except in us-east-1 where it must not.
+     *
+     * S3 reads an empty CreateBucket as a request for us-east-1, so a bucket asked
+     * for anywhere else comes back as IllegalLocationConstraintException unless the
+     * body says where -- and us-east-1 rejects the body that says so. The
+     * S3-compatible endpoints take the empty body, which is what pathStyle
+     * distinguishes: forEndpoint addresses those path-style, forRegion does not.
+     */
+    private byte[] createBucketBody() throws IOException {
+        if(pathStyle || "us-east-1".equals(region)) {
+            return new byte[0];
+        }
+        return ("<CreateBucketConfiguration "
+                + "xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">"
+                + "<LocationConstraint>" + region + "</LocationConstraint>"
+                + "</CreateBucketConfiguration>").getBytes("UTF-8");
+    }
+
     private Web.Result send(String method, String bucket, String key, Map query,
             Map headers, byte[] body) throws IOException {
-        return Aws.send(credentials, region, "s3", method, hostFor(bucket),
+        return Aws.send(credentials(), region, "s3", method, hostFor(bucket),
                 pathFor(bucket, key), query, headers, body, null, secure);
     }
 

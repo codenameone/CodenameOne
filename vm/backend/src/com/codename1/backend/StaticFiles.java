@@ -393,10 +393,20 @@ public final class StaticFiles implements HttpServer.Handler {
         if(value.indexOf('%') < 0) {
             return value;
         }
+        // A run of escapes is one UTF-8 sequence, not one character per octet.
+        // Appending each octet as a char turned the %C3%A9 a client sends for an
+        // accented letter into two characters, so the lookup missed a file that is
+        // on disk and the request 404'd.
         StringBuilder out = new StringBuilder();
+        byte[] pending = new byte[value.length()];
+        int pendingLength = 0;
         for(int iter = 0 ; iter < value.length() ; iter++) {
             char c = value.charAt(iter);
             if(c != '%') {
+                if(pendingLength > 0) {
+                    out.append(utf8(pending, pendingLength));
+                    pendingLength = 0;
+                }
                 out.append(c);
                 continue;
             }
@@ -404,13 +414,26 @@ public final class StaticFiles implements HttpServer.Handler {
                 return null;
             }
             try {
-                out.append((char)Integer.parseInt(value.substring(iter + 1, iter + 3), 16));
+                pending[pendingLength++] =
+                        (byte)Integer.parseInt(value.substring(iter + 1, iter + 3), 16);
             } catch (NumberFormatException err) {
                 return null;
             }
             iter += 2;
         }
+        if(pendingLength > 0) {
+            out.append(utf8(pending, pendingLength));
+        }
         return out.toString();
+    }
+
+    /** The gathered escape bytes as text; malformed input keeps its bytes. */
+    private static String utf8(byte[] bytes, int length) {
+        try {
+            return new String(bytes, 0, length, "UTF-8");
+        } catch (java.io.UnsupportedEncodingException err) {
+            return new String(bytes, 0, length);
+        }
     }
 
     static String contentType(String path) {

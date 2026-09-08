@@ -2559,6 +2559,7 @@ public final class HttpServer {
     private static final byte[] HTTP_1_0_BYTES = asciiConstant("HTTP/1.0");
     private static final byte[] CONTENT_LENGTH_BYTES = asciiConstant("content-length");
     private static final byte[] TRANSFER_ENCODING_BYTES = asciiConstant("transfer-encoding");
+    private static final byte[] HOST_BYTES = asciiConstant("host");
     private static final byte[][] KNOWN_METHOD_BYTES = asciiConstants(KNOWN_METHODS);
 
     private static byte[] asciiConstant(String ascii) {
@@ -2746,6 +2747,7 @@ public final class HttpServer {
         int contentLengthAt = -1;
         boolean chunked = false;
         String transferEncoding = null;
+        int hostCount = 0;
         for(int iter = 0 ; iter < headerCount ; iter++) {
             int base = iter * 4;
             if(sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], CONTENT_LENGTH_BYTES)) {
@@ -2768,6 +2770,8 @@ public final class HttpServer {
                 String value = asciiString(raw, slices[base + 2], slices[base + 3]);
                 transferEncoding = transferEncoding == null ? value
                         : transferEncoding + "," + value;
+            } else if(sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], HOST_BYTES)) {
+                hostCount++;
             }
         }
         if(transferEncoding != null) {
@@ -2780,8 +2784,15 @@ public final class HttpServer {
         // RFC 9112: an HTTP/1.1 request MUST carry Host, and a server MUST reject
         // one that does not. Routing on a name the client never sent is how a
         // request reaches the wrong virtual host.
-        if("HTTP/1.1".equals(version) && request.indexOfHeader("host") < 0) {
+        if("HTTP/1.1".equals(version) && hostCount == 0) {
             throw new ProtocolException(400, "missing Host header");
+        }
+        // RFC 9112 3.2: more than one Host is a 400. Accepting it lets the two
+        // request APIs disagree -- getHeader returns the first, getHeaders keeps the
+        // last -- so a handler and whatever authorized it can read different
+        // authorities out of the same request.
+        if(hostCount > 1) {
+            throw new ProtocolException(400, "duplicate Host header");
         }
 
         String contentLength = contentLengthAt < 0 ? null : "set";
@@ -2854,6 +2865,13 @@ public final class HttpServer {
         while(true) {
             int lineEnd = indexOfCrLf(conn.buffer, conn.pos);
             while(lineEnd < 0) {
+                // A chunk-size line with no CRLF would otherwise be read for ever:
+                // fill() reallocates and copies what is already buffered, and none
+                // of it counts toward MAX_BODY_BYTES because no body byte has been
+                // framed yet. Metadata gets the same ceiling the header block has.
+                if(conn.available() > MAX_HEADER_BYTES) {
+                    throw new ProtocolException(400, "chunk size line too long");
+                }
                 if(!conn.fill(scratch)) {
                     return null;
                 }
@@ -2876,14 +2894,24 @@ public final class HttpServer {
             }
             conn.pos = lineEnd + 2;
             if(size == 0) {
-                // Trailers, terminated by a bare CRLF.
+                // Trailers, terminated by a bare CRLF. Bounded in total, not per
+                // line: an endless run of short well-formed trailers costs exactly
+                // as much memory as one endless line.
+                int trailerBytes = 0;
                 while(true) {
                     int trailerEnd = indexOfCrLf(conn.buffer, conn.pos);
                     while(trailerEnd < 0) {
+                        if(conn.available() > MAX_HEADER_BYTES) {
+                            throw new ProtocolException(400, "chunk trailer too long");
+                        }
                         if(!conn.fill(scratch)) {
                             return body.toByteArray();
                         }
                         trailerEnd = indexOfCrLf(conn.buffer, conn.pos);
+                    }
+                    trailerBytes += (trailerEnd - conn.pos) + 2;
+                    if(trailerBytes > MAX_HEADER_BYTES) {
+                        throw new ProtocolException(400, "chunk trailers too large");
                     }
                     boolean blank = trailerEnd == conn.pos;
                     conn.pos = trailerEnd + 2;
