@@ -1384,11 +1384,11 @@ The `SliderBridge` class can bind a `ConnectionRequest` to a `Slider` and effect
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/NetworkSliderbridgeFigure.java[tag=io-java-072,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava072Snippet.java[tag=io-java-072,indent=0]
 ----
 
 .SliderBridge progress for downloading the image in the slow network mode
-image::img/generated/network-sliderbridge.png[SliderBridge progress for downloading the image in the slow network mode,scaledwidth=20%]
+image::img/network-sliderbridge.png[SliderBridge progress for downloading the image in the slow network mode,scaledwidth=20%]
 
 === Logging & crash protection
 

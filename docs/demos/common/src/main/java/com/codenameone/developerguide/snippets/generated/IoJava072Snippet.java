@@ -1,27 +1,4 @@
 /*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Codename One through http://www.codenameone.com/ if you
- * need additional information or have any questions.
- */
-
-/*
  * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
@@ -44,7 +21,7 @@
  * need additional information or have any questions.
  */
 
-package com.codenameone.developerguide.screenshots;
+package com.codenameone.developerguide.snippets.generated;
 
 import com.codename1.gpu.*;
 import com.codename1.ui.*;
@@ -77,8 +54,7 @@ import java.io.*;
 import java.util.*;
 
 
-class ComponentsBrowsercomponentJavascriptFigure implements GuideFigure {
-
+class IoJava072Snippet {
 
     Object context;
     Object url;
@@ -102,40 +78,22 @@ class ComponentsBrowsercomponentJavascriptFigure implements GuideFigure {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    
-
-    @Override
-    public String id() {
-        return "components-browsercomponent-javascript";
-    }
-
-    /// The tagged region is what the chapter includes, so the listing beside the
-    /// picture is the code that drew it.
-    @Override
-    public Form build() {
-        // tag::the-components-of-codename-one-java-111[]
-        Form hi = new Form("BrowserComponent", new BorderLayout());
-        BrowserComponent bc = new BrowserComponent();
-        bc.setPage( "<html lang=\"en\">\n" +
-        "    <head>\n" +
-        "        <meta charset=\"utf-8\">\n" +
-        "        <script>\n" +
-        "          function  fnc(message) {\n" +
-        "         document.write(message);\n" +
-        "            };\n" +
-        "        </script>\n" +
-        "    </head>\n" +
-        "    <body >\n" +
-        "        <p>Demo</p>\n" +
-        "    </body>\n" +
-        "</html>", null);
-        TextField tf = new TextField();
-        hi.add(BorderLayout.CENTER, bc).
-        add(BorderLayout.SOUTH, tf);
-        bc.addWebEventListener("onLoad", (e) ->  bc.execute("fnc('<p>Hello World</p>')"));
-        tf.addActionListener((e) -> bc.execute("fnc('<p>" + tf.getText() +"</p>')"));
+    void snippet() throws Exception {
+        // tag::io-java-072[]
+        Form hi = new Form("Download Progress", new BorderLayout());
+        Slider progress = new Slider();
+        Button download = new Button("Download");
+        download.addActionListener((e) -> {
+            ConnectionRequest cr = new ConnectionRequest("https://www.codenameone.com/img/blog/new_icon.png", false);
+            SliderBridge.bindProgress(cr, progress);
+            NetworkManager.getInstance().addToQueueAndWait(cr);
+            if(cr.getResponseCode() == 200) {
+                hi.add(BorderLayout.CENTER, new ScaleImageLabel(EncodedImage.create(cr.getResponseData())));
+                hi.revalidate();
+            }
+        });
+        hi.add(BorderLayout.SOUTH, progress).add(BorderLayout.NORTH, download);
         hi.show();
-        // end::the-components-of-codename-one-java-111[]
-        return hi;
+        // end::io-java-072[]
     }
 }

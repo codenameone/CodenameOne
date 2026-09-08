@@ -56,7 +56,6 @@ public final class GuideFigures {
             new FigureVariant(new SpanLabelFigure(), FigureDevice.ANDROID, false,
                     "components-spanlabel.png"),
             new FigureVariant(new L10nBasicFigure(), FigureDevice.ANDROID, false, "l10n-basic.png"),
-            new FigureVariant(new L10nManagerFigure(), FigureDevice.ANDROID, false, "l10n-manager.png"),
             new FigureVariant(new EditorsCodeFigure(), FigureDevice.ANDROID, false, "editors-code.png"),
             new FigureVariant(new ComponentsLabelTextPositionFigure(), FigureDevice.ANDROID, false, "components-label-text-position.png"),
             new FigureVariant(new AutosizeFigure(), FigureDevice.ANDROID, false, "autosize.png"),
@@ -71,11 +70,7 @@ public final class GuideFigures {
             new FigureVariant(new ComponentsSharebuttonFigure(), FigureDevice.ANDROID, false, "components-sharebutton.png"),
             new FigureVariant(new ComponentsScaleimageFigure(), FigureDevice.ANDROID, false, "components-scaleimage.png"),
             new FigureVariant(new ComponentsToolbarFigure(), FigureDevice.ANDROID, false, "components-toolbar.png"),
-            new FigureVariant(new ComponentsBrowsercomponentFigure(), FigureDevice.ANDROID, false, "components-browsercomponent.png"),
-            new FigureVariant(new ComponentsBrowsercomponentJavascriptFigure(), FigureDevice.ANDROID, false, "components-browsercomponent-javascript.png"),
             new FigureVariant(new ComponentsAutocompleteFigure(), FigureDevice.ANDROID, false, "components-autocomplete.png"),
-            new FigureVariant(new ComponentsPickerFigure(), FigureDevice.ANDROID, false, "components-picker.png"),
-            new FigureVariant(new ComponentsCalendarFigure(), FigureDevice.ANDROID, false, "components-calendar.png"),
             new FigureVariant(new ComponentsSignature2Figure(), FigureDevice.ANDROID, false, "components-signature2.png"),
             new FigureVariant(new ComponentsAccordionFigure(), FigureDevice.ANDROID, false, "components-accordion.png"),
             new FigureVariant(new ComponentsFloatinghintFigure(), FigureDevice.ANDROID, false, "components-floatinghint.png"),
@@ -87,7 +82,6 @@ public final class GuideFigures {
             new FigureVariant(new GraphicsFontimageMaterialFigure(), FigureDevice.ANDROID, false, "graphics-fontimage-material.png"),
             new FigureVariant(new FilesystemTreeFigure(), FigureDevice.ANDROID, false, "filesystem-tree.png"),
             new FigureVariant(new CsvParsingFigure(), FigureDevice.ANDROID, false, "csv-parsing.png"),
-            new FigureVariant(new NetworkSliderbridgeFigure(), FigureDevice.ANDROID, false, "network-sliderbridge.png"),
         };
     }
 }

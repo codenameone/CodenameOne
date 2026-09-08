@@ -29,6 +29,8 @@ import com.codenameone.developerguide.screenshots.FigureDevice;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.io.File;
+import java.util.Locale;
+import java.util.TimeZone;
 
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
@@ -64,6 +66,16 @@ public final class GuideScreenshotDesktopStub implements Runnable {
         // the display and multiplies the system font sizes above 1.5, so a Retina
         // Mac and a CI runner disagree without it.
         System.setProperty("cn1.retinaScale", "1");
+
+        // The same argument applies to the locale and the time zone, and they are
+        // easier to miss because most figures do not visibly depend on them.
+        // JavaSE's L10NManager is built from Locale.getDefault(), so currency,
+        // number, date, language and country strings all follow whoever ran the
+        // generator -- the committed localization figure was rendered on a Mac set
+        // to Israel and could not be reproduced anywhere else. Set them before
+        // Display.init, because the implementation reads them as it comes up.
+        Locale.setDefault(Locale.US);
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         if (!MODE_SCHEMATIC.equals(mode)) {
             FigureDevice device = FigureDevice.fromKey(mode);
             System.setProperty("cn1.javase.pixelMilliRatio",

@@ -1884,11 +1884,11 @@ The `BrowserComponent` can point at an arbitrary URL to load it:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsBrowsercomponentFigure.java[tag=the-components-of-codename-one-java-095,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava095Snippet.java[tag=the-components-of-codename-one-java-095,indent=0]
 ----
 
 .Browser Component showing the Codename One website on the simulator
-image::img/generated/components-browsercomponent.png[Browser Component showing the Codename One website on the simulator,scaledwidth=30%]
+image::img/components-browsercomponent.png[Browser Component showing the Codename One website on the simulator,scaledwidth=30%]
 
 NOTE: The scrollbars appear in the simulator, device versions of the browser component act differently and support touch scrolling.
 
@@ -2115,11 +2115,11 @@ This section describes the now deprecated `JSObject` approach. It's here for ref
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsBrowsercomponentJavascriptFigure.java[tag=the-components-of-codename-one-java-111,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava111Snippet.java[tag=the-components-of-codename-one-java-111,indent=0]
 ----
 
 .JavaScript code was invoked to append text into the browser image above
-image::img/generated/components-browsercomponent-javascript.png[JavaScript code was invoked to append text into the browser image above,scaledwidth=20%]
+image::img/components-browsercomponent-javascript.png[JavaScript code was invoked to append text into the browser image above,scaledwidth=20%]
 
 NOTE: Notice that opening an alert in an embedded native browser might not work
 
@@ -2285,12 +2285,12 @@ The sample below includes al picker types:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsPickerFigure.java[tag=the-components-of-codename-one-java-122,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava122Snippet.java[tag=the-components-of-codename-one-java-122,indent=0]
 ----
 
 
 .The various picker components
-image::img/generated/components-picker.png[The various picker components,scaledwidth=30%]
+image::img/components-picker.png[The various picker components,scaledwidth=30%]
 
 .The date & time picker on the simulator
 image::img/components-picker-date-time-on-simulator.png[The date & time picker on the simulator,scaledwidth=30%]
@@ -2505,11 +2505,11 @@ Simple usage of the `Calendar` class looks something like this:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsCalendarFigure.java[tag=the-components-of-codename-one-java-214,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava214Snippet.java[tag=the-components-of-codename-one-java-214,indent=0]
 ----
 
 .The Calendar component
-image::img/generated/components-calendar.png[The Calendar component,scaledwidth=20%]
+image::img/components-calendar.png[The Calendar component,scaledwidth=20%]
 
 === ToastBar
 

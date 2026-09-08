@@ -256,11 +256,11 @@ It allows formatting numbers/dates & time based on platform locale. It also prov
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/L10nManagerFigure.java[tag=miscellaneous-features-java-045,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava045Snippet.java[tag=miscellaneous-features-java-045,indent=0]
 ----
 
 .Localization formatting/parsing and information
-image::img/generated/l10n-manager.png[Localization formatting/parsing and information,scaledwidth=20%]
+image::img/l10n-manager.png[Localization formatting/parsing and information,scaledwidth=20%]
 
 ==== RTL/Bidi
 
