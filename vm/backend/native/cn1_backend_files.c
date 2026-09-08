@@ -263,13 +263,30 @@ JAVA_LONG com_codename1_backend_FileIo_sendFileImpl___int_int_long_long_R_long(C
         return -1;
     }
     CN1_YIELD_THREAD;
-    do {
-        rc = sendfile(inFd, outFd, (off_t)offset, &len, NULL, 0);
-    } while(rc < 0 && errno == EINTR);
-    /* Captured before CN1_RESUME_THREAD: the resume is a GC safepoint and can park
-       this thread on a timed wait, which overwrites errno. Read afterwards, this
-       classified a real sendfile failure by the WAIT's errno instead of its own. */
-    sendErrno = errno;
+    for(;;) {
+        len = (off_t)count;
+        do {
+            rc = sendfile(inFd, outFd, (off_t)offset, &len, NULL, 0);
+        } while(rc < 0 && errno == EINTR);
+        /* Captured before CN1_RESUME_THREAD: the resume is a GC safepoint and can
+           park this thread on a timed wait, which overwrites errno. Read after
+           it, this classified a real sendfile failure by the WAIT's errno. */
+        sendErrno = errno;
+        /* Anything except "the buffer was full and nothing moved" is an answer:
+           success, a real error, or a partial send the caller can advance on. */
+        if(rc >= 0 || sendErrno != EAGAIN || len > 0) {
+            break;
+        }
+        /* EAGAIN having moved nothing is backpressure, and returning the 0 in
+           len made sendBody() read "no progress" as "the peer is gone" and drop
+           a large file mid-transfer for any client reading slower than the
+           server writes. That is the same truncation the Linux branch above
+           fixes; this twin kept it. Wait for the socket the same way. */
+        if(cn1AwaitSocketWritable(outFd) <= 0) {
+            CN1_RESUME_THREAD;
+            return -1;
+        }
+    }
     CN1_RESUME_THREAD;
     if(rc < 0 && sendErrno != EAGAIN) {
         return len > 0 ? (JAVA_LONG)len : -1;

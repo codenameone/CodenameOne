@@ -37,6 +37,11 @@ import java.net.Socket;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
+import java.security.cert.X509Certificate;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -68,6 +73,12 @@ class BackendHttpIntegrationTest {
 
     private static Process server;
     private static int port;
+
+    private static Process tlsServer;
+    private static int tlsPort;
+
+    /** Larger than any plausible socket send buffer, so a slow reader stalls the write. */
+    private static final int HUGE_BYTES = 8 * 1024 * 1024;
     private static Path work;
     private static String skipReason;
 
@@ -93,6 +104,14 @@ class BackendHttpIntegrationTest {
             blob[i] = (byte) (i & 0xff);
         }
         Files.write(staticRoot.resolve("big.bin"), blob);
+        // Deliberately larger than any socket send buffer: a slow reader has to
+        // make the server's write block partway through, which is the only way
+        // to reach the backpressure paths in send() and sendfile().
+        byte[] huge = new byte[HUGE_BYTES];
+        for (int i = 0; i < huge.length; i++) {
+            huge[i] = (byte) ((i * 31) & 0xff);
+        }
+        Files.write(staticRoot.resolve("huge.bin"), huge);
 
         // The real build script, not a reimplementation of it: a test that builds
         // differently from the product is testing something else.
@@ -123,10 +142,68 @@ class BackendHttpIntegrationTest {
         run.redirectOutput(work.resolve("server.log").toFile());
         server = run.start();
         assertTrue(waitForPort(port, 30000), "the server never accepted a connection");
+
+        startTlsServer(work, binary, staticRoot);
+    }
+
+    /**
+     * Starts a second copy of the same binary with a certificate configured.
+     *
+     * TLS had no end-to-end coverage at all: every other test here speaks
+     * plaintext, so the handshake, the record layer and the ALPN negotiation
+     * were exercised by nothing. Reusing the binary just built keeps that to one
+     * extra process rather than a second translation.
+     */
+    private void startTlsServer(Path work, Path binary, Path staticRoot) throws Exception {
+        Path cert = work.resolve("cert.pem");
+        Path key = work.resolve("key.pem");
+        ProcessBuilder openssl = new ProcessBuilder("openssl", "req", "-x509", "-newkey",
+                "rsa:2048", "-keyout", key.toString(), "-out", cert.toString(),
+                "-days", "1", "-nodes", "-subj", "/CN=localhost");
+        openssl.redirectErrorStream(true);
+        openssl.redirectOutput(work.resolve("openssl.log").toFile());
+        Process made;
+        try {
+            made = openssl.start();
+        } catch (IOException noOpenssl) {
+            // Without a certificate there is nothing to serve; the plaintext
+            // tests still run and the TLS ones report why they did not.
+            return;
+        }
+        if (!made.waitFor(60, TimeUnit.SECONDS) || made.exitValue() != 0
+                || !Files.exists(cert) || !Files.exists(key)) {
+            return;
+        }
+        tlsPort = freePort();
+        ProcessBuilder run = new ProcessBuilder(binary.toString());
+        run.environment().put("CN1_PORT", String.valueOf(tlsPort));
+        run.environment().put("CN1_DB_PATH", work.resolve("tls.db").toString());
+        run.environment().put("CN1_STATIC_ROOT", staticRoot.toString());
+        run.environment().put("CN1_HTTP_TIMEOUT_MS", "4000");
+        run.environment().put("CN1_TLS_CERT", cert.toString());
+        run.environment().put("CN1_TLS_KEY", key.toString());
+        run.redirectErrorStream(true);
+        run.redirectOutput(work.resolve("tls-server.log").toFile());
+        tlsServer = run.start();
+        if (!waitForPort(tlsPort, 30000)) {
+            tlsServer.destroyForcibly();
+            tlsServer = null;
+            tlsPort = 0;
+        }
     }
 
     @AfterAll
     void stopServer() {
+        if (tlsServer != null) {
+            tlsServer.destroy();
+            try {
+                if (!tlsServer.waitFor(10, TimeUnit.SECONDS)) {
+                    tlsServer.destroyForcibly();
+                }
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+            }
+        }
         if (server != null) {
             server.destroy();
             try {
@@ -419,6 +496,200 @@ class BackendHttpIntegrationTest {
         }
         // And the server is still healthy afterwards.
         assertEquals(200, status(request("GET", "/healthz", null, null)));
+    }
+
+    // ------------------------------------------------------------------
+    // Resilience
+    //
+    // Every other test here is a prompt client: it sends a whole request and
+    // reads the whole reply at once. Two shipped regressions lived precisely in
+    // what that never exercises -- a client that writes slowly pinned the thread
+    // serving it, and a client that reads slowly had its response truncated,
+    // because the non-blocking descriptors introduced for virtual threads made
+    // both paths meet EAGAIN for the first time. These two hold that ground.
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("a response larger than the socket buffer survives a slow reader")
+    void slowReaderReceivesTheWholeResponse() throws Exception {
+        Socket socket = new Socket();
+        socket.connect(new InetSocketAddress("127.0.0.1", port), 5000);
+        socket.setSoTimeout(20000);
+        try {
+            socket.getOutputStream().write(("GET /static/huge.bin HTTP/1.1\r\n"
+                    + "Host: 127.0.0.1\r\nConnection: close\r\n\r\n")
+                    .getBytes(StandardCharsets.UTF_8));
+            socket.getOutputStream().flush();
+            InputStream in = socket.getInputStream();
+
+            // Read just the head, then stop reading. The server keeps writing
+            // until the kernel's send buffer is full and its next write answers
+            // EAGAIN -- the state the whole test exists to produce.
+            ByteArrayOutputStream head = new ByteArrayOutputStream();
+            String headText;
+            for (;;) {
+                int c = in.read();
+                assertTrue(c >= 0, "the connection closed before the headers ended");
+                head.write(c);
+                headText = new String(head.toByteArray(), StandardCharsets.UTF_8);
+                if (headText.endsWith("\r\n\r\n")) {
+                    break;
+                }
+            }
+            assertTrue(headText.startsWith("HTTP/1.1 200"), "unexpected head: " + headText);
+            Thread.sleep(750);
+
+            // Now drain, and count. A truncation shows up as a short total, and
+            // a corrupted one as a byte that is not where it should be.
+            byte[] chunk = new byte[16 * 1024];
+            long total = 0;
+            for (;;) {
+                int n = in.read(chunk);
+                if (n < 0) {
+                    break;
+                }
+                for (int i = 0; i < n; i++) {
+                    long at = total + i;
+                    assertEquals((byte) ((at * 31) & 0xff), chunk[i],
+                            "the body is corrupt at offset " + at);
+                }
+                total += n;
+            }
+            assertEquals(HUGE_BYTES, total,
+                    "the response was truncated: got " + total + " of " + HUGE_BYTES
+                            + " bytes, which is what treating EAGAIN as a failure does");
+        } finally {
+            socket.close();
+        }
+    }
+
+    @Test
+    @DisplayName("clients that never finish a request do not starve the ones that do")
+    void partialRequestsDoNotStarveOtherClients() throws Exception {
+        // Comfortably more than the worker pool, so if a half-written request
+        // holds the thread that serves it, nothing is left to answer the probe.
+        final int stalled = 64;
+        Socket[] sockets = new Socket[stalled];
+        try {
+            for (int i = 0; i < stalled; i++) {
+                sockets[i] = new Socket();
+                sockets[i].connect(new InetSocketAddress("127.0.0.1", port), 5000);
+                // A request head that has begun and will never end.
+                sockets[i].getOutputStream().write(
+                        ("GET /healthz HTTP/1.1\r\nHost: 127.0.0.1\r\nX-Stall: " + i + "\r\n")
+                                .getBytes(StandardCharsets.UTF_8));
+                sockets[i].getOutputStream().flush();
+            }
+            // Promptly, before the idle deadline sheds any of them.
+            long started = System.currentTimeMillis();
+            assertEquals(200, status(request("GET", "/healthz", null, null)),
+                    "a healthy request must still be answered while " + stalled
+                            + " connections sit mid-request");
+            long elapsed = System.currentTimeMillis() - started;
+            assertTrue(elapsed < 5000,
+                    "the probe waited " + elapsed + "ms, so the stalled connections "
+                            + "are holding the threads that should have served it");
+        } finally {
+            for (int i = 0; i < stalled; i++) {
+                if (sockets[i] != null) {
+                    try {
+                        sockets[i].close();
+                    } catch (IOException ignored) {
+                        // the server may already have shed it
+                    }
+                }
+            }
+        }
+        // The shed connections must not have left the server damaged.
+        assertEquals(200, status(request("GET", "/healthz", null, null)));
+    }
+
+    // ------------------------------------------------------------------
+    // TLS
+    //
+    // The handshake, the record layer and the user-space copy that replaces
+    // sendfile on a TLS connection. ALPN negotiation is NOT covered: this module
+    // targets 1.8, where the client-side API to request a protocol and read back
+    // what was chosen does not exist, so a test for it could only ever skip.
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("a request is served over TLS")
+    void tlsServesARequest() throws Exception {
+        SSLSocket socket = openTls();
+        try {
+            socket.startHandshake();
+            socket.getOutputStream().write(("GET /healthz HTTP/1.1\r\nHost: localhost\r\n"
+                    + "Connection: close\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+            socket.getOutputStream().flush();
+            String response = readFully(socket.getInputStream());
+            assertTrue(response.startsWith("HTTP/1.1 200"),
+                    "TLS did not serve the request: " + response);
+        } finally {
+            socket.close();
+        }
+    }
+
+    @Test
+    @DisplayName("a large file survives a slow reader over TLS too")
+    void tlsSlowReaderReceivesTheWholeResponse() throws Exception {
+        // TLS has no sendfile path -- the bytes have to be encrypted in user
+        // space -- so this covers the read/write copy that sendfile bypasses.
+        SSLSocket socket = openTls();
+        try {
+            socket.startHandshake();
+            socket.getOutputStream().write(("GET /static/huge.bin HTTP/1.1\r\n"
+                    + "Host: localhost\r\nConnection: close\r\n\r\n")
+                    .getBytes(StandardCharsets.UTF_8));
+            socket.getOutputStream().flush();
+            InputStream in = socket.getInputStream();
+            ByteArrayOutputStream head = new ByteArrayOutputStream();
+            String headText;
+            for (;;) {
+                int c = in.read();
+                assertTrue(c >= 0, "the connection closed before the headers ended");
+                head.write(c);
+                headText = new String(head.toByteArray(), StandardCharsets.UTF_8);
+                if (headText.endsWith("\r\n\r\n")) {
+                    break;
+                }
+            }
+            assertTrue(headText.startsWith("HTTP/1.1 200"), "unexpected head: " + headText);
+            Thread.sleep(750);
+            byte[] chunk = new byte[16 * 1024];
+            long total = 0;
+            for (;;) {
+                int n = in.read(chunk);
+                if (n < 0) {
+                    break;
+                }
+                total += n;
+            }
+            assertEquals(HUGE_BYTES, total, "the TLS response was truncated");
+        } finally {
+            socket.close();
+        }
+    }
+
+    /**
+     * Connects to the TLS port, trusting the throwaway self-signed certificate.
+     *
+     * Skips rather than fails when no TLS server came up: a machine without
+     * openssl cannot make a certificate, and that says nothing about the server.
+     */
+    private SSLSocket openTls() throws Exception {
+        Assumptions.assumeTrue(tlsServer != null && tlsPort != 0,
+                "no TLS server (openssl unavailable, or it did not start)");
+        SSLContext context = SSLContext.getInstance("TLS");
+        context.init(null, new TrustManager[]{ new X509TrustManager() {
+            public void checkClientTrusted(X509Certificate[] chain, String authType) { }
+            public void checkServerTrusted(X509Certificate[] chain, String authType) { }
+            public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+        } }, null);
+        SSLSocket socket = (SSLSocket) context.getSocketFactory()
+                .createSocket("127.0.0.1", tlsPort);
+        socket.setSoTimeout(20000);
+        return socket;
     }
 
     // ------------------------------------------------------------------

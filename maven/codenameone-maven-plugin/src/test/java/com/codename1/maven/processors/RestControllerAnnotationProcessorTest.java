@@ -191,6 +191,97 @@ public class RestControllerAnnotationProcessorTest {
     // ----------------------------------------------------------------
 
     /// The generated router, loaded and callable.
+    /// A second controller for the cases the first cannot express: a void route,
+    /// a parameter that is explicitly optional, and a required body.
+    private static final String OPTIONAL_SOURCE =
+            "package com.example;\n"
+            + "import com.codename1.backend.annotations.*;\n"
+            + "import java.util.*;\n"
+            + "@RestController\n"
+            + "@RequestMapping(\"/api\")\n"
+            + "public class Notes {\n"
+            + "    @DeleteMapping(\"/notes/{id}\")\n"
+            + "    public void remove(@PathVariable(\"id\") String id) { }\n"
+            + "    @GetMapping(\"/opt\")\n"
+            + "    public String opt(@RequestParam(value=\"q\", required=false) String q) {\n"
+            + "        return q == null ? \"none\" : q;\n"
+            + "    }\n"
+            + "    @PostMapping(\"/notes\")\n"
+            + "    public String create(@RequestBody String body) { return body; }\n"
+            + "}\n";
+
+    @Test
+    public void aVoidRouteAnswersNoContent() throws Exception {
+        Router router = generate(OPTIONAL_SOURCE);
+        Object response = router.call("DELETE", "/api/notes/42", null);
+        assertNotNull("DELETE /api/notes/42 matched no route", response);
+        // ResponseStatus documents this default; the generator used to answer 200
+        // for a void method, which made that javadoc wrong.
+        assertEquals(204, Router.statusOf(response));
+    }
+
+    @Test
+    public void anAbsentRequiredParamIsRefused() throws Exception {
+        Router router = generate(CONTROLLER_SOURCE);
+        // q is @RequestParam("q"), so required defaults to true.
+        Object missing = router.call("GET", "/api/search", null);
+        assertNotNull("GET /api/search matched no route", missing);
+        assertEquals(400, Router.statusOf(missing));
+        assertTrue(Router.bodyOf(missing), Router.bodyOf(missing).indexOf("q") >= 0);
+        // and the route still works when it is supplied
+        assertEquals("{\"q\":\"hi\",\"page\":7}", router.text("GET", "/api/search?q=hi"));
+    }
+
+    @Test
+    public void anAbsentRequiredHeaderIsRefused() throws Exception {
+        Router router = generate(CONTROLLER_SOURCE);
+        // This harness builds a Request with an empty header index, so no header
+        // is bindable through it -- which makes it exactly the "the client did
+        // not send it" case that @RequestHeader's required element describes.
+        Object response = router.call("GET", "/api/agent", null);
+        assertNotNull("GET /api/agent matched no route", response);
+        assertEquals(400, Router.statusOf(response));
+        assertTrue(Router.bodyOf(response),
+                Router.bodyOf(response).indexOf("user-agent") >= 0);
+    }
+
+    @Test
+    public void anOptionalParamIsStillOptional() throws Exception {
+        Router router = generate(OPTIONAL_SOURCE);
+        // required=false, so its absence is not an error -- the guard must not
+        // have been emitted for it.
+        assertEquals("none", router.text("GET", "/api/opt"));
+        assertEquals("hi", router.text("GET", "/api/opt?q=hi"));
+    }
+
+    @Test
+    public void anAbsentRequiredBodyIsRefused() throws Exception {
+        Router router = generate(OPTIONAL_SOURCE);
+        Object response = router.call("POST", "/api/notes", null);
+        assertNotNull("POST /api/notes matched no route", response);
+        assertEquals(400, Router.statusOf(response));
+        assertEquals("body", router.text2("POST", "/api/notes", "body"));
+    }
+
+    @Test
+    public void twoRoutesOfTheSameShapeAreRefused() throws Exception {
+        // The variable names differ; nothing a request carries does. The second
+        // method could never have run.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/notes/{id}\")\n"
+                + "    public String byId(@PathVariable(\"id\") String id) { return id; }\n"
+                + "    @GetMapping(\"/notes/{name}\")\n"
+                + "    public String byName(@PathVariable(\"name\") String name) { return name; }\n"
+                + "}\n"));
+        assertTrue("a shape that can never match should not compile", ctx.hasErrors());
+        String all = ctx.getErrors().toString();
+        assertTrue(all, all.indexOf("can never run") >= 0);
+    }
+
     private static final class Router {
         private final Object instance;
         private final Method handle;
@@ -198,6 +289,7 @@ public class RestControllerAnnotationProcessorTest {
         private static Field bodyField;
         private static Field deferredField;
         private static Field hasDeferredField;
+        private static Field statusField;
 
         Router(Object instance, Method handle) {
             this.instance = instance;
@@ -208,10 +300,21 @@ public class RestControllerAnnotationProcessorTest {
             return handle.invoke(instance, request(method, target, body));
         }
 
+        String text2(String method, String target, String body) throws Exception {
+            Object response = call(method, target, body);
+            assertNotNull(method + " " + target + " matched no route", response);
+            return bodyOf(response);
+        }
+
         String text(String method, String target) throws Exception {
             Object response = call(method, target, null);
             assertNotNull(method + " " + target + " matched no route", response);
             return bodyOf(response);
+        }
+
+        static int statusOf(Object response) throws Exception {
+            reflect();
+            return statusField.getInt(response);
         }
 
         static String bodyOf(Object response) throws Exception {
@@ -249,6 +352,8 @@ public class RestControllerAnnotationProcessorTest {
             deferredField.setAccessible(true);
             hasDeferredField = res.getDeclaredField("hasDeferredJson");
             hasDeferredField.setAccessible(true);
+            statusField = res.getDeclaredField("status");
+            statusField.setAccessible(true);
         }
     }
 

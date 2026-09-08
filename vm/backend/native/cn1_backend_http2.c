@@ -47,6 +47,12 @@
 #include <nghttp2/nghttp2.h>
 
 #define CN1_H2_MAX_HEADERS 64
+/* HttpServer.MAX_HEADER_BYTES. The count above bounds how MANY fields arrive,
+   never how large they are, so without this a peer stays under 64 fields and
+   still spends this process's memory a megabyte at a time -- across
+   CONTINUATION frames, and again on each stream its SETTINGS allows at once.
+   HTTP/1 has always refused that; this is the same ceiling for HTTP/2. */
+#define CN1_H2_MAX_HEADER_BYTES (64 * 1024)
 /* Mirrors HttpServer.MAX_BODY_BYTES: the HTTP/1 paths refuse a larger body and
    HTTP/2 must agree, or the limit is only as good as the protocol chosen. */
 #define CN1_H2_MAX_BODY_BYTES (8 * 1024 * 1024)
@@ -64,6 +70,7 @@ typedef struct CN1H2Request {
     char* authority;
     CN1H2Header headers[CN1_H2_MAX_HEADERS];
     int headerCount;
+    size_t headerBytes;
     unsigned char* body;
     size_t bodyLength;
     size_t bodyCapacity;
@@ -266,6 +273,13 @@ static int cn1H2OnHeader(nghttp2_session* session, const nghttp2_frame* frame,
     r = cn1H2FindOpen(s, frame->hd.stream_id);
     if(r == NULL) {
         return 0;
+    }
+    /* Charged before anything is duplicated, and charged for the pseudo-headers
+       too: a single enormous :path would otherwise walk straight past a ceiling
+       that only looked at ordinary fields. */
+    r->headerBytes += (size_t)nameLen + (size_t)valueLen;
+    if(r->headerBytes > CN1_H2_MAX_HEADER_BYTES) {
+        return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
     }
     /* The pseudo-headers carry what a request line carries in HTTP/1.1. */
     if(nameLen == 7 && memcmp(name, ":method", 7) == 0) {

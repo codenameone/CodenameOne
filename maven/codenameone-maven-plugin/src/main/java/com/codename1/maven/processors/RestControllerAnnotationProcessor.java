@@ -124,6 +124,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String name;
         String javaType;
         String defaultValue;
+        /** From the annotation. A request missing a required binding is refused. */
+        boolean required;
         int variableIndex = -1;
     }
 
@@ -204,7 +206,37 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             ctx.error(cls, "@RestController declares no mapped methods: " + controller.binaryName);
             return;
         }
+        if (!routeShapesAreDistinct(cls, controller, ctx)) {
+            return;
+        }
         controllers.put(controller.binaryName, controller);
+    }
+
+    /**
+     * Refuses two routes in one controller that no request can tell apart.
+     *
+     * A variable's NAME is not part of what the matcher sees, so `GET /notes/{id}`
+     * and `GET /notes/{name}` are one shape. The generated router tests the
+     * branches in order and returns from the first, which left the second method
+     * permanently unreachable with nothing at build time or run time saying so.
+     */
+    private boolean routeShapesAreDistinct(AnnotatedClass cls, Controller controller,
+            ProcessorContext ctx) {
+        Map<String, String> byShape = new LinkedHashMap<String, String>();
+        for (int i = 0; i < controller.routes.size(); i++) {
+            Route route = controller.routes.get(i);
+            String shape = route.httpMethod + " " + route.pattern.replaceAll("\\{[^}]*\\}", "{}");
+            String first = byShape.get(shape);
+            if (first != null) {
+                ctx.error(cls, controller.binaryName + "." + route.javaMethod + " and " + first
+                        + " both answer " + shape + ", which differ only in the names of "
+                        + "their path variables. The router matches in order, so the second "
+                        + "can never run. Give them different paths or one method.");
+                return false;
+            }
+            byShape.put(shape, route.javaMethod);
+        }
+        return true;
     }
 
     /**
@@ -275,6 +307,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 p.kind = "QUERY";
                 p.name = requestParam.getStringOrDefault("value", "");
                 p.defaultValue = requestParam.getStringOrDefault("defaultValue", "");
+                p.required = requestParam.getBoolOrDefault("required", true);
                 if (p.name.length() == 0) {
                     ctx.error(cls, "@RequestParam needs the parameter name: "
                             + cls.getBinaryName() + "." + m.getName());
@@ -284,6 +317,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 p.kind = "HEADER";
                 p.name = requestHeader.getStringOrDefault("value", "");
                 p.defaultValue = requestHeader.getStringOrDefault("defaultValue", "");
+                p.required = requestHeader.getBoolOrDefault("required", true);
                 if (p.name.length() == 0) {
                     ctx.error(cls, "@RequestHeader needs the header name: "
                             + cls.getBinaryName() + "." + m.getName());
@@ -291,6 +325,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 }
             } else if (requestBody != null) {
                 p.kind = "BODY";
+                p.required = requestBody.getBoolOrDefault("required", true);
             } else if (REQUEST_TYPE.equals(p.javaType)) {
                 // The escape hatch: a handler that needs something this binding does not
                 // model takes the Request itself, exactly as it would have before.
@@ -315,7 +350,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         route.returnJavaType = RestClientAnnotationProcessor.javaTypeFor(
                 Type.getReturnType(m.getDescriptor()), null);
         AnnotationValues status = m.getAnnotation(RESPONSE_STATUS);
-        route.status = status == null ? 200 : status.getIntOrDefault("value", 200);
+        // ResponseStatus documents that a value-returning method answers 200 and a
+        // void one answers 204. Defaulting to 200 for both made the annotation's
+        // own javadoc wrong about the case it exists to describe.
+        int implied = "void".equals(route.returnJavaType) ? 204 : 200;
+        route.status = status == null ? implied : status.getIntOrDefault("value", implied);
         return route;
     }
 
@@ -513,6 +552,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             pad = "                    ";
         }
 
+        emitRequiredGuards(sb, route, pad);
+
         StringBuilder args = new StringBuilder();
         for (int i = 0; i < route.params.size(); i++) {
             Param p = route.params.get(i);
@@ -549,6 +590,46 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append("                }\n");
         }
         sb.append("            }\n");
+    }
+
+    /**
+     * Refuses a request that omits a binding declared required.
+     *
+     * Without this the `required` element of RequestParam, RequestHeader and
+     * RequestBody was read by nobody: an absent value simply converted to null,
+     * or to a primitive zero, and the handler ran as though the client had sent
+     * one. Both settings behaved identically, so the annotation documented a
+     * check that did not exist. A declared default supplies the value instead,
+     * so it makes the parameter satisfiable and no guard is emitted.
+     */
+    private static void emitRequiredGuards(StringBuilder sb, Route route, String pad) {
+        for (int i = 0; i < route.params.size(); i++) {
+            Param p = route.params.get(i);
+            if (!p.required || (p.defaultValue != null && p.defaultValue.length() > 0)) {
+                continue;
+            }
+            String test;
+            String what;
+            if ("QUERY".equals(p.kind)) {
+                test = "request.queryParam(" + quote(p.name) + ") == null";
+                what = "query parameter " + p.name;
+            } else if ("HEADER".equals(p.kind)) {
+                test = "request.getHeader(" + quote(p.name) + ") == null";
+                what = "header " + p.name;
+            } else if ("BODY".equals(p.kind)) {
+                test = "request.getBody() == null || request.getBody().length() == 0";
+                what = "request body";
+            } else {
+                // A path variable cannot be absent: the route only matched because
+                // the segment was there.
+                continue;
+            }
+            sb.append(pad).append("if (").append(test).append(") {\n");
+            sb.append(pad).append("    return request.respond(400, \"text/plain; charset=utf-8\",\n");
+            sb.append(pad).append("            utf8(").append(quote("Missing required " + what))
+              .append("));\n");
+            sb.append(pad).append("}\n");
+        }
     }
 
     private static String argumentExpression(Param p) {

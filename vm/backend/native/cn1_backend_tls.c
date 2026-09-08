@@ -56,15 +56,19 @@ static int cn1TlsInitialised = 0;
  */
 static const unsigned char CN1_ALPN_BOTH[] = { 2, 'h', '2', 8, 'h', 't', 't', 'p', '/', '1', '.', '1' };
 static const unsigned char CN1_ALPN_HTTP11[] = { 8, 'h', 't', 't', 'p', '/', '1', '.', '1' };
-static int cn1AlpnOfferH2 = 0;
+/* The h2 policy travels in the callback's own arg rather than in a variable
+   beside it: a process that serves two TLS ports had the second createContext
+   overwrite the first one's setting, and every context shares this callback, so
+   a server built for http/1.1 could start negotiating h2 (or stop offering it)
+   because of an unrelated server elsewhere in the same process. */
 
 static int cn1AlpnSelect(SSL* ssl, const unsigned char** out, unsigned char* outlen,
                          const unsigned char* in, unsigned int inlen, void* arg) {
-    const unsigned char* offered = cn1AlpnOfferH2 ? CN1_ALPN_BOTH : CN1_ALPN_HTTP11;
-    unsigned int offeredLen = cn1AlpnOfferH2 ? (unsigned int)sizeof(CN1_ALPN_BOTH)
-                                             : (unsigned int)sizeof(CN1_ALPN_HTTP11);
+    int offerH2 = (int)(intptr_t)arg;
+    const unsigned char* offered = offerH2 ? CN1_ALPN_BOTH : CN1_ALPN_HTTP11;
+    unsigned int offeredLen = offerH2 ? (unsigned int)sizeof(CN1_ALPN_BOTH)
+                                      : (unsigned int)sizeof(CN1_ALPN_HTTP11);
     (void)ssl;
-    (void)arg;
     if(SSL_select_next_proto((unsigned char**)out, outlen, offered, offeredLen, in, inlen)
             != OPENSSL_NPN_NEGOTIATED) {
         /* No overlap. NOACK rather than ALERT_FATAL: a client that offered only
@@ -107,8 +111,8 @@ JAVA_LONG com_codename1_backend_Tls_createContextImpl___java_lang_String_java_la
         return 0;
     }
     SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
-    cn1AlpnOfferH2 = offerHttp2 ? 1 : 0;
-    SSL_CTX_set_alpn_select_cb(ctx, cn1AlpnSelect, NULL);
+    SSL_CTX_set_alpn_select_cb(ctx, cn1AlpnSelect,
+            (void*)(intptr_t)(offerHttp2 ? 1 : 0));
     /* The handshake and the record layer both want to retry on a partial write
        with a moved buffer; without this OpenSSL refuses and the connection dies
        on a large response. */
