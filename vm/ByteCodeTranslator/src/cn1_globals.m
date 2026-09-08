@@ -2733,6 +2733,25 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
 #endif
         } else {
             gcMarkObject(threadStateData, r, force);
+            // CONSUME THE TOUCH, having retained the referent for this cycle.
+            //
+            // Nothing else will. The ageing loop walks cn1RefDiscovered, and this reference
+            // is here precisely because it could not be recorded there -- so a stamp left
+            // at CN1_REF_TOUCHED stays that way for the life of the process. The condition
+            // above then refuses to clear on every subsequent emergency cycle, the soft
+            // referent is retained forever however long ago it was last read, and if that
+            // memory is what is blocking the allocation, codenameOneGcMalloc's retry loop
+            // never makes progress. That is the livelock this whole emergency path exists
+            // to break, reached through the one reference it cannot write down.
+            //
+            // Safe because the referent was just MARKED: a mutator holding it is covered
+            // for this cycle, which is all the stamp was protecting. If it is read again
+            // the next get() stamps it afresh and it is retained again; if it is not, the
+            // next emergency cycle is free to clear it. Compare-exchange rather than a
+            // plain store so a get() landing in between is not silently overwritten.
+            JAVA_INT expected = CN1_REF_TOUCHED;
+            __atomic_compare_exchange_n(touchAgeField, &expected, 0, 0,
+                                        __ATOMIC_RELAXED, __ATOMIC_RELAXED);
         }
         return;
     }
