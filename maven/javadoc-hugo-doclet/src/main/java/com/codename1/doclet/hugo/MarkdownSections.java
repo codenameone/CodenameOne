@@ -195,8 +195,25 @@ public final class MarkdownSections {
             int end = sectionEnd(lines, i + 1, level);
             String body = join(lines.subList(i + 1, end));
             switch (key) {
-                case "parameters" -> parameters.addAll(bullets(body));
-                case "throws" -> exceptions.addAll(bullets(body));
+                // A section with no named bullet documents nothing in particular:
+                // SampleQuery.setUnit explains under "Throws" that validation
+                // happens later, and lifting that produced a blank exception row
+                // with the prose stranded beside an empty label. Left where the
+                // author put it instead.
+                case "parameters" -> {
+                    if (containsBullet(body)) {
+                        parameters.addAll(bullets(body));
+                    } else {
+                        prose.addAll(lines.subList(i, end));
+                    }
+                }
+                case "throws" -> {
+                    if (containsBullet(body)) {
+                        exceptions.addAll(bullets(body));
+                    } else {
+                        prose.addAll(lines.subList(i, end));
+                    }
+                }
                 case "see also" -> {
                     for (String item : bulletTexts(body)) {
                         seeAlso.add(item);
@@ -226,6 +243,25 @@ public final class MarkdownSections {
         }
 
         return new Result(trimBlankEdges(prose), parameters, exceptions, seeAlso, returns, deprecated);
+    }
+
+    /**
+     * Whether a section is a list at all.
+     *
+     * <p>The test is the presence of a bullet, not whether a name could be read
+     * out of one. A bullet whose text defeats the name parser is still a
+     * parameter the author wrote and has to stay in the table; only a section
+     * with no list in it is prose, which is what
+     * com.codename1.health.SampleQuery.setUnit writes under "Throws" when it
+     * explains that validation happens later.
+     */
+    private static boolean containsBullet(String body) {
+        for (String line : body.split("\n", -1)) {
+            if (bulletMarker(line) != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

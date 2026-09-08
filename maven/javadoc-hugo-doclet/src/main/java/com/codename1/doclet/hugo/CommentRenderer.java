@@ -176,21 +176,28 @@ final class CommentRenderer {
         String type = hash < 0 ? signature : signature.substring(0, hash);
         String member = hash < 0 ? "" : signature.substring(hash + 1);
 
+        // The type name starts at the first segment that begins with a capital,
+        // and everything from there is kept: Pose.Landmark is a nested type, not
+        // a package called Pose. Testing the character *before* each dot instead
+        // read "Pose" as a package segment because it ends in a lower case
+        // letter, and shortened Pose.Landmark.getName() to Landmark.getName().
         String simpleType = type;
-        int lastDot = -1;
-        for (int i = 0; i < type.length(); i++) {
-            char c = type.charAt(i);
-            if (c == '(') {
+        int cut = -1;
+        int segmentStart = 0;
+        for (int i = 0; i <= type.length(); i++) {
+            if (i == type.length() || type.charAt(i) == '.') {
+                if (segmentStart < type.length()
+                        && Character.isUpperCase(type.charAt(segmentStart))) {
+                    cut = segmentStart;
+                    break;
+                }
+                segmentStart = i + 1;
+            } else if (type.charAt(i) == '(') {
                 break;
             }
-            // Only a dot that separates a lower case package segment from what
-            // follows is a qualifier; Outer.Inner must keep its dot.
-            if (c == '.' && i + 1 < type.length() && Character.isLowerCase(type.charAt(i > 0 ? i - 1 : 0))) {
-                lastDot = i;
-            }
         }
-        if (lastDot >= 0) {
-            simpleType = type.substring(lastDot + 1);
+        if (cut > 0) {
+            simpleType = type.substring(cut);
         }
 
         if (member.isEmpty()) {

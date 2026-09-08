@@ -298,8 +298,16 @@ class MarkdownSectionsTest {
                 "the section stays in the prose");
         assertTrue(asPackage.parameters().isEmpty(), "and is not claimed as structure");
 
-        MarkdownSections.Result asMethod = MarkdownSections.parse(body, true);
-        assertTrue(!asMethod.parameters().isEmpty(),
+        // The contrast this test is about is the element kind, so the method half
+        // uses a real bullet list. A section with no list in it is prose
+        // everywhere -- see leavesAProseOnlyThrowsSectionInThePlace.
+        MarkdownSections.Result asMethod = MarkdownSections.parse(String.join("\n",
+                "Runs a query.",
+                "",
+                "#### Parameters",
+                "",
+                "- `sql`: the statement to run"), true);
+        assertEquals("sql", asMethod.parameters().get(0).name(),
                 "on a method the same heading is still structure");
     }
 
@@ -333,6 +341,24 @@ class MarkdownSectionsTest {
         assertEquals(1, r.exceptions().size());
         assertEquals("NfcException", r.exceptions().get(0).name());
         assertEquals("when the input is bad", r.exceptions().get(0).text());
+    }
+
+    @Test
+    void leavesAProseOnlyThrowsSectionInThePlace() {
+        // com.codename1.health.SampleQuery.setUnit explains under Throws that
+        // validation happens later rather than naming an exception. Lifting that
+        // produced a blank exception row with the prose stranded beside an empty
+        // label.
+        MarkdownSections.Result r = MarkdownSections.parse(String.join("\n",
+                "Sets the unit.",
+                "",
+                "#### Throws",
+                "",
+                "Nothing here: the unit is validated when the query runs."), true);
+
+        assertTrue(r.exceptions().isEmpty(), "no nameless exception row");
+        assertTrue(r.description().contains("validated when the query runs"),
+                "the prose survives where the author wrote it");
     }
 
     @Test

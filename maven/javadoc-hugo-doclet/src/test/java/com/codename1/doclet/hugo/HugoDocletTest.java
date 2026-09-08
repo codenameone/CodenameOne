@@ -128,6 +128,12 @@ class HugoDocletTest {
                 "    public static final String PATTERN = \"EEE, dd MMM\";",
                 "    /// A constant holding a control character",
                 "    public static final String UNIT = \"\\u001f\";",
+                "    /// Returns what it was given.",
+                "    ///",
+                "    /// @param <V> the value type",
+                "    /// @param value the value",
+                "    /// @return the value",
+                "    public <V> V identity(V value) { return value; }",
                 "    /// A long constant",
                 "    public static final long BIG = 5L;",
                 "    /// Overloads that differ by type, not arity",
@@ -460,6 +466,17 @@ class HugoDocletTest {
         assertTrue(page.contains("what the parent called it"),
                 "the inherited text reaches the renamed parameter");
         assertTrue(page.contains("\"renamed\""), "under the override's own name");
+    }
+
+    @Test
+    void documentsAMethodsOwnTypeParameter() throws IOException {
+        // Map.of rejects a null value, and the type-parameter row passed one, so
+        // the whole generation died with a NullPointerException the moment any
+        // method documented a type parameter. Nothing in the framework does
+        // today, which is the only reason this was not already a broken build.
+        String page = page("Sample.md");
+        assertTrue(page.contains("the value type"), "the type parameter's text is kept");
+        assertTrue(page.contains("\"<V>\""), "under its own name");
     }
 
     @Test

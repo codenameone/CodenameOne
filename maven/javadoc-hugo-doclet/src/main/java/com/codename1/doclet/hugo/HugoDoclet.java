@@ -630,7 +630,14 @@ public final class HugoDoclet implements Doclet {
             if (documented.name().startsWith("<")) {
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("name", documented.name());
-                row.put("type", Map.of("label", "", "url", null));
+                // Not Map.of: it rejects a null value and took the whole
+                // generation down with a NullPointerException the moment any
+                // method documented a type parameter. Nothing in the framework
+                // does today, which is the only reason this was not a crash.
+                Map<String, Object> noType = new LinkedHashMap<>();
+                noType.put("label", "");
+                noType.put("url", null);
+                row.put("type", noType);
                 row.put("doc", documented.text());
                 out.add(row);
             }

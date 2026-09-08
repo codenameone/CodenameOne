@@ -167,11 +167,23 @@ MINIMUM_FRAGMENTS = 10000
 SKIPPED_PAGE_SUFFIX = "package-tree.html"
 
 # Identifiers javadoc puts on its own page furniture rather than on a member.
+# Anchored end to end on purpose. The first version matched any id merely
+# *starting* with one of these words, which quietly removed real members from the
+# comparison: methodType(...), fieldSubmitted(...), propertyChanged(...),
+# annotationType() and propertyNames() were all excluded, so a regression in
+# exactly those published URLs would have passed the compatibility gate.
 CHROME_ID_RE = re.compile(
-    r"^(class|constructor|method|field|nested-class|property|enum-constant|annotation)"
-    r"|^(navbar|skip-navbar|search-input|reset-search|type-param-|related-package)"
-    # Structural anchors on the summary pages, not addresses of an API element.
-    r"|^(package-description|package-summary|uses-of|hierarchy)$"
+    r"^(?:"
+    r"class-description"
+    r"|(?:constructor|method|field|property|enum-constant|nested-class"
+    r"|annotation-interface[a-z-]*)-(?:summary|detail)(?:-table[A-Za-z0-9._-]*)?"
+    # The type table on a package page, and the tab controls javadoc gives it.
+    r"|class-summary(?:-tab[0-9]+|\.tabpanel)?"
+    r"|(?:methods|fields|nested-classes|properties)-inherited-from-(?:class|interface)-[A-Za-z0-9_.$]*"
+    r"|navbar[A-Za-z0-9._-]*|skip-navbar[A-Za-z0-9._-]*|search-input|reset-search"
+    r"|type-param-[A-Za-z0-9_$]*|related-package-summary"
+    r"|package-description|package-summary|uses-of|hierarchy"
+    r")$"
 )
 
 # Identifiers javadoc auto-generates for headings inside a comment body.

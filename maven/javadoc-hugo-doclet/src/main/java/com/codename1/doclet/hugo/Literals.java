@@ -102,6 +102,17 @@ final class Literals {
             }
             return value + "f";
         }
+        // An enum-valued annotation default arrives as the constant's element, and
+        // its toString is the bare constant name. "default DEFAULT" says nothing
+        // about which enum, and the build-hint annotations are full of enums that
+        // each define a DEFAULT.
+        if (constant instanceof javax.lang.model.element.VariableElement variable
+                && variable.getKind() == javax.lang.model.element.ElementKind.ENUM_CONSTANT) {
+            javax.lang.model.element.Element owner = variable.getEnclosingElement();
+            return owner == null
+                    ? variable.getSimpleName().toString()
+                    : owner.getSimpleName() + "." + variable.getSimpleName();
+        }
         return String.valueOf(constant);
     }
 
