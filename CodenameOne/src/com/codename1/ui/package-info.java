@@ -287,7 +287,7 @@
 ///
 /// ### SignatureComponent
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/generated/components-signature2.png)
+/// ![](https://www.codenameone.com/developer-guide/img/components-signature2.png)
 /// `com.codename1.components.SignatureComponent` shows a dialog that allows the user to "sign"
 /// using the touch screen
 ///
@@ -299,7 +299,7 @@
 ///
 /// ### FloatingHint
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/generated/components-floatinghint.png)
+/// ![](https://www.codenameone.com/developer-guide/img/components-floatinghint.png)
 /// `com.codename1.components.FloatingHint` animates the text field hint into a label on top of
 /// the text field and visa versa
 ///
