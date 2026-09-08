@@ -2835,6 +2835,28 @@ JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     }
 }
 
+// A tagged value never allocates, so nothing else runs the boxed class's <clinit> -- and
+// that initializer is what fills the vtable a later hashCode/equals/compareTo on the
+// immediate dispatches through. Each valueOf below therefore forces it once.
+//
+// The flag is only a FAST PATH. __STATIC_INITIALIZER_X is already properly double-checked
+// behind the class monitor, so correctness never depended on this; what it does depend on
+// is publication. `volatile` in C is neither atomic nor ordered, so a plain flag lets a
+// second thread observe 1 while the initializer's vtable and static-field writes are still
+// invisible to it on a weak-memory target, and the next virtual call dispatches through
+// stale class state. Release on publish, acquire on read -- the same pairing
+// CN1_CONSTANT_POOL_LOAD documents in cn1_globals.h, and for the same reason.
+#if CN1_TAGGED_ACTIVE
+#define CN1_FORCE_BOX_CLINIT(cls) \
+    do { \
+        static int cn1__clinit_##cls = 0; \
+        if(!__atomic_load_n(&cn1__clinit_##cls, __ATOMIC_ACQUIRE)) { \
+            __STATIC_INITIALIZER_##cls(threadStateData); \
+            __atomic_store_n(&cn1__clinit_##cls, 1, __ATOMIC_RELEASE); \
+        } \
+    } while(0)
+#endif
+
 // ---- Tagged small-integer support (poor man's Valhalla, 64-bit pointers only) ----
 // Integer.valueOf returns an immediate tagged pointer instead of allocating; cn1Value
 // recovers the int from either a tagged immediate or a heap Integer's field. When the
@@ -2845,12 +2867,7 @@ extern void __STATIC_INITIALIZER_java_lang_Integer(CODENAME_ONE_THREAD_STATE);
 #endif
 JAVA_OBJECT java_lang_Integer_valueOf___int_R_java_lang_Integer(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {
 #if CN1_TAGGED_ACTIVE
-    // Tagged ints never allocate, so nothing else triggers Integer's class init -- but
-    // dispatching hashCode/equals on a tagged int reads class__java_lang_Integer.vtable,
-    // which the static initializer populates. Force it once. The guard keeps the hot path
-    // a single predictable branch (the initializer itself is also idempotent).
-    static volatile int cn1IntInit = 0;
-    if(!cn1IntInit) { __STATIC_INITIALIZER_java_lang_Integer(threadStateData); cn1IntInit = 1; }
+    CN1_FORCE_BOX_CLINIT(java_lang_Integer);
     return CN1_TAG_INT(i);
 #else
     return java_lang_Integer_valueOfHeap___int_R_java_lang_Integer(threadStateData, i);
@@ -2889,8 +2906,7 @@ extern void __STATIC_INITIALIZER_java_lang_Short(CODENAME_ONE_THREAD_STATE);
 JAVA_OBJECT java_lang_Long_valueOf___long_R_java_lang_Long(CODENAME_ONE_THREAD_STATE, JAVA_LONG i) {
 #if CN1_TAGGED_EXTRA_ACTIVE
     if(CN1_LONG_TAGGABLE(i)) {
-        static volatile int cn1LongInit = 0;
-        if(!cn1LongInit) { __STATIC_INITIALIZER_java_lang_Long(threadStateData); cn1LongInit = 1; }
+        CN1_FORCE_BOX_CLINIT(java_lang_Long);
         return CN1_TAG_LONG_VAL(i);
     }
 #endif
@@ -2911,8 +2927,7 @@ JAVA_OBJECT java_lang_Double_valueOf___double_R_java_lang_Double(CODENAME_ONE_TH
     union { JAVA_DOUBLE d; uint64_t b; } u;
     u.d = d;
     if(CN1_DOUBLE_TAGGABLE_BITS(u.b)) {
-        static volatile int cn1DoubleInit = 0;
-        if(!cn1DoubleInit) { __STATIC_INITIALIZER_java_lang_Double(threadStateData); cn1DoubleInit = 1; }
+        CN1_FORCE_BOX_CLINIT(java_lang_Double);
         return CN1_TAG_DOUBLE_BITS(u.b);
     }
 #endif
@@ -2935,8 +2950,7 @@ JAVA_OBJECT java_lang_Float_valueOf___float_R_java_lang_Float(CODENAME_ONE_THREA
     union { JAVA_FLOAT f; uint32_t b; } u;
     u.f = f;
     {
-        static volatile int cn1FloatInit = 0;
-        if(!cn1FloatInit) { __STATIC_INITIALIZER_java_lang_Float(threadStateData); cn1FloatInit = 1; }
+        CN1_FORCE_BOX_CLINIT(java_lang_Float);
     }
     return CN1_TAG_FLOAT_BITS(u.b);
 #else
@@ -2958,8 +2972,7 @@ JAVA_FLOAT java_lang_Float_cn1Value___R_float(CODENAME_ONE_THREAD_STATE, JAVA_OB
 JAVA_OBJECT java_lang_Character_valueOf___char_R_java_lang_Character(CODENAME_ONE_THREAD_STATE, JAVA_CHAR c) {
 #if CN1_TAGGED_EXTRA_ACTIVE
     {
-        static volatile int cn1CharInit = 0;
-        if(!cn1CharInit) { __STATIC_INITIALIZER_java_lang_Character(threadStateData); cn1CharInit = 1; }
+        CN1_FORCE_BOX_CLINIT(java_lang_Character);
     }
     return CN1_TAG_CHAR_VAL(c);
 #else
@@ -2979,8 +2992,7 @@ JAVA_CHAR java_lang_Character_cn1Value___R_char(CODENAME_ONE_THREAD_STATE, JAVA_
 JAVA_OBJECT java_lang_Short_valueOf___short_R_java_lang_Short(CODENAME_ONE_THREAD_STATE, JAVA_SHORT v) {
 #if CN1_TAGGED_EXTRA_ACTIVE
     {
-        static volatile int cn1ShortInit = 0;
-        if(!cn1ShortInit) { __STATIC_INITIALIZER_java_lang_Short(threadStateData); cn1ShortInit = 1; }
+        CN1_FORCE_BOX_CLINIT(java_lang_Short);
     }
     return CN1_TAG_SHORT_VAL(v);
 #else

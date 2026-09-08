@@ -328,6 +328,23 @@ the class as copyable and let scalar replacement survive a return. That is a sep
 and the thing to measure FIRST is a `CN1_ALLOC_CENSUS` profile of a real app: if `Dimension`
 and `Rectangle` are not near the top of it, the answer is no and it cost one run to find out.
 
+### Forcing a boxed class's clinit needs release/acquire, not `volatile`
+
+A tagged value never allocates, so nothing else runs its class's `<clinit>` -- and that is
+what fills the vtable a later `hashCode`/`equals`/`compareTo` on the immediate dispatches
+through. Each `valueOf` forces it once, behind a flag.
+
+That flag is a fast path only: `__STATIC_INITIALIZER_X` is already double-checked behind the
+class monitor. What it does affect is **publication**. `volatile` in C is neither atomic nor
+ordered, so a plain flag lets a second thread observe 1 while the initializer's vtable writes
+are still invisible to it on a weak-memory target, and the next virtual call dispatches
+through stale class state. `CN1_FORCE_BOX_CLINIT` publishes with `__ATOMIC_RELEASE` and reads
+with `__ATOMIC_ACQUIRE`, the same pairing `CN1_CONSTANT_POOL_LOAD` documents. Verified in the
+emitted arm64: `ldapr` on the read, `stlr` on the publish.
+
+The bug was in the original Integer native and was copied to all five new types; all six are
+fixed together, because half a memory-model fix is worse than none.
+
 ### Adding a seventh type
 
 Only one code is left, so spend it deliberately. The work is: a proxy entry, `valueOf` +
