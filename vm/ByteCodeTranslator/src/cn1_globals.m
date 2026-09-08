@@ -2905,6 +2905,23 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
 // Runs on the GC thread only, inside the SATB termination loop, barrier armed.
 // Returns JAVA_TRUE if it marked anything; it has already drained by then.
 static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
+    // NOTHING TO DO IN A PROGRAM WITH NO REFERENCES, and doing nothing has to mean
+    // touching nothing. Most applications never construct a Reference, and for those this
+    // pass previously still ran a cn1SatbBulkQuiesce() on every outer termination pass --
+    // which is not free: it spins in usleep(50) while any BULK ARRAY COPY is in flight, so
+    // an allocation-heavy program that arraycopies object arrays pays a collector stall for
+    // a feature it does not use.
+    //
+    // The early exit is also the answer to a CI regression that took a long time to find:
+    // BibopPageFloorIntegrationTest, whose workload contains no Reference at all, began
+    // failing intermittently on the 4-marker arm64 configuration once that quiesce landed,
+    // reporting its pages as released while the footprint stayed put. The base feature
+    // commit -- weak references with none of this machinery -- passes that job, which is
+    // what localised it here.
+    if(cn1RefDiscoveredTop == 0
+       && atomic_load_explicit(&cn1RefEmergencyTop, memory_order_relaxed) == 0) {
+        return JAVA_FALSE;
+    }
     JAVA_BOOLEAN marked = JAVA_FALSE;
 #ifdef CN1_GC_CONFORM
     long long __r0 = cn1GcNowNs();
