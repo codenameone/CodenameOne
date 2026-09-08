@@ -147,7 +147,11 @@ public final class S3 {
         }
         List code = elements(result.getBodyAsString(), "Code");
         String reason = code.isEmpty() ? "" : String.valueOf(code.get(0));
-        if("BucketAlreadyOwnedByYou".equals(reason) || "BucketAlreadyExists".equals(reason)) {
+        // Only "owned by you" is the idempotent case. Bucket names are global on AWS,
+        // so "already exists" means somebody else has it: returning normally there
+        // would report success for a bucket the caller does not have and cannot use,
+        // and every later call would fail on authorization instead of here.
+        if("BucketAlreadyOwnedByYou".equals(reason)) {
             return;
         }
         requireSuccess(result, "CREATE BUCKET", bucket, "");

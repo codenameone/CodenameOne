@@ -37,6 +37,19 @@
             <artifactId>codenameone-backend</artifactId>
             <version>${cn1.version}</version>
         </dependency>
+        <!--
+             The SQLite driver for `cn1:backend`, the local JVM run. It is optional in
+             codenameone-backend, so Maven does not pass it down here, and without it
+             Database.open(":memory:") fails with "No suitable driver" in the loop the
+             guide documents. The native build links SQLite in and does not use this.
+             Delete it if this server never opens a SQLite database.
+        -->
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.46.1.0</version>
+            <scope>runtime</scope>
+        </dependency>
     </dependencies>
 
     <build>

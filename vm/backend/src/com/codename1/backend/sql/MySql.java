@@ -626,12 +626,41 @@ public final class MySql {
         }
     }
 
+    /** The most one MySQL packet can carry: the length field is 24 bits. */
+    private static final int MAX_PACKET_BODY = 0xffffff;
+
+    /**
+     * Sends a body, split across packets when it does not fit in one.
+     *
+     * A body of 16MB or more -- an ordinary large byte[] parameter -- has to go out
+     * as consecutive full-length packets with running sequence numbers. Writing the
+     * low 24 bits of the length and then the whole body left the server reading the
+     * remainder as the next packet's header, which does not fail: the connection is
+     * simply desynchronised from that point on, and every answer after it is
+     * nonsense.
+     *
+     * A body whose length is an exact multiple of the maximum ends with an empty
+     * packet, which is how the protocol says the sequence is over.
+     */
     private void sendPacket(byte[] body) throws IOException {
-        wire.writeByte(body.length & 0xff);
-        wire.writeByte((body.length >> 8) & 0xff);
-        wire.writeByte((body.length >> 16) & 0xff);
-        wire.writeByte(sequence++ & 0xff);
-        wire.writeBytes(body);
+        int offset = 0;
+        while(true) {
+            int chunk = body.length - offset;
+            if(chunk > MAX_PACKET_BODY) {
+                chunk = MAX_PACKET_BODY;
+            }
+            wire.writeByte(chunk & 0xff);
+            wire.writeByte((chunk >> 8) & 0xff);
+            wire.writeByte((chunk >> 16) & 0xff);
+            wire.writeByte(sequence++ & 0xff);
+            if(chunk > 0) {
+                wire.writeBytes(body, offset, chunk);
+            }
+            offset += chunk;
+            if(chunk < MAX_PACKET_BODY) {
+                break;
+            }
+        }
         wire.flush();
     }
 
@@ -644,6 +673,25 @@ public final class MySql {
         sequence = wire.read() + 1;
         Packet packet = new Packet();
         packet.body = wire.readFully(length);
+        if(length == MAX_PACKET_BODY) {
+            // A full-length packet is continued by the next one, and the value only
+            // ends at a packet shorter than the maximum. Stopping at the first would
+            // hand the caller a truncated value and leave the following header to be
+            // read as data.
+            ByteArrayOutputStream all = new ByteArrayOutputStream();
+            all.write(packet.body, 0, packet.body.length);
+            while(length == MAX_PACKET_BODY) {
+                int next = wire.read();
+                if(next < 0) {
+                    throw new IOException("The MySQL connection closed mid-packet");
+                }
+                length = next | (wire.read() << 8) | (wire.read() << 16);
+                sequence = wire.read() + 1;
+                byte[] more = wire.readFully(length);
+                all.write(more, 0, more.length);
+            }
+            packet.body = all.toByteArray();
+        }
         if(packet.body.length == 0) {
             throw new IOException("An empty MySQL packet");
         }

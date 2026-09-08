@@ -110,6 +110,26 @@ typedef struct {
     struct CN1H2Body* bodies;
 } CN1H2Session;
 
+/*
+ * Frees one body, closing the descriptor when that is what it holds.
+ *
+ * Separate from cn1H2ReleaseBody, which unlinks it first, so that teardown can walk
+ * the list straight through instead of searching it once per body -- and so that
+ * there is no way to free a body without closing its descriptor. Doing it inline in
+ * two places is how the descriptor leaked from the teardown path: a client that
+ * dropped the connection mid-download left one open per request.
+ */
+static void cn1H2FreeBody(CN1H2Body* body) {
+    if(body->fd >= 0) {
+        /* The descriptor became the session's when the response was submitted, so
+           this is the one place that closes it: at EOF, at an early stream reset,
+           and at teardown, all of which arrive here. */
+        close(body->fd);
+    }
+    free(body->data);
+    free(body);
+}
+
 static void cn1H2ReleaseBody(CN1H2Session* s, CN1H2Body* body) {
     CN1H2Body** link = &s->bodies;
     while(*link != NULL) {
@@ -119,14 +139,7 @@ static void cn1H2ReleaseBody(CN1H2Session* s, CN1H2Body* body) {
         }
         link = &(*link)->next;
     }
-    if(body->fd >= 0) {
-        /* The descriptor became the session's when the response was submitted, so
-           this is the one place that closes it: at EOF, at an early stream reset,
-           and at teardown, all of which arrive here. */
-        close(body->fd);
-    }
-    free(body->data);
-    free(body);
+    cn1H2FreeBody(body);
 }
 
 static void cn1H2ReleaseBodyForStream(CN1H2Session* s, int32_t streamId) {
@@ -819,8 +832,7 @@ JAVA_VOID com_codename1_backend_Http2_destroyImpl___long(CODENAME_ONE_THREAD_STA
     free(s->out);
     while(s->bodies != NULL) {
         CN1H2Body* next = s->bodies->next;
-        free(s->bodies->data);
-        free(s->bodies);
+        cn1H2FreeBody(s->bodies);
         s->bodies = next;
     }
     free(s);

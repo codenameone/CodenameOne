@@ -1509,13 +1509,17 @@ public final class HttpServer {
             try {
                 ServerSocket.setBlocking(fd, false);
                 ServerSocket.setTimeout(fd, SOCKET_TIMEOUT_MILLIS);
-                armConnection(fd, true);
+                // Registered BEFORE the poller can report it. Arming first would let
+                // another host thread reach drop() for a descriptor this map has not
+                // heard of yet, and drop declines to close what it does not own.
                 liveConnections.put(new Integer(fd), Boolean.TRUE);
-                vtAccepts.incrementAndGet();
                 openConnections.incrementAndGet();
+                armConnection(fd, true);
+                vtAccepts.incrementAndGet();
                 connectionsAccepted.incrementAndGet();
             } catch (IOException err) {
-                ServerSocket.closeFd(fd);
+                // Through drop() so the count it just incremented comes back down.
+                drop(fd);
             }
         }
     }
@@ -1594,8 +1598,20 @@ public final class HttpServer {
         }
     }
 
-    /** The only place a served connection is closed, so the count stays honest. */
+    /**
+     * The only place a served connection is closed, so the count stays honest.
+     *
+     * Idempotent, and it has to be: the stop() deadline closes what is still open
+     * while a worker may be using that same connection, and that worker calls here
+     * again on its next failed read. Closing twice decrements the count a second
+     * time and hands close() a descriptor number the OS may already have reused for
+     * something else, so the second call would shut down unrelated I/O. Winning the
+     * removal is what decides which call owns the teardown.
+     */
     private void drop(int fd) {
+        if(liveConnections.remove(new Integer(fd)) == null) {
+            return;
+        }
         Object h2 = http2Sessions.remove(new Integer(fd));
         if(h2 != null) {
             ((Http2)h2).close();
@@ -1604,7 +1620,6 @@ public final class HttpServer {
         if(session != null) {
             Tls.closeSession(((Long)session).longValue());
         }
-        liveConnections.remove(new Integer(fd));
         ServerSocket.closeFd(fd);
         openConnections.decrementAndGet();
     }
@@ -2695,23 +2710,35 @@ public final class HttpServer {
 
         int targetStart = firstSpace + 1;
         int targetLength = secondSpace - targetStart;
+        // The origin-form target when it had to be built rather than pointed at.
+        String synthesized = null;
         // Absolute-form ("GET http://host/path"), which a request through a proxy
         // uses and RFC 9112 requires a server to accept.
         if(sliceStartsWithIgnoreCase(raw, targetStart, targetLength, "http://")
                 || sliceStartsWithIgnoreCase(raw, targetStart, targetLength, "https://")) {
             int schemeEnd = indexOfByte(raw, targetStart, targetStart + targetLength, (byte)':');
             int authority = schemeEnd + 3;      // past "://"
-            int slash = indexOfByte(raw, authority, targetStart + targetLength, (byte)'/');
-            if(slash < 0) {
-                targetStart = -1;               // origin-form is just "/"
-            } else {
-                targetLength = targetStart + targetLength - slash;
+            int end = targetStart + targetLength;
+            int slash = indexOfByte(raw, authority, end, (byte)'/');
+            int question = indexOfByte(raw, authority, end, (byte)'?');
+            // Whichever comes first ends the authority. Looking only for '/' drops the
+            // query of "http://host?a=b" on the floor, and reads a '/' INSIDE a query
+            // value as the start of the path.
+            if(slash >= 0 && (question < 0 || slash < question)) {
+                targetLength = end - slash;
                 targetStart = slash;
+            } else if(question >= 0) {
+                // No path but a query. The origin-form is "/" followed by that query,
+                // which is not a range of this buffer, so it has to be built.
+                synthesized = "/" + asciiString(raw, question, end - question);
+                targetStart = -1;
+            } else {
+                targetStart = -1;               // origin-form is just "/"
             }
         }
         String target;
         if(targetStart < 0) {
-            target = "/";
+            target = synthesized == null ? "/" : synthesized;
         } else {
             if(targetLength == 0
                     || (raw[targetStart] != '/'
@@ -3311,13 +3338,24 @@ public final class HttpServer {
      * what lets it stay lock-free.
      */
     private static final int FOLD_CACHE_SLOTS = 16;
-    private static final int FOLD_STORE_BYTES = 512;
+    /**
+     * Each slot owns its own bytes, at slot * FOLD_SLOT_BYTES.
+     *
+     * They used to share one 512-byte store filled end to end, which wrapped to zero
+     * once it was full without retiring the slots whose bytes it was about to
+     * overwrite. Thirteen distinct forty-character names was enough: a later lookup
+     * matched its key, compared against whatever name had since taken those bytes,
+     * and getHeader reported a header that was present as absent. Nothing throws --
+     * the request is simply answered as though the header had not been sent.
+     *
+     * A name longer than a slot takes the general path instead. Every name this
+     * server looks up is far shorter, and being uncached is only slower.
+     */
+    private static final int FOLD_SLOT_BYTES = 32;
     private static final String[] foldKeys = new String[FOLD_CACHE_SLOTS];
-    private static final int[] foldStart = new int[FOLD_CACHE_SLOTS];
     private static final int[] foldLength = new int[FOLD_CACHE_SLOTS];
-    private static final byte[] foldStore = new byte[FOLD_STORE_BYTES];
+    private static final byte[] foldStore = new byte[FOLD_CACHE_SLOTS * FOLD_SLOT_BYTES];
     private static int foldNext;
-    private static int foldUsed;
 
     /**
      * Folds `ascii` into {@link #foldStore} and returns its slot, or -1 when the
@@ -3330,25 +3368,26 @@ public final class HttpServer {
             }
         }
         int length = ascii.length();
-        if(length > FOLD_STORE_BYTES) {
+        if(length > FOLD_SLOT_BYTES) {
             return -1;
         }
-        if(foldUsed + length > FOLD_STORE_BYTES) {
-            foldUsed = 0;                    // wrap; stale slots are re-folded on miss
-        }
-        int at = foldUsed;
+        // Checked before anything is written, so an unfoldable name cannot leave a
+        // slot half rewritten.
         for(int iter = 0 ; iter < length ; iter++) {
-            char c = ascii.charAt(iter);
-            if(c > 127) {
+            if(ascii.charAt(iter) > 127) {
                 return -1;
             }
-            foldStore[at + iter] = (byte) foldAscii(c);
         }
-        foldUsed = at + length;
         int slot = foldNext;
         foldNext = (slot + 1) % FOLD_CACHE_SLOTS;
-        // Bounds before key: a reader that matches the key must see them complete.
-        foldStart[slot] = at;
+        int at = slot * FOLD_SLOT_BYTES;
+        // Retire the old key BEFORE its bytes are replaced: a lookup must not be able
+        // to match a key whose bytes are being rewritten underneath it.
+        foldKeys[slot] = null;
+        for(int iter = 0 ; iter < length ; iter++) {
+            foldStore[at + iter] = (byte) foldAscii(ascii.charAt(iter));
+        }
+        // Length before key, so a reader that matches the key sees it complete.
         foldLength[slot] = length;
         foldKeys[slot] = ascii;
         return slot;
@@ -3360,7 +3399,7 @@ public final class HttpServer {
         if(length != needle) {
             return false;
         }
-        int at = foldStart[slot];
+        int at = slot * FOLD_SLOT_BYTES;
         for(int iter = 0 ; iter < length ; iter++) {
             if(foldAscii(data[start + iter] & 0xff) != foldStore[at + iter]) {
                 return false;
