@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="820" height="500" viewBox="0 0 820 500">
-  <rect x="0" y="0" width="820" height="500" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="516" viewBox="0 0 820 516">
+  <rect x="0" y="0" width="820" height="516" fill="#ffffff"/>
   <text x="410" y="26" font-family="Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#222222">A network request, and which thread each callback runs on</text>
   <rect x="24" y="44" width="772" height="84" rx="6" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
   <text x="410" y="64" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a6fa5">Your code</text>
@@ -11,38 +11,43 @@
   <text x="602" y="108" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">on the EDT it waits via invokeAndBlock; off it, the caller blocks</text>
   <path d="M 410 128 L 410 146" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <path d="M 405 140 L 410 146 L 415 140" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
-  <rect x="24" y="150" width="772" height="184" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
+  <rect x="24" y="150" width="772" height="200" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
   <text x="410" y="170" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a7a3d">Network thread</text>
   <text x="410" y="186" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">one by default; NetworkManager.updateThreadCount(n) starts more</text>
-  <rect x="48" y="198" width="220" height="40" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1"/>
-  <text x="158" y="214" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">buildRequestBody(out)</text>
-  <text x="158" y="229" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">write your POST body</text>
-  <path d="M 268 218 L 296 218" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
-  <path d="M 290 213 L 296 218 L 290 223" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
-  <rect x="300" y="198" width="220" height="40" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1"/>
-  <text x="410" y="214" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">readHeaders(connection)</text>
-  <text x="410" y="229" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">status and headers arrive</text>
-  <path d="M 520 218 L 548 218" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
-  <path d="M 542 213 L 548 218 L 542 223" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
-  <rect x="552" y="198" width="220" height="40" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1"/>
-  <text x="662" y="214" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">readResponse(input)</text>
-  <text x="662" y="229" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">parse the body here</text>
-  <rect x="48" y="250" width="724" height="40" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
-  <text x="410" y="266" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">handleErrorResponseCode(code, message) / handleException(err)</text>
-  <text x="410" y="281" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">these two are on this thread as well</text>
-  <text x="410" y="308" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">The queue is sorted by priority, from PRIORITY_CRITICAL down to PRIORITY_REDUNDANT, so a request can overtake</text>
-  <text x="410" y="322" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">one already waiting. None of the boxes above is on the EDT: do not touch the UI from any of them.</text>
-  <path d="M 410 334 L 410 352" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
-  <path d="M 405 346 L 410 352 L 415 346" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
-  <rect x="24" y="356" width="772" height="128" rx="6" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
-  <text x="410" y="376" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#a56a3a">EDT</text>
-  <rect x="70" y="386" width="320" height="40" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
-  <text x="230" y="402" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">postResponse()</text>
-  <text x="230" y="417" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">callSerially'd back onto the EDT</text>
-  <rect x="430" y="386" width="320" height="40" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
-  <text x="590" y="402" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">NetworkManager error listeners</text>
-  <text x="590" y="417" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">blocking dispatch: the network thread waits</text>
-  <text x="410" y="444" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">postResponse runs after readResponse. readResponseForErrors defaults to true, so a 4xx or 5xx response reaches it</text>
-  <text x="410" y="458" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">as well: check the response code there rather than assuming success. Error listeners are dispatched with</text>
-  <text x="410" y="472" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">callSeriallyAndWait, so they run here, and consuming the event suppresses the default handling.</text>
+  <rect x="40" y="200" width="172" height="44" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1"/>
+  <text x="126" y="218" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">buildRequestBody(out)</text>
+  <text x="126" y="234" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">write your POST body</text>
+  <rect x="226" y="200" width="172" height="44" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
+  <text x="312" y="218" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">handleErrorResponseCode</text>
+  <text x="312" y="234" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">only for 4xx or 5xx</text>
+  <rect x="412" y="200" width="172" height="44" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1"/>
+  <text x="498" y="218" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">readHeaders(connection)</text>
+  <text x="498" y="234" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">headers are available</text>
+  <rect x="598" y="200" width="172" height="44" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1"/>
+  <text x="684" y="218" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">readResponse(input)</text>
+  <text x="684" y="234" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">parse the body here</text>
+  <path d="M 212 222 L 224 222" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
+  <path d="M 218 217 L 224 222 L 218 227" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
+  <path d="M 398 222 L 410 222" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
+  <path d="M 404 217 L 410 222 L 404 227" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
+  <path d="M 584 222 L 596 222" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
+  <path d="M 590 217 L 596 222 L 590 227" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="410" y="264" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">That order is the real one: for an error code the hook runs BEFORE the headers and body are read, so an override</text>
+  <text x="410" y="278" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">cannot inspect parsed data there. handleException(err) replaces the whole chain when the connection throws.</text>
+  <text x="410" y="300" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">The queue is sorted by priority, from PRIORITY_CRITICAL down to PRIORITY_REDUNDANT, so a request can overtake</text>
+  <text x="410" y="314" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">one already waiting. None of these boxes is on the EDT: do not touch the UI from any of them.</text>
+  <text x="410" y="336" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">With readResponseForErrors false, an error response returns here and the two read callbacks never run.</text>
+  <path d="M 410 350 L 410 368" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
+  <path d="M 405 362 L 410 368 L 415 362" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
+  <rect x="24" y="372" width="772" height="128" rx="6" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
+  <text x="410" y="392" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#a56a3a">EDT</text>
+  <rect x="70" y="402" width="320" height="40" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
+  <text x="230" y="418" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">postResponse()</text>
+  <text x="230" y="433" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">callSerially'd back onto the EDT</text>
+  <rect x="430" y="402" width="320" height="40" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
+  <text x="590" y="418" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">NetworkManager error listeners</text>
+  <text x="590" y="433" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">blocking dispatch: the network thread waits</text>
+  <text x="410" y="460" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">readResponseForErrors defaults to true, so a 4xx or 5xx reaches postResponse as well: check the code there.</text>
+  <text x="410" y="474" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">A 304 answered from the cache finishes in cacheUnmodified() and never reaches it at all. Error listeners are</text>
+  <text x="410" y="488" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">dispatched with callSeriallyAndWait, so they run here, and consuming the event suppresses the default handling.</text>
 </svg>
