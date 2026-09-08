@@ -114,7 +114,18 @@ public final class StaticFiles implements HttpServer.Handler {
             decoded = decoded + indexFile;
         }
 
-        int fd = FileIo.openRead(root + decoded);
+        // Open under the root so the kernel refuses an escape while it resolves.
+        // The realPath check further down runs against a SECOND lookup, so on its
+        // own it loses a race an attacker who can write symlinks into the document
+        // root controls: point the link outside for this open, inside for the
+        // check, and the descriptor served is the outside file. Where openBeneath
+        // works, containment is already settled by the time the descriptor exists.
+        boolean beneathProven = true;
+        int fd = FileIo.openBeneath(root, decoded);
+        if(fd == FileIo.BENEATH_UNSUPPORTED) {
+            beneathProven = false;
+            fd = FileIo.openRead(root + decoded);
+        }
         if(fd < 0) {
             return HttpServer.Response.text(404, "not found");
         }
@@ -129,7 +140,13 @@ public final class StaticFiles implements HttpServer.Handler {
                 // Directory listings leak names nobody asked to publish.
                 FileIo.close(fd);
                 release = false;
-                int indexFd = FileIo.openRead(root + stripTrailingSlash(decoded) + "/" + indexFile);
+                String indexPath = stripTrailingSlash(decoded) + "/" + indexFile;
+                int indexFd = beneathProven ? FileIo.openBeneath(root, indexPath)
+                                            : FileIo.openRead(root + indexPath);
+                if(indexFd == FileIo.BENEATH_UNSUPPORTED) {
+                    beneathProven = false;
+                    indexFd = FileIo.openRead(root + indexPath);
+                }
                 if(indexFd < 0) {
                     return HttpServer.Response.text(404, "not found");
                 }
@@ -141,12 +158,15 @@ public final class StaticFiles implements HttpServer.Handler {
                 decoded = stripTrailingSlash(decoded) + "/" + indexFile;
             }
 
-            // Containment is proven on the RESOLVED path, after symlinks. Checking
-            // the request string instead is defeated by an encoded traversal or by
-            // a symlink that points out of the tree.
-            String real = FileIo.realPath(root + decoded);
-            if(real == null || !isInsideRoot(real)) {
-                return HttpServer.Response.text(403, "forbidden");
+            // Only where the open could not prove it. Checking the request string
+            // instead is defeated by an encoded traversal or by a symlink out of the
+            // tree, so this resolves first -- but it is a second lookup, which is why
+            // the open above is preferred wherever the platform supports it.
+            if(!beneathProven) {
+                String real = FileIo.realPath(root + decoded);
+                if(real == null || !isInsideRoot(real)) {
+                    return HttpServer.Response.text(403, "forbidden");
+                }
             }
 
             long size = info[0];

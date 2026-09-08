@@ -56,6 +56,19 @@ public final class FileIo {
         }
     }
 
+    /** Unsupported on this runtime; see the ParparVM implementation. */
+    public static final int BENEATH_UNSUPPORTED = -2;
+
+    /**
+     * Always {@link #BENEATH_UNSUPPORTED} here. The local Java SE loop has no
+     * openat2, and a Java-side reimplementation would be the same racy
+     * open-then-check it replaces -- saying so lets the caller keep the older path
+     * rather than believe a check that did not happen.
+     */
+    public static int openBeneath(String root, String relative) {
+        return BENEATH_UNSUPPORTED;
+    }
+
     public static int openRead(String path) {
         try {
             Path p = Paths.get(path);

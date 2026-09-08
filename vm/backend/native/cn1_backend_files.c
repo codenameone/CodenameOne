@@ -48,6 +48,13 @@
 #ifndef _WIN32
 #include <unistd.h>
 #include <fcntl.h>
+#if defined(__linux__)
+#include <sys/syscall.h>
+#include <errno.h>
+/* From linux/openat2.h. Defined here so the build does not require a kernel header
+   that older distributions ship without. */
+#define CN1_RESOLVE_BENEATH 0x08
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #endif
@@ -62,6 +69,77 @@
 #endif
 
 /* Opens for reading. Returns the descriptor, or -1. */
+/*
+ * Opens a path under `root` and refuses anything that resolves outside it, in one
+ * syscall that the filesystem cannot race.
+ *
+ * open-then-realPath cannot do this. The check runs against a SECOND lookup, so a
+ * symlink under a writable document root can point outside for the open and inside
+ * for the check, and the descriptor that gets served is the outside file. Comparing
+ * st_dev/st_ino afterwards narrows that window without closing it, because the
+ * second lookup is racy in the same way.
+ *
+ * RESOLVE_BENEATH makes the kernel refuse the escape during resolution instead, so
+ * there is no window to lose. Returns -2 where the kernel or platform has no
+ * openat2 -- the caller falls back to the older check rather than serving nothing.
+ */
+JAVA_INT com_codename1_backend_FileIo_openBeneathImpl___java_lang_String_java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT root, JAVA_OBJECT relative) {
+#if defined(__linux__) && defined(SYS_openat2)
+    const char* rootPath;
+    const char* rel;
+    int dirFd;
+    int fd;
+    struct cn1_open_how {
+        uint64_t flags;
+        uint64_t mode;
+        uint64_t resolve;
+    } how;
+    if(root == JAVA_NULL || relative == JAVA_NULL) {
+        return -1;
+    }
+    rootPath = stringToUTF8(threadStateData, root);
+    if(rootPath == NULL) {
+        return -1;
+    }
+    dirFd = open(rootPath, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if(dirFd < 0) {
+        return -1;
+    }
+    rel = stringToUTF8(threadStateData, relative);
+    if(rel == NULL) {
+        close(dirFd);
+        return -1;
+    }
+    /* RESOLVE_BENEATH rejects an absolute path outright, and the caller's target
+       always starts at the root. */
+    while(*rel == '/') {
+        rel++;
+    }
+    if(*rel == 0) {
+        close(dirFd);
+        return -1;
+    }
+    memset(&how, 0, sizeof(how));
+    how.flags = (uint64_t)(O_RDONLY | O_CLOEXEC);
+    how.resolve = (uint64_t)CN1_RESOLVE_BENEATH;
+    fd = (int)syscall(SYS_openat2, dirFd, rel, &how, sizeof(how));
+    close(dirFd);
+    if(fd < 0) {
+        /* An old kernel knows the number but not the struct, or does not know the
+           call at all. Either way this cannot answer, so say so rather than let the
+           caller read a refusal as "file missing". */
+        if(errno == ENOSYS || errno == EINVAL || errno == E2BIG) {
+            return -2;
+        }
+        return -1;
+    }
+    return fd;
+#else
+    (void)root; (void)relative;
+    return -2;
+#endif
+}
+
 JAVA_INT com_codename1_backend_FileIo_openReadImpl___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
 #ifdef _WIN32
     (void)path;

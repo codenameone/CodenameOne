@@ -36,6 +36,22 @@ public final class FileIo {
     }
 
     /** Opens for reading. The descriptor, or -1. */
+    /**
+     * A descriptor for `relative` under `root`, or -1. Never a file outside `root`,
+     * and never by checking afterwards: the kernel refuses the escape while it
+     * resolves, so there is no window between the open and the check for a symlink
+     * to move through.
+     *
+     * Returns {@link #BENEATH_UNSUPPORTED} where the platform has no such call, so
+     * the caller can fall back rather than treat it as a missing file.
+     */
+    public static int openBeneath(String root, String relative) {
+        return openBeneathImpl(root, relative);
+    }
+
+    /** openBeneath cannot answer here; fall back to open plus a resolved-path check. */
+    public static final int BENEATH_UNSUPPORTED = -2;
+
     public static int openRead(String path) {
         return openReadImpl(path);
     }
@@ -80,6 +96,8 @@ public final class FileIo {
     public static void close(int fd) {
         closeImpl(fd);
     }
+
+    private static native int openBeneathImpl(String root, String relative);
 
     private static native int openReadImpl(String path);
     private static native int statImpl(int fd, long[] out);
