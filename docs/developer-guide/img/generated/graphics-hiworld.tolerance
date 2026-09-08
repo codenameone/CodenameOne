@@ -1,8 +1,8 @@
 # Glyph rasterization differs between macOS and Linux for the same bundled
 # font at the same size, so this figure does not come back byte-identical when
 # it is regenerated on a developer's machine. Measured against the CI runner's
-# own output, which is what the committed image is: 0.2847% of pixels differ,
-# worst channel delta 136.
+# own output, which is what the committed image is: 0.0937% of pixels differ,
+# worst channel delta 255.
 #
 # The committed image is CI's, so the gate that actually runs compares
 # byte-for-byte and this budget only covers local regeneration. Both bounds
@@ -10,4 +10,4 @@
 # AT ALL, so a wholesale recolour cannot creep through in small steps, and
 # maxChannelDelta caps how far any single pixel may move.
 maxChannelDelta=255
-maxMismatchPercent=0.4
+maxMismatchPercent=0.13

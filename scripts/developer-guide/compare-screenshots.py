@@ -67,6 +67,17 @@ def compare(generated: Path, committed: Path, tolerance: tuple[int, float] | Non
     a = Image.open(generated).convert("RGBA")
     b = Image.open(committed).convert("RGBA")
     if a.size != b.size:
+        # A tolerance sidecar deliberately does NOT cover this: a different size is
+        # a different picture, not a rendering difference.
+        #
+        # Note the figure heights are cropped to the laid-out content, and text
+        # component heights come from font metrics, which Java2D rounds slightly
+        # differently on macOS and Linux -- a handful of figures land two to five
+        # pixels apart between a developer's machine and the runner. The committed
+        # images are the runner's output, so CI compares byte-for-byte; a local
+        # regeneration of those figures reports a size change here and that is
+        # expected rather than a regression. Do not commit locally regenerated
+        # images to silence it -- that only moves the failure to CI.
         return f"size changed: generated {a.size[0]}x{a.size[1]}, committed {b.size[0]}x{b.size[1]}"
     pa, pb = a.load(), b.load()
     width, height = a.size
