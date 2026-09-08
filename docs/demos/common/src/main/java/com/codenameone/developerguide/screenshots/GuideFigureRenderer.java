@@ -168,22 +168,32 @@ public final class GuideFigureRenderer {
     /// Height to keep, so a figure is the part of the screen that has something
     /// on it rather than a phone-shaped picture that is four fifths empty.
     ///
-    /// Measured from what the content PREFERS, not from where it was laid out.
-    /// prepare() sizes the content pane to the whole device, and a form whose
-    /// child sits in BorderLayout.CENTER has that child stretched to fill it --
-    /// so reading the child's bounds reported the full height for every such
-    /// figure and cropped nothing at all, which is how the table, CSV and tree
-    /// figures came out 409x917 with most of the page blank.
+    /// Two shapes have to work at once, and each breaks the obvious reading of
+    /// the other. prepare() sizes the content pane to the whole device, so a
+    /// child in BorderLayout.CENTER is stretched to fill it: trusting its laid-out
+    /// height cropped nothing at all and left the table and tree figures 409x917
+    /// with a blank page below the content. But a component that paints itself and
+    /// declares no intrinsic size -- the custom Component behind the Hi World
+    /// figure -- reports a preferred height of zero while legitimately filling the
+    /// whole viewport, and trusting THAT cropped it to a 26-pixel sliver of its
+    /// red canvas.
+    ///
+    /// So: a preferred height is used when the component states one, and a
+    /// component that states none is taken at the height it was given.
     private static int figureHeight(Form form, FigureDevice device) {
         Container content = form.getContentPane();
-        int preferred = content.getPreferredH();
         int bottom = 0;
         for (int i = 0; i < content.getComponentCount(); i++) {
             Component child = content.getComponentAt(i);
-            bottom = Math.max(bottom, child.getY() + child.getPreferredH());
+            int preferred = child.getPreferredH();
+            int height = preferred > 0 ? preferred : child.getHeight();
+            bottom = Math.max(bottom, child.getY() + height);
         }
-        int used = content.getAbsoluteY() + Math.min(Math.max(preferred, bottom), device.height())
-                + content.getStyle().getPaddingBottom();
+        // No children at all means the figure IS the title area -- the toolbar
+        // figures are exactly that -- so the crop stops just below it rather than
+        // falling back to the content pane's stretched height, which produced a
+        // toolbar with a blank page underneath.
+        int used = content.getAbsoluteY() + bottom + content.getStyle().getPaddingBottom();
         return Math.min(device.height(), Math.max(1, used));
     }
 

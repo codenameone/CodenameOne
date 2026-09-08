@@ -57,7 +57,6 @@ public final class GuideFigures {
                     "components-spanlabel.png"),
             new FigureVariant(new L10nBasicFigure(), FigureDevice.ANDROID, false, "l10n-basic.png"),
             new FigureVariant(new ComponentsLabelTextPositionFigure(), FigureDevice.ANDROID, false, "components-label-text-position.png"),
-            new FigureVariant(new AutosizeFigure(), FigureDevice.ANDROID, false, "autosize.png"),
             new FigureVariant(new ComponentsLinkButtonFigure(), FigureDevice.ANDROID, false, "components-link-button.png"),
             new FigureVariant(new ComponentsToggleButtonsFigure(), FigureDevice.ANDROID, false, "components-toggle-buttons.png"),
             new FigureVariant(new ComponentsToggleButtonsComponentGroupFigure(), FigureDevice.ANDROID, false, "components-toggle-buttons-component-group.png"),

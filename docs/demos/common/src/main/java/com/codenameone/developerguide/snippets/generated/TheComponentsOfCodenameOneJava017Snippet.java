@@ -1,27 +1,4 @@
 /*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Codename One through http://www.codenameone.com/ if you
- * need additional information or have any questions.
- */
-
-/*
  * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
@@ -44,7 +21,7 @@
  * need additional information or have any questions.
  */
 
-package com.codenameone.developerguide.screenshots;
+package com.codenameone.developerguide.snippets.generated;
 
 import com.codename1.gpu.*;
 import com.codename1.ui.*;
@@ -77,8 +54,7 @@ import java.io.*;
 import java.util.*;
 
 
-class AutosizeFigure implements GuideFigure {
-
+class TheComponentsOfCodenameOneJava017Snippet {
 
     Object context;
     Object url;
@@ -102,17 +78,7 @@ class AutosizeFigure implements GuideFigure {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    
-
-    @Override
-    public String id() {
-        return "autosize";
-    }
-
-    /// The tagged region is what the chapter includes, so the listing beside the
-    /// picture is the code that drew it.
-    @Override
-    public Form build() {
+    void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-017[]
         Form hi = new Form("AutoSize", BoxLayout.y());
 
@@ -133,6 +99,5 @@ class AutosizeFigure implements GuideFigure {
 
         hi.show();
         // end::the-components-of-codename-one-java-017[]
-        return hi;
     }
 }
