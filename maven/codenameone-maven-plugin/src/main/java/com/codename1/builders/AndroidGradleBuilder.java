@@ -2112,6 +2112,24 @@ public class AndroidGradleBuilder extends Executor {
                     if (cls.indexOf("com/codename1/maps") == 0 || cls.indexOf("com/codename1/location") == 0) {
                         gpsPermission = true;
                     }
+                    // Counting the nested classes here does NOT make this fire
+                    // for every application, which is the obvious reading of a
+                    // scan over a jar that also holds the framework:
+                    // LocationButton's own constructor references
+                    // LocationButton$1, so if every framework class were walked
+                    // this would be set unconditionally. It is not -- usesClass
+                    // reports what the application reaches, so an application
+                    // that never names LocationButton never scans it and never
+                    // reaches its nested classes either.
+                    //
+                    // Measured both ways rather than argued: a generated app
+                    // whose only code is a Form and a Label produces a manifest
+                    // with no USE_LOCATION_BUTTON and no ACCESS_FINE_LOCATION,
+                    // while the same app with a LocationButton on the form gets
+                    // both. The same reasoning is why the gpsPermission rule
+                    // just above can match the whole com/codename1/location
+                    // package without giving every Codename One application
+                    // location permissions.
                     if (isLocationButtonClass(cls)) {
                         debug("Adding location button permission because of class " + cls);
                         locationButtonPermission = true;

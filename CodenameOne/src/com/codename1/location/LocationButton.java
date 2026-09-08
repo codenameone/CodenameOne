@@ -146,6 +146,20 @@ public class LocationButton extends Container {
     /// control back in a component that has visibly recovered from it.
     private boolean platformFailed;
 
+    /// Which built child the live platform callback belongs to.
+    ///
+    /// A setter rebuilds the child, and the control it removes can still have a
+    /// callback queued on the platform's side. Every peer calls the same
+    /// [#permissionResult] on this component, so without this a late error from
+    /// the replaced control would call [#useFallback()] and remove the good one,
+    /// and a late grant would start an acquisition nobody asked for. The
+    /// per-view guard on the Android side cannot see this: the replacement is a
+    /// different view with its own generation.
+    ///
+    /// Only ever read or written on the EDT, which is where components are
+    /// built and where the callback is delivered.
+    private int childGeneration;
+
     private final List<LocationSharedListener> listeners =
             new ArrayList<LocationSharedListener>();
 
@@ -336,6 +350,15 @@ public class LocationButton extends Container {
         if (size.getHeight() < floor) {
             size.setHeight(floor);
         }
+        // Both axes. Only the height was seen to clip -- the platform logged
+        // that clamp -- but 48dp is a minimum touch target, which has two of
+        // them, and the width is what the system surface gets created at
+        // exactly like the height. TEXT_NONE is an icon with no label, so it is
+        // the form that can get there. Whether the platform also clamps width
+        // was not measured; the floor does not depend on it.
+        if (size.getWidth() < floor) {
+            size.setWidth(floor);
+        }
         return size;
     }
 
@@ -350,12 +373,13 @@ public class LocationButton extends Container {
     /// Puts either the platform's control or the fallback button in place.
     private void buildChild() {
         if (!platformFailed && Display.getInstance().isLocationButtonSupported()) {
+            final int forGeneration = ++childGeneration;
             peer = Display.getInstance().createLocationButton(textType,
                     buttonBackgroundColor, buttonTextColor,
                     new SuccessCallback<Boolean>() {
                         @Override
                         public void onSucess(Boolean granted) {
-                            permissionResult(granted);
+                            permissionResult(granted, forGeneration);
                         }
                     });
             if (peer != null) {
@@ -397,10 +421,14 @@ public class LocationButton extends Container {
     ///   declined, and null when the platform's control failed -- which can
     ///   arrive without a tap, because the session is opened when the control
     ///   is attached
-    private void permissionResult(final Boolean granted) {
+    private void permissionResult(final Boolean granted, final int forGeneration) {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
+                if (forGeneration != childGeneration) {
+                    // From a control this component has already replaced.
+                    return;
+                }
                 if (granted == null) {
                     useFallback();
                     return;
@@ -421,6 +449,8 @@ public class LocationButton extends Container {
     /// and nothing says otherwise.
     private void useFallback() {
         platformFailed = true;
+        // Nothing else the dead control says is worth hearing.
+        childGeneration++;
         if (peer == null) {
             return;
         }

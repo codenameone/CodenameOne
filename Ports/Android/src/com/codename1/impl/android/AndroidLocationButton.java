@@ -129,6 +129,13 @@ class AndroidLocationButton extends SurfaceView {
     /// [UiThreadExecutor]. There is no second thread here to synchronize with.
     private int generation;
 
+    /// The size the live request or session was last told about, so a layout
+    /// that happened while a request was in flight can be spotted when its
+    /// session finally arrives.
+    private int requestedWidth;
+
+    private int requestedHeight;
+
     /// A failure is reported once. The component swaps itself for an ordinary
     /// Codename One button when it hears, and there is nothing to say twice.
     private boolean failed;
@@ -189,6 +196,8 @@ class AndroidLocationButton extends SurfaceView {
         if (session != null) {
             call(sessionClass(), session, "resize", new Class[]{int.class, int.class},
                     new Object[]{Integer.valueOf(w), Integer.valueOf(h)});
+            requestedWidth = w;
+            requestedHeight = h;
             return;
         }
         // The first pass that has a size is also the first pass with a host
@@ -285,10 +294,35 @@ class AndroidLocationButton extends SurfaceView {
             // surface carries; the platform's wrapper asks for the same order.
             callQuietly(this, "setCompositionOrder", new Class[]{int.class},
                     new Object[]{Integer.valueOf(1)});
+            // The request carried the size this view had when it was made, and
+            // a relayout in the meantime -- an orientation change is the easy
+            // one -- was dropped: onSizeChanged has no session to resize yet and
+            // will not ask for a second one while this request is in flight. So
+            // the size is reconciled here, where both numbers finally exist.
+            resizeToCurrent();
             invalidate();
         } catch (Throwable t) {
             fail(t);
         }
+    }
+
+    /// Tells an open session the size this view actually has.
+    ///
+    /// A no-op when they already agree, which is the common case; the platform
+    /// is only asked when a layout pass happened while the session was opening.
+    private void resizeToCurrent() {
+        if (session == null) {
+            return;
+        }
+        int w = getWidth();
+        int h = getHeight();
+        if (w <= 0 || h <= 0 || (w == requestedWidth && h == requestedHeight)) {
+            return;
+        }
+        call(sessionClass(), session, "resize", new Class[]{int.class, int.class},
+                new Object[]{Integer.valueOf(w), Integer.valueOf(h)});
+        requestedWidth = w;
+        requestedHeight = h;
     }
 
     private void closeSession() {
@@ -300,6 +334,12 @@ class AndroidLocationButton extends SurfaceView {
         }
         callQuietly(this, "clearChildSurfacePackage", new Class[0], new Object[0]);
         requested = false;
+        // Closing ends the generation too, not just the session. A callback the
+        // platform had already posted to this view's executor still runs after
+        // this returns, and without the bump it would arrive looking current: a
+        // queued grant would start acquiring a location for a control that is
+        // gone, and a queued error would mark the view failed for good.
+        generation++;
     }
 
     /// Reports that the platform's control is not going to work here.
@@ -340,6 +380,8 @@ class AndroidLocationButton extends SurfaceView {
             int.class, android.content.res.Configuration.class});
         Object builder = ctor.newInstance(new Object[]{Integer.valueOf(w),
             Integer.valueOf(h), getResources().getConfiguration()});
+        requestedWidth = w;
+        requestedHeight = h;
         callQuietly(builder, "setTextType", new Class[]{int.class},
                 new Object[]{Integer.valueOf(platformTextType(textType))});
         if (backgroundColor != UNSET_COLOR) {

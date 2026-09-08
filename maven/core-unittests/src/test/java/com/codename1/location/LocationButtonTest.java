@@ -26,6 +26,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.PeerComponent;
 import com.codename1.util.SuccessCallback;
@@ -274,6 +275,49 @@ class LocationButtonTest extends UITestBase {
     void isSystemRenderedIsFalseBeforeTheComponentIsShown() {
         implementation.setLocationButtonSupported(true);
         assertFalse(new LocationButton().isSystemRendered());
+    }
+
+    /// A control a setter replaced can still have a callback queued on the
+    /// platform's side. It must not act on the control that took its place.
+    @FormTest
+    void aCallbackFromAReplacedControlIsIgnored() {
+        implementation.setLocationButtonSupported(true);
+        manager.currentLocation = new Location(1.0, 2.0);
+        LocationButton button = showButton(new LocationButton());
+        SuccessCallback<Boolean> stale = implementation.getLocationButtonCallback();
+        assertNotNull(stale);
+
+        button.setTextType(LocationButton.TEXT_SHARE_PRECISE_LOCATION);
+        PeerComponent live = findPeer(button);
+        assertNotNull(live);
+        List<Location> shared = record(button);
+
+        // A late failure from the control that was replaced.
+        stale.onSucess(null);
+        flushSerialCalls();
+        assertSame(live, findPeer(button),
+                "a replaced control must not tear down the one that replaced it");
+        assertTrue(button.isSystemRendered());
+
+        // And a late grant from it must not acquire anything either.
+        stale.onSucess(Boolean.TRUE);
+        flushSerialCalls();
+        assertTrue(shared.isEmpty(), "a replaced control must not deliver a location");
+    }
+
+    /// The floor is a minimum touch target, which has two axes. TEXT_NONE is
+    /// the icon-only form and the one with the least natural width.
+    @FormTest
+    void neitherAxisFallsBelowTheTouchTarget() {
+        int floor = Display.getInstance().convertToPixels(8f);
+        for (int type = LocationButton.TEXT_NONE;
+                type <= LocationButton.TEXT_NEAR_YOUR_PRECISE_LOCATION; type++) {
+            LocationButton button = new LocationButton(type);
+            assertTrue(button.getPreferredSize().getWidth() >= floor,
+                    "text type " + type + " is narrower than the touch target");
+            assertTrue(button.getPreferredSize().getHeight() >= floor,
+                    "text type " + type + " is shorter than the touch target");
+        }
     }
 
     @FormTest
