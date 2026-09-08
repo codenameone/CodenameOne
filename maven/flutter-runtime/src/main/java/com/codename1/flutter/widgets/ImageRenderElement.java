@@ -458,7 +458,18 @@ public class ImageRenderElement extends RenderElement {
         fittedH = bh;
         fittedFit = fit;
         fittedRadius = radius;
-        if (radius <= 0 && l instanceof FittedImage) {
+        // A fit that OVERFLOWS the box cannot be rounded by rounding what is
+        // DRAWN: `cover` paints a rectangle larger than the component, so its
+        // rounded corners fall outside the clip and what shows is square. This
+        // only bites where the platform rounds in hardware, which is iOS and not
+        // the simulator -- the desktop builds a rounded copy and looks right --
+        // so the gallery's carousel cards were square on device and round in
+        // every sweep. Send an overflowing fit through the copy below, which
+        // scales to the BOX first and rounds that.
+        double[] drawn = fittedSize(fit, bw, bh, iw, ih);
+        boolean overflowsBox = drawn[0] > bw + 0.5 || drawn[1] > bh + 0.5;
+        if ((radius <= 0 || (FittedImage.roundsInHardware() && !overflowsBox))
+                && l instanceof FittedImage) {
             // NO COPY. The component draws the decoded source into its own box
             // under the fit rule, the way Flutter draws one texture through a
             // transform. Materialising a scaled bitmap per image and handing it
@@ -467,18 +478,26 @@ public class ImageRenderElement extends RenderElement {
             // -- and it did the scaling on the layout pass that produced the
             // first frame.
             //
-            // The rounded case below still copies. Painting the source through a
-            // rounded-rectangle clip instead was tried and is worse: Codename
-            // One's shaped clip has a hard edge, and a grid of clipped thumbnails
-            // measured 12.90% wrong pixels against the reference where the
-            // rounded bitmap measures 8.03% (`/demo/grid-lists`). The bitmap's
-            // corners are anti-aliased because they are alpha-blended pixels
-            // rather than a stencil test, which is what the reference does too.
+            // Rounded corners come through here too WHEN THE PLATFORM CAN DRAW
+            // THEM. Where it can, the corners are a property of the draw and cost
+            // nothing: no getRGB, no second bitmap, no second texture, and the
+            // edge is anti-aliased because the platform computes coverage rather
+            // than testing a stencil.
+            //
+            // Where it cannot, the copy below is still the right answer, and it
+            // is worth knowing why: painting the source through a shaped CLIP was
+            // tried and measured worse -- a grid of clipped thumbnails came out
+            // 12.90% wrong against the reference where the rounded bitmap
+            // measures 8.03% (`/demo/grid-lists`) -- because Codename One's
+            // shaped clip has a hard edge and the reference anti-aliases its
+            // corners. A hardware rounded draw does not have that problem; a
+            // clip does.
             FittedImage f = (FittedImage) l;
             f.setSource(img);
             f.srcW = iw;
             f.srcH = ih;
             f.fit = fit;
+            f.radius = radius;
             l.repaint();
             return;
         }
@@ -498,6 +517,14 @@ public class ImageRenderElement extends RenderElement {
             scaled = scaleUnencoded(img, fit, bw, bh, iw, ih);
         } finally {
             restoreScaling(prevScaling);
+        }
+        // The icon is only looked at when there is no source: FittedImage paints
+        // its source directly and ignores the icon entirely. Handing it a rounded
+        // copy while a source was still set meant the copy was built, retained,
+        // and never drawn -- the picture rendered with square corners and paid
+        // for round ones. Clear the source so the copy is what shows.
+        if (l instanceof FittedImage) {
+            ((FittedImage) l).setSource(null);
         }
         l.setIcon(roundCorners(scaled, radius));
         scaleMs += System.currentTimeMillis() - fitStart;
@@ -622,6 +649,10 @@ public class ImageRenderElement extends RenderElement {
     static final class FittedImage extends Label {
 
         private com.codename1.ui.Image source;
+        /// Corner radius in device pixels, drawn by the platform. Only ever set
+        /// when {@link #roundsInHardware()} is true; otherwise the caller builds
+        /// a rounded bitmap instead and this stays zero.
+        int radius;
         private final ImageLock lock = new ImageLock();
         BoxFit fit = BoxFit.scaleDown;
         /// The source's on-screen size in device pixels once its decode hints and
@@ -701,8 +732,29 @@ public class ImageRenderElement extends RenderElement {
             // Centred in the box, which is what every BoxFit but `fill` means.
             int dx = getX() + (int) Math.round((bw - dw) / 2);
             int dy = getY() + (int) Math.round((bh - dh) / 2);
-            g.drawImage(s, dx, dy, (int) Math.round(dw), (int) Math.round(dh));
+            if (radius > 0) {
+                g.drawImageRounded(s, dx, dy, (int) Math.round(dw), (int) Math.round(dh), radius);
+            } else {
+                g.drawImage(s, dx, dy, (int) Math.round(dw), (int) Math.round(dh));
+            }
         }
+
+        /// Whether the platform rounds a picture's corners as it draws it, in
+        /// which case no rounded copy has to be built. Resolved once: it is a
+        /// property of the renderer, not of any one image.
+        static boolean roundsInHardware() {
+            if (roundsInHardware == null) {
+                try {
+                    roundsInHardware = com.codename1.ui.Display.isInitialized()
+                            && com.codename1.ui.Display.getInstance().isRoundedImageSupported();
+                } catch (Throwable t) {
+                    roundsInHardware = Boolean.FALSE;
+                }
+            }
+            return roundsInHardware.booleanValue();
+        }
+
+        private static Boolean roundsInHardware;
     }
 
     /**
