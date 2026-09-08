@@ -1,0 +1,189 @@
+== Server-side backend
+
+The backend runs Codename One's server-side runtime through the same ParparVM
+pipeline the iOS, Windows and Linux ports use: your Java or Kotlin is translated
+to C and compiled into a single native executable. The result links statically
+against musl, so the artifact is one file with no JVM, no interpreter and no base
+image underneath it. On the benchmark app that file is around 8 MB, starts in a
+few milliseconds and idles at about 3 MB of resident memory.
+
+=== What this doesn't replace
+
+This is no replacement for Spring Boot, Jakarta EE, Quarkus or Micronaut, and
+choosing it for work those frameworks already do would be a mistake. They carry a
+dependency injection container, an ORM, a security stack, transaction management,
+a migration story and twenty years of operational knowledge. None of that ships
+// vale-skip: Microsoft.Contractions: the contracted form reads as a possessive here.
+here, and none of it is planned. A team running a Spring service that works keeps
+running it.
+
+The distinction worth holding on to is that those frameworks assume a JVM, and
+// vale-skip: Microsoft.Contractions: 'it' is the object of 'for'; the subject is 'paying'.
+assume that paying for it is fine. That assumption holds for most server work. The
+backend exists for the cases where it fails.
+
+=== Why it exists
+
+Every advantage ParparVM brings to a phone is an advantage on a server, and for
+the same reasons. A translated binary has no class loading to do, no bytecode to
+verify and no warm-up before it reaches steady state, so it starts in milliseconds
+rather than seconds. It has no JVM heap to reserve, so its resident set is a few
+megabytes rather than a few hundred. It's one file, so the container that holds
+it can be empty apart from that file.
+
+Those properties matter in a specific region of the server-side map: short-lived
+processes, per-request billing, memory-capped instances, sidecars, edge locations
+and small always-on services. Java is thin on the ground there. The JVM's start-up
+cost is charged on every cold invocation, its baseline memory is charged for the
+life of the instance, and neither cost can be amortised by a process that exits
+after a few hundred milliseconds. Teams therefore reach for Go or Node, and a
+Java shop that does this ends up maintaining a second language, a second
+toolchain and a second copy of every model object that crosses the boundary.
+
+The backend is aimed squarely at that gap. It doesn't try to win the territory
+the JVM already holds; it tries to remove the reason a Java team has to leave Java
+when it steps outside that territory.
+
+=== Full vertical integration
+
+Where the backend is most valuable is where the client is a Codename One app,
+because then both ends are the same language, the same build and the same
+contract. An interface annotated for the REST client generates the app's typed,
+asynchronous client. Enabling the server half generates, from that same
+declaration, a synchronous interface the backend implements and a dispatcher that
+routes a method, path and body to it.
+
+One declaration produces both ends. A change to the contract becomes a compile
+error on whichever side hasn't followed it, rather than a response the app fails
+to parse in the field. The data transfer objects are shared rather than
+transcribed, and their codecs are generated on both sides, so there is no hand
+written mapping layer to drift.
+
+The server half is off by default, because existing projects carry these
+interfaces for their client alone and generating server classes into those builds
+would grow them for nothing. Turn it on with a property:
+
+----
+mvn -Dcn1.restServer=true package
+----
+
+=== Where it fits in a deployment
+
+Two shapes make sense.
+
+As a piece of a larger system, the backend is a good fit for the services at the
+edge of it: a token issuer, a webhook receiver, an image resizer, a push
+dispatcher, a device-facing API in front of the services that hold the real
+business logic. These are the services whose cost is dominated by how many
+instances are idling and how fast they answer, not by how much framework they
+need. The rest of the system carries on running whatever it runs.
+
+For a smaller project, the backend can be the whole server. An application with a
+handful of endpoints and a database doesn't need a framework's structure, and the
+// vale-skip: Microsoft.Contractions: the verb belongs to 'simplicity', not to 'it'.
+operational simplicity of one executable with no runtime to patch underneath it is
+worth a great deal at that size.
+
+What connects both shapes is that the code is ordinary Java in the same repository
+as the app, built by the same command.
+
+=== What the runtime provides
+
+The runtime is small by design and has no third-party dependencies. Its
+protocol and storage layers are implemented directly rather than wrapped:
+
+[cols="1,3"]
+|===
+| Area | What the runtime covers
+
+| HTTP
+| An HTTP/1.1 and HTTP/2 server with keep-alive, an outbound HTTP client, static
+  file serving, and date handling for both directions.
+
+| TLS
+| Termination for inbound connections and verification for outbound ones.
+
+| Databases
+| SQLite in-process, and PostgreSQL and MySQL over their wire protocols, behind a
+  pooled connection API. No JDBC driver is involved.
+
+| Serialisation
+| A JSON reader and writer that works against a byte sink rather than building
+  intermediate strings, plus Base64 and its URL-safe variant.
+
+| Identity
+| JSON Web Token signing and verification.
+
+| Serverless
+| An AWS Lambda custom runtime loop.
+|===
+
+Anything outside that list isn't there. There is no dependency injection, no
+object-relational mapper, no template engine and no admin console.
+
+=== Running it locally
+
+During development, run the handler on the JVM. It starts in about two seconds
+against the minute and a half a native build takes, and because the runtime is
+ordinary Java compiled against the JDK, the classes underneath the handler are the
+only thing that differs from the deployed binary:
+
+----
+mvn cn1:backend
+----
+
+The protocol layer is no stand-in. It's the same source that ships, so
+behaviour here matches the deployed binary. The one deliberate exception is TLS:
+the local runtime doesn't terminate it, and therefore doesn't serve HTTP/2, and
+both refuse with a message saying so. A second handshake implementation would have
+its own defects rather than production's, which is worse than not having one
+because it resembles coverage. When TLS is what needs exercising, build the binary.
+
+=== Packaging a native binary
+
+----
+mvn cn1:backend-package
+----
+
+The translation runs once and the compile runs per target. Four targets are
+available, covering both common architectures against either libc:
+
+[cols="1,3"]
+|===
+| Target | Why
+
+| `musl-x86_64`, `musl-arm64`
+| A fully static binary. No libc, no OpenSSL, nothing. It runs in a scratch or
+  distroless image, so the container is the binary and there is no base image to
+  patch. This is the microservice shape.
+
+| `glibc-x86_64`, `glibc-arm64`
+| Linked against the distribution's libc and OpenSSL, for an organisation whose
+  base image already carries them and patches them on its own schedule.
+|===
+
+Cross-architecture builds work through emulation, which is correct but slow. On a
+build machine, prefer a native runner per architecture and name one target.
+
+=== Serverless
+
+The Lambda custom runtime is the case the properties above suit best. Billing is
+per invocation and per megabyte, cold start is charged to the caller, and the
+runtime API is a plaintext loopback poll that needs no listening socket and no
+TLS. A binary that starts in milliseconds and idles at single-digit megabytes is
+close to the ideal shape for it.
+
+=== Limits worth knowing before choosing it
+
+* The library ecosystem is the Codename One runtime, not Maven Central. A server
+  dependency that assumes the full Java SE class library won't translate.
+* There is no framework structure. Routing, validation and error mapping are
+  written by hand or generated from the REST contract.
+* Native builds run on Linux targets. Development happens anywhere the JVM runs.
+* Throughput is competitive rather than a reason on its own to move. The
+  measurements, the harness that produces them and the methodology live in
+  `vm/backend/benchmarks/README.md`; run them yourself before relying on them.
+
+The reasons to choose this are start-up time, footprint, deployment shape and
+sharing one language and one contract with the app. If none of those matter for
+the service in question, a JVM framework is the better tool.
