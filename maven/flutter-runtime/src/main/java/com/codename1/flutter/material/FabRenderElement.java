@@ -91,8 +91,6 @@ public class FabRenderElement extends RenderElement {
         // element had laid out for it.
         com.codename1.ui.Button b = new com.codename1.ui.Button();
         b.setUIID("FloatingActionButton");
-        FontImage.setMaterialIcon(b, iconChar(),
-                com.codename1.components.FloatingActionButton.getIconDefaultSize());
         // The listener reads the CURRENT widget config so onPressed updates
         // never require listener rewiring.
         b.addActionListener(new ActionListener<ActionEvent>() {
@@ -105,16 +103,26 @@ public class FabRenderElement extends RenderElement {
             }
         });
         applyStyle(b);
+        // The glyph is rasterised in the style's CURRENT foreground, so it has to
+        // come after the style is applied. Setting it first burned the theme's
+        // default ink into the image and the button then wore a dark plus sign
+        // on a purple surface where the reference has a white one.
+        setGlyph(b);
         return b;
     }
 
     @Override
     protected void updateComponent(Component c) {
+        applyStyle(c);
+        setGlyph(c);
+    }
+
+    /// The material glyph, in whatever foreground the style now carries.
+    private void setGlyph(Component c) {
         if (c instanceof com.codename1.ui.Button) {
             FontImage.setMaterialIcon((com.codename1.ui.Button) c, iconChar(),
                     com.codename1.components.FloatingActionButton.getIconDefaultSize());
         }
-        applyStyle(c);
     }
 
     /**
