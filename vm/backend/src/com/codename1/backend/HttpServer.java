@@ -2685,6 +2685,33 @@ public final class HttpServer {
     }
 
     /**
+     * True when this text can go into a response head as it stands.
+     *
+     * CR and LF end a field; NUL truncates it in every C call underneath. None of
+     * the three can appear in a header name or value, and a header carrying one is
+     * either a bug or an injection attempt -- neither is worth serialising.
+     */
+    private static boolean isHeaderSafe(String value) {
+        for(int iter = 0 ; iter < value.length() ; iter++) {
+            char c = value.charAt(iter);
+            if(c == '\r' || c == '\n' || c == 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** The same characters would break the log line they are reported on. */
+    private static String sanitizeForLog(String value) {
+        StringBuilder out = new StringBuilder(value.length());
+        for(int iter = 0 ; iter < value.length() ; iter++) {
+            char c = value.charAt(iter);
+            out.append(c == '\r' || c == '\n' || c < 0x20 ? '?' : c);
+        }
+        return out.toString();
+    }
+
+    /**
      * HTTP/1.1 keeps the connection alive unless asked not to; HTTP/1.0 closes
      * unless asked to keep it. Treating a 1.0 client as keep-alive leaves it
      * waiting for a close that never comes.
@@ -3288,10 +3315,24 @@ public final class HttpServer {
                 Object key = it.next();
                 Object value = response.extraHeaders.get(key);
                 if(key != null && value != null) {
-                    conn.put("\r\n");
-                    conn.put(String.valueOf(key));
-                    conn.put(": ");
-                    conn.put(String.valueOf(value));
+                    String name = String.valueOf(key);
+                    String text = String.valueOf(value);
+                    // A CR or LF here ENDS the field and starts another, so a value
+                    // built from request data -- a decoded query parameter reaches a
+                    // handler with real CRLF in it if the client sent %0d%0a -- lets
+                    // the client write its own headers, or a second response. That is
+                    // response splitting, and it is a cache-poisoning primitive.
+                    // Dropped rather than escaped: there is no correct escaping, and a
+                    // header the handler could not have meant is not worth sending.
+                    if(isHeaderSafe(name) && isHeaderSafe(text)) {
+                        conn.put("\r\n");
+                        conn.put(name);
+                        conn.put(": ");
+                        conn.put(text);
+                    } else {
+                        System.err.println("dropped a response header containing a "
+                                + "control character: " + sanitizeForLog(name));
+                    }
                 }
             }
         }

@@ -65,19 +65,24 @@ JAVA_LONG com_codename1_backend_Db_prepareImpl___long_java_lang_String_R_long(CO
     return 0;
 }
 
-JAVA_VOID com_codename1_backend_Db_bindStringImpl___long_int_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt, JAVA_INT index, JAVA_OBJECT value) {
+JAVA_INT com_codename1_backend_Db_bindStringImpl___long_int_java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt, JAVA_INT index, JAVA_OBJECT value) {
+    return 0;
 }
 
-JAVA_VOID com_codename1_backend_Db_bindLongImpl___long_int_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt, JAVA_INT index, JAVA_LONG value) {
+JAVA_INT com_codename1_backend_Db_bindLongImpl___long_int_long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt, JAVA_INT index, JAVA_LONG value) {
+    return 0;
 }
 
-JAVA_VOID com_codename1_backend_Db_bindDoubleImpl___long_int_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt, JAVA_INT index, JAVA_DOUBLE value) {
+JAVA_INT com_codename1_backend_Db_bindDoubleImpl___long_int_double_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt, JAVA_INT index, JAVA_DOUBLE value) {
+    return 0;
 }
 
-JAVA_VOID com_codename1_backend_Db_bindNullImpl___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt, JAVA_INT index) {
+JAVA_INT com_codename1_backend_Db_bindNullImpl___long_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt, JAVA_INT index) {
+    return 0;
 }
 
-JAVA_VOID com_codename1_backend_Db_bindBlobImpl___long_int_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt, JAVA_INT index, JAVA_OBJECT value) {
+JAVA_INT com_codename1_backend_Db_bindBlobImpl___long_int_byte_1ARRAY_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt, JAVA_INT index, JAVA_OBJECT value) {
+    return 0;
 }
 
 JAVA_INT com_codename1_backend_Db_stepImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt) {
@@ -171,39 +176,42 @@ JAVA_LONG com_codename1_backend_Db_prepareImpl___long_java_lang_String_R_long(CO
     return (JAVA_LONG)(intptr_t)stmt;
 }
 
-JAVA_VOID com_codename1_backend_Db_bindStringImpl___long_int_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index, JAVA_OBJECT value) {
+JAVA_INT com_codename1_backend_Db_bindStringImpl___long_int_java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index, JAVA_OBJECT value) {
     sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtHandle;
     if(stmt == NULL) {
-        return;
+        return SQLITE_MISUSE;
     }
     if(value == JAVA_NULL) {
-        sqlite3_bind_null(stmt, index);
-        return;
+        return sqlite3_bind_null(stmt, index);
     }
     /* SQLITE_TRANSIENT: the scratch buffer stringToUTF8 returns is reused by the
        next conversion on this thread, so sqlite must take its own copy. */
-    sqlite3_bind_text(stmt, index, stringToUTF8(threadStateData, value), -1, SQLITE_TRANSIENT);
+    return sqlite3_bind_text(stmt, index, stringToUTF8(threadStateData, value), -1,
+                             SQLITE_TRANSIENT);
 }
 
-JAVA_VOID com_codename1_backend_Db_bindLongImpl___long_int_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index, JAVA_LONG value) {
+JAVA_INT com_codename1_backend_Db_bindLongImpl___long_int_long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index, JAVA_LONG value) {
     sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtHandle;
-    if(stmt != NULL) {
-        sqlite3_bind_int64(stmt, index, (sqlite3_int64)value);
+    if(stmt == NULL) {
+        return SQLITE_MISUSE;
     }
+    return sqlite3_bind_int64(stmt, index, (sqlite3_int64)value);
 }
 
-JAVA_VOID com_codename1_backend_Db_bindDoubleImpl___long_int_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index, JAVA_DOUBLE value) {
+JAVA_INT com_codename1_backend_Db_bindDoubleImpl___long_int_double_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index, JAVA_DOUBLE value) {
     sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtHandle;
-    if(stmt != NULL) {
-        sqlite3_bind_double(stmt, index, value);
+    if(stmt == NULL) {
+        return SQLITE_MISUSE;
     }
+    return sqlite3_bind_double(stmt, index, value);
 }
 
-JAVA_VOID com_codename1_backend_Db_bindNullImpl___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index) {
+JAVA_INT com_codename1_backend_Db_bindNullImpl___long_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index) {
     sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtHandle;
-    if(stmt != NULL) {
-        sqlite3_bind_null(stmt, index);
+    if(stmt == NULL) {
+        return SQLITE_MISUSE;
     }
+    return sqlite3_bind_null(stmt, index);
 }
 
 /* 1 = a row is available, 0 = finished, -1 = error. */
@@ -258,21 +266,20 @@ JAVA_DOUBLE com_codename1_backend_Db_columnDoubleImpl___long_int_R_double(CODENA
     return stmt == NULL ? 0 : sqlite3_column_double(stmt, index);
 }
 
-JAVA_VOID com_codename1_backend_Db_bindBlobImpl___long_int_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index, JAVA_OBJECT value) {
+JAVA_INT com_codename1_backend_Db_bindBlobImpl___long_int_byte_1ARRAY_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index, JAVA_OBJECT value) {
     sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtHandle;
     JAVA_ARRAY arr;
     if(stmt == NULL) {
-        return;
+        return SQLITE_MISUSE;
     }
     if(value == JAVA_NULL) {
-        sqlite3_bind_null(stmt, index);
-        return;
+        return sqlite3_bind_null(stmt, index);
     }
     arr = (JAVA_ARRAY)value;
     /* SQLITE_TRANSIENT: sqlite copies, so the array may be collected or moved the
        moment this returns. */
-    sqlite3_bind_blob(stmt, index, (const void*)(JAVA_ARRAY_BYTE*)arr->data,
-                      (int)arr->length, SQLITE_TRANSIENT);
+    return sqlite3_bind_blob(stmt, index, (const void*)(JAVA_ARRAY_BYTE*)arr->data,
+                             (int)arr->length, SQLITE_TRANSIENT);
 }
 
 JAVA_OBJECT com_codename1_backend_Db_columnBlobImpl___long_int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index) {

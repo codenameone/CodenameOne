@@ -49,6 +49,7 @@
 #include "cn1_globals.h"
 #include <stdio.h>
 #include <string.h>
+#include <pthread.h>
 #include <stdlib.h>
 
 #ifndef CN1_BACKEND_NO_TLS
@@ -71,6 +72,15 @@ static int cn1ClientTlsInitialised = 0;
 static SSL_CTX* cn1ClientTlsContexts[CN1_TLS_CONTEXT_SLOTS];
 static char cn1ClientTlsRoots[CN1_TLS_CONTEXT_SLOTS][1024];
 static int cn1ClientTlsContextCount = 0;
+/*
+ * The cache is shared by every request thread, so building an entry has to be
+ * exclusive. Two threads opening their first TLS connection at once could pick the
+ * same slot and interleave the strcpy of the root name with the store of the
+ * context, leaving an entry labelled for one CA bundle holding the context built
+ * for another -- a later connection then validates against a trust root the caller
+ * did not choose, which is the one failure mode TLS exists to prevent.
+ */
+static pthread_mutex_t cn1ClientTlsMutex = PTHREAD_MUTEX_INITIALIZER;
 /* The last handshake failure, for the message Java throws. Per process rather
  * than per thread: a failed connect is reported immediately by the thread that
  * saw it, and a race here would at worst attach the wrong reason to a failure
@@ -88,7 +98,8 @@ static void cn1ClientTlsRecordError(const char* stage) {
              buffer[0] ? ": " : "", buffer);
 }
 
-static SSL_CTX* cn1ClientTlsEnsureContext(const char* caFile) {
+/* Holds cn1ClientTlsMutex for the whole lookup-and-build; see the mutex above. */
+static SSL_CTX* cn1ClientTlsEnsureContextLocked(const char* caFile) {
     const char* key = caFile == 0 ? "" : caFile;
     SSL_CTX* ctx;
     int iter;
@@ -140,7 +151,16 @@ static SSL_CTX* cn1ClientTlsEnsureContext(const char* caFile) {
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, 0);
     strcpy(cn1ClientTlsRoots[cn1ClientTlsContextCount], key);
     cn1ClientTlsContexts[cn1ClientTlsContextCount] = ctx;
+    /* The count LAST: a reader that sees it has already seen both writes above it. */
     cn1ClientTlsContextCount++;
+    return ctx;
+}
+
+static SSL_CTX* cn1ClientTlsEnsureContext(const char* caFile) {
+    SSL_CTX* ctx;
+    pthread_mutex_lock(&cn1ClientTlsMutex);
+    ctx = cn1ClientTlsEnsureContextLocked(caFile);
+    pthread_mutex_unlock(&cn1ClientTlsMutex);
     return ctx;
 }
 

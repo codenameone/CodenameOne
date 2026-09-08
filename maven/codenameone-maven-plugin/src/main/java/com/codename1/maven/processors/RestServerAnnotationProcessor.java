@@ -657,7 +657,12 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        String[] pairs = splitOn(query, '&');\n");
         sb.append("        for(int i = 0 ; i < pairs.length ; i++) {\n");
         sb.append("            int eq = pairs[i].indexOf('=');\n");
-        sb.append("            if(eq > 0 && pairs[i].substring(0, eq).equals(name)) return decodeQuery(pairs[i].substring(eq + 1));\n");
+        // The NAME is decoded before it is compared. A legal annotation name that has
+        // to be encoded on the wire -- @Query("filter[name]") goes out as
+        // filter%5Bname%5D, which is what the generated client sends -- otherwise
+        // never matched the annotation text, and the two halves of one contract
+        // failed to bind to each other.
+        sb.append("            if(eq > 0 && decodeQuery(pairs[i].substring(0, eq)).equals(name)) return decodeQuery(pairs[i].substring(eq + 1));\n");
         sb.append("        }\n");
         sb.append("        return null;\n");
         sb.append("    }\n\n");

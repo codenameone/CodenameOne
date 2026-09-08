@@ -214,22 +214,35 @@ public final class Db {
         return stmt;
     }
 
-    private static void bind(long stmt, int index, Object value) {
+    /**
+     * Binds one parameter, or fails.
+     *
+     * The status was discarded, so binding more parameters than the statement has
+     * placeholders -- SQLITE_RANGE -- was ignored and the statement executed anyway,
+     * with the unbound parameter reading as NULL. A mutation committed with the
+     * wrong values and nothing said so, where the JavaSE JDBC path throws.
+     */
+    private static void bind(long stmt, int index, Object value) throws IOException {
+        int status;
         if(value == null) {
-            bindNullImpl(stmt, index);
+            status = bindNullImpl(stmt, index);
         } else if(value instanceof String) {
-            bindStringImpl(stmt, index, (String)value);
+            status = bindStringImpl(stmt, index, (String)value);
         } else if(value instanceof Integer || value instanceof Long
                 || value instanceof Short || value instanceof Byte) {
-            bindLongImpl(stmt, index, ((Number)value).longValue());
+            status = bindLongImpl(stmt, index, ((Number)value).longValue());
         } else if(value instanceof Double || value instanceof Float) {
-            bindDoubleImpl(stmt, index, ((Number)value).doubleValue());
+            status = bindDoubleImpl(stmt, index, ((Number)value).doubleValue());
         } else if(value instanceof byte[]) {
-            bindBlobImpl(stmt, index, (byte[])value);
+            status = bindBlobImpl(stmt, index, (byte[])value);
         } else if(value instanceof Boolean) {
-            bindLongImpl(stmt, index, ((Boolean)value).booleanValue() ? 1 : 0);
+            status = bindLongImpl(stmt, index, ((Boolean)value).booleanValue() ? 1 : 0);
         } else {
-            bindStringImpl(stmt, index, String.valueOf(value));
+            status = bindStringImpl(stmt, index, String.valueOf(value));
+        }
+        if(status != 0) {                       // anything but SQLITE_OK
+            throw new IOException("Could not bind parameter " + index
+                    + " (sqlite status " + status + "); check the parameter count");
         }
     }
 
@@ -237,11 +250,11 @@ public final class Db {
     private static native int closeImpl(long handle);
     private static native String errorImpl(long handle);
     private static native long prepareImpl(long handle, String sql);
-    private static native void bindStringImpl(long stmt, int index, String value);
-    private static native void bindLongImpl(long stmt, int index, long value);
-    private static native void bindDoubleImpl(long stmt, int index, double value);
-    private static native void bindNullImpl(long stmt, int index);
-    private static native void bindBlobImpl(long stmt, int index, byte[] value);
+    private static native int bindStringImpl(long stmt, int index, String value);
+    private static native int bindLongImpl(long stmt, int index, long value);
+    private static native int bindDoubleImpl(long stmt, int index, double value);
+    private static native int bindNullImpl(long stmt, int index);
+    private static native int bindBlobImpl(long stmt, int index, byte[] value);
     private static native int stepImpl(long stmt);
     private static native int columnCountImpl(long stmt);
     private static native String columnNameImpl(long stmt, int index);

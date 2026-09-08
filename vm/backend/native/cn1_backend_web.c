@@ -156,6 +156,15 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
         return 0;
     }
     curl_easy_setopt(curl, CURLOPT_URL, urlCopy);
+    /* The path goes out exactly as the caller wrote it.
+       libcurl otherwise resolves "." and ".." before sending, while the SigV4
+       signature was computed over the UNNORMALISED path -- so an S3 key with a dot
+       segment in it is signed for one path and requested at another, and comes back
+       SignatureDoesNotMatch. The JavaSE path does not normalise, so such a key works
+       under cn1:backend and fails only once packaged. */
+#ifdef CURLOPT_PATH_AS_IS
+    curl_easy_setopt(curl, CURLOPT_PATH_AS_IS, 1L);
+#endif
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cn1WebWrite);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, r);
     curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, cn1WebHeader);
