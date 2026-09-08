@@ -716,7 +716,7 @@ final class BuildHintsAndroid {
                         + "the application uses `LocationButton` and nothing else from the "
                         + "location or maps packages. Set `false` when the application "
                         + "reaches precise location through native Android code, which the "
-                        + "class scan cannot see because Gradle compiles it later, and "
+                        + "class scan can't see because Gradle compiles it later, and "
                         + "`true` to declare it regardless."));
 
         h.add(new Hint("android.mockLocation")

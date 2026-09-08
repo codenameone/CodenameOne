@@ -133,6 +133,51 @@ class AndroidLocationButtonPermissionTest {
                 "com/codename1/location/SomethingAddedLater"));
     }
 
+    /** The button alone earns the restriction; anything else takes it away. */
+    @Test
+    void theRestrictionIsInferredFromButtonOnlyUse() {
+        assertTrue(AndroidGradleBuilder.wantsExclusiveLocation("auto", true, false));
+        assertFalse(AndroidGradleBuilder.wantsExclusiveLocation("auto", true, true));
+        assertFalse(AndroidGradleBuilder.wantsExclusiveLocation("auto", false, false));
+        assertFalse(AndroidGradleBuilder.wantsExclusiveLocation("auto", false, true));
+    }
+
+    /** The hint overrides the inference in both directions. */
+    @Test
+    void theHintOverridesTheInference() {
+        assertFalse(AndroidGradleBuilder.wantsExclusiveLocation("false", true, false));
+        assertTrue(AndroidGradleBuilder.wantsExclusiveLocation("true", false, true));
+    }
+
+    /**
+     * onlyForLocationButton is an API 37 enum value and AAPT resolves manifest
+     * enum values against the COMPILE SDK. Below 37 it is a resource-linking
+     * failure, measured:
+     *
+     * <pre>AAPT: error: 'onlyForLocationButton' is incompatible with attribute
+     * usesPermissionFlags (attr) flags [neverForLocation=65536]</pre>
+     *
+     * so the build must be able to decline to emit it.
+     */
+    @Test
+    void theRestrictionNeedsACompileSdkThatUnderstandsIt() {
+        assertFalse(AndroidGradleBuilder.compileSdkSupportsExclusiveLocation(35));
+        assertFalse(AndroidGradleBuilder.compileSdkSupportsExclusiveLocation(36));
+        assertTrue(AndroidGradleBuilder.compileSdkSupportsExclusiveLocation(37));
+        assertTrue(AndroidGradleBuilder.compileSdkSupportsExclusiveLocation(38));
+    }
+
+    /** Only the restrictive declaration carries the flag. */
+    @Test
+    void theDeclarationsDifferOnlyInTheFlag() {
+        assertFalse(AndroidGradleBuilder.FINE_LOCATION_PERMISSION.contains(
+                "usesPermissionFlags"));
+        assertTrue(AndroidGradleBuilder.FINE_LOCATION_PERMISSION_EXCLUSIVE.contains(
+                "android:usesPermissionFlags=\"onlyForLocationButton\""));
+        assertTrue(AndroidGradleBuilder.FINE_LOCATION_PERMISSION_EXCLUSIVE.contains(
+                "android.permission.ACCESS_FINE_LOCATION"));
+    }
+
     /**
      * A longer name starting the same way is not the button's listener, and a
      * prefix match would have said it was.

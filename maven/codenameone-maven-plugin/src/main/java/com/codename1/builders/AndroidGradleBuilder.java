@@ -536,23 +536,91 @@ public class AndroidGradleBuilder extends Executor {
     /// #### Returns
     ///
     /// the manifest line for ACCESS_FINE_LOCATION
-    private String fineLocationPermission(BuildRequest request) {
+    private String fineLocationPermission(BuildRequest request, int compileSdk) {
         String hint = request.getArg("android.locationButton.exclusive", "auto");
-        boolean exclusive;
-        if ("true".equals(hint)) {
-            exclusive = true;
-        } else if ("false".equals(hint)) {
-            exclusive = false;
-        } else {
-            exclusive = locationButtonPermission && !otherLocationUse;
+        boolean asked = "true".equals(hint);
+        if (!wantsExclusiveLocation(hint, locationButtonPermission, otherLocationUse)) {
+            return FINE_LOCATION_PERMISSION;
         }
-        if (!exclusive) {
-            return "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" android:required=\"false\" />\n";
+        // onlyForLocationButton is an API 37 enum value, and AAPT resolves
+        // manifest enum values against the COMPILE SDK, not the target: below
+        // 37 it fails resource linking outright --
+        //   AAPT: error: 'onlyForLocationButton' is incompatible with attribute
+        //   usesPermissionFlags (attr) flags [neverForLocation=65536]
+        // -- which is a broken build rather than the graceful fallback the
+        // component is supposed to give on older platforms. Measured against
+        // compileSdk 36; the same hazard the comment on compileSdkVersion
+        // further down describes, reached from a different direction.
+        //
+        // The level is passed in rather than read off compileSdkVersion,
+        // which is assigned thousands of lines after this runs; the caller asks
+        // the same shared helper the rest of the manifest fragments use.
+        if (!compileSdkSupportsExclusiveLocation(compileSdk)) {
+            if (asked) {
+                // An explicit request that cannot be honoured. Silently
+                // dropping it is the failure mode this whole flag exists to
+                // avoid, so say it plainly instead.
+                error("android.locationButton.exclusive=true needs a compile SDK of"
+                        + " 37 or newer; this build compiles against " + compileSdk
+                        + ", where AAPT rejects the onlyForLocationButton value.",
+                        new RuntimeException("compile SDK " + compileSdk
+                                + " cannot express onlyForLocationButton"));
+            } else {
+                warn("Not declaring ACCESS_FINE_LOCATION onlyForLocationButton:"
+                        + " the compile SDK is " + compileSdk + " and the value"
+                        + " needs 37. The location button still works; the"
+                        + " application keeps the ordinary precise-location"
+                        + " declaration.");
+            }
+            return FINE_LOCATION_PERMISSION;
         }
         debug("Declaring ACCESS_FINE_LOCATION onlyForLocationButton");
-        return "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\""
-                + " android:usesPermissionFlags=\"onlyForLocationButton\""
-                + " android:required=\"false\" />\n";
+        return FINE_LOCATION_PERMISSION_EXCLUSIVE;
+    }
+
+    /// The ordinary ACCESS_FINE_LOCATION declaration.
+    static final String FINE_LOCATION_PERMISSION =
+            "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" android:required=\"false\" />\n";
+
+    /// The declaration that limits precise location to the location button.
+    static final String FINE_LOCATION_PERMISSION_EXCLUSIVE =
+            "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\""
+            + " android:usesPermissionFlags=\"onlyForLocationButton\""
+            + " android:required=\"false\" />\n";
+
+    /// The API level that first understands `onlyForLocationButton`. AAPT
+    /// resolves manifest enum values against the compile SDK, so below this the
+    /// value is a resource-linking failure rather than a newer-platform hint.
+    static final int EXCLUSIVE_LOCATION_MIN_COMPILE_SDK = 37;
+
+    /// Whether precise location should be limited to the location button.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hint`: `android.locationButton.exclusive` -- `true`, `false`, or
+    ///   anything else for the inference
+    ///
+    /// - `buttonUsed`: whether the application references the location button
+    ///
+    /// - `otherLocationUse`: whether it also reaches location the ordinary way
+    ///
+    /// #### Returns
+    ///
+    /// whether to declare the restriction, before the compile SDK is consulted
+    static boolean wantsExclusiveLocation(String hint, boolean buttonUsed,
+            boolean otherLocationUse) {
+        if ("true".equals(hint)) {
+            return true;
+        }
+        if ("false".equals(hint)) {
+            return false;
+        }
+        return buttonUsed && !otherLocationUse;
+    }
+
+    /// Whether a compile SDK can express `onlyForLocationButton` at all.
+    static boolean compileSdkSupportsExclusiveLocation(int compileSdk) {
+        return compileSdk >= EXCLUSIVE_LOCATION_MIN_COMPILE_SDK;
     }
 
     /// Whether a class the application references means it needs precise
@@ -2209,6 +2277,22 @@ public class AndroidGradleBuilder extends Executor {
                     if (cls.indexOf("com/codename1/maps") == 0 || cls.indexOf("com/codename1/location") == 0) {
                         gpsPermission = true;
                     }
+                    // This sees cn1lib code too, so there is nothing to fold in
+                    // from libsDir and a scan of it would be dead weight.
+                    // CN1BuildMojo merges the dependency jars -- which is what a
+                    // cn1lib is on the Maven classpath -- into
+                    // jar-with-dependencies.jar via mergeJars(), and that becomes
+                    // dist.jar, which the builder unzips into dummyClassesDir:
+                    // the very tree this scan walks. A library that tracks or
+                    // geofences therefore reaches usesClass() here like any other
+                    // caller and takes the exclusive declaration away by itself.
+                    //
+                    // Review has now raised "libsDir is scanned separately, so
+                    // library usage is invisible" twice on this code. It is not
+                    // true of cn1lib Java, and the libsDir scans that do exist
+                    // (database, call/VPN, Nearby) are there for the native and
+                    // aar half, which never references com/codename1/location at
+                    // all and so could not affect this decision either way.
                     if (needsOrdinaryPreciseLocation(cls)) {
                         debug("Precise location is not button-only because of class " + cls);
                         otherLocationUse = true;
@@ -5401,7 +5485,13 @@ public class AndroidGradleBuilder extends Executor {
         if (gpsPermission) {
             permissions += "    <uses-feature android:name=\"android.hardware.location\" android:required=\"false\" />\n"
                     + "    <uses-feature android:name=\"android.hardware.location.gps\" android:required=\"false\" />\n"
-                    + permissionAdd(request, "ACCESS_FINE_LOCATION", fineLocationPermission(request))
+                    + permissionAdd(request, "ACCESS_FINE_LOCATION",
+                    fineLocationPermission(request,
+                            compileSdkInt(maxPlatformVersion, buildToolsVersion,
+                                    targetNumber, usesNearbyRanging,
+                                    usesNearbyRanging || usesNearbyTransport
+                                            || usesNearbyCompanion,
+                                    usesCallVoip, usesCustomTunnel)))
                     + permissionAdd(request, "ACCESS_COARSE_LOCATION",
                     "    <uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\"  android:required=\"false\" />\n");
             if(request.getArg("android.mockLocation", "true").equals("true")) {
