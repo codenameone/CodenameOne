@@ -1144,6 +1144,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     private boolean locationButtonSupported;
+    private boolean locationButtonReady = true;
     private SuccessCallback<Boolean> locationButtonCallback;
     private int locationButtonTextType = -1;
     private int locationButtonBackgroundColor;
@@ -1166,6 +1167,17 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         locationButtonCallback = onPermissionResult;
         return new PeerComponent(new Object()) {
         };
+    }
+
+    @Override
+    public boolean isLocationButtonReady(PeerComponent button) {
+        return button != null && locationButtonReady;
+    }
+
+    /// Plays a platform whose control was created but whose session never
+    /// opened -- present, blank, and reporting no failure.
+    public void setLocationButtonReady(boolean locationButtonReady) {
+        this.locationButtonReady = locationButtonReady;
     }
 
     /// Makes the fake implementation claim, or stop claiming, a system-rendered

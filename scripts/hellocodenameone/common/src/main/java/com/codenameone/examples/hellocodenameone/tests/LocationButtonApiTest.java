@@ -36,11 +36,13 @@ import com.codename1.ui.util.UITimer;
 ///
 /// The interesting assertion is the one that needs a device: on Android 17 the
 /// button is drawn by the *system*, in another process, into a surface this view
-/// adopts -- and if that session fails the component replaces itself with an
-/// ordinary Codename One button. So a peer that is still in place after the form
-/// has settled means the whole platform handshake worked: provider created, host
-/// token obtained, session opened, surface package adopted. Nothing short of a
-/// real Android 17 device can say that.
+/// adopts. What is checked is `isSystemRendered()`, which asks the platform
+/// whether it is actually drawing -- provider created, host token obtained,
+/// session opened, surface package adopted. A peer being in place is NOT that
+/// check and deliberately is not used as one: the component builds its peer
+/// synchronously, before any session exists, so a handshake that hangs with no
+/// error to report would leave a control that is present, blank, and passing.
+/// Nothing short of a real Android 17 device can tell those apart.
 ///
 /// Below API 37, and on every other port, the component is that ordinary button
 /// and this checks it is present and labelled.
@@ -84,12 +86,36 @@ public class LocationButtonApiTest extends BaseTest {
         // platform's session opens a beat later -- a failure arrives as a
         // callback, not as a return value, so the check has to wait for the
         // form to settle rather than run straight after show().
-        UITimer.timer(2000, false, f, new Runnable() {
+        //
+        // Bounded polling rather than one long sleep: the session took under a
+        // second on an Android 17 emulator, but that is one machine's answer
+        // and a fixed deadline tuned to it is a flake waiting for a slower one.
+        // A control that never opens still fails, just later.
+        scheduleCheck(f, platformSupported, 0);
+        return true;
+    }
+
+    /// How many times to look again before calling a session that has not
+    /// opened a session that never will.
+    private static final int MAX_ATTEMPTS = 8;
+
+    private void scheduleCheck(final Form f, final boolean platformSupported,
+            final int attempt) {
+        UITimer.timer(attempt == 0 ? 2000 : 1000, false, f, new Runnable() {
             public void run() {
+                if (platformSupported && !button.isSystemRendered()
+                        && attempt + 1 < MAX_ATTEMPTS
+                        && childOf(button) instanceof PeerComponent) {
+                    // Still the platform's control and still not drawing:
+                    // give the session more time before calling it dead. Once
+                    // the component has swapped in the fallback there is
+                    // nothing left to wait for.
+                    scheduleCheck(f, platformSupported, attempt + 1);
+                    return;
+                }
                 check(platformSupported);
             }
         });
-        return true;
     }
 
     private void check(boolean platformSupported) {
@@ -102,20 +128,22 @@ public class LocationButtonApiTest extends BaseTest {
                 + " systemRendered=" + button.isSystemRendered()
                 + " " + button.getWidth() + "x" + button.getHeight());
 
-        // The component's own answer and what it actually put on screen have to
-        // agree, on every port. A disagreement is the failure mode the instance
-        // method exists to prevent.
-        if (button.isSystemRendered() != (child instanceof PeerComponent)) {
-            fail("isSystemRendered() disagrees with the child it produced");
+        // Reporting the system's control while showing an ordinary button is
+        // the failure mode the instance method exists to prevent. The converse
+        // is legal for a beat -- the peer is built before its session opens --
+        // so only this direction is an error.
+        if (button.isSystemRendered() && !(child instanceof PeerComponent)) {
+            fail("isSystemRendered() is true while an ordinary button is showing");
             return;
         }
 
         if (platformSupported) {
             if (!button.isSystemRendered()) {
-                // The component swaps a failed platform session for the
-                // fallback button, so this is what a broken handshake looks
-                // like from here.
-                fail("the platform claims a location button but the session did not survive");
+                // Covers both shapes of a broken handshake: a session that
+                // reported an error, which the component swapped for the
+                // fallback button, and one that simply never opened, which
+                // leaves the peer in place and blank.
+                fail("the platform claims a location button but nothing is drawing it");
                 return;
             }
             if (button.getWidth() <= 0 || button.getHeight() <= 0) {

@@ -6464,6 +6464,24 @@ public final class Display extends CN1Constants {
                 onPermissionResult);
     }
 
+    /// Whether a control from [#createLocationButton] is actually live.
+    ///
+    /// The platform half of
+    /// `com.codename1.location.LocationButton#isSystemRendered()`. A control
+    /// the system renders in another process exists before it is drawn into,
+    /// and a session that never opens leaves it existing and blank.
+    ///
+    /// #### Parameters
+    ///
+    /// - `button`: a control this platform returned
+    ///
+    /// #### Returns
+    ///
+    /// whether the platform is drawing into it
+    public boolean isLocationButtonReady(PeerComponent button) {
+        return impl.isLocationButtonReady(button);
+    }
+
     /// Returns the platform motion sensor entry point or {@code null} when the
     /// current port does not provide motion sensors. Prefer
     /// {@link com.codename1.sensors.MotionSensorManager#getInstance()} in

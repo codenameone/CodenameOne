@@ -63,6 +63,7 @@ class LocationButtonTest extends UITestBase {
     @AfterEach
     void resetImplementation() {
         implementation.setLocationButtonSupported(false);
+        implementation.setLocationButtonReady(true);
     }
 
     @FormTest
@@ -269,6 +270,24 @@ class LocationButtonTest extends UITestBase {
                 "the platform still claims the control");
         assertFalse(button.isSystemRendered(),
                 "but this button is no longer showing it");
+    }
+
+    /// A control that was created but whose session never opened is present and
+    /// blank, and nothing reports a failure to fall back from. The component
+    /// must not call that the system's control.
+    @FormTest
+    void aControlWithNoSessionIsNotSystemRendered() {
+        implementation.setLocationButtonSupported(true);
+        implementation.setLocationButtonReady(false);
+        LocationButton button = showButton(new LocationButton());
+
+        assertNotNull(findPeer(button), "the peer is built before its session opens");
+        assertFalse(button.isSystemRendered(),
+                "a blank control is not the system rendering one");
+
+        implementation.setLocationButtonReady(true);
+        assertTrue(button.isSystemRendered(),
+                "and it is once the platform starts drawing");
     }
 
     @FormTest

@@ -9224,6 +9224,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return createNativePeer(builder.created);
     }
 
+    /// Whether the system has opened a session for this control.
+    ///
+    /// See [AndroidLocationButton#hasSession()]: the view is built
+    /// synchronously and the surface the system draws into arrives afterwards,
+    /// so a control that exists is not yet a control that works.
+    ///
+    /// #### Parameters
+    ///
+    /// - `button`: a peer from [#createLocationButton]
+    ///
+    /// #### Returns
+    ///
+    /// whether the platform is drawing into it
+    public boolean isLocationButtonReady(PeerComponent button) {
+        if (button == null) {
+            return false;
+        }
+        Object view = button.getNativePeer();
+        return view instanceof AndroidLocationButton
+                && ((AndroidLocationButton) view).hasSession();
+    }
+
     /// Constructs an [AndroidLocationButton] on the Android UI thread.
     private static final class LocationButtonBuilder implements Runnable {
         private final Activity activity;

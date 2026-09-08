@@ -196,11 +196,12 @@ public class LocationButton extends Container {
     /// Whether a tap on *this* button goes through a control the system itself
     /// drew.
     ///
-    /// False means this component is an ordinary Codename One button that asks
-    /// for the location permission -- the answer on every platform other than
-    /// Android, on Android below API level 37, before the component has been
-    /// shown, and on a device where the platform HAS the control but its
-    /// session failed and [#useFallback()] replaced it.
+    /// False means this component is not showing the system's control: every
+    /// platform other than Android, Android below API level 37, before the
+    /// component has been shown, in the moment between the control being
+    /// created and the system opening its session, and on a device where the
+    /// platform HAS the control but its session failed and [#useFallback()]
+    /// replaced it.
     ///
     /// That last case is why this is an instance question rather than a static
     /// one. `Display.isLocationButtonSupported()` answers what the platform can
@@ -211,7 +212,13 @@ public class LocationButton extends Container {
     ///
     /// whether the system drew the control this button is showing
     public boolean isSystemRendered() {
-        return peer != null;
+        // Not just "a peer exists". A control the system renders in another
+        // process is created here and drawn into later, so between the two
+        // there is a peer that is present and blank -- and a session that never
+        // opens leaves it that way, with nothing reporting a failure to fall
+        // back from. Asking the platform whether it is actually drawing is the
+        // only way to tell that apart from a working control.
+        return peer != null && Display.getInstance().isLocationButtonReady(peer);
     }
 
     /// The label this button carries.

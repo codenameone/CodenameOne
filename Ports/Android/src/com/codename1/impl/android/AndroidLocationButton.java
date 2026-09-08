@@ -153,6 +153,19 @@ class AndroidLocationButton extends SurfaceView {
         setZOrderMediaOverlay(true);
     }
 
+    /// Whether the platform has actually opened a session for this control.
+    ///
+    /// The view exists from the moment it is constructed; the surface the
+    /// system draws into arrives later, or not at all. Only this distinguishes
+    /// a working control from one that is present and blank.
+    ///
+    /// #### Returns
+    ///
+    /// whether a session is open
+    boolean hasSession() {
+        return session != null;
+    }
+
     /// Whether this device will actually draw the control.
     ///
     /// The SDK check and the class lookup are both needed: the level says the

@@ -8151,6 +8151,31 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Whether a control from [#createLocationButton] is actually live.
+    ///
+    /// Creating the control and having the platform draw into it are two
+    /// different moments on a port whose control is rendered by another
+    /// process: the peer exists as soon as it is asked for, and the session
+    /// behind it opens later. Between the two there is a component that looks
+    /// present and shows nothing, and a session that never opens leaves it that
+    /// way -- which is the one outcome this whole feature must not ship
+    /// silently.
+    ///
+    /// The default is true because on a port whose control is live the moment
+    /// it is built -- which is every port that has no remote surface -- there
+    /// is no in-between to report. Override where there is one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `button`: a control this implementation returned
+    ///
+    /// #### Returns
+    ///
+    /// whether the platform is drawing into it
+    public boolean isLocationButtonReady(PeerComponent button) {
+        return button != null;
+    }
+
     /// Returns the port-specific motion sensor entry point. Default
     /// implementation returns {@code null}; ports that expose the device motion
     /// hardware override this to return a cached manager. Application code
