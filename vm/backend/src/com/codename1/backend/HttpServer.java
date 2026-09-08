@@ -93,9 +93,26 @@ public final class HttpServer {
         private int[] slices;
         private int headerCount;
         private Map headers;
+        /**
+         * Where the request target sits inside {@link #raw}.
+         *
+         * Kept so a router can match on the bytes the parser already has. Matching
+         * on getTarget() means comparing Strings, and the generated router is the
+         * one caller that runs for every request on every route, so it is worth not
+         * asking it to.
+         */
+        private int targetStart;
+        private int targetLength;
+        /** Computed on first use; -1 until then. Reset with the rest of the Request. */
+        private int pathLength = -1;
 
         Request(String method, String target, String version, byte[] raw, int[] slices,
                 int headerCount, String body) {
+            this(method, target, version, raw, slices, headerCount, body, 0, 0);
+        }
+
+        Request(String method, String target, String version, byte[] raw, int[] slices,
+                int headerCount, String body, int targetStart, int targetLength) {
             this.method = method;
             this.target = target;
             this.version = version;
@@ -103,6 +120,202 @@ public final class HttpServer {
             this.slices = slices;
             this.headerCount = headerCount;
             this.body = body;
+            this.targetStart = targetStart;
+            this.targetLength = targetLength;
+            this.pathLength = -1;
+        }
+
+        /**
+         * True when the request PATH is exactly these bytes.
+         *
+         * The path, not the target: everything from `?` onwards is the query string
+         * and is not part of the route. A router that compared the whole target
+         * would match `/healthz` and miss `/healthz?probe=1`, which is the same
+         * request.
+         *
+         * For the generated router, which holds each route as a byte[] constant. No
+         * String is built and nothing is hashed: it is a length test and a compare
+         * against the buffer the request was parsed from. Falls back to comparing
+         * the target String when the slice is not available, which is the HTTP/2
+         * path -- there the target came from HPACK rather than from a byte range.
+         */
+        public boolean pathIs(byte[] path) {
+            if(path == null) {
+                return false;
+            }
+            int length = pathByteLength();
+            if(path.length != length) {
+                return false;
+            }
+            return regionEquals(path, 0, length);
+        }
+
+        /** As {@link #pathIs}, for a route that continues into a path variable. */
+        public boolean pathStartsWith(byte[] prefix) {
+            if(prefix == null || prefix.length > pathByteLength()) {
+                return false;
+            }
+            return regionEquals(prefix, 0, prefix.length);
+        }
+
+        /**
+         * The path from `from` onwards, as text. Allocates, so a matched route only.
+         *
+         * Percent escapes are left alone. The router decodes the segments it binds,
+         * because decoding first would let an encoded `/` invent a segment boundary
+         * that the client never sent.
+         */
+        public String pathFrom(int from) {
+            int length = pathByteLength();
+            if(from >= length) {
+                return "";
+            }
+            if(targetLength <= 0 || raw == null) {
+                return target.substring(from, length);
+            }
+            return asciiString(raw, targetStart + from, length - from);
+        }
+
+        /** The path's length in bytes -- the target up to `?` -- without building it. */
+        public int pathByteLength() {
+            if(pathLength >= 0) {
+                return pathLength;
+            }
+            int length = targetLength > 0 ? targetLength
+                                          : (target == null ? 0 : target.length());
+            int found = length;
+            for(int iter = 0 ; iter < length ; iter++) {
+                if(byteAt(iter) == '?') {
+                    found = iter;
+                    break;
+                }
+            }
+            pathLength = found;
+            return found;
+        }
+
+        /**
+         * A query parameter's decoded value, or null when the request did not send
+         * it. An empty `?flag=` is present with an empty value, which is not the
+         * same as absent, and callers that offer a default depend on the difference.
+         */
+        public String queryParam(String name) {
+            int length = targetLength > 0 ? targetLength
+                                          : (target == null ? 0 : target.length());
+            int pos = pathByteLength();
+            if(pos >= length || name == null) {
+                return null;
+            }
+            pos++; // the '?' itself
+            while(pos <= length) {
+                int end = pos;
+                while(end < length && byteAt(end) != '&') {
+                    end++;
+                }
+                int eq = pos;
+                while(eq < end && byteAt(eq) != '=') {
+                    eq++;
+                }
+                if(nameEquals(name, pos, eq)) {
+                    return percentDecode(eq < end ? eq + 1 : end, end);
+                }
+                pos = end + 1;
+            }
+            return null;
+        }
+
+        /** One byte of the request target, from whichever form this Request holds. */
+        private int byteAt(int index) {
+            if(targetLength > 0 && raw != null) {
+                return raw[targetStart + index] & 0xff;
+            }
+            return target.charAt(index) & 0xff;
+        }
+
+        private boolean regionEquals(byte[] expected, int from, int length) {
+            for(int iter = 0 ; iter < length ; iter++) {
+                if(byteAt(from + iter) != (expected[iter] & 0xff)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /**
+         * Compares a parameter name against the raw bytes, decoding escapes in the
+         * request as it goes. Names are rarely encoded, but comparing an encoded
+         * name against a plain one would silently miss the parameter.
+         */
+        private boolean nameEquals(String name, int from, int to) {
+            int index = 0;
+            int pos = from;
+            while(pos < to) {
+                int c = byteAt(pos);
+                int width = 1;
+                if(c == '%' && pos + 2 < to) {
+                    int hi = hexDigit(byteAt(pos + 1));
+                    int lo = hexDigit(byteAt(pos + 2));
+                    if(hi >= 0 && lo >= 0) {
+                        c = (hi << 4) | lo;
+                        width = 3;
+                    }
+                } else if(c == '+') {
+                    c = ' ';
+                }
+                if(index >= name.length() || (name.charAt(index) & 0xff) != c) {
+                    return false;
+                }
+                index++;
+                pos += width;
+            }
+            return index == name.length();
+        }
+
+        /**
+         * Decodes one query value. The octets are gathered and decoded as a run,
+         * because a percent escape carries one byte of UTF-8 and a character built
+         * from a single byte at a time is mojibake for everything above ASCII.
+         */
+        private String percentDecode(int from, int to) {
+            byte[] out = new byte[to - from];
+            int length = 0;
+            int pos = from;
+            while(pos < to) {
+                int c = byteAt(pos);
+                if(c == '%' && pos + 2 < to) {
+                    int hi = hexDigit(byteAt(pos + 1));
+                    int lo = hexDigit(byteAt(pos + 2));
+                    if(hi >= 0 && lo >= 0) {
+                        out[length++] = (byte)((hi << 4) | lo);
+                        pos += 3;
+                        continue;
+                    }
+                } else if(c == '+') {
+                    c = ' ';
+                }
+                out[length++] = (byte)c;
+                pos++;
+            }
+            try {
+                return new String(out, 0, length, "UTF-8");
+            } catch (java.io.UnsupportedEncodingException err) {
+                // UTF-8 is required of every VM this runs on; the checked exception
+                // is the API's, not a case that can happen.
+                return new String(out, 0, length);
+            }
+        }
+
+        private static int hexDigit(int c) {
+            if(c >= '0' && c <= '9') {
+                return c - '0';
+            }
+            if(c >= 'a' && c <= 'f') {
+                return c - 'a' + 10;
+            }
+            if(c >= 'A' && c <= 'F') {
+                return c - 'A' + 10;
+            }
+            return -1;
         }
 
         /**
@@ -192,6 +405,12 @@ public final class HttpServer {
          */
         void reset(Conn conn, String method, String target, String version, byte[] raw,
                    int[] slices, int headerCount, String body) {
+            reset(conn, method, target, version, raw, slices, headerCount, body, 0, 0);
+        }
+
+        void reset(Conn conn, String method, String target, String version, byte[] raw,
+                   int[] slices, int headerCount, String body,
+                   int targetStart, int targetLength) {
             this.conn = conn;
             this.method = method;
             this.target = target;
@@ -201,6 +420,11 @@ public final class HttpServer {
             this.headerCount = headerCount;
             this.body = body;
             this.headers = null;
+            this.targetStart = targetStart;
+            this.targetLength = targetLength;
+            // Recomputed for this request. A stale value would give the next request
+            // on this connection the previous one's path length.
+            this.pathLength = -1;
         }
 
         /**
@@ -2996,6 +3220,15 @@ public final class HttpServer {
             }
             target = conn.internTarget(raw, targetStart, targetLength);
         }
+        // The slice a generated router matches on, so it compares the bytes the
+        // parser already has instead of the String it just built. Zero when the
+        // target had to be BUILT rather than pointed at -- absolute-form with no
+        // path -- because then no range of this buffer holds it and the String is
+        // the only representation. Passing 0,0 for every request, which is what
+        // this did, left the byte path unreachable and every route matched as a
+        // String: correct, and none of the point.
+        int sliceStart = targetStart < 0 ? 0 : targetStart;
+        int sliceLength = targetStart < 0 ? 0 : targetLength;
 
         // Four ints per header, into a buffer the connection reuses.
         int[] slices = conn.slices;
@@ -3059,13 +3292,15 @@ public final class HttpServer {
         if(POOL_REQUEST) {
             if(conn.pooledRequest == null) {
                 conn.pooledRequest = new Request(method, target, version, raw, slices,
-                                                 headerCount, null);
+                                                 headerCount, null, sliceStart, sliceLength);
             } else {
-                conn.pooledRequest.reset(conn, method, target, version, raw, slices, headerCount, null);
+                conn.pooledRequest.reset(conn, method, target, version, raw, slices, headerCount,
+                        null, sliceStart, sliceLength);
             }
             request = conn.pooledRequest;
         } else {
-            request = new Request(method, target, version, raw, slices, headerCount, null);
+            request = new Request(method, target, version, raw, slices, headerCount, null,
+                    sliceStart, sliceLength);
         }
 
         int contentLengthAt = -1;
@@ -3170,10 +3405,12 @@ public final class HttpServer {
             return request;
         }
         if(POOL_REQUEST) {
-            request.reset(conn, method, target, version, raw, slices, headerCount, body);
+            request.reset(conn, method, target, version, raw, slices, headerCount, body,
+                    sliceStart, sliceLength);
             return request;
         }
-        return new Request(method, target, version, raw, slices, headerCount, body);
+        return new Request(method, target, version, raw, slices, headerCount, body,
+                sliceStart, sliceLength);
     }
 
     /**

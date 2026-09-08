@@ -55,10 +55,15 @@ import java.util.List;
  * which is worse than not having it because it looks like coverage. Run
  * `cn1:backend-package` when TLS is what you need to exercise.
  */
-// Forks the lifecycle up to compile first, so `mvn cn1:backend` on its own does
-// the obvious thing on a clean checkout instead of failing on an empty
+// Forks the lifecycle up to process-classes first, so `mvn cn1:backend` on its own
+// does the obvious thing on a clean checkout instead of failing on an empty
 // target/classes.
-@Execute(phase = LifecyclePhase.COMPILE)
+//
+// process-classes rather than compile because that is where process-annotations is
+// bound: a server written as @RestController classes has its router and its main
+// GENERATED there, so stopping at compile would leave this goal looking for an entry
+// point that the build had not produced yet.
+@Execute(phase = LifecyclePhase.PROCESS_CLASSES)
 @Mojo(name = "backend", requiresDependencyResolution = ResolutionScope.RUNTIME)
 public class BackendRunMojo extends AbstractMojo {
 

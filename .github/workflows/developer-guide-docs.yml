@@ -90,7 +90,7 @@ jobs:
         run: |
           set -euo pipefail
           xvfb-run -a mvn -B -ntp -f maven/pom.xml \
-            -pl core,javase,android,css-compiler,codenameone-maven-plugin \
+            -pl core,javase,android,css-compiler,codenameone-maven-plugin,backend \
             -am install \
             -Plocal-dev-javase \
             -DskipTests \

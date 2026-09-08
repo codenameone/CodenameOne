@@ -55,44 +55,36 @@ myapp/
   android/   Android build
   backend/   the server
     pom.xml
-    src/main/java/com/example/myapp/BackendServer.java
+    src/main/java/com/example/myapp/Notes.java
 ----
 
-The generated handler is a working server, not a stub:
+A server is a class with routes on it. The annotations are Spring's, under
+Codename One's package names, so this reads the same way to anyone who has
+written a Spring controller:
 
+[source,java]
 ----
-public class BackendServer {
-    public static void main(String[] args) throws Exception {
-        Signals.installShutdownHandler();
-
-        int port = envInt("PORT", 8080);
-        final HttpServer server = HttpServer.start(null, port, 512, 16,
-                new HttpServer.Handler() {
-            public HttpServer.Response handle(HttpServer.Request request) {
-                if ("/healthz".equals(request.getTarget())) {
-                    return HttpServer.Response.json(200, "{\"status\":\"ok\"}");
-                }
-                return request.respond(200, "text/plain", HELLO);
-            }
-        }, null);
-
-        Signals.onShutdown(new Runnable() {
-            public void run() {
-                server.stop(10000);   // stop accepting, drain, close
-                System.exit(0);
-            }
-        });
-        server.awaitTermination();
-    }
-}
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Notes.java[tag=backend-first-server,indent=0]
 ----
 
-Three things in that are worth naming. `Signals.installShutdownHandler` turns
-SIGTERM into the ordered shutdown below it, so a container stop drains in-flight
-requests instead of cutting them. `request.respond` answers from a Response the
-connection already owns rather than allocating a new one, which is what keeps the
-collector out of the request path. And `awaitTermination` is required: the host
-threads are detached, so a `main` that returned would exit the process with no message.
+There is no `main` here, and that's the point. Every server opens with the same
+twenty lines -- start a listener, install a shutdown handler, wait on it -- and
+getting any of them wrong produces one that leaks connections on SIGTERM, or one
+that ends the moment `main` returns and says nothing about why. The build writes
+those lines, from the controllers it finds.
+
+It also writes the router. The obvious hand-written form,
+`if ("/healthz".equals(request.getTarget()))`, builds a String for the target,
+hashes it and compares it -- for every route it tries before the one that matches,
+on every request -- and breaks as soon as a client appends `?probe=1`. The
+generated router holds each route as a `byte[]` and asks the request whether its
+path bytes are those bytes, so a route with no path variables allocates nothing at
+all and a query string can't break it.
+
+The return value decides the response. A `String` is sent as text, anything else as
+JSON, `null` is a 404, and `@ResponseStatus` sets the code for the cases where 200
+isn't it. A handler that needs something this doesn't model takes the
+`HttpServer.Request` itself and answers exactly as it would have before.
 
 Two commands matter:
 
@@ -141,13 +133,9 @@ they compete for the cores the server needs. In this mode `workers` stops meanin
 `Database.open` takes a SQLite path or a PostgreSQL or MySQL URL, and the rows
 come back as the same Java types either way:
 
+[source,java]
 ----
-Database db = Database.open(System.getenv("DATABASE_URL"));   // or ":memory:"
-db.execute("CREATE TABLE IF NOT EXISTS note (id INTEGER PRIMARY KEY, body TEXT)",
-           null);
-
-List rows = db.query("SELECT id, body FROM note WHERE id > ?",
-                     new Object[] { Integer.valueOf(10) });
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/DatabaseSnippets.java[tag=backend-database,indent=0]
 ----
 
 There is no JDBC driver involved. SQLite is linked into the binary, and the
@@ -159,15 +147,9 @@ connections when more than one request needs the database at a time.
 This is where having the same language on both ends stops being a slogan. An
 interface annotated for the REST client generates the app's client:
 
+[source,java]
 ----
-@RestClient
-public interface NotesApi {
-    @GET("/notes/{id}")
-    void note(@Path("id") String id, OnComplete<Response<Note>> callback);
-
-    @POST("/notes")
-    void create(@Body Note note, OnComplete<Response<Note>> callback);
-}
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/NotesApi.java[tag=backend-contract,indent=0]
 ----
 
 Building the backend module with `-Dcn1.restServer=true` generates two more types
@@ -175,11 +157,9 @@ from that same interface: `NotesApiServer`, a synchronous interface the backend
 implements, and `NotesApiDispatcher`, which routes a method, path and body to it
 and binds the path and query parameters.
 
+[source,java]
 ----
-public class Notes implements NotesApiServer {
-    public Note note(String id) { ... }          // no callback: this IS the server
-    public Note create(Note note) { ... }
-}
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/NotesEndpoint.java[tag=backend-contract-server,indent=0]
 ----
 
 The client's methods are asynchronous because a UI can't block; the server's
@@ -329,8 +309,9 @@ no TLS, and what it does need is exactly what a translated binary is good at.
 * The class library is the Codename One runtime, not Java SE. A server dependency
   that assumes the full JDK won't translate, and Maven Central isn't the
   ecosystem this draws on.
-* There is no framework structure. Routing, validation and error mapping are
-  written by hand or generated from the REST contract.
+* Routing is the whole of the framework. There is no dependency injection, no
+  configuration model, no aspect layer, no starter ecosystem; validation and error
+  mapping are written by hand or generated from the REST contract.
 * The packaging goal compiles Java. It recompiles the module's sources against the
   backend's class library instead of reusing the jar Maven built, which is what
   keeps a server off classes the runtime doesn't have, and is also why Kotlin is

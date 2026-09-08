@@ -64,9 +64,23 @@
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-maven-plugin</artifactId>
                 <version>${cn1.plugin.version}</version>
-                <configuration>
-                    <mainClass>${package}.BackendServer</mainClass>
-                </configuration>
+                <!--
+                     No <mainClass>: the entry point is generated from the
+                     @RestController classes in this module. Set one only if this
+                     server writes its own main instead.
+                -->
+                <executions>
+                    <execution>
+                        <id>cn1-process-annotations</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <!-- Generates a router and an entry point from the
+                                 @RestController classes in this module. A no-op for
+                                 a server that writes its own main instead. -->
+                            <goal>process-annotations</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

@@ -41,12 +41,19 @@ import org.apache.maven.artifact.repository.ArtifactRepository;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import com.codename1.maven.annotations.AnnotatedClass;
+import com.codename1.maven.annotations.ClassScanner;
+import com.codename1.maven.annotations.ProcessingException;
+import com.codename1.maven.annotations.ProcessorContext;
+import com.codename1.maven.processors.RestControllerAnnotationProcessor;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -93,8 +100,14 @@ public class BackendPackageMojo extends AbstractMojo {
     @Component
     private RepositorySystem repositorySystem;
 
-    /** The class whose main() becomes the program's entry point. */
-    @Parameter(property = "cn1.backend.mainClass", required = true)
+    /**
+     * The class whose main() becomes the program's entry point.
+     *
+     * Optional. A module whose server is written as `@RestController` classes has no
+     * main of its own -- one is generated from them -- and naming a class that does
+     * not exist is worse than leaving this out.
+     */
+    @Parameter(property = "cn1.backend.mainClass")
     private String mainClass;
 
     /**
@@ -179,6 +192,7 @@ public class BackendPackageMojo extends AbstractMojo {
         unzip(javaApiJar, javaApi, null);
 
         compile(jdk8, javaApi, runtimeSources, classes);
+        generateControllers(classes, work);
         requireMainClass(classes);
         translate(jdk8, compilerJar, javaApi, classes, nativeSources, translated);
         File binary = output != null ? output
@@ -192,6 +206,68 @@ public class BackendPackageMojo extends AbstractMojo {
      * BOOTCLASSPATH. See the class comment for why that matters.
      */
     /**
+     * Generates the routers and the bootstrap for this module's `@RestController`
+     * classes, into the directory this goal has just compiled into.
+     *
+     * Not left to the `process-annotations` goal, which writes into Maven's
+     * target/classes: that is a different build, made against a JDK rather than
+     * against the backend's class library, and the translator never reads it. A
+     * router generated there would be absent from the binary while looking present
+     * in the project. Generating into the tree that is about to be translated is
+     * what makes the wiring real.
+     *
+     * Sets mainClass to the generated bootstrap when the module did not name one.
+     */
+    private void generateControllers(File classes, File work) throws MojoExecutionException {
+        Map<String, AnnotatedClass> index;
+        try {
+            index = ClassScanner.scan(classes);
+        } catch (ProcessingException err) {
+            throw new MojoExecutionException("Could not scan the compiled backend classes: "
+                    + err.getMessage(), err);
+        }
+        RestControllerAnnotationProcessor processor = new RestControllerAnnotationProcessor();
+        ProcessorContext ctx = new ProcessorContext(classes, new File(work, "stubs"), index,
+                getLog(), project.getBasedir(), new Properties(), mainClass,
+                java.util.Collections.<String>emptyList(), "UTF-8",
+                compileClasspathWithoutRuntime());
+        try {
+            processor.start(ctx);
+            for (AnnotatedClass cls : index.values()) {
+                if (!cls.getClassAnnotations().isEmpty()) {
+                    processor.processClass(cls, ctx);
+                }
+            }
+            processor.finish(ctx);
+        } catch (ProcessingException err) {
+            throw new MojoExecutionException("Could not process @RestController: "
+                    + err.getMessage(), err);
+        }
+        if (ctx.hasErrors()) {
+            StringBuilder sb = new StringBuilder("@RestController could not be processed:");
+            for (ProcessorContext.ProcessingError e : ctx.getErrors()) {
+                sb.append("\n  ").append(e);
+            }
+            throw new MojoExecutionException(sb.toString());
+        }
+        byte[] generated = ctx.getEmittedResources()
+                .get(RestControllerAnnotationProcessor.MAIN_CLASS_RESOURCE);
+        if (generated == null) {
+            return;
+        }
+        String name;
+        try {
+            name = new String(generated, "UTF-8").trim();
+        } catch (java.io.UnsupportedEncodingException err) {
+            throw new MojoExecutionException("UTF-8 is required of every JDK", err);
+        }
+        if (mainClass == null || mainClass.length() == 0) {
+            mainClass = name;
+            getLog().info("cn1: entry point " + name + ", generated from @RestController");
+        }
+    }
+
+    /**
      * Fails here, with the reason, rather than inside the translator.
      *
      * The compile below reads .java and only .java, on purpose: recompiling against
@@ -204,6 +280,11 @@ public class BackendPackageMojo extends AbstractMojo {
      * developer guide's "Limits worth knowing" carries the same statement.
      */
     private void requireMainClass(File classes) throws MojoFailureException {
+        if (mainClass == null || mainClass.length() == 0) {
+            throw new MojoFailureException("No entry point: set <mainClass>, or annotate "
+                    + "a class with @RestController and let the bootstrap be generated "
+                    + "from it");
+        }
         if (new File(classes, mainClass.replace('.', '/') + ".class").isFile()) {
             return;
         }
