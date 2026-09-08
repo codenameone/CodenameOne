@@ -20,7 +20,7 @@
 
         The property is not optional: the backend module lives in a profile, so
         without it Maven reports "Could not find the selected project in the
-        reactor" -- the module is not in the default one.
+        reactor"; the module is not in the default one.
 
         mvn -pl backend -Dcodename1.platform=backend cn1:backend
             runs it on this JVM, in seconds

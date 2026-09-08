@@ -223,7 +223,7 @@
               The server side. Not built by default: a client-only app should not
               pay for it, and `mvn -Dcodename1.platform=backend package` is what
               asks for it. `mvn -pl backend -Dcodename1.platform=backend cn1:backend`
-              runs it on this JVM -- the property is what puts the module in the
+              runs it on this JVM; that property is what puts the module in the
               reactor at all.
             -->
             <id>backend</id>

@@ -3339,7 +3339,11 @@ public final class HttpServer {
             conn.put(' ');
             conn.put(reason(response.status));
             conn.put("\r\nContent-Type: ");
-            conn.put(response.contentType);
+            // Through the same guard as the fast path above. This branch is the
+            // measurement copy, and it had BOTH defects that branch was fixed for: a
+            // null content type reached it as an NPE, and a CR/LF one as a second
+            // header. A path kept for comparison is still a path that serves.
+            conn.put(safeContentType(response.contentType));
             conn.put("\r\nDate: ");
             conn.put(currentHttpDateBytes(), 0, HTTP_DATE_LENGTH);
             conn.put("\r\nContent-Length: ");
