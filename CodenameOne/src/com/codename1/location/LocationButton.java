@@ -436,6 +436,25 @@ public class LocationButton extends Container {
                     // From a control this component has already replaced.
                     return;
                 }
+                // Deliberately NOT also invalidated by deinitialization, which
+                // review has asked for: remove-and-immediately-re-add would then
+                // let a queued result through, so bump childGeneration there
+                // too and the window closes.
+                //
+                // The window is between the platform calling back on the Android
+                // UI thread and the next slice of this one -- anything arriving
+                // after the view detaches is already rejected on the native
+                // side, where closing a session ends its generation. What can
+                // slip through is a result that was real when it was produced:
+                // the user tapped a control the system drew and answered it, and
+                // the grant it refers to still holds. Delivering that a beat
+                // late to the same component is not wrong.
+                //
+                // Bumping on deinitialization buys nothing against it and costs
+                // the opposite error -- a genuine answer dropped because the
+                // application happened to move the component in the same
+                // millisecond. Between a late-but-true result and a lost one,
+                // this takes the late one.
                 if (!isInitialized()) {
                     // The component left the form between the platform's
                     // callback and this hop onto the EDT, so the control that

@@ -294,12 +294,19 @@ class AndroidLocationButton extends SurfaceView {
             callQuietlyOn(sessionClass(), opened, "close", new Class[0], new Object[0]);
             return;
         }
-        session = opened;
+        // NOT published yet. `session` is what hasSession() answers, and that is
+        // read from the Codename One EDT as "the platform is drawing this", so
+        // assigning it here would make it true for the length of a binder call
+        // and a reflective invoke while the surface is still blank -- and true
+        // for a moment before an adoption that fails, which ends in the
+        // fallback. It is assigned once the surface is actually adopted, which
+        // is the first instant the answer is true.
         try {
-            Object surfacePackage = call(sessionClass(), opened, "getSurfacePackage",
-                    new Class[0], new Object[0]);
+            Object surfacePackage = callQuietlyOn(sessionClass(), opened,
+                    "getSurfacePackage", new Class[0], new Object[0]);
             if (surfacePackage == null) {
-                fail(new IllegalStateException("the location button session had no surface"));
+                abandon(opened, new IllegalStateException(
+                        "the location button session had no surface"));
                 return;
             }
             Method setChild = null;
@@ -312,11 +319,13 @@ class AndroidLocationButton extends SurfaceView {
                 }
             }
             if (setChild == null) {
-                fail(new NoSuchMethodException("SurfaceView.setChildSurfacePackage"));
+                abandon(opened, new NoSuchMethodException(
+                        "SurfaceView.setChildSurfacePackage"));
                 return;
             }
             setVisibility(VISIBLE);
             setChild.invoke(this, new Object[]{surfacePackage});
+            session = opened;
             // The system's own control belongs in front of anything else this
             // surface carries; the platform's wrapper asks for the same order.
             callQuietly(this, "setCompositionOrder", new Class[]{int.class},
@@ -329,8 +338,18 @@ class AndroidLocationButton extends SurfaceView {
             resizeToCurrent();
             invalidate();
         } catch (Throwable t) {
-            fail(t);
+            abandon(opened, t);
         }
+    }
+
+    /// Gives up on a session that was opened but never adopted.
+    ///
+    /// It has to be closed here rather than left to [#closeSession()], which
+    /// only knows about the published one: this session never became that, so
+    /// dropping the reference would leak a surface in another process.
+    private void abandon(Object opened, Throwable cause) {
+        callQuietlyOn(sessionClass(), opened, "close", new Class[0], new Object[0]);
+        fail(cause);
     }
 
     /// Tells an open session the size this view actually has.
