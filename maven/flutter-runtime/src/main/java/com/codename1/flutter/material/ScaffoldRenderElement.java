@@ -399,6 +399,11 @@ public class ScaffoldRenderElement extends RenderElement {
         // Bottom navigation strip: embedded mode only; in root mode it lives
         // in the Form's SOUTH host.
         double navHeight = 0;
+        // Computed before the body is laid out, because the body has to stop
+        // short of it too.
+        double bottomBand = coversTheDisplay(constraints.hasBoundedHeight()
+                ? new Size(0, constraints.maxHeight()) : null)
+                ? bottomSafeAreaPx() : 0;
         RenderElement navRender = renderOf(bottomNavChild);
         if (navRender != null && !rootMode) {
             Size ns = navRender.layout(new BoxConstraints(
@@ -427,11 +432,12 @@ public class ScaffoldRenderElement extends RenderElement {
             BoxConstraints bodyConstraints;
             if (constraints.hasBoundedWidth() && constraints.hasBoundedHeight()) {
                 bodyConstraints = BoxConstraints.tight(width,
-                        Math.max(0, height - appBarHeight - navHeight - footerHeight));
+                        Math.max(0, height - appBarHeight - navHeight - footerHeight
+                                - bottomBand));
             } else {
                 bodyConstraints = constraints.loosen().deflate(
                         com.codename1.flutter.EdgeInsets.only(0, appBarHeight, 0,
-                                navHeight + footerHeight));
+                                navHeight + footerHeight + bottomBand));
             }
             Size bs = bodyRender.layout(bodyConstraints);
             setChildOffset(bodyRender, 0, appBarHeight);
@@ -442,14 +448,31 @@ public class ScaffoldRenderElement extends RenderElement {
 
         Size self = constraints.constrain(new Size(width, height));
 
-        // The bottom strip sits flush with the final bottom edge.
+        // The bottom strip sits above the display's own bottom padding, not
+        // flush with the screen. Flutter leaves that band to the scaffold's
+        // background: the reply study's bar is Material's 80 logical pixels with
+        // 34 of dark beneath it, which together read as one 114-tall bar. Laying
+        // the bar flush instead pushed the whole body 34 lower and left a white
+        // strip where the reference is dark -- the single largest wrong band on
+        // that route, 280 device pixels tall and 97% wrong.
+        //
+        // Only when this scaffold IS the display, which is the one thing that
+        // separates a full-screen study from a demo shown inside a card. The
+        // size says it, and by here the size is known.
         if (navRender != null && !rootMode) {
-            setChildOffset(navRender, 0, Math.max(0, self.height() - navHeight));
+            // The strip OWNS the band: it is laid out that much taller and stays
+            // flush with the bottom edge, with its content held at the top. That
+            // is what the reference draws -- the reply study's bar reads as one
+            // 114 logical pixel block of colour whose Inbox row sits in the top
+            // 56 of it, not as an 80 tall bar floating above a gap.
+            double barTotal = navHeight + bottomBand;
+            navRender.layout(BoxConstraints.tight(self.width(), barTotal));
+            setChildOffset(navRender, 0, Math.max(0, self.height() - barTotal));
         }
         if (footerRender != null) {
             footerRender.layout(BoxConstraints.tight(self.width(), footerHeight));
             setChildOffset(footerRender, 0,
-                    Math.max(0, self.height() - navHeight - footerHeight));
+                    Math.max(0, self.height() - navHeight - bottomBand - footerHeight));
         }
 
         RenderElement fabRender = renderOf(fabChild);
@@ -458,7 +481,8 @@ public class ScaffoldRenderElement extends RenderElement {
             setChildOffset(fabRender,
                     fabX(scaffold().getFloatingActionButtonLocation(), self.width(), fs.width()),
                     fabY(scaffold().getFloatingActionButtonLocation(), self.height(),
-                            fs.height(), contentInsetPx(navHeight)));
+                            fs.height(), contentInset(navHeight + bottomBand,
+                                    bottomSafeAreaPx())));
         }
         return self;
     }
@@ -472,13 +496,23 @@ public class ScaffoldRenderElement extends RenderElement {
      * lifted the reply study's docked button clear of its bar and into the mail
      * list, where it disappeared behind a card.</p>
      */
-    private double contentInsetPx(double navHeight) {
-        return contentInset(navHeight, bottomSafeAreaPx());
-    }
-
     /** @see #contentInsetPx(double) */
     static double contentInset(double navHeight, double bottomSafeArea) {
         return navHeight > 0 ? navHeight : bottomSafeArea;
+    }
+
+    /// Whether this scaffold IS the display, which is what decides whether the
+    /// display's bottom padding is a band the scaffold owns below its bar.
+    private boolean coversTheDisplay(Size self) {
+        try {
+            if (self == null || self.height() <= 0) {
+                return false;
+            }
+            Size screen = com.codename1.flutter.MediaQuery.sizeOf(this);
+            return screen != null && Math.abs(Dp.px(screen.height()) - self.height()) < 2;
+        } catch (Throwable noMediaQuery) {
+            return false;
+        }
     }
 
     /**

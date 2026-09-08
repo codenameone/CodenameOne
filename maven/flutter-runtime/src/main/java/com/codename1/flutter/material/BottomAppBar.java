@@ -105,6 +105,10 @@ public class BottomAppBar extends StatelessWidget {
         // reply study looks 114 tall it is 80 of bar over 34 of the scaffold's
         // own dark background.
         c.height(HEIGHT_LP);
+        // Held at the TOP, because the scaffold may lay this bar out taller than
+        // its own height to cover the display's bottom padding, and the content
+        // belongs in the Material 80 at the top of that, not centred in the rest.
+        c.alignment(com.codename1.flutter.Alignment.topCenter);
         c.child(child);
         return c;
     }
