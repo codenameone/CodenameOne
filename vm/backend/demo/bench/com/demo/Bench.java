@@ -189,6 +189,12 @@ public class Bench {
                     if(JSON_MODE == 1) {
                         return HttpServer.Response.jsonValue(200, HOISTED);
                     }
+                    if(JSON_MODE == 3) {
+                        // Mode 2's writer on the connection's pooled Response, so the
+                        // route allocates nothing at all. Mode 2 stays as it was so the
+                        // cost of the Response itself remains measurable against it.
+                        return request.respondJson(200, MESSAGE_WRITABLE);
+                    }
                     if(JSON_MODE == 2) {
                         // What the annotation processor now emits for a DTO: no
                         // map, no key hashing, no walk, no instanceof per value --

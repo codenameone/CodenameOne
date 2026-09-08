@@ -135,6 +135,44 @@ public final class HttpServer {
         }
 
         /**
+         * A JSON response on the connection's pooled Response, serialised straight
+         * from the value.
+         *
+         * The deferred-JSON path already avoided every copy on the body side --
+         * Json.write goes into the connection's reusable ByteSink, so nothing
+         * materialises a byte[] or a String -- but Response.jsonValue is a static
+         * that allocates a fresh Response per call, and that was the ONLY thing the
+         * route allocated. Profiled over 10.8M requests: 88.1 bytes each, all of it
+         * one HttpServer.Response, count 10789601 against 10789541 requests. The
+         * plaintext route had already been pooled and sat at 0.1 bytes per request.
+         *
+         * That is worth removing because of what allocation costs HERE rather than
+         * what it costs to allocate: the collector shares the server's cores, so a
+         * route that allocates pays for cycles in its tail. fasthttp on the same
+         * body allocates about 16 bytes per request and collects three times a
+         * second; this route was collecting thirteen to eighteen times a second.
+         *
+         * reset() clears deferredJson and hasDeferredJson, so a pooled Response
+         * reused for a plain body cannot carry a stale value into the next
+         * response -- which is the failure this would otherwise invite.
+         */
+        public Response respondJson(int status, Object value) {
+            if(conn == null) {
+                return Response.jsonValue(status, value);   // HTTP/2 path, as respond() does
+            }
+            if(conn.pooledResponse == null) {
+                conn.pooledResponse = new Response(status, JSON_CONTENT_TYPE,
+                        EMPTY_BODY, -1, 0, 0, null);
+            } else {
+                conn.pooledResponse.reset(status, JSON_CONTENT_TYPE,
+                        EMPTY_BODY, -1, 0, 0, null);
+            }
+            conn.pooledResponse.deferredJson = value;
+            conn.pooledResponse.hasDeferredJson = true;
+            return conn.pooledResponse;
+        }
+
+        /**
          * DIAGNOSTIC: the connection's Response exactly as the last request left
          * it, or null the first time. Separates the allocation pooling saves from
          * the field writes it adds -- see the bench demo's RESPONSE_MODE.
@@ -418,6 +456,8 @@ public final class HttpServer {
     private static final int COMBINED_WRITE_LIMIT = 8192;
 
     private static final byte[] EMPTY_BODY = new byte[0];
+    /** One instance, so the pooled JSON path does not intern a literal per call. */
+    static final String JSON_CONTENT_TYPE = "application/json; charset=utf-8";
 
     /** "Sat, 29 Aug 2026 07:11:02 GMT" -- RFC 9110 fixes the width. */
     private static final int HTTP_DATE_LENGTH = 29;
