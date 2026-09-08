@@ -2375,7 +2375,12 @@ static long cn1RefDropsAtCycleStart = 0;
 // practice, since it needs the discovery list to have failed to grow first.
 #define CN1_REF_EMERGENCY_SLOTS 512
 static JAVA_OBJECT cn1RefEmergencyCleared[CN1_REF_EMERGENCY_SLOTS];
-static long cn1RefEmergencyTop = 0;
+// ATOMIC, because this is reached with cn1RefMutex already released and mark functions run
+// on however many workers gcMarkDrainParallel is using. A plain post-increment there loses
+// increments and lets two workers publish into one slot, so a referent that WAS cleared
+// goes unrecorded -- and an unrecorded emergency clear is exactly the case the drop
+// recovery cannot repair, leaving the sweep free to take it under a racing get().
+static _Atomic long cn1RefEmergencyTop = 0;
 
 // Called from the allocation-failure path. Idempotent, allocation-free and safe from a
 // thread that is about to park -- a relaxed store and nothing else.
@@ -2394,12 +2399,41 @@ long long cn1RefPhaseNs = 0;          // GC thread only: time in cn1GcProcessRef
 long cn1RefPasses = 0;                // clear passes run this cycle (>1 == SATB reopen)
 #endif
 
+// Claim a recovery slot and publish the referent into it, or report that there is none.
+// Reserving BEFORE the field is cleared is the point: a slot that could not be claimed
+// means the clear must not happen, because nothing would be able to undo it.
+static JAVA_BOOLEAN cn1RefEmergencyReserve(JAVA_OBJECT r) {
+    long idx = atomic_fetch_add_explicit(&cn1RefEmergencyTop, 1, memory_order_relaxed);
+    if(idx >= CN1_REF_EMERGENCY_SLOTS) {
+        return JAVA_FALSE;      // full: caller marks instead of clearing
+    }
+    cn1RefEmergencyCleared[idx] = r;
+    return JAVA_TRUE;
+}
+
+// Mark every referent the emergency path cleared, for the recoveries below.
+static JAVA_BOOLEAN cn1RefRecoverEmergency(CODENAME_ONE_THREAD_STATE) {
+    JAVA_BOOLEAN any = JAVA_FALSE;
+    long top = atomic_load_explicit(&cn1RefEmergencyTop, memory_order_relaxed);
+    if(top > CN1_REF_EMERGENCY_SLOTS) {
+        top = CN1_REF_EMERGENCY_SLOTS;
+    }
+    for(long i = 0 ; i < top ; i++) {
+        JAVA_OBJECT was = cn1RefEmergencyCleared[i];
+        if(was != JAVA_NULL && !CN1_IS_TAGGED(was)) {
+            gcMarkObject(threadStateData, was, JAVA_FALSE);
+            any = JAVA_TRUE;
+        }
+    }
+    return any;
+}
+
 // Recompute the soft budget and drop the previous cycle's discoveries. Called from
 // codenameOneGCMark before anything can mark.
 static void cn1RefBeginCycle(void) {
     cn1RefDiscoveredTop = 0;
     cn1RefDropsAtCycleStart = atomic_load_explicit(&cn1SatbDrops, memory_order_relaxed);
-    cn1RefEmergencyTop = 0;
+    atomic_store_explicit(&cn1RefEmergencyTop, 0, memory_order_relaxed);
 #ifdef CN1_GC_CONFORM
     // PER CYCLE, like every other figure in [GCPROBE]. A running total cannot show
     // whether the budget is tracking memory pressure, which is the whole question the
@@ -2647,14 +2681,11 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
         // mutator. With nowhere to record it, marking is the answer: it keeps memory the
         // emergency wanted back, which is a worse outcome than clearing and a far better
         // one than a dangling read.
-        JAVA_BOOLEAN canRemember = (cn1RefEmergencyTop < CN1_REF_EMERGENCY_SLOTS)
-                                   ? JAVA_TRUE : JAVA_FALSE;
         if(!alreadyLive
-           && canRemember
            && strength == CN1_REF_SOFT
            && atomic_load_explicit(&cn1SoftRetainCycles, memory_order_relaxed) < 0
-           && __atomic_load_n(touchAgeField, __ATOMIC_RELAXED) != CN1_REF_TOUCHED) {
-            cn1RefEmergencyCleared[cn1RefEmergencyTop++] = r;
+           && __atomic_load_n(touchAgeField, __ATOMIC_RELAXED) != CN1_REF_TOUCHED
+           && cn1RefEmergencyReserve(r)) {
             __atomic_store_n(referentField, JAVA_NULL, __ATOMIC_RELAXED);
 #ifdef CN1_GC_CONFORM
             atomic_fetch_add_explicit(&cn1RefCleared, 1, memory_order_relaxed);
@@ -2829,6 +2860,14 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
                     markedThisRound = JAVA_TRUE;
                 }
             }
+            // AND THE EMERGENCY CLEARS. Those referents are gone from their fields
+            // already, so cn1RefDiscovered cannot reach them -- they exist only in the
+            // recovery array. This early return happens before the post-clear recovery
+            // below, so without this they would be retained nowhere and swept under a
+            // getter that had already been handed one.
+            if(cn1RefRecoverEmergency(threadStateData)) {
+                markedThisRound = JAVA_TRUE;
+            }
             if(markedThisRound) {
                 marked = JAVA_TRUE;
                 gcMarkDrain(threadStateData);
@@ -2923,26 +2962,43 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
     // mutator holds it, so the recovery marks what was cleared rather than restoring it.
     cn1SatbBulkQuiesce();
     if(atomic_load_explicit(&cn1SatbDrops, memory_order_relaxed) != cn1RefDropsAtCycleStart) {
-        JAVA_BOOLEAN recovered = JAVA_FALSE;
-        for(long i = 0 ; i < n ; i++) {
-            JAVA_OBJECT was = cn1RefDiscovered[i].clearedReferent;
-            if(was != JAVA_NULL && !CN1_IS_TAGGED(was)) {
-                gcMarkObject(threadStateData, was, JAVA_FALSE);
+        // TO A FIXPOINT, like every other recovery here. A referent brought back can hold
+        // a further Reference, whose mark function registers during the drain -- after
+        // these loops have run. Draining once would leave that nested reference reachable
+        // with an unmarked referent, and an empty final take would then let termination
+        // finish over it.
+        for(;;) {
+            long before = cn1RefDiscoveredTop;
+            JAVA_BOOLEAN recovered = JAVA_FALSE;
+            for(long i = 0 ; i < n ; i++) {
+                JAVA_OBJECT was = cn1RefDiscovered[i].clearedReferent;
+                if(was != JAVA_NULL && !CN1_IS_TAGGED(was)) {
+                    gcMarkObject(threadStateData, was, JAVA_FALSE);
+                    recovered = JAVA_TRUE;
+                }
+            }
+            // The emergency path's clears too. They never reached the list -- that is why
+            // they exist -- so they are remembered separately and recovered on the same
+            // signal.
+            if(cn1RefRecoverEmergency(threadStateData)) {
                 recovered = JAVA_TRUE;
             }
-        }
-        // The emergency path's clears too. They never reached the list -- that is why they
-        // exist -- so they are remembered separately and recovered on the same signal.
-        for(long i = 0 ; i < cn1RefEmergencyTop ; i++) {
-            JAVA_OBJECT was = cn1RefEmergencyCleared[i];
-            if(was != JAVA_NULL && !CN1_IS_TAGGED(was)) {
-                gcMarkObject(threadStateData, was, JAVA_FALSE);
-                recovered = JAVA_TRUE;
+            // Anything newly discovered by the drain still has to be retained: this pass
+            // is past the point where it could safely clear.
+            for(long i = n ; i < before ; i++) {
+                JAVA_OBJECT r = __atomic_load_n(cn1RefDiscovered[i].referentField, __ATOMIC_RELAXED);
+                if(r != JAVA_NULL && !CN1_IS_TAGGED(r)) {
+                    gcMarkObject(threadStateData, r, JAVA_FALSE);
+                    recovered = JAVA_TRUE;
+                }
             }
-        }
-        if(recovered) {
-            marked = JAVA_TRUE;
-            gcMarkDrain(threadStateData);
+            if(recovered) {
+                marked = JAVA_TRUE;
+                gcMarkDrain(threadStateData);
+            }
+            if(cn1RefDiscoveredTop == before) {
+                break;
+            }
         }
     }
 
@@ -2977,6 +3033,17 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
 
 void codenameOneGCMark() {
     currentGcMarkValue++;
+    // PUBLISH THE EPOCH HERE, not only from cn1BibopBeginGcCycle, because that call is
+    // compiled out under -DCN1_DISABLE_BIBOP and the mirror then stays at 1 forever.
+    //
+    // That is not the harmless staleness it looks like, and an earlier comment on this
+    // branch wrongly called it that. CN1_SATB_REF_KEEP skips a referent whose mark equals
+    // the epoch; against a frozen epoch it matches nothing from the second collection on,
+    // so every Reference.get() during a mark enqueues -- which is precisely the unfiltered
+    // shape measured on this branch to put over 10,000 entries a cycle into the log and
+    // drive the SATB termination loop into CN1_SATB_MAX_REOPENS every single cycle. A
+    // filter that silently stops filtering is a performance cliff, not a rounding error.
+    atomic_store_explicit(&bibopGcEpoch, currentGcMarkValue, memory_order_relaxed);
     // Drop the previous cycle's reference list and recompute the soft-retention budget
     // from the memory still available. Must precede anything that can mark, because
     // cn1GcDiscoverReference reads the budget to decide retention as it goes.
@@ -5226,9 +5293,9 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
 }
 
 void cn1BibopBeginGcCycle(void) {
-    // Publish the new GC-owned epoch separately for mutators. They must never
-    // read currentGcMarkValue while the collector increments it concurrently.
-    atomic_store_explicit(&bibopGcEpoch, currentGcMarkValue, memory_order_relaxed);
+    // The epoch is published by codenameOneGCMark, which every cycle passes through
+    // whether or not the page heap is compiled in. It used to be published here, which
+    // left the mirror frozen under -DCN1_DISABLE_BIBOP; see the note at that store.
     // Charge allocations racing this mark to the NEXT cycle. The old sweep-end
     // store lost those bytes and could delay a collection indefinitely under a
     // sustained allocator.
