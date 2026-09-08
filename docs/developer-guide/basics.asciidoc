@@ -38,6 +38,9 @@ Now that the structure is clear, open the Java file `TodoApp.java` in the projec
 
 A layout manager decides the size and location of components within a `Container`. Every `Container` has a layout manager. The default layout manager is `FlowLayout`.
 
+.What each layout manager is for
+image::img/layout-manager-choice.svg[What each Codename One layout manager is for,scaledwidth=85%]
+
 To understand layouts, first understand a basic concept about `Component`: each component has a "`preferred size.`" That's the size a component wants to occupy. For example, a `Label` uses the exact size needed to fit the label text, icon, and padding.
 
 .Understanding Preferred Size
