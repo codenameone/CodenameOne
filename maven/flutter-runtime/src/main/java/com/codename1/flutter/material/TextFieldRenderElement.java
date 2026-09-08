@@ -257,19 +257,51 @@ public class TextFieldRenderElement extends RenderElement {
      */
     private void applyTextStyle(com.codename1.ui.TextField tf, InputDecoration d) {
         applyOne(tf.getAllStyles(), textField().getStyle());
-        com.codename1.flutter.TextStyle hint = d == null ? null : d.getHintStyle();
-        if (hint != null && tf.getHintLabel() != null) {
-            applyOne(tf.getHintLabel().getAllStyles(), hint);
+        if (tf.getHintLabel() != null) {
+            applyOne(tf.getHintLabel().getAllStyles(), hintStyle(d));
         }
     }
 
-    // The placeholder keeps Codename One's own hint styling for now. Flutter
-    // builds it from titleMedium merged with the field's style and recoloured
-    // with the theme's hintColor, but applying that chain here changed only the
-    // colour -- Codename One's hint label did not take the derived font -- and a
-    // recoloured placeholder still set half again too large measured WORSE than
-    // leaving it alone: Crane's rows went from 17.33% wrong to 17.80%. The size
-    // is the thing to fix first, and it is not a styling problem.
+    /**
+     * The type the placeholder is set in.
+     *
+     * <p>Flutter's InputDecorator builds it as {@code titleMedium} merged with
+     * the field's own style, RECOLOURED with the theme's hintColor, then merged
+     * with an explicit hintStyle. The recolour is the part that is easy to lose:
+     * a placeholder that keeps the INPUT's colour is white on every row of
+     * Crane's search form, where the input colour is white.</p>
+     */
+    private com.codename1.flutter.TextStyle hintStyle(InputDecoration d) {
+        com.codename1.flutter.TextStyle style = new com.codename1.flutter.TextStyle();
+        com.codename1.flutter.Color tint = null;
+        try {
+            ThemeData theme = Theme.of(this);
+            if (theme.textTheme() != null) {
+                style = style.merge(theme.textTheme().titleMedium());
+            }
+            tint = theme.hintColor() != null ? theme.hintColor()
+                    : defaultHintColor(theme.brightness());
+        } catch (Throwable noTheme) {
+            tint = null;
+        }
+        if (textField().getStyle() != null) {
+            style = style.merge(textField().getStyle());
+        }
+        if (tint != null) {
+            style.color(tint);
+        }
+        com.codename1.flutter.TextStyle explicit = d == null ? null : d.getHintStyle();
+        return explicit == null ? style : style.merge(explicit);
+    }
+
+    /// Flutter's ThemeData default when the theme names no hintColor: black38
+    /// on a light theme, white70 on a dark one.
+    private static com.codename1.flutter.Color defaultHintColor(
+            com.codename1.flutter.Brightness brightness) {
+        return new com.codename1.flutter.Color(
+                brightness == com.codename1.flutter.Brightness.dark
+                        ? 0xB3FFFFFFL : 0x61000000L);
+    }
 
     /**
      * Flutter's {@code InputDecoration.applyDefaults}: every field the widget
@@ -322,8 +354,14 @@ public class TextFieldRenderElement extends RenderElement {
         if (ts == null) {
             return;
         }
-        if (ts.getFontSize() != null || ts.getFontWeight() != null) {
-            com.codename1.ui.Font base = target.getFont();
+        // Resolve the NAMED family first. Deriving from whatever the theme left
+        // on the component is what silently did nothing: a system font does not
+        // derive, so the size was dropped on the floor and the placeholder kept
+        // rendering half again too tall. A bundled TrueType face does derive.
+        com.codename1.ui.Font named = com.codename1.flutter.fonts.FontResolver.resolve(
+                ts.fontFamily(), ts.getFontWeight(), false);
+        if (ts.getFontSize() != null || ts.getFontWeight() != null || named != null) {
+            com.codename1.ui.Font base = named != null ? named : target.getFont();
             if (base == null) {
                 base = com.codename1.ui.Font.getDefaultFont();
             }
