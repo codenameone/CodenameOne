@@ -40,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -67,7 +68,7 @@ class LocationButtonTest extends UITestBase {
     void withoutAPlatformControlTheComponentIsAnOrdinaryButton() {
         LocationButton button = showButton(new LocationButton());
 
-        assertFalse(LocationButton.isSystemRendered());
+        assertFalse(button.isSystemRendered());
         assertNotNull(findButton(button), "the fallback button should be in place");
         assertNull(findPeer(button));
     }
@@ -137,7 +138,7 @@ class LocationButtonTest extends UITestBase {
         LocationButton button = showButton(
                 new LocationButton(LocationButton.TEXT_SHARE_PRECISE_LOCATION));
 
-        assertTrue(LocationButton.isSystemRendered());
+        assertTrue(button.isSystemRendered());
         assertNotNull(findPeer(button), "the platform control should be in place");
         assertNull(findButton(button));
         assertEquals(LocationButton.TEXT_SHARE_PRECISE_LOCATION,
@@ -191,6 +192,88 @@ class LocationButtonTest extends UITestBase {
         findButton(button).released();
         assertEquals(1, shared.size());
         assertSame(expected, shared.get(0));
+    }
+
+    /// A setter that arrives after the first show has to reach the platform's
+    /// control, which is configured when its session opens. Without a rebuild
+    /// it would move the field and change nothing on screen.
+    @FormTest
+    void changingTheTextTypeAfterShowingRebuildsThePlatformControl() {
+        implementation.setLocationButtonSupported(true);
+        LocationButton button = showButton(new LocationButton());
+        assertEquals(LocationButton.TEXT_USE_PRECISE_LOCATION,
+                implementation.getLocationButtonTextType());
+        PeerComponent first = findPeer(button);
+        assertNotNull(first);
+
+        button.setTextType(LocationButton.TEXT_NEAR_MY_PRECISE_LOCATION);
+
+        assertEquals(LocationButton.TEXT_NEAR_MY_PRECISE_LOCATION,
+                implementation.getLocationButtonTextType());
+        PeerComponent second = findPeer(button);
+        assertNotNull(second, "the control should still be in place");
+        assertNotSame(first, second, "the control should have been rebuilt");
+    }
+
+    @FormTest
+    void changingAColorAfterShowingRebuildsThePlatformControl() {
+        implementation.setLocationButtonSupported(true);
+        LocationButton button = showButton(new LocationButton());
+        assertEquals(-1, implementation.getLocationButtonBackgroundColor());
+
+        button.setButtonBackgroundColor(0x00ff00);
+
+        assertEquals(0x00ff00, implementation.getLocationButtonBackgroundColor());
+        assertNotNull(findPeer(button));
+    }
+
+    /// Setting the same value is not a reason to tear a live control down.
+    @FormTest
+    void settingTheSameTextTypeChangesNothing() {
+        implementation.setLocationButtonSupported(true);
+        LocationButton button = showButton(new LocationButton());
+        PeerComponent first = findPeer(button);
+
+        button.setTextType(LocationButton.TEXT_USE_PRECISE_LOCATION);
+
+        assertSame(first, findPeer(button));
+    }
+
+    /// The platform already said its control does not work here; a later setter
+    /// must not put the dead control back.
+    @FormTest
+    void aSetterAfterAFailedSessionKeepsTheFallback() {
+        implementation.setLocationButtonSupported(true);
+        LocationButton button = showButton(new LocationButton());
+        grant(null);
+        assertNull(findPeer(button));
+
+        button.setTextType(LocationButton.TEXT_SHARE_PRECISE_LOCATION);
+
+        assertNull(findPeer(button), "a failed platform must not be asked again");
+        assertNotNull(findButton(button));
+    }
+
+    /// The whole point of making this an instance question: on a platform that
+    /// HAS the control, a failed session means this button is not it.
+    @FormTest
+    void isSystemRenderedFollowsTheControlNotThePlatform() {
+        implementation.setLocationButtonSupported(true);
+        LocationButton button = showButton(new LocationButton());
+        assertTrue(button.isSystemRendered());
+
+        grant(null);
+
+        assertTrue(implementation.isLocationButtonSupported(),
+                "the platform still claims the control");
+        assertFalse(button.isSystemRendered(),
+                "but this button is no longer showing it");
+    }
+
+    @FormTest
+    void isSystemRenderedIsFalseBeforeTheComponentIsShown() {
+        implementation.setLocationButtonSupported(true);
+        assertFalse(new LocationButton().isSystemRendered());
     }
 
     @FormTest

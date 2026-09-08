@@ -112,6 +112,23 @@ class AndroidLocationButton extends SurfaceView {
     /// does not ask again while the first request is still in flight.
     private boolean requested;
 
+    /// Which attachment the live request belongs to.
+    ///
+    /// Detaching closes the session and clears `requested`, so a detach and a
+    /// quick reattach -- an ordinary Codename One form transition -- can put a
+    /// second `openSession` in flight before the first one has answered. Every
+    /// callback then arrives with the generation it was created for, and one
+    /// that is no longer current is closed or dropped rather than acted on.
+    /// Without it the first session would be adopted, silently overwritten by
+    /// the second and never closed, and an error from the abandoned client
+    /// would tear down the live control.
+    ///
+    /// A plain int, deliberately. Everything that reads or writes it runs on
+    /// the Android UI thread: `openSession` is reached from `onSizeChanged` and
+    /// from a `post()`, and the platform delivers its callbacks through
+    /// [UiThreadExecutor]. There is no second thread here to synchronize with.
+    private int generation;
+
     /// A failure is reported once. The component swaps itself for an ordinary
     /// Codename One button when it hears, and there is nothing to say twice.
     private boolean failed;
@@ -191,6 +208,7 @@ class AndroidLocationButton extends SurfaceView {
             return;
         }
         requested = true;
+        generation++;
         try {
             Object provider = createProvider();
             if (provider == null) {
@@ -220,21 +238,23 @@ class AndroidLocationButton extends SurfaceView {
             openSession.setAccessible(true);
             openSession.invoke(provider, new Object[]{activity, hostToken,
                 Integer.valueOf(displayId()), request, new UiThreadExecutor(),
-                newClient(clientClass)});
+                newClient(clientClass, generation)});
         } catch (Throwable t) {
             fail(t);
         }
     }
 
     /// Adopts the surface the platform drew the button into.
-    private void sessionOpened(Object opened) {
+    private void sessionOpened(Object opened, int forGeneration) {
         if (opened == null) {
             fail(new IllegalStateException("the location button session was null"));
             return;
         }
-        if (!isAttachedToWindow()) {
-            // The view went away while the session was being opened; there is
-            // nothing to show it in.
+        if (forGeneration != generation || !isAttachedToWindow()) {
+            // Either the view went away while the session was being opened, or
+            // a later attachment has already asked for one of its own. Closing
+            // is what makes this safe: the abandoned session holds a surface in
+            // another process, and dropping the reference would leak it.
             callQuietlyOn(sessionClass(), opened, "close", new Class[0], new Object[0]);
             return;
         }
@@ -340,9 +360,9 @@ class AndroidLocationButton extends SurfaceView {
         return color | 0xff000000;
     }
 
-    private Object newClient(Class clientClass) {
+    private Object newClient(Class clientClass, int forGeneration) {
         return Proxy.newProxyInstance(clientClass.getClassLoader(),
-                new Class[]{clientClass}, new ClientHandler());
+                new Class[]{clientClass}, new ClientHandler(forGeneration));
     }
 
     private IBinder hostToken() {
@@ -470,20 +490,35 @@ class AndroidLocationButton extends SurfaceView {
     /// The `LocationButtonClient` this control hands to the platform.
     private final class ClientHandler implements InvocationHandler {
 
+        /// The attachment this client was created for; see [#generation].
+        private final int forGeneration;
+
+        ClientHandler(int forGeneration) {
+            this.forGeneration = forGeneration;
+        }
+
         public Object invoke(Object proxy, Method method, Object[] args) {
             String name = method.getName();
             if ("onSessionOpened".equals(name)) {
-                sessionOpened(args == null || args.length == 0 ? null : args[0]);
+                sessionOpened(args == null || args.length == 0 ? null : args[0],
+                        forGeneration);
                 return null;
             }
+            // A tap or an error from a session this view has already moved on
+            // from says nothing about the control it is showing now, and acting
+            // on it would grant against, or tear down, the wrong one.
             if ("onPermissionResult".equals(name)) {
                 Object granted = args == null || args.length == 0 ? null : args[0];
-                if (callback != null && granted instanceof Boolean) {
+                if (forGeneration == generation && callback != null
+                        && granted instanceof Boolean) {
                     callback.onSucess((Boolean) granted);
                 }
                 return null;
             }
             if ("onSessionError".equals(name)) {
+                if (forGeneration != generation) {
+                    return null;
+                }
                 Object error = args == null || args.length == 0 ? null : args[0];
                 fail(error instanceof Throwable ? (Throwable) error : null);
                 return null;

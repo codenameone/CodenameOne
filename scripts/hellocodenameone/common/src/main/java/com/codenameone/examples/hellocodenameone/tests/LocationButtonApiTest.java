@@ -62,8 +62,13 @@ public class LocationButtonApiTest extends BaseTest {
 
     @Override
     public boolean runTest() {
-        final boolean systemRendered = LocationButton.isSystemRendered();
-        com.codename1.io.Log.p("LocationButtonApiTest: systemRendered=" + systemRendered);
+        // The PLATFORM question, asked before anything is built.
+        // LocationButton.isSystemRendered() answers for a particular button and
+        // is false until one has been shown, so the two are not interchangeable.
+        final boolean platformSupported =
+                com.codename1.ui.Display.getInstance().isLocationButtonSupported();
+        com.codename1.io.Log.p("LocationButtonApiTest: platformSupported="
+                + platformSupported);
 
         button = new LocationButton(LocationButton.TEXT_USE_PRECISE_LOCATION);
         if (button.getTextType() != LocationButton.TEXT_USE_PRECISE_LOCATION) {
@@ -81,23 +86,32 @@ public class LocationButtonApiTest extends BaseTest {
         // form to settle rather than run straight after show().
         UITimer.timer(2000, false, f, new Runnable() {
             public void run() {
-                check(systemRendered);
+                check(platformSupported);
             }
         });
         return true;
     }
 
-    private void check(boolean systemRendered) {
+    private void check(boolean platformSupported) {
         Component child = childOf(button);
         if (child == null) {
             fail("the location button produced no child at all");
             return;
         }
         com.codename1.io.Log.p("LocationButtonApiTest: child=" + child.getClass().getName()
+                + " systemRendered=" + button.isSystemRendered()
                 + " " + button.getWidth() + "x" + button.getHeight());
 
-        if (systemRendered) {
-            if (!(child instanceof PeerComponent)) {
+        // The component's own answer and what it actually put on screen have to
+        // agree, on every port. A disagreement is the failure mode the instance
+        // method exists to prevent.
+        if (button.isSystemRendered() != (child instanceof PeerComponent)) {
+            fail("isSystemRendered() disagrees with the child it produced");
+            return;
+        }
+
+        if (platformSupported) {
+            if (!button.isSystemRendered()) {
                 // The component swaps a failed platform session for the
                 // fallback button, so this is what a broken handshake looks
                 // like from here.

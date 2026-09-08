@@ -6421,8 +6421,11 @@ public final class Display extends CN1Constants {
     /// returns false and [com.codename1.location.LocationButton] falls back to
     /// an ordinary Codename One button that asks for the location permission.
     ///
-    /// Application code normally reads this through
-    /// `com.codename1.location.LocationButton#isSystemRendered()`.
+    /// This is the question to ask BEFORE building anything -- what the
+    /// platform can do. What a particular button ended up showing is
+    /// `com.codename1.location.LocationButton#isSystemRendered()`, which also
+    /// answers false when the platform has the control but its session
+    /// failed.
     ///
     /// #### Returns
     ///

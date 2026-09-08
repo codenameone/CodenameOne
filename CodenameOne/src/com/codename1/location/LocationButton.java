@@ -67,8 +67,10 @@ import java.util.List;
 /// that asks for the location permission the usual way. Either way the listener
 /// receives a [Location] or null, so an application is written once.
 ///
-/// [#isSystemRendered()] reports which of the two is in use, for an application
-/// that wants to say something different about it.
+/// [#isSystemRendered()] reports which of the two this button ended up with,
+/// for an application that wants to say something different about it. Ask
+/// `com.codename1.ui.Display#isLocationButtonSupported()` instead when the
+/// question is what the platform can do rather than what happened here.
 ///
 /// #### On Android
 ///
@@ -139,6 +141,11 @@ public class LocationButton extends Container {
 
     private PeerComponent peer;
 
+    /// Set once the platform's own control has failed on this device. It is not
+    /// asked for again: it already answered, and retrying would put the dead
+    /// control back in a component that has visibly recovered from it.
+    private boolean platformFailed;
+
     private final List<LocationSharedListener> listeners =
             new ArrayList<LocationSharedListener>();
 
@@ -172,17 +179,25 @@ public class LocationButton extends Container {
         });
     }
 
-    /// Whether a tap will go through a button the system itself drew.
+    /// Whether a tap on *this* button goes through a control the system itself
+    /// drew.
     ///
-    /// False means the component is an ordinary Codename One button that asks
-    /// for the location permission -- which is the answer on every platform
-    /// other than Android, and on Android below API level 37.
+    /// False means this component is an ordinary Codename One button that asks
+    /// for the location permission -- the answer on every platform other than
+    /// Android, on Android below API level 37, before the component has been
+    /// shown, and on a device where the platform HAS the control but its
+    /// session failed and [#useFallback()] replaced it.
+    ///
+    /// That last case is why this is an instance question rather than a static
+    /// one. `Display.isLocationButtonSupported()` answers what the platform can
+    /// do and is the right call to make before building anything; only the
+    /// component knows what actually ended up on screen.
     ///
     /// #### Returns
     ///
-    /// whether the platform draws this control
-    public static boolean isSystemRendered() {
-        return Display.getInstance().isLocationButtonSupported();
+    /// whether the system drew the control this button is showing
+    public boolean isSystemRendered() {
+        return peer != null;
     }
 
     /// The label this button carries.
@@ -196,9 +211,6 @@ public class LocationButton extends Container {
 
     /// Chooses the label this button carries.
     ///
-    /// Takes effect the next time the component is shown; the system renders
-    /// its side of the control once, when the control is attached.
-    ///
     /// #### Parameters
     ///
     /// - `textType`: one of the `TEXT_` constants
@@ -208,8 +220,12 @@ public class LocationButton extends Container {
     /// - `IllegalArgumentException`: if `textType` is not one of them
     public void setTextType(int textType) {
         checkTextType(textType);
+        if (this.textType == textType) {
+            return;
+        }
         this.textType = textType;
         fallback.setText(labelFor(textType));
+        rebuildChild();
     }
 
     /// Asks the platform to draw the button on this background colour.
@@ -221,7 +237,11 @@ public class LocationButton extends Container {
     ///
     /// - `color`: an RRGGBB colour, or -1 to let the system choose
     public void setButtonBackgroundColor(int color) {
+        if (buttonBackgroundColor == color) {
+            return;
+        }
         this.buttonBackgroundColor = color;
+        rebuildChild();
     }
 
     /// The background colour asked of the platform, or -1.
@@ -239,7 +259,11 @@ public class LocationButton extends Container {
     ///
     /// - `color`: an RRGGBB colour, or -1 to let the system choose
     public void setButtonTextColor(int color) {
+        if (buttonTextColor == color) {
+            return;
+        }
         this.buttonTextColor = color;
+        rebuildChild();
     }
 
     /// The label colour asked of the platform, or -1.
@@ -325,7 +349,7 @@ public class LocationButton extends Container {
 
     /// Puts either the platform's control or the fallback button in place.
     private void buildChild() {
-        if (Display.getInstance().isLocationButtonSupported()) {
+        if (!platformFailed && Display.getInstance().isLocationButtonSupported()) {
             peer = Display.getInstance().createLocationButton(textType,
                     buttonBackgroundColor, buttonTextColor,
                     new SuccessCallback<Boolean>() {
@@ -341,6 +365,28 @@ public class LocationButton extends Container {
         }
         peer = null;
         add(BorderLayout.CENTER, fallback);
+    }
+
+    /// Builds the child again so a setter that arrived after the first show
+    /// reaches the platform's control.
+    ///
+    /// The system button is configured when its session is opened and the
+    /// component builds its child exactly once, so without this a setter would
+    /// silently move the field and change nothing on screen -- the worst
+    /// outcome, because the application has every reason to believe it worked.
+    ///
+    /// Nothing to do before the first build: `initComponent` will use whatever
+    /// the fields say by then. Nothing to do for the fallback either -- it is
+    /// an ordinary Codename One button that has already taken its new text and
+    /// takes its colours from the theme.
+    private void rebuildChild() {
+        if (peer == null) {
+            return;
+        }
+        removeComponent(peer);
+        peer = null;
+        buildChild();
+        revalidateSelf();
     }
 
     /// The platform's answer to a tap, or to the session it opened.
@@ -374,12 +420,17 @@ public class LocationButton extends Container {
     /// the worst way for this to fail: the build and the manifest are both fine
     /// and nothing says otherwise.
     private void useFallback() {
+        platformFailed = true;
         if (peer == null) {
             return;
         }
         removeComponent(peer);
         peer = null;
         add(BorderLayout.CENTER, fallback);
+        revalidateSelf();
+    }
+
+    private void revalidateSelf() {
         Container parent = getParent();
         if (parent != null) {
             parent.revalidate();
