@@ -555,6 +555,16 @@ public class AndroidGradleBuilder extends Executor {
         // The level is passed in rather than read off compileSdkVersion,
         // which is assigned thousands of lines after this runs; the caller asks
         // the same shared helper the rest of the manifest fragments use.
+        //
+        // This is the compile SDK the BUILD GENERATES. A tool that rewrites
+        // app/build.gradle afterwards can still lower it out from under the
+        // manifest -- scripts/build-android-app.sh does exactly that, pinning
+        // the project for reproducible screenshots -- and AAPT would then
+        // reject the value this decided was safe to emit. Nothing here can see
+        // that; a tool that lowers the compile SDK below 37 has to drop this
+        // flag too. No sample currently qualifies for it, because
+        // hellocodenameone uses com/codename1/maps and so takes the ordinary
+        // declaration anyway.
         if (!compileSdkSupportsExclusiveLocation(compileSdk)) {
             if (asked) {
                 // An explicit request that cannot be honoured. Silently
