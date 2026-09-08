@@ -32,13 +32,18 @@ import java.util.Map;
 /**
  * The server side of this app.
  *
- * Run it with `mvn -pl backend -Dcodename1.platform=backend cn1:backend` while
- * developing: it starts on this
- * JVM in a couple of seconds against the minute and a half a native build takes,
- * and the protocol layer underneath is the same source that ships. Package it with
- * `mvn -pl backend -Dcodename1.platform=backend cn1:backend-package` to get a
- * single native binary with no JVM
- * to install beneath it.
+ * While developing, run it with
+ *
+ *     mvn -pl backend -Dcodename1.platform=backend cn1:backend
+ *
+ * which starts on this JVM in a couple of seconds against the minute and a half a
+ * native build takes, and whose protocol layer is the same source that ships. The
+ * property is not optional: the backend module lives in a profile, so without it
+ * Maven cannot see it in the reactor. Package it with
+ *
+ *     mvn -pl backend -Dcodename1.platform=backend cn1:backend-package
+ *
+ * to get a single native binary with no JVM to install beneath it.
  *
  * The local run deliberately does not terminate TLS, and therefore does not serve
  * HTTP/2. Build the binary when those are what you need to exercise.
