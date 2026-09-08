@@ -74,6 +74,18 @@ class LiteralsTest {
     }
 
     @Test
+    void writesNonFiniteFloatingPointAsAnExpression() {
+        // Infinity and NaN have no literal spelling, so toString produces text no
+        // source could contain. Numeric.min() and Numeric.max() default to these.
+        assertEquals("1.0/0.0", Literals.of(Double.POSITIVE_INFINITY));
+        assertEquals("-1.0/0.0", Literals.of(Double.NEGATIVE_INFINITY));
+        assertEquals("0.0/0.0", Literals.of(Double.NaN));
+        assertEquals("1.0f/0.0f", Literals.of(Float.POSITIVE_INFINITY));
+        assertEquals("0.0f/0.0f", Literals.of(Float.NaN));
+        assertEquals("1.5", Literals.of(1.5d));
+    }
+
+    @Test
     void passesNullThroughSoTheTemplateCanTestIt() {
         assertNull(Literals.of(null));
     }

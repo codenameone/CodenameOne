@@ -609,7 +609,7 @@ public final class HugoDoclet implements Doclet {
             named.add(simpleName(documented.name()));
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("name", documented.name());
-            row.put("url", urlOfTypeNamed(documented.name()));
+            row.put("url", exceptionUrl(member, documented.name()));
             row.put("doc", documented.text());
             out.add(row);
         }
@@ -626,6 +626,30 @@ public final class HugoDoclet implements Doclet {
             out.add(row);
         }
         return out;
+    }
+
+    /**
+     * The page for an exception a Throws section names.
+     *
+     * <p>The method's own throws clause is consulted first, because a simple
+     * name is ambiguous across the API and picking the first global match sends
+     * the reader somewhere else entirely: {@code java.text.Format.parseObject}
+     * declares {@code java.text.ParseException} and documents it as
+     * {@code ParseException}, which was resolving to
+     * {@code com.codename1.l10n.ParseException}.
+     */
+    private String exceptionUrl(ExecutableElement member, String name) {
+        String wanted = simpleName(name);
+        for (TypeMirror thrown : member.getThrownTypes()) {
+            if (thrown instanceof DeclaredType declared
+                    && declared.asElement() instanceof TypeElement element
+                    && (element.getQualifiedName().contentEquals(name)
+                        || element.getSimpleName().contentEquals(wanted))) {
+                return documented.containsKey(element.getQualifiedName().toString())
+                        ? Refs.typeUrl(element) : null;
+            }
+        }
+        return urlOfTypeNamed(name);
     }
 
     /** The last segment of a dotted name. */
@@ -677,7 +701,7 @@ public final class HugoDoclet implements Doclet {
 
             TypeElement owner = reference.type().isEmpty()
                     ? context
-                    : lookupType(reference.type());
+                    : lookupType(reference.type(), context);
             String url = null;
             if (owner != null) {
                 url = reference.member().isEmpty()
@@ -696,11 +720,32 @@ public final class HugoDoclet implements Doclet {
         return out;
     }
 
-    /** A documented type named either fully or by its simple name. */
-    private TypeElement lookupType(String name) {
+    /**
+     * A documented type named either fully or by its simple name.
+     *
+     * <p>A simple name is ambiguous across the API and the first match in
+     * iteration order is not an answer: {@code List} is both
+     * {@code com.codename1.ui.List} and {@code java.util.List}, and
+     * {@code java.util.AbstractList} referring to {@code List#size} was being
+     * sent to the UI widget. The link resolves, so the internal link check
+     * cannot see it -- only reading the page shows it is the wrong class.
+     *
+     * <p>The package the reference was written in decides, which is what the
+     * language would do with an unqualified name.
+     */
+    private TypeElement lookupType(String name, TypeElement context) {
         TypeElement exact = documented.get(name);
         if (exact != null) {
             return exact;
+        }
+        if (context != null) {
+            PackageElement pkg = Refs.packageOf(context);
+            if (pkg != null) {
+                TypeElement sibling = documented.get(pkg.getQualifiedName() + "." + name);
+                if (sibling != null) {
+                    return sibling;
+                }
+            }
         }
         String suffix = "." + name;
         for (Map.Entry<String, TypeElement> entry : documented.entrySet()) {

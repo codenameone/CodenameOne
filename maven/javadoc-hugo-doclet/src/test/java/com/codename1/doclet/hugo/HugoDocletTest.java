@@ -174,11 +174,50 @@ class HugoDocletTest {
                 "class Ignored {}",
                 ""), StandardCharsets.UTF_8);
 
+        // Two packages each holding a type called Shared, and a referrer in each
+        // that names it without qualifying. Whichever type a global search
+        // happens to reach first, it cannot satisfy both assertions -- which is
+        // what makes this test bite. An earlier version compared against one
+        // package only and passed with the fix removed.
+        Files.writeString(sources.resolve("Shared.java"), String.join("\n",
+                "package p;",
+                "/// The p one.",
+                "public class Shared {}",
+                ""), StandardCharsets.UTF_8);
+        Files.writeString(sources.resolve("UsesShared.java"), String.join("\n",
+                "package p;",
+                "/// Refers to Shared without qualifying it.",
+                "///",
+                "/// #### See also",
+                "///",
+                "/// - Shared",
+                "public class UsesShared {}",
+                ""), StandardCharsets.UTF_8);
+
+        Path other = workspace.resolve("src/q");
+        Files.createDirectories(other);
+        Files.writeString(other.resolve("Shared.java"), String.join("\n",
+                "package q;",
+                "/// The q one.",
+                "public class Shared {}",
+                ""), StandardCharsets.UTF_8);
+        Files.writeString(other.resolve("UsesShared.java"), String.join("\n",
+                "package q;",
+                "/// Refers to Shared without qualifying it.",
+                "///",
+                "/// #### See also",
+                "///",
+                "/// - Shared",
+                "public class UsesShared {}",
+                ""), StandardCharsets.UTF_8);
+
         DocumentationTool tool = ToolProvider.getSystemDocumentationTool();
         try (StandardJavaFileManager files = tool.getStandardFileManager(null, null, null)) {
             Iterable<? extends JavaFileObject> units = files.getJavaFileObjects(
                     sources.resolve("Sample.java"), sources.resolve("Other.java"),
-                    sources.resolve("Child.java"));
+                    sources.resolve("Child.java"),
+                    sources.resolve("Shared.java"), sources.resolve("UsesShared.java"),
+                    other.resolve("Shared.java"), other.resolve("UsesShared.java"));
             boolean ok = tool.getTask(null, files, null, HugoDoclet.class,
                     List.of("-d", content.toString(),
                             "-sourcepath", workspace.resolve("src").toString(),
@@ -361,6 +400,21 @@ class HugoDocletTest {
         String page = page("Child.md");
         assertTrue(page.contains("\"inheritedFields\""), "the block exists");
         assertTrue(page.contains("ALIGN"), "and carries the inherited constant");
+    }
+
+    @Test
+    void resolvesASimpleTypeNameInItsOwnPackageFirst() throws IOException {
+        // "List" is both com.codename1.ui.List and java.util.List, and
+        // java.util.AbstractList referring to "List#size" was sent to the UI
+        // widget. The link resolved, so no link check could see it -- only
+        // reading the page showed it was the wrong class.
+        String fromP = Files.readString(content.resolve("p/UsesShared.md"), StandardCharsets.UTF_8);
+        assertTrue(fromP.contains("/javadoc/p/Shared.html"), "p sees p.Shared");
+        assertFalse(fromP.contains("/javadoc/q/Shared.html"), "and not q.Shared");
+
+        String fromQ = Files.readString(content.resolve("q/UsesShared.md"), StandardCharsets.UTF_8);
+        assertTrue(fromQ.contains("/javadoc/q/Shared.html"), "q sees q.Shared");
+        assertFalse(fromQ.contains("/javadoc/p/Shared.html"), "and not p.Shared");
     }
 
     @Test

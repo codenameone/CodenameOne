@@ -80,8 +80,27 @@ final class Literals {
         if (constant instanceof Long) {
             return constant + "L";
         }
-        if (constant instanceof Float) {
-            return constant + "f";
+        // Infinity and NaN have no literal spelling in Java, so toString gives
+        // text no source could contain. javadoc writes the expression that
+        // produces the value, and so does this: Numeric.min() and Numeric.max()
+        // default to negative and positive infinity.
+        if (constant instanceof Double value) {
+            if (value.isNaN()) {
+                return "0.0/0.0";
+            }
+            if (value.isInfinite()) {
+                return value > 0 ? "1.0/0.0" : "-1.0/0.0";
+            }
+            return String.valueOf(value);
+        }
+        if (constant instanceof Float value) {
+            if (value.isNaN()) {
+                return "0.0f/0.0f";
+            }
+            if (value.isInfinite()) {
+                return value > 0 ? "1.0f/0.0f" : "-1.0f/0.0f";
+            }
+            return value + "f";
         }
         return String.valueOf(constant);
     }
