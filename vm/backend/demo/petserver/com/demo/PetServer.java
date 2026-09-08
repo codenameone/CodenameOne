@@ -135,9 +135,9 @@ public class PetServer {
                     pool.close();
                 }
                 System.out.println("stopped");
-                // stop() only unblocks the reactor loop; the process still has to
-                // end, and every remaining thread is detached.
-                System.exit(0);
+                // Signals ends the process once this returns. Exiting from here
+                // would deadlock under the JavaSE implementation, where the same
+                // body runs from a JVM shutdown hook.
             }
         });
         // Hold main here. The reactor and workers are detached threads, so a main

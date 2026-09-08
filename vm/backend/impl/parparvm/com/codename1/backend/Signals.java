@@ -64,6 +64,12 @@ public final class Signals {
                     System.out.println("signal " + signo + " received, shutting down");
                 }
                 body.run();
+                // Here rather than in body: stopping the server only unblocks the
+                // reactor, and every other thread is detached, so something has to
+                // end the process. Callers must NOT do this themselves -- the same
+                // body runs from a JVM shutdown hook under the JavaSE
+                // implementation, where exiting deadlocks.
+                System.exit(0);
             }
         });
         t.start();

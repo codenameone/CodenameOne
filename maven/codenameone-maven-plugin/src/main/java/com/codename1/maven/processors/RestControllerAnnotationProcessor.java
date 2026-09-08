@@ -97,6 +97,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
 
     private final TreeMap<String, Controller> controllers = new TreeMap<String, Controller>();
 
+    /**
+     * Every route shape seen so far, across every controller, to the method that
+     * claimed it. Kept beside `controllers` rather than inside one, because the
+     * generated bootstrap chains the routers and returns the first non-null
+     * response: two controllers colliding makes the later one unreachable in
+     * exactly the way two methods in one controller do.
+     */
+    private final Map<String, String> routeShapes = new LinkedHashMap<String, String>();
+
     private static final class Controller {
         String binaryName;
         String packageName;
@@ -219,22 +228,26 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      * and `GET /notes/{name}` are one shape. The generated router tests the
      * branches in order and returns from the first, which left the second method
      * permanently unreachable with nothing at build time or run time saying so.
+     *
+     * The shapes are held across controllers, not just within one: the bootstrap
+     * chains the routers and takes the first non-null response, so a collision
+     * between two controllers is unreachable in precisely the same way.
      */
     private boolean routeShapesAreDistinct(AnnotatedClass cls, Controller controller,
             ProcessorContext ctx) {
-        Map<String, String> byShape = new LinkedHashMap<String, String>();
         for (int i = 0; i < controller.routes.size(); i++) {
             Route route = controller.routes.get(i);
             String shape = route.httpMethod + " " + route.pattern.replaceAll("\\{[^}]*\\}", "{}");
-            String first = byShape.get(shape);
+            String first = routeShapes.get(shape);
             if (first != null) {
                 ctx.error(cls, controller.binaryName + "." + route.javaMethod + " and " + first
-                        + " both answer " + shape + ", which differ only in the names of "
-                        + "their path variables. The router matches in order, so the second "
-                        + "can never run. Give them different paths or one method.");
+                        + " both answer " + shape + ". A path variable's NAME is not part of "
+                        + "what a request carries, so nothing can tell them apart; the routers "
+                        + "are tried in order and the second can never run. Give them different "
+                        + "paths, or one method.");
                 return false;
             }
-            byShape.put(shape, route.javaMethod);
+            routeShapes.put(shape, controller.binaryName + "." + route.javaMethod);
         }
         return true;
     }
@@ -888,9 +901,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("        }, null);\n");
         sb.append("        com.codename1.backend.Signals.onShutdown(new Runnable() {\n");
         sb.append("            public void run() {\n");
-        sb.append("                // Stop accepting, let what is in flight finish, then leave.\n");
+        sb.append("                // Stop accepting and let what is in flight finish.\n");
+        sb.append("                // Signals ends the process; exiting from here would\n");
+        sb.append("                // deadlock the JVM shutdown hook this runs from.\n");
         sb.append("                server.stop(10000);\n");
-        sb.append("                System.exit(0);\n");
         sb.append("            }\n");
         sb.append("        });\n");
         sb.append("        // Required: the host threads are detached, so a main that returned\n");

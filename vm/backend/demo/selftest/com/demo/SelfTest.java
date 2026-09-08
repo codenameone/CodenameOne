@@ -387,6 +387,20 @@ public class SelfTest {
         check("unicode escapes decode", "\u00e9",
                 String.valueOf(Json.parseObject("{\"s\":\"\\u00e9\"}").get("s")));
 
+        // RFC 8259 requires anything below U+0020 to arrive escaped. Accepting a
+        // literal one let this parser and whatever validates upstream disagree
+        // about where the string ended.
+        boolean refusedControl = false;
+        try {
+            Json.parseObject("{\"s\":\"a\nb\"}");
+        } catch (Exception expected) {
+            refusedControl = true;
+        }
+        check("a raw control character in a string is refused", "true",
+                String.valueOf(refusedControl));
+        check("the same character escaped is accepted", "a\nb",
+                String.valueOf(Json.parseObject("{\"s\":\"a\\nb\"}").get("s")));
+
         Map out = new LinkedHashMap();
         out.put("q", "a\"b");
         out.put("n", new Long(5));

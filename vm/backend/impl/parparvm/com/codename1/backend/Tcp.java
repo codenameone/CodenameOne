@@ -82,6 +82,26 @@ public final class Tcp {
         tls = session;
     }
 
+    /**
+     * Refuses a slice that does not lie inside the array.
+     *
+     * recv() and SSL_read() index the array straight through the pointer they are
+     * given, and ParparVM adds no bounds check of its own, so a bad offset here is
+     * a native read or write of whatever is next in the heap rather than an
+     * exception. The JavaSE implementation gets this free from the stream API,
+     * which is why the same code is safe on the simulator and unsafe only once it
+     * is packaged. The subtraction avoids the overflow `offset + length` has.
+     */
+    private static void checkRange(byte[] buffer, int offset, int length) {
+        if(buffer == null) {
+            throw new NullPointerException("buffer");
+        }
+        if(offset < 0 || length < 0 || length > buffer.length - offset) {
+            throw new IndexOutOfBoundsException("offset " + offset + ", length "
+                    + length + ", buffer " + buffer.length);
+        }
+    }
+
     /** Whether this connection is encrypted. */
     public boolean isSecure() {
         return tls != 0;
@@ -92,6 +112,7 @@ public final class Tcp {
      */
     public int read(byte[] buffer, int offset, int length) throws IOException {
         checkOpen();
+        checkRange(buffer, offset, length);
         int n = tls == 0 ? readImpl(handle, buffer, offset, length)
                          : tlsReadImpl(tls, buffer, offset, length);
         if(n < -1) {
@@ -102,6 +123,7 @@ public final class Tcp {
 
     public void write(byte[] buffer, int offset, int length) throws IOException {
         checkOpen();
+        checkRange(buffer, offset, length);
         int n = tls == 0 ? writeImpl(handle, buffer, offset, length)
                          : tlsWriteImpl(tls, buffer, offset, length);
         if(n != length) {

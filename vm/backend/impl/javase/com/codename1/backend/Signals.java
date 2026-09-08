@@ -58,6 +58,16 @@ public final class Signals {
         }
     }
 
+    /**
+     * Runs body from a JVM shutdown hook.
+     *
+     * The hook RETURNS when body is done, and body must not call System.exit:
+     * exiting from inside a shutdown hook blocks forever, because System.exit
+     * waits for the shutdown it is already part of. The JVM ends on its own once
+     * every hook has returned, so there is nothing left to do here. The ParparVM
+     * implementation of this method does have to end the process, which is why
+     * that belongs in these two files and not in any caller.
+     */
     public static void onShutdown(final Runnable body) {
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
             public void run() {

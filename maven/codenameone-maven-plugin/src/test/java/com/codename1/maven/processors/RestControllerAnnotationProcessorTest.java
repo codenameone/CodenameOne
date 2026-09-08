@@ -282,6 +282,31 @@ public class RestControllerAnnotationProcessorTest {
         assertTrue(all, all.indexOf("can never run") >= 0);
     }
 
+    @Test
+    public void twoControllersOfTheSameShapeAreRefused() throws Exception {
+        // The bootstrap chains the routers and returns the first non-null answer,
+        // so a collision ACROSS controllers hides the later one exactly as a
+        // collision inside one does. Checking each controller alone missed it.
+        ProcessorContext ctx = run(compileBoth(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/notes/{id}\")\n"
+                + "    public String byId(@PathVariable(\"id\") String id) { return id; }\n"
+                + "}\n",
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Other {\n"
+                + "    @GetMapping(\"/notes/{name}\")\n"
+                + "    public String byName(@PathVariable(\"name\") String name) { return name; }\n"
+                + "}\n"));
+        assertTrue("a shape claimed by two controllers should not compile", ctx.hasErrors());
+        String all = ctx.getErrors().toString();
+        assertTrue(all, all.indexOf("can never run") >= 0);
+    }
+
     private static final class Router {
         private final Object instance;
         private final Method handle;
@@ -380,6 +405,16 @@ public class RestControllerAnnotationProcessorTest {
         Map<String, String> sources = new LinkedHashMap<String, String>();
         sources.put(controllerSource.indexOf("class Notes") >= 0
                 ? "com.example.Notes" : "com.example.Bad", controllerSource);
+        JavaSourceCompiler.compile(sources, classes, backendClasspath());
+        return classes;
+    }
+
+    /** Compiles two controllers into one output, the way a real project has them. */
+    private File compileBoth(String first, String second) throws Exception {
+        File classes = tmp.newFolder();
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.example.Notes", first);
+        sources.put("com.example.Other", second);
         JavaSourceCompiler.compile(sources, classes, backendClasspath());
         return classes;
     }

@@ -224,7 +224,7 @@ public class Bench {
         Signals.onShutdown(new Runnable() {
             public void run() {
                 server.stop(2000);
-                System.exit(0);
+                // Signals ends the process; see PetServer for why not here.
             }
         });
         server.awaitTermination();

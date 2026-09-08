@@ -184,6 +184,14 @@ public final class Json {
                 return out.toString();
             }
             if(c != '\\') {
+                // RFC 8259: everything below U+0020 has to arrive escaped. Taking
+                // it literally accepted documents that a conforming parser -- or
+                // whatever validates upstream of this one -- rejects, which is
+                // how the two disagree about where a string ends.
+                if(c < 0x20) {
+                    throw new IOException("A control character must be escaped in a "
+                            + "JSON string, at offset " + (pos - 1));
+                }
                 out.append(c);
                 continue;
             }
