@@ -2434,7 +2434,14 @@ static JAVA_BOOLEAN cn1RefRecoverEmergency(CODENAME_ONE_THREAD_STATE) {
 static JAVA_BOOLEAN cn1GcRetainAllReferences(CODENAME_ONE_THREAD_STATE) {
     JAVA_BOOLEAN marked = JAVA_FALSE;
     for(;;) {
+        // BOTH COUNTERS, because discovery has two ways to make progress. The drain can
+        // reach a reference whose referent the emergency path clears on the spot, and that
+        // path deliberately does NOT append to the discovery list -- it exists because the
+        // list could not grow. Watching only cn1RefDiscoveredTop therefore reads "nothing
+        // new" while a fresh recovery slot has just been filled, and the loop leaves
+        // without marking the referent it holds.
         long before = cn1RefDiscoveredTop;
+        long beforeEmergency = atomic_load_explicit(&cn1RefEmergencyTop, memory_order_relaxed);
         JAVA_BOOLEAN round = JAVA_FALSE;
         for(long i = 0 ; i < before ; i++) {
             JAVA_OBJECT r = __atomic_load_n(cn1RefDiscovered[i].referentField, __ATOMIC_RELAXED);
@@ -2455,7 +2462,8 @@ static JAVA_BOOLEAN cn1GcRetainAllReferences(CODENAME_ONE_THREAD_STATE) {
             marked = JAVA_TRUE;
             gcMarkDrain(threadStateData);
         }
-        if(cn1RefDiscoveredTop == before) {
+        if(cn1RefDiscoveredTop == before
+           && atomic_load_explicit(&cn1RefEmergencyTop, memory_order_relaxed) == beforeEmergency) {
             return marked;
         }
     }
