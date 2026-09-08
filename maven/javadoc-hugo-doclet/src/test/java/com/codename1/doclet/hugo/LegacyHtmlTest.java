@@ -1,0 +1,94 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.doclet.hugo;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
+
+/** Cases taken from the 13 core sources that still carry HTML in their comments. */
+class LegacyHtmlTest {
+
+    @Test
+    void convertsAListSoItSurvives() {
+        // com.codename1.gaming.physics.box2d.common.Settings. The whole list of
+        // tuning values disappeared from the page.
+        String out = LegacyHtml.convert("Good lerp precision\n<ul>\n<li>.0092</li>\n<li>.008201</li>\n</ul>");
+        assertTrue(out.contains("- .0092"), out);
+        assertTrue(out.contains("- .008201"), out);
+        assertFalse(out.contains("<li>"), "the tag itself must not survive");
+    }
+
+    @Test
+    void convertsParagraphsAndBreaks() {
+        assertTrue(LegacyHtml.convert("<p>Euler angles are in degrees.").contains("Euler angles"));
+        assertTrue(LegacyHtml.convert("one</br>two").contains("one\ntwo"));
+    }
+
+    @Test
+    void convertsInlineEmphasis() {
+        assertEquals("**bold** and *thin*", LegacyHtml.convert("<b>bold</b> and <i>thin</i>"));
+    }
+
+    @Test
+    void levelsHeadingsDownSoTheyDoNotOutrankThePage() {
+        String out = LegacyHtml.convert("<h2>Start at the level you need</h2>");
+        assertTrue(out.contains("#### Start at the level you need"), out);
+    }
+
+    @Test
+    void escapesATagCarryingAttributes() {
+        // com.codename1.util.regex.RE documents a substitution string. Rendering
+        // it would turn the example into a link; dropping it loses the example.
+        String out = LegacyHtml.convert("the substitution String \"<a href=\\\"$0\\\">$0</a>\"");
+        assertTrue(out.contains("&lt;a href="), out);
+        assertFalse(out.contains("<a href="), "must never become real markup");
+    }
+
+    @Test
+    void escapesTagsThatAreReallyPlaceholders() {
+        // PushBuilder writes <metadata>;<body> to mean one value then another.
+        String out = LegacyHtml.convert("Push callback will receive <metadata>;<body>.");
+        assertTrue(out.contains("&lt;metadata&gt;;&lt;body&gt;")
+                || out.contains("&lt;metadata>;&lt;body>"), out);
+    }
+
+    @Test
+    void leavesFencedCodeAlone() {
+        String source = "before\n```java\nString s = \"<b>not markup</b>\";\n```\nafter";
+        assertEquals(source, LegacyHtml.convert(source));
+    }
+
+    @Test
+    void leavesCodeSpansAlone() {
+        assertEquals("use `<p>` here", LegacyHtml.convert("use `<p>` here"));
+    }
+
+    @Test
+    void passesThroughABodyWithNoHtml() {
+        String source = "Just prose with a < b comparison.";
+        assertEquals(source, LegacyHtml.convert(source));
+    }
+}

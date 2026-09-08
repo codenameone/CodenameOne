@@ -117,7 +117,10 @@ final class DocReader {
         }
 
         DocTreePath path = pathOf(element, comment);
-        doc.description = renderer.render(comment.getFullBody(), path);
+        // Goldmark drops raw HTML rather than rendering it, so the leftovers in
+        // the comments that were converted to markdown have to be dealt with
+        // before anything else reads the body.
+        doc.description = LegacyHtml.convert(renderer.render(comment.getFullBody(), path));
 
         MarkdownSections.Result sections = MarkdownSections.parse(doc.description);
         doc.description = sections.description();
@@ -148,6 +151,14 @@ final class DocReader {
      *
      * <p>Only ever sets the flag. A comment that documented a deprecation keeps
      * whatever text it gave.
+     *
+     * <p>Note the site marks 299 more members deprecated than the standard pages
+     * do, and that is correct rather than a leak. Those carry a
+     * {@code #### Deprecated} section, which the standard doclet renders as an
+     * ordinary heading inside the description because it cannot see the
+     * convention -- the same reason it shows no parameter tables. Measured: every
+     * one of the 299 has deprecation text, and none is an undocumented override
+     * inheriting the flag from its parent.
      */
     private void markAnnotationDeprecation(Element element, ElementDoc doc) {
         if (elements.isDeprecated(element)) {
