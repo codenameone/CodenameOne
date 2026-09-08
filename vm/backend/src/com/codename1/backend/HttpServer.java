@@ -2697,8 +2697,15 @@ public final class HttpServer {
             }
             int nameStart = at;
             int nameEnd = colon;
-            while(nameEnd > nameStart && isSpace(raw[nameEnd - 1])) {
-                nameEnd--;
+            // RFC 9112 5.1: no whitespace between the field name and the colon, and
+            // a server MUST reject a message that has it. Trimming it instead made
+            // "Content-Length : 5" a valid Content-Length here while an intermediary
+            // in front either rejects that line or reads it as a different field.
+            // Two parsers disagreeing about which headers a request carries is how a
+            // request is smuggled, which is why the obsolete line folding above is
+            // refused rather than joined up.
+            if(nameEnd > nameStart && isSpace(raw[nameEnd - 1])) {
+                throw new ProtocolException(400, "whitespace before header colon");
             }
             int valueStart = colon + 1;
             int valueEnd = end;
@@ -2738,6 +2745,7 @@ public final class HttpServer {
 
         int contentLengthAt = -1;
         boolean chunked = false;
+        String transferEncoding = null;
         for(int iter = 0 ; iter < headerCount ; iter++) {
             int base = iter * 4;
             if(sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], CONTENT_LENGTH_BYTES)) {
@@ -2751,9 +2759,23 @@ public final class HttpServer {
                 contentLengthAt = base;
             } else if(sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1],
                                             TRANSFER_ENCODING_BYTES)) {
-                chunked = sliceContainsIgnoreCase(raw, slices[base + 2], slices[base + 3],
-                                                  "chunked");
+                // Every instance, in order, joined with commas. RFC 9110 5.3 makes
+                // repeated fields mean the same as one field holding the joined
+                // list, and framing has to be decided on the whole list: assigning
+                // per field let a second Transfer-Encoding overwrite the first, so
+                // "chunked" followed by anything else fell back to Content-Length
+                // here while a proxy in front still framed it as chunked.
+                String value = asciiString(raw, slices[base + 2], slices[base + 3]);
+                transferEncoding = transferEncoding == null ? value
+                        : transferEncoding + "," + value;
             }
+        }
+        if(transferEncoding != null) {
+            // RFC 9112 6.1: chunked MUST be the final coding, and a server that
+            // cannot decode the rest MUST NOT guess at the framing. An unsupported
+            // coding, chunked twice, or chunked in the middle all mean this server
+            // and the next hop could choose different message boundaries.
+            chunked = requireChunkedIsFinalCoding(transferEncoding);
         }
         // RFC 9112: an HTTP/1.1 request MUST carry Host, and a server MUST reject
         // one that does not. Routing on a name the client never sent is how a
@@ -3098,6 +3120,43 @@ public final class HttpServer {
             out[iter] = (byte)value.charAt(iter);
         }
         return out;
+    }
+
+    /**
+     * True when the joined Transfer-Encoding list ends in `chunked` and carries
+     * nothing this server cannot decode.
+     *
+     * Throws rather than returning false for a list it will not act on: silently
+     * ignoring a coding leaves the body to be read as the next request on the
+     * connection, which is the smuggling case this exists to close.
+     */
+    private static boolean requireChunkedIsFinalCoding(String value)
+            throws ProtocolException {
+        String[] codings = splitOn(value, ',');
+        int seen = 0;
+        for(int iter = 0 ; iter < codings.length ; iter++) {
+            String coding = codings[iter].trim();
+            // A transfer coding may carry parameters after a semicolon; the coding
+            // itself is what decides the framing.
+            int semi = coding.indexOf(';');
+            if(semi >= 0) {
+                coding = coding.substring(0, semi).trim();
+            }
+            if(coding.length() == 0) {
+                continue;
+            }
+            if(!"chunked".equalsIgnoreCase(coding)) {
+                throw new ProtocolException(501, "unsupported transfer coding");
+            }
+            if(iter != codings.length - 1) {
+                throw new ProtocolException(400, "chunked is not the final transfer coding");
+            }
+            seen++;
+        }
+        if(seen == 0) {
+            throw new ProtocolException(400, "empty Transfer-Encoding");
+        }
+        return true;
     }
 
     private static boolean isSpace(byte b) {

@@ -260,7 +260,20 @@ public class BackendPackageMojo extends AbstractMojo {
         command.add(compilerJar.getAbsolutePath());
         command.add("com.codename1.tools.translator.ByteCodeTranslator");
         command.add("clean");
-        command.add(javaApi.getAbsolutePath() + ";" + classes.getAbsolutePath());
+        // The module's dependencies belong on the translator's input, not only on
+        // javac's classpath. Without them a backend that uses a type from another
+        // module -- the shared contract or DTO module the generated project
+        // recommends -- compiles here and then fails to translate, because javac
+        // resolved the type from a jar whose bytecode the translator never sees.
+        // The runtime is excluded for the same reason it is excluded from javac's
+        // classpath: its sources are compiled into `classes` already.
+        StringBuilder translatorInput = new StringBuilder();
+        translatorInput.append(javaApi.getAbsolutePath())
+                .append(';').append(classes.getAbsolutePath());
+        for (String element : compileClasspathWithoutRuntime()) {
+            translatorInput.append(';').append(element);
+        }
+        command.add(translatorInput.toString());
         command.add(translated.getAbsolutePath());
         command.add(simpleName);
         command.add(packageName);

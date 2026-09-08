@@ -467,13 +467,26 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         if ("java.lang.String".equals(javaType)) return "bodyAsString(body)";
         if (javaType.startsWith("java.util.List<") || javaType.startsWith("java.util.Set<")) {
             String element = javaType.substring(javaType.indexOf('<') + 1, javaType.length() - 1);
+            // A Set parameter has to receive a Set. bodyAsList hands back an
+            // ArrayList, and casting that to Set is exactly the cast the comment
+            // above warns about: the JVM throws ClassCastException before the
+            // handler runs, and the translated target does not check at all, so it
+            // carries an ArrayList in a Set-typed field until something reads it as
+            // one. setFromList converts instead of asserting.
+            boolean isSet = javaType.startsWith("java.util.Set<");
+            String decoded;
             if (element.startsWith("java.")) {
-                return "(" + javaType + ")(Object)bodyAsList(body)";
+                decoded = "bodyAsList(body)";
+            } else {
+                decoded = "listFromMaps(bodyAsList(body), new FromMap() {\n"
+                        + "                public Object convert(java.util.Map m) { return "
+                        + codecFor(element) + ".fromMap(m); }\n"
+                        + "            })";
             }
-            return "(" + javaType + ")(Object)listFromMaps(bodyAsList(body), new FromMap() {\n"
-                    + "                public Object convert(java.util.Map m) { return "
-                    + codecFor(element) + ".fromMap(m); }\n"
-                    + "            })";
+            if (isSet) {
+                decoded = "setFromList(" + decoded + ")";
+            }
+            return "(" + javaType + ")(Object)" + decoded;
         }
         // A primitive or boxed scalar goes through the same text conversion the
         // query and path parameters use, so a JSON number reaching an `int` body
@@ -626,20 +639,39 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("    private static String decode(String value) {\n");
         sb.append("        if(value == null) return null;\n");
         sb.append("        if(value.indexOf('%') < 0 && value.indexOf('+') < 0) return value;\n");
+        // A run of escapes is one UTF-8 sequence, not one character each. Appending
+        // %C3%A9 as two chars produced "\u00c3\u00a9" where the client sent one
+        // accented letter, so consecutive escapes are gathered as bytes and decoded
+        // together.
         sb.append("        StringBuilder out = new StringBuilder();\n");
+        sb.append("        byte[] pending = new byte[value.length()];\n");
+        sb.append("        int pendingLen = 0;\n");
         sb.append("        for(int i = 0 ; i < value.length() ; i++) {\n");
         sb.append("            char c = value.charAt(i);\n");
-        sb.append("            if(c == '+') { out.append(' '); continue; }\n");
         sb.append("            if(c == '%' && i + 2 < value.length()) {\n");
         sb.append("                try {\n");
-        sb.append("                    out.append((char)Integer.parseInt(value.substring(i + 1, i + 3), 16));\n");
+        sb.append("                    pending[pendingLen++] = (byte)Integer.parseInt(value.substring(i + 1, i + 3), 16);\n");
         sb.append("                    i += 2;\n");
         sb.append("                    continue;\n");
         sb.append("                } catch (NumberFormatException err) { }\n");
         sb.append("            }\n");
+        sb.append("            if(pendingLen > 0) {\n");
+        sb.append("                out.append(decodeUtf8(pending, pendingLen));\n");
+        sb.append("                pendingLen = 0;\n");
+        sb.append("            }\n");
+        sb.append("            if(c == '+') { out.append(' '); continue; }\n");
         sb.append("            out.append(c);\n");
         sb.append("        }\n");
+        sb.append("        if(pendingLen > 0) out.append(decodeUtf8(pending, pendingLen));\n");
         sb.append("        return out.toString();\n");
+        sb.append("    }\n\n");
+        sb.append("    /** The gathered escape bytes as text. Malformed input keeps its bytes rather than throwing. */\n");
+        sb.append("    private static String decodeUtf8(byte[] bytes, int length) {\n");
+        sb.append("        try {\n");
+        sb.append("            return new String(bytes, 0, length, \"UTF-8\");\n");
+        sb.append("        } catch (java.io.UnsupportedEncodingException err) {\n");
+        sb.append("            return new String(bytes, 0, length);\n");
+        sb.append("        }\n");
         sb.append("    }\n\n");
         sb.append("    // A missing text value binds to 0 / null rather than throwing: an absent\n");
         sb.append("    // optional query parameter is not a server error.\n");
@@ -762,6 +794,13 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         if ("java.lang.Long".equals(type))    return "asBoxedLong(" + expr + ")";
         if ("java.lang.Double".equals(type))  return "asBoxedDouble(" + expr + ")";
         if ("java.lang.Boolean".equals(type)) return "asBoxedBoolean(" + expr + ")";
+        // Float, Short and Byte need the same treatment as the three above. The JSON
+        // reader only ever produces Long or Double, so leaving them to guardedCast
+        // meant an instanceof against the declared wrapper that never matched, and
+        // the field silently arrived null with the client's value discarded.
+        if ("java.lang.Float".equals(type))   return "asBoxedFloat(" + expr + ")";
+        if ("java.lang.Short".equals(type))   return "asBoxedShort(" + expr + ")";
+        if ("java.lang.Byte".equals(type))    return "asBoxedByte(" + expr + ")";
         // Anything else out of java.* is narrowed with instanceof rather than cast:
         // the value came from the wire, so its type is the client's choice.
         if (type.startsWith("java.")) return guardedCast(type, expr);
@@ -780,9 +819,16 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("    private static Long asBoxedLong(Object v) { return v == null ? null : Long.valueOf(asLong(v)); }\n");
         sb.append("    private static Double asBoxedDouble(Object v) { return v == null ? null : Double.valueOf(asDouble(v)); }\n");
         sb.append("    private static Boolean asBoxedBoolean(Object v) { return v == null ? null : Boolean.valueOf(asBoolean(v)); }\n");
+        sb.append("    private static Float asBoxedFloat(Object v) { return v == null ? null : Float.valueOf((float)asDouble(v)); }\n");
+        sb.append("    private static Short asBoxedShort(Object v) { return v == null ? null : Short.valueOf((short)asInt(v)); }\n");
+        sb.append("    private static Byte asBoxedByte(Object v) { return v == null ? null : Byte.valueOf((byte)asInt(v)); }\n");
         sb.append("    /** A decoded value narrowed to a JSON object, or null -- never a cast. */\n");
         sb.append("    private static java.util.Map asMap(Object v) { return v instanceof java.util.Map ? (java.util.Map)v : null; }\n");
         sb.append("    private static java.util.List asList(Object v) { return v instanceof java.util.List ? (java.util.List)v : null; }\n");
+        sb.append("    /** A decoded array as a Set, preserving the order it arrived in. */\n");
+        sb.append("    private static java.util.Set setFromList(java.util.List v) {\n");
+        sb.append("        return v == null ? null : new java.util.LinkedHashSet(v);\n");
+        sb.append("    }\n");
         sb.append("    private interface ToMapFn { java.util.Map convert(Object o); }\n");
         sb.append("    private interface FromMapFn { Object convert(java.util.Map m); }\n");
         sb.append("    private static java.util.List toValueList(java.util.Collection raw) {\n");

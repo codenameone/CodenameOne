@@ -88,7 +88,13 @@ public final class StaticFiles implements HttpServer.Handler {
             target = target.substring(0, q);
         }
         if(prefix.length() > 0) {
-            if(!target.startsWith(prefix)) {
+            // The prefix has to end on a segment boundary. startsWith alone let
+            // /assets2/logo.png match a prefix of /assets, strip to /2/logo.png and
+            // be served from the document root, which is a different URL namespace
+            // than the one this handler was mounted on.
+            if(!target.startsWith(prefix)
+                    || (target.length() > prefix.length()
+                        && target.charAt(prefix.length()) != '/')) {
                 return null; // not ours; let the caller 404 it
             }
             target = target.substring(prefix.length());

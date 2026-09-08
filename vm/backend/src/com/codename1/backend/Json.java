@@ -447,7 +447,13 @@ public final class Json {
             writeString(out, (String)value);
             return;
         }
-        if(value instanceof Boolean || value instanceof Integer || value instanceof Long) {
+        // Short and Byte belong here with the other integral types. The ByteSink
+        // writer already treats them as numbers, and leaving them out here sent
+        // them to the quoting branch below, so Json.write(Short) produced "1"
+        // where the sink produced 1 -- the same value with a different JSON type
+        // depending on which writer the caller reached.
+        if(value instanceof Boolean || value instanceof Integer || value instanceof Long
+                || value instanceof Short || value instanceof Byte) {
             out.append(value.toString());
             return;
         }

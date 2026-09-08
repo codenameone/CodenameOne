@@ -83,6 +83,19 @@ class BackendJavaSeRuntimeTest {
         int[] status = new int[1];
         String output = BackendTestSupport.runBackendScript(command, env, 600, status);
 
+        // generate-contract.sh needs codenameone-core and the maven plugin in the
+        // local repository, and says so by name rather than letting maven fail on an
+        // artifact nobody asked for. A job that has not installed them has an
+        // environment gap rather than a broken runtime, so it is skipped the same way
+        // the database tests skip without their service containers -- and
+        // CN1_BACKEND_REQUIRED still turns that skip into a failure where the backend
+        // is meant to be exercised.
+        if (output.indexOf("Install it first:") >= 0) {
+            BackendTestSupport.skipOrFail(
+                    "the local Maven repository has no codenameone-core to build the "
+                            + "contract against:\n" + output);
+        }
+
         assertTrue(output.indexOf("SELFTEST OK") >= 0,
                 "the local Java SE runtime reported failures:\n" + output);
         assertEquals(0, status[0], output);
