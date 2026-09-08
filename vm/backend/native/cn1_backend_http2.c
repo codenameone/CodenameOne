@@ -45,6 +45,9 @@
 #include <nghttp2/nghttp2.h>
 
 #define CN1_H2_MAX_HEADERS 64
+/* Mirrors HttpServer.MAX_BODY_BYTES: the HTTP/1 paths refuse a larger body and
+   HTTP/2 must agree, or the limit is only as good as the protocol chosen. */
+#define CN1_H2_MAX_BODY_BYTES (8 * 1024 * 1024)
 
 typedef struct CN1H2Header {
     char* name;
@@ -66,6 +69,25 @@ typedef struct CN1H2Request {
     struct CN1H2Request* next;
 } CN1H2Request;
 
+/*
+ * One response body, owned by the stream that is sending it.
+ *
+ * This used to be a single buffer on the session, and nghttp2 reads a body AFTER
+ * submit returns, while it pumps output. serveHttp2 submits every finished
+ * response before it drains, so with two streams completing in one receive cycle
+ * the second submit freed the first one's buffer and reset the shared offset:
+ * whichever body was submitted last got sent for both streams, or an empty one
+ * did. The provider's own source pointer is what nghttp2 offers for exactly this,
+ * and the session keeps the list so a stream reset before EOF still frees.
+ */
+typedef struct CN1H2Body {
+    int32_t streamId;
+    unsigned char* data;
+    size_t length;
+    size_t offset;
+    struct CN1H2Body* next;
+} CN1H2Body;
+
 typedef struct {
     nghttp2_session* session;
     /* Streams still being received, and requests ready for Java to take. */
@@ -77,11 +99,33 @@ typedef struct {
     unsigned char* out;
     size_t outLength;
     size_t outCapacity;
-    /* A response body has to outlive the submit call; nghttp2 reads it later. */
-    unsigned char* pendingBody;
-    size_t pendingBodyLength;
-    size_t pendingBodyOffset;
+    /* Response bodies still being written, one per stream. See CN1H2Body. */
+    struct CN1H2Body* bodies;
 } CN1H2Session;
+
+static void cn1H2ReleaseBody(CN1H2Session* s, CN1H2Body* body) {
+    CN1H2Body** link = &s->bodies;
+    while(*link != NULL) {
+        if(*link == body) {
+            *link = body->next;
+            break;
+        }
+        link = &(*link)->next;
+    }
+    free(body->data);
+    free(body);
+}
+
+static void cn1H2ReleaseBodyForStream(CN1H2Session* s, int32_t streamId) {
+    CN1H2Body* body = s->bodies;
+    while(body != NULL) {
+        CN1H2Body* next = body->next;
+        if(body->streamId == streamId) {
+            cn1H2ReleaseBody(s, body);
+        }
+        body = next;
+    }
+}
 
 static CN1H2Request* cn1H2FindOpen(CN1H2Session* s, int32_t streamId) {
     CN1H2Request* r = s->open;
@@ -234,8 +278,20 @@ static int cn1H2OnData(nghttp2_session* session, uint8_t flags, int32_t streamId
     if(r == NULL) {
         return 0;
     }
+    /* The same ceiling both HTTP/1 framing paths enforce (HttpServer.MAX_BODY_BYTES).
+       Without it a peer can stream DATA on one stream -- or on each of the streams
+       its SETTINGS allows at once -- until this process is out of native memory,
+       which the HTTP/1 side simply does not permit. Resetting the stream rather
+       than failing the callback keeps the connection and its other streams alive:
+       one oversized upload is that request's problem, not the session's. */
+    if(r->bodyLength + length > CN1_H2_MAX_BODY_BYTES) {
+        return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+    }
     if(r->bodyLength + length > r->bodyCapacity) {
         size_t grown = (r->bodyLength + length) * 2 + 1024;
+        if(grown > CN1_H2_MAX_BODY_BYTES) {
+            grown = CN1_H2_MAX_BODY_BYTES;
+        }
         unsigned char* buf = (unsigned char*)realloc(r->body, grown);
         if(buf == NULL) {
             return NGHTTP2_ERR_CALLBACK_FAILURE;
@@ -282,6 +338,10 @@ static int cn1H2OnStreamClose(nghttp2_session* session, int32_t streamId,
         cn1H2Unlink(&s->open, r);
         cn1H2FreeRequest(r);
     }
+    /* A response whose body nghttp2 never read to EOF -- the peer reset the stream,
+       or the body limit above reset it -- would otherwise sit on the list until the
+       session ends. */
+    cn1H2ReleaseBodyForStream(s, streamId);
     return 0;
 }
 
@@ -458,20 +518,25 @@ static ssize_t cn1H2ReadBody(nghttp2_session* session, int32_t streamId, uint8_t
                              size_t length, uint32_t* dataFlags, nghttp2_data_source* source,
                              void* userData) {
     CN1H2Session* s = (CN1H2Session*)userData;
+    CN1H2Body* body = (CN1H2Body*)source->ptr;
     size_t remaining;
     (void)session;
     (void)streamId;
-    (void)source;
-    remaining = s->pendingBodyLength - s->pendingBodyOffset;
+    if(body == NULL) {
+        *dataFlags |= NGHTTP2_DATA_FLAG_EOF;
+        return 0;
+    }
+    remaining = body->length - body->offset;
     if(remaining > length) {
         remaining = length;
     }
     if(remaining > 0) {
-        memcpy(buf, s->pendingBody + s->pendingBodyOffset, remaining);
-        s->pendingBodyOffset += remaining;
+        memcpy(buf, body->data + body->offset, remaining);
+        body->offset += remaining;
     }
-    if(s->pendingBodyOffset >= s->pendingBodyLength) {
+    if(body->offset >= body->length) {
         *dataFlags |= NGHTTP2_DATA_FLAG_EOF;
+        cn1H2ReleaseBody(s, body);
     }
     return (ssize_t)remaining;
 }
@@ -481,6 +546,7 @@ static ssize_t cn1H2ReadBody(nghttp2_session* session, int32_t streamId, uint8_t
  * is passed separately because :status is a pseudo-header nghttp2 requires first.
  */
 JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_java_lang_String_byte_1ARRAY_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_INT streamId, JAVA_OBJECT status, JAVA_OBJECT headerLines, JAVA_OBJECT body) {
+    CN1H2Body* pending;
     CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
     nghttp2_nv nva[CN1_H2_MAX_HEADERS + 1];
     char* headerCopy = NULL;
@@ -554,23 +620,33 @@ JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_jav
         }
     }
 
-    free(s->pendingBody);
-    s->pendingBody = NULL;
-    s->pendingBodyLength = 0;
-    s->pendingBodyOffset = 0;
+    /* A resubmission for the same stream would otherwise leave the old one to be
+       freed only at stream close. */
+    cn1H2ReleaseBodyForStream(s, streamId);
+    pending = NULL;
     if(body != JAVA_NULL && ((JAVA_ARRAY)body)->length > 0) {
         JAVA_ARRAY arr = (JAVA_ARRAY)body;
-        s->pendingBody = (unsigned char*)malloc((size_t)arr->length);
-        if(s->pendingBody != NULL) {
-            memcpy(s->pendingBody, (JAVA_ARRAY_BYTE*)arr->data, (size_t)arr->length);
-            s->pendingBodyLength = (size_t)arr->length;
+        pending = (CN1H2Body*)malloc(sizeof(CN1H2Body));
+        if(pending != NULL) {
+            pending->data = (unsigned char*)malloc((size_t)arr->length);
+            if(pending->data == NULL) {
+                free(pending);
+                pending = NULL;
+            } else {
+                memcpy(pending->data, (JAVA_ARRAY_BYTE*)arr->data, (size_t)arr->length);
+                pending->streamId = streamId;
+                pending->length = (size_t)arr->length;
+                pending->offset = 0;
+                pending->next = s->bodies;
+                s->bodies = pending;
+            }
         }
     }
-    provider.source.ptr = NULL;
+    provider.source.ptr = pending;
     provider.read_callback = cn1H2ReadBody;
 
     rc = nghttp2_submit_response(s->session, streamId, nva, count,
-                                 s->pendingBodyLength > 0 ? &provider : NULL);
+                                 pending != NULL ? &provider : NULL);
     free(statusCopy);
     free(headerCopy);
     return rc == 0 ? 0 : -1;
@@ -606,6 +682,11 @@ JAVA_VOID com_codename1_backend_Http2_destroyImpl___long(CODENAME_ONE_THREAD_STA
     }
     cn1H2FreeRequest(s->current);
     free(s->out);
-    free(s->pendingBody);
+    while(s->bodies != NULL) {
+        CN1H2Body* next = s->bodies->next;
+        free(s->bodies->data);
+        free(s->bodies);
+        s->bodies = next;
+    }
     free(s);
 }
