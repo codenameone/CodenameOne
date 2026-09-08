@@ -720,11 +720,11 @@ You can convert the sample above to use toggle buttons as such:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsToggleButtonsFigure.java[tag=the-components-of-codename-one-java-156,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava156Snippet.java[tag=the-components-of-codename-one-java-156,indent=0]
 ----
 
 .Toggle button converted sample
-image::img/generated/components-toggle-buttons.png[Toggle button converted sample,scaledwidth=20%]
+image::img/components-toggle-buttons.png[Toggle button converted sample,scaledwidth=20%]
 
 That's half the story though: to get the full effect of some cool toggle button UI's you can use a https://www.codenameone.com/javadoc/com/codename1/ui/ComponentGroup.html[ComponentGroup]. This allows you to create a button bar effect with the toggle buttons.
 
@@ -732,11 +732,11 @@ For example, to enclose the `CheckBox` components in a vertical `ComponentGroup`
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsToggleButtonsComponentGroupFigure.java[tag=the-components-of-codename-one-java-157,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava157Snippet.java[tag=the-components-of-codename-one-java-157,indent=0]
 ----
 
 .Toggle button converted sample wrapped in ComponentGroup
-image::img/generated/components-toggle-buttons-component-group.png[Toggle button converted sample wrapped in ComponentGroup,scaledwidth=20%]
+image::img/components-toggle-buttons-component-group.png[Toggle button converted sample wrapped in ComponentGroup,scaledwidth=20%]
 
 === ComponentGroup
 
@@ -1467,11 +1467,11 @@ In the sample code below you take a screenshot which is saved to https://www.cod
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsSharebuttonFigure.java[tag=the-components-of-codename-one-java-076,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava076Snippet.java[tag=the-components-of-codename-one-java-076,indent=0]
 ----
 
 .The share button running on the simulator
-image::img/generated/components-sharebutton.png[The share button running on the simulator,scaledwidth=20%]
+image::img/components-sharebutton.png[The share button running on the simulator,scaledwidth=20%]
 
 IMPORTANT: `ShareButton` behaves differently on the device...
 
@@ -2574,11 +2574,11 @@ Simple usage of the `SignatureComponent` class looks like:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsSignature2Figure.java[tag=the-components-of-codename-one-java-135,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava135Snippet.java[tag=the-components-of-codename-one-java-135,indent=0]
 ----
 
 .The signature Component
-image::img/generated/components-signature2.png[The Signature Component,scaledwidth=25%]
+image::img/components-signature2.png[The Signature Component,scaledwidth=25%]
 
 === Accordion
 
@@ -2601,11 +2601,11 @@ https://www.codenameone.com/javadoc/com/codename1/components/FloatingHint.html[F
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsFloatinghintFigure.java[tag=the-components-of-codename-one-java-137,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava137Snippet.java[tag=the-components-of-codename-one-java-137,indent=0]
 ----
 
 .The FloatingHint component with one component that contains text and another that doesn't
-image::img/generated/components-floatinghint.png[The FloatingHint component with one component that contains text and another that doesn't,scaledwidth=30%]
+image::img/components-floatinghint.png[The FloatingHint component with one component that contains text and another that doesn't,scaledwidth=30%]
 
 === Floating Button
 
