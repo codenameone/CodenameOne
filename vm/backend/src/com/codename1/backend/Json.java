@@ -225,22 +225,66 @@ public final class Json {
         return value;
     }
 
+    /**
+     * A JSON number, by the grammar rather than by what Java happens to parse.
+     *
+     * Scanning a run of "-+0-9.eE" and handing it to Long.parseLong accepted "+1",
+     * "01", ".5" and "1." -- none of which is a JSON number, and all of which a
+     * conforming client or an upstream validator rejects. A parser that takes
+     * documents its own clients cannot produce is worse than a strict one.
+     *
+     * RFC 8259: [ '-' ] ( '0' | [1-9][0-9]* ) [ '.' [0-9]+ ] [ ('e'|'E') [+-] [0-9]+ ]
+     */
+    private static boolean isDigit(char c) {
+        return c >= '0' && c <= '9';
+    }
+
     private Object readNumber() throws IOException {
         int start = pos;
         boolean floating = false;
-        while(pos < src.length()) {
-            char c = src.charAt(pos);
-            if(c == '-' || c == '+' || (c >= '0' && c <= '9')) {
+        if(pos < src.length() && src.charAt(pos) == '-') {
+            pos++;                          // '+' is not a JSON sign
+        }
+        int intStart = pos;
+        if(pos < src.length() && src.charAt(pos) == '0') {
+            pos++;
+            if(pos < src.length() && isDigit(src.charAt(pos))) {
+                throw new IOException("A leading zero is not a JSON number, at offset "
+                        + start);
+            }
+        } else {
+            while(pos < src.length() && isDigit(src.charAt(pos))) {
                 pos++;
-            } else if(c == '.' || c == 'e' || c == 'E') {
-                floating = true;
-                pos++;
-            } else {
-                break;
             }
         }
-        if(start == pos) {
-            throw new IOException("Expected a value at offset " + start);
+        if(pos == intStart) {
+            throw new IOException("Expected a digit at offset " + intStart);
+        }
+        if(pos < src.length() && src.charAt(pos) == '.') {
+            floating = true;
+            pos++;
+            int fracStart = pos;
+            while(pos < src.length() && isDigit(src.charAt(pos))) {
+                pos++;
+            }
+            if(pos == fracStart) {
+                throw new IOException("Expected a digit after '.' at offset " + fracStart);
+            }
+        }
+        if(pos < src.length() && (src.charAt(pos) == 'e' || src.charAt(pos) == 'E')) {
+            floating = true;
+            pos++;
+            if(pos < src.length() && (src.charAt(pos) == '-' || src.charAt(pos) == '+')) {
+                pos++;
+            }
+            int expStart = pos;
+            while(pos < src.length() && isDigit(src.charAt(pos))) {
+                pos++;
+            }
+            if(pos == expStart) {
+                throw new IOException("Expected a digit in the exponent at offset "
+                        + expStart);
+            }
         }
         String text = src.substring(start, pos);
         try {

@@ -224,6 +224,41 @@ public class RestServerAnnotationProcessorTest {
     }
 
     /**
+     * A DTO with a public final field cannot be round-tripped, so it is refused.
+     *
+     * The encoder writes every public field and the decoder assigns them after a
+     * no-argument construction, so a final one goes out and silently does not come
+     * back: the handler sees the initializer and the client's value is gone, with
+     * nothing failing to say so. A contract that cannot be honoured should not
+     * compile.
+     */
+    @Test
+    public void refusesADtoWithAFinalField() throws Exception {
+        File classes = tmp.newFolder();
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.Frozen",
+                "package com.example;\n"
+                + "public class Frozen {\n"
+                + "    public final String label = \"set at construction\";\n"
+                + "    public String mutable;\n"
+                + "    public Frozen() {}\n"
+                + "}\n");
+        sources.put("com.example.FrozenApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface FrozenApi {\n"
+                + "    @POST(\"/frozen\")\n"
+                + "    void send(@Body Frozen f, OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        JavaSourceCompiler.compile(sources, classes, Arrays.asList(testClassesDir()));
+        assertTrue("a public final DTO field must fail the build, not be dropped in transit",
+                runProcessor(classes).hasErrors());
+    }
+
+    /**
      * A DTO's collection FIELD arrives as its declared element type too.
      *
      * The body-parameter case was fixed first; this is the same defect one level in,

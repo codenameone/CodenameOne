@@ -597,6 +597,48 @@ JAVA_INT com_codename1_backend_ServerSocket_readImpl___int_byte_1ARRAY_int_int_R
 #endif
 }
 
+/*
+ * Waits for a descriptor to become writable, bounded by its own send deadline.
+ *
+ * Needed because serveOne leaves plaintext descriptors NON-BLOCKING in
+ * virtual-thread mode, so send() answers EAGAIN as soon as the client's receive
+ * window fills. Both write paths treated that as a permanent failure and dropped
+ * the connection, which truncates any response a client reads slowly -- while a
+ * blocking descriptor, which is what they were written against, simply waited.
+ *
+ * Waiting here rather than parking the virtual thread: a park is resumed by the
+ * poller, and a connection descriptor is registered for READ only, so a thread
+ * parked on writability would never be woken. Yielding as RUNNABLE instead would
+ * spin, and a running thread has no idle deadline to expire it. SO_SNDTIMEO is
+ * already set per connection, so this bounds the wait the same way a blocking
+ * send would have.
+ *
+ * Returns 1 when writable, 0 on timeout, -1 on error.
+ */
+static int cn1AwaitWritable(int fd) {
+    struct pollfd waiting;
+    struct timeval tv;
+    socklen_t len = (socklen_t)sizeof(tv);
+    int timeout = -1;
+    int rc;
+    if(getsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char*)&tv, &len) == 0) {
+        long millis = (long)tv.tv_sec * 1000L + (long)(tv.tv_usec / 1000);
+        if(millis > 0) {
+            timeout = (int)millis;
+        }
+    }
+    waiting.fd = fd;
+    waiting.events = POLLOUT;
+    waiting.revents = 0;
+    do {
+        rc = poll(&waiting, 1, timeout);
+    } while(rc < 0 && errno == EINTR);
+    if(rc < 0) {
+        return -1;
+    }
+    return rc == 0 ? 0 : 1;
+}
+
 JAVA_INT com_codename1_backend_ServerSocket_writeImpl___int_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_INT fd, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {
 #ifdef _WIN32
     (void)fd; (void)buffer; (void)offset; (void)length;
@@ -617,6 +659,17 @@ JAVA_INT com_codename1_backend_ServerSocket_writeImpl___int_byte_1ARRAY_int_int_
                             (size_t)(length - written), CN1_SEND_FLAGS);
         if(n < 0 && errno == EINTR) {
             continue;
+        }
+        if(n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            /* Backpressure, not failure: the client has not drained its window
+               yet. Returning -1 here dropped the connection and truncated the
+               response the moment a client read slower than the server wrote. */
+            int ready = cn1AwaitWritable(fd);
+            if(ready > 0) {
+                continue;
+            }
+            CN1_RESUME_THREAD;
+            return ready == 0 ? -3 : -1;    /* -3 is the deadline, as on the read side */
         }
         if(n <= 0) {
             CN1_RESUME_THREAD;

@@ -270,6 +270,33 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
 
     /// Records any application class reachable as a body or a result so a codec is
     /// emitted for it. `java.util.List<Foo>` contributes Foo, not List.
+    /**
+     * A DTO whose public fields the generated codec can actually round-trip.
+     *
+     * The encoder writes every public field; the decoder assigns them after a
+     * no-argument construction, so a FINAL one is written and then silently not
+     * read back. The handler gets the initializer and the client's value is gone,
+     * with nothing failing at build time or at request time to say so. Refused
+     * here instead: the contract cannot be honoured, so it should not compile.
+     */
+    private void requireAssignableFields(String binaryName, AnnotatedClass cls,
+            ProcessorContext ctx) {
+        for (FieldInfo f : cls.getFields()) {
+            if (f.isStatic() || !f.isPublic()) {
+                continue;
+            }
+            if ((f.getAccess() & org.objectweb.asm.Opcodes.ACC_SYNTHETIC) != 0) {
+                continue;
+            }
+            if (f.isFinal()) {
+                ctx.error(cls, binaryName + "." + f.getName() + " is public and final, "
+                        + "so the generated decoder cannot assign it: the field would "
+                        + "be sent by the client and silently dropped on arrival. Drop "
+                        + "the final, or keep the field out of the transferred shape.");
+            }
+        }
+    }
+
     private void collectDtos(String javaType, ProcessorContext ctx) {
         if (javaType == null) return;
         String t = javaType.trim();
@@ -286,6 +313,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         AnnotatedClass cls = ctx.lookup(t.replace('.', '/'));
         if (cls == null || cls.isInterface() || cls.isEnum()) return;
         if (dtos.containsKey(t)) return;
+        requireAssignableFields(t, cls, ctx);
         dtos.put(t, cls);
         for (FieldInfo f : cls.getFields()) {
             if (f.isStatic() || !f.isPublic()) continue;

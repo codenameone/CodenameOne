@@ -2587,11 +2587,8 @@ public final class HttpServer {
                 } catch (Exception err) {
                     System.err.println("handler failed: " + err);
                     response = Response.text(500, "internal error");
-                } finally {
-                    // Decremented once the handler is done. The HTTP/2 write is
-                    // nghttp2's to schedule from here, not this thread's to finish.
-                    inFlightRequests.decrementAndGet();
                 }
+                try {
                 boolean headOnly = "HEAD".equals(stream.getMethod());
                 List extra = new java.util.ArrayList();
                 if(response.extraHeaders != null) {
@@ -2631,6 +2628,14 @@ public final class HttpServer {
                             responseBodyFor(response, headOnly));
                 }
                 requestsServed.incrementAndGet();
+                } finally {
+                    // Held until the response has been SUBMITTED, not merely produced.
+                    // Releasing it after the handler let stop() see no work in flight
+                    // while this thread was still about to call into nghttp2 -- so the
+                    // deadline sweep could close the descriptor and free the session
+                    // underneath it, which truncates the response at best.
+                    inFlightRequests.decrementAndGet();
+                }
             }
             flushHttp2(fd, session, h2);
             if(!h2.isAlive()) {

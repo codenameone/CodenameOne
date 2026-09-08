@@ -44,6 +44,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <poll.h>
+#include <sys/socket.h>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -184,6 +186,39 @@ JAVA_INT com_codename1_backend_FileIo_statImpl___int_long_1ARRAY_R_int(CODENAME_
  * Sends count bytes of inFd starting at offset straight to the socket. Returns how
  * many moved, which may be fewer than asked -- the caller loops. -1 on error.
  */
+/*
+ * Waits for the output socket to drain, bounded by its own send deadline.
+ *
+ * A copy of the one in cn1_backend_server.c rather than a shared symbol: it is
+ * fifteen lines and the two files are compiled independently. See that copy for
+ * why this waits instead of parking the virtual thread.
+ *
+ * Returns 1 when writable, 0 on timeout, -1 on error.
+ */
+static int cn1AwaitSocketWritable(int fd) {
+    struct pollfd waiting;
+    struct timeval tv;
+    socklen_t len = (socklen_t)sizeof(tv);
+    int timeout = -1;
+    int rc;
+    if(getsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char*)&tv, &len) == 0) {
+        long millis = (long)tv.tv_sec * 1000L + (long)(tv.tv_usec / 1000);
+        if(millis > 0) {
+            timeout = (int)millis;
+        }
+    }
+    waiting.fd = fd;
+    waiting.events = POLLOUT;
+    waiting.revents = 0;
+    do {
+        rc = poll(&waiting, 1, timeout);
+    } while(rc < 0 && errno == EINTR);
+    if(rc < 0) {
+        return -1;
+    }
+    return rc == 0 ? 0 : 1;
+}
+
 JAVA_LONG com_codename1_backend_FileIo_sendFileImpl___int_int_long_long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT outFd, JAVA_INT inFd, JAVA_LONG offset, JAVA_LONG count) {
 #if defined(CN1_HAVE_SENDFILE) && defined(__linux__)
     off_t off = (off_t)offset;
@@ -192,11 +227,31 @@ JAVA_LONG com_codename1_backend_FileIo_sendFileImpl___int_int_long_long_R_long(C
         return -1;
     }
     CN1_YIELD_THREAD;
-    do {
+    for(;;) {
         n = sendfile(outFd, inFd, &off, (size_t)count);
-    } while(n < 0 && errno == EINTR);
+        if(n >= 0) {
+            break;
+        }
+        if(errno == EINTR) {
+            continue;
+        }
+        if(errno == EAGAIN || errno == EWOULDBLOCK) {
+            /* The client's window is full, not an error. The descriptor is
+               non-blocking in virtual-thread mode, so this is the ordinary way a
+               large download to a slow client proceeds -- and reporting it as -1
+               made StaticFiles close the connection and truncate the file. */
+            int ready = cn1AwaitSocketWritable(outFd);
+            if(ready > 0) {
+                continue;
+            }
+            n = ready == 0 ? -3 : -1;
+            break;
+        }
+        n = -1;
+        break;
+    }
     CN1_RESUME_THREAD;
-    return n < 0 ? -1 : (JAVA_LONG)n;
+    return (JAVA_LONG)n;
 #elif defined(CN1_HAVE_SENDFILE)
     /* macOS/FreeBSD: len is in-out -- asked for on the way in, moved on the way
        out -- and a partial send reports success with a smaller len, so a short
