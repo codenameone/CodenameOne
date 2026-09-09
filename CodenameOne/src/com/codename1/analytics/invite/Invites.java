@@ -540,6 +540,12 @@ public final class Invites {
             Analytics.autoEvent("invite_opened", CATEGORY, p);
             return true;
         }
+        // The held answer is not the answer any more. A no-match or an expiry
+        // that became terminal with no listener is remembered in `undelivered`,
+        // and leaving it there handed a listener registered after this link
+        // resolved the stale unavailable result -- with deliveredThisRun then
+        // suppressing the correct one.
+        undelivered = null;
         Map<String, String> pending = pendingRecord();
         pending.put("code", code);
         // The window and the budget are reset, because this is a new question.
@@ -773,6 +779,12 @@ public final class Invites {
     /// - `value`: true for last touch
     public static void setReattribution(boolean value) {
         reattribution = value;
+        // The cached state was derived under the old value. loadState() reads
+        // the pending record only when re-attribution is on, so a process that
+        // cached STATE_RESOLVED before this call would never look at a durable
+        // replacement again -- and setInviteListener(), which most applications
+        // call first, is enough to cache it.
+        stateLoaded = false;
     }
 
     /// Whether last touch attribution is enabled.
@@ -1167,6 +1179,12 @@ public final class Invites {
         return true;
     }
 
+    private static boolean hasSavedCode() {
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        String code = InviteStore.get(pending, "code", null);
+        return code != null && code.length() > 0;
+    }
+
     private static void markTerminal() {
         markTerminal(null);
     }
@@ -1192,6 +1210,14 @@ public final class Invites {
         Map<String, String> before = InviteStore.read(InviteStore.PENDING);
         InviteStore.put(done, "firstLaunch", InviteStore.get(before, "firstLaunch", null));
         InviteStore.put(done, "expiresAt", InviteStore.get(before, "expiresAt", null));
+        // And the delivery state, for the same reason the resolved record
+        // inherits it: a reopened lookup that ends terminally has still been
+        // answered once, and dropping the flag here delivered a second
+        // attributionUnavailable() to a listener registered afterwards. The
+        // reopen protection covered a successful resolve and not this.
+        if (InviteStore.getBoolean(before, "delivered", false)) {
+            done.put("delivered", "true");
+        }
         if (reason != null) {
             // Recorded on the marker, not only in memory. The listener contract
             // is "exactly one of the two methods per install, and the answer is
@@ -1302,7 +1328,13 @@ public final class Invites {
         if (s == STATE_RESOLVED || s == STATE_NONE_FOUND || s == STATE_DECLINED) {
             return;
         }
-        if (attributionWindow == 0) {
+        if (attributionWindow == 0 && !hasSavedCode()) {
+            // The kill switch turns off DEFERRED attribution -- the statistical
+            // lookup that needs a window to mean anything. A code we are
+            // already holding is an exact answer that needs none, and refusing
+            // to send it reported "unsupported" for an invite the user really
+            // did open.
+            //
             // setState() only rewrites a record that already exists, and on a
             // fresh install none does -- so this answer was purely in memory
             // and the listener heard it again on every launch, breaking the

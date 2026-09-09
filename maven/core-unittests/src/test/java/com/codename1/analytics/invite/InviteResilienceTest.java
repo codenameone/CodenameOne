@@ -1034,4 +1034,115 @@ class InviteResilienceTest extends UITestBase {
         assertEquals(originalExpiry, InviteStore.getLong(resumed, "expiresAt", 0),
                 "granting consent restarted the attribution window");
     }
+
+    @Test
+    @EdtTest
+    void theZeroWindowDoesNotDiscardAnExactCodeWeAreHolding() {
+        // setAttributionWindow(0) turns off the DEFERRED lookup, which is the
+        // one that needs a window to mean anything. A code already in hand is
+        // an exact answer that needs none, and refusing to send it reported
+        // "unsupported" for an invite the user really did open.
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/EXACT9");
+        assertEquals("EXACT9", InviteStore.get(
+                InviteStore.read(InviteStore.PENDING), "code", null));
+
+        Invites.setAttributionWindow(0);
+        Invites.forgetLoadedState();
+        final String[] told = new String[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0] = reason;
+            }
+        });
+        Invites.checkForInvite();
+
+        assertNull(told[0], "the kill switch discarded an exact code we were holding");
+        assertEquals(Invites.STATE_PENDING, Invites.getState());
+    }
+
+    @Test
+    @EdtTest
+    void turningOnReattributionLetsTheStateBeReadAgain() {
+        // loadState() reads the pending record only when re-attribution is on,
+        // so a process that cached STATE_RESOLVED before the setter ran would
+        // never look at a durable replacement again -- and setInviteListener,
+        // which most applications call first, is enough to cache it.
+        Invites.handleResolution(InviteTestSupport.resolvedJson("FIRST6", "c1", "sms"),
+                Invites.MATCH_DIRECT, false);
+        Invites.setReattribution(true);
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND6");
+        Invites.setReattribution(false);
+
+        // A later process: the listener is registered first, caching the state
+        // under the default, and only then is re-attribution turned on.
+        Invites.forgetLoadedState();
+        Invites.setInviteListener(null);
+        assertEquals(Invites.STATE_RESOLVED, Invites.getState());
+        Invites.setReattribution(true);
+
+        assertEquals(Invites.STATE_PENDING, Invites.getState(),
+                "the cached state hid the durable replacement");
+    }
+
+    @Test
+    @EdtTest
+    void aResumedLookupThatEndsTerminallyIsNotAnnouncedTwice() {
+        // The reopen carries the delivery state onto the pending record, and
+        // the terminal rewrite dropped it -- so a listener registered in the
+        // next process was told a second time.
+        final int[] told = new int[1];
+        InviteListener l = new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0]++;
+            }
+        };
+        Invites.setInviteListener(l);
+        Invites.checkForInvite();
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+        assertEquals(1, told[0], "the refusal was not delivered, so this proves nothing");
+
+        Analytics.setConsent(AnalyticsConsent.granted());
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_FINGERPRINT, true);
+
+        Invites.forgetLoadedState();
+        Invites.setInviteListener(null);
+        Invites.setInviteListener(l);
+        assertEquals(1, told[0], "the resumed lookup announced its end a second time");
+    }
+
+    @Test
+    @EdtTest
+    void aDirectLinkDiscardsAHeldAnswerThatIsNoLongerTrue() {
+        // A no-match that became terminal with no listener is remembered, and
+        // leaving it there handed a listener registered after this link
+        // resolved the stale unavailable result -- with deliveredThisRun then
+        // suppressing the correct one.
+        Invites.checkForInvite();
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_FINGERPRINT, true);
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState());
+
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/LATER6");
+        Invites.handleResolution(InviteTestSupport.resolvedJson("LATER6", "c1", "sms"),
+                Invites.MATCH_DIRECT, false);
+
+        final String[] unavailable = new String[1];
+        final InviteAttribution[] received = new InviteAttribution[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+                received[0] = a;
+            }
+
+            public void attributionUnavailable(String reason) {
+                unavailable[0] = reason;
+            }
+        });
+        assertNull(unavailable[0], "a stale held answer was reported over a resolved one");
+        assertNotNull(received[0], "the resolved attribution was suppressed by it");
+    }
 }
