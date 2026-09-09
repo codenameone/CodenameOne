@@ -15,8 +15,8 @@
   <text x="116" y="188" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">The EDT,</text>
   <text x="116" y="203" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">on its next turn</text>
   <text x="232" y="176" font-family="Arial, sans-serif" font-size="9.5" fill="#777777">the stacks are swapped, then handleEvent walks the batch</text>
-  <text x="232" y="195" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Everything queued since the last turn is dispatched here, in order, before the frame</text>
-  <text x="232" y="210" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">is painted. That batch is the subject of the next figure.</text>
+  <text x="232" y="195" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Everything queued since the last turn is dispatched here, in order, and that turn then</text>
+  <text x="232" y="210" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">paints. A blocking call suspends the walk mid-batch, which the next figure is about.</text>
   <path d="M 116 230 L 116 240" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <path d="M 111 234 L 116 240 L 121 234" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <rect x="16" y="240" width="200" height="78" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
