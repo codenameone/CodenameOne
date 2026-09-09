@@ -295,6 +295,9 @@ public class ButtonRenderElement extends RenderElement {
         }
     }
 
+    /** Flutter's {@code kMinInteractiveDimension}. */
+    private static final double MIN_INTERACTIVE_LP = 48;
+
     @Override
     protected Size performLayout(BoxConstraints constraints) {
         Component c = component();
@@ -304,7 +307,17 @@ public class ButtonRenderElement extends RenderElement {
         Dimension d = c.getPreferredSize();
         double w = d.getWidth();
         double h = d.getHeight();
-        if (!isIconButton()) {
+        if (isIconButton()) {
+            // Flutter's IconButton carries BoxConstraints(minWidth: minHeight:
+            // kMinInteractiveDimension) -- 48 logical pixels, the minimum touch target.
+            // Without it an icon button was only as big as its glyph and its padding: 40
+            // here, and every strip built out of them came up short. The 2D
+            // transformations demo's footer is a row of two, so its bar measured 56
+            // where the reference measures 64, and the board centred in the space that
+            // left sat 16 device pixels low -- most of that route's difference was this.
+            w = Math.max(w, Dp.px(MIN_INTERACTIVE_LP));
+            h = Math.max(h, Dp.px(MIN_INTERACTIVE_LP));
+        } else {
             // Material spec: text buttons have a 64x36lp minimum tap target
             w = Math.max(w, Dp.px(64));
             h = Math.max(h, Dp.px(36));
