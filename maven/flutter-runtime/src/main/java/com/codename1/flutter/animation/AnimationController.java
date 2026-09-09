@@ -278,11 +278,39 @@ public class AnimationController extends Animation<Double> {
             notifyStatusListeners(status);
         }
 
-        if (runDurationMs == 0 || runStartValue == runTargetValue || !Display.isInitialized()) {
+        if (runDurationMs == 0 || runStartValue == runTargetValue) {
+            finishRun(gen);
+            return;
+        }
+        if (!Display.isInitialized()) {
+            // Headless: there is no frame clock to advance us, so the run collapses to its
+            // end state. It still gets its first tick, so a listener that reacts to the
+            // start of a run behaves the same way here as on a device -- which is the kind
+            // of difference a headless test exists to rule out.
+            firstTick();
             finishRun(gen);
             return;
         }
         scheduleTick(gen);
+    }
+
+    /**
+     * The opening frame of a run. It defines t = 0, so the value is still
+     * {@code runStartValue} and nothing moves -- but the listeners are notified anyway.
+     *
+     * <p>Flutter's Ticker calls its callback on the first frame with an elapsed of zero
+     * and {@code AnimationController._tick} notifies unconditionally, so a listener is
+     * guaranteed one call while the run is still at the value it started from. Apps build
+     * on that: Reply's bottom drawer animates a controller up from 0, and the rebuild that
+     * makes the drawer visible comes from a listener that only calls setState while the
+     * value is below 0.01. Suppressing this notification -- on the reasonable-sounding
+     * grounds that the value has not moved yet -- meant the first call a listener ever saw
+     * was already past that threshold. The drawer's state flipped and its arrow turned,
+     * and no panel was ever built.</p>
+     */
+    private void firstTick() {
+        FrameDriver.noteAdvance(0);
+        notifyListeners();
     }
 
     private void scheduleTick(final int gen) {
@@ -330,10 +358,8 @@ public class AnimationController extends Animation<Double> {
         }
         int gen = generation;
         if (runStartTime == UNSTARTED) {
-            // First tick of this run: it defines t = 0. The value is already runStartValue,
-            // so there is nothing to notify - fall through and let the next tick move it.
             runStartTime = now();
-            FrameDriver.noteAdvance(0);
+            firstTick();
             return;
         }
         long elapsed = now() - runStartTime;
