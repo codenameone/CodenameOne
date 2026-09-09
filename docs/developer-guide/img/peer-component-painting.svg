@@ -1,33 +1,36 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="820" height="430" viewBox="0 0 820 430">
-  <rect x="0" y="0" width="820" height="430" fill="#ffffff"/>
-  <text x="410" y="26" font-family="Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#222222">Why a native peer always sits on top</text>
-  <text x="410" y="44" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Every frame is painted in two passes, and they do not interleave.</text>
-  <rect x="24" y="62" width="370" height="150" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
-  <text x="209" y="84" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a7a3d">Pass 1: Codename One</text>
-  <text x="209" y="104" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">every lightweight component, drawn by</text>
-  <text x="209" y="120" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">Codename One itself onto one surface</text>
-  <rect x="60" y="134" width="298" height="26" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1"/>
-  <text x="209" y="151" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#222222">title, buttons, labels, your components</text>
-  <text x="209" y="180" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">This is the layer the theme styles, and the</text>
-  <text x="209" y="193" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">layer a Dialog or a Toolbar is drawn into.</text>
-  <rect x="426" y="62" width="370" height="150" rx="6" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
-  <text x="611" y="84" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#a56a3a">Pass 2: native peers</text>
-  <text x="611" y="104" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">each PeerComponent, drawn by the</text>
-  <text x="611" y="120" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">platform on its own UI thread</text>
-  <rect x="462" y="134" width="298" height="26" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
-  <text x="611" y="151" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#222222">map, web view, native video, native input</text>
-  <text x="611" y="180" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">Codename One never draws these, so it</text>
-  <text x="611" y="193" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">cannot draw anything over them either.</text>
-  <path d="M 410 212 L 410 232" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
-  <path d="M 405 226 L 410 232 L 415 226" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
-  <rect x="24" y="234" width="772" height="72" rx="6" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
-  <text x="410" y="254" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#4a6fa5">What follows from the order</text>
-  <text x="410" y="274" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">A peer covers any Codename One component that overlaps it, whatever the z-order in your container says. That</text>
-  <text x="410" y="288" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">includes the title area and a Dialog: the peer is painted after them, so it lands on top of both.</text>
-  <rect x="24" y="318" width="772" height="100" rx="6" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
-  <text x="410" y="338" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#a56a3a">The two workarounds, and what they cost</text>
-  <text x="410" y="358" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">To put a Dialog over a peer, Codename One takes a screenshot of the peer, hides the peer and shows the still image,</text>
-  <text x="410" y="372" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">which the normal UI can draw over. That capture runs on the native thread and is expensive, so it is not automatic.</text>
-  <text x="410" y="392" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Peer scrolling nested inside Codename One scrolling is left alone for the same reason: the peer paints over the title,</text>
-  <text x="410" y="406" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">clipping it is difficult, and a drag inside the peer would fight the scroll outside it.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="446" viewBox="0 0 820 446">
+  <rect x="0" y="0" width="820" height="446" fill="#ffffff"/>
+  <text x="410" y="26" font-family="Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#222222">Where a native peer sits, and why it depends on the port</text>
+  <text x="410" y="44" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Display asks the implementation once: paintNativePeersBehind(). The answer changes the compositing entirely.</text>
+  <rect x="24" y="62" width="370" height="168" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="209" y="84" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a7a3d">In front: the default</text>
+  <text x="209" y="102" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">paintNativePeersBehind() is false</text>
+  <text x="209" y="118" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">Android, and any port that does not override it</text>
+  <rect x="60" y="132" width="298" height="24" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1"/>
+  <text x="209" y="148" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#222222">1. Codename One paints its components</text>
+  <rect x="60" y="162" width="298" height="24" rx="4" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1"/>
+  <text x="209" y="178" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#222222">2. the platform paints each peer, over that</text>
+  <text x="209" y="204" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">Nothing Codename One draws can cover a peer,</text>
+  <text x="209" y="217" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">the title area and a Dialog included.</text>
+  <rect x="426" y="62" width="370" height="168" rx="6" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="611" y="84" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#4a6fa5">Behind: iOS and JavaScript</text>
+  <text x="611" y="102" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">paintNativePeersBehind() is true</text>
+  <text x="611" y="118" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">both ports override it to return true</text>
+  <rect x="462" y="132" width="298" height="24" rx="4" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1"/>
+  <text x="611" y="148" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#222222">1. the native layer sits underneath</text>
+  <rect x="462" y="162" width="298" height="24" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
+  <text x="611" y="178" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#222222">2. Codename One paints above it, with a hole</text>
+  <text x="611" y="204" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">drawPeerComponent calls clearRect over the peer's</text>
+  <text x="611" y="217" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">bounds, so the native view shows through it.</text>
+  <rect x="24" y="246" width="772" height="86" rx="6" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
+  <text x="410" y="266" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#a56a3a">Why the difference matters</text>
+  <text x="410" y="286" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Where peers are in front, a peer covers whatever Codename One drew underneath it, whatever the z-order in your</text>
+  <text x="410" y="300" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">container says. Where they are behind, the Codename One surface is the top layer and only the punched hole lets</text>
+  <text x="410" y="314" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">the peer through, so components can be laid over a peer on those ports.</text>
+  <rect x="24" y="346" width="772" height="86" rx="6" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="410" y="366" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#4a6fa5">The older workarounds, and where they still apply</text>
+  <text x="410" y="386" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">To show a Dialog over a peer on a front-painting port, Codename One captures a screenshot of the peer, hides the</text>
+  <text x="410" y="400" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">peer and shows the still image, which the normal UI can draw over. That capture runs on the native thread and is</text>
+  <text x="410" y="414" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">expensive, which is why it is not automatic. Nested peer scrolling is avoided on either mode: clipping a peer is</text>
+  <text x="410" y="428" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">difficult, and a drag inside the peer fights the scroll outside it.</text>
 </svg>

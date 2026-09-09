@@ -1669,10 +1669,12 @@ This means that drawing looks something like this:
 
 . Loop over all native peer components and paint them.
 
-This means that all peer components are drawn on top of the Codename One components.
+On a port that paints peers in front, which is the default, this means peer components are drawn on top of the Codename One components.
 
-.The two painting passes, and what the order costs you
-image::img/peer-component-painting.svg[Why a native peer component is always painted above the Codename One layer,scaledwidth=85%]
+Newer ports invert that. iOS and the JavaScript port both return `true` from `paintNativePeersBehind()`, so the native layer sits underneath and Codename One paints above it, punching a hole through its own surface with `clearRect` wherever a peer belongs. Components can therefore be laid over a peer on those ports.
+
+.Where a peer sits, and what follows from it
+image::img/peer-component-painting.svg[Where a native peer is composited relative to the Codename One layer, and how it differs by port,scaledwidth=85%]
 
 NOTE: This was also the case in AWT/Swing to one degree or another...
 
