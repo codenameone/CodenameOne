@@ -553,6 +553,37 @@ public class AndroidGradleBuilder extends Executor {
                     + " infers this declaration on its own and the hint is not"
                     + " the way to ask for it.");
         }
+        if (declaresCappedFineLocation(xPermissions)) {
+            // permissionAdd() suppresses this build's declaration for any
+            // permission already named in xpermissions, by bare name, so a
+            // capped hand-written entry becomes the manifest's ONLY
+            // ACCESS_FINE_LOCATION and the application has no effective one past
+            // the cap. The build cannot rewrite the fragment, so it cannot fix
+            // this; what it can do is not ship it silently.
+            //
+            // Refused only where it is certainly fatal -- the location button
+            // grants precise location through this permission on Android 17,
+            // well past any cap anyone writes -- and reported everywhere else,
+            // because an ordinary location application with a capped
+            // declaration is very likely also broken but has been building for
+            // as long as the fragment has been there.
+            if (locationButtonPermission) {
+                throw new BuildException("android.xpermissions declares"
+                        + " ACCESS_FINE_LOCATION with a maxSdkVersion, which stops"
+                        + " this build declaring its own and leaves the application"
+                        + " with no effective precise-location permission on the"
+                        + " versions past that cap. The location button grants"
+                        + " precise location through it on Android 17, so it cannot"
+                        + " work. Remove the maxSdkVersion from that fragment, or"
+                        + " remove the fragment and let the build declare the"
+                        + " permission.");
+            }
+            warn("android.xpermissions declares ACCESS_FINE_LOCATION with a"
+                    + " maxSdkVersion, so this build's own declaration is"
+                    + " suppressed and the application has no effective"
+                    + " precise-location permission past that cap.");
+            return FINE_LOCATION_PERMISSION;
+        }
         String hint = request.getArg("android.locationButton.exclusive", "auto");
         boolean asked = "true".equals(hint);
         if (!wantsExclusiveLocation(hint, locationButtonPermission, otherLocationUse)) {
@@ -616,37 +647,6 @@ public class AndroidGradleBuilder extends Executor {
         // fragment beats an inference -- but a forced `true` would then succeed
         // while shipping ordinary precise access, which is the opposite of what
         // was asked for, and silently.
-        if (declaresCappedFineLocation(xPermissions)) {
-            // permissionAdd() suppresses this build's declaration for any
-            // permission already named in xpermissions, by bare name, so a
-            // capped hand-written entry becomes the manifest's ONLY
-            // ACCESS_FINE_LOCATION and the application has no effective one past
-            // the cap. The build cannot rewrite the fragment, so it cannot fix
-            // this; what it can do is not ship it silently.
-            //
-            // Refused only where it is certainly fatal -- the location button
-            // grants precise location through this permission on Android 17,
-            // well past any cap anyone writes -- and reported everywhere else,
-            // because an ordinary location application with a capped
-            // declaration is very likely also broken but has been building for
-            // as long as the fragment has been there.
-            if (locationButtonPermission) {
-                throw new BuildException("android.xpermissions declares"
-                        + " ACCESS_FINE_LOCATION with a maxSdkVersion, which stops"
-                        + " this build declaring its own and leaves the application"
-                        + " with no effective precise-location permission on the"
-                        + " versions past that cap. The location button grants"
-                        + " precise location through it on Android 17, so it cannot"
-                        + " work. Remove the maxSdkVersion from that fragment, or"
-                        + " remove the fragment and let the build declare the"
-                        + " permission.");
-            }
-            warn("android.xpermissions declares ACCESS_FINE_LOCATION with a"
-                    + " maxSdkVersion, so this build's own declaration is"
-                    + " suppressed and the application has no effective"
-                    + " precise-location permission past that cap.");
-            return FINE_LOCATION_PERMISSION;
-        }
         if (declaresOrdinaryFineLocation(xPermissions)) {
             if (asked) {
                 throw new BuildException("android.locationButton.exclusive=true"

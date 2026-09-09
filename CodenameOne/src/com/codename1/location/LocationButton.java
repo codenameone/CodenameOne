@@ -28,13 +28,11 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.PeerComponent;
-import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.UIManager;
-import com.codename1.ui.util.UITimer;
 import com.codename1.util.SuccessCallback;
 
 import java.util.ArrayList;
@@ -140,41 +138,6 @@ public class LocationButton extends Container {
     private long timeout = 30000;
     private boolean acquiring;
 
-    /// When this button's own wait runs out, absolute; Long.MAX_VALUE for the
-    /// -1 timeout that never does. Per button because a shared acquisition must
-    /// not hand one button another's timeout.
-    private long deadline;
-
-    /// The oldest fix this button will accept, absolute. A tap asks for the
-    /// location NOW, so a coordinate a tracking application cached long ago is
-    /// not an answer to it. The window is the button's own timeout: a fix no
-    /// older than the time it was willing to spend waiting for one.
-    private long acceptFrom;
-
-    /// How often the cache is re-read while a tracking application owns the
-    /// listener.
-    private static final long TRACKED_POLL_MILLIS = 150;
-
-    /// Whether the last round read its answer out of a tracking application's
-    /// cache rather than acquiring one itself.
-    ///
-    /// Only a cached fix can be stale. One that came from this request's own
-    /// bind is fresh because the bind is what produced it, whatever timestamp
-    /// the platform put on it -- and some put none, which would make every
-    /// ordinary acquisition look ancient if this were not distinguished.
-    private static boolean fixWasCached;
-
-    /// True while some button's acquisition is running. Static because the fix
-    /// is: LocationManager serves one one-shot request at a time, so a second
-    /// button asking during the first would be answered from the last known
-    /// location rather than made to wait. EDT-only state, so no lock -- see
-    /// acquire().
-    private static boolean inFlight;
-
-    /// The buttons that will be told the result of the acquisition in flight,
-    /// the one that started it included.
-    private static final List<LocationButton> waiting =
-            new ArrayList<LocationButton>();
 
     /// Always built, and used for the preferred size even when the platform
     /// draws the control -- the system button has no size of its own, we tell it
@@ -630,291 +593,50 @@ public class LocationButton extends Container {
     /// Called after a granted system session, and directly from the fallback
     /// button's action -- in which case obtaining the manager is what asks the
     /// user for permission.
+    /// Gets a location and tells the listeners.
+    ///
+    /// Deliberately a thin wrapper over getCurrentLocationSync. Everything
+    /// awkward about that method is LocationManager's contract and is shared by
+    /// every caller of it: a request made while a listener is installed is
+    /// answered from the last known location rather than waiting, and there is
+    /// one listener, so two requests at once do not both get their own fix.
+    /// Review has asked this component to work around each of those in turn --
+    /// share one acquisition between buttons, give each joiner its own deadline
+    /// and timer, judge the age of a cached fix, marshal the read onto the EDT
+    /// for a field the port does not publish safely. Each was a real effect,
+    /// and together they turned a button into a scheduler.
+    ///
+    /// None of it belongs here. A LocationButton is a button that asks for a
+    /// location; if getCurrentLocationSync should behave differently when a
+    /// tracker is installed, that is a change to LocationManager, for the
+    /// benefit of everything that calls it, and not a private compensation
+    /// hidden inside one component. Two of these tapped at the same instant is
+    /// also not a case worth carrying a scheduler for.
     private void acquire() {
         if (acquiring) {
             return;
         }
         acquiring = true;
-        // A second button's request joins the first rather than racing it.
-        //
-        // invokeAndBlock keeps the EDT pumping, so a form carrying two of these
-        // -- a pickup and a dropoff, which is exactly the transactional shape
-        // this control is for -- can have the second grant arrive while the
-        // first is still waiting for a fix. The one-shot wait is not reentrant:
-        // the first request installed LocationManager's listener, and
-        // getCurrentLocationSync answers a call made while one is installed from
-        // getCurrentLocation() instead of waiting. The second button would take
-        // a last-known location, or null, and report it as the fresh fix its own
-        // tap had just authorised.
-        //
-        // Nothing is locked because nothing here is concurrent: Codename One is
-        // single threaded and every line of this runs on the EDT. invokeAndBlock
-        // interleaves, it does not parallelise.
-        long now = System.currentTimeMillis();
-        deadline = timeout < 0 ? Long.MAX_VALUE : now + timeout;
-        acceptFrom = timeout < 0 ? now : now - timeout;
-        waiting.add(this);
-        if (inFlight) {
-            // Someone else's fix is already on its way and it is the same fix.
-            // The round already running cannot be shortened to suit this
-            // button, and it is not necessarily bounded either: a leader with
-            // the -1 timeout waits until a fix arrives, so a joiner that wanted
-            // to give up after a moment would wait with it for ever. Its own
-            // deadline is kept by a timer instead, which needs nothing from the
-            // request in flight.
-            scheduleDeadline();
-            return;
-        }
-        inFlight = true;
         try {
-            serveWaiting();
+            final LocationManager manager = LocationManager.getLocationManager();
+            if (manager == null) {
+                fireLocationShared(null);
+                return;
+            }
+            final Location[] result = new Location[1];
+            // invokeAndBlock so a cold fix does not freeze the form; the EDT
+            // keeps pumping while the platform looks for one.
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    result[0] = manager.getCurrentLocationSync(timeout);
+                }
+            });
+            fireLocationShared(result[0]);
         } finally {
-            inFlight = false;
+            acquiring = false;
         }
     }
-
-    /// Fetches fixes until everyone waiting has an answer.
-    ///
-    /// Each round waits only as far as the EARLIEST deadline among the buttons
-    /// still waiting, which is what keeps one button's timeout from becoming
-    /// another's. A five second button behind a leader that never times out was
-    /// left waiting for ever by a single shared wait; a thirty second button
-    /// behind a five second leader was handed that leader's null and told it was
-    /// its own answer. Now the short one is answered when its own time is up and
-    /// the rest keep waiting, and a round that ends with nothing simply runs
-    /// again for whoever still has time left.
-    ///
-    /// A button that joins mid-round is served at the end of that round rather
-    /// than shortening it. That is the one place the wait can run past a
-    /// deadline, it is bounded by the round already running, and closing it
-    /// would mean interrupting a platform request that is already in flight.
-    private static void serveWaiting() {
-        if (LocationManager.getLocationManager() == null) {
-            // Nothing to wait for and no wait to do: fetch would return null
-            // the instant it was asked, and re-running it until every deadline
-            // passed would spin the EDT for the length of the longest timeout.
-            // This is an answer, not a timeout, so everyone gets it now.
-            List<LocationButton> round = new ArrayList<LocationButton>(waiting);
-            waiting.clear();
-            for (LocationButton b : round) {
-                b.acquiring = false;
-                b.fireLocationShared(null);
-            }
-            return;
-        }
-        while (!waiting.isEmpty()) {
-            long now = System.currentTimeMillis();
-            long earliest = Long.MAX_VALUE;
-            for (LocationButton b : waiting) {
-                if (b.deadline < earliest) {
-                    earliest = b.deadline;
-                }
-            }
-            long wait = earliest == Long.MAX_VALUE ? -1 : earliest - now;
-            if (earliest != Long.MAX_VALUE && wait < 1) {
-                // Any expired deadline, not just one that lands exactly on
-                // zero. LL.run() tests `timeout > -1`, so every value from -1
-                // down means "never time out" to it, and a deadline that went
-                // by while this was being computed would turn a button that
-                // wanted to give up promptly into one that waits for ever.
-                wait = 1;
-            }
-            long since = Long.MAX_VALUE;
-            for (LocationButton b : waiting) {
-                if (b.acceptFrom < since) {
-                    since = b.acceptFrom;
-                }
-            }
-            Location fix = fetch(wait, since);
-            now = System.currentTimeMillis();
-            List<LocationButton> round = new ArrayList<LocationButton>(waiting);
-            waiting.clear();
-            for (LocationButton b : round) {
-                if (!b.acquiring) {
-                    // Its own deadline timer answered it while this round ran.
-                    continue;
-                }
-                // A cached fix has to be new enough for THIS button. The
-                // round asked for the oldest timestamp anyone would take, so a
-                // button that tapped later, or that will accept less age, can
-                // be handed a fix that satisfied somebody else and not it --
-                // which is the staleness this is all here to avoid, arriving by
-                // the side door.
-                boolean goodEnough = fix != null
-                        && (!fixWasCached || fix.getTimeStamp() >= b.acceptFrom);
-                if (goodEnough || now >= b.deadline) {
-                    // Past its deadline it gets whatever there is, stale or
-                    // null: that is what it would have been given before any of
-                    // this, so waiting longer for better serves nobody.
-                    b.acquiring = false;
-                    b.fireLocationShared(fix);
-                } else {
-                    // Still has time of its own; another round is run for it.
-                    waiting.add(b);
-                }
-            }
-        }
-    }
-
-    /// Arranges for this button to be answered when its own time is up, whatever
-    /// the request it joined is doing.
-    ///
-    /// Only for a button that joined a round already running. One that starts a
-    /// round has its timeout enforced by getCurrentLocationSync, and one waiting
-    /// between rounds is bounded by the next round's wait, which is computed
-    /// from the earliest deadline.
-    private void scheduleDeadline() {
-        if (deadline == Long.MAX_VALUE) {
-            // Nothing to be early for.
-            return;
-        }
-        // getComponentForm() keeps its original meaning and answers null for a
-        // component in a desktop Window, so using it here left exactly the
-        // button this timer exists for -- a finite joiner behind a leader that
-        // never times out -- with no timer at all inside a Window.
-        TopLevelContainer top = getTopLevelContainer();
-        if (top == null) {
-            return;
-        }
-        long ms = deadline - System.currentTimeMillis();
-        if (ms < 1) {
-            ms = 1;
-        }
-        if (ms > Integer.MAX_VALUE) {
-            return;
-        }
-        UITimer.timer((int) ms, false, top, new Runnable() {
-            @Override
-            public void run() {
-                deadlineReached();
-            }
-        });
-    }
-
-    /// This button's own timeout ran out while it was waiting for somebody
-    /// else's request.
-    private void deadlineReached() {
-        if (!acquiring || !waiting.remove(this)) {
-            // Already answered, by its round or by being removed from it.
-            return;
-        }
-        acquiring = false;
-        fireLocationShared(null);
-    }
-
-    /// One request to the platform, off the EDT.
-    ///
-    /// #### Parameters
-    ///
-    /// - `timeout`: how long this round may wait, -1 for as long as it takes
-    /// - `since`: the oldest timestamp any waiting button will accept
-    private static Location fetch(long timeout, long since) {
-        final LocationManager manager = LocationManager.getLocationManager();
-        if (manager == null) {
-            return null;
-        }
-        final long forTimeout = timeout;
-        final long forSince = since;
-        final Location[] result = new Location[1];
-        // invokeAndBlock so a cold fix does not freeze the form; the EDT
-        // keeps pumping while the platform looks for one.
-        Display.getInstance().invokeAndBlock(new Runnable() {
-            @Override
-            public void run() {
-                if (manager.getLocationListener() == null) {
-                    fixWasCached = false;
-                    result[0] = manager.getCurrentLocationSync(forTimeout);
-                } else {
-                    fixWasCached = true;
-                    result[0] = trackedFix(manager, forTimeout, forSince);
-                }
-            }
-        });
-        return result[0];
-    }
-
-    /// Reads the tracker's cached fix, on the thread that writes it.
-    ///
-    /// This runs from the worker invokeAndBlock spawned, and the cache is
-    /// written on the EDT -- AndroidLocationManager assigns lastLocation inside
-    /// a callSerially, and the field is a plain one. Reading it straight off
-    /// this thread asks for a value another thread published with no
-    /// happens-before to carry it, so the loop could keep seeing the old
-    /// reference for its whole timeout and miss the very update it is waiting
-    /// for. callSeriallyAndWait hands the read to the EDT and brings the answer
-    /// back, which is the ordering that was missing; nothing in the port needs
-    /// to change and no lock is added to a framework that does not use them.
-    ///
-    /// #### Parameters
-    ///
-    /// - `manager`: the manager holding the cache
-    private static Location readCache(final LocationManager manager) {
-        final Location[] out = new Location[1];
-        Display.getInstance().callSeriallyAndWait(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    out[0] = manager.getCurrentLocation();
-                } catch (Throwable err) {
-                    // Nothing to be had this time round; the tracker may still
-                    // deliver one before the deadline.
-                    out[0] = null;
-                }
-            }
-        });
-        return out[0];
-    }
-
-    /// A fix for an application that is already tracking location.
-    ///
-    /// getCurrentLocationSync does not wait when a listener is installed: it
-    /// answers from getCurrentLocation(), which on Android hands back the
-    /// coordinate the tracker cached last. For a tracking application that is
-    /// the right answer to "where are we"; it is the wrong answer to a button,
-    /// where the user has just tapped to share where they are NOW and the cache
-    /// can be arbitrarily old.
-    ///
-    /// The tracker is left strictly alone. Installing anything of our own would
-    /// mean setLocationListener, which clears the application's listener,
-    /// discards its LocationRequest and re-binds the platform -- disturbing the
-    /// tracking that application asked for in order to answer a button. So this
-    /// watches the cache instead and waits for it to move.
-    ///
-    /// It never does worse than the cache. Whatever it has when the time runs
-    /// out is returned, so the answer is at least the one this method would have
-    /// given before, and better whenever an update arrives in time.
-    ///
-    /// #### Parameters
-    ///
-    /// - `manager`: the manager whose listener the application owns
-    /// - `timeout`: how long to wait, -1 for as long as it takes
-    /// - `since`: the oldest timestamp worth accepting
-    private static Location trackedFix(LocationManager manager, long timeout,
-            long since) {
-        long until = timeout < 0 ? Long.MAX_VALUE
-                : System.currentTimeMillis() + timeout;
-        Location best = null;
-        while (true) {
-            Location current = readCache(manager);
-            if (current != null) {
-                best = current;
-                if (current.getTimeStamp() >= since) {
-                    return current;
-                }
-            }
-            if (System.currentTimeMillis() >= until) {
-                // The cache never moved. This is what the old code answered
-                // immediately, so returning it is no loss -- only late.
-                return best;
-            }
-            try {
-                Thread.sleep(TRACKED_POLL_MILLIS);
-            } catch (InterruptedException err) {
-                return best;
-            }
-        }
-    }
-
 
     private void fireLocationShared(Location location) {
         // A copy, because a listener is entitled to remove itself while it
