@@ -214,6 +214,15 @@ public abstract class Element implements BuildContext {
                 providers++;
                 Object v = ((InheritedValueProvider) a.widget).providedValueFor(type);
                 if (v != null) {
+                    // Remember that WE read this, so a change to the model can come back
+                    // and rebuild us. Without it a provider could notice its model change
+                    // and rebuild itself and nothing else: its build returns the same
+                    // child WIDGET INSTANCE, reconciliation sees widget == newWidget and
+                    // returns early, and the subtree that actually reads the value never
+                    // runs again. Every control whose job is to set a field on a model
+                    // then looked dead -- the handler ran, the model changed, the screen
+                    // did not.
+                    a.addProviderDependent(this);
                     return v;
                 }
             }
@@ -221,6 +230,45 @@ public abstract class Element implements BuildContext {
         }
         reportMissingProvider(type, providers);
         return null;
+    }
+
+    /// Elements that read a provided value from this element.
+    ///
+    /// Flutter tracks this as an InheritedWidget dependency; a provider here is an
+    /// ordinary widget, so the dependency has to be recorded by hand.
+    private java.util.List<Element> providerDependents;
+
+    void addProviderDependent(Element dependent) {
+        if (dependent == null || dependent == this) {
+            return;
+        }
+        if (providerDependents == null) {
+            providerDependents = new java.util.ArrayList<Element>();
+        }
+        if (!providerDependents.contains(dependent)) {
+            providerDependents.add(dependent);
+        }
+    }
+
+    /**
+     * Marks everything that read a value from this element for rebuild.
+     *
+     * <p>Unmounted readers are dropped as they are found: a dependency list that only
+     * grows would hold a whole popped route alive and keep rebuilding it.</p>
+     */
+    public void rebuildProviderDependents() {
+        if (providerDependents == null) {
+            return;
+        }
+        java.util.List<Element> snapshot =
+                new java.util.ArrayList<Element>(providerDependents);
+        for (Element e : snapshot) {
+            if (e.mounted) {
+                e.markNeedsBuild();
+            } else {
+                providerDependents.remove(e);
+            }
+        }
     }
 
     private void reportMissingProvider(Class<?> type, int providersSeen) {

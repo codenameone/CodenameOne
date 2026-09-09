@@ -49,6 +49,10 @@ public class ChangeNotifierProviderElement extends StatelessElement {
         @Override
         public void call() {
             markNeedsBuild();
+            // And everything that READ the model. Rebuilding only this element achieves
+            // nothing: its build hands back the same child widget instance and
+            // reconciliation returns early.
+            rebuildProviderDependents();
         }
     };
 
