@@ -1232,7 +1232,7 @@ public final class Invites {
         Map<String, String> pending = pendingRecord();
         long expires = InviteStore.getLong(pending, "expiresAt", 0);
         if (expires > 0 && System.currentTimeMillis() > expires) {
-            markTerminal();
+            markTerminal(REASON_EXPIRED);
             notifyUnavailable(REASON_EXPIRED);
             return;
         }
@@ -1606,6 +1606,16 @@ public final class Invites {
                     setState(STATE_PENDING);
                     return;
                 }
+                if (getAttribution() != null) {
+                    // A re-attribution claim that found nothing. The earlier
+                    // attribution is still the answer for this install, so
+                    // nothing is terminal here -- terminalizing it contradicted
+                    // the durable record, which still says RESOLVED and puts
+                    // the state back on the next launch, and told the listener
+                    // "no invite" as a second, opposite callback after it had
+                    // already been given one.
+                    return;
+                }
                 // Terminal, and it has to be durable. Deleting the record is
                 // not enough: loadState() reads an absent record as STATE_NONE,
                 // so the next launch built a fresh profile and asked again, and
@@ -1675,7 +1685,15 @@ public final class Invites {
             InviteStore.put(record, "params",
                     JSONParser.mapToJson(new LinkedHashMap<String, Object>(a.getParameters())));
         }
-        record.put("delivered", "false");
+        // Carried across from the record this one replaces. Re-attribution
+        // rewrites the attribution but not the fact that the listener has
+        // already been told about this install, and the contract is exactly one
+        // callback per install -- resetting the flag delivered inviteReceived()
+        // a second time, immediately if the first had happened in an earlier
+        // process and on the next launch if it had happened in this one.
+        Map<String, String> previous = InviteStore.read(InviteStore.ATTRIBUTION);
+        record.put("delivered",
+                String.valueOf(InviteStore.getBoolean(previous, "delivered", false)));
         // Storage was chosen over Preferences precisely because it reports a
         // failed write, so the result is checked. Deleting the pending record
         // after a failed write would leave neither an attribution nor any retry

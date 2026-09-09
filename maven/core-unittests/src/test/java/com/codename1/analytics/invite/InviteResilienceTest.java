@@ -651,4 +651,99 @@ class InviteResilienceTest extends UITestBase {
         assertEquals(Invites.STATE_PENDING, Invites.getState(),
                 "clearing the denial under opt-out did not resume the lookup");
     }
+
+    @Test
+    @EdtTest
+    void aReattributionThatFindsNothingLeavesTheEarlierAnswerStanding() {
+        // The earlier attribution is still the answer for this install, so a
+        // failed replacement is not terminal. Terminalizing it contradicted the
+        // durable record -- which still says RESOLVED and puts the state back on
+        // the next launch -- and told the listener "no invite" as a second,
+        // opposite callback after it had already been given one.
+        Invites.handleResolution(InviteTestSupport.resolvedJson("FIRST1", "c1", "sms"),
+                Invites.MATCH_DIRECT, false);
+        Invites.setReattribution(true);
+
+        final int[] told = new int[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0]++;
+            }
+        });
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_DIRECT, false);
+
+        assertEquals(Invites.STATE_RESOLVED, Invites.getState(),
+                "a failed re-attribution terminalized an attributed install");
+        assertEquals(0, told[0], "the listener was told the opposite of what it had heard");
+        assertNotNull(Invites.getAttribution());
+    }
+
+    @Test
+    @EdtTest
+    void areplacementAttributionIsNotDeliveredASecondTime() {
+        // Re-attribution rewrites the attribution but not the fact that the
+        // listener has already been told about this install, and the contract is
+        // exactly one callback per install.
+        final int[] received = new int[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+                received[0]++;
+            }
+
+            public void attributionUnavailable(String reason) {
+            }
+        });
+        Invites.handleResolution(InviteTestSupport.resolvedJson("FIRST2", "c1", "sms"),
+                Invites.MATCH_DIRECT, false);
+        assertEquals(1, received[0]);
+
+        Invites.setReattribution(true);
+        Invites.handleResolution(InviteTestSupport.resolvedJson("SECOND2", "c2", "email"),
+                Invites.MATCH_DIRECT, false);
+        Invites.forgetLoadedState();
+        Invites.setInviteListener(null);
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+                received[0]++;
+            }
+
+            public void attributionUnavailable(String reason) {
+            }
+        });
+
+        assertEquals(1, received[0], "the replacement was delivered as a second callback");
+    }
+
+    @Test
+    @EdtTest
+    void anExpiredWindowReportsExpiryToALateListener() {
+        // The expiry marker carried no reason, so after the process that
+        // reached it exited, a late listener was told REASON_NO_MATCH -- the
+        // marker's default -- instead of what actually happened.
+        Invites.checkForInvite();
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(pending);
+        pending.put("expiresAt", String.valueOf(System.currentTimeMillis() - 1000L));
+        InviteStore.write(InviteStore.PENDING, pending);
+
+        Invites.forgetLoadedState();
+        Invites.checkForInvite();
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState());
+
+        Invites.forgetLoadedState();
+        final String[] told = new String[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0] = reason;
+            }
+        });
+        assertEquals(Invites.REASON_EXPIRED, told[0],
+                "the late listener was told the wrong reason");
+    }
 }
