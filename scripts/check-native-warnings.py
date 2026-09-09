@@ -94,9 +94,16 @@ VENDORED_MARKERS = (
 GATING_GROUPS = ("generated", "runtime", "port", "toolchain")
 ALL_GROUPS = GATING_GROUPS + ("vendored", "sdk")
 
-# Port source directories per leg. Used only to turn a bare file name from the
-# manifest back into a repo-relative path, so the baseline can name the file a
-# human has to open.
+# Port source directories per leg, MOST SPECIFIC FIRST. Used to turn a bare file
+# name from the manifest back into a repo-relative path, so the baseline names the
+# file a human has to open.
+#
+# Order matters and is not a tiebreak of convenience: METALView.m exists in both
+# Ports/MacPort and Ports/iOSPort/nativeSources, and for a macOS build it is the
+# MacPort one that was compiled. The leg knows which port it built, so listing that
+# port first states a fact rather than guessing. A name that appears twice inside a
+# SINGLE port tree is still a hard error -- there the leg tells us nothing and
+# picking one would blame a file nobody edited.
 LEG_PORT_DIRS = {
     "ios-sim-debug": ["Ports/iOSPort/nativeSources"],
     "ios-device-release": ["Ports/iOSPort/nativeSources"],
@@ -214,6 +221,35 @@ def read_manifest(path):
     return entries
 
 
+_PORT_INDEX = {}
+
+
+def port_index(leg):
+    """{file name: [repo-relative paths]} for the port trees this leg builds from.
+
+    Built once per leg. The obvious spelling -- walk the tree looking for the name
+    each time a diagnostic needs resolving -- is O(diagnostics x files), and a real
+    census carries thousands of diagnostics.
+    """
+    if leg in _PORT_INDEX:
+        return _PORT_INDEX[leg]
+    index = {}
+    for rel in LEG_PORT_DIRS.get(leg, []):
+        base = os.path.join(ROOT, rel)
+        if not os.path.isdir(base):
+            continue
+        here = {}
+        for dirpath, _dirs, files in os.walk(base):
+            for fn in files:
+                here.setdefault(fn, []).append(
+                    os.path.relpath(os.path.join(dirpath, fn), ROOT))
+        # A more specific port tree already claimed this name; see LEG_PORT_DIRS.
+        for fn, paths in here.items():
+            index.setdefault(fn, paths)
+    _PORT_INDEX[leg] = index
+    return index
+
+
 def resolve_port_path(name, leg):
     """Repo-relative path of a hand-written native, or None if it is not ours.
 
@@ -222,14 +258,7 @@ def resolve_port_path(name, leg):
     a hard error rather than a guess: picking one would attribute a warning to a
     file nobody edited.
     """
-    matches = []
-    for rel in LEG_PORT_DIRS.get(leg, []):
-        base = os.path.join(ROOT, rel)
-        if not os.path.isdir(base):
-            continue
-        for dirpath, _dirs, files in os.walk(base):
-            if name in files:
-                matches.append(os.path.relpath(os.path.join(dirpath, name), ROOT))
+    matches = port_index(leg).get(name, [])
     if len(matches) > 1:
         raise SystemExit(
             "ambiguous port file %r for leg %s: %s\nResolve by scoping LEG_PORT_DIRS; "
