@@ -201,22 +201,80 @@ final class TypeNames {
         // stopping at the first ")" left one behind -- AdError arrived in the
         // index as "AdListener.onFailedToLoad(AdError))".
         text = unlink(text);
+
+        // Everything below rewrites markup, and a code span contains none: its
+        // content is literal by definition. JSONWriter.ArrayBuilder documents
+        // itself as "Fluent builder for `[ ..., ..., ... ]`", and treating those
+        // brackets as reference shorthand left the search result reading
+        // "Fluent builder for  ..., ..., ... ." So each span is lifted out,
+        // stripped of its delimiters, and put back untouched afterwards.
+        List<String> spans = new ArrayList<>();
+        StringBuilder masked = new StringBuilder(text.length());
+        int i = 0;
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            if (c != '`') {
+                masked.append(c);
+                i++;
+                continue;
+            }
+            int ticks = 0;
+            while (i + ticks < text.length() && text.charAt(i + ticks) == '`') {
+                ticks++;
+            }
+            String fence = "`".repeat(ticks);
+            int end = text.indexOf(fence, i + ticks);
+            if (end < 0) {
+                masked.append(c);
+                i++;
+                continue;
+            }
+            // NUL cannot appear in a doc comment that compiles, so it cannot
+            // collide with the text being masked.
+            masked.append('\0').append(spans.size()).append('\0');
+            spans.add(text.substring(i + ticks, end));
+            i = end + ticks;
+        }
+        text = masked.toString();
+
         // A reference link written as [Type] names that type.
         text = text.replaceAll("\\[([^\\]]*)\\]", "$1");
-        text = text.replace("`", "");
         text = text.replaceAll("\\*\\*([^*]+)\\*\\*", "$1");
         text = text.replaceAll("(?<![A-Za-z0-9])[*_]([^*_]+)[*_](?![A-Za-z0-9])", "$1");
         // A marker with no partner left is not emphasis, it is a stray asterisk.
         text = text.replace("**", "");
+
+        for (int span = 0; span < spans.size(); span++) {
+            text = text.replace("\0" + span + "\0", spans.get(span));
+        }
         return text.strip();
     }
 
-    /** Replaces every [label](destination) with its label, parentheses balanced. */
+    /**
+     * Replaces every [label](destination) with its label, parentheses balanced.
+     *
+     * <p>Code spans are copied through whole. Brackets inside one are literal
+     * text, not a reference: JSONWriter.ArrayBuilder documents itself as
+     * "Fluent builder for `[ ..., ..., ... ]`", and stripping the brackets there
+     * left the search result reading "Fluent builder for  ..., ..., ... ."
+     */
     private static String unlink(String text) {
         StringBuilder out = new StringBuilder(text.length());
         int i = 0;
         while (i < text.length()) {
             char c = text.charAt(i);
+            if (c == '`') {
+                int ticks = 0;
+                while (i + ticks < text.length() && text.charAt(i + ticks) == '`') {
+                    ticks++;
+                }
+                String fence = "`".repeat(ticks);
+                int end = text.indexOf(fence, i + ticks);
+                int stop = end < 0 ? text.length() : end + ticks;
+                out.append(text, i, stop);
+                i = stop;
+                continue;
+            }
             if (c != '[' && !(c == '!' && i + 1 < text.length() && text.charAt(i + 1) == '[')) {
                 out.append(c);
                 i++;

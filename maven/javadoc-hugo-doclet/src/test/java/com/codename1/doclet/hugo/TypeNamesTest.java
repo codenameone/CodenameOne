@@ -71,6 +71,22 @@ class TypeNamesTest {
     }
 
     @Test
+    void keepsLiteralBracketsInsideACodeSpan() {
+        // A code span holds literal text, so its brackets are not reference
+        // shorthand. JSONWriter.ArrayBuilder opens with a JSON fragment, and
+        // stripping them turned its search result into
+        // "Fluent builder for  ..., ..., ... ." -- brackets gone, spacing wrong.
+        assertEquals("Fluent builder for [ ..., ..., ... ].",
+                TypeNames.plainSummary("Fluent builder for `[ ..., ..., ... ]`."));
+        // Markup outside the span is still reduced, and a span is not a licence
+        // to stop processing the rest of the line.
+        assertEquals("See Component: pass [0] to reset.",
+                TypeNames.plainSummary(
+                        "See [Component](/javadoc/com/codename1/ui/Component/): "
+                        + "pass `[0]` to reset."));
+    }
+
+    @Test
     void keepsBalancedParenthesesInsideALinkDestination() {
         // A member URL ends in a signature, so its destination holds balanced
         // parentheses. Stopping at the first one left it behind: AdError arrived

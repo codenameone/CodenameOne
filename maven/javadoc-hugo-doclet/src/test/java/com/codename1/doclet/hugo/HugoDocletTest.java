@@ -281,7 +281,23 @@ class HugoDocletTest {
         Files.writeString(sources.resolve("Holder.java"), String.join("\n",
                 "package p;",
                 "/// Holds one value.",
-                "public class Holder<T> implements Marker {}",
+                "public class Holder<T> implements Marker {",
+                "    /// Stores a value.",
+                "    public void put(T value) {}",
+                "}",
+                ""), StandardCharsets.UTF_8);
+        // A see-also written with the ERASED spelling of a generic parameter.
+        // The anchor Holder#put answers to is "put(T)", and the reference says
+        // Object, so a comparison of the written spellings alone leaves the
+        // entry with no URL and renders it as dead code text.
+        Files.writeString(sources.resolve("UsesErased.java"), String.join("\n",
+                "package p;",
+                "/// Refers to a generic method by its erasure.",
+                "///",
+                "/// #### See also",
+                "///",
+                "/// - Holder#put(Object)",
+                "public class UsesErased {}",
                 ""), StandardCharsets.UTF_8);
         // The middle class must itself be generic, which is what makes the
         // substitution something that can be lost: HashMap<K, V> extends
@@ -325,6 +341,26 @@ class HugoDocletTest {
                 "public class UsesShared {}",
                 ""), StandardCharsets.UTF_8);
 
+        // Imports decide, and they shadow the package sibling: this file sits in
+        // p, where a type called Shared also lives, and imports q.Shared. The
+        // language resolves the unqualified name to the imported one, so the
+        // reference must too. Asserted alongside p.UsesShared, which has no
+        // import and must still reach p.Shared -- neither the old
+        // package-sibling-only order nor an imports-only rule satisfies both.
+        Files.writeString(sources.resolve("ImportsShared.java"), String.join("\n",
+                "package p;",
+                "import q.Shared;",
+                "/// Refers to the imported Shared, not the one next door.",
+                "///",
+                "/// #### See also",
+                "///",
+                "/// - Shared",
+                "public class ImportsShared {",
+                "    /// Never called.",
+                "    public void use(Shared value) {}",
+                "}",
+                ""), StandardCharsets.UTF_8);
+
         DocumentationTool tool = ToolProvider.getSystemDocumentationTool();
         try (StandardJavaFileManager files = tool.getStandardFileManager(null, null, null)) {
             Iterable<? extends JavaFileObject> units = files.getJavaFileObjects(
@@ -336,6 +372,8 @@ class HugoDocletTest {
                     sources.resolve("Hidden.java"), sources.resolve("Visible.java"),
                     sources.resolve("Holder.java"),
                     sources.resolve("Middle.java"), sources.resolve("Ints.java"),
+                    sources.resolve("UsesErased.java"),
+                    sources.resolve("ImportsShared.java"),
                     other.resolve("Shared.java"), other.resolve("UsesShared.java"));
             boolean ok = tool.getTask(null, files, null, HugoDoclet.class,
                     List.of("-d", content.toString(),
@@ -540,6 +578,33 @@ class HugoDocletTest {
         String fromQ = Files.readString(content.resolve("q/UsesShared.md"), StandardCharsets.UTF_8);
         assertTrue(fromQ.contains("/javadoc/q/Shared/"), "q sees q.Shared");
         assertFalse(fromQ.contains("/javadoc/p/Shared/"), "and not p.Shared");
+    }
+
+    @Test
+    void letsAnImportShadowThePackageSibling() throws IOException {
+        // JLS 6.4.1: a single-type import shadows a top level type of the same
+        // name declared elsewhere in the file's own package. p.ImportsShared
+        // imports q.Shared, so its unqualified "Shared" is q's -- while
+        // p.UsesShared, asserted above, imports nothing and still gets p's.
+        // Without the import lookup the answer is whichever documented type
+        // with that simple name iteration order reaches first.
+        String page = Files.readString(content.resolve("p/ImportsShared.md"),
+                StandardCharsets.UTF_8);
+        assertTrue(page.contains("/javadoc/q/Shared/"), "the import wins");
+        assertFalse(page.contains("/javadoc/p/Shared/"), "over the package sibling");
+    }
+
+    @Test
+    void linksASeeAlsoWrittenWithAnErasedSignature() throws IOException {
+        // Holder declares put(T); the reference spells it put(Object). The
+        // anchor already carries both aliases, so only the signature comparison
+        // was rejecting it -- the entry rendered as code with no link at all.
+        // Collection#toArray(Object[]) and NavigableMap#higherEntry(Object) are
+        // the real cases.
+        String page = Files.readString(content.resolve("p/UsesErased.md"),
+                StandardCharsets.UTF_8);
+        assertTrue(page.contains("/javadoc/p/Holder/#put("),
+                "an erased spelling still reaches the method");
     }
 
     @Test

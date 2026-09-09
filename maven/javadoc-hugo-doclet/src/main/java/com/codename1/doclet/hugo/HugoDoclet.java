@@ -980,6 +980,24 @@ public final class HugoDoclet implements Doclet {
         return urlOfTypeNamed(name);
     }
 
+    /** A signature with every parameter type reduced to its simple name. */
+    private static String simplifySignature(String signature) {
+        int open = signature.indexOf('(');
+        if (open < 0 || !signature.endsWith(")")) {
+            return signature;
+        }
+        String name = signature.substring(0, open);
+        String inside = signature.substring(open + 1, signature.length() - 1);
+        List<String> parts = new ArrayList<>();
+        for (String part : inside.split(",")) {
+            String trimmed = part.strip();
+            if (!trimmed.isEmpty()) {
+                parts.add(simpleName(trimmed));
+            }
+        }
+        return name + "(" + String.join(",", parts) + ")";
+    }
+
     /** The last segment of a dotted name. */
     private static String simpleName(String name) {
         int dot = name.lastIndexOf('.');
@@ -1066,6 +1084,18 @@ public final class HugoDoclet implements Doclet {
         if (exact != null) {
             return exact;
         }
+        // What the source file imported, before any global guess. Without this
+        // the answer is whichever documented type with that simple name happens
+        // to come first in iteration order, and there are two called Style:
+        // com.codename1.ui.plaf.Style and the nested
+        // com.codename1.charts.compat.Paint.Style. Component and
+        // ComponentSelector reach the right one today, but by luck rather than
+        // by rule, and a reader following "Style#stripMarginAndPadding()" into
+        // an unrelated enum would have no way to tell.
+        TypeElement imported = importedType(context, name);
+        if (imported != null) {
+            return imported;
+        }
         if (context != null) {
             PackageElement pkg = Refs.packageOf(context);
             if (pkg != null) {
@@ -1079,6 +1109,36 @@ public final class HugoDoclet implements Doclet {
         for (Map.Entry<String, TypeElement> entry : documented.entrySet()) {
             if (entry.getKey().endsWith(suffix)) {
                 return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    /** The type this simple name refers to through the context file's imports. */
+    private TypeElement importedType(TypeElement context, String name) {
+        if (context == null) {
+            return null;
+        }
+        com.sun.source.util.TreePath path = environment.getDocTrees().getPath(context);
+        if (path == null) {
+            return null;
+        }
+        for (com.sun.source.tree.ImportTree imported : path.getCompilationUnit().getImports()) {
+            if (imported.isStatic()) {
+                continue;
+            }
+            String qualified = imported.getQualifiedIdentifier().toString();
+            if (qualified.endsWith("." + name)) {
+                TypeElement found = documented.get(qualified);
+                if (found != null) {
+                    return found;
+                }
+            } else if (qualified.endsWith(".*")) {
+                TypeElement found =
+                        documented.get(qualified.substring(0, qualified.length() - 1) + name);
+                if (found != null) {
+                    return found;
+                }
             }
         }
         return null;
@@ -1119,6 +1179,15 @@ public final class HugoDoclet implements Doclet {
             for (Element candidate : candidates) {
                 if (refs.anchors(candidate).contains(wanted)) {
                     return anchorUrl(owner, candidate);
+                }
+                // A reference may write the erased spelling where the anchor
+                // writes it fully qualified: Collection#toArray(Object[]) against
+                // toArray(java.lang.Object[]). The alias is already there; it was
+                // only ever compared as written.
+                for (String anchor : refs.anchors(candidate)) {
+                    if (simplifySignature(anchor).equals(simplifySignature(wanted))) {
+                        return anchorUrl(owner, candidate);
+                    }
                 }
             }
             // The reference may spell the types simply where the identifier spells
