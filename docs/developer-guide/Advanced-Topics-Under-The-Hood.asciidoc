@@ -1679,7 +1679,7 @@ other component, so a component painted after the peer covers it. The simulator 
 peer that renders into a buffer.
 
 * Where the peer owns a surface of its own, the system composites that surface and paint order never
-reaches it. That's the case the screenshot technique below was written for.
+reaches it. The screenshot technique below can't reach it either, for the same reason.
 
 .Where a peer sits, and what follows from it
 image::img/peer-component-painting.svg[Where a native peer is composited relative to the Codename One layer, and how it differs by port,scaledwidth=85%]
@@ -1688,8 +1688,14 @@ NOTE: This was also the case in AWT/Swing to one degree or another...
 
 ==== Showing dialogs on top of peer components
 
-Where the platform composites the peer itself, painting over it isn't an option, so the still image
-stands in for it. Codename One grabs a screenshot of the peer, hide it and then you can show the screenshot. Since the screenshot is static it can be rendered through the standard UI. You can't do that always since grabbing a screenshot is an expensive process on all platforms and must be performed on the native device thread.
+A form transition doesn't need anything from you here: `initTransition` puts both forms into
+lightweight mode, and the ports answer that by standing a still image in for the peer while the
+transition runs. Arbitrary overlap is the part that isn't automatic. Codename One grabs a screenshot of the peer, hide it and then you can show the screenshot. Since the screenshot is static it can be rendered through the standard UI. You can't do that always since grabbing a screenshot is an expensive process on all platforms and must be performed on the native device thread.
+
+A peer that renders into a surface of its own is the case the capture can't cover at all: the ordinary
+view capture reads nothing back from such a surface. A port that needs the contents anyway has to keep
+its own copy, which is what the OpenGL peer does with `glReadPixels` so that its last frame still
+reaches a screenshot.
 
 ==== Why can't you combine peer component scrolling and Codename One scrolling
 
