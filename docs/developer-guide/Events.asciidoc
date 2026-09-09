@@ -219,17 +219,15 @@ Low-level events can be bound in one of 3 ways:
 
 TIP: That last one depends on the event. A key callback on an ordinary `Component` only fires while that
 component holds focus, because `Form` routes key events to the focused one - the exception is a key the
-menu bar claims, which `Form.keyPressed` hands to `MenuBar` before it consults `focused` at all. A pointer
-callback has no such prerequisite: `Form` looks up whatever component sits under the touch and delivers to
-it, whichever component holds focus at the time. What differs is what else happens. In the content pane the
-component has to be enabled to be called at all; in the title area and along the west side it's called even
-when it's disabled. Focus moves only when the target is focusable and enabled and the press isn't a scroll
-wheel - before the callback in the content pane, and after it elsewhere, by way of `LeadUtil`. Focus is
-therefore never a condition for a pointer callback, and only sometimes a consequence of one.
+menu bar claims, which `Form.keyPressed` hands to `MenuBar` before it consults `focused` at all.
 
-One more thing the lookup does: inside a container with a lead component the callback doesn't go to the
-component you touched. `Form.pointerPressed` resolves the lead parent, and `LeadUtil.pointerPressed` calls
-`pointerPressed` on the lead component, so that's the class to override or attach a listener to.
+A pointer callback has no focus prerequisite at all, and three things about its target are worth knowing.
+`Form.pointerPressed` resolves the *lead parent* of whatever sits under the touch, so `isEnabled()` and
+`isFocusable()` are asked of that parent rather than of the component you pressed. The callback itself goes
+to the *lead component*, which is the class to override or attach a listener to. And focus is assigned only
+when the lead parent is focusable and enabled and the press isn't a scroll wheel - in the content pane both
+before the callback and again after it, so moving focus from inside a pointer callback there can be undone
+the moment it returns.
 
 .How one touch reaches your code
 image::img/event-dispatch-path.svg[The path a pointer event takes from the native callback to your listener,scaledwidth=85%]

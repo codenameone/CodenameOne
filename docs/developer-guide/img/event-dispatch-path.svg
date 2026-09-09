@@ -30,9 +30,9 @@
   <text x="116" y="364" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#4a7a3d">The component</text>
   <text x="116" y="379" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#4a7a3d">that gets it</text>
   <text x="232" y="352" font-family="Arial, sans-serif" font-size="9.5" fill="#777777">getComponentAt, then leadParentImpl and leadComponentImpl</text>
-  <text x="232" y="371" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">In the content pane it must be enabled to be called; the title area and west side call</text>
-  <text x="232" y="386" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">it even when disabled. Inside a lead container the callback goes to the lead component,</text>
-  <text x="232" y="401" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">not the one you touched. Focus follows only if it is focusable and not a scroll wheel.</text>
+  <text x="232" y="371" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Form resolves the lead parent first, so isEnabled() and isFocusable() are asked of that,</text>
+  <text x="232" y="386" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">not of what you pressed, while the callback goes to the lead component. The content pane</text>
+  <text x="232" y="401" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">needs it enabled; the title area and west side do not. Focus is assigned only sometimes.</text>
   <path d="M 116 406 L 116 416" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
   <path d="M 111 410 L 116 416 L 121 410" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
   <rect x="16" y="416" width="200" height="78" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
