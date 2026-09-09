@@ -194,6 +194,35 @@ class AndroidLocationButtonPermissionTest {
                 "the restricted spelling is not the ordinary one");
     }
 
+    /**
+     * The Wi-Fi permissions bring their own ACCESS_FINE_LOCATION capped at
+     * maxSdkVersion 32, and it goes into the same xpermissions string that
+     * permissionAdd() checks by bare name. An application that needs precise
+     * location in its own right would therefore end up with the capped entry as
+     * its ONLY declaration and no effective one from Android 13 up -- fatal for
+     * a location button, whose whole platform is above that.
+     */
+    @Test
+    void wifiDoesNotCapTheLocationPermissionOfAnAppThatNeedsIt() {
+        assertFalse(AndroidGradleBuilder.needsCappedWifiFineLocation(true, ""),
+                "an app that uses location gets the uncapped declaration instead");
+        assertFalse(AndroidGradleBuilder.needsCappedWifiFineLocation(true, null));
+    }
+
+    /** Wi-Fi on its own still gets the capped entry, which is what it is for. */
+    @Test
+    void wifiAloneStillCapsTheLocationPermission() {
+        assertTrue(AndroidGradleBuilder.needsCappedWifiFineLocation(false, ""));
+        assertTrue(AndroidGradleBuilder.needsCappedWifiFineLocation(false, null));
+    }
+
+    /** And it is never added twice. */
+    @Test
+    void anExistingDeclarationIsNotDuplicated() {
+        String existing = "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />";
+        assertFalse(AndroidGradleBuilder.needsCappedWifiFineLocation(false, existing));
+    }
+
     /** Neither rule fires on a fragment that says nothing about location. */
     @Test
     void anUnrelatedFragmentIsNeitherDeclaration() {

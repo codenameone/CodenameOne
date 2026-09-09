@@ -682,6 +682,38 @@ public class AndroidGradleBuilder extends Executor {
     /// #### Returns
     ///
     /// whether to declare the restriction, before the compile SDK is consulted
+    /// Whether the Wi-Fi permissions should bring their own ACCESS_FINE_LOCATION
+    /// capped at `maxSdkVersion="32"`.
+    ///
+    /// Wi-Fi needs a location permission only to read the SSID/BSSID, and only
+    /// up to Android 12; from 13 NEARBY_WIFI_DEVICES covers it, so the cap keeps
+    /// a Wi-Fi-only application from asking for location on the versions where
+    /// it does not have to.
+    ///
+    /// It must not be added when the application needs precise location in its
+    /// own right. The entry goes into xPermissions, permissionAdd() drops this
+    /// build's declaration for any permission already named there -- a bare name
+    /// match that never looks at maxSdkVersion -- so the capped entry would be
+    /// the ONLY ACCESS_FINE_LOCATION in the manifest and the application would
+    /// have no effective one from Android 13 up. For a location button that is
+    /// fatal on the one platform it exists for: the system grants precise
+    /// location through a permission the manifest no longer really declares.
+    ///
+    /// The uncapped declaration this build emits instead serves Wi-Fi on every
+    /// version, so nothing is lost by leaving the cap out.
+    ///
+    /// #### Parameters
+    ///
+    /// - `gpsPermission`: whether the application uses location in its own right
+    /// - `xPermissions`: the extra permissions accumulated so far
+    static boolean needsCappedWifiFineLocation(boolean gpsPermission, String xPermissions) {
+        if (gpsPermission) {
+            return false;
+        }
+        return xPermissions == null
+                || xPermissions.indexOf("android.permission.ACCESS_FINE_LOCATION") < 0;
+    }
+
     /// Whether `android.xpermissions` hand-declares ACCESS_FINE_LOCATION
     /// WITHOUT the location-button restriction.
     ///
@@ -3196,7 +3228,7 @@ public class AndroidGradleBuilder extends Executor {
             // permission; on 13+ the dedicated NEARBY_WIFI_DEVICES permission
             // can replace it for scan-only flows. We declare both with
             // appropriate maxSdkVersion so the right one is requested per OS.
-            if (!xPermissions.contains("android.permission.ACCESS_FINE_LOCATION")) {
+            if (needsCappedWifiFineLocation(gpsPermission, xPermissions)) {
                 xPermissions = "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"32\" />\n" + xPermissions;
             }
             if (targetSDKVersionInt >= 33
