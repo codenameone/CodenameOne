@@ -281,13 +281,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
      */
     private void requireAssignableFields(String binaryName, AnnotatedClass cls,
             ProcessorContext ctx) {
-        for (FieldInfo f : cls.getFields()) {
-            if (f.isStatic() || !f.isPublic()) {
-                continue;
-            }
-            if ((f.getAccess() & org.objectweb.asm.Opcodes.ACC_SYNTHETIC) != 0) {
-                continue;
-            }
+        for (FieldInfo f : transferredFields(cls, ctx)) {
             if (f.isFinal()) {
                 ctx.error(cls, binaryName + "." + f.getName() + " is public and final, "
                         + "so the generated decoder cannot assign it: the field would "
@@ -317,6 +311,39 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         return true;
     }
 
+    /**
+     * Every public instance field a DTO carries, its superclasses included.
+     *
+     * AnnotatedClass.getFields() reads ONE class file, so an inherited field was
+     * invisible to all four passes that use it: it was not validated, its type was
+     * never collected, the encoder never wrote it and the decoder never read it. A
+     * subclass went over the wire missing everything its base declared, silently
+     * and on both ends. Walks up until the superclass is outside the index, which
+     * is where the JDK begins; a field hidden by one of the same name in a subclass
+     * is taken from the subclass, as Java resolves it.
+     */
+    private List<FieldInfo> transferredFields(AnnotatedClass cls, ProcessorContext ctx) {
+        List<FieldInfo> out = new ArrayList<FieldInfo>();
+        Set<String> seen = new LinkedHashSet<String>();
+        AnnotatedClass at = cls;
+        while (at != null) {
+            for (FieldInfo f : at.getFields()) {
+                if (f.isStatic() || !f.isPublic()) {
+                    continue;
+                }
+                if ((f.getAccess() & org.objectweb.asm.Opcodes.ACC_SYNTHETIC) != 0) {
+                    continue;
+                }
+                if (seen.add(f.getName())) {
+                    out.add(f);
+                }
+            }
+            String superName = at.getSuperInternalName();
+            at = superName == null ? null : ctx.lookup(superName);
+        }
+        return out;
+    }
+
     private void collectDtos(String javaType, ProcessorContext ctx) {
         if (javaType == null) return;
         String t = javaType.trim();
@@ -325,6 +352,22 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             String outer = t.substring(0, lt);
             String inner = t.substring(lt + 1, t.length() - 1);
             if ("java.util.List".equals(outer) || "java.util.Set".equals(outer)) {
+                // A collection OF a collection of DTOs encodes wrongly and quietly:
+                // fieldToJson applies the generated codec to the elements of the
+                // outer collection only, and an element that is itself a collection
+                // starts with "java." so it is handed to the writer untouched --
+                // where each DTO inside becomes the JSON string of its toString().
+                // Refused for the same reason a Map of DTOs is: the codec cannot
+                // express the shape, and producing the wrong JSON is worse than
+                // refusing to compile.
+                if (inner.indexOf('<') >= 0 && namesADto(inner, ctx)) {
+                    ctx.error("A transferred field or return typed " + t + " cannot be "
+                            + "encoded: the generated codec reaches the elements of the "
+                            + "outer collection only, so the DTOs inside " + inner
+                            + " would be written as their toString(). Use a collection "
+                            + "of a DTO that holds the inner collection.");
+                    return;
+                }
                 collectDtos(inner, ctx);
             } else if ("java.util.Map".equals(outer)) {
                 // A Map of JDK values round-trips; a Map whose values are a DTO
@@ -352,8 +395,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         if (dtos.containsKey(t)) return;
         requireAssignableFields(t, cls, ctx);
         dtos.put(t, cls);
-        for (FieldInfo f : cls.getFields()) {
-            if (f.isStatic() || !f.isPublic()) continue;
+        for (FieldInfo f : transferredFields(cls, ctx)) {
             collectDtos(fieldJavaType(f), ctx);
         }
     }
@@ -432,7 +474,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             if (wouldReplaceAnExistingClass(codec, "JSON codec", ctx)) {
                 return;
             }
-            sources.put(codec, generateDtoCodec(e.getKey(), e.getValue()));
+            sources.put(codec, generateDtoCodec(e.getKey(), e.getValue(), ctx));
         }
         try {
             List<java.io.File> cp = new ArrayList<java.io.File>();
@@ -610,7 +652,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         if ("java.lang.String".equals(javaType)) return expr;
         if ("int".equals(javaType))     return "parseInt(" + expr + ")";
         if ("long".equals(javaType))    return "parseLong(" + expr + ")";
-        if ("boolean".equals(javaType)) return "java.lang.Boolean.parseBoolean(" + expr + ")";
+        if ("boolean".equals(javaType)) return "parseBool(" + expr + ")";
         if ("double".equals(javaType))  return "parseDouble(" + expr + ")";
         if ("float".equals(javaType))   return "(float)parseDouble(" + expr + ")";
         if ("short".equals(javaType))   return "(short)parseInt(" + expr + ")";
@@ -900,7 +942,21 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("    private static Float boxFloat(String v) { return v == null || v.length() == 0 ? null : Float.valueOf(v.trim()); }\n");
         sb.append("    private static Short boxShort(String v) { return v == null || v.length() == 0 ? null : Short.valueOf(v.trim()); }\n");
         sb.append("    private static Byte boxByte(String v) { return v == null || v.length() == 0 ? null : Byte.valueOf(v.trim()); }\n");
-        sb.append("    private static Boolean boxBoolean(String v) { return v == null ? null : Boolean.valueOf(v.trim()); }\n");
+        // NOT Boolean.parseBoolean, which answers false for everything that is not
+        // "true": "?enabled=treu" reached the handler as an explicit false and the
+        // client was told nothing, while the same typo in a numeric binding throws
+        // and comes back as a 400. A present value is either boolean or it is a
+        // mistake worth reporting.
+        sb.append("    private static boolean parseBool(String v) {\n");
+        sb.append("        if (v == null || v.length() == 0) { return false; }\n");
+        sb.append("        String t = v.trim();\n");
+        sb.append("        if (t.equalsIgnoreCase(\"true\")) { return true; }\n");
+        sb.append("        if (t.equalsIgnoreCase(\"false\")) { return false; }\n");
+        sb.append("        throw new IllegalArgumentException(\"not a boolean: \" + v);\n");
+        sb.append("    }\n");
+        sb.append("    private static Boolean boxBoolean(String v) {\n");
+        sb.append("        return v == null || v.length() == 0 ? null : Boolean.valueOf(parseBool(v));\n");
+        sb.append("    }\n");
     }
 
     // ----------------------------------------------------------------
@@ -911,7 +967,8 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
     /// rather than reflective on purpose: ParparVM has no usable reflection and
     /// Codename One obfuscates, so a name lookup at runtime would fail in exactly
     /// the builds that matter.
-    private String generateDtoCodec(String binaryName, AnnotatedClass cls) {
+    private String generateDtoCodec(String binaryName, AnnotatedClass cls,
+            ProcessorContext ctx) {
         String pkg = RestClientAnnotationProcessor.packageOf(binaryName);
         String simple = RestClientAnnotationProcessor.simpleName(binaryName);
         StringBuilder sb = new StringBuilder(4096);
@@ -924,9 +981,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("    public static java.util.Map toMap(").append(binaryName).append(" o) {\n");
         sb.append("        if(o == null) return null;\n");
         sb.append("        java.util.Map m = new java.util.LinkedHashMap();\n");
-        for (FieldInfo f : cls.getFields()) {
-            if (f.isStatic() || !f.isPublic()) continue;
-            if ((f.getAccess() & org.objectweb.asm.Opcodes.ACC_SYNTHETIC) != 0) continue;
+        for (FieldInfo f : transferredFields(cls, ctx)) {
             String type = fieldJavaType(f);
             sb.append("        m.put(\"").append(RestClientAnnotationProcessor.escape(f.getName()))
               .append("\", ").append(fieldToJson(type, "o." + f.getName())).append(");\n");
@@ -937,8 +992,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("    public static ").append(binaryName).append(" fromMap(java.util.Map m) {\n");
         sb.append("        if(m == null) return null;\n");
         sb.append("        ").append(binaryName).append(" o = new ").append(binaryName).append("();\n");
-        for (FieldInfo f : cls.getFields()) {
-            if (f.isStatic() || !f.isPublic()) continue;
+        for (FieldInfo f : transferredFields(cls, ctx)) {
             if ((f.getAccess() & org.objectweb.asm.Opcodes.ACC_SYNTHETIC) != 0) continue;
             if (f.isFinal()) continue; // cannot be assigned after construction
             String type = fieldJavaType(f);

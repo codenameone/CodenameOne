@@ -974,6 +974,16 @@ public final class HttpServer {
     private static final int SOCKET_TIMEOUT_MILLIS = envInt("CN1_HTTP_TIMEOUT_MS", 15000);
 
     /**
+     * The slowest upload this server will wait for, in bytes per second.
+     *
+     * 8 KB/s is well under any real link and still bounds a body: 8 MiB has about
+     * seventeen minutes to arrive, and a client sending a byte at a time does not
+     * get them. Set CN1_HTTP_MIN_BODY_RATE to change it.
+     */
+    private static final int MIN_BODY_BYTES_PER_SECOND =
+            envInt("CN1_HTTP_MIN_BODY_RATE", 8192);
+
+    /**
      * Ceiling on open connections. Past it a connection is accepted and closed
      * immediately rather than left in the backlog: refusing is a fast, legible
      * answer, while a full backlog looks to a client like a server that hangs. Set
@@ -2588,7 +2598,22 @@ public final class HttpServer {
             byte[] grown = new byte[needed];
             System.arraycopy(buffer, pos, grown, 0, keep);
             int at = keep;
+            // A RATE, not a deadline. The head gets a flat bound because it is small;
+            // a body cannot, since 8 MiB over a slow mobile link is a real client and
+            // any fixed wall-clock limit refuses it. But SO_RCVTIMEO restarts on
+            // every successful read, so without something here a client declaring a
+            // large Content-Length and sending one byte inside each window holds its
+            // worker for as long as it likes -- and in pool mode, which is what TLS
+            // uses, enough of those are the whole server. The allowance is what this
+            // many bytes take at the floor rate, plus one socket timeout of slack, so
+            // a slow upload that keeps making progress finishes and a dribble does not.
+            long started = System.currentTimeMillis();
+            long allowed = SOCKET_TIMEOUT_MILLIS
+                    + (long)(needed - keep) * 1000L / MIN_BODY_BYTES_PER_SECOND;
             while(at < needed) {
+                if(System.currentTimeMillis() - started > allowed) {
+                    throw new ProtocolException(408, "the request body did not arrive in time");
+                }
                 // Exactly the shortfall, so a pipelined request behind this body stays
                 // in the socket for the next parse rather than being read into it.
                 int n = readFrom(fd, session, grown, at, needed - at);
