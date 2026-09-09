@@ -1399,8 +1399,19 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append("            return true;\n");
             sb.append("        }\n");
             sb.append("        try {\n");
-            sb.append("            ").append(numeric[i][2]).append("(value.trim());\n");
-            sb.append("            return true;\n");
+            if ("Float".equals(numeric[i][0])) {
+                // Float.parseFloat does not FAIL on a value too large for a
+                // float: it answers infinity, so 1e100 passed this guard and the
+                // handler ran on a number the client never sent. Every other
+                // width throws. An input that really spells an infinity is still
+                // accepted, which is what parseFloat means by it.
+                sb.append("            double asDouble = Double.parseDouble(value.trim());\n");
+                sb.append("            return !Float.isInfinite((float)asDouble)"
+                        + " || Double.isInfinite(asDouble);\n");
+            } else {
+                sb.append("            ").append(numeric[i][2]).append("(value.trim());\n");
+                sb.append("            return true;\n");
+            }
             sb.append("        } catch (NumberFormatException err) {\n");
             sb.append("            return false;\n");
             sb.append("        }\n");

@@ -286,6 +286,28 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aFloatTooLargeForAFloatIsRejected() throws Exception {
+        // Float.parseFloat answers INFINITY for 1e100 rather than throwing, so
+        // the guard approved it and the handler ran on a number the client did
+        // not send. Every other width throws and was already refused.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/scale\")\n"
+                + "    public String scale(@RequestParam(\"f\") float f) { return String.valueOf(f); }\n"
+                + "}\n");
+        Object tooLarge = router.call("GET", "/scale?f=1e100", null);
+        assertNotNull("GET /scale matched no route", tooLarge);
+        assertEquals(400, Router.statusOf(tooLarge));
+        // One that fits is still served.
+        Object ok = router.call("GET", "/scale?f=1.5", null);
+        assertNotNull(ok);
+        assertEquals(200, Router.statusOf(ok));
+    }
+
+    @Test
     public void aRelativeClassPrefixStillRoutes() throws Exception {
         // Written without the leading slash, which is the ordinary slip. Every
         // request target has one, so the route has to as well or nothing can

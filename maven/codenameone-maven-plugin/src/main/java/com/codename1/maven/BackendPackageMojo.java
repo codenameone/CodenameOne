@@ -364,7 +364,24 @@ public class BackendPackageMojo extends AbstractMojo {
             return;
         }
         try {
-            copyNonClasses(processed, classes);
+            int staged = copyNonClasses(processed, classes);
+            // Staged is not the same as READABLE, and the difference is silent.
+            // These files reach the translator, so anything that reads them at
+            // BUILD time works -- but the backend translates as app type "clean",
+            // and only the linux and windows types embed classpath resources into
+            // the binary. The clean runtime's Class.getResourceAsStream returns
+            // null unconditionally, so getResourceAsStream finds the file under
+            // cn1:backend, on the JVM, and finds nothing in the packaged
+            // executable. Said out loud rather than left to be discovered in
+            // production; embedding them is a change to the translator and the
+            // shared runtime, not to this goal.
+            if (staged > 0) {
+                getLog().warn("cn1: staged " + staged + " resource file(s) for translation, "
+                        + "but a packaged backend cannot READ them: getResourceAsStream "
+                        + "answers null in the translated runtime, though it works under "
+                        + "cn1:backend. Read configuration from a file path or the "
+                        + "environment instead of the classpath.");
+            }
         } catch (IOException err) {
             // A resource that cannot be staged is a packaging failure, not a note:
             // the executable would be reported as built while missing something
@@ -374,26 +391,27 @@ public class BackendPackageMojo extends AbstractMojo {
         }
     }
 
-    private void copyNonClasses(File from, File to) throws IOException {
+    /** @return how many non-class files were copied. */
+    private int copyNonClasses(File from, File to) throws IOException {
         if (from == null || !from.isDirectory()) {
-            return;
+            return 0;
         }
         File[] children = from.listFiles();
         if (children == null) {
-            return;
+            return 0;
         }
+        int copied = 0;
         for (File child : children) {
             File target = new File(to, child.getName());
             if (child.isDirectory()) {
                 target.mkdirs();
-                copyNonClasses(child, target);
+                copied += copyNonClasses(child, target);
             } else if (!child.getName().endsWith(".class")) {
-                // Not a warning: the executable this produces would be reported
-                // as built while silently missing a resource that cn1:backend has,
-                // so the difference shows up after deployment rather than here.
                 copyFile(child, target);
+                copied++;
             }
         }
+        return copied;
     }
 
     private static void copyFile(File from, File to) throws IOException {
