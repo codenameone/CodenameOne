@@ -464,6 +464,20 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                 // Both halves compile and neither works, so the shape is refused
                 // rather than mistranslated. Generating conversions for it is a
                 // feature, not a fix for this.
+                // The KEY as well. A JSON object's member names are strings, always,
+                // so Map<Integer,String> receives string keys under an integer-keyed
+                // declaration: a get(Integer) finds nothing and iterating the entries
+                // as Integer throws, while encoding turns the integers back into
+                // strings. Only a String key round-trips.
+                String key = mapKeyType(inner);
+                String rawKey = key.indexOf('<') < 0 ? key : key.substring(0, key.indexOf('<'));
+                if (!"java.lang.String".equals(rawKey) && !"java.lang.Object".equals(rawKey)) {
+                    ctx.error("A transferred field or return typed " + t + " cannot be "
+                            + "decoded: a JSON object's names are strings, so " + rawKey
+                            + " keys arrive as String and neither lookup nor iteration "
+                            + "works. Key the map by String.");
+                    return;
+                }
                 String value = mapValueType(inner);
                 // A Map's VALUES are handed over exactly as the parser made them:
                 // unlike a List or a Set, nothing walks them applying the element
@@ -565,6 +579,22 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             return "a Double";
         }
         return "something else";
+    }
+
+    /** The key half of a Map's type arguments, honouring nested generics. */
+    private static String mapKeyType(String inner) {
+        int depth = 0;
+        for (int i = 0; i < inner.length(); i++) {
+            char c = inner.charAt(i);
+            if (c == '<') {
+                depth++;
+            } else if (c == '>') {
+                depth--;
+            } else if (c == ',' && depth == 0) {
+                return inner.substring(0, i).trim();
+            }
+        }
+        return inner.trim();
     }
 
     /** The value half of a Map's type arguments, honouring nested generics. */

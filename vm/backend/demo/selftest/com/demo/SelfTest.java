@@ -420,8 +420,35 @@ public class SelfTest {
         check("a float is not widened", "1.2", Json.write(Float.valueOf(1.2f)));
     }
 
+    /**
+     * A malformed HTTP date must be NO date. Every field is read at a fixed
+     * offset and handed to a civil-date routine that normalises whatever it is
+     * given, so "99 Nov 9999 99:99:99" became a date far in the future and a
+     * conditional request read it as newer than the file -- answering 304, with
+     * no content, to a client that had nothing cached.
+     */
+    private static void malformedDatesAreNotDates() throws Exception {
+        String[] bad = new String[] {
+            "Sun, 99 Nov 9999 99:99:99 BAD",   // out of range, wrong suffix
+            "Sun, 06 Nov 1994 08:49:37 UTC",   // IMF-fixdate is GMT
+            "Sun, 06 Nov 1994 08:49:37",       // truncated
+            "Sun, 31 Feb 1994 08:49:37 GMT",   // a day that does not exist
+            "Sun, 06 Nov 1994 25:00:00 GMT",   // hour out of range
+            "Sunday, 06-Nov-94 08:49:37 GMT",  // RFC 850, deliberately unsupported
+        };
+        for(int iter = 0 ; iter < bad.length ; iter++) {
+            check("a malformed date is refused: " + bad[iter], "-1",
+                    String.valueOf(Http1Date.parse(bad[iter])));
+        }
+        // And the one real form still parses, round-tripping through the writer.
+        long when = Http1Date.parse("Sun, 06 Nov 1994 08:49:37 GMT");
+        check("a valid IMF-fixdate parses", "784111777000", String.valueOf(when));
+        check("and formats back", "Sun, 06 Nov 1994 08:49:37 GMT", Http1Date.format(when));
+    }
+
     private static void json() throws Exception {
         bothJsonWritersAgree();
+        malformedDatesAreNotDates();
         Map parsed = Json.parseObject("{\"a\":1,\"b\":\"two\",\"c\":true,\"d\":null,\"e\":1.5}");
         // Integers must stay integers: a long round-tripped through double loses
         // precision above 2^53, and ids are exactly the values that get large.

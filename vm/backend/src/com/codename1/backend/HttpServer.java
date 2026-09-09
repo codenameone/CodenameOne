@@ -857,6 +857,16 @@ public final class HttpServer {
      * a failure with nothing to do with whoever caused it.
      */
     private static final int MAX_OPEN_H2_FILES = envInt("CN1_HTTP_MAX_H2_FILES", 128);
+
+    /**
+     * Response-body heap that may be outstanding across the PROCESS. The limit
+     * beside it is per turn and per session, which bounds one connection -- and
+     * the connection ceiling is in the thousands, so a body per connection is
+     * still gigabytes. Memory runs out process-wide, so it is counted that way,
+     * exactly like the descriptors above.
+     */
+    private static final long MAX_OPEN_H2_BODY_BYTES =
+            envInt("CN1_HTTP_MAX_H2_BODY_MB", 64) * 1024L * 1024L;
     private static final int MAX_BODY_BYTES = 8 * 1024 * 1024;
     private static final int READY_CAPACITY = 256;
 
@@ -3238,7 +3248,8 @@ public final class HttpServer {
                 }
                 requestsServed.incrementAndGet();
                 if(queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES
-                        || Http2.pendingBodyFiles() > MAX_OPEN_H2_FILES) {
+                        || Http2.pendingBodyFiles() > MAX_OPEN_H2_FILES
+                        || Http2.pendingBodyBytesAll() > MAX_OPEN_H2_BODY_BYTES) {
                     flushHttp2(fd, session, h2);
                     // What the flush could NOT write, not zero. nghttp2 pulls
                     // from a submitted body only as the peer's flow-control
@@ -3250,7 +3261,8 @@ public final class HttpServer {
                     // held for a client that is reading none of it.
                     queuedBodyBytes = h2.pendingBodyBytes();
                     if(queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES
-                            || Http2.pendingBodyFiles() > MAX_OPEN_H2_FILES) {
+                            || Http2.pendingBodyFiles() > MAX_OPEN_H2_FILES
+                            || Http2.pendingBodyBytesAll() > MAX_OPEN_H2_BODY_BYTES) {
                         // Still over after a real attempt to write, so the peer
                         // is not draining. Leave the rest of the ready requests
                         // where they are -- their inbound bodies are already

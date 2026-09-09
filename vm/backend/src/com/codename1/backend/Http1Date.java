@@ -79,7 +79,17 @@ public final class Http1Date {
         // "Sun, 06 Nov 1994 08:49:37 GMT" -- the only form a modern server must
         // emit. The two obsolete RFC 850 / asctime forms are not accepted; a client
         // sending one gets a full response rather than a wrong 304.
-        if(v.length() < 29 || v.charAt(3) != ',') {
+        // The WHOLE shape, not the length and one comma. Every field below is
+        // read by fixed offset and then handed to daysFromCivil, which NORMALISES
+        // whatever it is given: "Sun, 99 Nov 9999 99:99:99 BAD" was accepted and
+        // turned into a date far in the future, and StaticFiles then read that as
+        // "newer than the file" and answered 304 -- a conditional request served
+        // no content because its date was nonsense. A malformed date has to be
+        // no date at all.
+        if(v.length() != 29 || v.charAt(3) != ',' || v.charAt(4) != ' '
+                || v.charAt(7) != ' ' || v.charAt(11) != ' ' || v.charAt(16) != ' '
+                || v.charAt(19) != ':' || v.charAt(22) != ':' || v.charAt(25) != ' '
+                || !"GMT".equals(v.substring(26))) {
             return -1;
         }
         try {
@@ -99,12 +109,33 @@ public final class Http1Date {
             int hour = Integer.parseInt(v.substring(17, 19).trim());
             int minute = Integer.parseInt(v.substring(20, 22).trim());
             int second = Integer.parseInt(v.substring(23, 25).trim());
+            // Ranges, for the same reason: daysFromCivil answers for day 99 as
+            // readily as for day 9, and the answer is a different date than the
+            // one written. A second of 60 is allowed because a leap second is
+            // spelled that way.
+            if(day < 1 || day > daysInMonth(year, month) || hour > 23 || minute > 59
+                    || second > 60 || year < 1) {
+                return -1;
+            }
             long days = daysFromCivil(year, month, day);
             return ((days * 86400L) + hour * 3600L + minute * 60L + second) * 1000L;
         } catch (NumberFormatException err) {
             return -1;
         } catch (IndexOutOfBoundsException err) {
             return -1;
+        }
+    }
+
+    /** Days in a month, so a date that does not exist is not silently moved. */
+    private static int daysInMonth(int year, int month) {
+        switch(month) {
+            case 2:
+                boolean leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+                return leap ? 29 : 28;
+            case 4: case 6: case 9: case 11:
+                return 30;
+            default:
+                return 31;
         }
     }
 

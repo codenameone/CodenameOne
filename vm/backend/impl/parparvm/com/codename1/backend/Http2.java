@@ -231,6 +231,16 @@ public final class Http2 {
         return pendingBodyFilesImpl();
     }
 
+    /**
+     * Response-body heap outstanding across the PROCESS rather than this session.
+     * The per-session figure says what one connection holds; a limit on that is a
+     * limit per connection, and the connection ceiling is in the thousands, so it
+     * bounds nothing about the machine.
+     */
+    public static long pendingBodyBytesAll() {
+        return pendingBodyBytesAllImpl();
+    }
+
     public void close() {
         if(session != 0) {
             long s = session;
@@ -293,5 +303,6 @@ public final class Http2 {
     private static native boolean wantsMoreImpl(long session);
     private static native long pendingBodyBytesImpl(long session);
     private static native int pendingBodyFilesImpl();
+    private static native long pendingBodyBytesAllImpl();
     private static native void destroyImpl(long session);
 }

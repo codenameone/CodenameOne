@@ -141,6 +141,11 @@ public final class Http2 {
         return 0;
     }
 
+    /** And nothing is submitted, so no body holds heap either. */
+    public static long pendingBodyBytesAll() {
+        return 0;
+    }
+
     public void close() {
     }
 }

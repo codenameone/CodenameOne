@@ -146,7 +146,21 @@ typedef struct {
    and destroyed in cn1H2FreeBody, so those two are the whole accounting. */
 static _Atomic long cn1H2OpenFileBodies = 0;
 
+/* Heap held by submitted response bodies across ALL sessions, for the same
+   reason the descriptors are counted that way: a per-session limit is a limit
+   per CONNECTION, and the connection ceiling is in the thousands. Each session
+   pausing itself after one oversized body still lets the process hold that body
+   times every connection, which is gigabytes of native memory pinned by small
+   GET requests whose senders never open their windows. Maintained at the three
+   points that already exist -- submitted, drained, freed -- so it cannot drift
+   from what the bodies actually hold. */
+static _Atomic long cn1H2PendingBodyBytes = 0;
+
 static void cn1H2FreeBody(CN1H2Body* body) {
+    if(body->data != NULL && body->length > body->offset) {
+        atomic_fetch_sub_explicit(&cn1H2PendingBodyBytes,
+                (long)(body->length - body->offset), memory_order_relaxed);
+    }
     if(body->fd >= 0) {
         atomic_fetch_sub_explicit(&cn1H2OpenFileBodies, 1, memory_order_relaxed);
         /* The descriptor became the session's when the response was submitted, so
@@ -581,6 +595,15 @@ JAVA_LONG com_codename1_backend_Http2_pendingBodyBytesImpl___long_R_long(CODENAM
  * invisible to the byte accounting, and a peer that never opens its window
  * keeps one per stream for as long as it likes.
  */
+/*
+ * Response-body heap outstanding across the PROCESS. The per-session figure says
+ * what one connection is holding; this says what the machine is holding, which
+ * is the number that decides whether there is memory left.
+ */
+JAVA_LONG com_codename1_backend_Http2_pendingBodyBytesAllImpl___R_long(CODENAME_ONE_THREAD_STATE) {
+    return (JAVA_LONG)atomic_load_explicit(&cn1H2PendingBodyBytes, memory_order_relaxed);
+}
+
 JAVA_INT com_codename1_backend_Http2_pendingBodyFilesImpl___R_int(CODENAME_ONE_THREAD_STATE) {
     return (JAVA_INT)atomic_load_explicit(&cn1H2OpenFileBodies, memory_order_relaxed);
 }
@@ -733,6 +756,10 @@ static ssize_t cn1H2ReadBody(nghttp2_session* session, int32_t streamId, uint8_t
             memcpy(buf, body->data + body->offset, remaining);
         }
         body->offset += remaining;
+        if(body->data != NULL) {
+            atomic_fetch_sub_explicit(&cn1H2PendingBodyBytes, (long)remaining,
+                                      memory_order_relaxed);
+        }
     }
     if(body->offset >= body->length) {
         *dataFlags |= NGHTTP2_DATA_FLAG_EOF;
@@ -898,6 +925,8 @@ JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_jav
                 pending->offset = 0;
                 pending->next = s->bodies;
                 s->bodies = pending;
+                atomic_fetch_add_explicit(&cn1H2PendingBodyBytes,
+                                          (long)pending->length, memory_order_relaxed);
             }
         }
         if(pending == NULL) {
