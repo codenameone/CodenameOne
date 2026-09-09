@@ -165,13 +165,13 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
 
     @Override
     protected void paintWithEffect(com.codename1.ui.Graphics g,
-            com.codename1.ui.Container pane, Runnable paintChildren) {
+            com.codename1.ui.Container pane, Subtree paintChildren) {
         styleOnce(pane);
         int radius = (int) Math.round(com.codename1.flutter.rendering.Dp.px(cornerRadiusLp()));
         if (radius <= 0) {
             // Square surface: nothing to paint here that the component's own background
             // does not already do (applyStyle leaves it in place in this case).
-            paintChildren.run();
+            paintChildren.paint(g);
             return;
         }
         boolean clips = !noShapeClip() && g.isShapeClipSupported()
@@ -235,12 +235,12 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
         // the corners used to end up square from behind.
         paintSurface(g, q, material().getElevation());
         if (!clips) {
-            paintChildren.run();
+            paintChildren.paint(g);
             return;
         }
         try {
             g.setClip(clipShape(q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7]));
-            paintChildren.run();
+            paintChildren.paint(g);
         } finally {
             g.setClip(cx, cy, cw, ch);
         }

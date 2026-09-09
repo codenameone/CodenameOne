@@ -1,0 +1,157 @@
+package com.codename1.flutter.widgets;
+
+import com.codename1.flutter.BorderRadius;
+import com.codename1.flutter.Radius;
+import com.codename1.flutter.Widget;
+import com.codename1.flutter.rendering.Dp;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.geom.GeneralPath;
+
+/**
+ * Clips its subtree to a ROUNDED rectangle — Flutter's {@code ClipRRect}.
+ *
+ * <p>It used to be a pass-through, so every corner the design rounds came out
+ * square: the gallery frames each demo in a card with a 10dp top radius, the
+ * mail study clips its avatars, and the study cards on the home screen are
+ * rounded. None of it appeared.</p>
+ *
+ * <p>The nested pane from {@link EffectRenderElement} already confines the
+ * subtree to a rectangle; the corners need a shaped clip on top, which is only
+ * available where the port supports one. Where it is not, the rectangular pane
+ * clip stands — square corners, but never content spilling out.</p>
+ *
+ * <p>The path is rebuilt only when the box or the radii change. Building a
+ * GeneralPath per paint is how an earlier version of this runtime put the event
+ * thread inside the garbage collector for the duration of every frame.</p>
+ */
+public class ClipRRectRenderElement extends ClipRectRenderElement {
+
+    private GeneralPath path;
+    private int pathX = Integer.MIN_VALUE;
+    private int pathY = Integer.MIN_VALUE;
+    private int pathW = -1;
+    private int pathH = -1;
+    private double pathTl;
+    private double pathTr;
+    private double pathBr;
+    private double pathBl;
+
+    public ClipRRectRenderElement(Widget widget) {
+        super(widget);
+    }
+
+    private BorderRadius radius() {
+        Widget w = widget();
+        if (!(w instanceof ClipRRect)) {
+            return null;
+        }
+        Object r = ((ClipRRect) w).getBorderRadius();
+        return r instanceof BorderRadius ? (BorderRadius) r : null;
+    }
+
+    private static double px(Radius r) {
+        return r == null ? 0 : Dp.px(r.x());
+    }
+
+    @Override
+    protected void paintWithEffect(Graphics g, Container pane, Subtree paintChildren) {
+        BorderRadius radius = radius();
+        int w = pane.getWidth();
+        int h = pane.getHeight();
+        if (radius == null || w <= 0 || h <= 0 || !shapeClipSupported(g)) {
+            paintChildren.paint(g);
+            return;
+        }
+        double tl = px(radius.topLeft());
+        double tr = px(radius.topRight());
+        double br = px(radius.bottomRight());
+        double bl = px(radius.bottomLeft());
+        if (tl <= 0 && tr <= 0 && br <= 0 && bl <= 0) {
+            paintChildren.paint(g);
+            return;
+        }
+        // PARENT-RELATIVE, not absolute: a Graphics being painted through has
+        // already accumulated its ancestors' translation, which is why the whole
+        // of Codename One draws with getX(). Clipping with the absolute position
+        // added that offset a second time, and the clip then landed somewhere
+        // else entirely -- the subtree was still laid out, still had components,
+        // and painted nothing.
+        int ax = pane.getX();
+        int ay = pane.getY();
+        GeneralPath p = pathFor(ax, ay, w, h, tl, tr, br, bl);
+        int[] saved = {g.getClipX(), g.getClipY(), g.getClipWidth(), g.getClipHeight()};
+        g.setClip(p);
+        try {
+            paintChildren.paint(g);
+        } finally {
+            // A shaped clip has to be undone here: Codename One's own clip
+            // bookkeeping restores rectangles, so anything painted after this
+            // would otherwise inherit these corners.
+            g.setClip(saved[0], saved[1], saved[2], saved[3]);
+        }
+    }
+
+    private static boolean shapeClipSupported(Graphics g) {
+        try {
+            return Display.isInitialized() && g.isShapeClipSupported();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private GeneralPath pathFor(int x, int y, int w, int h,
+            double tl, double tr, double br, double bl) {
+        // REUSED, not rebuilt. The path is geometry, and the geometry only
+        // changes when the box does; rebuilding it on every paint puts a fresh
+        // GeneralPath in front of the collector on every frame of every
+        // animation that crosses a rounded card, which is how an earlier
+        // version of this runtime parked the event thread inside the GC.
+        // The origin participates because the path is in parent-relative
+        // coordinates, which move when an ancestor scrolls.
+        if (path != null && pathX == x && pathY == y && pathW == w && pathH == h
+                && pathTl == tl && pathTr == tr && pathBr == br && pathBl == bl) {
+            return path;
+        }
+        path = new GeneralPath();
+        pathX = x;
+        pathY = y;
+        pathW = w;
+        pathH = h;
+        pathTl = tl;
+        pathTr = tr;
+        pathBr = br;
+        pathBl = bl;
+        // A radius can never exceed half the box, or opposite corners overlap and
+        // the outline crosses itself.
+        double max = Math.min(w, h) / 2.0;
+        tl = Math.min(tl, max);
+        tr = Math.min(tr, max);
+        br = Math.min(br, max);
+        bl = Math.min(bl, max);
+        float left = x;
+        float top = y;
+        float right = x + w;
+        float bottom = y + h;
+        path.moveTo(left + tl, top);
+        path.lineTo(right - tr, top);
+        if (tr > 0) {
+            path.quadTo(right, top, right, top + tr);
+        }
+        path.lineTo(right, bottom - br);
+        if (br > 0) {
+            path.quadTo(right, bottom, right - br, bottom);
+        }
+        path.lineTo(left + bl, bottom);
+        if (bl > 0) {
+            path.quadTo(left, bottom, left, bottom - bl);
+        }
+        path.lineTo(left, top + tl);
+        if (tl > 0) {
+            path.quadTo(left, top, left + tl, top);
+        }
+        path.closePath();
+        return path;
+    }
+}

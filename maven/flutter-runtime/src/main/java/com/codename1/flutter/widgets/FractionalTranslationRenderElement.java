@@ -96,22 +96,22 @@ public class FractionalTranslationRenderElement extends EffectRenderElement {
     }
 
     @Override
-    protected void paintWithEffect(Graphics g, Container pane, Runnable paintChildren) {
+    protected void paintWithEffect(Graphics g, Container pane, Subtree paintChildren) {
         FractionSource src = source();
         Offset f = src == null ? null : src.fraction();
         if (f == null || (f.dx() == 0 && f.dy() == 0)) {
-            paintChildren.run();
+            paintChildren.paint(g);
             return;
         }
         int dx = (int) Math.round(f.dx() * pane.getWidth());
         int dy = (int) Math.round(f.dy() * pane.getHeight());
         if (dx == 0 && dy == 0) {
-            paintChildren.run();
+            paintChildren.paint(g);
             return;
         }
         g.translate(dx, dy);
         try {
-            paintChildren.run();
+            paintChildren.paint(g);
         } finally {
             g.translate(-dx, -dy);
         }

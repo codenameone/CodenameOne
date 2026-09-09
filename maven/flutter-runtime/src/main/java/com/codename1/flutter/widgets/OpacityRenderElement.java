@@ -25,10 +25,10 @@ public class OpacityRenderElement extends EffectRenderElement {
     }
 
     @Override
-    protected void paintWithEffect(Graphics g, Container pane, Runnable paintChildren) {
+    protected void paintWithEffect(Graphics g, Container pane, Subtree paintChildren) {
         double o = opacity().getOpacity();
         if (o >= 1.0) {
-            paintChildren.run();
+            paintChildren.paint(g);
             return;
         }
         if (o <= 0.0) {
@@ -38,7 +38,7 @@ public class OpacityRenderElement extends EffectRenderElement {
         // Compose with the alpha already in effect, so nested Opacity multiplies.
         g.setAlpha((int) Math.round(previous * o));
         try {
-            paintChildren.run();
+            paintChildren.paint(g);
         } finally {
             g.setAlpha(previous);
         }

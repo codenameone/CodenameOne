@@ -55,28 +55,46 @@ public class RotatedBoxRenderElement extends EffectRenderElement {
     }
 
     @Override
-    protected void paintWithEffect(Graphics g, Container pane, Runnable paintChildren) {
+    protected void paintWithEffect(Graphics g, Container pane, Subtree paintChildren) {
         int t = turns();
         if (t == 0) {
-            paintChildren.run();
+            paintChildren.paint(g);
             return;
         }
         if (!g.isTransformSupported()) {
             com.codename1.flutter.FlutterErrorReport.unimplemented("RotatedBox",
                     "this platform has no transform support; the rotation is not painted");
-            paintChildren.run();
+            paintChildren.paint(g);
+            return;
+        }
+        // The subtree is rendered to a layer and the LAYER is turned, rather than the
+        // subtree being walked through a rotated Graphics. Under a matrix, Codename
+        // One's paint-time cull compares device-pixel component bounds against a clip
+        // reported in the matrix's own coordinates, and drops children that are in
+        // fact on screen -- see the note on EffectRenderElement.layer.
+        //
+        // The layer takes the CHILD's box, not the pane's: performLayout above reports
+        // the child's footprint with its axes swapped, so for a quarter turn the two
+        // differ and a pane-sized layer would clip the child before turning it.
+        int lw = swapsAxes() ? pane.getHeight() : pane.getWidth();
+        int lh = swapsAxes() ? pane.getWidth() : pane.getHeight();
+        com.codename1.ui.Image rendered = layer(pane, paintChildren, lw, lh);
+        if (rendered == null) {
             return;
         }
         com.codename1.ui.Transform saved = g.getTransform();
         com.codename1.ui.Transform r = saved.copy();
-        float cx = pane.getAbsoluteX() + pane.getWidth() / 2f;
-        float cy = pane.getAbsoluteY() + pane.getHeight() / 2f;
+        // The pivot is in the pane's own parent coordinates -- the space this Graphics
+        // is in. Absolute screen coordinates are a different space once any ancestor
+        // has translated, which is every ancestor.
+        float cx = pane.getX() + pane.getWidth() / 2f;
+        float cy = pane.getY() + pane.getHeight() / 2f;
         r.translate(cx, cy);
         r.rotate((float) (t * Math.PI / 2), 0, 0);
         r.translate(-cx, -cy);
         g.setTransform(r);
         try {
-            paintChildren.run();
+            g.drawImage(rendered, Math.round(cx - lw / 2f), Math.round(cy - lh / 2f));
         } finally {
             g.setTransform(saved);
         }

@@ -38,9 +38,9 @@ public class ClipRectRenderElement extends EffectRenderElement {
     }
 
     @Override
-    protected void paintWithEffect(Graphics g, Container pane, Runnable paintChildren) {
+    protected void paintWithEffect(Graphics g, Container pane, Subtree paintChildren) {
         // Clip.none never reaches here: ClipRect gives it a pass-through element instead,
         // since this element's pane clips whatever the behaviour asks for.
-        paintChildren.run();
+        paintChildren.paint(g);
     }
 }

@@ -42,10 +42,21 @@ public abstract class EffectRenderElement extends RenderElement {
     protected abstract Widget effectChild();
 
     /**
+     * Paints the effect's subtree into a Graphics of the caller's choosing.
+     *
+     * <p>The target is a parameter rather than the {@code Graphics} the effect was
+     * handed, because an effect that needs a matrix has to paint the subtree into an
+     * offscreen layer first - see {@link #layer}.</p>
+     */
+    protected interface Subtree {
+        void paint(Graphics target);
+    }
+
+    /**
      * Applies the effect and paints the subtree. Implementations must leave the
      * Graphics as they found it — a frame paints many components through the same one.
      */
-    protected abstract void paintWithEffect(Graphics g, Container pane, Runnable paintChildren);
+    protected abstract void paintWithEffect(Graphics g, Container pane, Subtree paintChildren);
 
     private RenderHost innerHost() {
         if (innerHost == null) {
@@ -141,6 +152,59 @@ public abstract class EffectRenderElement extends RenderElement {
         // here, and positioning the child again in host coordinates would double-offset it.
     }
 
+    /// The offscreen this effect's subtree is rendered into, reused across frames.
+    private com.codename1.ui.Image layerImage;
+
+    /// Renders the subtree into an offscreen image the size of {@code pane}, and hands
+    /// it back for the caller to draw wherever the effect wants it.
+    ///
+    /// An effect that needs a MATRIX -- a scale or a rotation -- cannot simply set one
+    /// on the Graphics and let Codename One walk the subtree, because the two disagree
+    /// about units once a matrix is in play. Component bounds are device pixels, but
+    /// `Graphics#getClipX` reports the clip in the matrix's own coordinates, and
+    /// `Container#paint`'s `g.translate(getX(), getY())` moves the origin by
+    /// `getX() / scale` user units rather than by `getX()`. `Component`'s
+    /// paint-time cull compares those two directly, so a child can be dropped for
+    /// being outside a clip it is in fact inside: the gallery's carousel scales the
+    /// card either side of the current page, and the 1019px translate to reach the
+    /// next card became 1171 user units, moving the clip clear of the card's bounds.
+    /// The card was not clipped or misplaced -- it was never painted at all, which is
+    /// why the next card never peeked in the way it does in the reference.
+    ///
+    /// Rendering to a layer and transforming the RESULT sidesteps that entirely: the
+    /// subtree paints through an untransformed Graphics, so every unit downstream is
+    /// the device pixel Codename One expects, and a pure scale then needs no matrix
+    /// support at all -- it is one `drawImage` into a destination rectangle. It is
+    /// also what Flutter does, where Transform is a layer rather than a paint mode.
+    ///
+    /// The buffer is kept and cleared rather than reallocated: a carousel drag scales
+    /// a card on every frame, and a fresh full-size ARGB image per frame is exactly
+    /// the allocation rate that drives a collection mid-drag.
+    ///
+    /// @return the layer, or null when the pane has no area to render into
+    protected final com.codename1.ui.Image layer(Container pane, Subtree subtree) {
+        return layer(pane, subtree, pane.getWidth(), pane.getHeight());
+    }
+
+    /// As {@link #layer(Container, Subtree)}, for an effect whose subtree does not have
+    /// the pane's own shape. A quarter-turned box is the case that needs it: its pane
+    /// reports the child's footprint with the axes swapped, so a layer the size of the
+    /// pane would cut the child in half before it was ever turned.
+    protected final com.codename1.ui.Image layer(Container pane, Subtree subtree, int w, int h) {
+        if (w <= 0 || h <= 0 || !(pane instanceof EffectPane)) {
+            return null;
+        }
+        if (layerImage == null || layerImage.getWidth() != w || layerImage.getHeight() != h) {
+            layerImage = com.codename1.ui.Image.createImage(w, h, 0);
+        } else {
+            layerImage.getGraphics().clearRect(0, 0, w, h);
+        }
+        // The subtree paints with the pane parked at the origin, so what lands in the
+        // image is exactly the pane's own box -- no translate to unwind afterwards.
+        ((EffectPane) pane).paintAtOrigin(layerImage.getGraphics());
+        return layerImage;
+    }
+
     /** The nested container: lays the subtree out at its own bounds and paints it through the effect. */
     private final class EffectPane extends Container {
 
@@ -161,12 +225,26 @@ public abstract class EffectRenderElement extends RenderElement {
         @Override
         public void paint(final Graphics g) {
             final Container self = this;
-            paintWithEffect(g, self, new Runnable() {
+            paintWithEffect(g, self, new Subtree() {
                 @Override
-                public void run() {
-                    EffectPane.super.paint(g);
+                public void paint(Graphics target) {
+                    EffectPane.super.paint(target);
                 }
             });
+        }
+
+        /** Paints the subtree with this pane parked at the origin, for {@link #layer}. */
+        void paintAtOrigin(Graphics target) {
+            int x = getX();
+            int y = getY();
+            setX(0);
+            setY(0);
+            try {
+                EffectPane.super.paint(target);
+            } finally {
+                setX(x);
+                setY(y);
+            }
         }
     }
 }
