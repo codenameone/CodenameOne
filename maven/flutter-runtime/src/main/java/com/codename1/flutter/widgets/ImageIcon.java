@@ -23,6 +23,7 @@
  */
 package com.codename1.flutter.widgets;
 
+import com.codename1.flutter.BoxFit;
 import com.codename1.flutter.BuildContext;
 import com.codename1.flutter.Color;
 import com.codename1.flutter.ImageProvider;
@@ -62,10 +63,38 @@ public class ImageIcon extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
-        SizedBox box = new SizedBox();
-        double side = size != null ? size : 24.0;
-        box.width(side);
-        box.height(side);
-        return box;
+        double side = size != null ? size.doubleValue() : iconThemeSize(context);
+        if (image == null) {
+            SizedBox box = new SizedBox();
+            box.width(side);
+            box.height(side);
+            return box;
+        }
+        // This used to return the empty SizedBox above and nothing else, so an ImageIcon
+        // reserved its space and drew nothing -- the mail study's logo is one, and its
+        // bottom bar simply had a gap where the mark belongs.
+        Image img = new Image();
+        img.image(image);
+        img.width(Double.valueOf(side));
+        img.height(Double.valueOf(side));
+        // An icon is CONTAINED in its box: Flutter sizes an ImageIcon by the icon theme
+        // and expects the artwork to fit inside that square whatever its aspect.
+        img.fit(BoxFit.contain);
+        return img;
+    }
+
+    /// {@code IconTheme.of(context).size}, or Material's 24 when there is none -- the
+    /// same fallback an Icon uses.
+    private static double iconThemeSize(BuildContext context) {
+        try {
+            com.codename1.flutter.material.IconThemeData theme =
+                    com.codename1.flutter.material.IconTheme.of(context);
+            if (theme != null && theme.size() != null) {
+                return theme.size().doubleValue();
+            }
+        } catch (Throwable noTheme) {
+            // fall through to Material's default
+        }
+        return 24.0;
     }
 }
