@@ -67,7 +67,7 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
      */
     private void applyStyle(Component face) {
         try {
-            boolean rounded = cornerRadiusLp() > 0;
+            boolean rounded = maxCornerRadiusLp() > 0;
             if (material().getColor() != null) {
                 com.codename1.flutter.material.ThemeDataAdapter.paintColor(
                         face.getAllStyles(), material().getColor());
@@ -167,8 +167,12 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
     protected void paintWithEffect(com.codename1.ui.Graphics g,
             com.codename1.ui.Container pane, Subtree paintChildren) {
         styleOnce(pane);
-        int radius = (int) Math.round(com.codename1.flutter.rendering.Dp.px(cornerRadiusLp()));
-        if (radius <= 0) {
+        double[] lp = cornerRadiiLp();
+        int rtl = (int) Math.round(com.codename1.flutter.rendering.Dp.px(lp[0]));
+        int rtr = (int) Math.round(com.codename1.flutter.rendering.Dp.px(lp[1]));
+        int rbr = (int) Math.round(com.codename1.flutter.rendering.Dp.px(lp[2]));
+        int rbl = (int) Math.round(com.codename1.flutter.rendering.Dp.px(lp[3]));
+        if (Math.max(Math.max(rtl, rtr), Math.max(rbr, rbl)) <= 0) {
             // Square surface: nothing to paint here that the component's own background
             // does not already do (applyStyle leaves it in place in this case).
             paintChildren.paint(g);
@@ -210,8 +214,9 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
         if (clipGeom == null) {
             clipGeom = new int[8];
         }
-        if (!clipGeometry(clipGeom, x, y, w, h, Math.min(radius, Math.min(w, h) / 2),
-                cx, cy, cw, ch)) {
+        int cap = Math.min(w, h) / 2;
+        if (!clipGeometry(clipGeom, x, y, w, h, Math.min(rtl, cap), Math.min(rtr, cap),
+                Math.min(rbr, cap), Math.min(rbl, cap), cx, cy, cw, ch)) {
             // Entirely clipped out: painting the subtree could only produce invisible pixels.
             return;
         }
@@ -224,7 +229,7 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
             com.codename1.flutter.FlutterErrorReport.unimplemented("MaterialClip",
                     "box=" + x + "," + y + "," + w + "," + h
                     + " clip=" + cx + "," + cy + "," + cw + "," + ch
-                    + " r=" + radius + " out=" + q[0] + "," + q[1] + "," + q[2] + "," + q[3]
+                    + " r=" + rtl + "," + rtr + "," + rbr + "," + rbl + " out=" + q[0] + "," + q[1] + "," + q[2] + "," + q[3]
                     + " corners=" + q[4] + "," + q[5] + "," + q[6] + "," + q[7]
                     + " shapeClip=" + g.isShapeClipSupported()
                     + " shadow=" + g.isShapeShadowSupported());
@@ -263,6 +268,15 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
      */
     static boolean clipGeometry(int[] out, int x, int y, int w, int h, int r,
             int cx, int cy, int cw, int ch) {
+        return clipGeometry(out, x, y, w, h, r, r, r, r, cx, cy, cw, ch);
+    }
+
+    /**
+     * As above, with a radius per corner -- Flutter rounds corners independently, and a
+     * surface that rounds one of them is not a surface with a single radius.
+     */
+    static boolean clipGeometry(int[] out, int x, int y, int w, int h,
+            int rtl, int rtr, int rbr, int rbl, int cx, int cy, int cw, int ch) {
         int ix = Math.max(x, cx);
         int iy = Math.max(y, cy);
         int ix2 = Math.min(x + w, cx + cw);
@@ -273,7 +287,7 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
         // Keep the arcs inside the visible box. Only reachable once the clip has already cut
         // an edge (r is <= half the full box), i.e. a card reduced to a sliver at the screen
         // edge, where a slightly tighter corner cannot be seen.
-        r = Math.max(0, Math.min(r, Math.min(ix2 - ix, iy2 - iy) / 2));
+        int cap = Math.min(ix2 - ix, iy2 - iy) / 2;
 
         // An edge the clip did not move is an edge whose two corners are still the card's own.
         boolean l = x >= ix;
@@ -284,11 +298,15 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
         out[1] = iy;
         out[2] = ix2 - ix;
         out[3] = iy2 - iy;
-        out[4] = l && t ? r : 0;
-        out[5] = rt && t ? r : 0;
-        out[6] = rt && b ? r : 0;
-        out[7] = l && b ? r : 0;
+        out[4] = l && t ? capped(rtl, cap) : 0;
+        out[5] = rt && t ? capped(rtr, cap) : 0;
+        out[6] = rt && b ? capped(rbr, cap) : 0;
+        out[7] = l && b ? capped(rbl, cap) : 0;
         return true;
+    }
+
+    private static int capped(int r, int cap) {
+        return Math.max(0, Math.min(r, cap));
     }
 
     /// A/B switch for the rounded clip, flipped at runtime with
@@ -376,7 +394,9 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
     private String styleSignature;
 
     private void styleOnce(com.codename1.ui.Container pane) {
-        String sig = cornerRadiusLp() + "|" + material().getElevation() + "|"
+        double[] r = cornerRadiiLp();
+        String sig = r[0] + "," + r[1] + "," + r[2] + "," + r[3]
+                + "|" + material().getElevation() + "|"
                 + (material().getColor() == null ? "-" : material().getColor().value());
         if (sig.equals(styleSignature)) {
             return;
@@ -398,10 +418,39 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
         if (material().getClipBehavior() == com.codename1.flutter.Clip.none) {
             return 0;
         }
-        return (int) Math.round(com.codename1.flutter.rendering.Dp.px(cornerRadiusLp()));
+        // One radius, so this can only answer for a surface whose corners agree. A
+        // surface that rounds some corners and not others has no uniform radius, and
+        // answering with one would round corners the surface leaves square; the caller
+        // falls back to the clip, which carries all four.
+        double[] r = cornerRadiiLp();
+        if (r[0] != r[1] || r[1] != r[2] || r[2] != r[3]) {
+            return 0;
+        }
+        return (int) Math.round(com.codename1.flutter.rendering.Dp.px(r[0]));
     }
 
-    private double cornerRadiusLp() {
+    /// Scratch for {@link #cornerRadiiLp}, owned per element so the paint path stays
+    /// allocation-free.
+    private double[] radiiLp;
+
+    /// The four corner radii in logical pixels, in the order {@code tl, tr, br, bl}.
+    ///
+    /// Flutter's radii are per corner, and reading only the top-left one squared every
+    /// surface that rounds some corners and not others. The gallery's settings button is
+    /// exactly that -- {@code BorderRadiusDirectional.only(bottomStart: 10)} -- so it
+    /// drew as a plain white block where the reference has a rounded bottom-left corner.
+    ///
+    /// A directional radius is resolved left-to-right, as the rest of the runtime
+    /// resolves {@code AlignmentDirectional} and {@code EdgeInsetsDirectional}.
+    private double[] cornerRadiiLp() {
+        if (radiiLp == null) {
+            radiiLp = new double[4];
+        }
+        double[] out = radiiLp;
+        out[0] = 0;
+        out[1] = 0;
+        out[2] = 0;
+        out[3] = 0;
         if (material().getShape() instanceof com.codename1.flutter.CircleBorder) {
             // A CircleBorder is the circle inscribed in the box, which as a
             // rounded rectangle is a corner radius of half the shorter side.
@@ -411,20 +460,46 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
             // rendered as an orange block sitting on the bottom bar.
             com.codename1.flutter.rendering.Size box = size();
             if (box == null || box.width() <= 0 || box.height() <= 0) {
-                return 0;
+                return out;
             }
             double scale = com.codename1.flutter.rendering.Dp.scale();
             double shorterPx = Math.min(box.width(), box.height());
-            return scale > 0 ? shorterPx / 2 / scale : 0;
+            double circle = scale > 0 ? shorterPx / 2 / scale : 0;
+            out[0] = circle;
+            out[1] = circle;
+            out[2] = circle;
+            out[3] = circle;
+            return out;
         }
         Object r = material().getShape() instanceof com.codename1.flutter.RoundedRectangleBorder
                 ? ((com.codename1.flutter.RoundedRectangleBorder) material().getShape()).getBorderRadius()
                 : material().getBorderRadius();
         if (r instanceof com.codename1.flutter.BorderRadius) {
-            com.codename1.flutter.Radius tl = ((com.codename1.flutter.BorderRadius) r).topLeft();
-            return tl == null ? 0 : tl.x();
+            com.codename1.flutter.BorderRadius b = (com.codename1.flutter.BorderRadius) r;
+            out[0] = radiusX(b.topLeft());
+            out[1] = radiusX(b.topRight());
+            out[2] = radiusX(b.bottomRight());
+            out[3] = radiusX(b.bottomLeft());
+        } else if (r instanceof com.codename1.flutter.BorderRadiusDirectional) {
+            com.codename1.flutter.BorderRadiusDirectional b =
+                    (com.codename1.flutter.BorderRadiusDirectional) r;
+            out[0] = radiusX(b.topStart());
+            out[1] = radiusX(b.topEnd());
+            out[2] = radiusX(b.bottomEnd());
+            out[3] = radiusX(b.bottomStart());
         }
-        return 0;
+        return out;
+    }
+
+    private static double radiusX(com.codename1.flutter.Radius r) {
+        return r == null ? 0 : r.x();
+    }
+
+    /// The largest of the four corner radii, for the decisions that only need to know
+    /// whether this surface is rounded at all.
+    private double maxCornerRadiusLp() {
+        double[] r = cornerRadiiLp();
+        return Math.max(Math.max(r[0], r[1]), Math.max(r[2], r[3]));
     }
 
 }

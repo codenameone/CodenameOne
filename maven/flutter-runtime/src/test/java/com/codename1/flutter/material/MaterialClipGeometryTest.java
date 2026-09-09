@@ -116,4 +116,55 @@ class MaterialClipGeometryTest {
         assertTrue(q[0] >= 150 && q[1] >= 130, "origin escaped the inherited clip");
         assertTrue(q[0] + q[2] <= 250 && q[1] + q[3] <= 190, "extent escaped the inherited clip");
     }
+
+    private static int[] corners(int rtl, int rtr, int rbr, int rbl,
+            int cx, int cy, int cw, int ch) {
+        int[] out = new int[8];
+        assertTrue(MaterialRenderElement.clipGeometry(out, 100, 100, 200, 150,
+                rtl, rtr, rbr, rbl, cx, cy, cw, ch), "expected something visible");
+        return out;
+    }
+
+    /// Flutter rounds corners independently, and the gallery's settings button rounds
+    /// exactly one of them: BorderRadiusDirectional.only(bottomStart: 10). Collapsing
+    /// that to a single radius -- the top-left one, which is zero -- is what drew it as
+    /// a plain white block where the reference has a rounded bottom-left corner.
+    @Test
+    void oneRoundedCornerRoundsOnlyThatCorner() {
+        assertArrayEquals(new int[] {100, 100, 200, 150, 0, 0, 0, 30},
+                corners(0, 0, 0, 30, 0, 0, 1000, 1000));
+    }
+
+    @Test
+    void everyCornerKeepsItsOwnRadius() {
+        assertArrayEquals(new int[] {100, 100, 200, 150, 4, 8, 12, 16},
+                corners(4, 8, 12, 16, 0, 0, 1000, 1000));
+    }
+
+    /// A clip that cuts an edge squares BOTH corners on it, whatever they asked for.
+    @Test
+    void aCutEdgeSquaresItsOwnCornersOnly() {
+        // clipped away on the left: the two left corners go, the right two survive.
+        assertArrayEquals(new int[] {200, 100, 100, 150, 0, 8, 12, 0},
+                corners(4, 8, 12, 16, 200, 0, 1000, 1000));
+    }
+
+    /// Each corner is capped independently by the visible box, not by the largest.
+    @Test
+    void eachCornerIsCappedByTheVisibleBox() {
+        int[] q = corners(200, 200, 10, 10, 0, 0, 1000, 1000);
+        // half the shorter visible side is 75
+        assertArrayEquals(new int[] {75, 75, 10, 10}, new int[] {q[4], q[5], q[6], q[7]});
+    }
+
+    /// The single-radius form still means what it used to.
+    @Test
+    void theUniformFormIsUnchanged() {
+        int[] four = new int[8];
+        int[] one = new int[8];
+        MaterialRenderElement.clipGeometry(four, 100, 100, 200, 150, 20, 20, 20, 20,
+                0, 0, 1000, 1000);
+        MaterialRenderElement.clipGeometry(one, 100, 100, 200, 150, 20, 0, 0, 1000, 1000);
+        assertArrayEquals(four, one);
+    }
 }
