@@ -3758,6 +3758,14 @@ public final class HttpServer {
      */
     private byte[] readChunked(Conn conn, byte[] scratch) throws IOException {
         ByteArrayOutputStream body = new ByteArrayOutputStream();
+        // The same floor rate the fixed-length path got, over the WHOLE chunked
+        // read: the size lines, the data and the trailers. Each of the three fill
+        // loops below restarts the socket timeout on every successful read, so a
+        // client sending a one-byte chunk just inside each window could hold a
+        // worker for years before the 8 MiB cap ever came into view -- and in pool
+        // mode, which is what TLS uses, enough of those are the server. Bounding
+        // only the fixed-length path left this one open.
+        long started = System.currentTimeMillis();
         while(true) {
             int lineEnd = indexOfCrLf(conn.buffer, conn.pos);
             while(lineEnd < 0) {
@@ -3768,6 +3776,7 @@ public final class HttpServer {
                 if(conn.available() > MAX_HEADER_BYTES) {
                     throw new ProtocolException(400, "chunk size line too long");
                 }
+                requireChunkedProgress(started, body.size());
                 if(!conn.fill(scratch)) {
                     return null;
                 }
@@ -3800,6 +3809,7 @@ public final class HttpServer {
                         if(conn.available() > MAX_HEADER_BYTES) {
                             throw new ProtocolException(400, "chunk trailer too long");
                         }
+                        requireChunkedProgress(started, body.size());
                         if(!conn.fill(scratch)) {
                             // EOF before the blank line that ends the trailers: the
                             // chunked framing never finished, so this is a truncated
@@ -3833,6 +3843,7 @@ public final class HttpServer {
             }
             // The chunk and its trailing CRLF must both be present before it is taken.
             while(conn.available() < size + 2) {
+                requireChunkedProgress(started, body.size());
                 if(!conn.fill(scratch)) {
                     return null;
                 }
@@ -3843,6 +3854,23 @@ public final class HttpServer {
                 throw new ProtocolException(400, "malformed chunk terminator");
             }
             conn.pos += 2;
+        }
+    }
+
+    /**
+     * Refuses a chunked body that is not arriving at the floor rate.
+     *
+     * The total is not declared, so the allowance is computed from what has
+     * ARRIVED: at any moment the elapsed time may be one socket timeout plus what
+     * those bytes take at MIN_BODY_BYTES_PER_SECOND. A slow but progressing upload
+     * keeps earning time; one that has stopped delivering does not.
+     */
+    private static void requireChunkedProgress(long started, int received)
+            throws ProtocolException {
+        long allowed = SOCKET_TIMEOUT_MILLIS
+                + (long)received * 1000L / MIN_BODY_BYTES_PER_SECOND;
+        if(System.currentTimeMillis() - started > allowed) {
+            throw new ProtocolException(408, "the chunked body did not arrive in time");
         }
     }
 

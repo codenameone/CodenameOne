@@ -92,6 +92,7 @@ public final class Base64 {
         int at = 0;
         for(int iter = 0 ; iter < length ; iter += 4) {
             int block = 0;
+            int pads = 0;
             for(int part = 0 ; part < 4 ; part++) {
                 char c = value.charAt(iter + part);
                 if(c == '=') {
@@ -100,13 +101,30 @@ public final class Base64 {
                     if(iter + 4 != length || part < 2) {
                         return null;
                     }
+                    pads++;
                     block <<= 6;
                     continue;
+                }
+                // CONTIGUOUS, and at the end. "AA=A" satisfied both tests above --
+                // final group, '=' at index 2 -- and then took the 'A' after it as
+                // ordinary data, returning three bytes for a string no encoder can
+                // produce. Once padding starts the group is over.
+                if(pads > 0) {
+                    return null;
                 }
                 if(c >= REVERSE.length || REVERSE[c] < 0) {
                     return null;
                 }
                 block = (block << 6) | REVERSE[c];
+            }
+            // The bits the padding stands for have to be zero, or one byte sequence
+            // has several spellings -- "AB==" and "AA==" would both decode to a
+            // single 0 byte -- which a strict decoder must not accept.
+            if(pads == 2 && ((block >> 12) & 0x0f) != 0) {
+                return null;
+            }
+            if(pads == 1 && ((block >> 6) & 0x03) != 0) {
+                return null;
             }
             for(int part = 16 ; part >= 0 && at < bytes ; part -= 8) {
                 out[at++] = (byte)((block >> part) & 0xff);

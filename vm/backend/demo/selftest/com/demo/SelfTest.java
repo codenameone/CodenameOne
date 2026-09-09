@@ -351,6 +351,17 @@ public class SelfTest {
     }
 
     private static void base64Url() throws Exception {
+        // Padding has to be contiguous and at the end, and the bits it stands for
+        // have to be zero. "AA=A" satisfied "final group, '=' at index 2" and then
+        // took the 'A' after it as data, returning three bytes for a string no
+        // encoder can produce; "AB==" gave a second spelling of a byte "AA=="
+        // already spells, which a strict decoder must not accept.
+        check("padding followed by data is refused", "true",
+                String.valueOf(com.codename1.backend.Base64.decode("AA=A") == null));
+        check("nonzero padding bits are refused", "true",
+                String.valueOf(com.codename1.backend.Base64.decode("AB==") == null));
+        check("ordinary padding still decodes", "1",
+                String.valueOf(com.codename1.backend.Base64.decode("AA==").length));
         check("encodes without padding", "SGVsbG8", Base64Url.encode(bytes("Hello")));
         check("one leftover byte", "SGU", Base64Url.encode(bytes("He")));
         check("two leftover bytes", "SGVs", Base64Url.encode(bytes("Hel")));

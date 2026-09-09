@@ -114,6 +114,25 @@ public class Throwable{
         }
     }
 
+    /*
+     * There is deliberately NO printStackTrace(java.io.PrintWriter) here.
+     *
+     * This VM has no java.io.PrintWriter -- not in vm/JavaAPI and not in
+     * Ports/CLDC11 -- so nothing on a device can construct one to pass, and
+     * CLDC11's Throwable, which is what the CN1 API offers at compile time, never
+     * declared the overload either. It existed here only because this file is
+     * compiled without a -bootclasspath and borrowed the JDK's class; the
+     * translator then emitted "#include java_io_PrintWriter.h" into
+     * java_lang_Throwable.c and every fresh translation died on the missing
+     * header. Nothing in the core or the device ports called it: the one caller in
+     * the tree is Ports/JavaSE, which compiles against the real JDK.
+     *
+     * Restoring it does not make `e.printStackTrace(writer)` translate either --
+     * the app's own PrintWriter reference is just as unresolvable -- so it would
+     * buy back the broken build and nothing else. Add java/io/PrintWriter.java
+     * first if that pattern is ever wanted.
+     */
+
     /**
      * The text to print for this throwable's own frames. By default this is the native
      * pre-rendered stack string. Once setStackTrace() has replaced the frames (an app

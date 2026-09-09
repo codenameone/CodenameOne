@@ -712,6 +712,31 @@ static long cn1H2BuildHeaders(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT status,
 
     if(headerCopy != NULL) {
         char* line = headerCopy;
+        /* Counted first, because running out of room used to end the loop quietly:
+           the response went out with the headers that fit and reported success, so
+           a late Set-Cookie, a CORS header or a security header simply was not
+           there over HTTP/2 while HTTP/1 sent all of them. Refusing is the honest
+           answer -- the handler asked for something this path cannot deliver. */
+        {
+            int wanted = count;
+            char* scan = headerCopy;
+            while(scan != NULL && *scan != 0) {
+                char* nl = strchr(scan, '\n');
+                char* colon = strchr(scan, ':');
+                /* The colon has to be on THIS line: strchr runs to the end of the
+                   whole block, so a colon further down would have counted a line
+                   that has none, and the count would refuse responses that fit. */
+                if(colon != NULL && (nl == NULL || colon < nl)) {
+                    wanted++;
+                }
+                scan = nl == NULL ? NULL : nl + 1;
+            }
+            if(wanted > CN1_H2_MAX_HEADERS) {
+                free(statusCopy);
+                free(headerCopy);
+                return -1;
+            }
+        }
         while(line != NULL && *line != 0 && count < CN1_H2_MAX_HEADERS) {
             char* nl = strchr(line, '\n');
             char* colon;

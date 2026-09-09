@@ -60,6 +60,8 @@ public final class FileIo {
         final long size;
         final long modified;
         final boolean directory;
+        /** Whether the descriptor and the path agreed; see openRead. */
+        final boolean consistent;
         long position;
 
         OpenFile(FileChannel channel, Path path) {
@@ -68,6 +70,7 @@ public final class FileIo {
             long capturedSize = 0;
             long capturedModified = 0;
             boolean capturedDirectory = false;
+            boolean capturedConsistent = false;
             try {
                 if(channel != null) {
                     capturedSize = channel.size();
@@ -78,6 +81,12 @@ public final class FileIo {
                 capturedDirectory = attributes.isDirectory();
                 if(channel == null) {
                     capturedSize = attributes.size();
+                    capturedConsistent = true;
+                } else {
+                    // The descriptor and the path describing the same file is what
+                    // makes the size/mtime pair -- and so the ETag -- describe the
+                    // bytes this descriptor will actually serve.
+                    capturedConsistent = attributes.size() == capturedSize;
                 }
             } catch (Exception ignored) {
                 // stat() reports the failure; there is nothing to do here.
@@ -85,6 +94,7 @@ public final class FileIo {
             this.size = capturedSize;
             this.modified = capturedModified;
             this.directory = capturedDirectory;
+            this.consistent = capturedConsistent;
         }
     }
 
@@ -109,8 +119,28 @@ public final class FileIo {
                 // at the index file, so it must still get a descriptor back.
                 return Descriptors.add(new OpenFile(null, p));
             }
-            return Descriptors.add(new OpenFile(
-                    FileChannel.open(p, StandardOpenOption.READ), p));
+            // Opened and stat'ed until the two AGREE. The size comes from the
+            // descriptor and the timestamp from the path, so a file replaced
+            // between them pairs the old bytes with the new file's mtime -- and
+            // StaticFiles builds its ETag from exactly that pair, so a client
+            // would cache the old content under the replacement's validator and
+            // be told 304 for as long as it asked. Java 8 has no fstat for a
+            // channel, so the race is detected rather than avoided: if the
+            // descriptor's size and the path's size disagree, the file changed
+            // under us and both are re-taken. A few attempts is plenty for an
+            // atomic replace; a file being rewritten continuously has no
+            // consistent validator to offer and gets the last pair read.
+            OpenFile opened = null;
+            for(int attempt = 0 ; attempt < 3 ; attempt++) {
+                FileChannel channel = FileChannel.open(p, StandardOpenOption.READ);
+                OpenFile candidate = new OpenFile(channel, p);
+                if(candidate.consistent || attempt == 2) {
+                    opened = candidate;
+                    break;
+                }
+                channel.close();
+            }
+            return Descriptors.add(opened);
         } catch (Exception err) {
             return -1;
         }
