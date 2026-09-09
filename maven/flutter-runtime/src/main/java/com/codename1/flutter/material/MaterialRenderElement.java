@@ -244,6 +244,15 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
             return;
         }
         try {
+            // NOTE: on iOS this clip does nothing -- see
+            // EffectRenderElement.paintRoundClipped for the probe. A Material's corners
+            // still come out round there because the SURFACE is painted with fillShape,
+            // which is honoured, and because an image filling the surface rounds its own
+            // bitmap (clipRadiusPx above). What is not clipped is any other content
+            // reaching a corner. No screen in the gallery does that, so there is nothing
+            // to check a fix against; routing this through the layer as the clip widgets
+            // do would put an offscreen behind every Material on screen, which is a cost
+            // worth paying only against a defect that can be seen.
             g.setClip(clipShape(q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7]));
             paintChildren.paint(g);
         } finally {

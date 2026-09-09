@@ -248,6 +248,11 @@ public class GraphicsCanvas extends Canvas {
     @Override
     public void clipPath(Path path) {
         if (shapes) {
+            // NOTE: on iOS this does nothing -- see EffectRenderElement.paintRoundClipped
+            // for the probe. A Canvas.clipPath is therefore inert there, and the subtree
+            // paints unclipped. Left as it is because nothing in the gallery calls
+            // clipPath, so there is no shape to check a fix against; when something does,
+            // it needs the layer treatment the clip widgets now use.
             g.setClip(toGeneralPath(path));
         }
     }
