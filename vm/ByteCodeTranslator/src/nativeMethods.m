@@ -1973,6 +1973,41 @@ JAVA_OBJECT java_lang_Class_getName___R_java_lang_String(CODENAME_ONE_THREAD_STA
     return newStringFromCString(threadStateData, clz->clsName);
 }
 
+/**
+ * Backs Integer.TYPE and the eight other wrapper TYPE fields. The JDK needs a
+ * native here for the same reason we do: `TYPE = int.class` cannot initialize the
+ * field, because javac lowers a primitive class literal to a read of that very
+ * field (getstatic TYPE; putstatic TYPE), leaving it null.
+ *
+ * Takes an int code rather than the JDK's String name deliberately. This runs
+ * inside the wrapper class initializers, which are among the earliest code in the
+ * process, and decoding a Java String here would drag in String.getBytes and the
+ * charset machinery during Integer's own clinit. An int argument allocates
+ * nothing and initializes nothing.
+ *
+ * The codes are an implementation detail shared only with java/lang/Class.java;
+ * they are matched by CN1_PRIM_* there.
+ */
+JAVA_OBJECT java_lang_Class_getPrimitiveClass___int_R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_INT typeCode) {
+    switch(typeCode) {
+        case 0: return (JAVA_OBJECT)&cn1_primitive_class_int;
+        case 1: return (JAVA_OBJECT)&cn1_primitive_class_long;
+        case 2: return (JAVA_OBJECT)&cn1_primitive_class_short;
+        case 3: return (JAVA_OBJECT)&cn1_primitive_class_byte;
+        case 4: return (JAVA_OBJECT)&cn1_primitive_class_char;
+        case 5: return (JAVA_OBJECT)&cn1_primitive_class_float;
+        case 6: return (JAVA_OBJECT)&cn1_primitive_class_double;
+        case 7: return (JAVA_OBJECT)&cn1_primitive_class_boolean;
+        case 8: return (JAVA_OBJECT)&cn1_primitive_class_void;
+    }
+    // Only java/lang/Class.java calls this, always with one of its own constants,
+    // so this is unreachable short of the two files disagreeing. Returning null
+    // would restore exactly the silent null TYPE this code exists to remove.
+    fprintf(stderr, "getPrimitiveClass: unknown primitive type code %d\n", (int)typeCode);
+    exit(1);
+    return JAVA_NULL;
+}
+
 JAVA_BOOLEAN java_lang_Class_isArray___R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls) {
     struct clazz* clz = (struct clazz*)cls;
     return clz->isArray;
@@ -1988,6 +2023,12 @@ JAVA_BOOLEAN java_lang_Class_isArray___R_boolean(CODENAME_ONE_THREAD_STATE, JAVA
 JAVA_BOOLEAN java_lang_Class_isAssignableFrom___java_lang_Class_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_OBJECT cls2) {
     struct clazz* clz1 = (struct clazz*)cls;
     struct clazz* clz2 = (struct clazz*)cls2;
+    // A primitive class carries CN1_PRIMITIVE_CLASS_ID, which indexes no row of
+    // the instanceof tables, so it must never reach instanceofFunction. The JDK
+    // rule is also simply identity: int is assignable only from int.
+    if(clz1->primitiveType || clz2->primitiveType) {
+        return clz1 == clz2 ? JAVA_TRUE : JAVA_FALSE;
+    }
     // A.isAssignableFrom(B): target is A, the class under test is B.
     return instanceofFunction(clz1->classId, clz2->classId);
 }
@@ -1995,6 +2036,9 @@ JAVA_BOOLEAN java_lang_Class_isAssignableFrom___java_lang_Class_R_boolean(CODENA
 JAVA_BOOLEAN java_lang_Class_isInstance___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_OBJECT obj) {
     if(obj == JAVA_NULL) { return JAVA_FALSE; }
     struct clazz* clz1 = (struct clazz*)cls;
+    // No object is ever an instance of a primitive class, and its sentinel
+    // classId indexes no instanceof table row -- see isAssignableFrom above.
+    if(((struct clazz*)cls)->primitiveType) { return JAVA_FALSE; }
     struct clazz* clz2 = (struct clazz*)CN1_CLASS_OF(obj); // tag-aware: a tagged Integer has no header
     // A.isInstance(o): target is A, the class under test is o's class. These were
     // reversed, so isInstance searched the TARGET's supertype table for the

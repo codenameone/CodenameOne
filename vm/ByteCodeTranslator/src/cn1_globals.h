@@ -2827,6 +2827,34 @@ extern struct clazz class_array1__JAVA_DOUBLE;
 extern struct clazz class_array2__JAVA_DOUBLE;
 extern struct clazz class_array3__JAVA_DOUBLE;
 
+/**
+ * The nine scalar primitive class objects -- int.class, Integer.TYPE and friends.
+ *
+ * javac lowers a primitive class literal to a read of the boxed type's own TYPE
+ * field, so `TYPE = int.class` inside Integer's initializer compiles to
+ * `getstatic TYPE; putstatic TYPE` -- it reads the field it is initializing and
+ * leaves it null. Every wrapper that declared TYPE that way had a null one, and
+ * a Map keyed on them collapsed to a single entry, so a lookup for int answered
+ * with whatever type was stored last. Nothing threw. The wrappers now go through
+ * java_lang_Class_getPrimitiveClass, which hands back one of these.
+ *
+ * classId is CN1_PRIMITIVE_CLASS_ID for all nine: these never take part in an
+ * instanceof, and instanceofFunction indexes tables by classId, so the callers
+ * that could reach one (isAssignableFrom, isInstance) test primitiveType first
+ * rather than indexing with a value no table has a row for.
+ */
+#define CN1_PRIMITIVE_CLASS_ID (-1)
+
+extern struct clazz cn1_primitive_class_int;
+extern struct clazz cn1_primitive_class_long;
+extern struct clazz cn1_primitive_class_short;
+extern struct clazz cn1_primitive_class_byte;
+extern struct clazz cn1_primitive_class_char;
+extern struct clazz cn1_primitive_class_float;
+extern struct clazz cn1_primitive_class_double;
+extern struct clazz cn1_primitive_class_boolean;
+extern struct clazz cn1_primitive_class_void;
+
 extern JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]);
 /**
  * Like newStringFromCString but DECODES, in the PLATFORM's encoding, instead of

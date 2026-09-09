@@ -28,6 +28,12 @@ package java.lang;
  * Since: JDK1.0, CLDC 1.1
  */
 public final class Float extends Number implements Comparable<Float> {
+
+    /**
+     * The class object for the primitive type this class wraps.
+     */
+    public static final Class<Float> TYPE = Class.getPrimitiveClass(Class.CN1_PRIM_FLOAT);
+
     /**
      * The largest positive value of type float. It is equal to the value returned by Float.intBitsToFloat(0x7f7fffff).
      * See Also:Constant Field Values

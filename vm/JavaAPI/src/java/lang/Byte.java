@@ -28,7 +28,7 @@ package java.lang;
  */
 public final class Byte extends Number implements Comparable<Byte> {
     
-    public static final Class<Byte> TYPE = byte.class;
+    public static final Class<Byte> TYPE = Class.getPrimitiveClass(Class.CN1_PRIM_BYTE);
     public static final int SIZE = 8;
     
     /**
