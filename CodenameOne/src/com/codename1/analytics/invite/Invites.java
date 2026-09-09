@@ -220,6 +220,13 @@ public final class Invites {
     // than announcing itself a second time. Carried onto the pending record as
     // soon as one exists, which is what makes it survive the process.
     private static boolean reopenedAlreadyDelivered;
+
+    // The original clock readings a reopened terminal marker carried, so the
+    // resumed lookup keeps the window it started with rather than restarting it
+    // from the moment consent was granted.
+    private static long reopenedFirstLaunch;
+
+    private static long reopenedExpiresAt;
     private static boolean deferredStarted;
 
     // When the last claim or match was issued. flush() restarts only once this
@@ -535,6 +542,15 @@ public final class Invites {
         }
         Map<String, String> pending = pendingRecord();
         pending.put("code", code);
+        // The window and the budget are reset, because this is a new question.
+        // Inheriting them from an older deferred lookup meant a link opened
+        // after that lookup had expired, or after its retries were spent, was
+        // marked expired by beginDeferred() before the saved code was ever
+        // looked at -- so an exact answer we were holding was never sent.
+        long now = System.currentTimeMillis();
+        pending.put("firstLaunch", String.valueOf(now));
+        pending.put("expiresAt", String.valueOf(now + attributionWindow));
+        pending.put("attempts", "0");
         pending.put("codeSource", "universal_link");
         pending.put("codeMatch", MATCH_DIRECT);
         pending.put("codeDeferred", "false");
@@ -826,6 +842,8 @@ public final class Invites {
         lookupIssuedAt = 0;
         undelivered = null;
         reopenedAlreadyDelivered = false;
+        reopenedFirstLaunch = 0;
+        reopenedExpiresAt = 0;
         unacknowledged.clear();
     }
 
@@ -978,6 +996,15 @@ public final class Invites {
         if (url == null || url.length() == 0) {
             return null;
         }
+        // Stripped once, here, before either branch reads the url. Doing it on
+        // the path branch alone left the query branch -- which runs first --
+        // parsing "?cn1_invite=ABC123#section" and claiming a code with the
+        // fragment glued to it. A fragment is client-side and part of neither
+        // the path nor the query.
+        int frag = url.indexOf('#');
+        if (frag >= 0) {
+            url = url.substring(0, frag);
+        }
         int q = url.indexOf('?');
         if (q >= 0) {
             String code = codeFromQuery(url.substring(q + 1));
@@ -1010,14 +1037,7 @@ public final class Invites {
                 path = path.substring(0, rel);
             }
         }
-        // A fragment is not part of the path and is not part of the code, and
-        // an App Link commonly arrives with one still attached -- so
-        // /i/acme/ABC123#section claimed a code called "ABC123#section", which
-        // exists nowhere.
-        int hash = path.indexOf('#');
-        if (hash >= 0) {
-            path = path.substring(0, hash);
-        }
+
         if (!path.startsWith("/i/")) {
             return null;
         }
@@ -1163,6 +1183,15 @@ public final class Invites {
     private static void markTerminal(int terminalState, String reason) {
         Map<String, String> done = new LinkedHashMap<String, String>();
         done.put("state", String.valueOf(terminalState));
+        // The timing is carried, and only the timing. firstLaunch and expiresAt
+        // say nothing about the device -- they are two clock readings -- and
+        // without them a reopened marker started the window again from the
+        // moment consent was granted. A user who answers the prompt a week
+        // later would then have run a fresh fingerprint lookup and reported
+        // invite_install for somebody else's click.
+        Map<String, String> before = InviteStore.read(InviteStore.PENDING);
+        InviteStore.put(done, "firstLaunch", InviteStore.get(before, "firstLaunch", null));
+        InviteStore.put(done, "expiresAt", InviteStore.get(before, "expiresAt", null));
         if (reason != null) {
             // Recorded on the marker, not only in memory. The listener contract
             // is "exactly one of the two methods per install, and the answer is
@@ -1210,8 +1239,14 @@ public final class Invites {
         }
         pending = new LinkedHashMap<String, String>();
         long now = System.currentTimeMillis();
-        pending.put("firstLaunch", String.valueOf(now));
-        pending.put("expiresAt", String.valueOf(now + attributionWindow));
+        // Restored from the marker a reopen carried them on, when there is one,
+        // so granting consent late does not restart the attribution window.
+        pending.put("firstLaunch", String.valueOf(reopenedFirstLaunch > 0
+                ? reopenedFirstLaunch : now));
+        pending.put("expiresAt", String.valueOf(reopenedExpiresAt > 0
+                ? reopenedExpiresAt : now + attributionWindow));
+        reopenedFirstLaunch = 0;
+        reopenedExpiresAt = 0;
         pending.put("attempts", "0");
         pending.put("state", String.valueOf(STATE_PENDING));
         if (reopenedAlreadyDelivered) {
@@ -1257,6 +1292,8 @@ public final class Invites {
                 // on the next launch. It rides the pending record instead.
                 reopenedAlreadyDelivered =
                         InviteStore.getBoolean(marker, "delivered", false);
+                reopenedFirstLaunch = InviteStore.getLong(marker, "firstLaunch", 0);
+                reopenedExpiresAt = InviteStore.getLong(marker, "expiresAt", 0);
                 InviteStore.delete(InviteStore.PENDING);
                 state = STATE_NONE;
                 s = STATE_NONE;

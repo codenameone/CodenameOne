@@ -134,8 +134,16 @@ class InviteResilienceTest extends UITestBase {
         Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_FINGERPRINT, true);
         Map<String, String> marker = InviteStore.read(InviteStore.PENDING);
         assertNotNull(marker, "the answer has to be durable");
-        assertEquals(1, marker.size(), "the marker kept fields beyond the state: " + marker);
         assertTrue(marker.containsKey("state"));
+        // The state, the reason, and the two clock readings that enforce the
+        // original window across a reopen -- and nothing that describes the
+        // device. Asserting a field count instead would fail the next time the
+        // marker legitimately carries one more, which is how this assertion
+        // came to be arguing against a privacy improvement.
+        for (String key : new String[] {"platform", "osVersion", "deviceModel",
+                "screenWidth", "screenHeight", "locale", "code"}) {
+            assertFalse(marker.containsKey(key), "the marker held " + key + ": " + marker);
+        }
     }
 
     @Test
@@ -973,5 +981,57 @@ class InviteResilienceTest extends UITestBase {
         Invites.forgetLoadedState();
         assertEquals(Invites.STATE_NONE_FOUND, Invites.getState(),
                 "a definitive empty referrer read was treated as retryable");
+    }
+
+    @Test
+    @EdtTest
+    void aDirectLinkGetsItsOwnWindowAndBudget() {
+        // Inheriting them from an older deferred lookup meant a link opened
+        // after that lookup had expired, or after its retries were spent, was
+        // marked expired by beginDeferred() before the saved code was ever
+        // looked at -- so an exact answer we were holding was never sent.
+        Invites.checkForInvite();
+        Map<String, String> stale = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(stale);
+        stale.put("expiresAt", String.valueOf(System.currentTimeMillis() - 1000L));
+        stale.put("attempts", String.valueOf(99));
+        InviteStore.write(InviteStore.PENDING, stale);
+
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/FRESH1");
+
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        assertEquals("FRESH1", InviteStore.get(pending, "code", null));
+        assertTrue(InviteStore.getLong(pending, "expiresAt", 0) > System.currentTimeMillis(),
+                "the direct claim inherited an expired window");
+        // One, not zero: the reset puts it back to zero and the claim this
+        // call issues counts as the first attempt against the new budget.
+        assertEquals(1, InviteStore.getInt(pending, "attempts", -1),
+                "the direct claim inherited a spent retry budget");
+    }
+
+    @Test
+    @EdtTest
+    void reopeningAfterConsentKeepsTheOriginalWindow() {
+        // Without the original timings a reopened marker started the window
+        // again from the moment consent was granted, so a user answering the
+        // prompt a week later ran a fresh fingerprint lookup and could report
+        // invite_install for somebody else's click.
+        Invites.checkForInvite();
+        Map<String, String> first = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(first);
+        // A distinctive value rather than whatever the clock produced a
+        // millisecond ago: a fresh window computed at grant time would land on
+        // almost the same number, and the test would pass by coincidence.
+        long originalExpiry = System.currentTimeMillis() + 123_456_789L;
+        first.put("expiresAt", String.valueOf(originalExpiry));
+        InviteStore.write(InviteStore.PENDING, first);
+
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+        Analytics.setConsent(AnalyticsConsent.granted());
+
+        Map<String, String> resumed = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(resumed);
+        assertEquals(originalExpiry, InviteStore.getLong(resumed, "expiresAt", 0),
+                "granting consent restarted the attribution window");
     }
 }

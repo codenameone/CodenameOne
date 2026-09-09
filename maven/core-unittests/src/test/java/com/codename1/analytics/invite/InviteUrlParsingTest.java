@@ -123,4 +123,16 @@ class InviteUrlParsingTest extends UITestBase {
         Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
         assertEquals("ABC124", InviteStore.get(pending, "code", null));
     }
+
+    @Test
+    @EdtTest
+    void aFragmentOnAQueryStyleLinkIsAlsoStripped() {
+        // The query branch runs first, so stripping on the path branch alone
+        // left it parsing "?cn1_invite=ABC125#section" and claiming a code with
+        // the fragment glued to it.
+        assertTrue(Invites.handleUrl(
+                "https://cloud.codenameone.com/i/acme?cn1_invite=ABC125#section"));
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        assertEquals("ABC125", InviteStore.get(pending, "code", null));
+    }
 }

@@ -324,8 +324,14 @@ class InviteConsentAndErasureTest extends UITestBase {
         if (record == null) {
             return;
         }
+        // firstLaunch and expiresAt are NOT in this list. They are two clock
+        // readings, they describe no device, and they never leave it -- the
+        // marker is local. Keeping them is what stops a consent grant arriving
+        // a week later from restarting the attribution window and matching an
+        // unrelated click, so dropping them would cost privacy rather than
+        // protect it.
         for (String key : new String[] {"platform", "osVersion", "deviceModel",
-                "screenWidth", "screenHeight", "locale", "firstLaunch"}) {
+                "screenWidth", "screenHeight", "locale"}) {
             assertFalse(record.containsKey(key), message + " (held " + key + ")");
         }
     }
