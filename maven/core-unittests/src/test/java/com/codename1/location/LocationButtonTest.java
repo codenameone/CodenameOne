@@ -493,6 +493,60 @@ class LocationButtonTest extends UITestBase {
         }
     }
 
+    /// Two buttons on one form, both granted, the second while the first is
+    /// still waiting. invokeAndBlock keeps the EDT pumping, so this interleaving
+    /// is ordinary rather than exotic -- and the one-shot wait is not reentrant:
+    /// the first request holds LocationManager's listener, so the second's
+    /// getCurrentLocationSync would answer from the last known location and
+    /// report it as the fresh fix its own tap authorised.
+    @FormTest
+    void twoButtonsGrantedTogetherShareTheOneFix() {
+        implementation.setLocationButtonSupported(true);
+        Location expected = new Location(11.0, 12.0);
+        manager.currentLocation = expected;
+        // What the second button gets if it asks on its own: the listener the
+        // first request installed sends it down getCurrentLocation() instead of
+        // a wait. Same object as the fix would make the two indistinguishable
+        // and the test would pass either way -- it did, before this line.
+        Location stale = new Location(1.0, 2.0);
+        manager.staleLocation = stale;
+
+        Form f = new Form("two");
+        LocationButton first = new LocationButton();
+        LocationButton second = new LocationButton();
+        f.add(first);
+        f.add(second);
+        f.show();
+        flushSerialCalls();
+
+        List<Location> firstShared = record(first);
+        List<Location> secondShared = record(second);
+        List<SuccessCallback<Boolean>> callbacks =
+                implementation.getLocationButtonCallbacks();
+        assertEquals(2, callbacks.size(), "each button gets its own callback");
+
+        final SuccessCallback<Boolean> secondCallback = callbacks.get(1);
+        manager.duringBind = new Runnable() {
+            public void run() {
+                secondCallback.onSucess(Boolean.TRUE);
+                flushSerialCalls();
+            }
+        };
+
+        callbacks.get(0).onSucess(Boolean.TRUE);
+        flushSerialCalls();
+
+        assertEquals(1, manager.bindCount,
+                "one fix is fetched, not one per button");
+        assertEquals(1, firstShared.size(), "the first button is told once");
+        assertEquals(1, secondShared.size(), "and so is the second");
+        assertSame(expected, firstShared.get(0));
+        assertSame(expected, secondShared.get(0),
+                "the joiner gets the fix, not the last-known stand-in "
+                        + "getCurrentLocationSync would have handed it");
+        assertNotSame(stale, secondShared.get(0));
+    }
+
     private void grant(Boolean granted) {
         SuccessCallback<Boolean> callback = implementation.getLocationButtonCallback();
         assertNotNull(callback, "the component should have handed the platform a callback");
@@ -543,9 +597,15 @@ class LocationButtonTest extends UITestBase {
         Location currentLocation;
         int bindCount;
 
+        /// What getCurrentLocation() answers when it differs from the fix that
+        /// bindListener delivers. LocationManager serves a request made while
+        /// another one holds its listener from here instead of waiting, so a
+        /// test can only tell the two apart when they are different objects.
+        Location staleLocation;
+
         @Override
         public Location getCurrentLocation() throws IOException {
-            return currentLocation;
+            return staleLocation != null ? staleLocation : currentLocation;
         }
 
         @Override
@@ -553,9 +613,18 @@ class LocationButtonTest extends UITestBase {
             return currentLocation;
         }
 
+        /// Runs inside the one-shot wait, which is the only place a second
+        /// button's grant can land while the first is still acquiring.
+        Runnable duringBind;
+
         @Override
         protected void bindListener() {
             bindCount++;
+            if (duringBind != null) {
+                Runnable r = duringBind;
+                duringBind = null;
+                r.run();
+            }
             LocationListener l = getLocationListener();
             if (l != null && currentLocation != null) {
                 setStatus(LocationManager.AVAILABLE);

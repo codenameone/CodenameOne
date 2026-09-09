@@ -1146,6 +1146,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private boolean locationButtonSupported;
     private boolean locationButtonReady = true;
     private SuccessCallback<Boolean> locationButtonCallback;
+    private final java.util.List<SuccessCallback<Boolean>> locationButtonCallbacks =
+            new java.util.ArrayList<SuccessCallback<Boolean>>();
     private int locationButtonTextType = -1;
     private int locationButtonBackgroundColor;
     private int locationButtonTextColor;
@@ -1165,6 +1167,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         locationButtonBackgroundColor = backgroundColor;
         locationButtonTextColor = textColor;
         locationButtonCallback = onPermissionResult;
+        locationButtonCallbacks.add(onPermissionResult);
         return new PeerComponent(new Object()) {
         };
     }
@@ -1186,6 +1189,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         this.locationButtonSupported = locationButtonSupported;
         if (!locationButtonSupported) {
             locationButtonCallback = null;
+            locationButtonCallbacks.clear();
             locationButtonTextType = -1;
         }
     }
@@ -1194,6 +1198,12 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     /// part of a user tapping the system button.
     public SuccessCallback<Boolean> getLocationButtonCallback() {
         return locationButtonCallback;
+    }
+
+    /// Every callback handed over, in creation order, so a test can play two
+    /// buttons on one form independently.
+    public java.util.List<SuccessCallback<Boolean>> getLocationButtonCallbacks() {
+        return locationButtonCallbacks;
     }
 
     public int getLocationButtonTextType() {

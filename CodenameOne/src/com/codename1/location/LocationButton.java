@@ -138,6 +138,18 @@ public class LocationButton extends Container {
     private long timeout = 30000;
     private boolean acquiring;
 
+    /// True while some button's acquisition is running. Static because the fix
+    /// is: LocationManager serves one one-shot request at a time, so a second
+    /// button asking during the first would be answered from the last known
+    /// location rather than made to wait. EDT-only state, so no lock -- see
+    /// acquire().
+    private static boolean inFlight;
+
+    /// The buttons that will be told the result of the acquisition in flight,
+    /// the one that started it included.
+    private static final List<LocationButton> waiting =
+            new ArrayList<LocationButton>();
+
     /// Always built, and used for the preferred size even when the platform
     /// draws the control -- the system button has no size of its own, we tell it
     /// how big to be, and telling it the size an ordinary themed button would
@@ -597,26 +609,56 @@ public class LocationButton extends Container {
             return;
         }
         acquiring = true;
+        // A second button's request joins the first rather than racing it.
+        //
+        // invokeAndBlock keeps the EDT pumping, so a form carrying two of these
+        // -- a pickup and a dropoff, which is exactly the transactional shape
+        // this control is for -- can have the second grant arrive while the
+        // first is still waiting for a fix. The one-shot wait is not reentrant:
+        // the first request installed LocationManager's listener, and
+        // getCurrentLocationSync answers a call made while one is installed from
+        // getCurrentLocation() instead of waiting. The second button would take
+        // a last-known location, or null, and report it as the fresh fix its own
+        // tap had just authorised.
+        //
+        // Nothing is locked because nothing here is concurrent: Codename One is
+        // single threaded and every line of this runs on the EDT. invokeAndBlock
+        // interleaves, it does not parallelise.
+        if (inFlight) {
+            // Someone else's fix is already on its way and it is the same fix.
+            waiting.add(this);
+            return;
+        }
+        inFlight = true;
+        waiting.add(this);
+        final Location[] result = new Location[1];
         try {
             final LocationManager manager = LocationManager.getLocationManager();
-            if (manager == null) {
-                fireLocationShared(null);
-                return;
+            if (manager != null) {
+                // invokeAndBlock so a cold fix does not freeze the form; the EDT
+                // keeps pumping while the platform looks for one.
+                Display.getInstance().invokeAndBlock(new Runnable() {
+                    @Override
+                    public void run() {
+                        result[0] = manager.getCurrentLocationSync(timeout);
+                    }
+                });
             }
-            final Location[] result = new Location[1];
-            // invokeAndBlock so a cold fix does not freeze the form; the EDT
-            // keeps pumping while the platform looks for one.
-            Display.getInstance().invokeAndBlock(new Runnable() {
-                @Override
-                public void run() {
-                    result[0] = manager.getCurrentLocationSync(timeout);
-                }
-            });
-            fireLocationShared(result[0]);
         } finally {
-            acquiring = false;
+            // Everyone who joined is told, including this one, and told the same
+            // thing. A joiner inherits the leader's timeout, which is the point:
+            // there is one fix and one wait for it.
+            List<LocationButton> told =
+                    new ArrayList<LocationButton>(waiting);
+            waiting.clear();
+            inFlight = false;
+            for (LocationButton b : told) {
+                b.acquiring = false;
+                b.fireLocationShared(result[0]);
+            }
         }
     }
+
 
     private void fireLocationShared(Location location) {
         // A copy, because a listener is entitled to remove itself while it
