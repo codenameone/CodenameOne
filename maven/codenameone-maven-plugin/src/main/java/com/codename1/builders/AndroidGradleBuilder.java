@@ -2336,6 +2336,22 @@ public class AndroidGradleBuilder extends Executor {
                     // (database, call/VPN, Nearby) are there for the native and
                     // aar half, which never references com/codename1/location at
                     // all and so could not affect this decision either way.
+                    //
+                    // The mirror-image claim has been raised too: that the
+                    // FRAMEWORK is scanned, so LocationButton.acquire()'s own
+                    // call to LocationManager.getLocationManager() would set
+                    // otherLocationUse for every application that shows a button
+                    // and defeat the inference entirely. It would -- if the
+                    // framework were there. It is not:
+                    // CN1BuildMojo.BUNDLE_ARTIFACT_ID_BLACKLIST holds
+                    // codenameone-core and java-runtime out of the merged jar,
+                    // and the staged userClasses.jar of an application whose
+                    // form holds nothing but a LocationButton contains no
+                    // com/codename1/location/LocationButton, no LocationManager
+                    // and not even com/codename1/ui/Display -- checked with
+                    // unzip -l, and confirmed by the outcome: that application's
+                    // manifest gets onlyForLocationButton, which requires
+                    // otherLocationUse to be false.
                     if (needsOrdinaryPreciseLocation(cls)) {
                         debug("Precise location is not button-only because of class " + cls);
                         otherLocationUse = true;
