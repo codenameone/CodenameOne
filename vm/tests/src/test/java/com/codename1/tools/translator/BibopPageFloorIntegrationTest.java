@@ -251,6 +251,15 @@ class BibopPageFloorIntegrationTest {
                     m.containsKey("RELEASED") ? m.get("RELEASED") : -1,
                     m.containsKey("MINAFTER") ? m.get("MINAFTER") : -1));
         }
+        // How much of the release wait was spent. Sized for the SLOWEST marker
+        // configuration in the matrix, so the margin has to be visible: a green
+        // run that used its whole budget is about to go red on a slower runner.
+        Matcher settle = Pattern.compile("ARM_SETTLE name=(\\S+) rounds=(\\d+) maxRounds=(\\d+)")
+                .matcher(vmOutput);
+        while (settle.find()) {
+            report.append(String.format("%-24s settle used %s of %s rounds%n",
+                    settle.group(1), settle.group(2), settle.group(3)));
+        }
         System.err.println("[BibopPageFloorIntegrationTest] texture set " + TEXTURE_SET_KB
                 + "KB, phys_footprint\n" + report);
 

@@ -115,9 +115,25 @@ public class BibopPageFloorApp {
      * "the collector had not finished yet". System.gc() is asynchronous (it sets
      * forceGc and notifies the collector thread, then returns), so each round is
      * a request plus a pause long enough for a full cycle to land.
+     *
+     * <p>The ceiling is sized for the SLOWEST marker configuration the suite
+     * runs, not the default one. Measured on one commit across two arm64 jobs:
+     * with four markers the warm-up gave back 90% of its 266MB inside the old
+     * 5s ceiling, while with a single marker it gave back NOTHING in the same
+     * 5s and the next phase then allocated over it, so the run never had a
+     * quiet moment for the floor reading to see. Marking with one thread simply
+     * takes about four times as long, and the ceiling had been tuned against
+     * four.
+     *
+     * <p>Note the ceiling cannot be replaced by "stop once the footprint stops
+     * falling". In that failing run the footprint was flat for the whole
+     * window because reclamation had not started yet, so a flatness rule would
+     * have given up even earlier -- the same trap SETTLE_STABLE_STREAK below
+     * exists to avoid. Only an absolute budget works here, and it stays finite
+     * so a release that never comes still fails the assertion.
      */
     private static final int SETTLE_MIN_ROUNDS = 4;
-    private static final int SETTLE_MAX_ROUNDS = 20;
+    private static final int SETTLE_MAX_ROUNDS = 80;
     private static final int SETTLE_PLAIN_MIN_ROUNDS = 4;
     private static final int SETTLE_PLAIN_MAX_ROUNDS = 12;
     private static final long SETTLE_PAUSE_MS = 250;
@@ -286,7 +302,12 @@ public class BibopPageFloorApp {
     private static void releasePhase(String name, long heldKb, boolean expectDrop) {
         scrubStack(SCRUB_DEPTH);
         if (expectDrop) {
-            settleForRelease(heldKb);
+            // Report what the wait actually cost. A run that passes while
+            // spending its whole budget is one runner away from failing, and
+            // that is invisible if only the outcome is printed.
+            System.out.println("ARM_SETTLE name=" + name
+                    + " rounds=" + settleForRelease(heldKb)
+                    + " maxRounds=" + SETTLE_MAX_ROUNDS);
         } else {
             settle();
         }
@@ -357,15 +378,16 @@ public class BibopPageFloorApp {
      * fails the assertion -- it just fails on the real behaviour rather than on
      * whichever machine ran it.
      */
-    private static void settleForRelease(long heldKb) {
+    private static int settleForRelease(long heldKb) {
         long target = (heldKb * 3) / 5;
         for (int i = 0; i < SETTLE_MAX_ROUNDS; i++) {
             System.gc();
             sleep(SETTLE_PAUSE_MS);
             if (i + 1 >= SETTLE_MIN_ROUNDS && footprintKb() <= target) {
-                return;
+                return i + 1;
             }
         }
+        return SETTLE_MAX_ROUNDS;
     }
 
     private static long scrubStack(int depth) {
