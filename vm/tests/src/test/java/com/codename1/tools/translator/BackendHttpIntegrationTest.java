@@ -77,6 +77,15 @@ class BackendHttpIntegrationTest {
     private static Process tlsServer;
     private static int tlsPort;
 
+    /**
+     * A third server, pinned to ONE virtual-thread host by CN1_WORKERS=1, so a
+     * test can keep that host continuously busy. With several hosts the traffic
+     * and the silent connection may land on different ones and the test would
+     * prove nothing some of the time, which is worse than not having it.
+     */
+    private static Process busyServer;
+    private static int busyPort;
+
     /** Larger than any plausible socket send buffer, so a slow reader stalls the write. */
     private static final int HUGE_BYTES = 8 * 1024 * 1024;
     private static Path work;
@@ -144,6 +153,27 @@ class BackendHttpIntegrationTest {
         assertTrue(waitForPort(port, 30000), "the server never accepted a connection");
 
         startTlsServer(work, binary, staticRoot);
+        startBusyServer(work, binary, staticRoot);
+    }
+
+    /** The single-host server described on busyServer. */
+    private static void startBusyServer(Path work, Path binary, Path staticRoot)
+            throws Exception {
+        busyPort = freePort();
+        ProcessBuilder run = new ProcessBuilder(binary.toString());
+        run.environment().put("CN1_PORT", String.valueOf(busyPort));
+        run.environment().put("CN1_DB_PATH", work.resolve("busy.db").toString());
+        run.environment().put("CN1_STATIC_ROOT", staticRoot.toString());
+        run.environment().put("CN1_HTTP_TIMEOUT_MS", "2000");
+        run.environment().put("CN1_WORKERS", "1");
+        run.redirectErrorStream(true);
+        run.redirectOutput(work.resolve("busy-server.log").toFile());
+        busyServer = run.start();
+        if (!waitForPort(busyPort, 30000)) {
+            busyServer.destroy();
+            busyServer = null;
+            busyPort = 0;
+        }
     }
 
     /**
@@ -194,6 +224,16 @@ class BackendHttpIntegrationTest {
 
     @AfterAll
     void stopServer() {
+        if (busyServer != null) {
+            busyServer.destroy();
+            try {
+                if (!busyServer.waitFor(10, TimeUnit.SECONDS)) {
+                    busyServer.destroyForcibly();
+                }
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+            }
+        }
         if (tlsServer != null) {
             tlsServer.destroy();
             try {
@@ -457,6 +497,65 @@ class BackendHttpIntegrationTest {
         String text = new String(response, StandardCharsets.UTF_8);
         assertTrue(text.indexOf("au-lait") >= 0,
                 "the encoded name must match the declared one:\n" + text);
+    }
+
+    @Test
+    @DisplayName("a silent connection is shed even while its host stays busy")
+    void deadlinesAreSweptOnABusyHost() throws Exception {
+        // The sweep used to run only when a poll came back EMPTY, so a host that
+        // always had an event never swept -- and a client can keep that true with
+        // a trickle of traffic while its other connections sit silent, holding
+        // them past any timeout until the process ceiling is reached.
+        //
+        // This server is pinned to one virtual-thread host (CN1_WORKERS=1), so
+        // the traffic below and the silent connection are certainly on the same
+        // one. With several hosts they might not be, and the test would pass by
+        // luck rather than by the fix.
+        Assumptions.assumeTrue(busyServer != null && busyPort != 0,
+                "the single-host server is not running");
+        Socket quiet = new Socket();
+        quiet.connect(new InetSocketAddress("127.0.0.1", busyPort), 5000);
+        quiet.setSoTimeout(12000);
+        try {
+            // Never speaks. Its deadline is the only thing that can close it.
+            InputStream in = quiet.getInputStream();
+            long deadline = System.currentTimeMillis() + 10000;
+            boolean closed = false;
+            while (System.currentTimeMillis() < deadline) {
+                // Keep the host receiving events, so a poll never comes back empty.
+                Socket chatter = new Socket();
+                chatter.connect(new InetSocketAddress("127.0.0.1", busyPort), 5000);
+                chatter.setSoTimeout(5000);
+                try {
+                    chatter.getOutputStream().write(("GET /healthz HTTP/1.1\r\nHost: x\r\n"
+                            + "Connection: close\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+                    chatter.getOutputStream().flush();
+                    while (chatter.getInputStream().read() >= 0) {
+                        // drain
+                    }
+                } finally {
+                    chatter.close();
+                }
+                if (in.available() > 0 || quiet.isClosed()) {
+                    closed = true;
+                    break;
+                }
+                // A read with a short timeout tells us whether the peer hung up.
+                quiet.setSoTimeout(200);
+                try {
+                    if (in.read() < 0) {
+                        closed = true;
+                        break;
+                    }
+                } catch (java.net.SocketTimeoutException stillOpen) {
+                    // expected while the deadline has not yet passed
+                }
+            }
+            assertTrue(closed, "a connection that never spoke must be shed by its "
+                    + "deadline even while the host is busy");
+        } finally {
+            quiet.close();
+        }
     }
 
     @Test

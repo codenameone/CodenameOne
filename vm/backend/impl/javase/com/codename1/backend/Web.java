@@ -155,7 +155,26 @@ public final class Web {
             throw new IOException("Request to " + url + " failed: " + err.getMessage());
         }
         try {
-            connection.setRequestMethod(method == null ? "GET" : method);
+            String verb = method == null ? "GET" : method;
+            try {
+                connection.setRequestMethod(verb);
+            } catch (java.net.ProtocolException unsupported) {
+                // HttpURLConnection has a FIXED set of verbs and PATCH is not in
+                // it, on every JDK this runs on. The packaged arm sends it through
+                // CURLOPT_CUSTOMREQUEST and does not care, so an integration that
+                // works once packaged fails here -- and the JDK's own message,
+                // "Invalid HTTP method: PATCH", says nothing about that being the
+                // difference. Reflecting over the private field is the usual trick
+                // and is not one: measured, it works on 8 and throws
+                // InaccessibleObjectException on 21 and 25, which are the versions
+                // this actually runs on.
+                throw new IOException("The local Java SE runtime cannot send " + verb
+                        + " -- HttpURLConnection accepts a fixed set of verbs and this "
+                        + "is not one of them. The packaged backend sends it normally, "
+                        + "so this is a limitation of cn1:backend rather than of your "
+                        + "code. Exercise this path against the packaged binary, or use "
+                        + "POST with the override header your service expects.");
+            }
             connection.setConnectTimeout(30000);
             connection.setReadTimeout(30000);
             // Following a redirect RESENDS the caller's headers to wherever it

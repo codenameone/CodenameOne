@@ -1051,6 +1051,13 @@ public final class HttpServer {
      */
     private static final int VT_STACK_BYTES = envInt("CN1_HTTP_VT_STACK", 64 * 1024);
 
+    /**
+     * How often a virtual-thread host sweeps its deadlines, however busy it is.
+     * The same 250ms the idle poll waits, so a quiet host behaves exactly as
+     * before and a busy one stops being exempt.
+     */
+    private static final long SWEEP_INTERVAL_MILLIS = 250;
+
     private static final int KEEPALIVE_LINGER_MILLIS =
             envInt("CN1_HTTP_KEEPALIVE_LINGER_MS", 5);
 
@@ -1850,6 +1857,9 @@ public final class HttpServer {
          */
         long[] deadlineByFd = new long[1024];
 
+        /** When this host last swept, so a busy one still sheds stale work. */
+        long lastSweep;
+
         VtHost(Reactor poller) {
             this.poller = poller;
         }
@@ -1858,22 +1868,38 @@ public final class HttpServer {
             return fd < vtByFd.length ? vtByFd[fd] : 0;
         }
 
-        void setHandle(int fd, long handle) {
-            if(fd >= vtByFd.length) {
-                int size = vtByFd.length;
-                while(size <= fd) {
-                    size = size * 2;
-                }
-                long[] grown = new long[size];
-                System.arraycopy(vtByFd, 0, grown, 0, vtByFd.length);
-                vtByFd = grown;
-                long[] grownDeadlines = new long[size];
-                System.arraycopy(deadlineByFd, 0, grownDeadlines, 0, deadlineByFd.length);
-                deadlineByFd = grownDeadlines;
-                boolean[] grownArmed = new boolean[size];
-                System.arraycopy(armedByFd, 0, grownArmed, 0, armedByFd.length);
-                armedByFd = grownArmed;
+        /**
+         * Makes room for this descriptor in all three tables.
+         *
+         * Every writer calls it, not just setHandle. The tables start at 1024
+         * and a process serving the advertised connection ceiling opens numbers
+         * far past that, so a write that only bounds-CHECKED was a write that
+         * silently did nothing: an accepted connection above 1024 recorded no
+         * deadline, and a client that then sent nothing was never swept, because
+         * the growth happened in setHandle and setHandle only runs once the
+         * connection has spoken. Silence was the one case it had to cover.
+         */
+        void ensureCapacity(int fd) {
+            if(fd < vtByFd.length) {
+                return;
             }
+            int size = vtByFd.length;
+            while(size <= fd) {
+                size = size * 2;
+            }
+            long[] grown = new long[size];
+            System.arraycopy(vtByFd, 0, grown, 0, vtByFd.length);
+            vtByFd = grown;
+            long[] grownDeadlines = new long[size];
+            System.arraycopy(deadlineByFd, 0, grownDeadlines, 0, deadlineByFd.length);
+            deadlineByFd = grownDeadlines;
+            boolean[] grownArmed = new boolean[size];
+            System.arraycopy(armedByFd, 0, grownArmed, 0, armedByFd.length);
+            armedByFd = grownArmed;
+        }
+
+        void setHandle(int fd, long handle) {
+            ensureCapacity(fd);
             vtByFd[fd] = handle;
             if(handle == 0) {
                 deadlineByFd[fd] = 0;
@@ -1886,9 +1912,11 @@ public final class HttpServer {
         }
 
         void setDeadline(int fd, long at) {
-            if(fd < deadlineByFd.length) {
-                deadlineByFd[fd] = at;
+            if(fd < 0) {
+                return;
             }
+            ensureCapacity(fd);
+            deadlineByFd[fd] = at;
         }
 
         boolean isArmed(int fd) {
@@ -1896,7 +1924,8 @@ public final class HttpServer {
         }
 
         void setArmed(int fd, boolean armed) {
-            if(fd >= 0 && fd < armedByFd.length) {
+            if(fd >= 0) {
+                ensureCapacity(fd);
                 armedByFd[fd] = armed;
             }
         }
@@ -1963,7 +1992,16 @@ public final class HttpServer {
             int n;
             try {
                 n = me.poller.await(ready, (ranSome || !me.ringEmpty()) ? 0 : 250);
-                if(n == 0) {
+                // On ELAPSED TIME, not on an idle poll. Sweeping only when a poll
+                // came back empty meant a host that always had at least one event
+                // never swept at all -- and a client can keep that true with a
+                // trickle of traffic while its other connections sit silent, so
+                // the deadline that exists to shed them never runs and they
+                // accumulate to the process ceiling. Busy is exactly when the
+                // sweep matters.
+                long now = System.currentTimeMillis();
+                if(n == 0 || now - me.lastSweep >= SWEEP_INTERVAL_MILLIS) {
+                    me.lastSweep = now;
                     sweepDeadlines(me);
                 }
             } catch (IOException err) {

@@ -467,8 +467,41 @@ public class SelfTest {
                 "null", String.valueOf(Jwt.bearer("Basic abc")));
     }
 
+    /**
+     * PATCH is where the two runtimes genuinely differ, and this says so rather
+     * than pretending otherwise: the packaged one sends it, while Java SE's
+     * HttpURLConnection refuses the verb outright on every JDK measured -- 8, 21
+     * and 25 -- and the reflection trick usually reached for works only on 8.
+     *
+     * What BOTH must satisfy is that the developer is never left holding an
+     * unexplained failure. Packaged, the request is attempted; locally, it fails
+     * with a message that names the limitation and says the packaged binary can
+     * do it. The JDK's own "Invalid HTTP method: PATCH" says none of that, and
+     * that opaque failure is what this asserts is gone.
+     */
+    private static void patchIsASendableVerb() throws Exception {
+        String outcome;
+        try {
+            Web.Result r = Web.request("PATCH", "http://127.0.0.1:1/nothing", null, null);
+            // Nothing is listening, so a failed CONNECTION is the expected answer
+            // where the verb IS sendable. What matters is that the verb was not
+            // what stopped it.
+            outcome = r == null || r.getStatus() <= 0 ? "sent or explained" : "answered";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            // Either it went out and the connection failed, or it was refused with
+            // the explanation. Anything else is the opaque JDK error.
+            outcome = message.indexOf("cannot send") >= 0
+                    || message.indexOf("Connection refused") >= 0
+                    || message.indexOf("failed") >= 0
+                    ? "sent or explained" : "opaque: " + message;
+        }
+        check("PATCH is sent, or refused with a reason", "sent or explained", outcome);
+    }
+
     private static void json() throws Exception {
         bothJsonWritersAgree();
+        patchIsASendableVerb();
         malformedDatesAreNotDates();
         asciiFoldingIsLocaleIndependent();
         Map parsed = Json.parseObject("{\"a\":1,\"b\":\"two\",\"c\":true,\"d\":null,\"e\":1.5}");
