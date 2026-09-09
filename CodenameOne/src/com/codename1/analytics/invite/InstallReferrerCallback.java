@@ -38,7 +38,7 @@ public interface InstallReferrerCallback {
     ///
     /// - `installBeginSeconds`: when the install began, in seconds since the
     ///   epoch, or 0 when the store did not say
-    public void onReferrer(String rawReferrer, long referrerClickSeconds,
+    void onReferrer(String rawReferrer, long referrerClickSeconds,
             long installBeginSeconds);
 
     /// Called when no referrer can be obtained. This is the normal answer on
@@ -48,5 +48,5 @@ public interface InstallReferrerCallback {
     /// #### Parameters
     ///
     /// - `reason`: one of the `REASON_` constants on [Invites]
-    public void onUnavailable(String reason);
+    void onUnavailable(String reason);
 }

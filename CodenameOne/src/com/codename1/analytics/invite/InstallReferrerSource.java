@@ -41,7 +41,7 @@ public interface InstallReferrerSource {
     /// #### Returns
     ///
     /// true when a store client is present
-    public boolean isSupported();
+    boolean isSupported();
 
     /// Asks for the install referrer. The answer arrives on the callback,
     /// possibly asynchronously and possibly on another thread; [Invites]
@@ -50,5 +50,5 @@ public interface InstallReferrerSource {
     /// #### Parameters
     ///
     /// - `callback`: receives the answer, never null
-    public void requestReferrer(InstallReferrerCallback callback);
+    void requestReferrer(InstallReferrerCallback callback);
 }

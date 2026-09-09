@@ -35,17 +35,15 @@ public final class Invite {
     private final String channel;
     private final String payload;
     private final long createdTimestamp;
-    private final boolean registered;
 
     Invite(String code, String url, String campaign, String channel, String payload,
-            long createdTimestamp, boolean registered) {
+            long createdTimestamp) {
         this.code = code;
         this.url = url;
         this.campaign = campaign;
         this.channel = channel;
         this.payload = payload;
         this.createdTimestamp = createdTimestamp;
-        this.registered = registered;
     }
 
     /// The opaque invite code. This identifies the invite and authorizes
@@ -103,17 +101,12 @@ public final class Invite {
         return createdTimestamp;
     }
 
-    /// Whether the link service has acknowledged this invite. An invite that
-    /// has not been acknowledged is still shareable and still attributes --
-    /// registration is retried in the background -- so this is a diagnostic,
-    /// not a gate.
-    ///
-    /// #### Returns
-    ///
-    /// true once the server has acknowledged the invite
-    public boolean isRegistered() {
-        return registered;
-    }
+    // There is deliberately no isRegistered() here. This object is a value
+    // captured the moment the invite was minted, and registration completes
+    // asynchronously afterwards, so any flag stored on it could only ever
+    // report the value it was constructed with -- false, for ever, contradicting
+    // its own documentation. Ask [Invites#isRegistered(Invite)] instead, which
+    // reads the durable outbox and can actually answer.
 
     @Override
     public String toString() {

@@ -158,6 +158,59 @@ class InviteConsentAndErasureTest extends UITestBase {
     }
 
     @FormTest
+    void registeringTheProviderBeforeAnyChoiceMustNotLookLikeARefusal() {
+        // The regression this pins: Analytics.addProvider synthesizes
+        // AnalyticsConsent.denied() for the null state, and the invite provider
+        // is registered on every facade entry. A second launch before the user
+        // has answered the prompt therefore arrived looking exactly like an
+        // explicit refusal, deleted the profile captured on the first launch,
+        // and moved to DECLINED -- so a later grant could never resume, for a
+        // user who had refused nothing.
+        InviteTestSupport.freshInstall();
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+        Analytics.setConsent(null);
+        implementation.setAutoProcessConnections(false);
+
+        // First launch captures the deferred profile.
+        Invites.checkForInvite();
+        assertTrue(Storage.getInstance().exists(InviteStore.PENDING));
+        assertEquals(Invites.STATE_PENDING, Invites.getState());
+
+        // Second launch, still no choice on record: re-registering the provider
+        // must leave the profile alone.
+        Analytics.clearProviders();
+        Analytics.addProvider(new InviteAttributionProvider());
+
+        assertTrue(Storage.getInstance().exists(InviteStore.PENDING),
+                "an unanswered prompt was treated as a refusal");
+        assertEquals(Invites.STATE_PENDING, Invites.getState());
+
+        // And a later grant still resolves rather than being stuck at DECLINED.
+        Analytics.setConsent(AnalyticsConsent.granted());
+        assertEquals(Invites.STATE_PENDING, Invites.getState());
+    }
+
+    @FormTest
+    void customParametersSurviveARestart() {
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.handleResolution("{\"resolved\":true,\"code\":\"ABC123\","
+                + "\"campaign\":\"spring\",\"parameters\":{\"room\":\"42\"}}",
+                Invites.MATCH_REFERRER, true);
+        assertEquals("42", Invites.getAttribution().getParameters().get("room"));
+
+        // Simulate the next process: drop the in-memory copy and re-read the
+        // durable record. An answer that arrives before the listener registers
+        // is delivered on the NEXT launch, so losing the parameters here means
+        // delivering an attribution stripped of the data the app acts on.
+        Invites.forgetCachedAttributionForTest();
+
+        assertEquals("42", Invites.getAttribution().getParameters().get("room"),
+                "custom parameters did not survive the restart");
+        assertEquals("spring", Invites.getAttribution().getCampaign());
+    }
+
+    @FormTest
     void optOutModeAloneDoesNotAuthoriseTheStatisticalMatch() {
         InviteTestSupport.freshInstall();
         // The deprecated AnalyticsService forces OPT_OUT, under which the

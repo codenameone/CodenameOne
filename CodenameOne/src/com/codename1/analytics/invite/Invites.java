@@ -194,7 +194,9 @@ public final class Invites {
     private static InviteListener listener;
     private static InstallReferrerSource referrerSource;
     private static InviteAttribution resolved;
-    private static int state = -1;
+    private static boolean attributionLoaded;
+    private static int state = STATE_NONE;
+    private static boolean stateLoaded;
     private static boolean deliveredThisRun;
     private static boolean deferredStarted;
 
@@ -242,7 +244,7 @@ public final class Invites {
         String code = newCode();
         long now = System.currentTimeMillis();
         Invite invite = new Invite(code, buildUrl(code), request.getCampaign(),
-                request.getChannel(), request.getPayload(), now, false);
+                request.getChannel(), request.getPayload(), now);
         queueRegistration(invite, request);
         Map<String, Object> p = new HashMap<String, Object>();
         p.put("invite_code", code);
@@ -450,12 +452,21 @@ public final class Invites {
     ///
     /// the attribution
     public static InviteAttribution getAttribution() {
-        InviteAttribution a = resolved;
-        if (a == null) {
-            a = readAttribution();
-            resolved = a;
+        loadAttribution();
+        return resolved;
+    }
+
+    // Loads the durable record once. Guarded by a flag rather than by a null
+    // check on the field itself: "no attribution" is a real answer, so a null
+    // check would re-read storage on every call for the uninvited majority.
+    // There is no locking here and there should not be -- the facade runs on
+    // the EDT.
+    private static void loadAttribution() {
+        if (attributionLoaded) {
+            return;
         }
-        return a;
+        attributionLoaded = true;
+        resolved = readAttribution();
     }
 
     /// Where attribution has got to: one of the `STATE_` constants.
@@ -464,16 +475,27 @@ public final class Invites {
     ///
     /// the current state
     public static int getState() {
-        if (state < 0) {
-            if (getAttribution() != null) {
-                state = STATE_RESOLVED;
-            } else {
-                Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
-                state = pending == null ? STATE_NONE
-                        : InviteStore.getInt(pending, "state", STATE_PENDING);
-            }
-        }
+        loadState();
         return state;
+    }
+
+    // Guarded by a flag rather than by a sentinel value on the field itself,
+    // for the same reason loadAttribution() is: STATE_NONE is a real answer,
+    // and re-deriving it from storage on every call would read the disk for
+    // every uninvited install. No locking -- the facade runs on the EDT.
+    private static void loadState() {
+        if (stateLoaded) {
+            return;
+        }
+        stateLoaded = true;
+        if (getAttribution() != null) {
+            state = STATE_RESOLVED;
+            stateLoaded = true;
+            return;
+        }
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        state = pending == null ? STATE_NONE
+                : InviteStore.getInt(pending, "state", STATE_PENDING);
     }
 
     // ---- closing the funnel ---------------------------------------------
@@ -603,6 +625,17 @@ public final class Invites {
     /// an application that knows it has just regained connectivity.
     public static void flush() {
         drainOutbox();
+        // A deferred lookup that failed because the first launch was offline
+        // leaves deferredStarted set, and nothing else clears it inside the
+        // process: the request is fail-silent, so no callback runs. Without
+        // this, the documented "I have just regained connectivity" call would
+        // drain registrations and silently leave the attribution unresolved
+        // until the next cold start. The persisted attempt counter still
+        // bounds the retries.
+        if (getState() == STATE_PENDING) {
+            deferredStarted = false;
+            beginDeferred();
+        }
     }
 
     /// Forgets every trace of invite attribution on this device: the pending
@@ -618,9 +651,21 @@ public final class Invites {
         Preferences.delete(PREF_CONSUMED_ARG);
         clearDimensions();
         resolved = null;
+        // Loaded, and the answer is "none" -- not "unknown", or the next call
+        // would read the record we have just deleted back off the disk.
+        attributionLoaded = true;
         state = STATE_NONE;
+        stateLoaded = true;
         deliveredThisRun = false;
         deferredStarted = false;
+    }
+
+    // Package private test seam: drops the in-memory copy so the next read
+    // comes off the disk, which is what the next process would do.
+    static void forgetCachedAttributionForTest() {
+        resolved = null;
+        attributionLoaded = false;
+        stateLoaded = false;
     }
 
     // Package private: the analytics provider hook calls this when the client
@@ -665,8 +710,8 @@ public final class Invites {
     private static void ensureProvider() {
         try {
             List providers = Analytics.getProviders();
-            for (int i = 0; i < providers.size(); i++) {
-                if (providers.get(i) instanceof InviteAttributionProvider) {
+            for (Object provider : providers) {
+                if (provider instanceof InviteAttributionProvider) {
                     return;
                 }
             }
@@ -846,6 +891,7 @@ public final class Invites {
 
     private static void setState(int s) {
         state = s;
+        stateLoaded = true;
         Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
         if (pending != null) {
             pending.put("state", String.valueOf(s));
@@ -897,11 +943,13 @@ public final class Invites {
         if (expires > 0 && System.currentTimeMillis() > expires) {
             InviteStore.delete(InviteStore.PENDING);
             state = STATE_NONE_FOUND;
+            stateLoaded = true;
             notifyUnavailable(REASON_EXPIRED);
             return;
         }
         if (InviteStore.getInt(pending, "attempts", 0) >= MAX_ATTEMPTS) {
             state = STATE_NONE_FOUND;
+            stateLoaded = true;
             notifyUnavailable(REASON_NO_MATCH);
             return;
         }
@@ -941,6 +989,7 @@ public final class Invites {
                 public void onReferrer(final String rawReferrer, final long clickSeconds,
                         final long beginSeconds) {
                     onEdt(new Runnable() {
+                        @Override
                         public void run() {
                             String code = codeFromQuery(rawReferrer);
                             if (code == null) {
@@ -957,6 +1006,7 @@ public final class Invites {
                 @Override
                 public void onUnavailable(String reason) {
                     onEdt(new Runnable() {
+                        @Override
                         public void run() {
                             fallBackToMatch();
                         }
@@ -1048,7 +1098,8 @@ public final class Invites {
     private static void send(String url, String json, String matchType, boolean deferred,
             boolean registration) {
         try {
-            InviteConnection req = new InviteConnection(matchType, deferred, registration);
+            InviteConnection req = new InviteConnection(matchType, deferred, registration,
+                    registration ? json : null);
             req.setUrl(url);
             req.setPost(true);
             req.setContentType("application/json");
@@ -1067,12 +1118,17 @@ public final class Invites {
         private final String matchType;
         private final boolean deferred;
         private final boolean registration;
+        // The outbox entry this request carries, so a success can retire
+        // exactly that one rather than the whole queue.
+        private final String outboxEntry;
         private String payload;
 
-        InviteConnection(String matchType, boolean deferred, boolean registration) {
+        InviteConnection(String matchType, boolean deferred, boolean registration,
+                String outboxEntry) {
             this.matchType = matchType;
             this.deferred = deferred;
             this.registration = registration;
+            this.outboxEntry = outboxEntry;
         }
 
         @Override
@@ -1084,6 +1140,9 @@ public final class Invites {
         protected void postResponse() {
             if (registration) {
                 applySlug(payload);
+                if (outboxEntry != null) {
+                    registrationAcknowledged(outboxEntry);
+                }
             } else {
                 handleResolution(payload, matchType, deferred);
             }
@@ -1127,6 +1186,7 @@ public final class Invites {
             applySlug(payload);
             if (!truthy(json.get("resolved"))) {
                 state = STATE_NONE_FOUND;
+                stateLoaded = true;
                 notifyUnavailable(REASON_NO_MATCH);
                 return;
             }
@@ -1150,8 +1210,7 @@ public final class Invites {
             Object rawParams = json.get("parameters");
             if (rawParams instanceof Map) {
                 Map raw = (Map) rawParams;
-                for (java.util.Iterator i = raw.entrySet().iterator(); i.hasNext();) {
-                    Object next = i.next();
+                for (Object next : raw.entrySet()) {
                     if (next instanceof Map.Entry) {
                         Map.Entry en = (Map.Entry) next;
                         Object k = en.getKey();
@@ -1184,11 +1243,21 @@ public final class Invites {
         record.put("deferred", String.valueOf(a.isDeferred()));
         record.put("clickTs", String.valueOf(a.getClickTimestamp()));
         record.put("resolvedTs", String.valueOf(a.getResolvedTimestamp()));
+        // The inviter's custom parameters are part of the attribution the app
+        // acts on, so they have to survive a restart -- an answer that arrives
+        // before the listener is registered is delivered on the NEXT launch,
+        // and would otherwise arrive stripped of them.
+        if (!a.getParameters().isEmpty()) {
+            InviteStore.put(record, "params",
+                    JSONParser.mapToJson(new LinkedHashMap<String, Object>(a.getParameters())));
+        }
         record.put("delivered", "false");
         InviteStore.write(InviteStore.ATTRIBUTION, record);
         InviteStore.delete(InviteStore.PENDING);
         resolved = a;
+        attributionLoaded = true;
         state = STATE_RESOLVED;
+        stateLoaded = true;
         writeDimensions(a);
         Map<String, Object> p = new HashMap<String, Object>();
         p.put("invite_code", a.getCode());
@@ -1217,8 +1286,8 @@ public final class Invites {
     }
 
     private static void clearDimensions() {
-        for (int i = 0; i < DIMENSIONS.length; i++) {
-            Analytics.clearDimension(DIMENSIONS[i]);
+        for (String dimension : DIMENSIONS) {
+            Analytics.clearDimension(dimension);
         }
     }
 
@@ -1238,7 +1307,32 @@ public final class Invites {
                 InviteStore.getBoolean(r, "deferred", false),
                 InviteStore.getLong(r, "clickTs", 0),
                 InviteStore.getLong(r, "resolvedTs", 0),
-                new LinkedHashMap<String, String>());
+                parseParams(InviteStore.get(r, "params", null)));
+    }
+
+    private static Map<String, String> parseParams(String json) {
+        Map<String, String> out = new LinkedHashMap<String, String>();
+        if (json == null || json.length() == 0) {
+            return out;
+        }
+        try {
+            Map<String, Object> parsed = JSONParser.parseJSON(json);
+            if (parsed != null) {
+                for (Object next : parsed.entrySet()) {
+                    if (next instanceof Map.Entry) {
+                        Map.Entry en = (Map.Entry) next;
+                        Object k = en.getKey();
+                        Object v = en.getValue();
+                        if (k instanceof String && v instanceof String) {
+                            out.put((String) k, (String) v);
+                        }
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+        return out;
     }
 
     // Delivers at most once per install. The durable flag is what survives a
@@ -1306,17 +1400,58 @@ public final class Invites {
         if (outbox.isEmpty()) {
             return;
         }
-        for (int i = 0; i < outbox.size(); i++) {
-            postRegistration(outbox.get(i));
+        // Each entry is removed by its OWN successful response, never here.
+        // Clearing the queue at send time looked harmless and was not: the
+        // registration carries the campaign, channel, payload and preview
+        // metadata, and none of it can be reconstructed from a click. The case
+        // that loses it is exactly the case the outbox exists for -- an invite
+        // minted with no network, which is the reason minting is offline in
+        // the first place.
+        //
+        // Re-posting an entry that did land is harmless: the server keys on
+        // the code and treats a repeat from the same inviter as idempotent.
+        for (String json : outbox) {
+            postRegistration(json);
         }
-        // Cleared optimistically: a registration that does not land is
-        // recoverable server side from the click itself, and keeping the
-        // entries would re-post them on every facade call.
-        InviteStore.writeOutbox(new java.util.ArrayList<String>());
     }
 
     private static void postRegistration(String json) {
         send(getLinkBase() + PATH_MINT, json, MATCH_DIRECT, false, true);
+    }
+
+    // Called from the registration response, which ConnectionRequest invokes
+    // only on success.
+    private static void registrationAcknowledged(String json) {
+        List<String> outbox = InviteStore.readOutbox();
+        if (outbox.remove(json)) {
+            InviteStore.writeOutbox(outbox);
+        }
+    }
+
+    /// Whether the link service has acknowledged this invite.
+    ///
+    /// An unacknowledged invite is still shareable and still attributes --
+    /// registration is retried until it lands -- so this is a diagnostic
+    /// rather than a gate.
+    ///
+    /// #### Parameters
+    ///
+    /// - `invite`: the invite to ask about, may be null
+    ///
+    /// #### Returns
+    ///
+    /// true once the server has acknowledged it
+    public static boolean isRegistered(Invite invite) {
+        if (invite == null) {
+            return false;
+        }
+        String code = invite.getCode();
+        for (String pending : InviteStore.readOutbox()) {
+            if (pending != null && pending.indexOf(code) >= 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean truthy(Object o) {

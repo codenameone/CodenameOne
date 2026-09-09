@@ -45,7 +45,7 @@ public interface InviteListener {
     /// #### Parameters
     ///
     /// - `attribution`: the resolved attribution, never null
-    public void inviteReceived(InviteAttribution attribution);
+    void inviteReceived(InviteAttribution attribution);
 
     /// Called when no invite will be attributed to this install. This is the
     /// ordinary outcome -- most installs are not invited -- so treat it as
@@ -54,5 +54,5 @@ public interface InviteListener {
     /// #### Parameters
     ///
     /// - `reason`: one of the `REASON_` constants on [Invites]
-    public void attributionUnavailable(String reason);
+    void attributionUnavailable(String reason);
 }

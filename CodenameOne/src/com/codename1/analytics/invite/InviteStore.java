@@ -25,7 +25,6 @@ package com.codename1.analytics.invite;
 import com.codename1.io.Log;
 import com.codename1.io.Storage;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,8 +73,7 @@ final class InviteStore {
             if (o instanceof Map) {
                 Map raw = (Map) o;
                 Map<String, String> out = new LinkedHashMap<String, String>();
-                for (Iterator i = raw.entrySet().iterator(); i.hasNext();) {
-                    Object next = i.next();
+                for (Object next : raw.entrySet()) {
                     if (next instanceof Map.Entry) {
                         Map.Entry en = (Map.Entry) next;
                         Object k = en.getKey();
@@ -130,8 +128,7 @@ final class InviteStore {
             Object o = s.readObject(OUTBOX);
             if (o instanceof List) {
                 List raw = (List) o;
-                for (int i = 0; i < raw.size(); i++) {
-                    Object v = raw.get(i);
+                for (Object v : raw) {
                     if (v instanceof String) {
                         out.add((String) v);
                     }

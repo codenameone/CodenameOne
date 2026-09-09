@@ -61,7 +61,8 @@ class InviteMintTest extends UITestBase {
         assertTrue(invite.getUrl().endsWith("/i/" + invite.getCode()), invite.getUrl());
         assertEquals("spring", invite.getCampaign());
         assertEquals("sms", invite.getChannel());
-        assertFalse(invite.isRegistered());
+        assertFalse(Invites.isRegistered(invite),
+                "nothing has acknowledged it yet");
     }
 
     @FormTest
@@ -104,6 +105,33 @@ class InviteMintTest extends UITestBase {
         assertTrue(compact.contains("\"channel\":\"sms\""), body);
         assertTrue(compact.contains("\"payload\":\"room-42\""), body);
         assertTrue(compact.contains("\"clientId\":"), body);
+    }
+
+    @FormTest
+    void anUnacknowledgedRegistrationStaysInTheOutboxAndIsRetried() {
+        InviteTestSupport.freshInstall();
+        implementation.clearQueuedRequests();
+        implementation.setAutoProcessConnections(false);
+
+        Invite invite = Invites.create(InviteRequest.create().campaign("spring").build());
+        assertEquals(1, implementation.getQueuedRequests().size());
+
+        // Nothing has answered, so the entry must survive: the registration
+        // carries the campaign and payload, and a click cannot reconstruct
+        // them. The offline mint is exactly the case this protects.
+        implementation.clearQueuedRequests();
+        Invites.flush();
+
+        List<ConnectionRequest> retried = implementation.getQueuedRequests();
+        boolean reposted = false;
+        for (ConnectionRequest r : retried) {
+            if (r.getUrl().endsWith("/api/v2/analytics/invites")
+                    && r.getRequestBody().contains(invite.getCode())) {
+                reposted = true;
+            }
+        }
+        assertTrue(reposted, "an unacknowledged registration was dropped");
+        assertFalse(Invites.isRegistered(invite));
     }
 
     @FormTest

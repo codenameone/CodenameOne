@@ -23,6 +23,7 @@
 package com.codename1.analytics.invite;
 
 import com.codename1.analytics.AbstractAnalyticsProvider;
+import com.codename1.analytics.Analytics;
 import com.codename1.analytics.AnalyticsCapability;
 import com.codename1.analytics.AnalyticsConsent;
 import com.codename1.analytics.AnalyticsContext;
@@ -79,7 +80,23 @@ final class InviteAttributionProvider extends AbstractAnalyticsProvider {
 
     @Override
     public void onConsentChanged(AnalyticsConsent consent) {
-        Invites.onConsentChanged(consent != null && consent.isAnalytics());
+        // The argument cannot be trusted to distinguish "refused" from "not
+        // asked yet". Analytics.addProvider synthesizes AnalyticsConsent.denied()
+        // for the null state, and this provider is registered on every facade
+        // entry -- so a second launch before the user has answered the prompt
+        // would arrive here looking exactly like an explicit refusal, delete
+        // the deferred profile captured on the first launch, and move to
+        // DECLINED. A later grant could then never resume, and the invite that
+        // caused the install would be lost for a user who never refused
+        // anything.
+        //
+        // Analytics.getConsent() returns null until there is a real choice on
+        // record, so ask it instead of believing the argument.
+        AnalyticsConsent recorded = Analytics.getConsent();
+        if (recorded == null) {
+            return;
+        }
+        Invites.onConsentChanged(recorded.isAnalytics());
     }
 
     @Override
