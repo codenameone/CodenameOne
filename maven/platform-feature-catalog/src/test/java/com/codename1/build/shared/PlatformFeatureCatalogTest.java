@@ -898,8 +898,11 @@ class PlatformFeatureCatalogTest {
         assertTrue(e.androidGradleDeps().get(0)
                         .startsWith("com.android.installreferrer:installreferrer"),
                 "the deterministic Android path needs the Play referrer library");
-        assertEquals(21, e.androidMinimumSdk(),
-                "the installreferrer aar declares minSdk 21 and the merger enforces it");
+        // Checked against the real artifact: installreferrer 2.2 declares
+        // minSdkVersion 8 in its own manifest, so it imposes no floor. Adding
+        // one here would drop API 19 and 20 devices for nothing.
+        assertEquals(0, e.androidMinimumSdk(),
+                "the referrer library imposes no floor, so neither may this entry");
         assertTrue(e.iosPods().isEmpty(), "the iOS path links nothing");
         assertTrue(e.iosFrameworks().isEmpty(), "the iOS path links nothing");
         assertNull(e.iosMinimumDeploymentTarget(),
@@ -934,7 +937,7 @@ class PlatformFeatureCatalogTest {
         List<PlatformFeatureCatalog.Entry> hits = PlatformFeatureCatalog.matchesFor(
                 "com/codename1/components/InviteButton");
         assertEquals(1, hits.size(), "expected one entry to fire");
-        assertEquals(21, hits.get(0).androidMinimumSdk());
+        assertEquals(0, hits.get(0).androidMinimumSdk());
         assertTrue(PlatformFeatureCatalog.matchesFor(
                 "com/codename1/components/ShareButton").isEmpty(),
                 "the plain share button must buy nothing");

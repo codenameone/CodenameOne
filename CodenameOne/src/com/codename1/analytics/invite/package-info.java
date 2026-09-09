@@ -58,7 +58,8 @@
 ///
 /// This package is deliberately separate from
 /// {@link com.codename1.analytics}. The Android half of the attribution links
-/// the Play Install Referrer library, which raises the application's minimum
-/// API level, and the build only does that for applications that actually
-/// reference this package.
+/// the Play Install Referrer library and declares the permission that binds to
+/// it, and the build only does that for applications that actually reference
+/// this package -- an application that merely reports analytics carries
+/// neither.
 package com.codename1.analytics.invite;

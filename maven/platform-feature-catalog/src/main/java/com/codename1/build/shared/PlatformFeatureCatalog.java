@@ -831,22 +831,31 @@ public final class PlatformFeatureCatalog {
                 .description("Cross-platform augmented reality (world/image/face tracking)"));
 
         // Invite / referral attribution. The Play Install Referrer library is
-        // the deterministic half of the attribution and carries a minSdk 21
-        // floor of its own, so this entry MUST stay keyed on the invite
-        // subpackage rather than on com/codename1/analytics/. Display and the
-        // Analytics facade are referenced by practically every application;
-        // keying one package higher would put a Play dependency and an API 21
-        // floor on all of them, which is the DatabaseConfig failure recorded
-        // in AndroidGradleBuilder.usesClass -- and the later deletion of the
-        // unused sources does not undo it, because the dependency and the
-        // floor are already in the gradle file.
+        // the deterministic half of the attribution: the invite code makes the
+        // whole round trip through the store and comes back verbatim, so
+        // nothing has to be matched or guessed.
+        //
+        // Keyed on the invite subpackage rather than on com/codename1/analytics/
+        // deliberately. Display and the Analytics facade are referenced by
+        // practically every application, so keying one package higher would put
+        // this dependency on all of them -- the DatabaseConfig failure recorded
+        // in AndroidGradleBuilder.usesClass, which the later deletion of the
+        // unused sources does not undo because the dependency is already in the
+        // gradle file.
+        //
+        // No androidMinimumSdk: checked against the real artifact rather than
+        // assumed. installreferrer 2.2, the newest release, declares
+        // minSdkVersion 8 in its own manifest, so it imposes no floor and
+        // adding one here would drop API 19 and 20 devices from an invite
+        // app's Play listing for nothing. The aar also declares the
+        // BIND_GET_INSTALL_REFERRER_SERVICE permission itself, so the manifest
+        // merger brings it in without a catalog entry.
         //
         // No iOS half: there is nothing to link. The iOS attribution path is
         // an HTTPS call built from Display properties that already exist, so
         // it needs no pod, no framework and no deployment target lift.
         e.add(new Entry("com/codename1/analytics/invite/")
                 .androidGradle("com.android.installreferrer:installreferrer:2.2")
-                .androidMinimumSdk(21)
                 .description("Invite referral attribution (Play Install Referrer)"));
 
         // InviteButton lives beside ShareButton in com/codename1/components,
@@ -856,7 +865,6 @@ public final class PlatformFeatureCatalog {
         // is unaffected.
         e.add(new Entry("com/codename1/components/InviteButton")
                 .androidGradle("com.android.installreferrer:installreferrer:2.2")
-                .androidMinimumSdk(21)
                 .description("Invite button (Play Install Referrer)"));
 
         ENTRIES = Collections.unmodifiableList(e);

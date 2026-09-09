@@ -4483,6 +4483,23 @@ public class AndroidGradleBuilder extends Executor {
             cipherPackage.delete();
         }
 
+        if (!usesInvites) {
+            // The Play Install Referrer implementation compiles against
+            // com.android.installreferrer, which is only on the classpath when
+            // the catalog has added it. Deleting it here keeps an app that
+            // never invites anyone from carrying the dependency, and from
+            // declaring the BIND_GET_INSTALL_REFERRER_SERVICE permission the
+            // aar's own manifest contributes.
+            File referrerPackage = new File(srcDir, "com/codename1/impl/android/referrer");
+            File[] referrerFiles = referrerPackage.listFiles();
+            if (referrerFiles != null) {
+                for (File f : referrerFiles) {
+                    f.delete();
+                }
+            }
+            referrerPackage.delete();
+        }
+
         pruneOptionalAiSources(srcDir);
 
         pruneBiometricSourcesForCompileSdk(srcDir,
@@ -5958,6 +5975,22 @@ public class AndroidGradleBuilder extends Executor {
                     + fbPkg + ".FirebaseAnalyticsBridgeImpl());\n";
         }
 
+        // Registers the Play Install Referrer reader with the invite API.
+        //
+        // A direct symbol reference in generated code rather than a
+        // Class.forName lookup: the reference exists exactly when the class
+        // does, R8 renames the call site and the target together, and there is
+        // no keep rule to forget. The class itself is a port source, not a
+        // generated string literal -- it owns a connection lifecycle, a
+        // reconnect path and a bounded retry, and as a literal it would be
+        // invisible to review and to the SpotBugs gate.
+        String inviteRegisterInstall = "";
+        if (usesInvites) {
+            inviteRegisterInstall = "            com.codename1.analytics.invite.Invites"
+                    + ".registerInstallReferrerSource(new "
+                    + "com.codename1.impl.android.referrer.AndroidInstallReferrer());\n";
+        }
+
         String consumableCode;
         consumableCode = "public boolean isConsumable(String sku) {\n"
                 + "  boolean retVal = super.isConsumable(sku);\n"
@@ -6336,6 +6369,7 @@ public class AndroidGradleBuilder extends Executor {
                             + "        if(firstTime) {\n"
                             + "            firstTime = false;\n"
                             + firebaseRegisterInstall
+                            + inviteRegisterInstall
                             + svgRegistryInstall
                             + "            i.init(this);\n"
                             + fcmRegisterPushCode
