@@ -82,7 +82,7 @@ no `R.drawable` constants). They're resolved at runtime per platform:
 | Parameter | What to provide | Android resolution | iOS resolution
 | `alertSound` / channel sound | a file whose name starts with `notification_sound`, bundled in the app | `res/raw/<name>` via `android.resource://` URI | `UNNotificationSound` from the app bundle
 | `alertImage` | image path placed in the app root | loaded from `assets/` | `UNNotificationAttachment` from the bundle
-| `Action` icon | a drawable name bundled in `native/android` | `getResources().getIdentifier(name, "drawable", pkg)` | not displayed
+| `Action` icon | a drawable name bundled in `android/src/main/resources` | `getResources().getIdentifier(name, "drawable", pkg)` | not displayed
 |===
 
 The file extension is optional for the action icon and is ignored. iOS notification
