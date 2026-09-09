@@ -27,6 +27,7 @@ on:
       - 'scripts/ci/retry.sh'
       - 'scripts/ci/apt-get-update.sh'
       - 'scripts/ci/apt-get-install.sh'
+      - 'scripts/ci/tests/apt-get-update-test.sh'
       # The build hint gates are run from this workflow and nowhere else, and one
       # of them holds an empty baseline. Ignoring the whole directory meant a
       # change that breaks a gate, or that adds a line to the baseline, could
@@ -78,6 +79,7 @@ on:
       - 'scripts/ci/retry.sh'
       - 'scripts/ci/apt-get-update.sh'
       - 'scripts/ci/apt-get-install.sh'
+      - 'scripts/ci/tests/apt-get-update-test.sh'
       # The build hint gates are run from this workflow and nowhere else, and one
       # of them holds an empty baseline. Ignoring the whole directory meant a
       # change that breaks a gate, or that adds a line to the baseline, could
@@ -469,6 +471,12 @@ jobs:
       - name: Check build hint catalog
         if: ${{ matrix.java-version == 8 }}
         run: scripts/check-build-hint-catalog.sh
+      - name: Check the apt source prune keeps Ubuntu's own sources
+        if: ${{ matrix.java-version == 8 }}
+        # Cheap, and the rule it covers is only ever exercised on a runner whose
+        # apt is already broken -- so without this it would be tested by a red
+        # build and nothing else.
+        run: bash scripts/ci/tests/apt-get-update-test.sh
       - name: Check the build hint data file can be rendered
         if: ${{ matrix.java-version == 8 }}
         # Not a drift check: nothing is committed to drift from, because every

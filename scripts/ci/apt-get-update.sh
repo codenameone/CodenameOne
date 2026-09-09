@@ -1,14 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# GitHub-hosted Ubuntu runners occasionally ship transiently broken Microsoft
-# apt sources (azure-cli / packages.microsoft.com). These are not needed by our
-# package installs, but a bad InRelease from them makes apt-get update fail
-# before we can install normal Ubuntu packages such as xvfb or clang.
-if [ -d /etc/apt/sources.list.d ]; then
-  sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \
-    \( -iname '*microsoft*' -o -iname '*azure-cli*' \) \
-    -print -delete || true
+# GitHub-hosted Ubuntu runners ship third-party apt sources that we never
+# install from, and apt-get update fails as a WHOLE when any one of them serves
+# a bad index -- it prints "they have been ignored, or old ones used instead"
+# and then exits non-zero anyway. So a broken vendor mirror stops us installing
+# xvfb or clang from Ubuntu's own archive, which was working the entire time.
+#
+# This started as a Microsoft-only rule (azure-cli / packages.microsoft.com).
+# Naming vendors one at a time does not converge: Google's chrome-stable repo
+# took out five jobs on one branch with a Hash Sum mismatch that outlasted all
+# three retries below, and it is the runner image's repo, not ours -- the only
+# browser any workflow here uses is the chromium Playwright downloads itself.
+#
+# So the rule is by ORIGIN rather than by name: a source list survives only if
+# it points at an Ubuntu host. That has to be a keep-list rather than a
+# drop-list, because on 24.04 Ubuntu's own archive moved INTO this directory as
+# ubuntu.sources (deb822), and deleting it would leave apt with no distro at
+# all -- a much worse failure than the one being fixed.
+# The directory is a variable ONLY so the test beside this script can point the
+# rule at a fixture; nothing in CI sets it.
+APT_SOURCES_DIR="${CN1_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
+if [ -d "$APT_SOURCES_DIR" ]; then
+  for source in "$APT_SOURCES_DIR"/*; do
+    [ -f "$source" ] || continue
+    if grep -qE '(^|[/.])(archive|security|ports|azure\.archive)\.ubuntu\.com' "$source"; then
+      continue
+    fi
+    echo "apt-get-update: dropping third-party source $source" >&2
+    sudo rm -f "$source" || true
+  done
 fi
 
 # Dropped in as configuration rather than passed as options, because the install
