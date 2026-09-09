@@ -45,7 +45,26 @@ public class MediaQuery extends com.codename1.flutter.widgets.InheritedWidget {
                 // fall back to the Display below
             }
         }
-        return MediaQueryData.fromDisplay();
+        return MediaQueryData.fromDisplay(formOf(context));
+    }
+
+    /**
+     * The Form the subtree at {@code context} belongs to, or null.
+     *
+     * <p>Asked instead of {@code Display.getCurrent()} because the first screen is BUILT
+     * BEFORE IT IS SHOWN: {@code runApp} mounts the tree into a new Form and shows it
+     * afterwards, so during that first build nothing is current and every safe-area
+     * lookup answered zero. The gallery's home page then laid its title out under the
+     * status bar and its scroll view took no top inset, and the screen only corrected
+     * itself if something later re-mounted it -- which a route push does, and which is
+     * why this was invisible to any measurement taken after opening a route.</p>
+     */
+    private static com.codename1.ui.Form formOf(BuildContext context) {
+        if (!(context instanceof Element)) {
+            return null;
+        }
+        com.codename1.flutter.rendering.RenderHost h = ((Element) context).host();
+        return h == null ? null : h.form();
     }
 
     /** {@code MediaQuery.sizeOf}: the ambient display size. */

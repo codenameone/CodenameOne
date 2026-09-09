@@ -117,6 +117,18 @@ public class MediaQueryData {
      * defaults when no Display is initialized.
      */
     public static MediaQueryData fromDisplay() {
+        return fromDisplay(null);
+    }
+
+    /**
+     * As {@link #fromDisplay()}, for a subtree that knows which Form it is in.
+     *
+     * <p>The safe area has to be asked of a Form, and the first screen is BUILT BEFORE
+     * IT IS SHOWN, so {@code Display.getCurrent()} is null throughout that build and
+     * every inset came back zero. Passing the Form the subtree actually belongs to
+     * removes the dependency on what happens to be on screen.</p>
+     */
+    public static MediaQueryData fromDisplay(com.codename1.ui.Form form) {
         if (!Display.isInitialized()) {
             return new MediaQueryData(new Size(0, 0), 1.0, Brightness.light);
         }
@@ -128,7 +140,7 @@ public class MediaQueryData {
             // ports without dark-mode detection
         }
         return compute(d.getDisplayWidth(), d.getDisplayHeight(), Dp.scale(), dark,
-                safeAreaInsets(d));
+                safeAreaInsets(d, form));
     }
 
     /**
@@ -144,9 +156,10 @@ public class MediaQueryData {
      * <p>Codename One already knows the answer ({@code Form.getSafeArea()}, backed by the
      * port's {@code getDisplaySafeArea}); the runtime simply never asked.</p>
      */
-    private static EdgeInsets safeAreaInsets(Display d) {
+    private static EdgeInsets safeAreaInsets(Display d, com.codename1.ui.Form form) {
         try {
-            com.codename1.ui.Form f = d.getCurrent();
+            // The caller's own Form first: during runApp's build nothing is current yet.
+            com.codename1.ui.Form f = form != null ? form : d.getCurrent();
             if (f == null) {
                 return EdgeInsets.all(0);
             }
