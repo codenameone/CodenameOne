@@ -830,6 +830,35 @@ public final class PlatformFeatureCatalog {
                 .androidMetaData("com.google.ar.core", "optional")
                 .description("Cross-platform augmented reality (world/image/face tracking)"));
 
+        // Invite / referral attribution. The Play Install Referrer library is
+        // the deterministic half of the attribution and carries a minSdk 21
+        // floor of its own, so this entry MUST stay keyed on the invite
+        // subpackage rather than on com/codename1/analytics/. Display and the
+        // Analytics facade are referenced by practically every application;
+        // keying one package higher would put a Play dependency and an API 21
+        // floor on all of them, which is the DatabaseConfig failure recorded
+        // in AndroidGradleBuilder.usesClass -- and the later deletion of the
+        // unused sources does not undo it, because the dependency and the
+        // floor are already in the gradle file.
+        //
+        // No iOS half: there is nothing to link. The iOS attribution path is
+        // an HTTPS call built from Display properties that already exist, so
+        // it needs no pod, no framework and no deployment target lift.
+        e.add(new Entry("com/codename1/analytics/invite/")
+                .androidGradle("com.android.installreferrer:installreferrer:2.2")
+                .androidMinimumSdk(21)
+                .description("Invite referral attribution (Play Install Referrer)"));
+
+        // InviteButton lives beside ShareButton in com/codename1/components,
+        // outside the prefix above, and an application can reference it
+        // without naming anything in the invite package. Matched as an exact
+        // class (no trailing slash) so the rest of com/codename1/components
+        // is unaffected.
+        e.add(new Entry("com/codename1/components/InviteButton")
+                .androidGradle("com.android.installreferrer:installreferrer:2.2")
+                .androidMinimumSdk(21)
+                .description("Invite button (Play Install Referrer)"));
+
         ENTRIES = Collections.unmodifiableList(e);
         Set<String> classPrefixes = new LinkedHashSet<String>();
         Set<String> methodKeys = new LinkedHashSet<String>();

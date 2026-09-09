@@ -1,0 +1,1328 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.analytics.invite;
+
+import com.codename1.analytics.Analytics;
+import com.codename1.analytics.AnalyticsConsent;
+import com.codename1.analytics.ConsentMode;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Preferences;
+import com.codename1.io.Util;
+import com.codename1.share.ShareResult;
+import com.codename1.share.ShareResultListener;
+import com.codename1.ui.Display;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.util.Base64;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/// Invite a friend, and follow the invitation through to what it caused.
+///
+/// Mint an invite, share it, and on the friend's device recover the invite
+/// that produced the install. Once attribution resolves it is written as
+/// persistent analytics dimensions, so every later event -- including the
+/// `purchase` event the framework already emits -- carries the campaign and
+/// the referrer, and revenue per campaign comes out of the reports you have.
+///
+/// ### Sending
+///
+/// ```java
+/// Invite invite = Invites.create(InviteRequest.create()
+///         .campaign("spring")
+///         .channel("share_sheet")
+///         .build());
+/// Invites.share(invite, "Come and try this with me");
+/// ```
+///
+/// [#create] returns immediately and works with no network, so the share
+/// sheet never waits on a server. Registration with the link service is
+/// retried in the background.
+///
+/// ### Receiving
+///
+/// ```java
+/// Invites.setInviteListener(new InviteListener() {
+///     public void inviteReceived(InviteAttribution attribution) {
+///         // attribution.getCode(), getCampaign(), getPayload()
+///     }
+///
+///     public void attributionUnavailable(String reason) {
+///     }
+/// });
+/// Invites.checkForInvite();
+/// ```
+///
+/// Call [#checkForInvite] from your `start()` method. It is a pull rather
+/// than a callback on purpose: Android delivers a link by replacing the
+/// activity intent and iOS by setting a property, and reading the launch
+/// argument is the one path that behaves the same on both.
+///
+/// ### Consent, and what is on the device before it
+///
+/// Everything reported here is gated on the analytics consent category of
+/// [Analytics], and nothing is transmitted until consent is granted.
+///
+/// One thing does happen before consent: on first launch a coarse device
+/// profile -- operating system version, hardware model, language, screen size
+/// -- is written to local storage so that a deferred match is still possible
+/// once consent arrives. It is never transmitted while consent is withheld,
+/// and it is deleted outright if consent is refused. There is no alternative
+/// that also works, because the window in which a deferred match can be made
+/// closes within the hour, long before a typical consent prompt is answered.
+/// [#setAttributionWindow] with `0` switches deferred attribution off
+/// entirely.
+///
+/// ### How exact the answer is
+///
+/// [InviteAttribution#getMatchType] says how the attribution was made.
+/// [#MATCH_DIRECT] and [#MATCH_REFERRER] are exact. [#MATCH_FINGERPRINT] is a
+/// statistical match made on the server, used where the platform's store
+/// carries no referrer, and it is occasionally wrong -- check
+/// [InviteAttribution#getConfidence] and do not pay a referral bounty on it
+/// without saying so.
+public final class Invites {
+    /// Nothing has been attributed and nothing is outstanding.
+    public static final int STATE_NONE = 0;
+
+    /// An invite is being resolved; the answer has not arrived yet.
+    public static final int STATE_PENDING = 1;
+
+    /// This install has been attributed to an invite.
+    public static final int STATE_RESOLVED = 2;
+
+    /// No invite will be attributed to this install.
+    public static final int STATE_NONE_FOUND = 3;
+
+    /// Attribution was abandoned because analytics consent was refused.
+    public static final int STATE_DECLINED = 4;
+
+    /// The link opened an application that was already installed. Exact.
+    public static final String MATCH_DIRECT = "direct";
+
+    /// The invite code made the whole trip through the application store and
+    /// came back verbatim. Exact.
+    public static final String MATCH_REFERRER = "referrer";
+
+    /// The server matched this install to a click statistically, because the
+    /// platform's store carries no referrer. Not exact.
+    public static final String MATCH_FINGERPRINT = "fingerprint";
+
+    /// No invite matched. The ordinary outcome for an uninvited install.
+    public static final String REASON_NO_MATCH = "no_match";
+
+    /// The attribution window closed before an answer arrived.
+    public static final String REASON_EXPIRED = "expired";
+
+    /// Analytics consent was refused, so attribution was abandoned.
+    public static final String REASON_CONSENT_DENIED = "consent_denied";
+
+    /// This platform cannot recover a deferred invite.
+    public static final String REASON_UNSUPPORTED = "unsupported";
+
+    /// The analytics category every invite event is reported under.
+    public static final String CATEGORY = "referral";
+
+    /// Dimension carrying the matched invite code.
+    public static final String DIMENSION_CODE = "cn1_invite_code";
+
+    /// Dimension carrying the campaign the invite belonged to.
+    public static final String DIMENSION_CAMPAIGN = "cn1_campaign";
+
+    /// Dimension carrying the channel the invite was sent through.
+    public static final String DIMENSION_CHANNEL = "cn1_channel";
+
+    /// Dimension carrying how the attribution was made.
+    public static final String DIMENSION_MATCH = "cn1_invite_match";
+
+    /// The default attribution window: how long after a first launch a
+    /// deferred invite may still be resolved.
+    public static final long DEFAULT_ATTRIBUTION_WINDOW = 7L * 24L * 60L * 60L * 1000L;
+
+    static final String[] DIMENSIONS = {
+        DIMENSION_CODE, DIMENSION_CAMPAIGN, DIMENSION_CHANNEL, DIMENSION_MATCH
+    };
+
+    private static final String DEFAULT_BASE_URL = "https://cloud.codenameone.com";
+    private static final String PATH_MINT = "/api/v2/analytics/invites";
+    private static final String PATH_CLAIM = "/api/v2/analytics/invites/claim";
+    private static final String PATH_MATCH = "/api/v2/analytics/invites/match";
+
+    private static final String PREF_SLUG = "cn1$inviteSlug";
+    private static final String PREF_CONSUMED_ARG = "cn1$inviteConsumedArg";
+
+    // The referrer key the link service puts on the store url. Compared with
+    // equals and never case folded: String.toLowerCase is locale sensitive and
+    // has no root-locale overload here, so under a Turkish default locale the
+    // 'i' folds to a dotless i and the key silently stops matching on exactly
+    // the devices nobody can reproduce on.
+    private static final String REFERRER_KEY = "cn1_invite";
+
+    private static final int MAX_ATTEMPTS = 5;
+
+    private static String linkBase;
+    private static long attributionWindow = DEFAULT_ATTRIBUTION_WINDOW;
+    private static boolean reattribution;
+    private static InviteListener listener;
+    private static InstallReferrerSource referrerSource;
+    private static InviteAttribution resolved;
+    private static int state = -1;
+    private static boolean deliveredThisRun;
+    private static boolean deferredStarted;
+
+    private Invites() {
+    }
+
+    /// Registers the platform hook that reads the application store's install
+    /// referrer. The Codename One build calls this before the application
+    /// starts on platforms that have one; an application does not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the platform source, or null to remove it
+    public static void registerInstallReferrerSource(InstallReferrerSource source) {
+        referrerSource = source;
+    }
+
+    // ---- sending ---------------------------------------------------------
+
+    /// Mints an invite and returns it immediately.
+    ///
+    /// This never blocks and never fails for want of a network. The code is
+    /// generated on the device, so [Invite#getUrl] is usable at once;
+    /// registration with the link service is queued and retried until it
+    /// lands. A link clicked before that registration arrives is still
+    /// attributed, because the server records the click against the code and
+    /// joins it when the registration turns up.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: what to mint, must not be null
+    ///
+    /// #### Returns
+    ///
+    /// the invite, never null
+    public static Invite create(InviteRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("request is null");
+        }
+        ensureProvider();
+        String code = newCode();
+        long now = System.currentTimeMillis();
+        Invite invite = new Invite(code, buildUrl(code), request.getCampaign(),
+                request.getChannel(), request.getPayload(), now, false);
+        queueRegistration(invite, request);
+        Map<String, Object> p = new HashMap<String, Object>();
+        p.put("invite_code", code);
+        putIfSet(p, "campaign", request.getCampaign());
+        putIfSet(p, "channel", request.getChannel());
+        Analytics.autoEvent("invite_created", CATEGORY, p);
+        flush();
+        return invite;
+    }
+
+    /// Shares an invite through the native share sheet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `invite`: the invite to share, must not be null
+    ///
+    /// - `message`: text placed before the link, or null for the link alone
+    public static void share(Invite invite, String message) {
+        share(invite, message, null, null);
+    }
+
+    /// Shares an invite through the native share sheet and reports the
+    /// outcome.
+    ///
+    /// The invite funnel's `invite_shared` event is emitted from here, and
+    /// only when the platform confirms the user actually shared -- a
+    /// dismissed sheet reports `invite_share_dismissed` instead. That is what
+    /// makes the "shared" number a measurement rather than an assumption.
+    ///
+    /// #### Parameters
+    ///
+    /// - `invite`: the invite to share, must not be null
+    ///
+    /// - `message`: text placed before the link, or null for the link alone
+    ///
+    /// - `sourceRect`: popover anchor hint, may be null
+    ///
+    /// - `resultListener`: receives the share outcome, may be null
+    public static void share(Invite invite, String message, Rectangle sourceRect,
+            ShareResultListener resultListener) {
+        if (invite == null) {
+            throw new IllegalArgumentException("invite is null");
+        }
+        Display d = Display.getInstance();
+        if (d == null) {
+            return;
+        }
+        String text = message == null || message.length() == 0
+                ? invite.getUrl() : message + " " + invite.getUrl();
+        d.share(text, null, null, sourceRect, chain(invite, resultListener));
+    }
+
+    /// Reports the outcome of a share your application performed itself,
+    /// rather than through [#share]. Use this when the invite goes out
+    /// through your own user interface -- a contact picker, a message
+    /// composer, a copy-link button -- so the funnel still records whether it
+    /// was really sent.
+    ///
+    /// `invite_shared` is emitted only when `result` says the user actually
+    /// shared; a dismissed sheet reports `invite_share_dismissed` instead.
+    /// Calling this is optional and calling it twice for one share double
+    /// counts, so call it once, from the share callback.
+    ///
+    /// #### Parameters
+    ///
+    /// - `invite`: the invite that was shared, must not be null
+    ///
+    /// - `result`: the outcome the platform reported, may be null
+    public static void reportShareResult(Invite invite, ShareResult result) {
+        if (invite == null || result == null) {
+            return;
+        }
+        Map<String, Object> p = new HashMap<String, Object>();
+        p.put("invite_code", invite.getCode());
+        putIfSet(p, "campaign", invite.getCampaign());
+        putIfSet(p, "channel", invite.getChannel());
+        if (result.isSharedTo()) {
+            // May legitimately be null on older Android and the web share
+            // api. Omitted rather than filled with a placeholder, so the
+            // console's unknown rate stays honest.
+            putIfSet(p, "target", result.getPackageName());
+            Analytics.autoEvent("invite_shared", CATEGORY, p);
+        } else if (result.isDismissed()) {
+            Analytics.autoEvent("invite_share_dismissed", CATEGORY, p);
+        }
+    }
+
+    // Wraps the caller's listener so the funnel sees the real outcome and the
+    // caller still gets theirs.
+    private static ShareResultListener chain(final Invite invite,
+            final ShareResultListener delegate) {
+        return new ShareResultListener() {
+            @Override
+            public void onResult(ShareResult result) {
+                try {
+                    reportShareResult(invite, result);
+                } catch (Throwable t) {
+                    Log.e(t);
+                }
+                if (delegate != null) {
+                    delegate.onResult(result);
+                }
+            }
+        };
+    }
+
+    // ---- receiving -------------------------------------------------------
+
+    /// Registers the listener that receives the invite behind this install.
+    ///
+    /// An answer that arrived before the listener was registered -- which
+    /// happens routinely on a cold launch from a link, because the platform
+    /// delivers the link before the application starts -- is delivered as
+    /// soon as this is called.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener, or null to remove it
+    public static void setInviteListener(InviteListener l) {
+        listener = l;
+        ensureProvider();
+        if (l != null) {
+            deliverPending();
+        }
+    }
+
+    /// The registered listener, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the listener
+    public static InviteListener getInviteListener() {
+        return listener;
+    }
+
+    /// Looks for an invite: first in the launch argument, then, when this
+    /// looks like a fresh install, by asking the link service.
+    ///
+    /// Safe and cheap to call on every start; it will not attribute twice and
+    /// will not report twice.
+    ///
+    /// #### Returns
+    ///
+    /// true when the launch argument carried an invite link
+    public static boolean checkForInvite() {
+        ensureProvider();
+        deliverPending();
+        String appArg = null;
+        Display d = Display.getInstance();
+        if (d != null) {
+            appArg = d.getProperty("AppArg", null);
+        }
+        boolean consumed = false;
+        if (appArg != null && appArg.length() > 0
+                && !appArg.equals(Preferences.get(PREF_CONSUMED_ARG, ""))) {
+            consumed = handleUrl(appArg);
+            if (consumed) {
+                Preferences.set(PREF_CONSUMED_ARG, appArg);
+            }
+        }
+        if (!consumed) {
+            beginDeferred();
+        }
+        return consumed;
+    }
+
+    /// Offers a url to the invite machinery directly, for applications that
+    /// consume the launch argument themselves or route it through
+    /// `com.codename1.router`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the url to inspect, may be null
+    ///
+    /// #### Returns
+    ///
+    /// true when the url carried an invite code
+    public static boolean handleUrl(String url) {
+        String code = extractCode(url);
+        if (code == null) {
+            return false;
+        }
+        ensureProvider();
+        if (getState() == STATE_RESOLVED && !reattribution) {
+            // Already attributed. Re-engagement is worth counting, but
+            // rewriting the cohort mid-stream would make lifetime value per
+            // referrer unjoinable, so first touch stands.
+            Map<String, Object> p = new HashMap<String, Object>();
+            p.put("invite_code", code);
+            p.put("match", MATCH_DIRECT);
+            Analytics.autoEvent("invite_opened", CATEGORY, p);
+            return true;
+        }
+        Map<String, String> pending = pendingRecord();
+        pending.put("code", code);
+        InviteStore.write(InviteStore.PENDING, pending);
+        setState(STATE_PENDING);
+        claim(code, "universal_link", "", MATCH_DIRECT, false);
+        return true;
+    }
+
+    /// The attribution for this install, or null when there is none yet.
+    ///
+    /// #### Returns
+    ///
+    /// the attribution
+    public static InviteAttribution getAttribution() {
+        if (resolved == null) {
+            resolved = readAttribution();
+        }
+        return resolved;
+    }
+
+    /// Where attribution has got to: one of the `STATE_` constants.
+    ///
+    /// #### Returns
+    ///
+    /// the current state
+    public static int getState() {
+        if (state < 0) {
+            if (getAttribution() != null) {
+                state = STATE_RESOLVED;
+            } else {
+                Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+                state = pending == null ? STATE_NONE
+                        : InviteStore.getInt(pending, "state", STATE_PENDING);
+            }
+        }
+        return state;
+    }
+
+    // ---- closing the funnel ---------------------------------------------
+
+    /// Reports that the invited user reached the outcome the invite existed
+    /// for -- signed up, joined the room, completed onboarding. No-op unless
+    /// this install was attributed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `action`: what the user did
+    public static void conversion(String action) {
+        conversion(action, 0d, null);
+    }
+
+    /// Reports a conversion carrying a value, so revenue can be attributed to
+    /// the campaign and the referrer. No-op unless this install was
+    /// attributed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `action`: what the user did
+    ///
+    /// - `value`: the value of the conversion
+    ///
+    /// - `currency`: the currency code, or null
+    public static void conversion(String action, double value, String currency) {
+        InviteAttribution a = getAttribution();
+        if (a == null) {
+            return;
+        }
+        Map<String, Object> p = new HashMap<String, Object>();
+        p.put("invite_code", a.getCode());
+        putIfSet(p, "campaign", a.getCampaign());
+        putIfSet(p, "channel", a.getChannel());
+        putIfSet(p, "action", action);
+        if (value != 0d) {
+            p.put("value", new Double(value));
+        }
+        putIfSet(p, "currency", currency);
+        Analytics.autoEvent("invite_converted", CATEGORY, p);
+    }
+
+    // ---- configuration ---------------------------------------------------
+
+    /// Points the invite machinery at a different link service. Defaults to
+    /// the Codename One cloud, honouring the `cloudServerURL` display
+    /// property.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the base address, with no trailing path
+    public static void setLinkBase(String url) {
+        linkBase = url;
+    }
+
+    /// The link service base address in use.
+    ///
+    /// #### Returns
+    ///
+    /// the base address, never null
+    public static String getLinkBase() {
+        if (linkBase != null && linkBase.length() > 0) {
+            return trimSlash(linkBase);
+        }
+        Display d = Display.getInstance();
+        String base = d == null ? DEFAULT_BASE_URL
+                : d.getProperty("cloudServerURL", DEFAULT_BASE_URL);
+        if (base == null || base.length() == 0) {
+            base = DEFAULT_BASE_URL;
+        }
+        return trimSlash(base);
+    }
+
+    /// How long after a first launch a deferred invite may still be
+    /// resolved. Clamped to at most 30 days. Zero switches deferred
+    /// attribution off, which is the supported way to ship without the
+    /// statistical match.
+    ///
+    /// #### Parameters
+    ///
+    /// - `millis`: the window in milliseconds
+    public static void setAttributionWindow(long millis) {
+        long max = 30L * 24L * 60L * 60L * 1000L;
+        if (millis < 0) {
+            millis = 0;
+        }
+        if (millis > max) {
+            millis = max;
+        }
+        attributionWindow = millis;
+    }
+
+    /// The attribution window in milliseconds.
+    ///
+    /// #### Returns
+    ///
+    /// the window
+    public static long getAttributionWindow() {
+        return attributionWindow;
+    }
+
+    /// Whether a later invite replaces an earlier attribution. Off by
+    /// default: first touch stands, so a user's cohort does not change
+    /// underneath the reports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: true for last touch
+    public static void setReattribution(boolean value) {
+        reattribution = value;
+    }
+
+    /// Whether last touch attribution is enabled.
+    ///
+    /// #### Returns
+    ///
+    /// true when a later invite replaces an earlier one
+    public static boolean isReattribution() {
+        return reattribution;
+    }
+
+    // ---- housekeeping ----------------------------------------------------
+
+    /// Retries anything queued: unregistered invites, and an outstanding
+    /// deferred match. Called for you on the paths that matter; exposed for
+    /// an application that knows it has just regained connectivity.
+    public static void flush() {
+        drainOutbox();
+    }
+
+    /// Forgets every trace of invite attribution on this device: the pending
+    /// fingerprint, the resolved attribution and the referral dimensions.
+    ///
+    /// [Analytics#resetClientId] triggers this for you, because an erasure
+    /// that left the referral dimensions behind would re-link the fresh
+    /// identity to the same inviter.
+    public static void reset() {
+        InviteStore.delete(InviteStore.PENDING);
+        InviteStore.delete(InviteStore.ATTRIBUTION);
+        InviteStore.delete(InviteStore.OUTBOX);
+        Preferences.delete(PREF_CONSUMED_ARG);
+        clearDimensions();
+        resolved = null;
+        state = STATE_NONE;
+        deliveredThisRun = false;
+        deferredStarted = false;
+    }
+
+    // Package private: the analytics provider hook calls this when the client
+    // id changes underneath us, which is what an erasure request looks like.
+    static void eraseInternal() {
+        reset();
+    }
+
+    // Package private: called from the provider when consent changes.
+    static void onConsentChanged(boolean allowed) {
+        if (allowed) {
+            if (getState() == STATE_PENDING) {
+                deferredStarted = false;
+                beginDeferred();
+            } else if (getState() == STATE_RESOLVED) {
+                // Re-granting restores the dimensions from the record we kept,
+                // without re-reporting the install or telling the app again.
+                InviteAttribution a = getAttribution();
+                if (a != null) {
+                    writeDimensions(a);
+                }
+            }
+            drainOutbox();
+            return;
+        }
+        // Refused. A device profile held for a match that is no longer
+        // permitted has no reason to exist, so it goes now rather than at the
+        // end of the window.
+        if (getState() == STATE_PENDING) {
+            InviteStore.delete(InviteStore.PENDING);
+            setState(STATE_DECLINED);
+            notifyUnavailable(REASON_CONSENT_DENIED);
+        }
+        clearDimensions();
+    }
+
+    // ---- internals -------------------------------------------------------
+
+    // Registers the provider that gives us the erasure and consent hooks.
+    // Analytics.clearProviders() can drop it, so this re-registers on facade
+    // entry rather than only once; the provider list is a handful of entries.
+    private static void ensureProvider() {
+        try {
+            List providers = Analytics.getProviders();
+            for (int i = 0; i < providers.size(); i++) {
+                if (providers.get(i) instanceof InviteAttributionProvider) {
+                    return;
+                }
+            }
+            Analytics.addProvider(new InviteAttributionProvider());
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
+    // The ordinary gate: what Analytics itself would allow.
+    private static boolean allowed() {
+        AnalyticsConsent c = Analytics.getConsent();
+        if (Analytics.getConsentMode() == ConsentMode.OPT_OUT) {
+            return c == null || c.isAnalytics();
+        }
+        return c != null && c.isAnalytics();
+    }
+
+    // The strict gate, for the statistical match only. Opt-out mode reports
+    // permission with no user choice on record -- the deprecated
+    // AnalyticsService forces exactly that for legacy callers -- and sending
+    // a device profile under an implicit allow is not defensible. Everything
+    // else uses allowed().
+    private static boolean explicitlyAllowed() {
+        AnalyticsConsent c = Analytics.getConsent();
+        return c != null && c.isAnalytics();
+    }
+
+    private static String newCode() {
+        byte[] raw = new byte[16];
+        try {
+            Util.secureRandomBytes(raw);
+        } catch (Throwable t) {
+            // A code identifies an invite and authorizes nothing, so a weaker
+            // source degrades uniqueness, not security. Reported once rather
+            // than failing the invite.
+            Log.e(t);
+            java.util.Random r = new java.util.Random();
+            r.nextBytes(raw);
+        }
+        String s = Base64.encodeUrlSafe(raw);
+        int pad = s.indexOf('=');
+        if (pad > 0) {
+            s = s.substring(0, pad);
+        }
+        return s;
+    }
+
+    private static String buildUrl(String code) {
+        String slug = Preferences.get(PREF_SLUG, "");
+        if (slug != null && slug.length() > 0) {
+            return getLinkBase() + "/i/" + slug + "/" + code;
+        }
+        // No slug known yet -- the very first invite on a fresh install with
+        // no network. The bare form still redirects correctly; the server
+        // hands back the slugged url on registration and later invites use it.
+        return getLinkBase() + "/i/" + code;
+    }
+
+    // Recognises our own link, or any url carrying the referrer key. The host
+    // is compared with regionMatches rather than folded, because case folding
+    // a protocol token is locale sensitive here.
+    static String extractCode(String url) {
+        if (url == null || url.length() == 0) {
+            return null;
+        }
+        int q = url.indexOf('?');
+        if (q >= 0) {
+            String code = codeFromQuery(url.substring(q + 1));
+            if (code != null) {
+                return code;
+            }
+        }
+        String host = hostOf(url);
+        if (host == null) {
+            return null;
+        }
+        String base = getLinkBase();
+        String expected = hostOf(base);
+        if (expected == null || !host.regionMatches(true, 0, expected, 0, expected.length())
+                || host.length() != expected.length()) {
+            return null;
+        }
+        String path = url;
+        int schemeEnd = path.indexOf("://");
+        if (schemeEnd >= 0) {
+            int slash = path.indexOf('/', schemeEnd + 3);
+            if (slash < 0) {
+                return null;
+            }
+            path = path.substring(slash);
+        }
+        if (q >= 0) {
+            int rel = path.indexOf('?');
+            if (rel >= 0) {
+                path = path.substring(0, rel);
+            }
+        }
+        if (!path.startsWith("/i/")) {
+            return null;
+        }
+        String rest = path.substring(3);
+        while (rest.endsWith("/")) {
+            rest = rest.substring(0, rest.length() - 1);
+        }
+        if (rest.length() == 0) {
+            return null;
+        }
+        int slash = rest.lastIndexOf('/');
+        String code = slash < 0 ? rest : rest.substring(slash + 1);
+        if (slash > 0) {
+            // Remember the slug so later invites mint the precise form.
+            Preferences.set(PREF_SLUG, rest.substring(0, slash));
+        }
+        return code.length() == 0 ? null : code;
+    }
+
+    // Parses a referrer or query string for the invite key. Split on the
+    // FIRST '=' only, and compare the key with equals -- never a case fold.
+    static String codeFromQuery(String query) {
+        if (query == null || query.length() == 0) {
+            return null;
+        }
+        int start = 0;
+        while (start <= query.length()) {
+            int amp = query.indexOf('&', start);
+            String pair = amp < 0 ? query.substring(start) : query.substring(start, amp);
+            int eq = pair.indexOf('=');
+            if (eq > 0) {
+                String key = pair.substring(0, eq);
+                if (REFERRER_KEY.equals(key)) {
+                    String value = pair.substring(eq + 1);
+                    try {
+                        value = Util.decode(value, "UTF-8", true);
+                    } catch (Throwable t) {
+                        Log.e(t);
+                    }
+                    return value.length() == 0 ? null : value;
+                }
+            }
+            if (amp < 0) {
+                break;
+            }
+            start = amp + 1;
+        }
+        return null;
+    }
+
+    private static String hostOf(String url) {
+        int schemeEnd = url.indexOf("://");
+        if (schemeEnd < 0) {
+            return null;
+        }
+        int start = schemeEnd + 3;
+        int end = url.length();
+        for (int i = start; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c == '/' || c == '?' || c == '#' || c == ':') {
+                end = i;
+                break;
+            }
+        }
+        return end > start ? url.substring(start, end) : null;
+    }
+
+    private static String trimSlash(String base) {
+        while (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        return base;
+    }
+
+    private static void putIfSet(Map<String, Object> p, String key, String value) {
+        if (value != null && value.length() > 0) {
+            p.put(key, value);
+        }
+    }
+
+    private static void setState(int s) {
+        state = s;
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        if (pending != null) {
+            pending.put("state", String.valueOf(s));
+            InviteStore.write(InviteStore.PENDING, pending);
+        }
+    }
+
+    private static Map<String, String> pendingRecord() {
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        if (pending != null) {
+            return pending;
+        }
+        pending = new LinkedHashMap<String, String>();
+        long now = System.currentTimeMillis();
+        pending.put("firstLaunch", String.valueOf(now));
+        pending.put("expiresAt", String.valueOf(now + attributionWindow));
+        pending.put("attempts", "0");
+        pending.put("state", String.valueOf(STATE_PENDING));
+        Display d = Display.getInstance();
+        if (d != null) {
+            InviteStore.put(pending, "platform", d.getPlatformName());
+            InviteStore.put(pending, "osVersion", d.getProperty("OSVer", ""));
+            InviteStore.put(pending, "deviceModel",
+                    d.getProperty("DeviceHardwareModel", d.getProperty("DeviceName", "")));
+            pending.put("screenWidth", String.valueOf(d.getDisplayWidth()));
+            pending.put("screenHeight", String.valueOf(d.getDisplayHeight()));
+        }
+        Locale loc = Locale.getDefault();
+        InviteStore.put(pending, "locale", loc == null ? "" : loc.toString());
+        InviteStore.write(InviteStore.PENDING, pending);
+        return pending;
+    }
+
+    private static void beginDeferred() {
+        if (deferredStarted) {
+            return;
+        }
+        int s = getState();
+        if (s == STATE_RESOLVED || s == STATE_NONE_FOUND || s == STATE_DECLINED) {
+            return;
+        }
+        if (attributionWindow == 0) {
+            setState(STATE_NONE_FOUND);
+            notifyUnavailable(REASON_UNSUPPORTED);
+            return;
+        }
+        Map<String, String> pending = pendingRecord();
+        long expires = InviteStore.getLong(pending, "expiresAt", 0);
+        if (expires > 0 && System.currentTimeMillis() > expires) {
+            InviteStore.delete(InviteStore.PENDING);
+            state = STATE_NONE_FOUND;
+            notifyUnavailable(REASON_EXPIRED);
+            return;
+        }
+        if (InviteStore.getInt(pending, "attempts", 0) >= MAX_ATTEMPTS) {
+            state = STATE_NONE_FOUND;
+            notifyUnavailable(REASON_NO_MATCH);
+            return;
+        }
+        setState(STATE_PENDING);
+        if (!allowed()) {
+            // Nothing leaves the device. The record stays; onConsentChanged
+            // restarts this the moment consent arrives.
+            return;
+        }
+        deferredStarted = true;
+        String code = InviteStore.get(pending, "code", null);
+        if (code != null && code.length() > 0) {
+            claim(code, "universal_link", "", MATCH_DIRECT, false);
+            return;
+        }
+        InstallReferrerSource source = referrerSource;
+        if (source != null && safeSupported(source)) {
+            requestReferrer(source);
+            return;
+        }
+        requestMatch(pending);
+    }
+
+    private static boolean safeSupported(InstallReferrerSource source) {
+        try {
+            return source.isSupported();
+        } catch (Throwable t) {
+            Log.e(t);
+            return false;
+        }
+    }
+
+    private static void requestReferrer(InstallReferrerSource source) {
+        try {
+            source.requestReferrer(new InstallReferrerCallback() {
+                @Override
+                public void onReferrer(final String rawReferrer, final long clickSeconds,
+                        final long beginSeconds) {
+                    onEdt(new Runnable() {
+                        public void run() {
+                            String code = codeFromQuery(rawReferrer);
+                            if (code == null) {
+                                fallBackToMatch();
+                                return;
+                            }
+                            claim(code, "install_referrer",
+                                    rawReferrer == null ? "" : rawReferrer,
+                                    MATCH_REFERRER, true);
+                        }
+                    });
+                }
+
+                @Override
+                public void onUnavailable(String reason) {
+                    onEdt(new Runnable() {
+                        public void run() {
+                            fallBackToMatch();
+                        }
+                    });
+                }
+            });
+        } catch (Throwable t) {
+            Log.e(t);
+            fallBackToMatch();
+        }
+    }
+
+    // No store referrer: either the device has no store client, or this was
+    // an organic install. Either way the statistical match is the only path
+    // left, and it is the same one iOS always takes.
+    private static void fallBackToMatch() {
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        if (pending == null) {
+            return;
+        }
+        requestMatch(pending);
+    }
+
+    private static void onEdt(Runnable r) {
+        Display d = Display.getInstance();
+        if (d == null) {
+            r.run();
+            return;
+        }
+        if (d.isEdt()) {
+            r.run();
+        } else {
+            d.callSerially(r);
+        }
+    }
+
+    private static void requestMatch(Map<String, String> pending) {
+        if (!explicitlyAllowed()) {
+            return;
+        }
+        bumpAttempts(pending);
+        Map<String, Object> body = identity();
+        body.put("platform", InviteStore.get(pending, "platform", ""));
+        body.put("osVersion", InviteStore.get(pending, "osVersion", ""));
+        body.put("deviceModel", InviteStore.get(pending, "deviceModel", ""));
+        body.put("locale", InviteStore.get(pending, "locale", ""));
+        body.put("screenWidth", new Integer(InviteStore.getInt(pending, "screenWidth", 0)));
+        body.put("screenHeight", new Integer(InviteStore.getInt(pending, "screenHeight", 0)));
+        post(getLinkBase() + PATH_MATCH, body, MATCH_FINGERPRINT, true);
+    }
+
+    private static void claim(String code, String source, String rawReferrer,
+            final String matchType, final boolean deferred) {
+        if (!allowed()) {
+            return;
+        }
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        if (pending != null) {
+            bumpAttempts(pending);
+        }
+        Map<String, Object> body = identity();
+        body.put("code", code);
+        body.put("source", source);
+        body.put("rawReferrer", rawReferrer == null ? "" : rawReferrer);
+        post(getLinkBase() + PATH_CLAIM, body, matchType, deferred);
+    }
+
+    private static void bumpAttempts(Map<String, String> pending) {
+        pending.put("attempts",
+                String.valueOf(InviteStore.getInt(pending, "attempts", 0) + 1));
+        InviteStore.write(InviteStore.PENDING, pending);
+    }
+
+    private static Map<String, Object> identity() {
+        Map<String, Object> body = new LinkedHashMap<String, Object>();
+        Display d = Display.getInstance();
+        body.put("clientId", Analytics.clientId());
+        body.put("buildKey", d == null ? "" : d.getProperty("build_key", ""));
+        body.put("packageName", d == null ? "" : d.getProperty("package_name", ""));
+        body.put("consentAnalytics", Boolean.valueOf(allowed()));
+        return body;
+    }
+
+    private static void post(String url, Map<String, Object> body, final String matchType,
+            final boolean deferred) {
+        try {
+            ConnectionRequest req = new ConnectionRequest() {
+                private String payload;
+
+                @Override
+                protected void readResponse(InputStream input) throws IOException {
+                    byte[] data = Util.readInputStream(input);
+                    payload = data == null ? null : new String(data, "UTF-8");
+                }
+
+                @Override
+                protected void postResponse() {
+                    handleResolution(payload, matchType, deferred);
+                }
+            };
+            req.setUrl(url);
+            req.setPost(true);
+            req.setContentType("application/json");
+            req.setRequestBody(JSONParser.mapToJson(body));
+            req.setFailSilently(true);
+            NetworkManager.getInstance().addToQueue(req);
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
+    private static void handleResolution(String payload, String matchType, boolean deferred) {
+        try {
+            if (payload == null || payload.length() == 0) {
+                return;
+            }
+            Map<String, Object> json = JSONParser.parseJSON(payload);
+            if (json == null) {
+                return;
+            }
+            Object slug = json.get("slug");
+            if (slug instanceof String && ((String) slug).length() > 0) {
+                Preferences.set(PREF_SLUG, (String) slug);
+            }
+            if (!truthy(json.get("resolved"))) {
+                state = STATE_NONE_FOUND;
+                notifyUnavailable(REASON_NO_MATCH);
+                return;
+            }
+            String code = str(json.get("code"));
+            if (code == null) {
+                return;
+            }
+            String confidence = str(json.get("confidence"));
+            double score = 1d;
+            Object rawScore = json.get("score");
+            if (rawScore instanceof Number) {
+                double s = ((Number) rawScore).doubleValue();
+                score = s > 1d ? s / 100d : s;
+            } else if (MATCH_FINGERPRINT.equals(matchType)) {
+                score = 0d;
+            }
+            if (MATCH_DIRECT.equals(matchType) || MATCH_REFERRER.equals(matchType)) {
+                score = 1d;
+            }
+            Map<String, String> params = new LinkedHashMap<String, String>();
+            Object rawParams = json.get("parameters");
+            if (rawParams instanceof Map) {
+                Map raw = (Map) rawParams;
+                for (java.util.Iterator i = raw.keySet().iterator(); i.hasNext();) {
+                    Object k = i.next();
+                    Object v = raw.get(k);
+                    if (k instanceof String && v instanceof String) {
+                        params.put((String) k, (String) v);
+                    }
+                }
+            }
+            String serverMatch = str(json.get("match"));
+            InviteAttribution a = new InviteAttribution(code, str(json.get("campaign")),
+                    str(json.get("channel")), str(json.get("payload")),
+                    serverMatch == null ? matchType : serverMatch, score, deferred,
+                    longOf(json.get("clickTs")), System.currentTimeMillis(), params);
+            resolve(a, confidence);
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
+    private static void resolve(InviteAttribution a, String confidence) {
+        Map<String, String> record = new LinkedHashMap<String, String>();
+        record.put("code", a.getCode());
+        InviteStore.put(record, "campaign", a.getCampaign());
+        InviteStore.put(record, "channel", a.getChannel());
+        InviteStore.put(record, "payload", a.getPayload());
+        record.put("match", a.getMatchType());
+        record.put("confidence", String.valueOf(a.getConfidence()));
+        record.put("deferred", String.valueOf(a.isDeferred()));
+        record.put("clickTs", String.valueOf(a.getClickTimestamp()));
+        record.put("resolvedTs", String.valueOf(a.getResolvedTimestamp()));
+        record.put("delivered", "false");
+        InviteStore.write(InviteStore.ATTRIBUTION, record);
+        InviteStore.delete(InviteStore.PENDING);
+        resolved = a;
+        state = STATE_RESOLVED;
+        writeDimensions(a);
+        Map<String, Object> p = new HashMap<String, Object>();
+        p.put("invite_code", a.getCode());
+        putIfSet(p, "campaign", a.getCampaign());
+        putIfSet(p, "channel", a.getChannel());
+        p.put("match", a.getMatchType());
+        putIfSet(p, "confidence", confidence);
+        if (a.isDeferred()) {
+            p.put("deferred", Boolean.TRUE);
+            Analytics.autoEvent("invite_install", CATEGORY, p);
+        } else {
+            Analytics.autoEvent("invite_opened", CATEGORY, p);
+        }
+        deliverPending();
+    }
+
+    private static void writeDimensions(InviteAttribution a) {
+        Analytics.setDimension(DIMENSION_CODE, a.getCode());
+        if (a.getCampaign() != null) {
+            Analytics.setDimension(DIMENSION_CAMPAIGN, a.getCampaign());
+        }
+        if (a.getChannel() != null) {
+            Analytics.setDimension(DIMENSION_CHANNEL, a.getChannel());
+        }
+        Analytics.setDimension(DIMENSION_MATCH, a.getMatchType());
+    }
+
+    private static void clearDimensions() {
+        for (int i = 0; i < DIMENSIONS.length; i++) {
+            Analytics.clearDimension(DIMENSIONS[i]);
+        }
+    }
+
+    private static InviteAttribution readAttribution() {
+        Map<String, String> r = InviteStore.read(InviteStore.ATTRIBUTION);
+        if (r == null) {
+            return null;
+        }
+        String code = InviteStore.get(r, "code", null);
+        if (code == null) {
+            return null;
+        }
+        return new InviteAttribution(code, InviteStore.get(r, "campaign", null),
+                InviteStore.get(r, "channel", null), InviteStore.get(r, "payload", null),
+                InviteStore.get(r, "match", MATCH_DIRECT),
+                InviteStore.getDouble(r, "confidence", 1d),
+                InviteStore.getBoolean(r, "deferred", false),
+                InviteStore.getLong(r, "clickTs", 0),
+                InviteStore.getLong(r, "resolvedTs", 0),
+                new LinkedHashMap<String, String>());
+    }
+
+    // Delivers at most once per install. The durable flag is what survives a
+    // restart; deliveredThisRun covers the window between resolving and the
+    // flag reaching the disk, so a failed write costs at most a duplicate
+    // after a crash rather than one on every launch.
+    private static void deliverPending() {
+        if (listener == null || deliveredThisRun) {
+            return;
+        }
+        Map<String, String> r = InviteStore.read(InviteStore.ATTRIBUTION);
+        if (r == null || InviteStore.getBoolean(r, "delivered", false)) {
+            return;
+        }
+        InviteAttribution a = getAttribution();
+        if (a == null) {
+            return;
+        }
+        deliveredThisRun = true;
+        r.put("delivered", "true");
+        InviteStore.write(InviteStore.ATTRIBUTION, r);
+        try {
+            listener.inviteReceived(a);
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
+    private static void notifyUnavailable(String reason) {
+        if (listener == null || deliveredThisRun) {
+            return;
+        }
+        deliveredThisRun = true;
+        try {
+            listener.attributionUnavailable(reason);
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
+    // ---- registration outbox --------------------------------------------
+
+    private static void queueRegistration(Invite invite, InviteRequest request) {
+        Map<String, Object> body = identity();
+        body.put("code", invite.getCode());
+        putIfSet(body, "campaign", invite.getCampaign());
+        putIfSet(body, "channel", invite.getChannel());
+        putIfSet(body, "payload", invite.getPayload());
+        putIfSet(body, "title", request.getTitle());
+        putIfSet(body, "description", request.getDescription());
+        putIfSet(body, "imageUrl", request.getImageUrl());
+        if (!request.getParameters().isEmpty()) {
+            body.put("parameters", new LinkedHashMap<String, String>(request.getParameters()));
+        }
+        List<String> outbox = InviteStore.readOutbox();
+        outbox.add(JSONParser.mapToJson(body));
+        InviteStore.writeOutbox(outbox);
+    }
+
+    private static void drainOutbox() {
+        if (!allowed()) {
+            return;
+        }
+        List<String> outbox = InviteStore.readOutbox();
+        if (outbox.isEmpty()) {
+            return;
+        }
+        for (int i = 0; i < outbox.size(); i++) {
+            postRegistration(outbox.get(i));
+        }
+        // Cleared optimistically: a registration that does not land is
+        // recoverable server side from the click itself, and keeping the
+        // entries would re-post them on every facade call.
+        InviteStore.writeOutbox(new java.util.ArrayList<String>());
+    }
+
+    private static void postRegistration(final String json) {
+        try {
+            ConnectionRequest req = new ConnectionRequest() {
+                private String payload;
+
+                @Override
+                protected void readResponse(InputStream input) throws IOException {
+                    byte[] data = Util.readInputStream(input);
+                    payload = data == null ? null : new String(data, "UTF-8");
+                }
+
+                @Override
+                protected void postResponse() {
+                    try {
+                        if (payload == null || payload.length() == 0) {
+                            return;
+                        }
+                        Map<String, Object> r = JSONParser.parseJSON(payload);
+                        if (r == null) {
+                            return;
+                        }
+                        Object slug = r.get("slug");
+                        if (slug instanceof String && ((String) slug).length() > 0) {
+                            Preferences.set(PREF_SLUG, (String) slug);
+                        }
+                    } catch (Throwable t) {
+                        Log.e(t);
+                    }
+                }
+            };
+            req.setUrl(getLinkBase() + PATH_MINT);
+            req.setPost(true);
+            req.setContentType("application/json");
+            req.setRequestBody(json);
+            req.setFailSilently(true);
+            NetworkManager.getInstance().addToQueue(req);
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
+    private static boolean truthy(Object o) {
+        if (o instanceof Boolean) {
+            return ((Boolean) o).booleanValue();
+        }
+        if (o instanceof String) {
+            return "true".equals(o);
+        }
+        return false;
+    }
+
+    private static String str(Object o) {
+        if (o instanceof String && ((String) o).length() > 0) {
+            return (String) o;
+        }
+        return null;
+    }
+
+    private static long longOf(Object o) {
+        if (o instanceof Number) {
+            return ((Number) o).longValue();
+        }
+        return 0;
+    }
+}

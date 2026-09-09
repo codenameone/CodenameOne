@@ -33,6 +33,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -887,5 +888,58 @@ class PlatformFeatureCatalogTest {
                 "com/codename1/nearby/NearbyError").isEmpty());
         assertTrue(PlatformFeatureCatalog.matchesFor(
                 "com/codename1/nearby/spi/NearbyBridge").isEmpty());
+    }
+    @Test
+    void inviteAttributionBuysThePlayInstallReferrerAndItsFloor() {
+        List<PlatformFeatureCatalog.Entry> hits = PlatformFeatureCatalog.matchesFor(
+                "com/codename1/analytics/invite/Invites");
+        assertEquals(1, hits.size(), "expected one entry to fire");
+        PlatformFeatureCatalog.Entry e = hits.get(0);
+        assertTrue(e.androidGradleDeps().get(0)
+                        .startsWith("com.android.installreferrer:installreferrer"),
+                "the deterministic Android path needs the Play referrer library");
+        assertEquals(21, e.androidMinimumSdk(),
+                "the installreferrer aar declares minSdk 21 and the merger enforces it");
+        assertTrue(e.iosPods().isEmpty(), "the iOS path links nothing");
+        assertTrue(e.iosFrameworks().isEmpty(), "the iOS path links nothing");
+        assertNull(e.iosMinimumDeploymentTarget(),
+                "attribution over HTTPS must not lift the deployment target");
+    }
+
+    @Test
+    void plainAnalyticsDoesNotBuyThePlayInstallReferrer() {
+        // The whole reason the invite classes live in their own subpackage.
+        // Practically every application references the Analytics facade; if
+        // the entry were keyed on com/codename1/analytics/ instead, all of
+        // them would gain a Play dependency and an API 21 floor. That is the
+        // DatabaseConfig failure AndroidGradleBuilder.usesClass documents,
+        // and deleting the unused sources later does not undo it.
+        assertTrue(PlatformFeatureCatalog.matchesFor(
+                "com/codename1/analytics/Analytics").isEmpty(),
+                "the analytics facade must buy nothing");
+        assertTrue(PlatformFeatureCatalog.matchesFor(
+                "com/codename1/analytics/AnalyticsEvent").isEmpty(),
+                "the analytics value types must buy nothing");
+        assertTrue(PlatformFeatureCatalog.matchesFor(
+                "com/codename1/analytics/CodenameOneAnalyticsProvider").isEmpty(),
+                "the first-party provider must buy nothing");
+    }
+
+    @Test
+    void inviteButtonIsMatchedExactlyAndLeavesTheRestOfComponentsAlone() {
+        // InviteButton sits beside ShareButton, outside the invite package,
+        // because a Button subclass does not belong in an analytics package.
+        // An application can reference it and nothing else, so it needs its
+        // own entry -- but as an exact class, or every component would fire.
+        List<PlatformFeatureCatalog.Entry> hits = PlatformFeatureCatalog.matchesFor(
+                "com/codename1/components/InviteButton");
+        assertEquals(1, hits.size(), "expected one entry to fire");
+        assertEquals(21, hits.get(0).androidMinimumSdk());
+        assertTrue(PlatformFeatureCatalog.matchesFor(
+                "com/codename1/components/ShareButton").isEmpty(),
+                "the plain share button must buy nothing");
+        assertTrue(PlatformFeatureCatalog.matchesFor(
+                "com/codename1/components/InfiniteProgress").isEmpty(),
+                "an exact-class key must not behave like a prefix");
     }
 }
