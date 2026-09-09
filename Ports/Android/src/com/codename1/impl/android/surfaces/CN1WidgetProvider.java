@@ -178,9 +178,9 @@ public abstract class CN1WidgetProvider extends AppWidgetProvider {
             if (whenMillis <= System.currentTimeMillis()) {
                 return;
             }
-            // The cast sits INSIDE the instanceof branch, which is the shape the cast-semantics
-            // verifier recognises -- and the reason for the rule is real here: a failed CHECKCAST
-            // does not throw on ParparVM, so the catch below would never run for one.
+            // getSystemService is declared to return Object, so the cast sits inside the
+            // instanceof branch: a device that answers something else leaves the fetch
+            // unscheduled instead of failing the whole reload path.
             Object service = context.getSystemService(Context.ALARM_SERVICE);
             if (service instanceof AlarmManager) {
                 scheduleFetchAlarm(context, (AlarmManager) service, kindId, listenerClass,

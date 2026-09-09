@@ -298,8 +298,15 @@ recognized and never reported. Note the rule is about the *cast*: a
 `catch (ClassCastException)` with no cast under it is fine, because an
 *explicitly thrown* ClassCastException propagates normally.
 
-Run it locally (needs core/android/ios/JavaAPI built; unbuilt modules are skipped
-with a note):
+The scope is what a translation actually sees -- `maven/core`, `maven/ios` and
+`vm/JavaAPI`. **The Android port is not covered**, and adding it back would be a
+mistake: ART implements `CHECKCAST` to spec, so a `catch (Throwable)` around a
+`(NotificationManager) getSystemService(...)` there is live, correct code, and
+`Ports/Android` is never translated. That is the same reason `Ports/CLDC11` is
+out of scope.
+
+Run it locally (needs core/ios/JavaAPI built; unbuilt modules are skipped with a
+note):
 
 ```bash
 source tools/env.sh

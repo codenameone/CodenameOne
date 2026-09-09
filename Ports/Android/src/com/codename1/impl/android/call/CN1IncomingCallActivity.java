@@ -199,13 +199,9 @@ public class CN1IncomingCallActivity extends Activity {
     /// stays up and the call is answered over it, which is the platform's
     /// decision to make rather than this one's.
     private void dismissKeyguard() {
-        // TESTED with instanceof, and OUTSIDE the try. The cast used to sit
-        // inside it, where catch (Exception) swallows ClassCastException --
-        // and ParparVM does not throw one for a failed cast, so a handler
-        // written to catch it never runs. This class is Android-only today
-        // and the rule is about iOS, but the check is a ratchet over the
-        // whole port for a reason: the next reader copies the shape, not the
-        // platform it was written for.
+        // TESTED with instanceof, and OUTSIDE the try: the cast used to sit
+        // inside it, where catch (Exception) would report a keyguard service
+        // of an unexpected type as a failure of the reflective call below.
         Object service =
                 getSystemService(android.content.Context.KEYGUARD_SERVICE);
         if (!(service instanceof android.app.KeyguardManager)) {

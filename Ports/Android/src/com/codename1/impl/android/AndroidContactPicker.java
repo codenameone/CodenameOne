@@ -260,9 +260,9 @@ class AndroidContactPicker {
                         selectionLimit, requireAllRequestedFields)
                 : legacyPickerIntent(requestedFields);
         Activity activity = AndroidNativeUtil.getActivity();
-        // instanceof rather than a cast: ParparVM's CHECKCAST is unchecked, so
-        // a wrong type here would be handed to the next instruction rather
-        // than throwing.
+        // instanceof rather than a cast: an application can host Codename One
+        // in an Activity of its own, and the checks below are skipped rather
+        // than thrown out of when it does.
         CodenameOneActivity host = activity instanceof CodenameOneActivity
                 ? (CodenameOneActivity) activity : null;
         if (host != null && host.isWaitingForResult()) {

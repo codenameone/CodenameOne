@@ -173,9 +173,8 @@ public class AndroidDocumentProviderBridge implements DocumentProviderBridge {
         // Every folder cursor registers against its own child-documents URI, so an already open
         // folder needs its own notification: the roots URI does not reach it.
         //
-        // Deliberately not inside a catch(Throwable): the generic iteration below compiles to a
-        // checkcast, and ParparVM does not throw for a failed cast -- a handler wrapping this
-        // would be one the device can never run. Each notify guards itself instead.
+        // Deliberately not inside a catch(Throwable): one folder that cannot be notified must
+        // not skip the rest. Each notify guards itself instead.
         List<String> folders = new ArrayList<String>();
         synchronized (staleFolderIds) {
             folders.addAll(staleFolderIds);
