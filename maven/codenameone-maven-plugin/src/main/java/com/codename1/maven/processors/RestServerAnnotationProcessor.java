@@ -246,6 +246,21 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                 if (name == null) {
                     continue;
                 }
+                if (hasSecondPlaceholder(template[ti])) {
+                    // Said out loud rather than matched approximately. "{a}-{b}"
+                    // has no single reading -- where one value ends and the next
+                    // begins is a guess -- and a server that guesses binds
+                    // something the client never meant. The client half accepts
+                    // this shape, so the developer is told where the disagreement
+                    // is instead of meeting a route that never matches.
+                    ctx.error(cls, api.binaryName + "." + op.name + " declares the route "
+                            + op.pathTemplate + ", whose segment '" + template[ti]
+                            + "' holds more than one placeholder. Where one value ends "
+                            + "and the next begins cannot be decided from the path, so "
+                            + "give each placeholder its own segment.");
+                    anyError = true;
+                    continue;
+                }
                 boolean bound = false;
                 for (int pi = 0; pi < op.params.size(); pi++) {
                     Param p = op.params.get(pi);
@@ -851,14 +866,26 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                 sb.append(" && \"").append(RestClientAnnotationProcessor.escape(template[i]))
                   .append("\".equals(seg[").append(i).append("])");
             } else {
-                // A placeholder stands for a segment, and "" is not one. /pets/
-                // splits to the same COUNT as /pets/{id}, so with no condition
-                // here the route ran with id set to the empty string rather than
-                // not matching -- a path the contract does not describe. The
-                // overlap checker models a placeholder as [^/]+ and the
-                // @RestController router refuses an empty variable, so this is
-                // the rule the rest of the system already applies.
-                sb.append(" && seg[").append(i).append("].length() > 0");
+                // A placeholder stands for a NON-EMPTY run within its segment, and
+                // any literal text around it has to match too. /pets/ splits to the
+                // same COUNT as /pets/{id}, so without the length test the route ran
+                // with id set to the empty string rather than not matching -- a path
+                // the contract does not describe. The overlap checker models a
+                // placeholder as [^/]+ and the @RestController router refuses an
+                // empty variable, so this is the rule the rest of the system already
+                // applies.
+                String prefix = placeholderPrefix(template[i]);
+                String suffix = placeholderSuffix(template[i]);
+                if (prefix.length() > 0) {
+                    sb.append(" && seg[").append(i).append("].startsWith(\"")
+                      .append(RestClientAnnotationProcessor.escape(prefix)).append("\")");
+                }
+                if (suffix.length() > 0) {
+                    sb.append(" && seg[").append(i).append("].endsWith(\"")
+                      .append(RestClientAnnotationProcessor.escape(suffix)).append("\")");
+                }
+                sb.append(" && seg[").append(i).append("].length() > ")
+                  .append(prefix.length() + suffix.length());
             }
         }
         return sb.toString();
@@ -876,8 +903,22 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             sb.append("            ").append(p.javaType).append(" _a").append(pi).append(" = ");
             if ("path".equals(p.bindKind)) {
                 int idx = placeholderIndex(template, p.bindName);
-                sb.append(idx < 0 ? fromText(p.javaType, "null")
-                        : fromText(p.javaType, "decodePath(seg[" + idx + "])"));
+                if (idx < 0) {
+                    sb.append(fromText(p.javaType, "null"));
+                } else {
+                    // Only the part BETWEEN the literals is the value. The
+                    // condition above has already proved both are present, so the
+                    // arithmetic here cannot go out of range.
+                    String slice = "seg[" + idx + "]";
+                    int prefixLength = placeholderPrefix(template[idx]).length();
+                    int suffixLength = placeholderSuffix(template[idx]).length();
+                    if (prefixLength > 0 || suffixLength > 0) {
+                        slice = slice + ".substring(" + prefixLength
+                                + (suffixLength > 0 ? ", " + slice + ".length() - " + suffixLength : "")
+                                + ")";
+                    }
+                    sb.append(fromText(p.javaType, "decodePath(" + slice + ")"));
+                }
             } else if ("query".equals(p.bindKind)) {
                 sb.append(fromText(p.javaType, "queryParam(query, \""
                         + RestClientAnnotationProcessor.escape(p.bindName) + "\")"));
@@ -1626,19 +1667,66 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         return parts.toArray(new String[parts.size()]);
     }
 
+    /**
+     * Whether this segment carries a placeholder at all -- alone or with literal
+     * text around it.
+     *
+     * The CLIENT generator has always substituted {name} anywhere in the template,
+     * so /files/{name}.json produced a working client while this half saw no
+     * placeholder, reported that the @Path was unbound, and refused the contract.
+     * One annotation cannot mean two things in the two halves generated from it.
+     */
     private static boolean isPlaceholder(String segment) {
-        return segment.length() > 2 && segment.charAt(0) == '{' && segment.charAt(segment.length() - 1) == '}';
+        int open = segment.indexOf('{');
+        return open >= 0 && segment.indexOf('}', open + 1) > open + 1;
     }
 
-    /** The name inside a placeholder segment, or null when it is not one. */
+    /** The name inside this segment's placeholder, or null when it has none. */
     private static String placeholderName(String segment) {
-        return isPlaceholder(segment) ? segment.substring(1, segment.length() - 1) : null;
+        int open = segment.indexOf('{');
+        if (open < 0) {
+            return null;
+        }
+        int close = segment.indexOf('}', open + 1);
+        return close > open + 1 ? segment.substring(open + 1, close) : null;
+    }
+
+    /** The literal text before this segment's placeholder. */
+    private static String placeholderPrefix(String segment) {
+        int open = segment.indexOf('{');
+        return open < 0 ? "" : segment.substring(0, open);
+    }
+
+    /** The literal text after it. */
+    private static String placeholderSuffix(String segment) {
+        int open = segment.indexOf('{');
+        if (open < 0) {
+            return "";
+        }
+        int close = segment.indexOf('}', open + 1);
+        return close < 0 ? "" : segment.substring(close + 1);
+    }
+
+    /**
+     * Whether this segment holds more than one placeholder.
+     *
+     * Refused rather than matched: "{a}-{b}" has no single reading -- the split
+     * point between the two values is a guess -- and guessing it here would make
+     * the server bind something the client never meant. Named explicitly so the
+     * developer is told, instead of the shape silently not matching.
+     */
+    private static boolean hasSecondPlaceholder(String segment) {
+        int open = segment.indexOf('{');
+        if (open < 0) {
+            return false;
+        }
+        int close = segment.indexOf('}', open + 1);
+        return close >= 0 && segment.indexOf('{', close + 1) >= 0;
     }
 
     private static int placeholderIndex(String[] template, String name) {
         for (int i = 0; i < template.length; i++) {
-            if (isPlaceholder(template[i])
-                    && template[i].substring(1, template[i].length() - 1).equals(name)) {
+            if (name.equals(placeholderName(template[i]))) {
                 return i;
             }
         }

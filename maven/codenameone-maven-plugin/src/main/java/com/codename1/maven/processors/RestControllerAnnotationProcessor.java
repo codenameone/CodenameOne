@@ -500,9 +500,9 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      * Whether two single segments can be the same text.
      *
      * A segment is a literal, a whole variable, or a variable with literal text
-     * around it ("{}.json"). Two segments that both contain a variable are treated
-     * as overlapping unless their fixed edges make that impossible, which errs
-     * toward reporting an ambiguity rather than shipping one.
+     * around it ("{}.json"). Two segments that both contain a variable overlap
+     * only when their fixed edges permit it; anything less certain errs toward
+     * reporting an ambiguity rather than shipping one.
      */
     private static boolean segmentsOverlap(String left, String right) {
         boolean leftVar = left.indexOf("{}") >= 0;
@@ -511,7 +511,22 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             return left.equals(right);
         }
         if (leftVar && rightVar) {
-            return true;
+            // The fixed EDGES decide it. Both carry a variable, but "{}.json" and
+            // "{}.xml" cannot both match one segment, and returning true here
+            // refused a controller that could never be ambiguous -- while the
+            // matcher this check guards handles literals around a variable
+            // perfectly well. A segment matching both must start with both
+            // prefixes and end with both suffixes, which is only possible when one
+            // of each pair contains the other.
+            String leftPrefix = left.substring(0, left.indexOf("{}"));
+            String rightPrefix = right.substring(0, right.indexOf("{}"));
+            String leftSuffix = left.substring(left.lastIndexOf("{}") + 2);
+            String rightSuffix = right.substring(right.lastIndexOf("{}") + 2);
+            boolean prefixesAgree = leftPrefix.startsWith(rightPrefix)
+                    || rightPrefix.startsWith(leftPrefix);
+            boolean suffixesAgree = leftSuffix.endsWith(rightSuffix)
+                    || rightSuffix.endsWith(leftSuffix);
+            return prefixesAgree && suffixesAgree;
         }
         String pattern = leftVar ? left : right;
         String literal = leftVar ? right : left;
@@ -1281,6 +1296,16 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // -- the same defect the DTO check exists to stop, arriving through a
         // wider declared type. This list mirrors the branches of Json.writeValue
         // in order; a type added there belongs here too.
+        if ("?".equals(raw)) {
+            // A wildcard is UNKNOWN, not primitive, and it has no dot -- so it fell
+            // into the branch below and was approved as though it were an int. The
+            // handler can then return a Date or a DTO inside a List<?> and Json
+            // writes the quoted toString(), which is exactly what this validation
+            // refuses when the same thing is declared as List<Object>. Note the
+            // asymmetry with a BODY: an unknown element arriving is the client's
+            // to shape, while an unknown element leaving is ours to serialise.
+            return false;
+        }
         if (raw.indexOf('.') < 0) {
             return true;              // a primitive, which is always written as one
         }

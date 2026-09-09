@@ -980,6 +980,72 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void routesWithDisjointSuffixesAreNotAmbiguous() throws Exception {
+        // No request satisfies both: one ends .json, the other .xml. The overlap
+        // check treated every pair of variable-carrying segments as colliding, so
+        // a controller that cannot be ambiguous failed to compile -- and the
+        // matcher it would have generated handles literals around a variable
+        // perfectly well.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/{name}.json\")\n"
+                + "    public String json(@PathVariable(\"name\") String name) {\n"
+                + "        return \"json:\" + name;\n"
+                + "    }\n"
+                + "    @GetMapping(\"/{name}.xml\")\n"
+                + "    public String xml(@PathVariable(\"name\") String name) {\n"
+                + "        return \"xml:\" + name;\n"
+                + "    }\n"
+                + "}\n");
+        assertEquals("json:a", router.text("GET", "/a.json"));
+        assertEquals("xml:a", router.text("GET", "/a.xml"));
+    }
+
+    @Test
+    public void routesWithOverlappingSuffixesAreStillRefused() throws Exception {
+        // And the check must still bite where the two CAN collide: a bare
+        // variable matches "a.json" as readily as {name}.json does.
+        ProcessorContext ctx = run(compileBoth(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/{name}.json\")\n"
+                + "    public String json(@PathVariable(\"name\") String name) { return name; }\n"
+                + "}\n",
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Other {\n"
+                + "    @GetMapping(\"/{anything}\")\n"
+                + "    public String any(@PathVariable(\"anything\") String a) { return a; }\n"
+                + "}\n"));
+        assertTrue("a bare variable answers /a.json too, so these do collide",
+                ctx.hasErrors());
+    }
+
+    @Test
+    public void anUnboundedWildcardReturnElementIsRefused() throws Exception {
+        // "?" is not a primitive, it is UNKNOWN. Reaching the no-dot branch it was
+        // read as one, so List<?> was approved and a handler returning a DTO or a
+        // Date inside it got Json's quoted toString() fallback -- the malformed
+        // contract this validation exists to refuse for List<Object>.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/notes\")\n"
+                + "    public java.util.List<?> all() { return null; }\n"
+                + "}\n"));
+        assertTrue("a List<?> return says nothing about what Json must write",
+                ctx.hasErrors());
+    }
+
+    @Test
     public void aBoundedWildcardElementIsCheckedLikeItsBound() throws Exception {
         // List<? extends String> was accepted with NO runtime element check at
         // all, because every consumer read a bounded wildcard as "claims

@@ -278,6 +278,84 @@ public class RestServerAnnotationProcessorTest {
     }
 
     @Test
+    public void anEmbeddedPlaceholderIsBoundLikeTheClientBindsIt() throws Exception {
+        // The CLIENT generator substitutes {name} anywhere in the template, so
+        // /files/{name}.json has always produced a working client. The server
+        // generator only recognised a placeholder that owned a whole segment, so
+        // turning server generation on reported that @Path("name") was absent and
+        // refused a contract that already worked -- two halves of one annotation
+        // disagreeing about what it means.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.FileApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface FileApi {\n"
+                + "    @GET(\"/files/{name}.json\")\n"
+                + "    void get(@Path(\"name\") String name,\n"
+                + "             OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+
+        URLClassLoader loader = new URLClassLoader(
+                new URL[]{classes.toURI().toURL(), testClassesDir().toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> serverItf = loader.loadClass("com.example.FileApiServer");
+        final Object[] seen = new Object[1];
+        Object handler = Proxy.newProxyInstance(loader, new Class<?>[]{serverItf},
+                new InvocationHandler() {
+                    public Object invoke(Object proxy, Method m, Object[] args) {
+                        seen[0] = args[0];
+                        return "ok";
+                    }
+                });
+        Class<?> dispatcherClass = loader.loadClass("com.example.FileApiDispatcher");
+        Object dispatcher = dispatcherClass.getConstructor(serverItf).newInstance(handler);
+        Method dispatch = dispatcherClass.getMethod("dispatch",
+                String.class, String.class, java.util.Map.class, Object.class);
+
+        assertNotNull("the route did not match at all",
+                dispatch.invoke(dispatcher, "GET", "/files/report.json", null, null));
+        assertEquals("the value between the literals is what binds",
+                "report", seen[0]);
+
+        // The literals are part of the match, not decoration.
+        seen[0] = null;
+        assertNull("a different extension must not match",
+                dispatch.invoke(dispatcher, "GET", "/files/report.xml", null, null));
+        assertNull("and an empty value is not a segment",
+                dispatch.invoke(dispatcher, "GET", "/files/.json", null, null));
+    }
+
+    @Test
+    public void twoPlaceholdersInOneSegmentAreRefusedWithAReason() throws Exception {
+        // Supporting one embedded placeholder does not mean guessing at two.
+        // "{a}-{b}" gives no way to decide where the first value ends, and a
+        // server that picks one binds something the client never meant -- so the
+        // developer is told, rather than left with a route that never matches.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.PairApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface PairApi {\n"
+                + "    @GET(\"/pair/{a}-{b}\")\n"
+                + "    void pair(@Path(\"a\") String a, @Path(\"b\") String b,\n"
+                + "              OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        ProcessorContext ctx = runProcessor(compileSources(sources));
+        assertTrue("two placeholders in one segment cannot be split", ctx.hasErrors());
+        String all = ctx.getErrors().toString();
+        assertTrue(all, all.indexOf("more than one placeholder") >= 0);
+    }
+
+    @Test
     public void twoDynamicRoutesThatOverlapAreRefused() throws Exception {
         // Different shapes, and /a/b/c satisfies both. Neither is more specific, so
         // literal-first ordering cannot break the tie and dispatch answers with
