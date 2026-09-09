@@ -700,6 +700,67 @@ class LocationButtonTest extends UITestBase {
                         + "tracker had cached ten minutes earlier");
     }
 
+    /// A round asks the cache for the oldest timestamp anyone waiting would
+    /// accept, so a fix can satisfy the button that started the round and not
+    /// one that joined it wanting something newer. Handing that button the same
+    /// fix would report a coordinate older than its own tap as its fresh
+    /// result -- the very staleness this path exists to prevent, arriving by
+    /// the side door.
+    @FormTest
+    void aJoinerIsNotGivenAFixOlderThanItWouldAccept() {
+        implementation.setLocationButtonSupported(true);
+        long now = System.currentTimeMillis();
+        // Old enough that the patient button takes it and the strict one does
+        // not: inside a five second window, outside a fifty millisecond one.
+        Location middling = new Location(1.0, 2.0);
+        middling.setTimeStamp(now - 2000);
+        final Location newest = new Location(9.0, 9.0);
+        newest.setTimeStamp(now + 100000);
+        manager.currentLocation = middling;
+        manager.setLocationListener(new LocationListener() {
+            public void locationUpdated(Location location) {
+            }
+
+            public void providerStateChanged(int newState) {
+            }
+        });
+
+        Form f = new Form("freshness");
+        LocationButton patient = new LocationButton();
+        patient.setTimeout(5000);
+        LocationButton strict = new LocationButton();
+        strict.setTimeout(50);
+        f.add(patient);
+        f.add(strict);
+        f.show();
+        flushSerialCalls();
+
+        List<Location> patientShared = record(patient);
+        List<Location> strictShared = record(strict);
+        List<SuccessCallback<Boolean>> callbacks =
+                implementation.getLocationButtonCallbacks();
+
+        final SuccessCallback<Boolean> strictCallback = callbacks.get(1);
+        manager.duringCurrentLocation = new Runnable() {
+            public void run() {
+                strictCallback.onSucess(Boolean.TRUE);
+                flushSerialCalls();
+                // The tracker moves, so the strict button has something it can
+                // actually accept before its own deadline.
+                manager.currentLocation = newest;
+            }
+        };
+
+        callbacks.get(0).onSucess(Boolean.TRUE);
+        flushSerialCalls();
+
+        assertEquals(1, patientShared.size(), "the patient button is answered");
+        assertEquals(1, strictShared.size(), "and so is the strict one");
+        assertSame(newest, strictShared.get(0),
+                "the strict button gets a fix inside its own window, not the "
+                        + "older one that satisfied the button it joined");
+    }
+
     private void grant(Boolean granted) {
         SuccessCallback<Boolean> callback = implementation.getLocationButtonCallback();
         assertNotNull(callback, "the component should have handed the platform a callback");

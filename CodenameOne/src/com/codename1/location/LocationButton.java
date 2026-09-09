@@ -155,6 +155,15 @@ public class LocationButton extends Container {
     /// listener.
     private static final long TRACKED_POLL_MILLIS = 150;
 
+    /// Whether the last round read its answer out of a tracking application's
+    /// cache rather than acquiring one itself.
+    ///
+    /// Only a cached fix can be stale. One that came from this request's own
+    /// bind is fresh because the bind is what produced it, whatever timestamp
+    /// the platform put on it -- and some put none, which would make every
+    /// ordinary acquisition look ancient if this were not distinguished.
+    private static boolean fixWasCached;
+
     /// True while some button's acquisition is running. Static because the fix
     /// is: LocationManager serves one one-shot request at a time, so a second
     /// button asking during the first would be answered from the last known
@@ -725,7 +734,18 @@ public class LocationButton extends Container {
                     // Its own deadline timer answered it while this round ran.
                     continue;
                 }
-                if (fix != null || now >= b.deadline) {
+                // A cached fix has to be new enough for THIS button. The
+                // round asked for the oldest timestamp anyone would take, so a
+                // button that tapped later, or that will accept less age, can
+                // be handed a fix that satisfied somebody else and not it --
+                // which is the staleness this is all here to avoid, arriving by
+                // the side door.
+                boolean goodEnough = fix != null
+                        && (!fixWasCached || fix.getTimeStamp() >= b.acceptFrom);
+                if (goodEnough || now >= b.deadline) {
+                    // Past its deadline it gets whatever there is, stale or
+                    // null: that is what it would have been given before any of
+                    // this, so waiting longer for better serves nobody.
                     b.acquiring = false;
                     b.fireLocationShared(fix);
                 } else {
@@ -798,8 +818,10 @@ public class LocationButton extends Container {
             @Override
             public void run() {
                 if (manager.getLocationListener() == null) {
+                    fixWasCached = false;
                     result[0] = manager.getCurrentLocationSync(forTimeout);
                 } else {
+                    fixWasCached = true;
                     result[0] = trackedFix(manager, forTimeout, forSince);
                 }
             }
