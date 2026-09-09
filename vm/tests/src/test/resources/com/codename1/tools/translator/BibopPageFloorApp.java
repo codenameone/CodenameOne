@@ -116,21 +116,24 @@ public class BibopPageFloorApp {
      * forceGc and notifies the collector thread, then returns), so each round is
      * a request plus a pause long enough for a full cycle to land.
      *
-     * <p>The ceiling is sized for the SLOWEST marker configuration the suite
-     * runs, not the default one. Measured on one commit across two arm64 jobs:
-     * with four markers the warm-up gave back 90% of its 266MB inside the old
-     * 5s ceiling, while with a single marker it gave back NOTHING in the same
-     * 5s and the next phase then allocated over it, so the run never had a
-     * quiet moment for the floor reading to see. Marking with one thread simply
-     * takes about four times as long, and the ceiling had been tuned against
-     * four.
+     * <p>The ceiling is generous because the wait is not the interesting part,
+     * and raising it is NOT a fix for the single-marker failures on arm64 CI:
+     * it was raised for those and they continued. What the reported round count
+     * then showed is that the behaviour is bimodal rather than slow. Two
+     * adjacent commits with identical collector code, same 1-marker job: one
+     * released inside four rounds (one second), the other spent all 80 (twenty
+     * seconds) and gave back NOTHING, and the memory then came back during the
+     * next phase instead. A budget cannot fix "never" -- something is holding
+     * the warm-up's live set across the settle, and the next phase's frames
+     * overwriting it is what lets go. See the scrubStack note below, which
+     * records the same behaviour from the first time it was seen.
      *
      * <p>Note the ceiling cannot be replaced by "stop once the footprint stops
-     * falling". In that failing run the footprint was flat for the whole
-     * window because reclamation had not started yet, so a flatness rule would
-     * have given up even earlier -- the same trap SETTLE_STABLE_STREAK below
-     * exists to avoid. Only an absolute budget works here, and it stays finite
-     * so a release that never comes still fails the assertion.
+     * falling". In the failing runs the footprint is flat for the whole window,
+     * so a flatness rule gives up sooner and reports the same wrong answer --
+     * the trap SETTLE_STABLE_STREAK below already exists to avoid. Only an
+     * absolute budget works here, and it stays finite so a release that never
+     * comes still fails the assertion rather than hanging.
      */
     private static final int SETTLE_MIN_ROUNDS = 4;
     private static final int SETTLE_MAX_ROUNDS = 80;
