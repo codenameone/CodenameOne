@@ -102,6 +102,25 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      * what a generated route can be reached by. Kept in the same order the
      * server declares it.
      */
+    /**
+     * The JDK types Json.writeValue has a branch for, and therefore the only ones
+     * a handler may return without writing itself. Kept in the order that method
+     * tests them so the two can be read side by side: String; the integral boxes;
+     * the floating ones; Map; List; byte[] (handled as an array before this);
+     * Collection, of which Set is the shape people actually return.
+     */
+    private static final Set<String> JSON_JDK_TYPES = Collections.unmodifiableSet(
+            new LinkedHashSet<String>(Arrays.asList(
+                    "java.lang.String", "java.lang.Character",
+                    "java.lang.Boolean", "java.lang.Integer", "java.lang.Long",
+                    "java.lang.Short", "java.lang.Byte",
+                    "java.lang.Double", "java.lang.Float",
+                    "java.util.Map", "java.util.HashMap", "java.util.LinkedHashMap",
+                    "java.util.TreeMap", "java.util.SortedMap",
+                    "java.util.List", "java.util.ArrayList", "java.util.LinkedList",
+                    "java.util.Collection", "java.util.Set", "java.util.HashSet",
+                    "java.util.LinkedHashSet", "java.util.TreeSet", "java.util.SortedSet")));
+
     private static final List<String> ROUTABLE_METHODS = Collections.unmodifiableList(
             Arrays.asList("GET", "POST", "HEAD", "PUT", "DELETE", "PATCH", "OPTIONS"));
 
@@ -593,6 +612,17 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // own javadoc wrong about the case it exists to describe.
         int implied = "void".equals(route.returnJavaType) ? 204 : 200;
         route.status = status == null ? implied : status.getIntOrDefault("value", implied);
+        // A typo here is copied straight into the generated router, and neither
+        // writer questions it: HTTP/1 emits it as the status line and HTTP/2
+        // submits it as :status, so a handler that worked perfectly answers with
+        // something the client rejects or cannot frame. Three digits is the whole
+        // of what HTTP defines.
+        if (route.status < 100 || route.status > 599) {
+            ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " declares "
+                    + "@ResponseStatus(" + route.status + "), which is not an HTTP status "
+                    + "code. It has to be between 100 and 599.");
+            return null;
+        }
         return route;
     }
 
@@ -982,9 +1012,21 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 }
             }
         }
-        // Json.write handles the JDK shapes and anything that writes itself.
-        if (raw.startsWith("java.") || raw.indexOf('.') < 0) {
+        // Only the JDK shapes Json ACTUALLY writes. "Anything under java." was too
+        // generous by a wide margin: java.util.Date reaches Json's final branch
+        // and comes back as a quoted, implementation-formatted toString(), and
+        // java.lang.Object holding a DTO comes back as "com.example.Note@1a2b3c"
+        // -- the same defect the DTO check exists to stop, arriving through a
+        // wider declared type. This list mirrors the branches of Json.writeValue
+        // in order; a type added there belongs here too.
+        if (raw.indexOf('.') < 0) {
+            return true;              // a primitive, which is always written as one
+        }
+        if (JSON_JDK_TYPES.contains(raw)) {
             return true;
+        }
+        if (raw.startsWith("java.")) {
+            return false;             // some other JDK type Json would toString()
         }
         String internal = raw.replace('.', '/');
         AnnotatedClass cls = ctx.lookup(internal);

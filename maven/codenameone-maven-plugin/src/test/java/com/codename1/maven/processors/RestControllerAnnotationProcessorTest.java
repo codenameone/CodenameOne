@@ -286,6 +286,44 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aJdkReturnJsonCannotWriteIsRefused() throws Exception {
+        // java.util.Date has no branch in Json.writeValue, so it reaches the
+        // final one and is answered as a quoted, implementation-formatted
+        // toString() -- a date the client cannot parse back, from a build and a
+        // request that both reported success.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/when\")\n"
+                + "    public java.util.Date when() { return null; }\n"
+                + "}\n"));
+        assertTrue("a JDK type Json cannot write should not compile", ctx.hasErrors());
+        assertTrue(ctx.getErrors().toString(),
+                ctx.getErrors().toString().indexOf("cannot encode") >= 0);
+    }
+
+    @Test
+    public void aStatusOutsideTheHttpRangeIsRefused() throws Exception {
+        // Copied verbatim into the router, emitted verbatim as the status line
+        // and as :status -- so a typo turns a working handler into a reply the
+        // client rejects or cannot frame.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/oops\")\n"
+                + "    @ResponseStatus(700)\n"
+                + "    public String oops() { return \"x\"; }\n"
+                + "}\n"));
+        assertTrue("a status outside 100..599 should not compile", ctx.hasErrors());
+        assertTrue(ctx.getErrors().toString(),
+                ctx.getErrors().toString().indexOf("not an HTTP status") >= 0);
+    }
+
+    @Test
     public void anArrayReturnOtherThanBytesIsRefused() throws Exception {
         // Json writes byte[] as base64 and has no handling for any other array,
         // so this would be answered as the JSON string "[I@1a2b3c" while the

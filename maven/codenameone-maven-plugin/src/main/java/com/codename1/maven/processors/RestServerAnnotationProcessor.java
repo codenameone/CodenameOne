@@ -33,6 +33,7 @@ import com.codename1.maven.annotations.ProcessorContext;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -438,7 +439,25 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             }
             return;
         }
-        if (t.startsWith("java.") || t.indexOf('.') < 0) return;   // JDK type or a primitive
+        if (t.indexOf('.') < 0) return;                            // a primitive
+        if (t.startsWith("java.")) {
+            // Not every JDK type round-trips, and the ones that do not fail
+            // SILENTLY in both directions. A field typed java.util.Date is the
+            // plain case: the client sends a number, so the decoder's guarded
+            // cast to Date never matches and the field arrives null, while the
+            // encoder hands the Date to Json and gets its toString() -- the
+            // contract compiles at both ends and the value survives neither.
+            // The same is true of BigDecimal, UUID and every java.time type, so
+            // the answer is the supported set rather than a case for Date.
+            if (!CODEC_JDK_TYPES.contains(t)) {
+                ctx.error("A transferred field or return typed " + t + " cannot be "
+                        + "encoded: the generated codec handles the primitives and their "
+                        + "boxes, String, byte[], and List, Set or Map of those. " + t
+                        + " would arrive null and be written as its toString(). Carry it "
+                        + "as a long of epoch milliseconds or as a String.");
+            }
+            return;
+        }
         AnnotatedClass cls = ctx.lookup(t.replace('.', '/'));
         if (cls == null || cls.isInterface() || cls.isEnum()) return;
         if (dtos.containsKey(t)) return;
@@ -448,6 +467,21 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             collectDtos(fieldJavaType(f), ctx);
         }
     }
+
+    /**
+     * The JDK types a generated codec can convert in BOTH directions. Taken from
+     * the branches of the conversion above, plus the containers handled by the
+     * generic path and byte[]; a type added there belongs here too. Anything else
+     * under java.* reaches the guarded cast, which cannot match a value the JSON
+     * parser produced.
+     */
+    private static final Set<String> CODEC_JDK_TYPES = Collections.unmodifiableSet(
+            new LinkedHashSet<String>(Arrays.asList(
+                    "java.lang.String", "java.lang.Integer", "java.lang.Long",
+                    "java.lang.Double", "java.lang.Boolean", "java.lang.Float",
+                    "java.lang.Short", "java.lang.Byte",
+                    "java.util.List", "java.util.Set", "java.util.Collection",
+                    "java.util.Map")));
 
     /** The value half of a Map's type arguments, honouring nested generics. */
     private static String mapValueType(String inner) {

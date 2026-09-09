@@ -34,8 +34,13 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.PARAMETER)
 public @interface PathVariable {
-    /// The name to bind from. Defaults to the parameter's own name.
-    String value() default "";
+    /// The name to bind from. REQUIRED, and deliberately so: it cannot default to
+    /// the parameter's own name because a Java parameter name only survives
+    /// compilation when the application is built with -parameters, which is the
+    /// application's build to decide and not this one's. An annotation that
+    /// promised the default would compile fine and then fail at packaging, for
+    /// every developer who took it at its word.
+    String value();
     /// Whether a request without it is rejected.
     boolean required() default true;
     /// Used when the request omits it.
