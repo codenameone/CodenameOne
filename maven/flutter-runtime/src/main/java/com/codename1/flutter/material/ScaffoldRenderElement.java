@@ -497,6 +497,11 @@ public class ScaffoldRenderElement extends RenderElement {
         RenderElement fabRender = renderOf(fabChild);
         if (fabRender != null) {
             Size fs = fabRender.layout(BoxConstraints.loose(self.width(), self.height()));
+            // Published for the bottom bar, which has to cut a notch for it. Flutter hands
+            // the same thing over as ScaffoldGeometry.floatingActionButtonArea. Read at
+            // PAINT time, not build time: the bar is built before this layout runs, so at
+            // build time there is nothing to read.
+            fabSize = fs;
             setChildOffset(fabRender,
                     fabX(scaffold().getFloatingActionButtonLocation(), self.width(), fs.width()),
                     fabY(scaffold().getFloatingActionButtonLocation(), self.height(),
@@ -504,6 +509,37 @@ public class ScaffoldRenderElement extends RenderElement {
                                     bottomSafeAreaPx())));
         }
         return self;
+    }
+
+    /// The size the docked floating action button was last laid out at, in DEVICE
+    /// pixels, or null.
+    private Size fabSize;
+
+    /// The nearest enclosing Scaffold's last floating-action-button size, or null. The
+    /// bottom bar needs it to carve its notch, and the bar is not a child of the button
+    /// -- they are two slots of the same Scaffold -- so it has to ask.
+    public static Size fabSizeOf(com.codename1.flutter.Element from) {
+        com.codename1.flutter.Element e = from;
+        while (e != null) {
+            if (e instanceof ScaffoldRenderElement) {
+                return ((ScaffoldRenderElement) e).fabSize;
+            }
+            e = e.parent();
+        }
+        return null;
+    }
+
+    /// Where the nearest enclosing Scaffold docks its floating action button.
+    public static FloatingActionButtonLocation fabLocationOf(
+            com.codename1.flutter.Element from) {
+        com.codename1.flutter.Element e = from;
+        while (e != null) {
+            if (e instanceof ScaffoldRenderElement) {
+                return ((ScaffoldRenderElement) e).scaffold().getFloatingActionButtonLocation();
+            }
+            e = e.parent();
+        }
+        return null;
     }
 
     /**

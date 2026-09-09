@@ -28,4 +28,21 @@ package com.codename1.flutter.material;
  * {@code NotchedShape} interface.
  */
 public abstract class NotchedShape {
+
+    /**
+     * The outline of {@code host} with a notch carved for {@code guest}.
+     *
+     * <p>Declared here so a transpiled strategy -- the mail study's
+     * {@code WaterfallNotchedRectangle} is one -- can be CALLED. This was an empty marker
+     * class, so the shape a BottomAppBar was given could be stored and never asked for
+     * anything, and the bar drew as a plain rectangle with the docked button sitting on
+     * an edge it should have been cut into.</p>
+     *
+     * <p>Returns null when the strategy cannot produce a path, which is the answer for
+     * anything that has not overridden it; the caller then draws the host unchanged.</p>
+     */
+    public com.codename1.flutter.Path getOuterPath(com.codename1.flutter.Rect host,
+            com.codename1.flutter.Rect guest) {
+        return null;
+    }
 }

@@ -96,6 +96,21 @@ public class BottomAppBar extends StatelessWidget {
     public Widget build(BuildContext context) {
         Container c = new Container();
         Color fill = color != null ? color : themedColor(context);
+        NotchedShape notch = shape instanceof NotchedShape ? (NotchedShape) shape : null;
+        if (fill != null && notch != null) {
+            // Painted through the shape rather than coloured: a Container fills its box,
+            // and the whole point of a notched shape is that the box is not what should
+            // be filled.
+            NotchedSurface surface = new NotchedSurface();
+            surface.shape(notch);
+            surface.color(fill);
+            surface.notchMargin(notchMargin != null ? notchMargin.doubleValue() : 4.0);
+            c.height(HEIGHT_LP);
+            c.alignment(com.codename1.flutter.Alignment.topCenter);
+            c.child(child);
+            surface.child(c);
+            return surface;
+        }
         if (fill != null) {
             c.color(fill);
         }
