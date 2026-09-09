@@ -669,14 +669,31 @@ public class RestServerAnnotationProcessorTest {
                 tagsOut.get(0) instanceof java.util.Map);
         assertEquals("friendly", ((java.util.Map) tagsOut.get(0)).get("label"));
 
-        // An element of the wrong shape becomes null rather than a mistyped object.
+        // An element of the wrong shape is REFUSED. This assertion used to expect
+        // null, which was itself an improvement on handing the handler a Map
+        // wearing a Tag's type -- but null is a value the client can legitimately
+        // send, so substituting it for a mistake made the two indistinguishable
+        // and let the handler act on a collection with a hole in it. Throwing is
+        // what lets the transport answer 400, which is what the request deserves.
         java.util.List mixed = new java.util.ArrayList();
         mixed.add("not an object");
         java.util.Map petMixed = new java.util.LinkedHashMap();
         petMixed.put("tags", mixed);
-        java.util.Map mixedOut = (java.util.Map) dispatch.invoke(dispatcher, "POST", "/pet",
-                null, petMixed);
-        assertNull(((java.util.List) mixedOut.get("tags")).get(0));
+        try {
+            dispatch.invoke(dispatcher, "POST", "/pet", null, petMixed);
+            fail("a scalar where a Tag was declared must be refused, not nulled");
+        } catch (java.lang.reflect.InvocationTargetException expected) {
+            assertTrue(String.valueOf(expected.getCause()),
+                    expected.getCause() instanceof IllegalArgumentException);
+        }
+        // A genuine JSON null element still passes through as null.
+        java.util.List withNull = new java.util.ArrayList();
+        withNull.add(null);
+        java.util.Map petNull = new java.util.LinkedHashMap();
+        petNull.put("tags", withNull);
+        java.util.Map nullOut = (java.util.Map) dispatch.invoke(dispatcher, "POST", "/pet",
+                null, petNull);
+        assertNull(((java.util.List) nullOut.get("tags")).get(0));
         loader.close();
     }
 

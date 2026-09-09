@@ -397,6 +397,45 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void adjacentPathVariablesAreRefused() throws Exception {
+        // Nothing separates them, so the matcher hands the first variable the
+        // whole remainder and then fails because a second is still owed: the
+        // route compiled and answered 404 to every request, which is the worst
+        // way to be wrong -- the build says fine and the endpoint does not exist.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/{left}{right}\")\n"
+                + "    public String both(@PathVariable(\"left\") String left,\n"
+                + "                       @PathVariable(\"right\") String right) { return left; }\n"
+                + "}\n"));
+        assertTrue("adjacent variables should not compile", ctx.hasErrors());
+        assertTrue(ctx.getErrors().toString(),
+                ctx.getErrors().toString().indexOf("adjacent") >= 0);
+    }
+
+    @Test
+    public void variablesSeparatedByALiteralStillRoute() throws Exception {
+        // The separated form is the one people write, and it has to keep working.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/{left}-{right}\")\n"
+                + "    public String both(@PathVariable(\"left\") String left,\n"
+                + "                       @PathVariable(\"right\") String right) {\n"
+                + "        return left + \"|\" + right;\n"
+                + "    }\n"
+                + "}\n");
+        Object response = router.call("GET", "/a-b", null);
+        assertNotNull("GET /a-b matched no route", response);
+        assertEquals("a|b", Router.bodyOf(response));
+    }
+
+    @Test
     public void anEmptyBooleanValueIsRejectedRatherThanFalse() throws Exception {
         // "?enabled=" is a parameter the client SENT. Binding it to false hands
         // the controller a decision nobody made -- the same defect the numeric

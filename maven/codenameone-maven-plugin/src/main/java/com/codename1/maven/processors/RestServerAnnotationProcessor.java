@@ -1410,7 +1410,16 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
     private static void emitValueCoercion(StringBuilder sb) {
         sb.append("    // The JSON reader produces Long for integers and Double for reals, so every\n");
         sb.append("    // numeric read goes through Number rather than casting to the field's type.\n");
-        sb.append("    private static String asString(Object v) { return v == null ? null : String.valueOf(v); }\n");
+        // String.valueOf turns ANYTHING into a string, so a number arrived as
+        // "1" and a whole object as "{x=1}" -- values the declared JSON shape
+        // never allowed, handed to the handler as though the client had sent
+        // them. A JSON string is a string; anything else is the client being
+        // wrong, and null is still null.
+        sb.append("    private static String asString(Object v) {\n");
+        sb.append("        if (v == null || v instanceof String) { return (String)v; }\n");
+        sb.append("        throw new IllegalArgumentException(\"a JSON string is required, not \""
+                + " + v.getClass().getName());\n");
+        sb.append("    }\n");
         // Range-checked, not narrowed. The parser answers a Long for any JSON
         // integer, and intValue() on 2147483648 is -2147483648 -- so an id, a count
         // or an amount reached the handler as a DIFFERENT number from the one the
@@ -1519,8 +1528,15 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("    private interface FromValueFn { Object convert(Object v); }\n");
         sb.append("    /** Converts each element of a decoded array to the field's element type. */\n");
         sb.append("    private static java.util.List fromValueList(Object raw, FromValueFn f) {\n");
-        sb.append("        java.util.List in = asList(raw);\n");
-        sb.append("        if(in == null) return null;\n");
+        // asList answers null for anything that is not one, so an object or a
+        // scalar where an array was declared left the field null -- the client's
+        // mistake made indistinguishable from an explicit JSON null.
+        sb.append("        if(raw == null) return null;\n");
+        sb.append("        if(!(raw instanceof java.util.List)) {\n");
+        sb.append("            throw new IllegalArgumentException(\"a JSON array is required, not \""
+                + " + raw.getClass().getName());\n");
+        sb.append("        }\n");
+        sb.append("        java.util.List in = (java.util.List)raw;\n");
         sb.append("        java.util.List out = new java.util.ArrayList();\n");
         sb.append("        for(int i = 0 ; i < in.size() ; i++) {\n");
         sb.append("            out.add(f.convert(in.get(i)));\n");
@@ -1547,7 +1563,14 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        java.util.List out = new java.util.ArrayList();\n");
         sb.append("        for(int i = 0 ; i < src.size() ; i++) {\n");
         sb.append("            Object e = src.get(i);\n");
-        sb.append("            out.add(e instanceof java.util.Map ? f.convert((java.util.Map)e) : null);\n");
+        // The same rule listFromMaps takes: a non-null element that is not an
+        // object is the client being wrong, and substituting null for it hands
+        // the handler a collection with a hole where a DTO should be.
+        sb.append("            if(e != null && !(e instanceof java.util.Map)) {\n");
+        sb.append("                throw new IllegalArgumentException(\"element \" + i"
+                + " + \" is \" + e.getClass().getName() + \", not an object\");\n");
+        sb.append("            }\n");
+        sb.append("            out.add(e == null ? null : f.convert((java.util.Map)e));\n");
         sb.append("        }\n");
         sb.append("        return out;\n");
         sb.append("    }\n");

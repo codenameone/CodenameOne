@@ -526,8 +526,22 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
             variableNames.add(route.pattern.substring(pos + 1, close));
             int next = route.pattern.indexOf('{', close);
-            route.after.add(next < 0 ? route.pattern.substring(close + 1)
-                                     : route.pattern.substring(close + 1, next));
+            String following = next < 0 ? route.pattern.substring(close + 1)
+                                        : route.pattern.substring(close + 1, next);
+            // Two variables with nothing between them cannot be split. There is
+            // no text to look for, so the matcher gives the first one everything
+            // that is left and then fails because a second is still owed --
+            // meaning the route compiles and then answers 404 to every request,
+            // which is the worst way to be wrong. Nothing can bind it, so it is
+            // refused where it is written.
+            if (following.length() == 0 && next >= 0) {
+                ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " declares the "
+                        + "route " + route.pattern + ", where two variables are adjacent. "
+                        + "Nothing separates them, so no request could ever match it. Put a "
+                        + "literal between them, such as a '/' or a '-'.");
+                return null;
+            }
+            route.after.add(following);
             pos = next;
         }
 
