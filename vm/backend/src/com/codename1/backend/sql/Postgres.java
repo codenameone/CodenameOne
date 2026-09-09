@@ -263,6 +263,19 @@ public final class Postgres {
             throw new IOException("The server's SCRAM iteration count is not a number");
         }
 
+        // The password goes into PBKDF2 as its raw UTF-8, WITHOUT SASLprep, and
+        // that is a deliberate limitation rather than an oversight. SASLprep
+        // (RFC 4013) is a stringprep profile whose mapping step is NFKC, and
+        // there is no Normalizer on this platform -- this class is translated
+        // for the packaged server, so it may only use what vm/JavaAPI and
+        // CLDC11 define, and neither has java.text. Implementing the part that
+        // needs no Unicode tables would make things WORSE, not better:
+        // PostgreSQL falls back to the raw password whenever its own saslprep
+        // rejects the input, so a half-prepared password would stop matching
+        // verifiers that work today. Printable ASCII -- which SASLprep leaves
+        // untouched -- is therefore correct here; a password that SASLprep
+        // would normalise is rejected, and has to be set in ASCII or
+        // authenticated by another method.
         byte[] saltedPassword = Crypto.pbkdf2Sha256(
                 Wire.utf8(password == null ? "" : password), salt, iterations, 32);
         byte[] clientKey = Crypto.hmacSha256(saltedPassword, Wire.utf8("Client Key"));
@@ -509,12 +522,21 @@ public final class Postgres {
                 }
             case 700:  // float4
             case 701:  // float8
-            case 1700: // numeric
                 try {
                     return Double.valueOf(Double.parseDouble(text.trim()));
                 } catch (NumberFormatException err) {
                     return text;
                 }
+            case 1700: // numeric
+                // NOT a double. numeric is arbitrary precision, and
+                // Double.parseDouble does not fail on the values it cannot
+                // hold: 1e999 comes back as infinity, which Json then writes
+                // as null, and a merely large numeric comes back quietly
+                // rounded. Both report a successful query with a value the
+                // database does not hold. The exact text is what the server
+                // sent, so that is what the caller gets -- matching DECIMAL
+                // on the MySQL path, which is the same kind of column.
+                return text;
             case 17: { // bytea, sent as \x48656c6c6f
                 if(text.length() >= 2 && text.charAt(0) == '\\' && text.charAt(1) == 'x') {
                     byte[] out = unhex(text.substring(2));

@@ -142,27 +142,31 @@ public final class Db {
     }
 
     public Object transaction(Work body) throws Exception {
-        Connection c = live();
-        c.setAutoCommit(false);
+        // BEGIN IMMEDIATE, not setAutoCommit(false), because that is what the
+        // PACKAGED arm does and the two must not disagree about concurrency.
+        // setAutoCommit(false) leaves the JDBC driver on SQLite's DEFERRED
+        // default, where a read-then-write transaction takes its read snapshot
+        // first and only asks for the write lock when it writes: two of them
+        // interleave, and the second fails SQLITE_BUSY on the upgrade instead
+        // of waiting at its start. So the same code that is well behaved here
+        // starts failing once it is packaged, which is the worst direction for
+        // a difference like this to run. IMMEDIATE takes the write lock up
+        // front, so the second transaction waits (bounded by busy_timeout).
+        execute("BEGIN IMMEDIATE", null);
         boolean committed = false;
         try {
             Object result = body.run(this);
-            c.commit();
+            execute("COMMIT", null);
             committed = true;
             return result;
         } finally {
             if(!committed) {
                 try {
-                    c.rollback();
-                } catch (SQLException err) {
+                    execute("ROLLBACK", null);
+                } catch (Exception err) {
                     // The original failure is the one worth reporting.
                     System.err.println("rollback failed: " + err);
                 }
-            }
-            try {
-                c.setAutoCommit(true);
-            } catch (SQLException ignored) {
-                // The connection is going away anyway.
             }
         }
     }

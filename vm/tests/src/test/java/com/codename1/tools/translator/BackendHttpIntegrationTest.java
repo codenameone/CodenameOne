@@ -418,6 +418,29 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("a response header whose name is not a token never reaches the wire")
+    void malformedResponseHeaderNamesAreDropped() throws Exception {
+        // /rawheader asks for four extra headers, three of which are not field
+        // names. A space inside a name makes a field line no peer can read; a
+        // LEADING space is obsolete line folding, which appends the text to the
+        // PREVIOUS header instead, so a handler's header can silently rewrite one
+        // the server owns; a colon just ends the name early and renames the field.
+        byte[] response = raw("GET /rawheader HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
+        String text = new String(response, StandardCharsets.UTF_8);
+        String head = text.substring(0, text.indexOf("\r\n\r\n") + 4);
+        assertTrue(head.startsWith("HTTP/1.1 200"), "the reply should be a 200:\n" + text);
+        assertTrue(head.indexOf("X-Good: ok") >= 0,
+                "a well formed extra header must still be sent:\n" + head);
+        assertEquals(-1, head.indexOf("space-in-name"),
+                "a name with a space in it is not a field name:\n" + head);
+        assertEquals(-1, head.indexOf("obsolete-folding"),
+                "a name with a leading space folds into the header before it:\n" + head);
+        assertEquals(-1, head.indexOf("colon-in-name"),
+                "a colon ends the name early and renames the field:\n" + head);
+        assertTrue(text.endsWith("raw"), "the body must still be intact:\n" + text);
+    }
+
+    @Test
     @DisplayName("a Connection option is matched as a whole token, not a substring")
     void connectionOptionsAreWholeTokens() throws Exception {
         // "disclose" contains "close". Read as a substring it shut the connection,

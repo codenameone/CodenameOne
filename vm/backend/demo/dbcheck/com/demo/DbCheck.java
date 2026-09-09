@@ -114,6 +114,24 @@ public class DbCheck {
         Map second = (Map)rows.get(1);
         check("a NULL column is null", "null", String.valueOf(second.get("payload")));
 
+        // DECIMAL is the one type the three engines cannot be asked to agree
+        // on, because SQLite does not have it: a column DECLARED DECIMAL there
+        // has NUMERIC affinity and stores an INTEGER or a REAL, so there is no
+        // exact-decimal value to compare against. On the two servers that do
+        // have it, the column exists precisely because a double would not hold
+        // the value -- so it has to come back exact and it has to come back as
+        // a number the caller can read, not as a BLOB that JSON base64s.
+        if(postgres || mysql) {
+            String exact = "123456789012345678901234567890.12345";
+            db.execute("DROP TABLE IF EXISTS cn1_check_decimal", null);
+            db.execute("CREATE TABLE cn1_check_decimal (amount DECIMAL(65,5))", null);
+            db.execute("INSERT INTO cn1_check_decimal (amount) VALUES (" + exact + ")", null);
+            List decimals = db.query("SELECT amount FROM cn1_check_decimal", null);
+            Object amount = ((Map)decimals.get(0)).get("amount");
+            check("a decimal column is a String", "java.lang.String", typeOf(amount));
+            check("the decimal value is exact", exact, String.valueOf(amount));
+        }
+
         // Binding, not interpolation. A value containing a quote would end the
         // statement early if this were concatenated.
         db.execute("INSERT INTO cn1_check (name, size) VALUES (" + placeholders(postgres, 2) + ")",

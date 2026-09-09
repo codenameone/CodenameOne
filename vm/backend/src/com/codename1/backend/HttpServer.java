@@ -3155,11 +3155,12 @@ public final class HttpServer {
                             if(isServerOwnedHeader(name)) {
                                 System.err.println("dropped a response header the "
                                         + "server owns: " + sanitizeForLog(name));
-                            } else if(isHeaderSafe(name) && isHeaderSafe(text)) {
+                            } else if(isHeaderName(name) && isHeaderSafe(text)) {
                                 extra.add(name + ": " + text);
                             } else {
-                                System.err.println("dropped a response header containing "
-                                        + "a control character: " + sanitizeForLog(name));
+                                System.err.println("dropped a response header whose name "
+                                        + "is not a token or whose value carries a control "
+                                        + "character: " + sanitizeForLog(name));
                             }
                         }
                     }
@@ -3365,6 +3366,34 @@ public final class HttpServer {
      * the three can appear in a header name or value, and a header carrying one is
      * either a bug or an injection attempt -- neither is worth serialising.
      */
+    /**
+     * True when this is a field NAME as HTTP defines one: a non-empty run of
+     * tchar (RFC 9110 5.6.2). isHeaderSafe is the right rule for a value and
+     * the wrong one for a name -- a space, tab or colon passes it and still
+     * produces a field line no peer reads the way the handler meant. A leading
+     * space is worse than merely malformed: over HTTP/1 that is obsolete line
+     * folding, so the name and value are appended to the PREVIOUS header
+     * instead of forming their own. Over HTTP/2 nghttp2 rejects the name, and
+     * that can cost the whole response rather than the one header.
+     */
+    private static boolean isHeaderName(String name) {
+        if(name.length() == 0) {
+            return false;
+        }
+        for(int iter = 0 ; iter < name.length() ; iter++) {
+            char c = name.charAt(iter);
+            boolean tchar = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9')
+                    || c == '!' || c == '#' || c == '$' || c == '%' || c == '&'
+                    || c == '\'' || c == '*' || c == '+' || c == '-' || c == '.'
+                    || c == '^' || c == '_' || c == '`' || c == '|' || c == '~';
+            if(!tchar) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static boolean isHeaderSafe(String value) {
         for(int iter = 0 ; iter < value.length() ; iter++) {
             char c = value.charAt(iter);
@@ -4110,14 +4139,15 @@ public final class HttpServer {
                     if(isServerOwnedHeader(name)) {
                         System.err.println("dropped a response header the server owns: "
                                 + sanitizeForLog(name));
-                    } else if(isHeaderSafe(name) && isHeaderSafe(text)) {
+                    } else if(isHeaderName(name) && isHeaderSafe(text)) {
                         conn.put("\r\n");
                         conn.put(name);
                         conn.put(": ");
                         conn.put(text);
                     } else {
-                        System.err.println("dropped a response header containing a "
-                                + "control character: " + sanitizeForLog(name));
+                        System.err.println("dropped a response header whose name is "
+                                + "not a token or whose value carries a control character: "
+                                + sanitizeForLog(name));
                     }
                 }
             }

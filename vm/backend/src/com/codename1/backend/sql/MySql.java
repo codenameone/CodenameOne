@@ -530,6 +530,17 @@ public final class MySql {
                 return reader.temporal();
             case 0x0b: // TIME
                 return reader.time();
+            case 0x00: // DECIMAL
+            case 0xf6: { // NEWDECIMAL
+                // Sent as its decimal TEXT even in the binary protocol, and
+                // flagged character set 63 like every other numeric column --
+                // so the binary fallback below would hand a money column back
+                // as a byte[], which JSON then base64s. Kept as the exact text
+                // rather than parsed to a double: DECIMAL(65,30) is why the
+                // column type was chosen, and a double cannot hold it.
+                byte[] digits = reader.lengthEncodedBytes();
+                return digits == null ? null : Wire.fromUtf8(digits);
+            }
             default: {
                 byte[] data = reader.lengthEncodedBytes();
                 if(data == null) {

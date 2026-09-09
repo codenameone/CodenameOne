@@ -105,6 +105,22 @@ public class PetServer {
                     return new HttpServer.Response(204, "text/plain",
                             "junk".getBytes("UTF-8"));
                 }
+                // Also deliberately malformed, and for the same reason: a handler
+                // can put anything in extraHeaders, and what it must never do is
+                // reach the wire. A name with a space in it is not a field name,
+                // and a name with a LEADING space is obsolete line folding, which
+                // appends both to whatever header came before -- so a header the
+                // handler could not have meant would silently rewrite one the
+                // server owns.
+                if("/rawheader".equals(stripQuery(target))) {
+                    Map extra = new LinkedHashMap();
+                    extra.put("X-Good", "ok");
+                    extra.put("X Bad", "space-in-name");
+                    extra.put(" X-Fold", "obsolete-folding");
+                    extra.put("X:Colon", "colon-in-name");
+                    return new HttpServer.Response(200, "text/plain",
+                            "raw".getBytes("UTF-8"), extra);
+                }
                 if(!dispatcher.hasRoute(method, target)) {
                     if(files != null) {
                         HttpServer.Response served = files.handle(request);
