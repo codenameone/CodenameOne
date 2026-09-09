@@ -545,6 +545,9 @@ public class LocationButton extends Container {
         removeComponent(peer);
         peer = null;
         add(BorderLayout.CENTER, fallback);
+        // The same reason buildChild does it: Container#setEnabled propagated to
+        // the peer that was there at the time, and this button was not.
+        adoptEnabledState(fallback);
         revalidateSelf();
     }
 

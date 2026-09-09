@@ -382,6 +382,27 @@ class LocationButtonTest extends UITestBase {
         assertTrue(shared.isEmpty(), "a disabled button must not acquire");
     }
 
+    /// A component disabled while the platform control was up must not come
+    /// back live when a failed session swaps in the ordinary button.
+    @FormTest
+    void aDisabledButtonStaysDisabledThroughTheFallback() {
+        implementation.setLocationButtonSupported(true);
+        manager.currentLocation = new Location(3.0, 4.0);
+        LocationButton button = showButton(new LocationButton());
+        button.setEnabled(false);
+        List<Location> shared = record(button);
+
+        grant(null);
+
+        Button fallback = findButton(button);
+        assertNotNull(fallback, "the failed control is replaced by the button");
+        assertFalse(fallback.isEnabled(),
+                "and it inherits the disabled state the peer was carrying");
+
+        tapComponent(fallback);
+        assertTrue(shared.isEmpty(), "a disabled fallback must not acquire");
+    }
+
     /// And the ordinary case still works, so the guard is not disabling
     /// everything.
     @FormTest

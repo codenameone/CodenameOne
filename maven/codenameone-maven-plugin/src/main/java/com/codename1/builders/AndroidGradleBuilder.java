@@ -581,6 +581,31 @@ public class AndroidGradleBuilder extends Executor {
         // flag too. No sample currently qualifies for it, because
         // hellocodenameone uses com/codename1/maps and so takes the ordinary
         // declaration anyway.
+        // A hand-written ACCESS_FINE_LOCATION wins over ours: permissionAdd()
+        // suppresses this method's answer the moment xPermissions names the
+        // permission. For `auto` that is the right precedence -- an explicit
+        // fragment beats an inference -- but a forced `true` would then succeed
+        // while shipping ordinary precise access, which is the opposite of what
+        // was asked for, and silently.
+        boolean manualFine = xPermissions != null
+                && xPermissions.indexOf("ACCESS_FINE_LOCATION") >= 0;
+        boolean manualExclusive = xPermissions != null
+                && xPermissions.indexOf("onlyForLocationButton") >= 0;
+        if (manualFine && !manualExclusive) {
+            if (asked) {
+                throw new BuildException("android.locationButton.exclusive=true"
+                        + " conflicts with the ACCESS_FINE_LOCATION declaration in"
+                        + " android.xpermissions, which the build cannot rewrite and"
+                        + " which takes precedence over the one it generates. Remove"
+                        + " that fragment and let the build declare the permission,"
+                        + " or drop the hint if the manual declaration is what you"
+                        + " want.");
+            }
+            warn("android.xpermissions declares ACCESS_FINE_LOCATION, so the"
+                    + " build's own declaration is suppressed and precise location"
+                    + " is not limited to the location button.");
+            return FINE_LOCATION_PERMISSION;
+        }
         if (!compileSdkSupportsExclusiveLocation(compileSdk)) {
             if (asked) {
                 // THROWN, not logged. Executor.error() only writes to the

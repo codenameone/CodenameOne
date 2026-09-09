@@ -301,8 +301,9 @@ class AndroidLocationButton extends SurfaceView {
         // for a moment before an adoption that fails, which ends in the
         // fallback. It is assigned once the surface is actually adopted, which
         // is the first instant the answer is true.
+        Object surfacePackage = null;
         try {
-            Object surfacePackage = callQuietlyOn(sessionClass(), opened,
+            surfacePackage = callQuietlyOn(sessionClass(), opened,
                     "getSurfacePackage", new Class[0], new Object[0]);
             if (surfacePackage == null) {
                 abandon(opened, new IllegalStateException(
@@ -325,14 +326,6 @@ class AndroidLocationButton extends SurfaceView {
             }
             setVisibility(VISIBLE);
             setChild.invoke(this, new Object[]{surfacePackage});
-            // The package is the caller's to release: setChildSurfacePackage
-            // takes what it needs out of it, and holding this one keeps a
-            // native SurfaceControl alive for nothing. Every rebuilt peer and
-            // every detach/reattach opens another session, so keeping them
-            // piles up graphics handles until a finalizer happens to run.
-            // Verified on an Android 17 emulator that the control still renders
-            // and still grants after this, including across a rotation.
-            callQuietly(surfacePackage, "release", new Class[0], new Object[0]);
             session = opened;
             // The system's own control belongs in front of anything else this
             // surface carries; the platform's wrapper asks for the same order.
@@ -347,6 +340,23 @@ class AndroidLocationButton extends SurfaceView {
             invalidate();
         } catch (Throwable t) {
             abandon(opened, t);
+        } finally {
+            // The package is the caller's to release: setChildSurfacePackage
+            // takes what it needs out of it, and holding this one keeps a
+            // native SurfaceControl alive for nothing. Every rebuilt peer and
+            // every detach/reattach opens another session, so keeping them
+            // piles up graphics handles until a finalizer happens to run.
+            //
+            // In a finally because the adoption can leave by more routes than
+            // the successful one -- a missing setChildSurfacePackage, or an
+            // invoke that throws on some build of the platform -- and those are
+            // exactly the devices that would then accumulate handles fastest.
+            // Verified on an Android 17 emulator that the control still renders
+            // and still grants after the release, including across a rotation,
+            // which opens a second session and releases a second package.
+            if (surfacePackage != null) {
+                callQuietly(surfacePackage, "release", new Class[0], new Object[0]);
+            }
         }
     }
 
