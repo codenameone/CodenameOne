@@ -212,6 +212,9 @@ public class GestureOverlayRenderElement extends RenderElement {
         private boolean suppressTap;
         /** The inner component this press was handed to, if any. */
         private Component forwardTo;
+        /** Where the press landed, for the slop test in {@link #pointerReleased}. */
+        private int pressX;
+        private int pressY;
 
         OverlayComponent() {
             setUIID("FlutterGesture");
@@ -230,6 +233,8 @@ public class GestureOverlayRenderElement extends RenderElement {
         @Override
         public void pointerPressed(int x, int y) {
             suppressTap = false;
+            pressX = x;
+            pressY = y;
             forwardTo = interactiveTargetAt(x, y);
             if (forwardTo != null) {
                 // The press belongs to something inside us. We stay CN1's event target, so
@@ -253,6 +258,15 @@ public class GestureOverlayRenderElement extends RenderElement {
             super.pointerDragged(x, y);
         }
 
+        /// Whether the pointer travelled far enough for this to be a scroll rather than
+        /// a tap. See {@link #TOUCH_SLOP_LP}.
+        private boolean movedBeyondSlop(int x, int y) {
+            double dx = x - pressX;
+            double dy = y - pressY;
+            double slop = com.codename1.flutter.rendering.Dp.px(TOUCH_SLOP_LP);
+            return dx * dx + dy * dy > slop * slop;
+        }
+
         @Override
         public void dragInitiated() {
             // A drag means the press was a scroll, not a tap: Flutter cancels the splash.
@@ -272,7 +286,7 @@ public class GestureOverlayRenderElement extends RenderElement {
 
         @Override
         public void pointerReleased(int x, int y) {
-            boolean wasDrag = isDragActivated();
+            boolean wasDrag = movedBeyondSlop(x, y);
             if (forwardTo != null) {
                 Component target = forwardTo;
                 forwardTo = null;
@@ -299,6 +313,15 @@ public class GestureOverlayRenderElement extends RenderElement {
             suppressTap = false;
         }
     }
+
+    /// Flutter's {@code kTouchSlop}: how far a pointer may travel and still be a tap.
+    ///
+    /// Codename One reports a drag as soon as it sees pointer movement, and taking that
+    /// as "not a tap" cancels a tap on any tremor -- a finger on glass always moves a
+    /// pixel or two, so inside a scrollable a control could be pressed, show its ink, and
+    /// then do nothing. Flutter measures the DISTANCE instead and only stops calling it a
+    /// tap past 18 logical pixels, which is far short of any real scroll.
+    private static final double TOUCH_SLOP_LP = 18;
 
     /** The InkWell/InkResponse configuration for this tap area, or null for a plain gesture. */
     private com.codename1.flutter.material.InkResponse inkResponse() {
