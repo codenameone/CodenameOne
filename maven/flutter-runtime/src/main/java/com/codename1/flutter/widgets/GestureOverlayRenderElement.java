@@ -57,9 +57,25 @@ public class GestureOverlayRenderElement extends RenderElement {
         return null;
     }
 
+    /**
+     * Runs a gesture callback, and REPORTS anything it throws.
+     *
+     * <p>An exception here travelled up into Codename One's pointer dispatch, which
+     * catches it, so the gesture did nothing and said nothing. A control that is visibly
+     * pressed and then simply does not act is the hardest kind of defect to find from a
+     * screenshot, and the sweep photographs screens at rest so it never sees one at all.
+     * Whatever the handler does wrong, the error channel should carry it.</p>
+     */
     private void fire(Funcs.VoidFunc0 f) {
-        if (f != null) {
+        if (f == null) {
+            return;
+        }
+        try {
             f.call();
+        } catch (Throwable t) {
+            com.codename1.flutter.FlutterErrorReport.unimplemented("Gesture",
+                    "a tap handler threw " + t.getClass().getName()
+                    + (t.getMessage() == null ? "" : ": " + t.getMessage()));
         }
     }
 
