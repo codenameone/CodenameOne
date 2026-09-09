@@ -34,6 +34,18 @@ import com.codename1.flutter.Widget;
  */
 public class ChangeNotifierProvider extends Provider {
 
+    /**
+     * Subscribes to the model and rebuilds this subtree when it notifies.
+     *
+     * <p>Without this the provider read its value once and nothing ever listened, so
+     * {@code notifyListeners()} changed nothing on screen and every control whose job is
+     * to set a field on the model did nothing at all.</p>
+     */
+    @Override
+    public com.codename1.flutter.Element createElement() {
+        return new ChangeNotifierProviderElement(this);
+    }
+
     /** The {@code ChangeNotifierProvider.value(value: ...)} named constructor. */
     public static ChangeNotifierProvider value(Key key, Object value, Widget child) {
         ChangeNotifierProvider p = new ChangeNotifierProvider();

@@ -296,9 +296,15 @@ public class GraphicsCanvas extends Canvas {
                 cy = oval.center().dy() + oval.height() / 2 * Math.sin(end);
                 hasCurrent = true;
             } else if ("arcToPoint".equals(s.verb)) {
-                // without full elliptical-arc solving, a straight segment to
-                // the arc's end point keeps the outline closed
-                p.lineTo(mapX(v[0], v[1]), mapY(v[0], v[1]));
+                double[] arc = arcToPoint(cx, cy, v[0], v[1], v[2], v[5] != 0, v[6] != 0,
+                        ARC_SEGMENTS);
+                if (arc == null) {
+                    p.lineTo(mapX(v[0], v[1]), mapY(v[0], v[1]));
+                } else {
+                    for (int i = 0; i < arc.length; i += 2) {
+                        p.lineTo(mapX(arc[i], arc[i + 1]), mapY(arc[i], arc[i + 1]));
+                    }
+                }
                 cx = v[0]; cy = v[1]; hasCurrent = true;
             } else if ("addRect".equals(s.verb)) {
                 appendRect(p, v[0], v[1], v[2], v[3]);
@@ -312,6 +318,59 @@ public class GraphicsCanvas extends Canvas {
         }
         return p;
     }
+
+    /// The points along a circular arc from (x0,y0) to (x1,y1), in the path's own
+    /// coordinates, EXCLUDING the start and including the end.
+    ///
+    /// Flutter's {@code arcToPoint} names an arc by its END POINT and a radius, the way
+    /// SVG does. Both callers used to replace it with a straight line -- the note here
+    /// said that "keeps the outline closed", which it does, but a chord is not an arc: a
+    /// bottom app bar's notch is two quadratics either side of one of these, so the curve
+    /// went down, cut straight across, and came back up. It reads as a dimple with a bump
+    /// in it, which is exactly what it is.
+    ///
+    /// Solved as SVG does (endpoint to centre parameterisation) for the circular case,
+    /// which is the only one Flutter's own notch strategies use, and flattened: a filled
+    /// path is flattened by the rasteriser anyway, and the ports flatten clip paths
+    /// themselves.
+    ///
+    /// @param segments how many line segments to approximate with; 1 gives back the chord
+    /// @return {x, y} pairs, or null when the arc is degenerate and the chord is right
+    public static double[] arcToPoint(double x0, double y0, double x1, double y1,
+            double radius, boolean largeArc, boolean clockwise, int segments) {
+        double dx = (x0 - x1) / 2;
+        double dy = (y0 - y1) / 2;
+        double half = Math.sqrt(dx * dx + dy * dy);
+        if (half <= 0 || segments < 2) {
+            return null;
+        }
+        double r = Math.max(Math.abs(radius), half);
+        // The centre lies off the chord's midpoint, perpendicular to it. Which side is
+        // what largeArc and clockwise choose between.
+        double coef = Math.sqrt(Math.max(0, (r * r - half * half))) / half;
+        double sign = largeArc != clockwise ? 1 : -1;
+        double cx = (x0 + x1) / 2 + sign * coef * dy;
+        double cy = (y0 + y1) / 2 - sign * coef * dx;
+        double a0 = Math.atan2(y0 - cy, x0 - cx);
+        double a1 = Math.atan2(y1 - cy, x1 - cx);
+        double sweep = a1 - a0;
+        // Normalise the sweep into the direction asked for.
+        if (clockwise && sweep < 0) {
+            sweep += 2 * Math.PI;
+        } else if (!clockwise && sweep > 0) {
+            sweep -= 2 * Math.PI;
+        }
+        double[] out = new double[segments * 2];
+        for (int i = 1; i <= segments; i++) {
+            double a = a0 + sweep * i / segments;
+            out[(i - 1) * 2] = cx + r * Math.cos(a);
+            out[(i - 1) * 2 + 1] = cy + r * Math.sin(a);
+        }
+        return out;
+    }
+
+    /** Segments enough that an arc reads as a curve at any size a notch or badge uses. */
+    public static final int ARC_SEGMENTS = 24;
 
     private void appendRect(GeneralPath p, double l, double t, double r, double b) {
         p.moveTo(mapX(l, t), mapY(l, t));

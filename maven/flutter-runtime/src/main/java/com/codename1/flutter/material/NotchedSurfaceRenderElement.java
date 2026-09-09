@@ -130,10 +130,18 @@ public class NotchedSurfaceRenderElement extends EffectRenderElement {
                 cx = v[4];
                 cy = v[5];
             } else if ("arcToPoint".equals(seg.verb)) {
-                // A short arc between two points a notch-radius apart; a straight segment
-                // closes the outline within a pixel at this size, and the two quadratics
-                // either side carry the curve that is actually visible.
-                out.lineTo(mx(v[0], ox, dpr), mx(v[1], oy, dpr));
+                // The notch's floor. A chord here is what made the dimple curve down, cut
+                // straight across and come back up -- a bump between two curves.
+                double[] arc = com.codename1.flutter.rendering.GraphicsCanvas.arcToPoint(
+                        cx, cy, v[0], v[1], v[2], v[5] != 0, v[6] != 0,
+                        com.codename1.flutter.rendering.GraphicsCanvas.ARC_SEGMENTS);
+                if (arc == null) {
+                    out.lineTo(mx(v[0], ox, dpr), mx(v[1], oy, dpr));
+                } else {
+                    for (int i = 0; i < arc.length; i += 2) {
+                        out.lineTo(mx(arc[i], ox, dpr), mx(arc[i + 1], oy, dpr));
+                    }
+                }
                 cx = v[0];
                 cy = v[1];
             } else if ("close".equals(seg.verb)) {

@@ -78,6 +78,18 @@ final class InkFeedback {
 
     private Animation clock;
 
+    /**
+     * A target that can say whether Codename One has turned the gesture into a drag.
+     *
+     * <p>{@code Component.isDragActivated()} is protected, so only the component itself
+     * can answer. The clock needs the answer because once a drag starts, Codename One
+     * delivers the rest of the gesture -- the release included -- to whatever is
+     * scrolling, and nothing will ever release this ink.</p>
+     */
+    interface DragAware {
+        boolean gestureBecameDrag();
+    }
+
     // ------------------------------------------------------------------
 
     void press(Component c, int x, int y, InkResponse config) {
@@ -199,6 +211,20 @@ final class InkFeedback {
                 long now = System.currentTimeMillis();
                 if (active && !held && now - releasedAt >= FADE_MS) {
                     active = false;
+                }
+                // The gesture turned into a drag. Codename One then delivers the rest of
+                // it -- including the release -- to whatever is scrolling, so nothing will
+                // ever release this ink and a HELD press keeps its highlight standing
+                // (deliberately, see below). A mail row in the study went grey when
+                // touched and stayed grey for exactly this: pressed inside a scrollable,
+                // the finger moved a pixel, and the release went to the list.
+                if (active && held && target instanceof DragAware
+                        && ((DragAware) target).gestureBecameDrag()) {
+                    active = false;
+                    held = false;
+                    target.repaint();
+                    detach(target);
+                    return false;
                 }
                 // A held press that never releases would otherwise animate for the life of
                 // the form: the expiry above only fires once the finger is up. A real

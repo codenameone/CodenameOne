@@ -38,7 +38,36 @@ import com.codename1.flutter.widgets.Icon;
  * gallery builds every demo page's back button as {@code IconButton(icon: BackButtonIcon())},
  * so each of those pages had an invisible — though still tappable — way back.</p>
  */
-public class BackButtonIcon extends StatelessWidget {
+public class BackButtonIcon extends StatelessWidget
+        implements com.codename1.flutter.widgets.HasIcon {
+
+    /**
+     * The glyph, for callers that want it without building — see
+     * {@link com.codename1.flutter.widgets.HasIcon}.
+     *
+     * <p>There is no context here to read the ambient theme's platform from, so this asks
+     * the one the app is RUNNING on, which is what {@code ThemeData.platform} defaults to
+     * anyway. It used to answer the material arrow unconditionally, and the shortcut is
+     * the path an extended FloatingActionButton takes for its icon -- so the gallery's
+     * "Back to gallery" button wore a long arrow on iOS where the reference wears the
+     * chevron. The glyph was not merely a different shape; it was the wrong platform's.</p>
+     */
+    @Override
+    public com.codename1.flutter.IconData iconData() {
+        return isApplePlatform() ? Icons.arrow_back_ios : Icons.arrow_back;
+    }
+
+    /** Whether the platform the app is running on uses the chevron. */
+    private static boolean isApplePlatform() {
+        try {
+            TargetPlatform p = com.codename1.flutter.foundation.FoundationLib
+                    .defaultTargetPlatform;
+            return p == TargetPlatform.iOS || p == TargetPlatform.macOS;
+        } catch (Throwable noPlatform) {
+            return false;
+        }
+    }
+
 
     @Override
     public Widget build(BuildContext context) {

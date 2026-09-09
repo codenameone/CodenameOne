@@ -207,7 +207,13 @@ public class GestureOverlayRenderElement extends RenderElement {
         return container.isScrollableX() || container.isScrollableY();
     }
 
-    class OverlayComponent extends Component {
+    class OverlayComponent extends Component implements InkFeedback.DragAware {
+
+        @Override
+        public boolean gestureBecameDrag() {
+            return isDragActivated();
+        }
+
 
         private boolean suppressTap;
         /** The inner component this press was handed to, if any. */
@@ -249,6 +255,15 @@ public class GestureOverlayRenderElement extends RenderElement {
 
         @Override
         public void pointerDragged(int x, int y) {
+            // Past the slop this is a scroll, not a tap, and Flutter drops the splash --
+            // whether or not Codename One has decided to call it a drag yet. Waiting for
+            // its verdict leaves a highlight standing on a row the finger has left.
+            if (movedBeyondSlop(x, y)) {
+                ink.cancel(this);
+                if (forwardTo instanceof OverlayComponent) {
+                    ((OverlayComponent) forwardTo).ownInk().cancel(forwardTo);
+                }
+            }
             // Only a scrollable target gets the drag: handing one to a button would start a
             // press it never finishes, and CN1 already treats our own drag as a scroll.
             if (forwardTo != null && isScrollPane(forwardTo)) {
@@ -256,6 +271,11 @@ public class GestureOverlayRenderElement extends RenderElement {
                 return;
             }
             super.pointerDragged(x, y);
+        }
+
+        /** This overlay's ink, so a forwarding neighbour can cancel it. */
+        InkFeedback ownInk() {
+            return ink;
         }
 
         /// Whether the pointer travelled far enough for this to be a scroll rather than
@@ -272,6 +292,17 @@ public class GestureOverlayRenderElement extends RenderElement {
             // A drag means the press was a scroll, not a tap: Flutter cancels the splash.
             super.dragInitiated();
             ink.cancel(this);
+            // And whatever we handed the press to. It is not Codename One's event target,
+            // so nothing else will ever tell it the gesture ended -- its ink would stay
+            // HELD, and a held press deliberately keeps its highlight standing. That is
+            // why a mail row in the study went grey when touched and never came back:
+            // two nested InkWells, the outer forwarding to the inner, and the inner never
+            // hearing that the finger had moved away.
+            Component target = forwardTo;
+            forwardTo = null;
+            if (target instanceof OverlayComponent) {
+                ((OverlayComponent) target).dragInitiated();
+            }
         }
 
         @Override
@@ -291,10 +322,13 @@ public class GestureOverlayRenderElement extends RenderElement {
                 Component target = forwardTo;
                 forwardTo = null;
                 super.pointerReleased(x, y);
-                // A drag was a scroll, not a tap on the control: let it go, as CN1 would.
-                if (!wasDrag) {
-                    target.pointerReleased(x, y);
-                }
+                // ALWAYS, even when the gesture turned out to be a drag. The target was
+                // told the pointer went down; a press with no matching release leaves it
+                // held -- a mail row in the study stayed grey after being touched and
+                // never came back. A target that is itself one of these works out that it
+                // was a drag from its own press point and cancels its ink instead of
+                // firing, which is what Flutter does with a splash a scroll interrupted.
+                target.pointerReleased(x, y);
                 suppressTap = false;
                 return;
             }
