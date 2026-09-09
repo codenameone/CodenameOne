@@ -244,6 +244,11 @@ public class ScaffoldRenderElement extends RenderElement {
             tb = new Toolbar();
             form.setToolbar(tb);
         }
+        // FlutterUI hides the Toolbar of a Form nothing claimed. A Scaffold asking for
+        // it here is claiming it, which can happen after that decision was taken if a
+        // rebuild introduces an AppBar where there was none.
+        tb.setHidden(false);
+        tb.setVisible(true);
         return tb;
     }
 

@@ -92,7 +92,31 @@ public final class FlutterUI {
         // whatever is actually showing.
         f.putClientProperty(ROOT_ELEMENT, mounted);
         f.add(BorderLayout.CENTER, c);
+        hideUnusedToolbar(f, host);
         return host;
+    }
+
+    /**
+     * Hides the Form's Toolbar unless a root Scaffold claimed it for its AppBar.
+     *
+     * <p>Every CN1 Form has a Toolbar, and an empty one is invisible on a display with
+     * no cutout -- which is every desktop, which is why this cost nothing in any sweep.
+     * On a phone it takes the status-bar inset, so an empty Toolbar paints a band of
+     * the FORM's own colour across the top and pushes the content pane down under it.
+     * On iOS that was 222px of the Material baseline surface above a page whose own
+     * background is the theme's, where the reference simply carries on behind the
+     * status bar.</p>
+     *
+     * <p>The rule is the one {@code Navigator.push} already applied to pushed routes;
+     * it belongs here so that the app's first screen -- which is mounted by
+     * {@code runApp} and never went through the navigator -- obeys it too.</p>
+     */
+    private static void hideUnusedToolbar(Form f, RenderHost host) {
+        com.codename1.ui.Toolbar tb = f.getToolbar();
+        if (tb != null && !host.isFormToolbarBound()) {
+            tb.setVisible(false);
+            tb.setHidden(true);
+        }
     }
 
     private static final String ROOT_ELEMENT = "cn1$flutterRootElement";

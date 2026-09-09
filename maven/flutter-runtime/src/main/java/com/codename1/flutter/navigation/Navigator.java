@@ -133,15 +133,12 @@ public class Navigator extends StatelessWidget {
                         pop(null);
                     }
                 });
-            } else if (tb != null) {
-                // The page draws its own AppBar in-canvas (a Scaffold nested
-                // below another render widget, as the gallery's demo pages
-                // are). Showing the Form's Toolbar too would put two bars on
-                // the page AND shrink the Flutter canvas by the toolbar inset,
-                // which is what left demo pages floating inside a margin.
-                tb.setVisible(false);
-                tb.setHidden(true);
             }
+            // The unbound case -- a page that draws its own AppBar in-canvas, as the
+            // gallery's demo pages do -- needs the Form's Toolbar hidden, or the page
+            // carries two bars and the Flutter canvas shrinks by the toolbar inset.
+            // FlutterUI.mountInNewForm does that for every Form it builds, this one
+            // included, so there is nothing to do here.
             stack.add(e);
             e.form.show();
         } else {
