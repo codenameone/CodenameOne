@@ -180,6 +180,12 @@ public final class Invites {
     /// by the builders from the `invite.domain` build hint.
     static final String PROPERTY_DOMAIN = "invite.domain";
 
+    // The build stamps this beside the domain. It has to reach the client:
+    // the Android app-links filter and the iOS path claim are both scoped to
+    // /i/<slug>/, so a link minted without the slug does not match the app's
+    // own filter and opens the browser instead.
+    static final String PROPERTY_SLUG = "invite.slug";
+
     static final String PREF_SLUG = "cn1$inviteSlug";
     static final String PREF_CONSUMED_ARG = "cn1$inviteConsumedArg";
 
@@ -256,7 +262,15 @@ public final class Invites {
         long now = System.currentTimeMillis();
         Invite invite = new Invite(code, buildUrl(code), request.getCampaign(),
                 request.getChannel(), request.getPayload(), now);
-        queueRegistration(invite, request);
+        if (!queueRegistration(invite, request)) {
+            // The outbox could not be persisted, and the invite has already
+            // been minted -- so the choice is between sending now and losing
+            // the registration for good. Send now: if it lands, the link is
+            // registered with everything it carries; if it does not, nothing
+            // is worse than the alternative. There is deliberately no retry,
+            // because the queue that would drive one is the thing that failed.
+            postRegistration(pendingRegistration);
+        }
         Map<String, Object> p = new HashMap<String, Object>();
         p.put("invite_code", code);
         putIfSet(p, "campaign", request.getCampaign());
@@ -490,6 +504,19 @@ public final class Invites {
         resolved = readAttribution();
     }
 
+    // Drops everything cached in memory while leaving every durable record
+    // in place -- which is exactly what a process restart does. Package
+    // private and test-only: the whole point of the durable records is that
+    // the answer survives a relaunch, and nothing else can check that.
+    static void forgetLoadedState() {
+        stateLoaded = false;
+        attributionLoaded = false;
+        resolved = null;
+        state = STATE_NONE;
+        deferredStarted = false;
+        deliveredThisRun = false;
+    }
+
     /// Where attribution has got to: one of the `STATE_` constants.
     ///
     /// #### Returns
@@ -509,12 +536,24 @@ public final class Invites {
             return;
         }
         stateLoaded = true;
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        // The pending record is consulted first only under re-attribution.
+        // There a later invite writes a new claim while the earlier attribution
+        // still stands, and answering STATE_RESOLVED from that old attribution
+        // made beginDeferred() return -- so a claim interrupted by process
+        // death was never retried and last touch silently kept losing to first.
+        // Without re-attribution the resolved record is the answer, because a
+        // stale pending record must never reopen a settled attribution.
+        if (reattribution && pending != null
+                && InviteStore.getInt(pending, "state", STATE_PENDING) == STATE_PENDING) {
+            state = STATE_PENDING;
+            return;
+        }
         if (getAttribution() != null) {
             state = STATE_RESOLVED;
             stateLoaded = true;
             return;
         }
-        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
         state = pending == null ? STATE_NONE
                 : InviteStore.getInt(pending, "state", STATE_PENDING);
     }
@@ -806,7 +845,7 @@ public final class Invites {
     }
 
     private static String buildUrl(String code) {
-        String slug = Preferences.get(PREF_SLUG, "");
+        String slug = configuredSlug();
         if (slug != null && slug.length() > 0) {
             return getLinkBase() + "/i/" + slug + "/" + code;
         }
@@ -922,6 +961,20 @@ public final class Invites {
         return end > start ? url.substring(start, end) : null;
     }
 
+    // The build hint wins over the value the link service handed back: it is
+    // what the generated intent filter and the associated domain were scoped
+    // to, so minting anything else produces a link this build cannot open.
+    // The stored value is the fallback for builds that set no hint, where the
+    // server picks the slug and tells us on the first registration.
+    private static String configuredSlug() {
+        Display d = Display.getInstance();
+        String slug = d == null ? null : d.getProperty(PROPERTY_SLUG, null);
+        if (slug != null && slug.trim().length() > 0) {
+            return slug.trim();
+        }
+        return Preferences.get(PREF_SLUG, "");
+    }
+
     private static String trimSlash(String base) {
         while (base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);
@@ -943,6 +996,18 @@ public final class Invites {
             pending.put("state", String.valueOf(s));
             InviteStore.write(InviteStore.PENDING, pending);
         }
+    }
+
+    // Replaces the pending record with a marker that says only "asked, and the
+    // answer was no". Durable, so no later launch repeats the lookup, and it
+    // carries none of the device profile the pending record held -- the profile
+    // exists to be matched, and there is nothing left to match it against.
+    private static void markTerminal() {
+        Map<String, String> done = new LinkedHashMap<String, String>();
+        done.put("state", String.valueOf(STATE_NONE_FOUND));
+        InviteStore.write(InviteStore.PENDING, done);
+        state = STATE_NONE_FOUND;
+        stateLoaded = true;
     }
 
     private static Map<String, String> pendingRecord() {
@@ -1001,15 +1066,12 @@ public final class Invites {
         Map<String, String> pending = pendingRecord();
         long expires = InviteStore.getLong(pending, "expiresAt", 0);
         if (expires > 0 && System.currentTimeMillis() > expires) {
-            InviteStore.delete(InviteStore.PENDING);
-            state = STATE_NONE_FOUND;
-            stateLoaded = true;
+            markTerminal();
             notifyUnavailable(REASON_EXPIRED);
             return;
         }
         if (InviteStore.getInt(pending, "attempts", 0) >= MAX_ATTEMPTS) {
-            state = STATE_NONE_FOUND;
-            stateLoaded = true;
+            markTerminal();
             notifyUnavailable(REASON_NO_MATCH);
             return;
         }
@@ -1174,7 +1236,8 @@ public final class Invites {
     // One request type for every invite call. Named rather than anonymous so
     // the two call sites share a single implementation, and so the equals()
     // exemption a one-shot request needs is scoped to one class.
-    private static final class InviteConnection extends ConnectionRequest {
+    // Package private so a test can exercise the response handling directly.
+    static final class InviteConnection extends ConnectionRequest {
         private final String matchType;
         private final boolean deferred;
         private final boolean registration;
@@ -1183,6 +1246,12 @@ public final class Invites {
         // exactly that one rather than the whole queue.
         private final String outboxEntry;
         private String payload;
+        // Set by the error hook below. ConnectionRequest reads the body of an
+        // error response by default and then runs the ordinary success path
+        // over it, so the status is the only thing that separates a real answer
+        // from a 503 -- and getResponseCode() alone is not enough to test
+        // against, because nothing can set it from outside the class.
+        private boolean failed;
 
         InviteConnection(String matchType, boolean deferred, boolean registration,
                 String outboxEntry, int epoch) {
@@ -1194,12 +1263,34 @@ public final class Invites {
         }
 
         @Override
+        protected void handleErrorResponseCode(int code, String message) {
+            failed = true;
+        }
+
+        // Package private so a test can drive the outcome this class exists to
+        // get right without standing up a server.
+        boolean isFailed() {
+            int code = getResponseCode();
+            return failed || (code != 0 && (code < 200 || code > 299));
+        }
+
+        @Override
         protected void readResponse(InputStream input) throws IOException {
             payload = new String(Util.readInputStream(input), "UTF-8");
         }
 
         @Override
         protected void postResponse() {
+            // Reading the body of an error response is on by default
+            // (ConnectionRequest.readResponseForErrorsDefault), and the error
+            // path falls through to postResponse() exactly as a 200 does. So
+            // this runs for a 503 too, and without the check a transient
+            // outage retired the durable registration as though the server had
+            // accepted it, while an error body parsed as "not resolved" turned
+            // a server fault into a permanent "you were not invited".
+            if (isFailed()) {
+                return;
+            }
             if (registration) {
                 applySlug(payload);
                 if (outboxEntry != null) {
@@ -1259,14 +1350,11 @@ public final class Invites {
             }
             applySlug(payload);
             if (!truthy(json.get("resolved"))) {
-                // Terminal, and it has to be durable. Leaving the pending
-                // record at STATE_PENDING meant loadState() resurrected the
-                // lookup on every launch, so an ordinary uninvited install
-                // re-queried the server and re-fired attributionUnavailable
-                // for ever.
-                InviteStore.delete(InviteStore.PENDING);
-                state = STATE_NONE_FOUND;
-                stateLoaded = true;
+                // Terminal, and it has to be durable. Deleting the record is
+                // not enough: loadState() reads an absent record as STATE_NONE,
+                // so the next launch built a fresh profile and asked again, and
+                // an ordinary uninvited install re-queried the server for ever.
+                markTerminal();
                 notifyUnavailable(REASON_NO_MATCH);
                 return;
             }
@@ -1461,7 +1549,11 @@ public final class Invites {
 
     // ---- registration outbox --------------------------------------------
 
-    private static void queueRegistration(Invite invite, InviteRequest request) {
+    // The JSON of the registration the last queueRegistration() built, so a
+    // failed enqueue can still be sent once rather than lost silently.
+    private static String pendingRegistration;
+
+    private static boolean queueRegistration(Invite invite, InviteRequest request) {
         Map<String, Object> body = identity();
         body.put("code", invite.getCode());
         putIfSet(body, "campaign", invite.getCampaign());
@@ -1473,9 +1565,10 @@ public final class Invites {
         if (!request.getParameters().isEmpty()) {
             body.put("parameters", new LinkedHashMap<String, String>(request.getParameters()));
         }
+        pendingRegistration = JSONParser.mapToJson(body);
         List<String> outbox = InviteStore.readOutbox();
-        outbox.add(JSONParser.mapToJson(body));
-        InviteStore.writeOutbox(outbox);
+        outbox.add(pendingRegistration);
+        return InviteStore.writeOutbox(outbox);
     }
 
     private static void drainOutbox() {
@@ -1505,8 +1598,7 @@ public final class Invites {
         send(getLinkBase() + PATH_MINT, json, MATCH_DIRECT, false, true);
     }
 
-    // Called from the registration response, which ConnectionRequest invokes
-    // only on success.
+    // Called from the registration response, once its status has been checked.
     private static void registrationAcknowledged(String json) {
         List<String> outbox = InviteStore.readOutbox();
         if (outbox.remove(json)) {

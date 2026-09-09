@@ -95,6 +95,45 @@ class InviteManifestFragmentsTest {
     }
 
     @Test
+    void anUnrelatedPathOnTheSameHostDoesNotSuppressTheInviteFilter() {
+        // The host alone used to settle it, so an application that already
+        // routed cloud.codenameone.com/account/ never got an invite filter and
+        // every invite link opened the browser.
+        String existing = "<intent-filter>"
+                + "<data android:scheme=\"https\" "
+                + "android:host=\"" + HOST + "\" "
+                + "android:pathPrefix=\"/account/\" />"
+                + "</intent-filter>";
+        assertFalse(InviteManifestFragments.declaresInviteLinks(existing, HOST, "acme"),
+                "an unrelated path must not read as covering the invite links");
+        String out = InviteManifestFragments.injectAppLinks(existing, HOST, "acme");
+        assertTrue(out.contains("android:pathPrefix=\"/i/acme/\""),
+                "the invite filter was suppressed by an unrelated path");
+    }
+
+    @Test
+    void aBroaderPrefixOnTheSameHostDoesCoverTheInviteLinks() {
+        String existing = "<data android:host=\"" + HOST + "\" "
+                + "android:pathPrefix=\"/i/\" />";
+        assertTrue(InviteManifestFragments.declaresInviteLinks(existing, HOST, "acme"),
+                "/i/ accepts /i/acme/<code> and needs no second filter");
+        assertEquals(existing, InviteManifestFragments.injectAppLinks(existing, HOST, "acme"));
+    }
+
+    @Test
+    void anotherAppsSlugDoesNotCoverOurs() {
+        String existing = "<data android:host=\"" + HOST + "\" "
+                + "android:pathPrefix=\"/i/other/\" />";
+        assertFalse(InviteManifestFragments.declaresInviteLinks(existing, HOST, "acme"));
+    }
+
+    @Test
+    void aHostFilterWithNoPathAtAllCoversEveryPathOnIt() {
+        String existing = "<data android:scheme=\"https\" android:host=\"" + HOST + "\" />";
+        assertTrue(InviteManifestFragments.declaresInviteLinks(existing, HOST, "acme"));
+    }
+
+    @Test
     void anEmptyHostInjectsNothing() {
         assertEquals("", InviteManifestFragments.injectAppLinks("", "", null));
         assertEquals("", InviteManifestFragments.injectAppLinks("", null, null));

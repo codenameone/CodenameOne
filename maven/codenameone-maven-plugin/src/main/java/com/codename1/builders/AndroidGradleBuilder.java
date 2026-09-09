@@ -5993,6 +5993,16 @@ public class AndroidGradleBuilder extends Executor {
         if (usesInvites) {
             inviteDomainProperty = "        Display.getInstance().setProperty(\"invite.domain\", \""
                     + request.getArg("invite.domain", "cloud.codenameone.com") + "\");\n";
+            // The slug goes with it, and for the same reason. This build claims
+            // /i/<slug>/ and nothing else, so a client that mints a bare
+            // /i/<code> link produces a url its own build cannot open -- and it
+            // would, because the client only learns the slug from the link
+            // service, which the first invite is minted before ever reaching.
+            String inviteSlug = request.getArg("invite.slug", "");
+            if (inviteSlug != null && inviteSlug.trim().length() > 0) {
+                inviteDomainProperty += "        Display.getInstance().setProperty(\"invite.slug\", \""
+                        + inviteSlug.trim() + "\");\n";
+            }
         }
 
         String inviteRegisterInstall = "";

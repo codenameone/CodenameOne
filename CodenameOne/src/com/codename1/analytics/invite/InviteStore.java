@@ -147,11 +147,15 @@ final class InviteStore {
         return out;
     }
 
-    static void writeOutbox(List<String> entries) {
+    /// Returns false when the queue could not be persisted -- a full or
+    /// read-only store. The caller has to know: an entry that never reached
+    /// the outbox carries the campaign, channel, payload and preview of a link
+    /// that has already been handed out, and nothing can reconstruct it later.
+    static boolean writeOutbox(List<String> entries) {
         try {
             Storage s = Storage.getInstance();
             if (s == null) {
-                return;
+                return false;
             }
             List<String> copy = new ArrayList<String>(entries);
             int dropped = 0;
@@ -167,12 +171,13 @@ final class InviteStore {
                 if (s.exists(OUTBOX)) {
                     s.deleteStorageFile(OUTBOX);
                 }
-                return;
+                return true;
             }
-            s.writeObject(OUTBOX, copy);
+            return s.writeObject(OUTBOX, copy);
         } catch (Throwable t) {
             Log.e(t);
         }
+        return false;
     }
 
     static String get(Map<String, String> record, String key, String def) {
