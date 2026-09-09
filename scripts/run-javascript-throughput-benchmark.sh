@@ -199,16 +199,25 @@ RAW="$WORK_DIR/raw.txt"
 # One process per workload. Sharing a process makes every measurement depend
 # on what ran before it, which reports phantom regressions in unchanged code.
 WORKLOADS="$(grep -oE 'run\("[A-Za-z]+"' "$BENCH_SRC" | sed 's/run("//;s/"//' | sort -u)"
-if [ -z "$WORKLOADS" ]; then bench_log "could not read the workload list from $BENCH_SRC"; exit 2; fi
+# A source with no run("...") calls is a PROBE, not the benchmark -- run it once
+# unfiltered rather than refusing. Reproducing a translator bug in six seconds
+# instead of a forty-seven-minute CI cycle is most of what this harness is for.
+if [ -z "$WORKLOADS" ]; then
+  bench_log "no run(\"...\") workloads found; running $APP_NAME once, unfiltered"
+  WORKLOADS="__all__"
+fi
 
 for workload in $WORKLOADS; do
-  if ! "$NODE_BIN" "$WORK_DIR/harness.js" "$DIST" "$workload" "$APP_NAME" \
+  filter="$workload"
+  [ "$filter" = "__all__" ] && filter=""
+  if ! "$NODE_BIN" "$WORK_DIR/harness.js" "$DIST" "$filter" "$APP_NAME" \
         >> "$RAW" 2>>"$WORK_DIR/stderr.txt"; then
     bench_log "workload $workload failed"
     sed -n '1,40p' "$WORK_DIR/stderr.txt" >&2
     exit 1
   fi
 done
+cat "$RAW" >&2
 
 if ! grep -q '^BENCHSUITE ' "$RAW"; then
   bench_log "benchmark did not reach its final marker -- output follows"

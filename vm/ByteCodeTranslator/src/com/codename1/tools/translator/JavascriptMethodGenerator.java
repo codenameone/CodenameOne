@@ -596,6 +596,70 @@ final class JavascriptMethodGenerator {
             String base = cls.getBaseClass();
             current = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
         }
+        // A ``super`` call can land on an INTERFACE DEFAULT METHOD: the
+        // superclass chain declares nothing, and the JVM (like the runtime's
+        // resolveVirtual) then searches the interfaces. Walking only the
+        // extends chain returned null here, and a null direct target is
+        // treated as suspending -- so the emitter wrote ``yield*`` in front of
+        // a default method that is emitted as a plain function, which is
+        // exactly "yield* ... is not iterable". Harmless while every default
+        // was suspending anyway; live the moment call sites resolve against
+        // their receiver.
+        BytecodeMethod viaInterface = resolveThroughInterfaces(idx,
+                JavascriptNameUtil.sanitizeClassName(invoke.getOwner()), normalizedName, desc);
+        if (viaInterface != null) {
+            return viaInterface;
+        }
+        return null;
+    }
+
+    /**
+     * Breadth-first search of the interface hierarchy above {@code owner} for
+     * a concrete (default) {@code name + desc}, mirroring the order
+     * {@code jvm.resolveVirtual} uses: superclasses first, then interfaces.
+     */
+    private static BytecodeMethod resolveThroughInterfaces(Map<String, ByteCodeClass> idx,
+            String owner, String name, String desc) {
+        java.util.ArrayDeque<String> pending = new java.util.ArrayDeque<String>();
+        java.util.HashSet<String> seen = new java.util.HashSet<String>();
+        String current = owner;
+        while (current != null && seen.add(current)) {
+            ByteCodeClass cls = idx.get(current);
+            if (cls == null) {
+                break;
+            }
+            if (cls.getBaseInterfaces() != null) {
+                for (String iface : cls.getBaseInterfaces()) {
+                    pending.add(JavascriptNameUtil.sanitizeClassName(iface));
+                }
+            }
+            String base = cls.getBaseClass();
+            current = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
+        }
+        java.util.HashSet<String> visitedIfaces = new java.util.HashSet<String>();
+        while (!pending.isEmpty()) {
+            String ifaceName = pending.poll();
+            if (ifaceName == null || !visitedIfaces.add(ifaceName)) {
+                continue;
+            }
+            ByteCodeClass iface = idx.get(ifaceName);
+            if (iface == null) {
+                continue;
+            }
+            for (BytecodeMethod m : iface.getMethods()) {
+                if (m.isEliminated() || m.isAbstract()) {
+                    continue;
+                }
+                if (name.equals(m.getMethodName()) && desc.equals(m.getSignature())) {
+                    return m;
+                }
+            }
+            if (iface.getBaseInterfaces() != null) {
+                for (String up : iface.getBaseInterfaces()) {
+                    pending.add(JavascriptNameUtil.sanitizeClassName(up));
+                }
+            }
+        }
         return null;
     }
 

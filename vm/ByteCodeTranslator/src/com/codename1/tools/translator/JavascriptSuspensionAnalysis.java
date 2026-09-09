@@ -678,6 +678,58 @@ final class JavascriptSuspensionAnalysis {
             String base = cls.getBaseClass();
             clsName = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
         }
+        // Same interface-default case the emitter handles: a ``super`` call
+        // whose superclass chain declares nothing resolves to an interface
+        // DEFAULT method. Returning null here would make the caller treat the
+        // site as suspending while the default itself is classified sync --
+        // the two sides must agree, so search the interfaces exactly as the
+        // emitter and the runtime's resolveVirtual do.
+        return resolveThroughInterfaces(JavascriptNameUtil.sanitizeClassName(owner),
+                normalizedName, desc);
+    }
+
+    /** Breadth-first interface search; superclasses have already been tried. */
+    private BytecodeMethod resolveThroughInterfaces(String owner, String name, String desc) {
+        java.util.ArrayDeque<String> pending = new java.util.ArrayDeque<String>();
+        java.util.HashSet<String> seen = new java.util.HashSet<String>();
+        String current = owner;
+        while (current != null && seen.add(current)) {
+            ByteCodeClass cls = byName.get(current);
+            if (cls == null) {
+                break;
+            }
+            if (cls.getBaseInterfaces() != null) {
+                for (String iface : cls.getBaseInterfaces()) {
+                    pending.add(JavascriptNameUtil.sanitizeClassName(iface));
+                }
+            }
+            String base = cls.getBaseClass();
+            current = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
+        }
+        java.util.HashSet<String> visited = new java.util.HashSet<String>();
+        while (!pending.isEmpty()) {
+            String ifaceName = pending.poll();
+            if (ifaceName == null || !visited.add(ifaceName)) {
+                continue;
+            }
+            ByteCodeClass iface = byName.get(ifaceName);
+            if (iface == null) {
+                continue;
+            }
+            for (BytecodeMethod m : iface.getMethods()) {
+                if (m.isEliminated() || m.isAbstract()) {
+                    continue;
+                }
+                if (name.equals(m.getMethodName()) && desc.equals(m.getSignature())) {
+                    return m;
+                }
+            }
+            if (iface.getBaseInterfaces() != null) {
+                for (String up : iface.getBaseInterfaces()) {
+                    pending.add(JavascriptNameUtil.sanitizeClassName(up));
+                }
+            }
+        }
         return null;
     }
 
