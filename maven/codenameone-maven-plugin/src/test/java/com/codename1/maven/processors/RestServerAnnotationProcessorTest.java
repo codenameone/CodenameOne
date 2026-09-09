@@ -118,6 +118,125 @@ public class RestServerAnnotationProcessorTest {
                     + "}\n";
 
     @Test
+    public void aDtoCarriesTheFieldsItInherits() throws Exception {
+        // AnnotatedClass.getFields() reads one class file, so the base's fields were
+        // invisible to the codec: a Cat went over the wire with no species at all,
+        // and the decoder left it null on the way back.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.Animal",
+                "package com.example;\n"
+                + "public class Animal {\n"
+                + "    public String species;\n"
+                + "    public Animal() {}\n"
+                + "}\n");
+        sources.put("com.example.Cat",
+                "package com.example;\n"
+                + "public class Cat extends Animal {\n"
+                + "    public String name;\n"
+                + "    public Cat() {}\n"
+                + "}\n");
+        sources.put("com.example.CatApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface CatApi {\n"
+                + "    @GET(\"/cat\")\n"
+                + "    void get(OnComplete<Response<Cat>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+
+        URLClassLoader loader = new URLClassLoader(
+                new URL[]{classes.toURI().toURL(), testClassesDir().toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> cat = loader.loadClass("com.example.Cat");
+        Object instance = cat.newInstance();
+        cat.getField("name").set(instance, "Tom");
+        cat.getField("species").set(instance, "felis");
+
+        Class<?> codec = loader.loadClass("com.example.CatJson");
+        Method toMap = codec.getMethod("toMap", cat);
+        Map encoded = (Map) toMap.invoke(null, instance);
+        assertEquals("Tom", encoded.get("name"));
+        assertEquals("the inherited field is missing from the wire shape",
+                "felis", encoded.get("species"));
+
+        // And back, so the loss is not merely one-directional.
+        Method fromMap = codec.getMethod("fromMap", Map.class);
+        Object decoded = fromMap.invoke(null, encoded);
+        assertEquals("felis", cat.getField("species").get(decoded));
+    }
+
+    @Test
+    public void aMalformedBooleanIsRefusedRatherThanTakenAsFalse() throws Exception {
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.FlagApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface FlagApi {\n"
+                + "    @GET(\"/flag\")\n"
+                + "    void flag(@Query(\"on\") boolean on,\n"
+                + "              OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+
+        URLClassLoader loader = new URLClassLoader(
+                new URL[]{classes.toURI().toURL(), testClassesDir().toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> serverItf = loader.loadClass("com.example.FlagApiServer");
+        Object handler = java.lang.reflect.Proxy.newProxyInstance(loader,
+                new Class<?>[]{serverItf}, new java.lang.reflect.InvocationHandler() {
+                    public Object invoke(Object proxy, Method m, Object[] args) {
+                        return "on=" + args[0];
+                    }
+                });
+        Class<?> dispatcherClass = loader.loadClass("com.example.FlagApiDispatcher");
+        Object dispatcher = dispatcherClass.getConstructor(serverItf).newInstance(handler);
+        Method dispatch = dispatcherClass.getMethod("dispatch",
+                String.class, String.class, Map.class, Object.class);
+
+        assertEquals("on=true", dispatch.invoke(dispatcher, "GET", "/flag?on=true", null, null));
+        assertEquals("on=false", dispatch.invoke(dispatcher, "GET", "/flag?on=false", null, null));
+        // "treu" used to arrive as an explicit false, so the handler ran on a value
+        // the client never sent and nothing anywhere said so.
+        try {
+            dispatch.invoke(dispatcher, "GET", "/flag?on=treu", null, null);
+            fail("a value that is not a boolean should not bind as false");
+        } catch (java.lang.reflect.InvocationTargetException expected) {
+            assertTrue(String.valueOf(expected.getCause()),
+                    expected.getCause() instanceof IllegalArgumentException);
+        }
+    }
+
+    @Test
+    public void aCollectionOfCollectionsOfDtosIsRefused() throws Exception {
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.Tag", TAG_SOURCE);
+        sources.put("com.example.NestedApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface NestedApi {\n"
+                + "    @GET(\"/nested\")\n"
+                + "    void nested(OnComplete<Response<java.util.List<java.util.List<Tag>>>> callback);\n"
+                + "}\n");
+        ProcessorContext ctx = runProcessor(compileSources(sources));
+        // The codec reaches the outer elements only, so the Tags inside would have
+        // been written as their toString(). A build error beats wrong JSON.
+        assertTrue("a shape the codec cannot encode should not compile", ctx.hasErrors());
+    }
+
+    @Test
     public void generatesServerInterfaceAndWorkingDispatcher() throws Exception {
         File classes = compileApi();
         ProcessorContext ctx = runProcessor(classes);
@@ -580,6 +699,13 @@ public class RestServerAnnotationProcessorTest {
         assertNoErrors(ctx);
         assertTrue("the server half must be opt-in so existing app builds do not grow",
                 !new File(classes, "com/example/GreeterApiDispatcher.class").isFile());
+    }
+
+    /** Compiles an arbitrary set of sources, for the cases the shared fixture cannot express. */
+    private File compileSources(Map<String, String> sources) throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(sources, classes, Arrays.asList(testClassesDir()));
+        return classes;
     }
 
     private File compileApi() throws Exception {
