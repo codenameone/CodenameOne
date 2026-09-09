@@ -711,6 +711,71 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("a kept-alive TLS connection left idle is shed, not held for ever")
+    void tlsIdleKeepAliveConnectionsAreShed() throws Exception {
+        // The case that has no thread in recv: ONE request is answered, the
+        // connection goes back to the reactor, and the client then says nothing.
+        // A connection that never speaks at all is held by a worker inside recv
+        // and shed by SO_RCVTIMEO, so it proves nothing about the reactor -- an
+        // earlier version of this test did exactly that and passed with the sweep
+        // removed. The TLS server runs on the pool, which had no idle deadline of
+        // its own, so these accumulated to MAX_CONNECTIONS and every later client
+        // was refused.
+        SSLSocket socket = openTls();
+        try {
+            socket.startHandshake();
+            socket.setSoTimeout(30000);
+            socket.getOutputStream().write(("GET /healthz HTTP/1.1\r\nHost: localhost\r\n"
+                    + "Connection: keep-alive\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+            socket.getOutputStream().flush();
+
+            InputStream in = socket.getInputStream();
+            ByteArrayOutputStream head = new ByteArrayOutputStream();
+            String text;
+            for (;;) {
+                int c = in.read();
+                assertTrue(c >= 0, "the first reply never arrived");
+                head.write(c);
+                text = new String(head.toByteArray(), StandardCharsets.UTF_8);
+                if (text.endsWith("\r\n\r\n")) {
+                    break;
+                }
+            }
+            assertTrue(text.startsWith("HTTP/1.1 200"), "unexpected reply: " + text);
+
+            // Answered and parked. Now nothing is reading it on the server side.
+            // Short client-side reads so the wait can END with this test's own
+            // sentence: blocking for the whole window instead threw a bare
+            // SocketTimeoutException from the client, which says nothing about
+            // what the server did.
+            socket.setSoTimeout(2000);
+            long started = System.currentTimeMillis();
+            boolean closed = false;
+            while (System.currentTimeMillis() - started < 25000) {
+                try {
+                    if (in.read() < 0) {
+                        closed = true;
+                        break;
+                    }
+                } catch (java.net.SocketTimeoutException stillOpen) {
+                    // The server has not closed it yet; keep waiting.
+                }
+            }
+            long elapsed = System.currentTimeMillis() - started;
+            assertTrue(closed, "the parked keep-alive connection was still open after "
+                    + elapsed + "ms, so nothing sheds a pooled connection once the "
+                    + "reactor has it back");
+            assertTrue(elapsed < 25000,
+                    "the idle deadline should have shed it, took " + elapsed + "ms");
+            assertTrue(elapsed > 500, "closed implausibly fast (" + elapsed
+                    + "ms): the connection may not have been parked at all");
+        } finally {
+            socket.close();
+        }
+        assertEquals(200, status(request("GET", "/healthz", null, null)));
+    }
+
+    @Test
     @DisplayName("a large file survives a slow reader over TLS too")
     void tlsSlowReaderReceivesTheWholeResponse() throws Exception {
         // TLS has no sendfile path -- the bytes have to be encrypted in user

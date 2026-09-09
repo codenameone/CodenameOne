@@ -1053,6 +1053,24 @@ public final class HttpServer {
      * itself fully stopped.
      */
     private final Map liveConnections = java.util.Collections.synchronizedMap(new java.util.HashMap());
+
+    /**
+     * When each PARKED pooled connection stops being worth keeping.
+     *
+     * The virtual-thread path has this on its hosts, keyed by descriptor and swept
+     * by the poller. The pooled reactor had nothing: it registered the descriptor
+     * and left, and SO_RCVTIMEO cannot expire a socket while no thread is inside
+     * recv, so an accepted connection that said nothing -- or a keep-alive one
+     * re-armed and then abandoned -- stayed in liveConnections for ever. Enough of
+     * them reach MAX_CONNECTIONS and every later client is refused, which is the
+     * cheapest denial of service there is. Every Java SE run and every TLS server
+     * takes this path.
+     *
+     * Only while PARKED: handOff removes the entry, because a connection a worker
+     * is serving is bounded by the request deadlines instead.
+     */
+    private final Map pooledDeadlines =
+            java.util.Collections.synchronizedMap(new java.util.HashMap());
     private volatile boolean running = true;
     private Thread loop;
     /** Released only when stop() has finished draining. See awaitTermination. */
@@ -1566,6 +1584,34 @@ public final class HttpServer {
                     handOff(fd);
                 }
             }
+            sweepIdlePooledConnections();
+        }
+    }
+
+    /**
+     * Closes parked pooled connections whose idle deadline has passed.
+     *
+     * On the reactor thread, which is the only one that parks them, and after the
+     * ready set has been dispatched so a descriptor that just became readable is
+     * never swept on the same turn. await() returns at least every 250ms, so this
+     * runs often enough without a timer of its own.
+     */
+    private void sweepIdlePooledConnections() {
+        if(virtualThreads || pooledDeadlines.isEmpty()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        java.util.Iterator it =
+                new java.util.ArrayList(pooledDeadlines.entrySet()).iterator();
+        while(it.hasNext()) {
+            java.util.Map.Entry entry = (java.util.Map.Entry)it.next();
+            if(((Long)entry.getValue()).longValue() > now) {
+                continue;
+            }
+            int fd = ((Integer)entry.getKey()).intValue();
+            pooledDeadlines.remove(entry.getKey());
+            trace("idle deadline reached, dropping fd=" + fd);
+            drop(fd);
         }
     }
 
@@ -2009,6 +2055,8 @@ public final class HttpServer {
      */
     private void armConnection(int fd, boolean fresh) throws IOException {
         if(!virtualThreads) {
+            pooledDeadlines.put(new Integer(fd),
+                    new Long(System.currentTimeMillis() + SOCKET_TIMEOUT_MILLIS));
             reactor.add(fd, CONN_EVENTS);
             return;
         }
@@ -2103,6 +2151,7 @@ public final class HttpServer {
     private void handOffBatch(final int[] fds, final int count) {
         for(int iter = 0 ; iter < count ; iter++) {
             reactor.remove(fds[iter]);
+            pooledDeadlines.remove(new Integer(fds[iter]));
         }
         pendingWork.addAndGet(count);
         try {
@@ -2123,6 +2172,9 @@ public final class HttpServer {
     }
 
     private void handOff(final int fd) {
+        // It is about to be served, so the idle deadline no longer applies; the
+        // request deadlines take over from here.
+        pooledDeadlines.remove(new Integer(fd));
         trace("handOff fd=" + fd);
         reactor.remove(fd);
         pendingWork.incrementAndGet();
@@ -2155,6 +2207,10 @@ public final class HttpServer {
         if(liveConnections.remove(new Integer(fd)) == null) {
             return;
         }
+        // Before anything else: a descriptor number is reused as soon as it is
+        // closed, so an entry left behind here would time out the NEXT connection
+        // to be handed that number.
+        pooledDeadlines.remove(new Integer(fd));
         Object h2 = http2Sessions.remove(new Integer(fd));
         if(h2 != null) {
             ((Http2)h2).close();
@@ -3790,7 +3846,7 @@ public final class HttpServer {
                 if(conn.available() > MAX_HEADER_BYTES) {
                     throw new ProtocolException(400, "chunk size line too long");
                 }
-                requireChunkedProgress(started, body.size());
+                requireChunkedProgress(started, body.size() + conn.available());
                 if(!conn.fill(scratch)) {
                     return null;
                 }
@@ -3823,7 +3879,7 @@ public final class HttpServer {
                         if(conn.available() > MAX_HEADER_BYTES) {
                             throw new ProtocolException(400, "chunk trailer too long");
                         }
-                        requireChunkedProgress(started, body.size());
+                        requireChunkedProgress(started, body.size() + conn.available());
                         if(!conn.fill(scratch)) {
                             // EOF before the blank line that ends the trailers: the
                             // chunked framing never finished, so this is a truncated
@@ -3857,7 +3913,7 @@ public final class HttpServer {
             }
             // The chunk and its trailing CRLF must both be present before it is taken.
             while(conn.available() < size + 2) {
-                requireChunkedProgress(started, body.size());
+                requireChunkedProgress(started, body.size() + conn.available());
                 if(!conn.fill(scratch)) {
                     return null;
                 }
@@ -3878,6 +3934,12 @@ public final class HttpServer {
      * ARRIVED: at any moment the elapsed time may be one socket timeout plus what
      * those bytes take at MIN_BODY_BYTES_PER_SECOND. A slow but progressing upload
      * keeps earning time; one that has stopped delivering does not.
+     *
+     * "Arrived" includes what is BUFFERED for the chunk in progress, not just the
+     * chunks already complete. Counting only completed chunks meant one legal
+     * large chunk earned no time at all while it streamed: a 1 MiB chunk at four
+     * times the floor rate was cut off with a 408 after about fifteen seconds,
+     * because the total stayed zero until the whole of it had landed.
      */
     private static void requireChunkedProgress(long started, int received)
             throws ProtocolException {
