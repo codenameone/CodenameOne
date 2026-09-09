@@ -845,6 +845,13 @@ public final class HttpServer {
      * many of them may sit copied into native buffers at once while this loop
      * keeps answering the next ready stream.
      */
+    /**
+     * What a request body buffer starts at, and doubles from as bytes arrive. Not
+     * the declared Content-Length: see fillTo for why believing that number before
+     * the body exists is what lets a client allocate memory it never has to send.
+     */
+    private static final int BODY_CHUNK_BYTES = 16 * 1024;
+
     private static final long MAX_QUEUED_H2_BODY_BYTES = 4L * 1024 * 1024;
 
     /**
@@ -2712,20 +2719,33 @@ public final class HttpServer {
          * uploads turn into the whole machine.
          *
          * When the total is known -- and for Content-Length it is -- the destination
-         * can be allocated once and read into directly. That is one copy of what was
-         * already buffered and none after it.
+         * can be grown toward it in doublings, which is one copy of what was already
+         * buffered and an amortised one of the body.
          *
-         * The invariant the rest of this class depends on is kept: the array is
-         * exactly `needed` long and every byte of it is valid, so `buffer.length`
-         * still means "bytes readable" and no cached extent is introduced. See the
-         * class comment for why a `limit` field is not the answer here.
+         * It is NOT allocated at `needed` up front, which is what this did first.
+         * Content-Length is a client's CLAIM, and believing it before a byte of the
+         * body has arrived means an unauthenticated client can make the server
+         * allocate 8MB by sending a header and then nothing at all: this loop holds
+         * that memory until the rate allowance below expires, and the connection
+         * ceiling is in the thousands, so a few dozen such requests are gigabytes.
+         * Growing as the bytes ARRIVE makes the memory track what was actually sent,
+         * which is the only figure a client cannot lie about. The doubling is what
+         * keeps that affordable -- growing by each read's size instead was the
+         * original defect here, about a thousand resizes and 4GB of copying for one
+         * 8MB upload.
+         *
+         * The invariant the rest of this class depends on is kept, because every
+         * growth is capped at `needed`: the last one allocates exactly that, so the
+         * array handed over is exactly `needed` long with every byte valid, and
+         * `buffer.length` still means "bytes readable". See the class comment for
+         * why a `limit` field is not the answer here.
          */
         boolean fillTo(int needed) throws IOException {
             int keep = available();
             if(keep >= needed) {
                 return true;
             }
-            byte[] grown = new byte[needed];
+            byte[] grown = new byte[Math.max(keep, Math.min(needed, BODY_CHUNK_BYTES))];
             System.arraycopy(buffer, pos, grown, 0, keep);
             int at = keep;
             // A RATE, not a deadline. The head gets a flat bound because it is small;
@@ -2744,9 +2764,17 @@ public final class HttpServer {
                 if(System.currentTimeMillis() - started > allowed) {
                     throw new ProtocolException(408, "the request body did not arrive in time");
                 }
+                if(at == grown.length) {
+                    // Doubling, capped at what was declared -- so the final growth
+                    // lands exactly on `needed` and the invariant above holds.
+                    int next = (int)Math.min((long)needed, (long)grown.length * 2);
+                    byte[] bigger = new byte[next];
+                    System.arraycopy(grown, 0, bigger, 0, at);
+                    grown = bigger;
+                }
                 // Exactly the shortfall, so a pipelined request behind this body stays
                 // in the socket for the next parse rather than being read into it.
-                int n = readFrom(fd, session, grown, at, needed - at);
+                int n = readFrom(fd, session, grown, at, grown.length - at);
                 if(n <= 0) {
                     closedByPeer = true;
                     return false;
@@ -3242,9 +3270,24 @@ public final class HttpServer {
                             extra, response.fileFd, response.fileOffset, response.fileLength);
                 } else {
                     byte[] h2Body = responseBodyFor(response, noBody);
-                    queuedBodyBytes += h2Body == null ? 0 : h2Body.length;
-                    h2.respond(stream.getId(), response.status, contentType, extra,
-                            h2Body);
+                    int bodyBytes = h2Body == null ? 0 : h2Body.length;
+                    // Checked BEFORE the copy, not after it. respond() copies the
+                    // body into native memory, so a check that follows it has
+                    // already spent what it was meant to withhold -- and every
+                    // session wakes on a control frame and spends one more, so the
+                    // cap was really the cap plus a body per connection. The
+                    // ordering is the whole point of the limit; the same mistake
+                    // on the descriptor path was fixed for the same reason.
+                    if(bodyBytes > 0
+                            && Http2.pendingBodyBytesAll() + bodyBytes
+                                > MAX_OPEN_H2_BODY_BYTES) {
+                        h2.respond(stream.getId(), 503, "text/plain", extra,
+                                asciiBytes("too much response data in flight"));
+                    } else {
+                        queuedBodyBytes += bodyBytes;
+                        h2.respond(stream.getId(), response.status, contentType, extra,
+                                h2Body);
+                    }
                 }
                 requestsServed.incrementAndGet();
                 if(queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES

@@ -437,7 +437,8 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         if (lt >= 0) {
             String outer = t.substring(0, lt);
             String inner = t.substring(lt + 1, t.length() - 1);
-            if ("java.util.List".equals(outer) || "java.util.Set".equals(outer)) {
+            if ("java.util.List".equals(outer) || "java.util.Set".equals(outer)
+                    || "java.util.Collection".equals(outer)) {
                 // A collection OF a collection of DTOs encodes wrongly and quietly:
                 // fieldToJson applies the generated codec to the elements of the
                 // outer collection only, and an element that is itself a collection
@@ -488,8 +489,11 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                 // arrives; the numeric types that need converting do not.
                 String rawValue = value.indexOf('<') < 0 ? value
                         : value.substring(0, value.indexOf('<'));
-                if (!namesADto(value, ctx) && rawValue.startsWith("java.")
-                        && !PARSED_MAP_VALUE_TYPES.contains(rawValue)) {
+                // The raw type is not the whole answer: Map<String,List<Integer>>
+                // has an acceptable OUTER value and an Integer inside it that the
+                // parser never produces. Nothing converts a map's values at any
+                // depth, so every level has to be a type that arrives as itself.
+                if (!namesADto(value, ctx) && !mapValueArrivesAsDeclared(value)) {
                     ctx.error("A transferred field or return typed " + t + " cannot be "
                             + "decoded: a map's values arrive as the parser built them, so "
                             + value + " would really be " + parserTypeFor(rawValue)
@@ -566,8 +570,15 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             new LinkedHashSet<String>(Arrays.asList(
                     "java.lang.Object", "java.lang.String", "java.lang.Long",
                     "java.lang.Double", "java.lang.Boolean",
-                    "java.util.Map", "java.util.List", "java.util.Set",
-                    "java.util.Collection")));
+                    // Map and List only. Set and Collection are NOT here even
+                    // though a collection field elsewhere may be declared as
+                    // either: a JSON array always arrives as a List, and the
+                    // element conversion that turns one into a Set runs for
+                    // FIELDS, never for a map's values -- so Map<String,Set<...>>
+                    // hands the handler a List under a Set declaration and throws
+                    // on first use. What a map's value may be declared as is
+                    // exactly what the parser hands over, with nothing in between.
+                    "java.util.Map", "java.util.List")));
 
     /** What the parser really answers where the declared type says otherwise. */
     private static String parserTypeFor(String declared) {
@@ -579,6 +590,54 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             return "a Double";
         }
         return "something else";
+    }
+
+    /**
+     * A declared collection this codec converts element by element. Collection
+     * belongs with List and Set: the parser answers an ArrayList either way, so
+     * a Collection<Note> that is NOT recognised here falls through to a guarded
+     * cast, which erases -- the handler is then holding a collection of Map under
+     * a Collection<Note> declaration and throws on its first element. The three
+     * have to be listed everywhere any of them is, which is why this is one
+     * method rather than three copies of the same disjunction.
+     */
+    private static boolean isCollectionShape(String javaType) {
+        return javaType.startsWith("java.util.List<")
+                || javaType.startsWith("java.util.Set<")
+                || javaType.startsWith("java.util.Collection<");
+    }
+
+    /**
+     * Whether a map value's declared type is what the parser really hands over,
+     * all the way down. A map's values are never converted -- not at the top
+     * level and not inside a nested container -- so each level must already be
+     * what arrives: Map, List, String, Long, Double, Boolean or Object.
+     */
+    private static boolean mapValueArrivesAsDeclared(String javaType) {
+        int lt = javaType.indexOf('<');
+        String raw = lt < 0 ? javaType : javaType.substring(0, lt);
+        if (!PARSED_MAP_VALUE_TYPES.contains(raw)) {
+            return false;
+        }
+        if (lt < 0) {
+            return true;
+        }
+        int end = javaType.lastIndexOf('>');
+        if (end <= lt) {
+            return true;
+        }
+        List<String> args = RestControllerAnnotationProcessor.splitTypeArguments(
+                javaType.substring(lt + 1, end));
+        for (int i = 0; i < args.size(); i++) {
+            String arg = args.get(i);
+            if (arg.startsWith("?")) {
+                continue;
+            }
+            if (!mapValueArrivesAsDeclared(arg)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** The key half of a Map's type arguments, honouring nested generics. */
@@ -889,7 +948,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
     /// either tests with instanceof or converts through text.
     private static String fromBody(String javaType) {
         if ("java.lang.String".equals(javaType)) return "bodyAsString(body)";
-        if (javaType.startsWith("java.util.List<") || javaType.startsWith("java.util.Set<")) {
+        if (isCollectionShape(javaType)) {
             String element = javaType.substring(javaType.indexOf('<') + 1, javaType.length() - 1);
             // A Set parameter has to receive a Set. bodyAsList hands back an
             // ArrayList, and casting that to Set is exactly the cast the comment
@@ -955,7 +1014,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
 
     /// The handler's return value, converted to something the JSON writer accepts.
     private static String toJsonValue(String javaType, String expr) {
-        if (javaType.startsWith("java.util.List<") || javaType.startsWith("java.util.Set<")) {
+        if (isCollectionShape(javaType)) {
             String element = javaType.substring(javaType.indexOf('<') + 1, javaType.length() - 1);
             if (element.startsWith("java.")) {
                 // Handed to the writer as it stands, Set included: Json.write emits any
@@ -1251,7 +1310,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
     /// That is a deliberate decision about this processor's dependency contract,
     /// not a detail to slip in behind a performance patch.
     private static String fieldToJson(String type, String expr) {
-        if (type.startsWith("java.util.List<") || type.startsWith("java.util.Set<")) {
+        if (isCollectionShape(type)) {
             String element = type.substring(type.indexOf('<') + 1, type.length() - 1);
             if (element.startsWith("java.")) return "toValueList(" + expr + ")";
             // A nested DTO list has to become a list of MAPS; handing the writer
@@ -1266,7 +1325,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
     }
 
     private static String fieldFromJson(String type, String expr) {
-        if (type.startsWith("java.util.List<") || type.startsWith("java.util.Set<")) {
+        if (isCollectionShape(type)) {
             String element = type.substring(type.indexOf('<') + 1, type.length() - 1);
             // Both branches below produce a List, so a Set-typed field has to be
             // converted rather than cast -- the same fix the request-body path
