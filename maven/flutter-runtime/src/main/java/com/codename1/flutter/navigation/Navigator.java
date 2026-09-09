@@ -451,21 +451,50 @@ public class Navigator extends StatelessWidget {
         return new BoundState(context);
     }
 
-    /** The element a push should inherit from, or null when unknown. */
-    private static com.codename1.flutter.Element pushingElement(BuildContext context) {
-        if (context instanceof com.codename1.flutter.Element) {
-            return (com.codename1.flutter.Element) context;
+    /** The element a push should inherit from, or null when unknown. Package visible so
+     *  RouteInheritanceTest can pin the rule without mounting and showing a Form. */
+    static com.codename1.flutter.Element pushingElement(BuildContext context) {
+        // A route inherits from the NAVIGATOR, never from the widget that pushed it.
+        // In Flutter the route's subtree is built by the Navigator and sits directly
+        // under it, so the only ancestors it ever sees are the ones above the
+        // Navigator -- MaterialApp's Theme, MediaQuery and Localizations, and whatever
+        // the app wrapped MaterialApp in (the studies put their providers there).
+        // Whichever button happened to be tapped contributes nothing.
+        //
+        // Inheriting from the tapping widget instead is not a harmless approximation,
+        // because scopes on the way down SUBTRACT things. A vertical scroll view wraps
+        // its content in MediaQuery.removePadding(top, bottom) -- it has consumed the
+        // display cutout itself, so its children must not inset for it a second time.
+        // A route pushed from a row inside that list then inherited "the top inset is
+        // already spent", its SafeArea resolved to zero, and the new page drew its
+        // title underneath the clock. That is why tapping a mail row landed under the
+        // status bar while the compose button -- a Scaffold slot, outside the list --
+        // came out correctly: same widget code, different ancestor chain.
+        //
+        // "The navigator" is the NEAREST one, exactly as Navigator.of(context) resolves
+        // it. A study is a MaterialApp in its own right, wrapped by the providers it
+        // needs, so a route it pushes has to mount under ITS scope: mounting under the
+        // outermost app's instead climbs out of the study's MultiProvider, and the
+        // page's first Provider.of<EmailStore> comes back null.
+        for (com.codename1.flutter.Element e = context instanceof com.codename1.flutter.Element
+                ? (com.codename1.flutter.Element) context : null; e != null; e = e.parent()) {
+            if (e.widget() instanceof RootScope) {
+                return e;
+            }
         }
-        // A push from outside the tree - a deep link, a notification tap, a test
-        // harness - has no context of its own, and a route mounted with no ancestors
-        // dies on its first Theme.of / MediaQuery.of / Localizations.of. Inherit from
-        // the app's root navigator position instead, which is what pushing on the root
-        // navigator means in Flutter.
+        // Nothing above the pushing context claims a navigator position, so fall back to
+        // the outermost app's - which is where a context-less push belongs anyway.
         if (rootScopeContext != null && rootScopeContext.isMounted()) {
             return rootScopeContext;
         }
-        // No MaterialApp (a bare FlutterUI.wrap tree, say): the showing tree's root is
-        // the best ancestor available.
+        // No MaterialApp at all (a bare FlutterUI.wrap tree, or a push that arrives
+        // before the app root mounts). The pushing context is then the best ancestor
+        // available, subtractive scopes and all.
+        if (context instanceof com.codename1.flutter.Element) {
+            return (com.codename1.flutter.Element) context;
+        }
+        // A push from outside the tree entirely - a deep link, a notification tap, a
+        // test harness: the showing tree's root is all there is.
         BuildContext showing = com.codename1.flutter.FlutterUI.currentContext();
         return showing instanceof com.codename1.flutter.Element
                 ? (com.codename1.flutter.Element) showing : null;

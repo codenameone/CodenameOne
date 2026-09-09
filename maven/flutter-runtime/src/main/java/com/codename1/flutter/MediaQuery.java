@@ -86,8 +86,23 @@ public class MediaQuery extends com.codename1.flutter.widgets.InheritedWidget {
         if (!(context instanceof Element)) {
             return null;
         }
-        com.codename1.flutter.rendering.RenderHost h = ((Element) context).host();
-        return h == null ? null : h.form();
+        // WALK UP. An element's own host is not always the Form's: every paint effect --
+        // Material, Opacity, Transform, a clip -- owns a nested RenderHost for its
+        // subtree, and a nested host does not necessarily carry the Form. Asking only the
+        // immediate host therefore answered null for anything under one, the safe area
+        // came back as zero, and the page laid its content out under the status bar.
+        //
+        // That is how the mail study's message view ended up with its title across the
+        // clock while the compose page beside it was correct: the message view is opened
+        // through an OpenContainer, which wraps the page in a Material, and the compose
+        // page is not.
+        for (Element e = (Element) context; e != null; e = e.parent()) {
+            com.codename1.flutter.rendering.RenderHost h = e.host();
+            if (h != null && h.form() != null) {
+                return h.form();
+            }
+        }
+        return null;
     }
 
     /** {@code MediaQuery.sizeOf}: the ambient display size. */

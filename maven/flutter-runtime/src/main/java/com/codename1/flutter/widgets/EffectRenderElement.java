@@ -100,6 +100,34 @@ public abstract class EffectRenderElement extends RenderElement {
     }
 
     @Override
+    public void mount(Element parent, int slot) {
+        // The pane is a container INSIDE the same Form, so its host has to know
+        // about that Form: a subtree that asks its host for the Form -- a
+        // Scaffold deciding whether it owns the toolbar, a dialog looking for
+        // somewhere to open -- would otherwise be told there is none simply
+        // because it happens to sit under a paint effect.
+        // Walk up for it. A nested host does not necessarily carry the Form -- an effect
+        // inside another effect takes its parent's inner host, whose form may itself be
+        // unset -- and once one link in that chain is null every host below it is too.
+        // Anything that then asks its host which Form it is in gets no answer: the safe
+        // area comes back as zero and the page lays out under the status bar.
+        com.codename1.ui.Form form = null;
+        for (Element e = parent; e != null && form == null; e = e.parent()) {
+            RenderHost h = e.host();
+            if (h != null) {
+                form = h.form();
+            }
+        }
+        if (form == null && host() != null) {
+            form = host().form();
+        }
+        if (form != null) {
+            innerHost().form(form);
+        }
+        super.mount(parent, slot);
+    }
+
+    @Override
     protected Component createComponent() {
         if (!Display.isInitialized()) {
             // headless unit tests: no CN1 components can exist
