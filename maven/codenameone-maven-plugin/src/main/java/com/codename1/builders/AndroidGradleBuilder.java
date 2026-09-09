@@ -1887,20 +1887,6 @@ public class AndroidGradleBuilder extends Executor {
                 xPermissions += permissionAdd(request, xPerm, addString);
             }
         }
-        // What the DEVELOPER asked for, kept because everything below adds this
-        // builder's own fragments to the same string and nothing afterwards can
-        // tell the two apart. Whether a fine-location declaration is theirs or
-        // ours decides both whether the build may rewrite it and whether it
-        // counts as a manual declaration that beats this build's inference.
-        //
-        // AFTER the loop above, not before it: `android.permission.XXX=true` is
-        // a second way to hand-declare a permission, with its own
-        // `.maxSdkVersion`, and it is every bit as much the application's as a
-        // fragment written into android.xpermissions. Snapshotting above this
-        // read those declarations as the build's own, so a forced exclusive
-        // restriction saw no conflict and shipped ordinary precise access, and
-        // a developer's own cap was rewritten.
-        xPermissionsAsSupplied = xPermissions;
 
         final String usesFeaturePrefix = "android.uses_feature.";
         final int usesFeaturePrefixLen = usesFeaturePrefix.length();
@@ -1952,6 +1938,26 @@ public class AndroidGradleBuilder extends Executor {
             addString += "/>\n";
             xPermissions += permissionAdd(request, permissionName, addString);
         }
+
+        // What the DEVELOPER asked for, kept because everything below adds this
+        // builder's own fragments to the same string and nothing afterwards can
+        // tell the two apart. Whether a fine-location declaration is theirs or
+        // ours decides whether the build may rewrite it, whether it counts as a
+        // manual declaration that beats this build's inference, and whether a
+        // feature is what needs precise location.
+        //
+        // Below ALL of the loops above, which are three ways of saying the same
+        // thing and all of them the application's:
+        //
+        //   android.xpermissions             -- the fragment, written out by hand
+        //   android.permission.XXX=true      -- with its own .maxSdkVersion
+        //   android.uses_permission.XXX=maxSdkVersion:NN
+        //
+        // Each was found sitting below this line in turn, and each time the
+        // effect was the same: the application's own declaration read as the
+        // build's, its cap rewritten, and a forced exclusive restriction either
+        // refused for the wrong reason or dropped without a word.
+        xPermissionsAsSupplied = xPermissions;
 
         File tmpFile = getBuildDirectory();
         if (tmpFile == null) {
