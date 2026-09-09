@@ -1231,7 +1231,21 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("    // optional query parameter is not a server error.\n");
         sb.append("    private static int parseInt(String v) { return v == null || v.length() == 0 ? 0 : Integer.parseInt(v.trim()); }\n");
         sb.append("    private static long parseLong(String v) { return v == null || v.length() == 0 ? 0L : Long.parseLong(v.trim()); }\n");
-        sb.append("    private static double parseDouble(String v) { return v == null || v.length() == 0 ? 0d : Double.parseDouble(v.trim()); }\n");
+        // Double.parseDouble does not FAIL on a value too large for a double:
+        // 1e999 comes back as infinity, so the handler ran on a number the client
+        // never sent, and echoing it through Json writes null -- the client gets
+        // back neither its value nor an error. The SPELLING decides whether an
+        // infinity was meant, because the parsed value cannot tell 1e999 from
+        // Infinity. Same test the controller processor's guards use.
+        sb.append("    private static double parseDouble(String v) {\n");
+        sb.append("        if (v == null || v.length() == 0) { return 0d; }\n");
+        sb.append("        String t = v.trim();\n");
+        sb.append("        double d = Double.parseDouble(t);\n");
+        sb.append("        if (Double.isInfinite(d) && t.indexOf(\"Infinity\") < 0) {\n");
+        sb.append("            throw new NumberFormatException(\"out of range for double: \" + v);\n");
+        sb.append("        }\n");
+        sb.append("        return d;\n");
+        sb.append("    }\n");
         sb.append("    private static short parseShort(String v) { return v == null || v.length() == 0 ? (short)0 : Short.parseShort(v.trim()); }\n");
         sb.append("    private static byte parseByte(String v) { return v == null || v.length() == 0 ? (byte)0 : Byte.parseByte(v.trim()); }\n");
         // A double outside float range becomes INFINITY on the cast rather than
@@ -1240,17 +1254,24 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         // answers 400 for.
         sb.append("    private static float parseFloat(String v) {\n");
         sb.append("        if (v == null || v.length() == 0) { return 0f; }\n");
-        sb.append("        double d = Double.parseDouble(v.trim());\n");
+        sb.append("        String t = v.trim();\n");
+        sb.append("        double d = Double.parseDouble(t);\n");
         sb.append("        float f = (float)d;\n");
-        sb.append("        if (Float.isInfinite(f) && !Double.isInfinite(d)) {\n");
+        // Was !Double.isInfinite(d), which is the wrong question: parseDouble
+        // ("1e999") is ITSELF infinite, so every double-overflowing value read as
+        // a deliberate infinity and went through. The text is what says it was
+        // meant.
+        sb.append("        if (Float.isInfinite(f) && t.indexOf(\"Infinity\") < 0) {\n");
         sb.append("            throw new NumberFormatException(\"out of range for float: \" + v);\n");
         sb.append("        }\n");
         sb.append("        return f;\n");
         sb.append("    }\n");
         sb.append("    private static Integer boxInt(String v) { return v == null || v.length() == 0 ? null : Integer.valueOf(v.trim()); }\n");
         sb.append("    private static Long boxLong(String v) { return v == null || v.length() == 0 ? null : Long.valueOf(v.trim()); }\n");
-        sb.append("    private static Double boxDouble(String v) { return v == null || v.length() == 0 ? null : Double.valueOf(v.trim()); }\n");
-        sb.append("    private static Float boxFloat(String v) { return v == null || v.length() == 0 ? null : Float.valueOf(v.trim()); }\n");
+        // Through the guarded parsers, not valueOf: a boxed binding is the same
+        // binding with a null for "absent", and it had no overflow check at all.
+        sb.append("    private static Double boxDouble(String v) { return v == null || v.length() == 0 ? null : Double.valueOf(parseDouble(v)); }\n");
+        sb.append("    private static Float boxFloat(String v) { return v == null || v.length() == 0 ? null : Float.valueOf(parseFloat(v)); }\n");
         sb.append("    private static Short boxShort(String v) { return v == null || v.length() == 0 ? null : Short.valueOf(v.trim()); }\n");
         sb.append("    private static Byte boxByte(String v) { return v == null || v.length() == 0 ? null : Byte.valueOf(v.trim()); }\n");
         // NOT Boolean.parseBoolean, which answers false for everything that is not

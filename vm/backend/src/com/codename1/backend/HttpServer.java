@@ -2809,11 +2809,21 @@ public final class HttpServer {
             }
             long charged = 0;
             try {
-            byte[] grown = new byte[Math.max(keep, Math.min(needed, BODY_CHUNK_BYTES))];
-            charged += grown.length;
-            if(http1UploadBytes.addAndGet(grown.length) > MAX_HTTP1_UPLOAD_BYTES) {
+            // RESERVED before allocated, not after. The charge is what bounds
+            // concurrent uploads, and a budget checked after the allocation
+            // bounds nothing: every thread that reaches a growth boundary at the
+            // same moment takes its memory first and finds out it was over the
+            // limit second, so the peak is the number of threads times their
+            // step, whatever the limit says. Reserving first makes the refusal
+            // happen while the memory is still hypothetical. `charged` is
+            // incremented in the same breath, so the finally below rolls the
+            // reservation back even if the allocation itself fails.
+            int first = Math.max(keep, Math.min(needed, BODY_CHUNK_BYTES));
+            charged += first;
+            if(http1UploadBytes.addAndGet(first) > MAX_HTTP1_UPLOAD_BYTES) {
                 throw new ProtocolException(503, "too many uploads in flight");
             }
+            byte[] grown = new byte[first];
             System.arraycopy(buffer, pos, grown, 0, keep);
             int at = keep;
             // A RATE, not a deadline. The head gets a flat bound because it is small;
@@ -2836,13 +2846,14 @@ public final class HttpServer {
                     // Doubling, capped at what was declared -- so the final growth
                     // lands exactly on `needed` and the invariant above holds.
                     int next = (int)Math.min((long)needed, (long)grown.length * 2);
-                    byte[] bigger = new byte[next];
-                    System.arraycopy(grown, 0, bigger, 0, at);
-                    long delta$ = bigger.length - grown.length;
+                    // Reserved before allocated, for the reason above.
+                    long delta$ = (long)next - grown.length;
                     charged += delta$;
                     if(http1UploadBytes.addAndGet(delta$) > MAX_HTTP1_UPLOAD_BYTES) {
                         throw new ProtocolException(503, "too many uploads in flight");
                     }
+                    byte[] bigger = new byte[next];
+                    System.arraycopy(grown, 0, bigger, 0, at);
                     grown = bigger;
                 }
                 // Exactly the shortfall, so a pipelined request behind this body stays

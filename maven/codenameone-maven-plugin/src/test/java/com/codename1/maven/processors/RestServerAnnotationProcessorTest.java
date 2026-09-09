@@ -204,6 +204,80 @@ public class RestServerAnnotationProcessorTest {
     }
 
     @Test
+    public void anOverflowingFloatingPointQueryIsRefused() throws Exception {
+        // parseDouble and valueOf do not FAIL on a value too large: 1e999 comes
+        // back as infinity, so the handler ran on a number the client never sent
+        // and Json wrote it back as null -- neither the value nor an error. The
+        // boxed helpers had no check at all, and the float one asked
+        // !Double.isInfinite(d), which parseDouble("1e999") already satisfies.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.RateApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface RateApi {\n"
+                + "    @GET(\"/rate\")\n"
+                + "    void rate(@Query(\"d\") double d, @Query(\"bd\") Double bd,\n"
+                + "              @Query(\"f\") float f, @Query(\"bf\") Float bf,\n"
+                + "              OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+        URLClassLoader loader = new URLClassLoader(
+                new URL[]{classes.toURI().toURL(), testClassesDir().toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> dispatcherClass = loader.loadClass("com.example.RateApiDispatcher");
+
+        // Every one of the four bindings, because each reached the value by its
+        // own helper and only one of them was guarded at all.
+        String[][] cases = {
+                {"d", "1e999"}, {"bd", "1e999"}, {"f", "1e50"}, {"bf", "1e50"},
+        };
+        for (int i = 0; i < cases.length; i++) {
+            assertRefused(loader, dispatcherClass, cases[i][0], cases[i][1]);
+        }
+
+        // And a value that really spells an infinity is still accepted, which is
+        // what the parse means by it -- the guard is about overflow, not about
+        // infinities the client asked for.
+        Object answered = dispatch(loader, dispatcherClass, "d", "Infinity");
+        assertNotNull("a deliberate Infinity must still bind", answered);
+        loader.close();
+    }
+
+    private void assertRefused(URLClassLoader loader, Class<?> dispatcherClass,
+                               String param, String value) throws Exception {
+        try {
+            dispatch(loader, dispatcherClass, param, value);
+            fail(param + "=" + value + " overflows and should not reach the handler");
+        } catch (java.lang.reflect.InvocationTargetException expected) {
+            Throwable cause = expected.getCause();
+            assertTrue(param + "=" + value + " failed with " + cause,
+                    cause instanceof NumberFormatException
+                            || cause instanceof IllegalArgumentException);
+        }
+    }
+
+    /** Calls the generated dispatcher with one query parameter set. */
+    private Object dispatch(URLClassLoader loader, Class<?> dispatcherClass,
+                            String param, String value) throws Exception {
+        Class<?> serverItf = loader.loadClass("com.example.RateApiServer");
+        Object handler = Proxy.newProxyInstance(loader, new Class<?>[]{serverItf},
+                new InvocationHandler() {
+                    public Object invoke(Object proxy, Method m, Object[] args) {
+                        return "ok";
+                    }
+                });
+        Object dispatcher = dispatcherClass.getConstructor(serverItf).newInstance(handler);
+        Method d = dispatcherClass.getMethod("dispatch",
+                String.class, String.class, java.util.Map.class, Object.class);
+        return d.invoke(dispatcher, "GET", "/rate?" + param + "=" + value, null, null);
+    }
+
+    @Test
     public void twoDynamicRoutesThatOverlapAreRefused() throws Exception {
         // Different shapes, and /a/b/c satisfies both. Neither is more specific, so
         // literal-first ordering cannot break the tie and dispatch answers with

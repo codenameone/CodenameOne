@@ -808,12 +808,26 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         }
         List<String> args = splitTypeArguments(javaType.substring(lt + 1, end));
         if ("java.util.Map".equals(javaType.substring(0, lt)) && args.size() == 2) {
+            // A BOUNDED wildcard is not the same as an unbounded one. Exempting
+            // anything beginning with '?' let Map<? extends Long, V> through,
+            // and that bound is still a promise that every key is a Long -- so
+            // `for (Long key : body.keySet())` compiles and then fails on the
+            // Strings a JSON object really produces. Only the unbounded ? claims
+            // nothing; a bound is judged exactly like a spelled-out type.
             String key = args.get(0).trim();
-            int inner = key.indexOf('<');
-            String rawKey = inner < 0 ? key : key.substring(0, inner);
-            if (!key.startsWith("?") && !"java.lang.String".equals(rawKey)
-                    && !"java.lang.Object".equals(rawKey)) {
-                return rawKey;
+            if (!"?".equals(key)) {
+                String bound = key;
+                if (bound.startsWith("? extends ")) {
+                    bound = bound.substring("? extends ".length()).trim();
+                } else if (bound.startsWith("? super ")) {
+                    bound = bound.substring("? super ".length()).trim();
+                }
+                int inner = bound.indexOf('<');
+                String rawKey = inner < 0 ? bound : bound.substring(0, inner);
+                if (!"java.lang.String".equals(rawKey)
+                        && !"java.lang.Object".equals(rawKey)) {
+                    return rawKey;
+                }
             }
         }
         for (int i = 0; i < args.size(); i++) {

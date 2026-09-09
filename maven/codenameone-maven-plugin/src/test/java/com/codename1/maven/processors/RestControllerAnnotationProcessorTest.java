@@ -980,6 +980,45 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aMapBodyKeyedByABoundedWildcardIsRefused() throws Exception {
+        // "? extends Long" is not the same claim as "?". The bound still promises
+        // every key is a Long, so `for (Long key : body.keySet())` compiles and
+        // then meets the Strings a JSON object really produces -- a 500 for what
+        // is a 400. Exempting everything starting with '?' let it through.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Bounded {\n"
+                + "    @PostMapping(\"/counts\")\n"
+                + "    public String put(@RequestBody"
+                + " java.util.Map<? extends Long, String> counts) {\n"
+                + "        return \"ok\";\n"
+                + "    }\n"
+                + "}\n"));
+        assertTrue("a bounded wildcard key is still a promise about the key type",
+                ctx.hasErrors());
+    }
+
+    @Test
+    public void aMapBodyKeyedByAnUnboundedWildcardIsAccepted() throws Exception {
+        // The unbounded one claims nothing, so it stays legal -- the rule must
+        // separate "any key" from "a Long key spelled as a wildcard".
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Unbounded {\n"
+                + "    @PostMapping(\"/counts\")\n"
+                + "    public String put(@RequestBody java.util.Map<?, ?> counts) {\n"
+                + "        return \"ok\";\n"
+                + "    }\n"
+                + "}\n"));
+        assertFalse("Map<?,?> claims nothing about its keys: " + ctx.getErrors(),
+                ctx.hasErrors());
+    }
+
+    @Test
     public void aMapBodyKeyedByStringIsAccepted() throws Exception {
         // The rule must not swallow the shape it is protecting.
         ProcessorContext ctx = run(compile(

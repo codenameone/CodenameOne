@@ -85,6 +85,8 @@ class BackendHttpIntegrationTest {
      */
     private static Process busyServer;
     private static int busyPort;
+    private static Process smallUploadServer;
+    private static int smallUploadPort;
 
     /** Larger than any plausible socket send buffer, so a slow reader stalls the write. */
     private static final int HUGE_BYTES = 8 * 1024 * 1024;
@@ -154,6 +156,30 @@ class BackendHttpIntegrationTest {
 
         startTlsServer(work, binary, staticRoot);
         startBusyServer(work, binary, staticRoot);
+        startSmallUploadServer(work, binary, staticRoot);
+    }
+
+    /**
+     * A copy with a SMALL in-flight upload budget, so the budget can be reached
+     * with megabytes instead of the default sixty-four. A test that has to move
+     * 64MB to reach a limit is a test nobody runs.
+     */
+    private static void startSmallUploadServer(Path work, Path binary, Path staticRoot)
+            throws Exception {
+        smallUploadPort = freePort();
+        ProcessBuilder run = new ProcessBuilder(binary.toString());
+        run.environment().put("CN1_PORT", String.valueOf(smallUploadPort));
+        run.environment().put("CN1_DB_PATH", work.resolve("upload.db").toString());
+        run.environment().put("CN1_STATIC_ROOT", staticRoot.toString());
+        run.environment().put("CN1_HTTP_MAX_UPLOAD_MB", "16");
+        run.redirectErrorStream(true);
+        run.redirectOutput(work.resolve("upload-server.log").toFile());
+        smallUploadServer = run.start();
+        if (!waitForPort(smallUploadPort, 30000)) {
+            smallUploadServer.destroy();
+            smallUploadServer = null;
+            smallUploadPort = 0;
+        }
     }
 
     /** The single-host server described on busyServer. */
@@ -224,6 +250,16 @@ class BackendHttpIntegrationTest {
 
     @AfterAll
     void stopServer() {
+        if (smallUploadServer != null) {
+            smallUploadServer.destroy();
+            try {
+                if (!smallUploadServer.waitFor(10, TimeUnit.SECONDS)) {
+                    smallUploadServer.destroyForcibly();
+                }
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+            }
+        }
         if (busyServer != null) {
             busyServer.destroy();
             try {
@@ -620,6 +656,68 @@ class BackendHttpIntegrationTest {
         assertEquals(-1, text.substring(0, Math.min(64, text.length())).indexOf(" 503"),
                 "a legitimate upload must not hit the in-flight budget:\n"
                         + text.substring(0, Math.min(200, text.length())));
+    }
+
+    @Test
+    @DisplayName("concurrent uploads reserve and release their budget")
+    void concurrentUploadsDoNotLeakTheirBudget() throws Exception {
+        // The in-flight budget is what bounds concurrent uploads, so it is charged
+        // BEFORE the memory is allocated -- a budget checked afterwards bounds
+        // nothing, since every thread at a growth boundary takes its memory first
+        // and learns it was over the limit second.
+        //
+        // The ORDER is not observable from out here. A leaked RESERVATION is, and
+        // only if the numbers are chosen for it: against a 16MB budget, three
+        // concurrent 2MB uploads peak at 6MB and pass, while three rounds of them
+        // charge 18MB cumulatively and start answering 503 the moment the release
+        // stops happening. A first version of this test ran four rounds of six
+        // against the DEFAULT 64MB budget -- 48MB, which never reaches the limit,
+        // so it passed with the release deleted and proved nothing.
+        Assumptions.assumeTrue(smallUploadPort > 0,
+                "the small-upload-budget server did not start");
+        final int rounds = 3;
+        final int concurrent = 3;
+        StringBuilder json = new StringBuilder(2 * 1024 * 1024 + 16);
+        json.append("[\"");
+        for (int i = 0; i < 2 * 1024 * 1024; i++) {
+            json.append('a');
+        }
+        json.append("\"]");
+        final byte[] body = json.toString().getBytes(StandardCharsets.UTF_8);
+
+        for (int round = 0; round < rounds; round++) {
+            final String[] outcomes = new String[concurrent];
+            Thread[] threads = new Thread[concurrent];
+            for (int i = 0; i < concurrent; i++) {
+                final int slot = i;
+                threads[i] = new Thread(new Runnable() {
+                    public void run() {
+                        try {
+                            byte[] response = rawOn(smallUploadPort,
+                                    "POST /api/notes HTTP/1.1\r\nHost: x\r\n"
+                                    + "Content-Type: application/json\r\nContent-Length: "
+                                    + body.length + "\r\nConnection: close\r\n\r\n", body);
+                            String text = new String(response, StandardCharsets.UTF_8);
+                            outcomes[slot] = text.substring(0, Math.min(32, text.length()));
+                        } catch (Exception err) {
+                            outcomes[slot] = "threw: " + err;
+                        }
+                    }
+                });
+                threads[i].start();
+            }
+            for (int i = 0; i < concurrent; i++) {
+                threads[i].join(120000);
+            }
+            for (int i = 0; i < concurrent; i++) {
+                assertNotNull(outcomes[i], "upload " + i + " of round " + round
+                        + " never answered");
+                assertEquals(-1, outcomes[i].indexOf(" 503"),
+                        "round " + round + " upload " + i + " hit the in-flight budget, so a "
+                                + "reservation from an earlier round was never released: "
+                                + outcomes[i]);
+            }
+        }
     }
 
     @Test
@@ -1741,8 +1839,12 @@ class BackendHttpIntegrationTest {
     }
 
     private byte[] raw(String head, byte[] body) throws IOException {
+        return rawOn(port, head, body);
+    }
+
+    private byte[] rawOn(int onPort, String head, byte[] body) throws IOException {
         Socket socket = new Socket();
-        socket.connect(new InetSocketAddress("127.0.0.1", port), 5000);
+        socket.connect(new InetSocketAddress("127.0.0.1", onPort), 5000);
         socket.setSoTimeout(15000);
         try {
             OutputStream out = socket.getOutputStream();
