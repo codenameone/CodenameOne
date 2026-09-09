@@ -3242,6 +3242,11 @@ public final class HttpServer {
         try {
             Object existing = http2Sessions.get(new Integer(fd));
             if(existing == null) {
+                // Told to the native side once, where the reservation happens.
+                // Idempotent, so doing it per session rather than finding a
+                // startup hook costs an atomic store on a path that is already
+                // creating a session.
+                Http2.setMaxBodyBytes(MAX_OPEN_H2_BODY_BYTES);
                 h2 = Http2.create();
                 http2Sessions.put(new Integer(fd), h2);
                 // The SETTINGS preface has to reach the client before anything else.
@@ -3349,8 +3354,14 @@ public final class HttpServer {
                     // very thing being rationed. Closing it and saying so is the
                     // honest answer, and 503 is what it is.
                     StaticFiles.closeFile(response.fileFd);
-                    h2.respond(stream.getId(), 503, "text/plain", extra,
-                            asciiBytes("too many files in flight"));
+                    // Even this small explanation is a body, and a body is what
+                    // the ceiling refuses. If there is no room for it, the status
+                    // alone still has to reach the client -- dropping the whole
+                    // response would leave the stream hanging.
+                    if(!h2.respond(stream.getId(), 503, "text/plain", extra,
+                            asciiBytes("too many files in flight"))) {
+                        h2.respond(stream.getId(), 503, "text/plain", extra, null);
+                    }
                 } else if(response.fileFd >= 0 && !noBody) {
                     // Streamed frame by frame out of the descriptor. Reading the file
                     // in first cost its whole size in the heap plus the same again in
@@ -3394,22 +3405,22 @@ public final class HttpServer {
                     }
                     byte[] h2Body = responseBodyFor(response, noBody);
                     int bodyBytes = h2Body == null ? 0 : h2Body.length;
-                    // Checked BEFORE the copy, not after it. respond() copies the
-                    // body into native memory, so a check that follows it has
-                    // already spent what it was meant to withhold -- and every
-                    // session wakes on a control frame and spends one more, so the
-                    // cap was really the cap plus a body per connection. The
-                    // ordering is the whole point of the limit; the same mistake
-                    // on the descriptor path was fixed for the same reason.
-                    if(bodyBytes > 0
-                            && Http2.pendingBodyBytesAll() + bodyBytes
-                                > MAX_OPEN_H2_BODY_BYTES) {
-                        h2.respond(stream.getId(), 503, "text/plain", extra,
-                                asciiBytes("too much response data in flight"));
+                    // The RESERVATION is the check. Testing the counter here and
+                    // allocating inside respond() is two steps with a gap: two
+                    // sessions being processed at once both read the total below
+                    // the ceiling and then both allocate, so the real peak was the
+                    // limit plus a body for every concurrent responder. respond()
+                    // reserves and allocates in the same step natively, and
+                    // answers false having taken nothing when the body would
+                    // cross the ceiling.
+                    if(!h2.respond(stream.getId(), response.status, contentType, extra,
+                            h2Body)) {
+                        // Bodiless, because the reason for refusing is that there
+                        // is no room for bodies. An explanatory body here is the
+                        // one allocation that must not be attempted.
+                        h2.respond(stream.getId(), 503, "text/plain", extra, null);
                     } else {
                         queuedBodyBytes += bodyBytes;
-                        h2.respond(stream.getId(), response.status, contentType, extra,
-                                h2Body);
                     }
                 }
                 requestsServed.incrementAndGet();

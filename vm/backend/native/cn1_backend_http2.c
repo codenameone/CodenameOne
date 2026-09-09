@@ -156,6 +156,32 @@ static _Atomic long cn1H2OpenFileBodies = 0;
    from what the bodies actually hold. */
 static _Atomic long cn1H2PendingBodyBytes = 0;
 
+/* The ceiling cn1H2PendingBodyBytes is reserved against, or 0 for none.
+   Kept here rather than passed per call so that the RESERVATION can sit next to
+   the allocation it bounds: a limit tested in Java and enforced in C is two
+   steps with a gap, and two sessions processed at once both read the counter
+   below the limit and then both allocate. Set once from Java at startup. */
+static _Atomic long cn1H2MaxBodyBytes = 0;
+
+/* Reserves `bytes` against the ceiling, atomically. Returns 0 when the
+   reservation would cross it, in which case nothing is added. */
+static int cn1H2ReserveBodyBytes(long bytes) {
+    long limit = atomic_load_explicit(&cn1H2MaxBodyBytes, memory_order_relaxed);
+    long current = atomic_load_explicit(&cn1H2PendingBodyBytes, memory_order_relaxed);
+    for(;;) {
+        if(limit > 0 && current + bytes > limit) {
+            return 0;
+        }
+        if(atomic_compare_exchange_weak_explicit(&cn1H2PendingBodyBytes, &current,
+                                                 current + bytes,
+                                                 memory_order_relaxed,
+                                                 memory_order_relaxed)) {
+            return 1;
+        }
+        /* current now holds what another thread left; try again against that. */
+    }
+}
+
 /* And the INBOUND side, for the identical reason. The per-session ceilings below
    bound one connection; the connection ceiling is in the thousands, so a few
    clients holding streams just under their session limit still add up to the
@@ -677,6 +703,11 @@ JAVA_INT com_codename1_backend_Http2_pendingBodyFilesImpl___R_int(CODENAME_ONE_T
     return (JAVA_INT)atomic_load_explicit(&cn1H2OpenFileBodies, memory_order_relaxed);
 }
 
+/* The ceiling for outstanding response bodies across the process. */
+JAVA_VOID com_codename1_backend_Http2_setMaxBodyBytesImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG limit) {
+    atomic_store_explicit(&cn1H2MaxBodyBytes, (long)limit, memory_order_relaxed);
+}
+
 /* Takes everything nghttp2 wants written, and empties the buffer. */
 JAVA_OBJECT com_codename1_backend_Http2_drainImpl___long_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
@@ -990,6 +1021,15 @@ JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_jav
     pending = NULL;
     if(body != JAVA_NULL && ((JAVA_ARRAY)body)->length > 0) {
         JAVA_ARRAY arr = (JAVA_ARRAY)body;
+        /* RESERVED first. Charging after the copy spends exactly what the
+           ceiling exists to withhold, and does it once per session that happens
+           to be running -- so the real peak was the limit plus a body for every
+           concurrent responder, whatever the configured number said. */
+        if(!cn1H2ReserveBodyBytes((long)arr->length)) {
+            free(statusCopy);
+            free(headerCopy);
+            return -2;
+        }
         pending = (CN1H2Body*)malloc(sizeof(CN1H2Body));
         if(pending != NULL) {
             pending->data = (unsigned char*)malloc((size_t)arr->length);
@@ -1005,11 +1045,13 @@ JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_jav
                 pending->offset = 0;
                 pending->next = s->bodies;
                 s->bodies = pending;
-                atomic_fetch_add_explicit(&cn1H2PendingBodyBytes,
-                                          (long)pending->length, memory_order_relaxed);
             }
         }
         if(pending == NULL) {
+            /* The reservation outlived its body; give it back or the ceiling
+               ratchets down one failed allocation at a time. */
+            atomic_fetch_sub_explicit(&cn1H2PendingBodyBytes, (long)arr->length,
+                                      memory_order_relaxed);
             /* The body could not be copied. Submitting anyway sends the headers with
                an EMPTY body and reports success, so the caller ships a 200 whose
                content silently went missing under memory pressure. Failing here lets

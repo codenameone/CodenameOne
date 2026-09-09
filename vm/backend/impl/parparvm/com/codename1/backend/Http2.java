@@ -160,12 +160,37 @@ public final class Http2 {
      *   dropped, because HTTP/2 forbids them, and names are lower-cased, because a
      *   capital letter is a protocol error the peer resets the stream over.
      */
-    public void respond(int streamId, int status, String contentType, List extraHeaders, byte[] body)
+    public boolean respond(int streamId, int status, String contentType, List extraHeaders, byte[] body)
             throws IOException {
-        if(respondImpl(session, streamId, String.valueOf(status),
-                headerLines(contentType, extraHeaders), body) != 0) {
+        int rc = respondImpl(session, streamId, String.valueOf(status),
+                headerLines(contentType, extraHeaders), body);
+        if(rc == OVER_BODY_BUDGET) {
+            // Not a failure: the body was refused because submitting it would
+            // cross the process-wide ceiling, and NOTHING was allocated or
+            // charged. The caller answers 503 instead. Reported rather than
+            // thrown because it is an ordinary load condition, and because the
+            // reservation has to be the same step as the allocation -- a limit
+            // the caller tests beforehand is two steps with a gap in the middle,
+            // which is how two sessions both passed a 64MB check and then held
+            // 80MB between them.
+            return false;
+        }
+        if(rc != 0) {
             throw new IOException("Could not submit an HTTP/2 response on stream " + streamId);
         }
+        return true;
+    }
+
+    /** respondImpl's answer when the body would cross the ceiling. */
+    static final int OVER_BODY_BUDGET = -2;
+
+    /**
+     * The ceiling for outstanding response bodies across the process.
+     *
+     * Set once, and enforced natively where the memory is actually taken.
+     */
+    public static void setMaxBodyBytes(long limit) {
+        setMaxBodyBytesImpl(limit);
     }
 
     /**
@@ -298,6 +323,8 @@ public final class Http2 {
 
     private static native int respondFileImpl(long session, int streamId, String status,
             String headerLines, int fd, long offset, long length);
+    private static native void setMaxBodyBytesImpl(long limit);
+
     private static native int respondImpl(long session, int streamId, String status,
                                           String headerLines, byte[] body);
     private static native boolean wantsMoreImpl(long session);

@@ -172,6 +172,9 @@ class BackendHttpIntegrationTest {
         run.environment().put("CN1_DB_PATH", work.resolve("upload.db").toString());
         run.environment().put("CN1_STATIC_ROOT", staticRoot.toString());
         run.environment().put("CN1_HTTP_MAX_UPLOAD_MB", "16");
+        // And a small HTTP/2 body ceiling, so that one can be reached with a
+        // few megabytes as well.
+        run.environment().put("CN1_HTTP_MAX_H2_BODY_MB", "4");
         run.redirectErrorStream(true);
         run.redirectOutput(work.resolve("upload-server.log").toFile());
         smallUploadServer = run.start();
@@ -1314,6 +1317,100 @@ class BackendHttpIntegrationTest {
             assertTrue(sawHeaders, "no HEADERS frame came back");
             assertTrue(sawData, "no DATA frame came back");
             assertTrue(data.contains("\"status\":\"ok\""), data);
+        } finally {
+            socket.close();
+        }
+    }
+
+    @Test
+    @DisplayName("an h2 body over the ceiling is refused, and the ceiling is given back")
+    void http2BodiesAreBoundedAndReleased() throws Exception {
+        // The ceiling is reserved natively, in the same step as the allocation --
+        // a limit tested in Java and enforced in C is two steps with a gap, and
+        // two sessions being processed at once both read the total below the
+        // ceiling and then both allocate.
+        //
+        // What a client can see is the two ends of that: a body over the ceiling
+        // is refused rather than served, and the reservation comes back when the
+        // body is done, so the NEXT request over the ceiling is refused for the
+        // same reason rather than because the first one is still charged. Without
+        // the release, request two would be refused at any size at all.
+        Assumptions.assumeTrue(smallUploadPort > 0,
+                "the small-ceiling server did not start");
+        assertEquals(503, h2StatusFor(smallUploadPort, "/bulk?size=" + (6 * 1024 * 1024)),
+                "a body over the ceiling must be refused");
+        assertEquals(200, h2StatusFor(smallUploadPort, "/bulk?size=1024"),
+                "a small body after it must still be served: the refusal must not "
+                        + "have left its bytes charged");
+        // THREE two-megabyte bodies against a four-megabyte ceiling. Each one is
+        // under it, but their sum is not, so they only all succeed if each
+        // reservation is released when its body finishes. A first version of this
+        // test asked for one 1KB and one 2MB body -- never reaching the ceiling
+        // cumulatively -- and so passed with every release deleted.
+        for (int i = 0; i < 3; i++) {
+            assertEquals(200, h2StatusFor(smallUploadPort, "/bulk?size=" + (2 * 1024 * 1024)),
+                    "body " + i + " of three under the ceiling was refused, so an "
+                            + "earlier one's reservation was never released");
+        }
+        assertEquals(503, h2StatusFor(smallUploadPort, "/bulk?size=" + (6 * 1024 * 1024)),
+                "and the ceiling still applies afterwards");
+    }
+
+    /** The :status of one h2c GET, decoded from the HEADERS block. */
+    private int h2StatusFor(int onPort, String path) throws Exception {
+        Socket socket = new Socket();
+        socket.connect(new InetSocketAddress("127.0.0.1", onPort), 5000);
+        socket.setSoTimeout(20000);
+        try {
+            OutputStream out = socket.getOutputStream();
+            out.write("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+            out.write(frame(4, 0, 0, new byte[0]));
+            byte[] windowUpdate = new byte[4];
+            int increment = 8 * 1024 * 1024;
+            windowUpdate[0] = (byte) ((increment >> 24) & 0x7f);
+            windowUpdate[1] = (byte) ((increment >> 16) & 0xff);
+            windowUpdate[2] = (byte) ((increment >> 8) & 0xff);
+            windowUpdate[3] = (byte) (increment & 0xff);
+            out.write(frame(8, 0, 0, windowUpdate));
+            ByteArrayOutputStream block = new ByteArrayOutputStream();
+            hpackLiteral(block, ":method", "GET");
+            hpackLiteral(block, ":path", path);
+            hpackLiteral(block, ":scheme", "http");
+            hpackLiteral(block, ":authority", "127.0.0.1");
+            out.write(frame(1, 0x05, 1, block.toByteArray()));
+            out.flush();
+            out.write(frame(8, 0, 1, windowUpdate));
+            out.flush();
+
+            long deadline = System.currentTimeMillis() + 20000;
+            InputStream in = socket.getInputStream();
+            boolean done = false;
+            int status = -1;
+            while (System.currentTimeMillis() < deadline && !done) {
+                byte[] header = readExactly(in, 9);
+                if (header == null) {
+                    break;
+                }
+                int length = ((header[0] & 0xff) << 16) | ((header[1] & 0xff) << 8)
+                        | (header[2] & 0xff);
+                int type = header[3] & 0xff;
+                int flags = header[4] & 0xff;
+                byte[] payload = length == 0 ? new byte[0] : readExactly(in, length);
+                if (payload == null) {
+                    break;
+                }
+                if (type == 1 && payload.length > 0) {
+                    // 0x88 is the indexed :status 200; 503 has no static index, so
+                    // it arrives as a literal on name index 8.
+                    status = (payload[0] & 0xff) == 0x88 ? 200 : 503;
+                    done = (flags & 0x01) != 0;
+                } else if (type == 0) {
+                    done = (flags & 0x01) != 0;
+                } else if (type == 7) {
+                    fail("the server sent GOAWAY: " + new String(payload, StandardCharsets.UTF_8));
+                }
+            }
+            return status;
         } finally {
             socket.close();
         }

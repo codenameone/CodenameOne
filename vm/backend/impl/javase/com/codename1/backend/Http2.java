@@ -118,9 +118,13 @@ public final class Http2 {
         throw new IOException(UNSUPPORTED);
     }
 
-    public void respond(int streamId, int status, String contentType, List extraHeaders,
+    public boolean respond(int streamId, int status, String contentType, List extraHeaders,
             byte[] body) throws IOException {
         throw new IOException(UNSUPPORTED);
+    }
+
+    /** Nothing is ever submitted here, so there is no ceiling to enforce. */
+    public static void setMaxBodyBytes(long limit) {
     }
 
     public byte[] drain() throws IOException {

@@ -816,14 +816,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // nothing; a bound is judged exactly like a spelled-out type.
             String key = args.get(0).trim();
             if (!"?".equals(key)) {
-                String bound = key;
-                if (bound.startsWith("? extends ")) {
-                    bound = bound.substring("? extends ".length()).trim();
-                } else if (bound.startsWith("? super ")) {
-                    bound = bound.substring("? super ".length()).trim();
-                }
-                int inner = bound.indexOf('<');
-                String rawKey = inner < 0 ? bound : bound.substring(0, inner);
+                // Already normalised by splitTypeArguments, so "? extends Long"
+                // arrives here as Long and only a genuinely unbounded wildcard
+                // is still spelled "?". One rule, in one place.
+                int inner = key.indexOf('<');
+                String rawKey = inner < 0 ? key : key.substring(0, inner);
                 if (!"java.lang.String".equals(rawKey)
                         && !"java.lang.Object".equals(rawKey)) {
                     return rawKey;
@@ -1348,15 +1345,40 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             } else if (c == '>') {
                 depth--;
             } else if (c == ',' && depth == 0) {
-                out.add(args.substring(start, i).trim());
+                out.add(withoutWildcard(args.substring(start, i).trim()));
                 start = i + 1;
             }
         }
         String last = args.substring(start).trim();
         if (last.length() > 0) {
-            out.add(last);
+            out.add(withoutWildcard(last));
         }
         return out;
+    }
+
+    /**
+     * A type argument reduced to what it actually PROMISES about the value.
+     *
+     * Normalised here, at the one place type arguments are produced, rather than
+     * at each of the six consumers -- validation, the element type, the map value
+     * type, the encodability walk and the emitted instanceof checks all ask the
+     * same question, and a bounded wildcard was being read as "claims nothing" by
+     * every one of them. `List<? extends String>` was accepted with no runtime
+     * check at all, so `[1]` reached the handler as a list holding a Long and the
+     * first typed read answered 500 where a 400 was owed.
+     *
+     * `? extends T` promises T. `? super T` does NOT: the value may be T or any
+     * supertype of it, so the only honest reading is the unbounded one, and a
+     * check against T there would reject values the declaration allows.
+     */
+    private static String withoutWildcard(String arg) {
+        if (arg.startsWith("? extends ")) {
+            return arg.substring("? extends ".length()).trim();
+        }
+        if (arg.startsWith("? super ")) {
+            return "?";
+        }
+        return arg;
     }
 
     /** Whether an annotation's declared default really is a value of that type. */

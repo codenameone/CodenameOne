@@ -980,6 +980,52 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aBoundedWildcardElementIsCheckedLikeItsBound() throws Exception {
+        // List<? extends String> was accepted with NO runtime element check at
+        // all, because every consumer read a bounded wildcard as "claims
+        // nothing". The bound is a claim: a body of [1] reached the handler as a
+        // list holding a Long, and the first typed read answered 500 where a 400
+        // was owed. Normalising the wildcard where type arguments are produced
+        // fixes the validation and the emitted check together.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @PostMapping(\"/notes\")\n"
+                + "    public String add(@RequestBody"
+                + " java.util.List<? extends String> notes) {\n"
+                + "        return \"ok\";\n"
+                + "    }\n"
+                + "}\n");
+        assertEquals(200, Router.statusOf(router.call("POST", "/notes", "[\"a\"]")));
+        // JUnit 4 order: message first.
+        assertEquals("a Long where the bound promised String is the client's mistake, "
+                        + "so it is a 400 and not a 500",
+                400, Router.statusOf(router.call("POST", "/notes", "[1]")));
+    }
+
+    @Test
+    public void aSuperBoundedWildcardElementIsNotChecked() throws Exception {
+        // The other direction, and it must NOT be normalised the same way:
+        // List<? super String> allows a String or any supertype, so an element
+        // check against String would reject values the declaration permits.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @PostMapping(\"/notes\")\n"
+                + "    public String add(@RequestBody"
+                + " java.util.List<? super String> notes) {\n"
+                + "        return \"ok\";\n"
+                + "    }\n"
+                + "}\n");
+        assertEquals("? super String permits a Long element, so nothing may reject it",
+                200, Router.statusOf(router.call("POST", "/notes", "[1]")));
+    }
+
+    @Test
     public void aMapBodyKeyedByABoundedWildcardIsRefused() throws Exception {
         // "? extends Long" is not the same claim as "?". The bound still promises
         // every key is a Long, so `for (Long key : body.keySet())` compiles and
