@@ -175,8 +175,9 @@ public final class Invites {
     private static final String PATH_CLAIM = "/api/v2/analytics/invites/claim";
     private static final String PATH_MATCH = "/api/v2/analytics/invites/match";
 
-    private static final String PREF_SLUG = "cn1$inviteSlug";
-    private static final String PREF_CONSUMED_ARG = "cn1$inviteConsumedArg";
+    // Package private so the unit tests can clear them between cases.
+    static final String PREF_SLUG = "cn1$inviteSlug";
+    static final String PREF_CONSUMED_ARG = "cn1$inviteConsumedArg";
 
     // The referrer key the link service puts on the store url. Compared with
     // equals and never case folded: String.toLowerCase is locale sensitive and
@@ -196,6 +197,10 @@ public final class Invites {
     private static int state = -1;
     private static boolean deliveredThisRun;
     private static boolean deferredStarted;
+
+    // Only ever touched on the fallback path in newCode(), and held as a field
+    // so there is one generator for the process rather than one per call.
+    private static final java.util.Random FALLBACK_RANDOM = new java.util.Random();
 
     private Invites() {
     }
@@ -445,10 +450,12 @@ public final class Invites {
     ///
     /// the attribution
     public static InviteAttribution getAttribution() {
-        if (resolved == null) {
-            resolved = readAttribution();
+        InviteAttribution a = resolved;
+        if (a == null) {
+            a = readAttribution();
+            resolved = a;
         }
-        return resolved;
+        return a;
     }
 
     /// Where attribution has got to: one of the `STATE_` constants.
@@ -504,7 +511,7 @@ public final class Invites {
         putIfSet(p, "channel", a.getChannel());
         putIfSet(p, "action", action);
         if (value != 0d) {
-            p.put("value", new Double(value));
+            p.put("value", Double.valueOf(value));
         }
         putIfSet(p, "currency", currency);
         Analytics.autoEvent("invite_converted", CATEGORY, p);
@@ -697,8 +704,7 @@ public final class Invites {
             // source degrades uniqueness, not security. Reported once rather
             // than failing the invite.
             Log.e(t);
-            java.util.Random r = new java.util.Random();
-            r.nextBytes(raw);
+            FALLBACK_RANDOM.nextBytes(raw);
         }
         String s = Base64.encodeUrlSafe(raw);
         int pad = s.indexOf('=');
@@ -997,8 +1003,8 @@ public final class Invites {
         body.put("osVersion", InviteStore.get(pending, "osVersion", ""));
         body.put("deviceModel", InviteStore.get(pending, "deviceModel", ""));
         body.put("locale", InviteStore.get(pending, "locale", ""));
-        body.put("screenWidth", new Integer(InviteStore.getInt(pending, "screenWidth", 0)));
-        body.put("screenHeight", new Integer(InviteStore.getInt(pending, "screenHeight", 0)));
+        body.put("screenWidth", Integer.valueOf(InviteStore.getInt(pending, "screenWidth", 0)));
+        body.put("screenHeight", Integer.valueOf(InviteStore.getInt(pending, "screenHeight", 0)));
         post(getLinkBase() + PATH_MATCH, body, MATCH_FINGERPRINT, true);
     }
 
@@ -1034,27 +1040,19 @@ public final class Invites {
         return body;
     }
 
-    private static void post(String url, Map<String, Object> body, final String matchType,
-            final boolean deferred) {
+    private static void post(String url, Map<String, Object> body, String matchType,
+            boolean deferred) {
+        send(url, JSONParser.mapToJson(body), matchType, deferred, false);
+    }
+
+    private static void send(String url, String json, String matchType, boolean deferred,
+            boolean registration) {
         try {
-            ConnectionRequest req = new ConnectionRequest() {
-                private String payload;
-
-                @Override
-                protected void readResponse(InputStream input) throws IOException {
-                    byte[] data = Util.readInputStream(input);
-                    payload = data == null ? null : new String(data, "UTF-8");
-                }
-
-                @Override
-                protected void postResponse() {
-                    handleResolution(payload, matchType, deferred);
-                }
-            };
+            InviteConnection req = new InviteConnection(matchType, deferred, registration);
             req.setUrl(url);
             req.setPost(true);
             req.setContentType("application/json");
-            req.setRequestBody(JSONParser.mapToJson(body));
+            req.setRequestBody(json);
             req.setFailSilently(true);
             NetworkManager.getInstance().addToQueue(req);
         } catch (Throwable t) {
@@ -1062,7 +1060,62 @@ public final class Invites {
         }
     }
 
-    private static void handleResolution(String payload, String matchType, boolean deferred) {
+    // One request type for every invite call. Named rather than anonymous so
+    // the two call sites share a single implementation, and so the equals()
+    // exemption a one-shot request needs is scoped to one class.
+    private static final class InviteConnection extends ConnectionRequest {
+        private final String matchType;
+        private final boolean deferred;
+        private final boolean registration;
+        private String payload;
+
+        InviteConnection(String matchType, boolean deferred, boolean registration) {
+            this.matchType = matchType;
+            this.deferred = deferred;
+            this.registration = registration;
+        }
+
+        @Override
+        protected void readResponse(InputStream input) throws IOException {
+            payload = new String(Util.readInputStream(input), "UTF-8");
+        }
+
+        @Override
+        protected void postResponse() {
+            if (registration) {
+                applySlug(payload);
+            } else {
+                handleResolution(payload, matchType, deferred);
+            }
+        }
+    }
+
+    // The link service hands back the per-application path segment on any
+    // answer. Remembering it is what lets later invites mint the precise form
+    // that keeps two enrolled applications on one device from claiming each
+    // other's links.
+    private static void applySlug(String payload) {
+        try {
+            if (payload == null || payload.length() == 0) {
+                return;
+            }
+            Map<String, Object> r = JSONParser.parseJSON(payload);
+            if (r == null) {
+                return;
+            }
+            Object slug = r.get("slug");
+            if (slug instanceof String && ((String) slug).length() > 0) {
+                Preferences.set(PREF_SLUG, (String) slug);
+            }
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
+    // Package private rather than private so the unit tests can drive the real
+    // resolution path with a canned server answer instead of racing the
+    // network thread.
+    static void handleResolution(String payload, String matchType, boolean deferred) {
         try {
             if (payload == null || payload.length() == 0) {
                 return;
@@ -1071,10 +1124,7 @@ public final class Invites {
             if (json == null) {
                 return;
             }
-            Object slug = json.get("slug");
-            if (slug instanceof String && ((String) slug).length() > 0) {
-                Preferences.set(PREF_SLUG, (String) slug);
-            }
+            applySlug(payload);
             if (!truthy(json.get("resolved"))) {
                 state = STATE_NONE_FOUND;
                 notifyUnavailable(REASON_NO_MATCH);
@@ -1100,11 +1150,15 @@ public final class Invites {
             Object rawParams = json.get("parameters");
             if (rawParams instanceof Map) {
                 Map raw = (Map) rawParams;
-                for (java.util.Iterator i = raw.keySet().iterator(); i.hasNext();) {
-                    Object k = i.next();
-                    Object v = raw.get(k);
-                    if (k instanceof String && v instanceof String) {
-                        params.put((String) k, (String) v);
+                for (java.util.Iterator i = raw.entrySet().iterator(); i.hasNext();) {
+                    Object next = i.next();
+                    if (next instanceof Map.Entry) {
+                        Map.Entry en = (Map.Entry) next;
+                        Object k = en.getKey();
+                        Object v = en.getValue();
+                        if (k instanceof String && v instanceof String) {
+                            params.put((String) k, (String) v);
+                        }
                     }
                 }
             }
@@ -1261,45 +1315,8 @@ public final class Invites {
         InviteStore.writeOutbox(new java.util.ArrayList<String>());
     }
 
-    private static void postRegistration(final String json) {
-        try {
-            ConnectionRequest req = new ConnectionRequest() {
-                private String payload;
-
-                @Override
-                protected void readResponse(InputStream input) throws IOException {
-                    byte[] data = Util.readInputStream(input);
-                    payload = data == null ? null : new String(data, "UTF-8");
-                }
-
-                @Override
-                protected void postResponse() {
-                    try {
-                        if (payload == null || payload.length() == 0) {
-                            return;
-                        }
-                        Map<String, Object> r = JSONParser.parseJSON(payload);
-                        if (r == null) {
-                            return;
-                        }
-                        Object slug = r.get("slug");
-                        if (slug instanceof String && ((String) slug).length() > 0) {
-                            Preferences.set(PREF_SLUG, (String) slug);
-                        }
-                    } catch (Throwable t) {
-                        Log.e(t);
-                    }
-                }
-            };
-            req.setUrl(getLinkBase() + PATH_MINT);
-            req.setPost(true);
-            req.setContentType("application/json");
-            req.setRequestBody(json);
-            req.setFailSilently(true);
-            NetworkManager.getInstance().addToQueue(req);
-        } catch (Throwable t) {
-            Log.e(t);
-        }
+    private static void postRegistration(String json) {
+        send(getLinkBase() + PATH_MINT, json, MATCH_DIRECT, false, true);
     }
 
     private static boolean truthy(Object o) {

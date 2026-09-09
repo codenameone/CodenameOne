@@ -68,19 +68,26 @@ final class InviteStore {
                 return null;
             }
             Object o = s.readObject(record);
-            if (!(o instanceof Map)) {
-                return null;
-            }
-            Map<String, String> out = new LinkedHashMap<String, String>();
-            Map raw = (Map) o;
-            for (Iterator i = raw.keySet().iterator(); i.hasNext();) {
-                Object k = i.next();
-                Object v = raw.get(k);
-                if (k instanceof String && v instanceof String) {
-                    out.put((String) k, (String) v);
+            // Positive instanceof guards throughout: ParparVM does not throw
+            // on a failed cast, so the catch below would never see one and the
+            // wrong object would simply be read as the wrong type.
+            if (o instanceof Map) {
+                Map raw = (Map) o;
+                Map<String, String> out = new LinkedHashMap<String, String>();
+                for (Iterator i = raw.entrySet().iterator(); i.hasNext();) {
+                    Object next = i.next();
+                    if (next instanceof Map.Entry) {
+                        Map.Entry en = (Map.Entry) next;
+                        Object k = en.getKey();
+                        Object v = en.getValue();
+                        if (k instanceof String && v instanceof String) {
+                            out.put((String) k, (String) v);
+                        }
+                    }
                 }
+                return out;
             }
-            return out;
+            return null;
         } catch (Throwable t) {
             Log.e(t);
             return null;
@@ -121,14 +128,13 @@ final class InviteStore {
                 return out;
             }
             Object o = s.readObject(OUTBOX);
-            if (!(o instanceof List)) {
-                return out;
-            }
-            List raw = (List) o;
-            for (int i = 0; i < raw.size(); i++) {
-                Object v = raw.get(i);
-                if (v instanceof String) {
-                    out.add((String) v);
+            if (o instanceof List) {
+                List raw = (List) o;
+                for (int i = 0; i < raw.size(); i++) {
+                    Object v = raw.get(i);
+                    if (v instanceof String) {
+                        out.add((String) v);
+                    }
                 }
             }
         } catch (Throwable t) {
