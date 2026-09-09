@@ -430,6 +430,16 @@ public class SelfTest {
         } catch (Exception expected) {
             refusedBucket = true;
         }
+        // Both arms must refuse the same configuration. The translated one used to
+        // cast this to an unsigned short, so 65536 became 0 and the server came up
+        // on an arbitrary port while the Java SE loop rejected it.
+        boolean refusedPort = false;
+        try {
+            ServerSocket.bind(null, 65536, 16);
+        } catch (Exception expected) {
+            refusedPort = true;
+        }
+        check("a port above 65535 is refused", "true", String.valueOf(refusedPort));
         check("a bucket name that rewrites the host is refused", "true",
                 String.valueOf(refusedBucket));
         boolean signedOrdinary = false;

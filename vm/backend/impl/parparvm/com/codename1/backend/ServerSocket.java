@@ -42,6 +42,14 @@ public final class ServerSocket {
      * - `port`: 0 to let the OS choose, then ask {@link #getPort}
      */
     public static ServerSocket bind(String host, int port, int backlog) throws IOException {
+        // The native side casts this to unsigned short, so 65536 became 0 and the
+        // process listened on an arbitrary port instead of refusing the setting.
+        // The Java SE arm rejects it through InetSocketAddress, so a PORT tested
+        // with cn1:backend behaved differently once packaged -- and an arbitrary
+        // port is the worst way to find out, because the process starts.
+        if(port < 0 || port > 65535) {
+            throw new IllegalArgumentException("port out of range: " + port);
+        }
         int fd = bindImpl(host, port, backlog);
         if(fd < 0) {
             throw new IOException("Could not bind " + (host == null ? "*" : host) + ":" + port);
