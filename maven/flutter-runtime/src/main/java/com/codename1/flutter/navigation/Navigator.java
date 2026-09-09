@@ -163,6 +163,9 @@ public class Navigator extends StatelessWidget {
             // FlutterUI.mountInNewForm does that for every Form it builds, this one
             // included, so there is nothing to do here.
             stack.add(e);
+            // Without this the Form replaces the screen outright and the page is fully
+            // painted on the first frame after the tap. Flutter always animates a route in.
+            RouteTransitions.apply(e.form, route);
             e.form.show();
         } else {
             stack.add(e);

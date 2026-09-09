@@ -60,6 +60,11 @@ public class MaterialPageRoute<T> extends Route<T> {
         this.fullscreenDialog = v;
     }
 
+    @Override
+    public boolean isFullscreenDialog() {
+        return Boolean.TRUE.equals(fullscreenDialog);
+    }
+
     public Funcs.Func1<BuildContext, Widget> getBuilder() {
         return builder;
     }

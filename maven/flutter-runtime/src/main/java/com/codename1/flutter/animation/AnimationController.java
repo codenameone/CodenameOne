@@ -63,6 +63,16 @@ public class AnimationController extends Animation<Double> {
     private double runStartValue;
     private double runTargetValue;
     private AnimationStatus runStatus;
+    /**
+     * The curve this run eases along, or null for a linear run.
+     *
+     * <p>{@code animateTo}/{@code animateBack} take a curve in Flutter and it shapes the
+     * controller's own progress; {@code forward}, {@code reverse} and {@code fling} are
+     * linear. Dropping it made every eased call linear, which is not a subtle difference:
+     * Reply opens its drawer with {@code animateTo(0.4, curve: Easing.legacy)}, and a
+     * linear run starts and stops abruptly where the real one eases in and settles.</p>
+     */
+    private Curve runCurve;
 
     // Repeat config.
     private boolean repeating;
@@ -209,14 +219,14 @@ public class AnimationController extends Animation<Double> {
         repeating = false;
         long d = duration != null ? duration.inMilliseconds() : durationMs;
         AnimationStatus dir = target >= currentValue ? AnimationStatus.forward : AnimationStatus.reverse;
-        beginRun(clamp(target), d, dir);
+        beginRun(clamp(target), d, dir, curve);
     }
 
     public void animateBack(double target, Duration duration, Curve curve) {
         repeating = false;
         long d = duration != null ? duration.inMilliseconds()
                 : (reverseDurationMs >= 0 ? reverseDurationMs : durationMs);
-        beginRun(clamp(target), d, AnimationStatus.reverse);
+        beginRun(clamp(target), d, AnimationStatus.reverse, curve);
     }
 
     public void repeat(Double min, Double max, Boolean reverse, Duration period) {
@@ -257,6 +267,10 @@ public class AnimationController extends Animation<Double> {
     // ------------------------------------------------------------------
 
     private void beginRun(double target, long dMs, AnimationStatus phase) {
+        beginRun(target, dMs, phase, null);
+    }
+
+    private void beginRun(double target, long dMs, AnimationStatus phase, Curve curve) {
         generation++;
         final int gen = generation;
         running = true;
@@ -264,6 +278,7 @@ public class AnimationController extends Animation<Double> {
         runTargetValue = target;
         runDurationMs = Math.max(0, dMs);
         runStatus = phase;
+        runCurve = curve;
         // NOT now(): the run is timed from its FIRST tick, which is what Flutter's Ticker
         // does (it records _startTime inside the first frame callback). The gap between
         // "start the animation" and "the clock reaches it" is setup - the setState that
@@ -371,6 +386,9 @@ public class AnimationController extends Animation<Double> {
                 FrameDriver.remove(this);
             }
             return;
+        }
+        if (runCurve != null) {
+            t = runCurve.transform(t);
         }
         currentValue = runStartValue + (runTargetValue - runStartValue) * t;
         notifyListeners();

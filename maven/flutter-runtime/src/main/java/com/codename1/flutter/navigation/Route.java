@@ -24,11 +24,14 @@
 package com.codename1.flutter.navigation;
 
 /**
- * Base type of a navigable route — Flutter's {@code Route<T>}. Minimal marker
- * added so typed route factories (a demo function returning {@code
- * Route<String>}) accept the concrete Cupertino route subclasses. The
- * navigation category may later flesh this out; the Cupertino routes only
- * rely on it as a common supertype.
+ * Base type of a navigable route — Flutter's {@code Route<T>}.
+ *
+ * <p>{@link #buildPage} is the one thing every route has to answer, and having
+ * it here is what stops the navigator caring which kind of route it holds. It
+ * used to ask {@code instanceof MaterialPageRoute} and build nothing for
+ * anything else, so a nested navigator handed a Cupertino route — as the
+ * Cupertino navigation-bar demo does — rendered a blank screen with nothing
+ * reported.
  *
  * @param <T> the value type the route completes with when popped
  */
@@ -47,5 +50,43 @@ public abstract class Route<T> {
 
     public RouteSettings settings() {
         return settings;
+    }
+
+    /**
+     * The page this route displays, or null when it cannot build one.
+     *
+     * <p>Every concrete route overrides this; a route that does not is a gap
+     * worth reporting rather than a blank screen, which is why the navigator
+     * reports a null page.</p>
+     */
+    /**
+     * How long this route's entrance runs, or -1 to take the platform's page duration.
+     * Flutter reads this off the route ({@code Route.transitionDuration}); a route with
+     * motion of its own -- a container transform, a custom PageRouteBuilder -- sets it.
+     */
+    public int transitionMillis() {
+        return -1;
+    }
+
+    /**
+     * Whether this route enters as a full-screen modal, which Flutter animates up from the
+     * bottom edge rather than in from the side.
+     */
+    public boolean isFullscreenDialog() {
+        return false;
+    }
+
+    /**
+     * Whether this route is an expanding container transform rather than a page push. The
+     * real effect grows the tapped card into the page; a route is a Form of its own here,
+     * so the closest honest approximation is a cross-fade, which at least reads as the
+     * same surface changing rather than a new page arriving from off-screen.
+     */
+    public boolean isContainerTransform() {
+        return false;
+    }
+
+    public com.codename1.flutter.Widget buildPage(com.codename1.flutter.BuildContext context) {
+        return null;
     }
 }

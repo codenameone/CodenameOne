@@ -171,8 +171,21 @@ public class OpenContainer<T> extends StatelessWidget {
         if (openBuilder == null) {
             return;
         }
+        // The route carries the container transform's identity and duration, so the
+        // Navigator animates it as an expanding surface rather than as a page push.
         com.codename1.flutter.navigation.MaterialPageRoute<T> route =
-                new com.codename1.flutter.navigation.MaterialPageRoute<T>();
+                new com.codename1.flutter.navigation.MaterialPageRoute<T>() {
+                    @Override
+                    public boolean isContainerTransform() {
+                        return true;
+                    }
+
+                    @Override
+                    public int transitionMillis() {
+                        return transitionDuration == null
+                                ? -1 : (int) transitionDuration.inMilliseconds();
+                    }
+                };
         route.builder(new dart.runtime.Funcs.Func1<BuildContext, Widget>() {
             @Override
             public Widget call(BuildContext routeContext) {
