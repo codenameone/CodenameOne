@@ -346,7 +346,17 @@ public final class HugoDoclet implements Doclet {
         }
 
         api.put("nested", nestedRows(type));
-        api.put("fields", memberRows(ElementFilter.fieldsIn(owned), type));
+        // An enum constant is a field in the model and not one on the page: the
+        // standard reference gives it its own summary and detail sections and no
+        // field summary at all, where this rendered "public static final
+        // BindAttr TEXT" under Fields.
+        List<VariableElement> enumConstants = new ArrayList<>();
+        List<VariableElement> plainFields = new ArrayList<>();
+        for (VariableElement field : ElementFilter.fieldsIn(owned)) {
+            (field.getKind() == ElementKind.ENUM_CONSTANT ? enumConstants : plainFields).add(field);
+        }
+        api.put("enumConstants", memberRows(enumConstants, type));
+        api.put("fields", memberRows(plainFields, type));
         api.put("constructors", executableRows(
                 ElementFilter.constructorsIn(type.getEnclosedElements()), type));
         api.put("methods", executableRows(dedupeBySignature(ElementFilter.methodsIn(owned)), type));
@@ -631,7 +641,14 @@ public final class HugoDoclet implements Doclet {
                 continue;
             }
             Map<String, Object> row = baseRow(field, doc, owner);
-            row.put("fieldType", typeNames.reference(field.asType()));
+            boolean isEnumConstant = field.getKind() == ElementKind.ENUM_CONSTANT;
+            row.put("enumConstant", isEnumConstant);
+            if (isEnumConstant) {
+                // "public static final BindAttr TEXT" is how the model spells it
+                // and not how anyone writes or reads it.
+                row.put("modifiers", "");
+            }
+            row.put("fieldType", isEnumConstant ? null : typeNames.reference(field.asType()));
             Object constant = field.getConstantValue();
             row.put("constant", Literals.of(constant));
             out.add(row);

@@ -238,6 +238,17 @@ class HugoDocletTest {
                 "public class UsesShared {}",
                 ""), StandardCharsets.UTF_8);
 
+        Files.writeString(sources.resolve("Colour.java"), String.join("\n",
+                "package p;",
+                "/// A colour.",
+                "public enum Colour {",
+                "    /// The red one",
+                "    RED,",
+                "    /// The green one",
+                "    GREEN",
+                "}",
+                ""), StandardCharsets.UTF_8);
+
         Files.writeString(sources.resolve("Marker.java"), String.join("\n",
                 "package p;",
                 "/// A marker interface inherited by everything below Holder.",
@@ -311,6 +322,7 @@ class HugoDocletTest {
                     sources.resolve("Child.java"),
                     sources.resolve("Shared.java"), sources.resolve("UsesShared.java"),
                     sources.resolve("Listener.java"), sources.resolve("Marker.java"),
+                    sources.resolve("Colour.java"),
                     sources.resolve("Hidden.java"), sources.resolve("Visible.java"),
                     sources.resolve("Holder.java"),
                     sources.resolve("Middle.java"), sources.resolve("Ints.java"),
@@ -630,6 +642,25 @@ class HugoDocletTest {
         String row = page.substring(at, Math.min(page.length(), at + 900));
         assertFalse(row.contains("#### See also"), "the heading is not in the banner: " + row);
         assertTrue(row.contains("/javadoc/p/Shared/"), "and the reference resolved: " + row);
+    }
+
+    @Test
+    void rendersEnumConstantsSeparatelyFromFields() throws IOException {
+        // An enum constant is a field in the model and not one on the page. The
+        // standard reference gives them their own summary and detail and no
+        // field summary at all, where BindAttr was listing "public static final
+        // BindAttr TEXT" under Fields.
+        String page = page("Colour.md");
+        // Asserting only that the key exists passes with the fix removed, because
+        // the key is written either way -- empty. What differs is which list the
+        // constants land in, so assert that the field list is the empty one.
+        assertTrue(page.contains("\"fields\": []"),
+                "an enum has no fields, only constants: " + page);
+        int at = page.indexOf("\"enumConstants\"");
+        assertTrue(at > 0 && page.indexOf("\"RED\"", at) > 0,
+                "and RED is one of the constants");
+        assertFalse(page.contains("\"public static final\""),
+                "without the modifiers the model reports but nobody writes");
     }
 
     @Test

@@ -101,6 +101,7 @@
   </section>
   {{- end }}
 
+  {{ partial "javadoc/summary-table.html" (dict "rows" $j.enumConstants "title" "Enum constants" "page" .) }}
   {{ partial "javadoc/summary-table.html" (dict "rows" $j.fields "title" "Fields" "page" .) }}
   {{ partial "javadoc/summary-table.html" (dict "rows" $j.constructors "title" "Constructors" "page" .) }}
   {{ partial "javadoc/summary-table.html" (dict "rows" $j.methods "title" "Methods" "page" .) }}
@@ -153,6 +154,13 @@
       </p>
     </div>
     {{- end }}
+  </section>
+  {{- end }}
+
+  {{- if $j.enumConstants }}
+  <section class="cn1-api-details">
+    <h2 class="cn1-api-details__title">Enum constant details</h2>
+    {{- range $j.enumConstants }}{{ partial "javadoc/member-detail.html" (dict "member" . "page" $) }}{{ end }}
   </section>
   {{- end }}
 
