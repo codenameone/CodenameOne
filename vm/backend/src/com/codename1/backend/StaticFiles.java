@@ -217,16 +217,23 @@ public final class StaticFiles implements HttpServer.Handler {
             String range = request.getHeader("range");
             if(range != null && rangeIsFresh(request, etag, modified)) {
                 long[] parsed = parseRange(range, size);
-                if(parsed == null) {
+                if(parsed == IGNORE_RANGE) {
+                    // Nothing wrong with the request; this server just cannot
+                    // answer it as a range. Send the representation whole.
+                    parsed = null;
+                } else if(parsed == null) {
                     headers.put("Content-Range", "bytes */" + size);
                     FileIo.close(fd);
                     release = false;
                     return HttpServer.Response.empty(416, contentType(decoded), headers);
                 }
-                offset = parsed[0];
-                length = parsed[1];
-                status = 206;
-                headers.put("Content-Range", "bytes " + offset + "-" + (offset + length - 1) + "/" + size);
+                if(parsed != null) {
+                    offset = parsed[0];
+                    length = parsed[1];
+                    status = 206;
+                    headers.put("Content-Range",
+                            "bytes " + offset + "-" + (offset + length - 1) + "/" + size);
+                }
             }
 
             release = false; // the server owns the descriptor from here
@@ -295,20 +302,38 @@ public final class StaticFiles implements HttpServer.Handler {
     }
 
     /** Returns {offset, length}, or null when the range cannot be satisfied. */
+    /**
+     * Returned when the Range field cannot be honoured but nothing about it is
+     * wrong: the whole representation is sent, with a 200, exactly as if the
+     * client had not asked. Distinct from null, which means every range asked
+     * for is unsatisfiable and 416 is the answer.
+     */
+    static final long[] IGNORE_RANGE = new long[0];
+
     static long[] parseRange(String header, long size) {
         String value = header.trim();
         if(!value.startsWith("bytes=")) {
-            return null;
+            return IGNORE_RANGE;
         }
         value = value.substring("bytes=".length());
         if(value.indexOf(',') >= 0) {
-            // Multi-range needs a multipart/byteranges body. Refusing is allowed
-            // and honest; pretending to satisfy only the first range is not.
-            return null;
+            // Multi-range needs a multipart/byteranges body, which this does not
+            // build. But NOT satisfying a range is not the same as the range being
+            // unsatisfiable, and 416 says the second: RFC 9110 15.5.17 is for the
+            // case where none of what was asked for exists, and "bytes=0-99,200-299"
+            // over a large enough file is entirely satisfiable -- this server simply
+            // will not assemble it. The rule for a Range that cannot be honoured is
+            // to IGNORE the field and send the whole representation, which every
+            // client understands, rather than to refuse a request that is correct.
+            return IGNORE_RANGE;
         }
         int dash = value.indexOf('-');
         if(dash < 0) {
-            return null;
+            // Not a byte-range-spec at all. RFC 9110 14.2 says to IGNORE a Range
+            // the server cannot parse, not to refuse the request over it -- 416
+            // asserts that what was asked for does not exist, which is a claim
+            // this cannot make about a field it did not understand.
+            return IGNORE_RANGE;
         }
         String fromText = value.substring(0, dash).trim();
         String toText = value.substring(dash + 1).trim();
@@ -344,7 +369,9 @@ public final class StaticFiles implements HttpServer.Handler {
             }
             return new long[]{from, to - from + 1};
         } catch (NumberFormatException err) {
-            return null;
+            // Digits that are not digits: unparseable, so ignored for the same
+            // reason as above rather than answered 416.
+            return IGNORE_RANGE;
         }
     }
 

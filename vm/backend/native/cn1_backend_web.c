@@ -137,6 +137,18 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
         JAVA_ARRAY arr = (JAVA_ARRAY)body;
         bodyLength = arr->length;
         bodyCopy = (char*)malloc(bodyLength == 0 ? 1 : (size_t)bodyLength);
+        if(bodyCopy == NULL && bodyLength > 0) {
+            /* The request must NOT go out without it. The POSTFIELDS block below
+               is skipped when bodyCopy is null, so a failed allocation sent the
+               same request with an EMPTY body and reported success: an S3
+               putObject would replace the object with nothing, and the caller
+               would be told it worked. A request whose body could not be made is
+               a failed request. */
+            free(urlCopy);
+            free(methodCopy);
+            curl_slist_free_all(headers);
+            return 0;
+        }
         if(bodyCopy != NULL && bodyLength > 0) {
             memcpy(bodyCopy, (JAVA_ARRAY_BYTE*)arr->data, (size_t)bodyLength);
         }
@@ -192,7 +204,18 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
 #endif
     }
     curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    /* A CONNECT deadline and a STALL deadline, not a deadline on the whole
+       transfer. CURLOPT_TIMEOUT caps the entire operation, so a large upload or
+       download that is progressing perfectly well is aborted at 30 seconds for
+       no reason other than its size -- and the Java SE arm does not do that: it
+       sets a READ timeout, which fires only when a single read stalls. The two
+       have to agree, or an S3 object big enough to take half a minute transfers
+       under cn1:backend and fails once packaged.
+       LOW_SPEED_LIMIT/LOW_SPEED_TIME is libcurl's spelling of the same idea:
+       give up when the transfer makes essentially no progress for 30s. */
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);
+    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 30L);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "codenameone-backend");
     /* CN1_WEB_VERBOSE=1 makes libcurl narrate the exchange on stderr. Off by

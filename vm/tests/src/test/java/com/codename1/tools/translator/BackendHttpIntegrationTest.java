@@ -379,6 +379,22 @@ class BackendHttpIntegrationTest {
 
         assertEquals(416, status(request("GET", "/static/big.bin", null,
                 new String[]{"Range: bytes=999999999-"})));
+
+        // A multi-range request is VALID and satisfiable; this server just does
+        // not assemble multipart/byteranges. 416 asserts that none of what was
+        // asked for exists, which is a different and untrue statement, so the
+        // Range is ignored and the whole representation is sent instead.
+        byte[] multi = request("GET", "/static/big.bin", null,
+                new String[]{"Range: bytes=0-99,200-299"});
+        assertEquals(200, statusOf(multi),
+                "a satisfiable multi-range must not be refused as unsatisfiable");
+        assertEquals("262144", header(multi, "Content-Length"));
+        assertEquals(null, header(multi, "Content-Range"),
+                "a 200 describes the whole representation, so it carries no Content-Range");
+
+        // And a Range that cannot be parsed at all is ignored for the same reason.
+        assertEquals(200, status(request("GET", "/static/big.bin", null,
+                new String[]{"Range: bytes=abc"})));
     }
 
     @Test
