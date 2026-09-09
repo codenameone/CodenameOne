@@ -526,6 +526,19 @@ public class BackendPackageMojo extends AbstractMojo {
                 // provably miscompiles the output without these.
                 "-fwrapv", "-fno-strict-aliasing",
                 "-fno-builtin-fmod", "-fno-builtin-fmodf"));
+        if (!sqlite) {
+            // Turning the engine OFF is two changes, not one. Without
+            // -Dcn1.sqlite=true the translator leaves cn1_sqlite3.h out, but
+            // cn1_backend_db.c is copied and compiled either way -- and its
+            // SQLite branch includes that header unconditionally, so the compile
+            // fails with "cn1_sqlite3.h file not found" and the option advertised
+            // as saving the engine could not produce a binary at all. The macro
+            // is what compiles that file to stubs instead, which answer "could
+            // not open" and become an IOException, rather than dropping the Db
+            // natives and taking their Java methods with them. build.sh has
+            // always set both; this half had only the first.
+            command.add("-DCN1_BACKEND_NO_SQLITE");
+        }
         if (cflags != null && cflags.trim().length() > 0) {
             command.addAll(Arrays.asList(cflags.trim().split("\\s+")));
         }

@@ -156,6 +156,18 @@ static _Atomic long cn1H2OpenFileBodies = 0;
    from what the bodies actually hold. */
 static _Atomic long cn1H2PendingBodyBytes = 0;
 
+/* And the INBOUND side, for the identical reason. The per-session ceilings below
+   bound one connection; the connection ceiling is in the thousands, so a few
+   clients holding streams just under their session limit still add up to the
+   whole machine. Counted where a request's bytes are added -- header fields and
+   body chunks -- and released in cn1H2FreeRequest, which is the one place a
+   request's memory goes away. */
+static _Atomic long cn1H2InboundBytes = 0;
+/* The ceiling on that total. Four sessions' worth: enough that no honest client
+   meets it, small enough that a dishonest fleet cannot walk past it. */
+#define CN1_H2_MAX_PROCESS_INBOUND_BYTES (4 * (CN1_H2_MAX_SESSION_BODY_BYTES \
+        + CN1_H2_MAX_SESSION_HEADER_BYTES))
+
 static void cn1H2FreeBody(CN1H2Body* body) {
     if(body->data != NULL && body->length > body->offset) {
         atomic_fetch_sub_explicit(&cn1H2PendingBodyBytes,
@@ -211,6 +223,8 @@ static void cn1H2FreeRequest(CN1H2Request* r) {
     if(r == NULL) {
         return;
     }
+    atomic_fetch_sub_explicit(&cn1H2InboundBytes,
+            (long)(r->bodyLength + r->headerBytes), memory_order_relaxed);
     free(r->method);
     free(r->path);
     free(r->scheme);
@@ -337,6 +351,16 @@ static int cn1H2OnHeader(nghttp2_session* session, const nghttp2_frame* frame,
             return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
         }
     }
+    /* Charged unconditionally, because r->headerBytes above already counts these
+       bytes and cn1H2FreeRequest gives back exactly that -- so the two have to
+       move together whether or not this field is the one that crosses the line.
+       Refusing the stream is what releases them. */
+    atomic_fetch_add_explicit(&cn1H2InboundBytes, (long)(nameLen + valueLen),
+                              memory_order_relaxed);
+    if(atomic_load_explicit(&cn1H2InboundBytes, memory_order_relaxed)
+            > CN1_H2_MAX_PROCESS_INBOUND_BYTES) {
+        return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+    }
     /* The pseudo-headers carry what a request line carries in HTTP/1.1. */
     if(nameLen == 7 && memcmp(name, ":method", 7) == 0) {
         r->method = cn1H2Dup(value, valueLen);
@@ -413,6 +437,16 @@ static int cn1H2OnData(nghttp2_session* session, uint8_t flags, int32_t streamId
             return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
         }
     }
+    /* Tested before the append and charged after it, because cn1H2FreeRequest
+       gives back bodyLength: charging first would strand the bytes of an append
+       that then FAILS to grow the buffer, and the counter would drift up until
+       it refused everything. The load-then-add can overshoot when two sessions
+       cross together, by at most one chunk each, which is the right trade for a
+       coarse memory guard -- the alternative is a lock on the data path. */
+    if(atomic_load_explicit(&cn1H2InboundBytes, memory_order_relaxed) + (long)length
+            > CN1_H2_MAX_PROCESS_INBOUND_BYTES) {
+        return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+    }
     if(r->bodyLength + length > r->bodyCapacity) {
         size_t grown = (r->bodyLength + length) * 2 + 1024;
         if(grown > CN1_H2_MAX_BODY_BYTES) {
@@ -427,6 +461,7 @@ static int cn1H2OnData(nghttp2_session* session, uint8_t flags, int32_t streamId
     }
     memcpy(r->body + r->bodyLength, data, length);
     r->bodyLength += length;
+    atomic_fetch_add_explicit(&cn1H2InboundBytes, (long)length, memory_order_relaxed);
     return 0;
 }
 
