@@ -418,6 +418,20 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("a Connection option is matched as a whole token, not a substring")
+    void connectionOptionsAreWholeTokens() throws Exception {
+        // "disclose" contains "close". Read as a substring it shut the connection,
+        // so an extension token this server has never heard of decided the framing.
+        // The second request is only answered if the first did not close.
+        byte[] response = raw("GET /healthz HTTP/1.1\r\nHost: x\r\nConnection: disclose\r\n\r\n"
+                + "GET /healthz HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
+        String text = new String(response, StandardCharsets.UTF_8);
+        assertEquals(2, countOccurrences(text, "HTTP/1.1 "),
+                "Connection: disclose is not Connection: close, so the connection had to "
+                        + "stay open for the second request:\n" + text);
+    }
+
+    @Test
     @DisplayName("Content-Length together with Transfer-Encoding is refused")
     void refusesConflictingFraming() throws Exception {
         // Two framings in one request is how a request is smuggled past a proxy

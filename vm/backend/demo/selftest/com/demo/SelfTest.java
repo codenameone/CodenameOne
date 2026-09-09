@@ -450,6 +450,17 @@ public class SelfTest {
             signedOrdinary = false;
         }
         check("an ordinary bucket still signs", "true", String.valueOf(signedOrdinary));
+        // A lifetime outside SigV4's 1 second to 7 days produces a URL that looks
+        // right and is refused when the device tries to use it, which is a failure
+        // a long way from the call that caused it.
+        boolean refusedLifetime = false;
+        try {
+            s3.presignGet("ordinary-bucket", "k", 0);
+        } catch (Exception expected) {
+            refusedLifetime = true;
+        }
+        check("a presigned URL with no lifetime is refused", "true",
+                String.valueOf(refusedLifetime));
         check("the same character escaped is accepted", "a\nb",
                 String.valueOf(Json.parseObject("{\"s\":\"a\\nb\"}").get("s")));
 

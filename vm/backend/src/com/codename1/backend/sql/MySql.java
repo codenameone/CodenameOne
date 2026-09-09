@@ -265,7 +265,13 @@ public final class MySql {
             byte[] third = Crypto.sha256(concat(second, scramble));
             return xor(first, third);
         }
-        if("mysql_native_password".equals(plugin) || "mysql_old_password".equals(plugin)) {
+        // NOT mysql_old_password. It was accepted here and answered with the
+        // mysql_native_password scramble, which is a different algorithm entirely --
+        // the pre-4.1 one -- so such an account was always rejected by the server
+        // while the message below already said this client does not speak it. The
+        // plugin is removed in MySQL 8.0 and its hash is broken by design, so it
+        // falls through to that message rather than being implemented.
+        if("mysql_native_password".equals(plugin)) {
             // XOR(SHA1(password), SHA1(scramble + SHA1(SHA1(password))))
             byte[] first = Crypto.sha1(secret);
             byte[] second = Crypto.sha1(first);

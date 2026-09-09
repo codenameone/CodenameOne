@@ -173,6 +173,9 @@ public final class Aws {
      * proxying the bytes through the server, which is most of the reason to use
      * object storage from an app at all.
      */
+    /** SigV4's ceiling: seven days. */
+    private static final int MAX_PRESIGN_SECONDS = 7 * 24 * 60 * 60;
+
     public static String presign(Credentials credentials, String region, String service,
             String method, String host, String path, Map query, int expiresSeconds,
             String timestamp) throws IOException {
@@ -184,6 +187,15 @@ public final class Aws {
     public static String presign(Credentials credentials, String region, String service,
             String method, String host, String path, Map query, int expiresSeconds,
             String timestamp, boolean secure) throws IOException {
+        // SigV4 accepts 1 second to 7 days, and anything else produces a URL that
+        // LOOKS right and is refused when someone tries to use it. These URLs are
+        // handed straight to a device, so the failure would surface far from the
+        // call that caused it -- and a caller computing a lifetime from
+        // configuration is exactly how a zero or a negative one gets here.
+        if(expiresSeconds < 1 || expiresSeconds > MAX_PRESIGN_SECONDS) {
+            throw new IOException("A presigned URL lasts between 1 second and 7 days; "
+                    + expiresSeconds + " would be refused when it was used");
+        }
         String stamp = timestamp == null ? Clock.timestamp() : timestamp;
         String date = stamp.substring(0, 8);
         String scope = date + "/" + region + "/" + service + "/aws4_request";

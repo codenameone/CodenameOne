@@ -495,14 +495,57 @@ public final class HttpServer {
                 return null;
             }
             if(raw == null) {
-                Object v = headers.get(name.toLowerCase());
+                Object v = headers.get(asciiLower(name));
                 return v == null ? null : String.valueOf(v);
             }
             int at = indexOfHeader(name);
             if(at < 0) {
                 return null;
             }
-            return asciiString(raw, slices[at + 2], slices[at + 3]);
+            if(countHeader(name) == 1) {
+                return asciiString(raw, slices[at + 2], slices[at + 3]);
+            }
+            // Repeated field. getHeaders() combines these and the HTTP/2 path does
+            // too; returning only the first meant a handler reading getHeader saw
+            // less than one reading getHeaders, and cookies split across two Cookie
+            // fields -- which is legal on the wire -- simply vanished from the
+            // second one. Authentication that reads a cookie could then differ by
+            // which API it used, or by protocol.
+            //
+            // Cookie joins with "; " because that is its own delimiter (RFC 6265);
+            // everything else with "," as RFC 9110 5.3 defines for a list field.
+            String separator = "cookie".equalsIgnoreCase(name) ? "; " : ", ";
+            StringBuilder joined = new StringBuilder();
+            for(int iter = 0 ; iter < headerCount ; iter++) {
+                int base = iter * 4;
+                if(!sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], name)) {
+                    continue;
+                }
+                if(joined.length() > 0) {
+                    joined.append(separator);
+                }
+                joined.append(asciiString(raw, slices[base + 2], slices[base + 3]));
+            }
+            return joined.toString();
+        }
+
+        /**
+         * Lowercases an ASCII header name.
+         *
+         * NOT String.toLowerCase(), which is locale sensitive and has no overload
+         * here that takes a Locale: on a Turkish default the I of "COOKIE" folds to
+         * a dotless i and the lookup misses a header that is present. A field name
+         * is ASCII by specification, so it folds by hand. Six lines, copied rather
+         * than shared, as the other folds in this tree are.
+         */
+        private static String asciiLower(String name) {
+            int length = name.length();
+            StringBuilder out = new StringBuilder(length);
+            for(int iter = 0 ; iter < length ; iter++) {
+                char c = name.charAt(iter);
+                out.append(c >= 'A' && c <= 'Z' ? (char)(c + 32) : c);
+            }
+            return out.toString();
         }
 
         /** The slice index of a header, or -1. No allocation on either path. */
@@ -540,15 +583,85 @@ public final class HttpServer {
          * Whether a header's value contains a token, case-insensitively. Used for
          * "connection: keep-alive" and friends without materialising the value.
          */
+        /**
+         * Whether a comma-separated field lists this token.
+         *
+         * A WHOLE token, not a substring. "Connection: disclose" contains "close"
+         * and "not-keep-alive" contains "keep-alive", and a substring test read
+         * both as the option itself -- so an extension token nobody here has heard
+         * of decided whether the connection stays open, which is a framing
+         * decision made on an unrelated name. Every occurrence of the field is
+         * searched, because a repeated one is as legal as a repeated Cookie.
+         */
         boolean headerContains(String name, String token) {
             if(raw == null) {
-                Object v = headers == null ? null : headers.get(name.toLowerCase());
-                return v != null
-                        && String.valueOf(v).toLowerCase().indexOf(token.toLowerCase()) >= 0;
+                Object v = headers == null ? null : headers.get(asciiLower(name));
+                return v != null && listHasToken(String.valueOf(v), token);
             }
-            int at = indexOfHeader(name);
-            return at >= 0
-                    && sliceContainsIgnoreCase(raw, slices[at + 2], slices[at + 3], token);
+            for(int iter = 0 ; iter < headerCount ; iter++) {
+                int base = iter * 4;
+                if(!sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], name)) {
+                    continue;
+                }
+                if(sliceHasToken(raw, slices[base + 2], slices[base + 3], token)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /** The slice form: no String is built for the field or for its tokens. */
+        private boolean sliceHasToken(byte[] data, int start, int length, String token) {
+            int end = start + length;
+            int at = start;
+            while(at < end) {
+                while(at < end && (data[at] == ' ' || data[at] == '\t' || data[at] == ',')) {
+                    at++;
+                }
+                int tokenStart = at;
+                while(at < end && data[at] != ',') {
+                    at++;
+                }
+                int tokenEnd = at;
+                while(tokenEnd > tokenStart
+                        && (data[tokenEnd - 1] == ' ' || data[tokenEnd - 1] == '\t')) {
+                    tokenEnd--;
+                }
+                if(tokenEnd - tokenStart == token.length()
+                        && sliceEqualsIgnoreCase(data, tokenStart, tokenEnd - tokenStart, token)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /** The String form, for a Request built from a map rather than a socket. */
+        private boolean listHasToken(String value, String token) {
+            int at = 0;
+            while(at <= value.length()) {
+                int comma = value.indexOf(',', at);
+                int end = comma < 0 ? value.length() : comma;
+                int start = at;
+                while(start < end && (value.charAt(start) == ' ' || value.charAt(start) == '\t')) {
+                    start++;
+                }
+                int trimmed = end;
+                while(trimmed > start
+                        && (value.charAt(trimmed - 1) == ' ' || value.charAt(trimmed - 1) == '\t')) {
+                    trimmed--;
+                }
+                // regionMatches(true, ...) compares character by character and is
+                // locale independent, unlike folding both sides with toLowerCase().
+                if(trimmed - start == token.length()
+                        && value.regionMatches(true, start, token, 0, token.length())) {
+                    return true;
+                }
+                if(comma < 0) {
+                    return false;
+                }
+                at = comma + 1;
+            }
+            return false;
         }
 
         /** How many headers arrived, so a duplicate can be detected. */
