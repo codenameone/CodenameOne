@@ -40,7 +40,7 @@ class InviteManifestFragmentsTest {
 
     @Test
     void filterCarriesAutoVerifyAndTheInvitePath() {
-        String out = InviteManifestFragments.injectAppLinks("", HOST);
+        String out = InviteManifestFragments.injectAppLinks("", HOST, null);
         // autoVerify is what makes Android open the app rather than showing a
         // disambiguation dialog, and it is the whole point of the filter.
         assertTrue(out.contains("android:autoVerify=\"true\""), out);
@@ -57,15 +57,15 @@ class InviteManifestFragmentsTest {
                 + "<action android:name=\"android.intent.action.VIEW\" />"
                 + "<data android:scheme=\"myapp\" />"
                 + "</intent-filter>";
-        String out = InviteManifestFragments.injectAppLinks(existing, HOST);
+        String out = InviteManifestFragments.injectAppLinks(existing, HOST, null);
         assertTrue(out.startsWith(existing), "the developer's filter must survive verbatim");
         assertTrue(out.contains("android:host=\"" + HOST + "\""), out);
     }
 
     @Test
     void anAlreadyDeclaredHostIsNotDeclaredTwice() {
-        String existing = InviteManifestFragments.injectAppLinks("", HOST);
-        String out = InviteManifestFragments.injectAppLinks(existing, HOST);
+        String existing = InviteManifestFragments.injectAppLinks("", HOST, null);
+        String out = InviteManifestFragments.injectAppLinks(existing, HOST, null);
         assertEquals(existing, out, "the host was declared a second time");
     }
 
@@ -83,7 +83,7 @@ class InviteManifestFragmentsTest {
                 + "</intent-filter>";
         assertFalse(InviteManifestFragments.declaresHost(existing, HOST),
                 "a longer host must not read as ours");
-        String out = InviteManifestFragments.injectAppLinks(existing, HOST);
+        String out = InviteManifestFragments.injectAppLinks(existing, HOST, null);
         assertTrue(out.contains("android:host=\"" + HOST + "\""),
                 "the production filter was suppressed by a staging one");
     }
@@ -96,14 +96,33 @@ class InviteManifestFragmentsTest {
 
     @Test
     void anEmptyHostInjectsNothing() {
-        assertEquals("", InviteManifestFragments.injectAppLinks("", ""));
-        assertEquals("", InviteManifestFragments.injectAppLinks("", null));
-        assertEquals("x", InviteManifestFragments.injectAppLinks("x", null));
+        assertEquals("", InviteManifestFragments.injectAppLinks("", "", null));
+        assertEquals("", InviteManifestFragments.injectAppLinks("", null, null));
+        assertEquals("x", InviteManifestFragments.injectAppLinks("x", null, null));
+    }
+
+    @Test
+    void aSlugScopesTheFilterToThisAppAlone() {
+        // The link domain is shared by every invite-enabled app, so a bare /i/
+        // prefix makes all of them eligible handlers for every invite url and
+        // Android shows a chooser or opens the wrong one. This is the Android
+        // twin of the apple-app-site-association collision.
+        String out = InviteManifestFragments.injectAppLinks("", HOST, "acme");
+        assertTrue(out.contains("android:pathPrefix=\"/i/acme/\""), out);
+        assertFalse(out.contains("android:pathPrefix=\"/i/\""), out);
+    }
+
+    @Test
+    void withoutASlugTheBroadFilterIsStillEmitted() {
+        // A filter matching nothing would be worse than a broad one: the app
+        // would never open its own links at all.
+        String out = InviteManifestFragments.injectAppLinks("", HOST, "");
+        assertTrue(out.contains("android:pathPrefix=\"/i/\""), out);
     }
 
     @Test
     void aCustomHostIsHonoured() {
-        String out = InviteManifestFragments.injectAppLinks("", "links.example.com");
+        String out = InviteManifestFragments.injectAppLinks("", "links.example.com", null);
         assertTrue(out.contains("android:host=\"links.example.com\""), out);
         assertFalse(out.contains(HOST), out);
     }

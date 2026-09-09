@@ -62,7 +62,7 @@ final class InviteManifestFragments {
      *                 {@code cloud.codenameone.com}
      * @return the value to put back on the hint
      */
-    static String injectAppLinks(String existing, String host) {
+    static String injectAppLinks(String existing, String host, String slug) {
         String current = existing == null ? "" : existing;
         if (host == null || host.length() == 0) {
             return current;
@@ -70,7 +70,7 @@ final class InviteManifestFragments {
         if (declaresHost(current, host)) {
             return current;
         }
-        return current + filter(host);
+        return current + filter(host, slug);
     }
 
     /**
@@ -107,14 +107,26 @@ final class InviteManifestFragments {
      * @param host the invite link host
      * @return the intent filter XML
      */
-    static String filter(String host) {
+    static String filter(String host, String slug) {
+        // The path is scoped to this app's own slug when one is configured.
+        // The link domain is shared by every invite-enabled Codename One app,
+        // so a bare /i/ prefix makes every one of them an eligible handler for
+        // every invite url -- Android then shows a chooser, or opens the wrong
+        // app, and the slug inside the path cannot disambiguate because the
+        // filter accepts them all. This is the Android twin of the
+        // apple-app-site-association collision the slug exists to solve.
+        //
+        // Without a slug the broad filter is still emitted, because a filter
+        // that matches nothing would be worse: the app would never open its own
+        // links at all. That case is documented on the invite.slug hint.
+        String prefix = slug == null || slug.length() == 0 ? "/i/" : "/i/" + slug + "/";
         return "\n        <intent-filter android:autoVerify=\"true\">\n"
                 + "            <action android:name=\"android.intent.action.VIEW\" />\n"
                 + "            <category android:name=\"android.intent.category.DEFAULT\" />\n"
                 + "            <category android:name=\"android.intent.category.BROWSABLE\" />\n"
                 + "            <data android:scheme=\"https\"\n"
                 + "                  android:host=\"" + host + "\"\n"
-                + "                  android:pathPrefix=\"/i/\" />\n"
+                + "                  android:pathPrefix=\"" + prefix + "\" />\n"
                 + "        </intent-filter>\n";
     }
 }

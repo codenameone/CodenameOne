@@ -204,6 +204,13 @@ public final class Invites {
     private static boolean deliveredThisRun;
     private static boolean deferredStarted;
 
+    // Bumped whenever the identity or the permission behind an outstanding
+    // lookup changes -- an erasure, or consent being withdrawn. A response
+    // carries the epoch it was issued under and is dropped if it no longer
+    // matches, so a request already on the wire cannot resurrect an attribution
+    // the user has just erased or refused.
+    private static int lookupEpoch;
+
     // Only ever touched on the fallback path in newCode(), and held as a field
     // so there is one generator for the process rather than one per call.
     private static final java.util.Random FALLBACK_RANDOM = new java.util.Random();
@@ -432,6 +439,16 @@ public final class Invites {
             return false;
         }
         ensureProvider();
+        // The same guard beginDeferred() has. checkForInvite() treats a
+        // consumed URL as handled and skips beginDeferred entirely, so without
+        // this a refused user who opened an invite link still had a profile
+        // persisted -- by a different route to the one that was fixed.
+        if (explicitlyDenied()) {
+            InviteStore.delete(InviteStore.PENDING);
+            state = STATE_DECLINED;
+            stateLoaded = true;
+            return true;
+        }
         if (getState() == STATE_RESOLVED && !reattribution) {
             // Already attributed. Re-engagement is worth counting, but
             // rewriting the cohort mid-stream would make lifetime value per
@@ -658,6 +675,7 @@ public final class Invites {
     /// that left the referral dimensions behind would re-link the fresh
     /// identity to the same inviter.
     public static void reset() {
+        lookupEpoch++;
         InviteStore.delete(InviteStore.PENDING);
         InviteStore.delete(InviteStore.ATTRIBUTION);
         InviteStore.delete(InviteStore.OUTBOX);
@@ -671,6 +689,12 @@ public final class Invites {
         stateLoaded = true;
         deliveredThisRun = false;
         deferredStarted = false;
+    }
+
+    // Package private test seam: the epoch an outstanding lookup was issued
+    // under, so a test can simulate a response that raced an erasure.
+    static int currentLookupEpochForTest() {
+        return lookupEpoch;
     }
 
     // Package private test seam: drops the in-memory copy so the next read
@@ -706,7 +730,9 @@ public final class Invites {
         }
         // Refused. A device profile held for a match that is no longer
         // permitted has no reason to exist, so it goes now rather than at the
-        // end of the window.
+        // end of the window. The epoch bump additionally discards any response
+        // already in flight.
+        lookupEpoch++;
         if (getState() == STATE_PENDING) {
             InviteStore.delete(InviteStore.PENDING);
             setState(STATE_DECLINED);
@@ -1133,7 +1159,7 @@ public final class Invites {
             boolean registration) {
         try {
             InviteConnection req = new InviteConnection(matchType, deferred, registration,
-                    registration ? json : null);
+                    registration ? json : null, lookupEpoch);
             req.setUrl(url);
             req.setPost(true);
             req.setContentType("application/json");
@@ -1152,17 +1178,19 @@ public final class Invites {
         private final String matchType;
         private final boolean deferred;
         private final boolean registration;
+        private final int epoch;
         // The outbox entry this request carries, so a success can retire
         // exactly that one rather than the whole queue.
         private final String outboxEntry;
         private String payload;
 
         InviteConnection(String matchType, boolean deferred, boolean registration,
-                String outboxEntry) {
+                String outboxEntry, int epoch) {
             this.matchType = matchType;
             this.deferred = deferred;
             this.registration = registration;
             this.outboxEntry = outboxEntry;
+            this.epoch = epoch;
         }
 
         @Override
@@ -1178,7 +1206,7 @@ public final class Invites {
                     registrationAcknowledged(outboxEntry);
                 }
             } else {
-                handleResolution(payload, matchType, deferred);
+                handleResolution(payload, matchType, deferred, epoch);
             }
         }
     }
@@ -1209,6 +1237,18 @@ public final class Invites {
     // resolution path with a canned server answer instead of racing the
     // network thread.
     static void handleResolution(String payload, String matchType, boolean deferred) {
+        handleResolution(payload, matchType, deferred, lookupEpoch);
+    }
+
+    static void handleResolution(String payload, String matchType, boolean deferred, int epoch) {
+        // A response that was already on the wire when consent was withdrawn or
+        // the identity was erased must not be acted on. Both of those delete the
+        // pending record and clear the dimensions; resolving anyway would write
+        // them straight back, under the new identity, and undo the very
+        // operation the user asked for.
+        if (epoch != lookupEpoch || !allowed()) {
+            return;
+        }
         try {
             if (payload == null || payload.length() == 0) {
                 return;

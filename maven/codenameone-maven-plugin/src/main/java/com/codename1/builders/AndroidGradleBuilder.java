@@ -2973,8 +2973,8 @@ public class AndroidGradleBuilder extends Executor {
         if (usesInvites && "true".equals(request.getArg("android.invite.appLinks", "true"))) {
             String inviteHost = request.getArg("invite.domain", "cloud.codenameone.com");
             String existingFilter = request.getArg("android.xintent_filter", "");
-            String withAppLinks =
-                    InviteManifestFragments.injectAppLinks(existingFilter, inviteHost);
+            String withAppLinks = InviteManifestFragments.injectAppLinks(existingFilter,
+                    inviteHost, request.getArg("invite.slug", ""));
             if (!withAppLinks.equals(existingFilter)) {
                 debug("Invite attribution: adding the App Links filter for " + inviteHost);
                 request.putArgument("android.xintent_filter", withAppLinks);

@@ -63,6 +63,18 @@ final class BuildHintsGeneral {
                         + "different link service; the matching `apple-app-site-association` and "
                         + "`assetlinks.json` must be served from that host."));
 
+        h.add(new Hint("invite.slug")
+                .group(HintGroup.GENERAL)
+                .type(HintType.STRING)
+                .platform("general")
+                .doc("This app's path segment in its invite links "
+                        + "(`https://<host>/i/<slug>/<code>`), shown in the invite settings of "
+                        + "the build console. Set it so the generated Android App Link filter "
+                        + "matches only this app's own links. The link domain is shared by every "
+                        + "invite-enabled app, so when this is unset the filter matches every "
+                        + "invite link on the domain and a device with two such apps installed "
+                        + "may show a chooser or open the other one."));
+
         h.add(new Hint("KeepScreenOn")
                 .group(HintGroup.GENERAL)
                 .type(HintType.BOOLEAN)

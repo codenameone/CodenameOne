@@ -51,11 +51,18 @@ final class InviteStore {
     // Mint registrations that have not reached the link service yet.
     static final String OUTBOX = "CN1$InviteOutbox";
 
-    // A viral inviter can mint faster than a bad network drains the queue.
-    // Dropping the oldest is right: an unregistered invite still attributes
-    // once the server sees the click, so the newest are the ones whose
-    // registration is still worth racing.
-    static final int MAX_OUTBOX = 32;
+    // Entries leave this queue when the server acknowledges them, so the cap is
+    // a safety ceiling rather than a working limit -- and it was far too low
+    // for that. A dropped registration is not recoverable: the code carries no
+    // inviter, campaign, payload or parameters, so a click on a link that was
+    // already shared can never be joined to any of it.
+    //
+    // 512 short JSON bodies is well under a megabyte, and reaching it means the
+    // device minted 512 invites without once reaching the network, which is far
+    // outside anything the design contemplates. An unbounded on-device queue is
+    // still not something to ship, so the ceiling stays -- but breaching it is
+    // logged rather than silent, because it means invites are being lost.
+    static final int MAX_OUTBOX = 512;
 
     private InviteStore() {
     }
@@ -147,8 +154,14 @@ final class InviteStore {
                 return;
             }
             List<String> copy = new ArrayList<String>(entries);
+            int dropped = 0;
             while (copy.size() > MAX_OUTBOX) {
                 copy.remove(0);
+                dropped++;
+            }
+            if (dropped > 0) {
+                Log.p("invite: dropped " + dropped + " unacknowledged registration(s); "
+                        + "those invite links can no longer be attributed", Log.ERROR);
             }
             if (copy.isEmpty()) {
                 if (s.exists(OUTBOX)) {

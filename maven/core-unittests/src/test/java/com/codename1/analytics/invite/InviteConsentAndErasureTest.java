@@ -236,6 +236,44 @@ class InviteConsentAndErasureTest extends UITestBase {
     }
 
     @FormTest
+    void aResponseInFlightDuringAnErasureIsDiscarded() {
+        // An erasure deletes the pending record and clears the dimensions, but
+        // the request it raced was already on the wire. Resolving it anyway
+        // wrote the attribution and the referral dimensions straight back --
+        // under the freshly issued identity -- undoing exactly what the user
+        // asked for.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.checkForInvite();
+
+        int issuedUnder = Invites.currentLookupEpochForTest();
+        Analytics.resetClientId();
+
+        Invites.handleResolution(
+                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                Invites.MATCH_REFERRER, true, issuedUnder);
+
+        assertNull(Invites.getAttribution(), "an erased identity was re-attributed");
+        assertNull(Analytics.getDimensions().get(Invites.DIMENSION_CAMPAIGN));
+    }
+
+    @FormTest
+    void aResponseInFlightWhenConsentIsWithdrawnIsDiscarded() {
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.checkForInvite();
+
+        int issuedUnder = Invites.currentLookupEpochForTest();
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+
+        Invites.handleResolution(
+                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                Invites.MATCH_REFERRER, true, issuedUnder);
+
+        assertNull(Invites.getAttribution(), "a refusal was overridden by a late response");
+    }
+
+    @FormTest
     void optOutModeAloneDoesNotAuthoriseTheStatisticalMatch() {
         InviteTestSupport.freshInstall();
         // The deprecated AnalyticsService forces OPT_OUT, under which the
