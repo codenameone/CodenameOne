@@ -746,4 +746,95 @@ class InviteResilienceTest extends UITestBase {
         assertEquals(Invites.REASON_EXPIRED, told[0],
                 "the late listener was told the wrong reason");
     }
+
+    @Test
+    @EdtTest
+    void aReferrerReadCountsAsALookupInFlight() {
+        // Only claim() and requestMatch() said so, so a flush() during the read
+        // -- create() issues one unconditionally -- treated it as stale,
+        // advanced the epoch, and the epoch guard then discarded the exact
+        // answer when it arrived. Worse than a lost retry: the source has
+        // already burned its once-only flag, so the deterministic result is
+        // gone and a statistical guess replaces it.
+        final InstallReferrerCallback[] held = new InstallReferrerCallback[1];
+        Invites.registerInstallReferrerSource(new InstallReferrerSource() {
+            public boolean isSupported() {
+                return true;
+            }
+
+            public void requestReferrer(InstallReferrerCallback callback) {
+                held[0] = callback;
+            }
+        });
+        Invites.checkForInvite();
+        assertNotNull(held[0]);
+        int issued = Invites.currentLookupEpochForTest();
+
+        Invites.flush();
+        assertEquals(issued, Invites.currentLookupEpochForTest(),
+                "flush() superseded a referrer read that was still outstanding");
+
+        held[0].onReferrer("utm_source=cn1_invite&cn1_invite=KEPT1", 0L, 0L);
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        assertEquals("KEPT1", InviteStore.get(pending, "code", null),
+                "the exact referrer answer was discarded");
+    }
+
+    @Test
+    @EdtTest
+    void aFailedReplacementPutsTheInstallBackWhereItWas() {
+        // handleUrl writes a PENDING record for the replacement before issuing
+        // the claim, so simply returning left the install pending: every later
+        // flush and launch retried the failed replacement until the attempt cap
+        // reported unavailable, with the durable attribution sitting beside it
+        // the whole time.
+        Invites.handleResolution(InviteTestSupport.resolvedJson("FIRST3", "c1", "sms"),
+                Invites.MATCH_DIRECT, false);
+        Invites.setReattribution(true);
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND3");
+        assertEquals(Invites.STATE_PENDING, Invites.getState());
+
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_DIRECT, false);
+
+        assertEquals(Invites.STATE_RESOLVED, Invites.getState());
+        assertNull(InviteStore.read(InviteStore.PENDING),
+                "the failed replacement's pending record was left behind");
+        Invites.forgetLoadedState();
+        assertEquals(Invites.STATE_RESOLVED, Invites.getState(),
+                "the install came back pending on the next launch");
+    }
+
+    @Test
+    @EdtTest
+    void aResumedLookupDoesNotAnnounceItselfToAListenerAlreadyTold() {
+        // The refusal was delivered, so the listener has had its one callback
+        // for this install. Reopening deleted the marker that recorded that,
+        // and the resumed lookup's attribution was written as undelivered --
+        // arriving as a second callback on the next launch.
+        final int[] told = new int[1];
+        final int[] received = new int[1];
+        InviteListener l = new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+                received[0]++;
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0]++;
+            }
+        };
+        Invites.setInviteListener(l);
+        Invites.checkForInvite();
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+        assertEquals(1, told[0], "the refusal was not delivered, so this proves nothing");
+
+        Analytics.setConsent(AnalyticsConsent.granted());
+        Invites.handleResolution(InviteTestSupport.resolvedJson("LATER3", "c1", "sms"),
+                Invites.MATCH_FINGERPRINT, true);
+
+        Invites.forgetLoadedState();
+        Invites.setInviteListener(null);
+        Invites.setInviteListener(l);
+        assertEquals(0, received[0],
+                "the resumed lookup announced itself to a listener already told");
+    }
 }

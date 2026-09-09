@@ -214,6 +214,12 @@ public final class Invites {
     // Held for the run rather than persisted: the state itself is durable, and
     // a later launch reaches this answer again through the ordinary path.
     private static String undelivered;
+
+    // Set when a terminal marker that had already been delivered is reopened,
+    // so the attribution the resumed lookup writes inherits that fact rather
+    // than announcing itself a second time. Carried onto the pending record as
+    // soon as one exists, which is what makes it survive the process.
+    private static boolean reopenedAlreadyDelivered;
     private static boolean deferredStarted;
 
     // When the last claim or match was issued. flush() restarts only once this
@@ -806,6 +812,7 @@ public final class Invites {
         deferredStarted = false;
         lookupIssuedAt = 0;
         undelivered = null;
+        reopenedAlreadyDelivered = false;
         unacknowledged.clear();
     }
 
@@ -1165,6 +1172,10 @@ public final class Invites {
         pending.put("expiresAt", String.valueOf(now + attributionWindow));
         pending.put("attempts", "0");
         pending.put("state", String.valueOf(STATE_PENDING));
+        if (reopenedAlreadyDelivered) {
+            pending.put("delivered", "true");
+            reopenedAlreadyDelivered = false;
+        }
         Display d = Display.getInstance();
         if (d != null) {
             InviteStore.put(pending, "platform", d.getPlatformName());
@@ -1197,6 +1208,13 @@ public final class Invites {
             boolean reopen = (REASON_UNSUPPORTED.equals(why) && attributionWindow != 0)
                     || (REASON_CONSENT_DENIED.equals(why) && !explicitlyDenied());
             if (reopen) {
+                // The listener may already have been told about this install,
+                // and the marker is where that fact lives. Deleting it lost it,
+                // so the resumed lookup's attribution was written as
+                // undelivered and inviteReceived() arrived as a second callback
+                // on the next launch. It rides the pending record instead.
+                reopenedAlreadyDelivered =
+                        InviteStore.getBoolean(marker, "delivered", false);
                 InviteStore.delete(InviteStore.PENDING);
                 state = STATE_NONE;
                 s = STATE_NONE;
@@ -1278,6 +1296,15 @@ public final class Invites {
         // the direct attribution. Incrementing the epoch cannot invalidate a
         // callback that does not remember which epoch it belongs to.
         final int issued = lookupEpoch;
+        // A referrer read IS a lookup in flight, and only claim() and
+        // requestMatch() were saying so. A flush() during the read -- create()
+        // issues one unconditionally -- therefore treated it as stale, advanced
+        // the epoch and started again, and the guard above then discarded the
+        // exact answer when it arrived. Worse than an ordinary lost retry,
+        // because the source has already burned its once-only flag by then, so
+        // the deterministic result is gone for good and the replacement falls
+        // back to a statistical guess.
+        lookupIssuedAt = System.currentTimeMillis();
         try {
             source.requestReferrer(new InstallReferrerCallback() {
                 @Override
@@ -1610,10 +1637,23 @@ public final class Invites {
                     // A re-attribution claim that found nothing. The earlier
                     // attribution is still the answer for this install, so
                     // nothing is terminal here -- terminalizing it contradicted
-                    // the durable record, which still says RESOLVED and puts
-                    // the state back on the next launch, and told the listener
-                    // "no invite" as a second, opposite callback after it had
-                    // already been given one.
+                    // the durable record, which still says RESOLVED, and told
+                    // the listener "no invite" as a second, opposite callback
+                    // after it had already been given one.
+                    //
+                    // Returning is not enough either: handleUrl wrote a PENDING
+                    // record for the replacement before issuing this claim, so
+                    // leaving it there kept the install pending, and every
+                    // later flush and launch retried the failed replacement
+                    // until the attempt cap finally reported unavailable --
+                    // still with the durable attribution sitting beside it. The
+                    // replacement attempt is dropped and the install goes back
+                    // to what it was.
+                    InviteStore.delete(InviteStore.PENDING);
+                    state = STATE_RESOLVED;
+                    stateLoaded = true;
+                    deferredStarted = false;
+                    lookupIssuedAt = 0;
                     return;
                 }
                 // Terminal, and it has to be durable. Deleting the record is
@@ -1691,7 +1731,13 @@ public final class Invites {
         // callback per install -- resetting the flag delivered inviteReceived()
         // a second time, immediately if the first had happened in an earlier
         // process and on the next launch if it had happened in this one.
+        // The attribution being replaced, or -- when there is none, because
+        // this lookup was resumed after a delivered refusal -- the pending
+        // record that carried the fact across the reopen.
         Map<String, String> previous = InviteStore.read(InviteStore.ATTRIBUTION);
+        if (previous == null) {
+            previous = InviteStore.read(InviteStore.PENDING);
+        }
         record.put("delivered",
                 String.valueOf(InviteStore.getBoolean(previous, "delivered", false)));
         // Storage was chosen over Preferences precisely because it reports a
