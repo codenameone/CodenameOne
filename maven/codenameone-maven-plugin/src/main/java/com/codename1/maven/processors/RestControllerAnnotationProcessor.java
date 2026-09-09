@@ -92,6 +92,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private static final String REQUEST_TYPE = "com.codename1.backend.HttpServer.Request";
     private static final String RESPONSE_TYPE = "com.codename1.backend.HttpServer.Response";
 
+    /**
+     * The verbs HttpServer routes. It compares them with equals and answers 501
+     * to everything else before dispatch, so this list is the whole truth about
+     * what a generated route can be reached by. Kept in the same order the
+     * server declares it.
+     */
+    private static final List<String> ROUTABLE_METHODS = Collections.unmodifiableList(
+            Arrays.asList("GET", "POST", "HEAD", "PUT", "DELETE", "PATCH", "OPTIONS"));
+
     /** Where the generated bootstrap's name is left for the packaging goal to read. */
     public static final String MAIN_CLASS_RESOURCE = "META-INF/cn1-backend-main";
 
@@ -202,6 +211,20 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
             if (httpMethod == null) {
                 continue;
+            }
+            // The verb is emitted into the router verbatim, and HttpServer
+            // answers 501 to anything outside this set BEFORE dispatch -- so a
+            // mistyped or unsupported one compiles into a branch no request can
+            // ever reach, and both the build and the running server report
+            // success while the endpoint simply does not exist. Case matters
+            // for the same reason: the server compares with equals, so "get"
+            // is not "GET".
+            if (!ROUTABLE_METHODS.contains(httpMethod)) {
+                ctx.error(cls, controller.binaryName + "." + m.getName() + " maps HTTP "
+                        + "method \"" + httpMethod + "\", which the server does not route: "
+                        + "the request would be answered 501 before reaching it. Use one of "
+                        + ROUTABLE_METHODS + ", in upper case.");
+                return;
             }
             if (paths.isEmpty()) {
                 paths = Collections.singletonList("");
@@ -476,8 +499,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             route.params.add(p);
         }
 
+        // The generic signature, not just the descriptor: the descriptor erases
+        // List<Note> to java.util.List, and the check below would then approve
+        // the container without ever looking at what is IN it.
         route.returnJavaType = RestClientAnnotationProcessor.javaTypeFor(
-                Type.getReturnType(m.getDescriptor()), null);
+                Type.getReturnType(m.getDescriptor()), returnSignature(m.getSignature()));
         // A return type this router can actually turn into JSON. Anything else
         // reached Json.write as an unknown object and came out as the QUOTED
         // result of its toString() -- "com.example.Note@1a2b3c" where the caller
@@ -865,6 +891,19 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         int lt = raw.indexOf('<');
         if (lt >= 0) {
             raw = raw.substring(0, lt);
+            // What Json actually writes is the ELEMENTS, so a container is only
+            // encodable when they are. java.util.List passes the raw check
+            // below on its own name, while every Note inside it comes out as
+            // the quoted result of its toString().
+            int end = javaType.lastIndexOf('>');
+            if (end > lt) {
+                List<String> args = splitTypeArguments(javaType.substring(lt + 1, end));
+                for (int i = 0; i < args.size(); i++) {
+                    if (!isEncodableReturn(args.get(i), ctx)) {
+                        return false;
+                    }
+                }
+            }
         }
         // Json.write handles the JDK shapes and anything that writes itself.
         if (raw.startsWith("java.") || raw.indexOf('.') < 0) {
@@ -880,6 +919,49 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
         }
         return false;
+    }
+
+    /**
+     * The return portion of a generic method signature, or null when the method
+     * carries none. Only the descriptor is guaranteed to exist, and it is the
+     * erased form.
+     */
+    private static String returnSignature(String signature) {
+        if (signature == null) {
+            return null;
+        }
+        int close = signature.lastIndexOf(')');
+        if (close < 0 || close + 1 >= signature.length()) {
+            return null;
+        }
+        return signature.substring(close + 1);
+    }
+
+    /**
+     * Splits type arguments on their TOP-LEVEL commas, so the two arguments of
+     * Map&lt;String, List&lt;Note&gt;&gt; come back whole rather than being cut
+     * inside the nested one.
+     */
+    private static List<String> splitTypeArguments(String args) {
+        List<String> out = new ArrayList<String>();
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < args.length(); i++) {
+            char c = args.charAt(i);
+            if (c == '<') {
+                depth++;
+            } else if (c == '>') {
+                depth--;
+            } else if (c == ',' && depth == 0) {
+                out.add(args.substring(start, i).trim());
+                start = i + 1;
+            }
+        }
+        String last = args.substring(start).trim();
+        if (last.length() > 0) {
+            out.add(last);
+        }
+        return out;
     }
 
     private static String numericChecker(String javaType) {

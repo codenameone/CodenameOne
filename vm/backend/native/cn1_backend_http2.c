@@ -512,6 +512,32 @@ JAVA_INT com_codename1_backend_Http2_pendingOutputImpl___long_R_int(CODENAME_ONE
     return s == NULL ? 0 : (JAVA_INT)s->outLength;
 }
 
+/*
+ * Heap held by response bodies that have been SUBMITTED and not yet fully
+ * written. This is not outLength: that buffer is what nghttp2 has already
+ * serialised, while a submitted body is pulled from its provider only as the
+ * peer's flow-control window allows. A client that stops sending WINDOW_UPDATE
+ * therefore leaves every body it asked for retained here, which is the figure a
+ * caller has to cap -- flushing frees nothing when the window is shut.
+ *
+ * A file-backed body owns a descriptor rather than a buffer, so it adds no heap
+ * and is not counted; descriptors are bounded by the stream concurrency limit.
+ */
+JAVA_LONG com_codename1_backend_Http2_pendingBodyBytesImpl___long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
+    CN1H2Body* body;
+    int64_t total = 0;
+    if(s == NULL) {
+        return 0;
+    }
+    for(body = s->bodies ; body != NULL ; body = body->next) {
+        if(body->data != NULL && body->length > body->offset) {
+            total += (int64_t)(body->length - body->offset);
+        }
+    }
+    return (JAVA_LONG)total;
+}
+
 /* Takes everything nghttp2 wants written, and empties the buffer. */
 JAVA_OBJECT com_codename1_backend_Http2_drainImpl___long_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;

@@ -131,6 +131,11 @@ public final class Http2 {
         return false;
     }
 
+    /** Nothing is ever submitted here, so nothing is ever outstanding. */
+    public long pendingBodyBytes() {
+        return 0;
+    }
+
     public void close() {
     }
 }

@@ -207,6 +207,19 @@ public final class Http2 {
         return wantsMoreImpl(session);
     }
 
+    /**
+     * Heap held by response bodies that have been submitted and not yet fully
+     * written, which is NOT what drain() empties: that buffer is what nghttp2
+     * has already serialised. nghttp2 pulls from a submitted body only as the
+     * peer's flow-control window allows, so a client that stops sending
+     * WINDOW_UPDATE leaves every body it asked for sitting here. A caller that
+     * keeps submitting has to look at this figure rather than at what it just
+     * handed over, because a flush that could write nothing frees nothing.
+     */
+    public long pendingBodyBytes() {
+        return session == 0 ? 0 : pendingBodyBytesImpl(session);
+    }
+
     public void close() {
         if(session != 0) {
             long s = session;
@@ -267,5 +280,6 @@ public final class Http2 {
     private static native int respondImpl(long session, int streamId, String status,
                                           String headerLines, byte[] body);
     private static native boolean wantsMoreImpl(long session);
+    private static native long pendingBodyBytesImpl(long session);
     private static native void destroyImpl(long session);
 }

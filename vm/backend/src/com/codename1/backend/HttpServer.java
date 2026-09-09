@@ -3187,7 +3187,25 @@ public final class HttpServer {
                 requestsServed.incrementAndGet();
                 if(queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES) {
                     flushHttp2(fd, session, h2);
-                    queuedBodyBytes = 0;
+                    // What the flush could NOT write, not zero. nghttp2 pulls
+                    // from a submitted body only as the peer's flow-control
+                    // window allows, so a client that simply stops sending
+                    // WINDOW_UPDATE makes every flush a no-op while the bodies
+                    // stay retained. Zeroing a turn-local counter against that
+                    // bounds nothing: the advertised stream concurrency times a
+                    // large endpoint is hundreds of megabytes of native buffers
+                    // held for a client that is reading none of it.
+                    queuedBodyBytes = h2.pendingBodyBytes();
+                    if(queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES) {
+                        // Still over after a real attempt to write, so the peer
+                        // is not draining. Leave the rest of the ready requests
+                        // where they are -- their inbound bodies are already
+                        // capped by the session limit -- and end the turn. The
+                        // WINDOW_UPDATE that unblocks this connection wakes it
+                        // again, and a peer that sends nothing at all is closed
+                        // by the idle deadline rather than held forever.
+                        break;
+                    }
                 }
                 } finally {
                     // Held until the response has been SUBMITTED, not merely produced.

@@ -286,6 +286,46 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aListOfDtosIsRefused() throws Exception {
+        // The DESCRIPTOR erases this to java.util.List, which the encodable
+        // check waves through on its own name. Every Note in the list would
+        // then be written as the quoted result of its toString(), while the
+        // build and the request both reported success.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import java.util.List;\n"
+                + "class Note { public String title = \"t\"; }\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/notes\")\n"
+                + "    public List<Note> all() { return null; }\n"
+                + "}\n"));
+        assertTrue("a list of types the router cannot encode should not compile",
+                ctx.hasErrors());
+        String all = ctx.getErrors().toString();
+        assertTrue(all, all.indexOf("cannot encode") >= 0);
+    }
+
+    @Test
+    public void aVerbTheServerDoesNotRouteIsRefused() throws Exception {
+        // HttpServer compares the verb with equals and answers 501 before
+        // dispatch, so this route could never be reached -- and nothing said so:
+        // the build passed and the endpoint simply did not exist.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @RequestMapping(value = \"/notes\", method = \"get\")\n"
+                + "    public String all() { return \"[]\"; }\n"
+                + "}\n"));
+        assertTrue("a verb the server cannot route should not compile", ctx.hasErrors());
+        String all = ctx.getErrors().toString();
+        assertTrue(all, all.indexOf("does not route") >= 0);
+    }
+
+    @Test
     public void aBodyThatIsNotJsonIsRefused() throws Exception {
         Router router = generate(CONTROLLER_SOURCE);
         // bodyAsMap answers null both for "no body" and for "not JSON", so the
