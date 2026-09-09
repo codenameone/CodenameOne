@@ -1690,7 +1690,7 @@ NOTE: This was also the case in AWT/Swing to one degree or another...
 
 A form transition tells the peers about itself without any help from you: `initTransition` puts both
 forms into lightweight mode, which is how the framework says that a peer isn't truly visible for a
-while. What a peer does about that is the peer's own business, and it varies by port. Arbitrary overlap
+while. How a peer responds is left to the peer, and it varies by port. Arbitrary overlap
 is the part that isn't automatic anywhere. Codename One grabs a screenshot of the peer, hide it and then you can show the screenshot. Since the screenshot is static it can be rendered through the standard UI. You can't do that always since grabbing a screenshot is an expensive process on all platforms and must be performed on the native device thread.
 
 `PeerComponent` declares that callback empty, so a port opts into the still by overriding it. The iOS
