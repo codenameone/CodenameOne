@@ -808,6 +808,10 @@ public class AndroidGradleBuilder extends Executor {
     /// Whether the app referenced com.codename1.vpn.tunnel.
     private boolean usesCustomTunnel;
 
+    /// Whether the app referenced the invite attribution API, and therefore
+    /// needs the App Links filter that lets an invite link open it.
+    private boolean usesInvites;
+
     private boolean integrateMoPub = false;
 
     private static final boolean isMac;
@@ -2302,6 +2306,13 @@ public class AndroidGradleBuilder extends Executor {
                     if (cls.indexOf("com/codename1/vpn/tunnel/") == 0) {
                         usesCustomTunnel = true;
                     }
+                    // Both entry points, because an app can reference either
+                    // one alone: the button without the facade, or the facade
+                    // without the button.
+                    if (cls.indexOf("com/codename1/analytics/invite/") == 0
+                            || "com/codename1/components/InviteButton".equals(cls)) {
+                        usesInvites = true;
+                    }
                     if (cls.indexOf("com/codename1/nearby/ranging/") == 0) {
                         usesNearbyRanging = true;
                     }
@@ -2945,6 +2956,45 @@ public class AndroidGradleBuilder extends Executor {
             if (callServices.length() > 0) {
                 request.putArgument("android.xapplication",
                         existingApplication + callServices);
+            }
+        }
+
+        // The App Links filter that lets an invite link open the app instead
+        // of the browser (com.codename1.analytics.invite).
+        //
+        // AFTER the class scan, beside the call fragments, because the flag it
+        // reads is set BY that scan -- the same ordering the tunnel block below
+        // documents the hard way.
+        //
+        // Appended to android.xintent_filter rather than emitted at a new
+        // manifest site. That hint is already rendered inside the main
+        // <activity>, and rendered again into the wear companion manifest, so
+        // one append reaches both and cannot drift.
+        if (usesInvites && "true".equals(request.getArg("android.invite.appLinks", "true"))) {
+            String inviteHost = request.getArg("invite.domain", "cloud.codenameone.com");
+            String existingFilter = request.getArg("android.xintent_filter", "");
+            String withAppLinks =
+                    InviteManifestFragments.injectAppLinks(existingFilter, inviteHost);
+            if (!withAppLinks.equals(existingFilter)) {
+                debug("Invite attribution: adding the App Links filter for " + inviteHost);
+                request.putArgument("android.xintent_filter", withAppLinks);
+            }
+            // launchMode decides whether a link reaching an app that is
+            // already running is delivered to it at all. singleTop (the
+            // default) and singleTask both route through onNewIntent;
+            // "standard" starts a SECOND activity and a second lifecycle, and
+            // the invite is simply lost. Refused rather than warned: a warning
+            // in a build log is exactly the thing nobody reads, and the
+            // symptom on the device is a feature that silently never fires.
+            String launchMode = request.getArg("android.activity.launchMode", "singleTop");
+            if ("standard".equals(launchMode)) {
+                throw new BuildException("This app uses invite attribution "
+                        + "(com.codename1.analytics.invite), which needs an invite link to reach "
+                        + "the running activity, but android.activity.launchMode is \"standard\". "
+                        + "A link then starts a second activity instead of being delivered to the "
+                        + "running one, and the invite is lost. Use singleTop (the default) or "
+                        + "singleTask, or set android.invite.appLinks=false and handle the link "
+                        + "yourself.");
             }
         }
 

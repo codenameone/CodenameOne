@@ -1351,6 +1351,11 @@ public class IPhoneBuilder extends Executor {
     // other hand would fail its codesigning for a capability it never asked for.
     private boolean usesContinuitySync;
 
+    // Set when the app references com.codename1.analytics.invite (or the
+    // InviteButton that fronts it). Gates the associated domain and the
+    // entitlement that let an invite link open the app instead of Safari.
+    private boolean usesInvites;
+
     // Set when the app references com.codename1.documents. Gates the CN1_USE_DOCUMENTS native
     // define, the CN1Documents file provider extension and the app group that lets the two
     // processes meet.
@@ -1492,6 +1497,28 @@ public class IPhoneBuilder extends Executor {
     /// Records a boolean CarPlay entitlement (e.g. com.apple.developer.carplay-audio) unless the
     /// project already set it explicitly, mirroring how the App Attest / Apple Sign-In entitlements
     /// are injected. The downstream entitlements generator emits these as &lt;true/&gt;.
+    /// Whether a comma delimited ios.associatedDomains value already declares
+    /// `domain`.
+    ///
+    /// Compared element by element after trimming, never as a substring: an
+    /// existing `applinks:staging.cloud.codenameone.com` CONTAINS
+    /// `applinks:cloud.codenameone.com` is false, but the reverse containment
+    /// -- an existing entry for a longer host reading as the shorter one --
+    /// is exactly the mistake the surfaces url-scheme code documents, and the
+    /// same shape of bug applies here.
+    static boolean declaresAssociatedDomain(String existing, String domain) {
+        if (existing == null || domain == null) {
+            return false;
+        }
+        StringTokenizer tok = new StringTokenizer(existing, ",");
+        while (tok.hasMoreTokens()) {
+            if (tok.nextToken().trim().equals(domain)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void putCarPlayEntitlement(BuildRequest request, String key) {
         if (request.getArg("ios.entitlements." + key, null) == null) {
             request.putArgument("ios.entitlements." + key, "true");
@@ -2732,6 +2759,14 @@ public class IPhoneBuilder extends Executor {
                     // that publish documents.
                     if (!usesDocuments && cls.indexOf("com/codename1/documents/") == 0) {
                         usesDocuments = true;
+                    }
+                    // Invite attribution (com.codename1.analytics.invite). Both entry points,
+                    // because an app can reference either alone: the button without the facade,
+                    // or the facade without the button.
+                    if (!usesInvites
+                            && (cls.indexOf("com/codename1/analytics/invite/") == 0
+                                || "com/codename1/components/InviteButton".equals(cls))) {
+                        usesInvites = true;
                     }
                     // State restoration and continuity (com.codename1.continuity.*). Gated on
                     // actual usage so the CN1_USE_CONTINUITY natives and the NSUserActivityTypes
@@ -4345,6 +4380,36 @@ public class IPhoneBuilder extends Executor {
                 File CodenameOne_GLViewController_m = new File(buildinRes, "CodenameOne_GLViewController.m");
                 replaceInFile(CodenameOne_GLViewController_m, "BOOL vkbAlwaysOpen = NO;", "BOOL vkbAlwaysOpen = YES;");
             }
+            // Invite attribution needs an invite link to open the app rather
+            // than Safari, which on iOS means a universal link, which means the
+            // invite host has to be an associated domain.
+            //
+            // This MUST run before the block below. That block's only test is
+            // whether ios.associatedDomains is non-null, and it is what
+            // uncomments CN1_HANDLE_UNIVERSAL_LINKS in
+            // CodenameOne_GLViewController.h. Appending one line later would
+            // leave the define commented out: the entitlement would be present,
+            // application:continueUserActivity:restorationHandler: would not be
+            // compiled in, and every invite link would silently open the
+            // browser.
+            //
+            // The matching com.apple.developer.associated-domains entitlement
+            // is derived from this same hint by the entitlements generator, so
+            // it is not written separately here -- doing that would risk a
+            // duplicate key, which fails codesigning.
+            if (usesInvites
+                    && "true".equals(request.getArg("ios.invite.universalLinks", "true"))) {
+                String inviteHost = request.getArg("invite.domain", "cloud.codenameone.com");
+                String want = "applinks:" + inviteHost;
+                String existingDomains = request.getArg("ios.associatedDomains", "");
+                if (!declaresAssociatedDomain(existingDomains, want)) {
+                    String merged = existingDomains.trim().length() == 0
+                            ? want : existingDomains + "," + want;
+                    debug("Invite attribution: adding the associated domain " + want);
+                    request.putArgument("ios.associatedDomains", merged);
+                }
+            }
+
             if (request.getArg("ios.associatedDomains", null) != null) {
                 // If the user has provided the ios.associatedDomains build hint, then we will need to
                 // enable handling for these events.
