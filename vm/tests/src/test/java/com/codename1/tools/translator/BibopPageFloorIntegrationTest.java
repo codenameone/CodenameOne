@@ -274,6 +274,19 @@ class BibopPageFloorIntegrationTest {
         // phase; so does a run where task_info was unavailable. Nothing can be
         // measured then, and failing would report a porting/environment gap as a
         // memory regression.
+        // Some arm64 hosts run a 64KB system page, and on those the collector
+        // DECLINES to release pages at all: the rounded page header plus one
+        // system page no longer fits inside a 64KB BiBOP page, so the release
+        // offset is zero and the whole process keeps its footprint by design.
+        // The floor this test measures cannot exist there, and failing would
+        // report a host property as a collector regression. The runtime says so
+        // itself rather than this test guessing -- so if the line is absent the
+        // failure is real and still fails.
+        org.junit.jupiter.api.Assumptions.assumeFalse(
+                lastVmStderr.indexOf("page release unavailable on this host") >= 0,
+                "this host cannot release pages, so there is no floor to measure\n"
+                        + report);
+
         org.junit.jupiter.api.Assumptions.assumeTrue(warmupHeld > 0,
                 "This run could not read phys_footprint through Runtime, so the probe cannot be "
                         + "measured here.\n" + report);
@@ -418,17 +431,30 @@ class BibopPageFloorIntegrationTest {
         // or not, since cn1BibopTrimFreePool runs only at the end of one, so a
         // failing run has to say whether one ran and what it spliced.
         builder.environment().put("CN1_LOG_PAGE_RELEASE", "1");
-        builder.redirectError(ProcessBuilder.Redirect.INHERIT);
+        // To a FILE rather than INHERIT, for the same reason it is not merged:
+        // the stream stays separate so nothing splices a marker line, but the
+        // test can now READ it. The collector reports a host that cannot release
+        // pages at all on stderr, and a diagnosis this test has to act on is no
+        // use if only a human scrolling the log can see it. It is echoed below
+        // so the CI log keeps exactly what INHERIT used to show.
+        Path errFile = workingDir.resolve("vm-stderr.txt");
+        builder.redirectError(ProcessBuilder.Redirect.to(errFile.toFile()));
         Process process = builder.start();
         String output;
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             output = reader.lines().collect(Collectors.joining("\n"));
         }
-        assertEquals(0, process.waitFor(),
-                "ParparVM run should exit cleanly. Output: " + output);
+        int exit = process.waitFor();
+        lastVmStderr = Files.exists(errFile)
+                ? new String(Files.readAllBytes(errFile), StandardCharsets.UTF_8) : "";
+        System.err.print(lastVmStderr);
+        assertEquals(0, exit, "ParparVM run should exit cleanly. Output: " + output);
         return output;
     }
+
+    /** Whatever the last translated run wrote to stderr; see runVm. */
+    private String lastVmStderr = "";
 
     private String loadAppSource() throws Exception {
         java.io.InputStream in = BibopPageFloorIntegrationTest.class

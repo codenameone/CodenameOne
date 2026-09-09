@@ -6140,6 +6140,24 @@ static int cn1BibopUpgradeFallbackPages(void) {
 static void cn1BibopTrimFreePool(void) {
 #if !defined(CN1_BIBOP_NO_PAGE_RELEASE) && !defined(_WIN32)
     if(cn1BibopReleaseOffset() == 0) {
+        // Say so, ONCE. This is a whole-process condition -- not one page and
+        // not one sweep -- so a build that lands on such a host returns no
+        // memory at all for its entire life, and every symptom of that looks
+        // like the collector failing to reclaim rather than declining to. The
+        // case that reaches here in practice is a 64KB system page: the rounded
+        // header plus one system page no longer fits inside a 64KB BiBOP page,
+        // and arm64 kernels are configurable this way, so the same binary can
+        // release on one host and not on another. Without this line that is
+        // invisible, and it reads as a collector bug.
+        static int reported = 0;
+        if(!reported) {
+            reported = 1;
+            fprintf(stderr, "CN1 GC: page release unavailable on this host "
+                            "(system page %ld, BiBOP page %d); the footprint "
+                            "will not fall\n",
+                    (long)getpagesize(), (int)CN1_BIBOP_PAGE_SIZE);
+            fflush(stderr);
+        }
         return;
     }
     pthread_mutex_lock(&bibopMutex);
