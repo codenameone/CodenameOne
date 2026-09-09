@@ -1838,8 +1838,30 @@ final class JavascriptBundleWriter {
                 if (close < 0) {
                     continue;
                 }
-                int fn = src.indexOf("function", close);    // the wrapper keyword
-                if (fn < 0) {
+                // The wrapper must be the LITERAL argument that follows the
+                // name array. Searching forward for the next ``function``
+                // walks straight past the end of the bindNative call when the
+                // wrapper is built by a factory --
+                // ``bindNative([...], cn1CryptoAesBinding("aesEncrypt"))``
+                // matched the ``function cn1CryptoRsaBinding(op)`` DECLARATION
+                // several lines below and classified aesEncrypt as a
+                // synchronous native. It is a generator, so callers took the
+                // sync dispatcher and the runtime raised
+                // ``cn1_ivs: ... (CHA unsound)``. Anything that is not a
+                // literal function expression here is left OUT of the sync
+                // set, i.e. stays suspending, which is the safe direction.
+                int fn = close + 1;
+                while (fn < src.length() && Character.isWhitespace(src.charAt(fn))) {
+                    fn++;
+                }
+                if (fn >= src.length() || src.charAt(fn) != ',') {
+                    continue;
+                }
+                fn++;
+                while (fn < src.length() && Character.isWhitespace(src.charAt(fn))) {
+                    fn++;
+                }
+                if (!src.startsWith("function", fn)) {
                     continue;
                 }
                 int k = fn + "function".length();
