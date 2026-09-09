@@ -426,7 +426,96 @@ public abstract class Element implements BuildContext {
                 }
             }
         }
+        // A FRESH child, not a replacement. Anchor it too: appending puts its components
+        // at the END of the flat host container, which is the top of the paint order.
+        //
+        // A subtree does not always arrive in tree order. A LayoutBuilder sits out a
+        // speculative measurement pass and builds on a later one, by which time its
+        // siblings are attached -- so a Scaffold's BODY, which is a LayoutBuilder in the
+        // mail study, was created after the bottom bar and the floating action button and
+        // painted over both of them. The bar and the button were not missing or
+        // mispositioned; they were underneath the body, showing only where it did not
+        // cover them.
+        //
+        // Anchor before the first already-attached sibling that belongs AFTER this slot,
+        // so the new subtree lands where the element tree says it goes.
+        int anchor = anchorForSlot(newSlot);
+        if (anchor >= 0) {
+            RenderHost childHost = hostForNewChild(newSlot);
+            if (childHost != null) {
+                int prev = childHost.beginInsertion(anchor);
+                try {
+                    return inflateWidget(newWidget, newSlot);
+                } finally {
+                    childHost.endInsertion(prev);
+                }
+            }
+        }
         return inflateWidget(newWidget, newSlot);
+    }
+
+    /// Where a child of {@code slot} should attach, or -1 when appending is already right.
+    ///
+    /// The first attach index of any already-attached child whose slot sorts AFTER this
+    /// one. Nothing after it means the end of the container is the correct place, which
+    /// is what appending already does.
+    private int anchorForSlot(int slot) {
+        RenderHost childHost = hostForNewChild(slot);
+        if (childHost == null) {
+            return -1;
+        }
+        // The next element in TREE order after where this child goes: first among our own
+        // later children, then -- since the late builder is usually a leaf with no later
+        // sibling of its own -- the first later sibling of an ancestor. A Scaffold's body
+        // is a LayoutBuilder, so the sibling that has to be painted over is the bottom
+        // bar three levels up, not anything the builder can see.
+        int at = laterSiblingAttachIndex(this, slot, childHost);
+        if (at >= 0) {
+            return at;
+        }
+        Element node = this;
+        while (node != null && node.parent() != null) {
+            at = laterSiblingAttachIndex(node.parent(), node.slot, childHost);
+            if (at >= 0) {
+                return at;
+            }
+            node = node.parent();
+        }
+        return -1;
+    }
+
+    /// The earliest attach index, in {@code host}, of a child of {@code parent} whose slot
+    /// sorts after {@code slot}. -1 when there is none.
+    private static int laterSiblingAttachIndex(Element parent, final int slot,
+            final RenderHost host) {
+        if (parent == null) {
+            return -1;
+        }
+        final int[] best = {-1};
+        parent.visitChildren(new dart.runtime.Funcs.VoidFunc1<Element>() {
+            @Override
+            public void call(Element c) {
+                if (c == null || c.slot <= slot) {
+                    return;
+                }
+                int at = host.firstAttachIndex(c);
+                if (at >= 0 && (best[0] < 0 || at < best[0])) {
+                    best[0] = at;
+                }
+            }
+        });
+        return best[0];
+    }
+
+    /// The host a child of this slot attaches into.
+    private RenderHost hostForNewChild(int slot) {
+        if (this instanceof RenderElement) {
+            RenderHost h = ((RenderElement) this).hostForChild(slot);
+            if (h != null) {
+                return h;
+            }
+        }
+        return host();
     }
 
     protected Element inflateWidget(Widget newWidget, int newSlot) {
