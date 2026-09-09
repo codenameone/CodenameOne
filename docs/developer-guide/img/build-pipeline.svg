@@ -22,9 +22,9 @@
   <path d="M 247 176 L 252 182 L 257 176" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <rect x="182" y="184" width="140" height="96" rx="4" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
   <text x="252" y="204" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#4a7a3d">Android</text>
-  <text x="252" y="222" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">already Java</text>
-  <text x="252" y="244" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">the same bytecode, running</text>
-  <text x="252" y="256" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">on ART or Dalvik</text>
+  <text x="252" y="222" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">Gradle, then DEX</text>
+  <text x="252" y="244" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">class files become DEX, which</text>
+  <text x="252" y="256" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">ART runs on the device</text>
   <path d="M 410 164 L 410 182" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <path d="M 405 176 L 410 182 L 415 176" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <rect x="340" y="184" width="140" height="96" rx="4" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
@@ -43,9 +43,9 @@
   <path d="M 721 176 L 726 182 L 731 176" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <rect x="656" y="184" width="140" height="96" rx="4" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
   <text x="726" y="204" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#4a7a3d">Desktop</text>
-  <text x="726" y="222" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">javapackager</text>
-  <text x="726" y="244" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">the build cloud runs it to</text>
-  <text x="726" y="256" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">produce a native desktop app</text>
+  <text x="726" y="222" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#222222">packaged in the cloud</text>
+  <text x="726" y="244" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">installers are generated on a</text>
+  <text x="726" y="256" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">Mac or Windows build machine</text>
   <rect x="24" y="300" width="772" height="68" rx="6" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
   <text x="410" y="320" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#4a6fa5">The translator is one program with several outputs</text>
   <text x="410" y="340" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">ByteCodeTranslator emits C for iOS and for the native macOS port, and JavaScript for the web target, from the</text>
