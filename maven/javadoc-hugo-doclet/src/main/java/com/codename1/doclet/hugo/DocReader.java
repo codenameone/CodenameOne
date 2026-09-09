@@ -237,20 +237,24 @@ final class DocReader {
                     // signature table, so it is folded into the description rather
                     // than silently dropped.
                     String name = param.getName().getName().toString();
-                    String text = renderer.render(param.getDescription(), path).strip();
+                    String text = takeTrailingSections(
+                            renderer.render(param.getDescription(), path), element, doc);
                     doc.addParameter(new MarkdownSections.NamedText(
                             param.isTypeParameter() ? "<" + name + ">" : name, text));
                 }
                 case RETURN -> {
-                    if (doc.returns == null) {
-                        doc.returns = renderer.render(((ReturnTree) tag).getDescription(), path).strip();
+                    String text = takeTrailingSections(
+                            renderer.render(((ReturnTree) tag).getDescription(), path), element, doc);
+                    if (doc.returns == null && !text.isEmpty()) {
+                        doc.returns = text;
                     }
                 }
                 case THROWS, EXCEPTION -> {
                     ThrowsTree thrown = (ThrowsTree) tag;
                     doc.addException(new MarkdownSections.NamedText(
                             thrown.getExceptionName().getSignature(),
-                            renderer.render(thrown.getDescription(), path).strip()));
+                            takeTrailingSections(
+                                    renderer.render(thrown.getDescription(), path), element, doc)));
                 }
                 case SEE -> {
                     String text = renderer.render(((SeeTree) tag).getReference(), path).strip();
@@ -267,28 +271,52 @@ final class DocReader {
                     // those headings inside the deprecation banner and left the
                     // references unresolved: CellRenderer and
                     // ImageDownloadService both lost their See-also entirely.
-                    String body = renderer.render(((DeprecatedTree) tag).getBody(), path);
-                    MarkdownSections.Result split =
-                            MarkdownSections.parse(body, element instanceof ExecutableElement);
-                    String text = split.description().strip();
+                    String text = takeTrailingSections(
+                            renderer.render(((DeprecatedTree) tag).getBody(), path), element, doc);
                     if (!text.isEmpty()) {
                         doc.deprecatedText = text;
-                    }
-                    doc.seeAlso.addAll(split.seeAlso());
-                    for (MarkdownSections.NamedText parameter : split.parameters()) {
-                        doc.addParameter(parameter);
-                    }
-                    for (MarkdownSections.NamedText thrown : split.exceptions()) {
-                        doc.addException(thrown);
-                    }
-                    if (doc.returns == null) {
-                        doc.returns = split.returns();
                     }
                 }
                 case HIDDEN -> doc.hidden = true;
                 default -> readUnknownTag(tag, path, doc);
             }
         }
+    }
+
+    /**
+     * Splits the sections a block tag's body ran on into, and returns what is
+     * genuinely the tag's own text.
+     *
+     * <p>The house convention writes a block tag underneath a heading of the
+     * same name, and everything after it -- another heading and its bullets --
+     * is still inside that tag as far as the JDK is concerned. Storing a body
+     * whole therefore swallows whatever followed it: 205 methods rendered a
+     * "#### Throws" heading and its bullet inside their Returns text and emitted
+     * no exception row at all, com.codename1.ui.CN.requestFullScreen among them.
+     *
+     * <p>Applied to every tag with a body rather than to @deprecated alone,
+     * which is where this was first noticed and fixed one tag too narrowly.
+     */
+    private String takeTrailingSections(String body, Element element, ElementDoc doc) {
+        MarkdownSections.Result split =
+                MarkdownSections.parse(body, element instanceof ExecutableElement);
+        doc.seeAlso.addAll(split.seeAlso());
+        for (MarkdownSections.NamedText parameter : split.parameters()) {
+            doc.addParameter(parameter);
+        }
+        for (MarkdownSections.NamedText thrown : split.exceptions()) {
+            doc.addException(thrown);
+        }
+        if (doc.returns == null && split.returns() != null) {
+            doc.returns = split.returns();
+        }
+        if (split.deprecated() != null) {
+            doc.deprecated = true;
+            if (doc.deprecatedText.isEmpty()) {
+                doc.deprecatedText = split.deprecated();
+            }
+        }
+        return split.description().strip();
     }
 
     /**

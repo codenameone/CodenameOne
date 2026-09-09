@@ -110,6 +110,16 @@ class HugoDocletTest {
                 "    public void variableVarargs(T... values) {}",
                 "    /// Takes a nested type",
                 "    public void inner(Sample.Inner value) {}",
+                "    /// Casts a value.",
+                "    ///",
+                "    /// #### Returns",
+                "    ///",
+                "    /// @return the value, cast",
+                "    ///",
+                "    /// #### Throws",
+                "    ///",
+                "    /// - `IllegalStateException`: when it cannot be cast",
+                "    public Object castIt(Object value) { return value; }",
                 "    /// Returns something documented",
                 "    ///",
                 "    /// #### Returns",
@@ -661,6 +671,20 @@ class HugoDocletTest {
                 "and RED is one of the constants");
         assertFalse(page.contains("\"public static final\""),
                 "without the modifiers the model reports but nobody writes");
+    }
+
+    @Test
+    void splitsTrailingSectionsOutOfAReturnTag() throws IOException {
+        // A block tag written under a heading of the same name swallows whatever
+        // follows it: 205 methods rendered a "#### Throws" heading inside their
+        // Returns text and emitted no exception row. Fixed for @deprecated one
+        // round earlier and, wrongly, only for @deprecated.
+        String page = page("Sample.md");
+        int at = page.indexOf("\"castIt\"");
+        assertTrue(at > 0, "the method is on the page");
+        String row = page.substring(at, Math.min(page.length(), at + 1200));
+        assertFalse(row.contains("#### Throws"), "the heading is not in the return text: " + row);
+        assertTrue(row.contains("IllegalStateException"), "and the exception row exists: " + row);
     }
 
     @Test

@@ -184,7 +184,11 @@ public final class HugoDoclet implements Doclet {
      * walked through rather than treated as the end of the line.
      */
     private void recordSubtypeEdges(TypeElement type) {
-        Deque<TypeMirror> queue = new ArrayDeque<>(types.directSupertypes(type.asType()));
+        // directSupertypes() hands an interface java.lang.Object, which the
+        // language does not, so seeding from it made every interface a known
+        // subtype of Object: the Object page listed 1406 of them, AdCallback and
+        // OnUserEarnedRewardListener included. allSupertypes() already skips it.
+        Deque<TypeMirror> queue = new ArrayDeque<>(realSupertypes(type.asType()));
         Set<String> visited = new LinkedHashSet<>();
         while (!queue.isEmpty()) {
             TypeMirror supertype = queue.removeFirst();
@@ -197,9 +201,45 @@ public final class HugoDoclet implements Doclet {
                 subtypes.computeIfAbsent(parent.getQualifiedName().toString(),
                         key -> new ArrayList<>()).add(type);
             } else {
-                queue.addAll(types.directSupertypes(supertype));
+                // Filtered at every hop, not only the first. HTMLCallback reaches
+                // Object through the package private CSSParserCallback, so
+                // filtering the seed alone still left it a subtype of Object.
+                queue.addAll(realSupertypes(supertype));
             }
         }
+    }
+
+    /**
+     * The supertypes a type actually has.
+     *
+     * <p>{@code directSupertypes()} hands an interface {@code java.lang.Object},
+     * which the language does not: an interface extends only its
+     * superinterfaces. Seeding the subtype graph from that made every interface
+     * a known subtype of Object, and the Object page listed 1406 of them.
+     *
+     * <p>Filtered at every hop rather than only at the seed, because an
+     * interface reaches Object through an unpublished one it is walked through:
+     * com.codename1.ui.html.HTMLCallback survived the first attempt that way.
+     *
+     * <p>There is no unit test for this. java.lang.Object comes from
+     * Ports/CLDC11 and cannot be part of the doclet's own fixture, so the edge
+     * it is about is never recorded there and any assertion passes with the fix
+     * removed. The evidence is the full run: Object's known subtypes went from
+     * 1406 to 1089, and the number of them that are interfaces from 314 to 0.
+     */
+    private List<TypeMirror> realSupertypes(TypeMirror type) {
+        boolean isInterface = type instanceof DeclaredType declared
+                && declared.asElement().getKind() == ElementKind.INTERFACE;
+        List<TypeMirror> out = new ArrayList<>();
+        for (TypeMirror supertype : types.directSupertypes(type)) {
+            if (isInterface && supertype instanceof DeclaredType declared
+                    && declared.asElement() instanceof TypeElement element
+                    && element.getQualifiedName().contentEquals("java.lang.Object")) {
+                continue;
+            }
+            out.add(supertype);
+        }
+        return out;
     }
 
     private void collectType(TypeElement type) {
