@@ -58,12 +58,17 @@ class LocationButtonTest extends UITestBase {
         manager = new RecordingLocationManager();
         implementation.setLocationManager(manager);
         implementation.setLocationButtonSupported(false);
+        // LocationManager's listener is static, so a test that installs one --
+        // playing an application that tracks -- would otherwise leave every
+        // later test on the tracked path, where nothing binds at all.
+        manager.setLocationListener(null);
     }
 
     @AfterEach
     void resetImplementation() {
         implementation.setLocationButtonSupported(false);
         implementation.setLocationButtonReady(true);
+        manager.setLocationListener(null);
     }
 
     @FormTest
@@ -649,6 +654,52 @@ class LocationButtonTest extends UITestBase {
         assertNull(briefShared.get(0), "and its answer is its timeout");
     }
 
+    /// An application that is already tracking owns LocationManager's single
+    /// listener, so getCurrentLocationSync does not wait at all: it answers from
+    /// getCurrentLocation(), which hands back whatever the tracker cached. That
+    /// is the right answer to "where are we" and the wrong one to a tap, which
+    /// asks where the user is NOW. The button waits for the cache to move.
+    @FormTest
+    void aStaleTrackedFixIsNotTheAnswerToATap() {
+        implementation.setLocationButtonSupported(true);
+        Location old = new Location(1.0, 2.0);
+        old.setTimeStamp(System.currentTimeMillis() - 600000);
+        Location fresh = new Location(7.0, 8.0);
+        fresh.setTimeStamp(System.currentTimeMillis());
+        manager.currentLocation = old;
+        // The application is tracking, which is what sends the button down the
+        // cached-answer path.
+        manager.setLocationListener(new LocationListener() {
+            public void locationUpdated(Location location) {
+            }
+
+            public void providerStateChanged(int newState) {
+            }
+        });
+
+        LocationButton button = new LocationButton();
+        button.setTimeout(3000);
+        Form f = new Form("tracked");
+        f.add(button);
+        f.show();
+        flushSerialCalls();
+        List<Location> shared = record(button);
+
+        // The tracker delivers a new fix a moment after the tap.
+        manager.duringCurrentLocation = new Runnable() {
+            public void run() {
+                manager.currentLocation = fresh;
+            }
+        };
+
+        grant(Boolean.TRUE);
+
+        assertEquals(1, shared.size(), "the button is answered");
+        assertSame(fresh, shared.get(0),
+                "with the fix that arrived after the tap, not the one the "
+                        + "tracker had cached ten minutes earlier");
+    }
+
     private void grant(Boolean granted) {
         SuccessCallback<Boolean> callback = implementation.getLocationButtonCallback();
         assertNotNull(callback, "the component should have handed the platform a callback");
@@ -705,9 +756,24 @@ class LocationButtonTest extends UITestBase {
         /// test can only tell the two apart when they are different objects.
         Location staleLocation;
 
+        /// Runs on each read of the cache, so a test can play the tracker
+        /// delivering an update while the button waits.
+        Runnable duringCurrentLocation;
+
         @Override
         public Location getCurrentLocation() throws IOException {
-            return staleLocation != null ? staleLocation : currentLocation;
+            // The answer is decided BEFORE the hook runs, so the hook models a
+            // tracker delivering an update after this read rather than during
+            // it. Running it first made the very first read return the new fix,
+            // which no amount of waiting is needed for -- and a test that could
+            // not tell whether any waiting happened at all.
+            Location answer = staleLocation != null ? staleLocation : currentLocation;
+            if (duringCurrentLocation != null) {
+                Runnable r = duringCurrentLocation;
+                duringCurrentLocation = null;
+                r.run();
+            }
+            return answer;
         }
 
         @Override

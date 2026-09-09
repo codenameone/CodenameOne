@@ -145,6 +145,16 @@ public class LocationButton extends Container {
     /// not hand one button another's timeout.
     private long deadline;
 
+    /// The oldest fix this button will accept, absolute. A tap asks for the
+    /// location NOW, so a coordinate a tracking application cached long ago is
+    /// not an answer to it. The window is the button's own timeout: a fix no
+    /// older than the time it was willing to spend waiting for one.
+    private long acceptFrom;
+
+    /// How often the cache is re-read while a tracking application owns the
+    /// listener.
+    private static final long TRACKED_POLL_MILLIS = 150;
+
     /// True while some button's acquisition is running. Static because the fix
     /// is: LocationManager serves one one-shot request at a time, so a second
     /// button asking during the first would be answered from the last known
@@ -631,8 +641,9 @@ public class LocationButton extends Container {
         // Nothing is locked because nothing here is concurrent: Codename One is
         // single threaded and every line of this runs on the EDT. invokeAndBlock
         // interleaves, it does not parallelise.
-        deadline = timeout < 0 ? Long.MAX_VALUE
-                : System.currentTimeMillis() + timeout;
+        long now = System.currentTimeMillis();
+        deadline = timeout < 0 ? Long.MAX_VALUE : now + timeout;
+        acceptFrom = timeout < 0 ? now : now - timeout;
         waiting.add(this);
         if (inFlight) {
             // Someone else's fix is already on its way and it is the same fix.
@@ -699,7 +710,13 @@ public class LocationButton extends Container {
                 // wanted to give up promptly into one that waits for ever.
                 wait = 1;
             }
-            Location fix = fetch(wait);
+            long since = Long.MAX_VALUE;
+            for (LocationButton b : waiting) {
+                if (b.acceptFrom < since) {
+                    since = b.acceptFrom;
+                }
+            }
+            Location fix = fetch(wait, since);
             now = System.currentTimeMillis();
             List<LocationButton> round = new ArrayList<LocationButton>(waiting);
             waiting.clear();
@@ -762,22 +779,89 @@ public class LocationButton extends Container {
     }
 
     /// One request to the platform, off the EDT.
-    private static Location fetch(long timeout) {
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: how long this round may wait, -1 for as long as it takes
+    /// - `since`: the oldest timestamp any waiting button will accept
+    private static Location fetch(long timeout, long since) {
         final LocationManager manager = LocationManager.getLocationManager();
         if (manager == null) {
             return null;
         }
         final long forTimeout = timeout;
+        final long forSince = since;
         final Location[] result = new Location[1];
         // invokeAndBlock so a cold fix does not freeze the form; the EDT
         // keeps pumping while the platform looks for one.
         Display.getInstance().invokeAndBlock(new Runnable() {
             @Override
             public void run() {
-                result[0] = manager.getCurrentLocationSync(forTimeout);
+                if (manager.getLocationListener() == null) {
+                    result[0] = manager.getCurrentLocationSync(forTimeout);
+                } else {
+                    result[0] = trackedFix(manager, forTimeout, forSince);
+                }
             }
         });
         return result[0];
+    }
+
+    /// A fix for an application that is already tracking location.
+    ///
+    /// getCurrentLocationSync does not wait when a listener is installed: it
+    /// answers from getCurrentLocation(), which on Android hands back the
+    /// coordinate the tracker cached last. For a tracking application that is
+    /// the right answer to "where are we"; it is the wrong answer to a button,
+    /// where the user has just tapped to share where they are NOW and the cache
+    /// can be arbitrarily old.
+    ///
+    /// The tracker is left strictly alone. Installing anything of our own would
+    /// mean setLocationListener, which clears the application's listener,
+    /// discards its LocationRequest and re-binds the platform -- disturbing the
+    /// tracking that application asked for in order to answer a button. So this
+    /// watches the cache instead and waits for it to move.
+    ///
+    /// It never does worse than the cache. Whatever it has when the time runs
+    /// out is returned, so the answer is at least the one this method would have
+    /// given before, and better whenever an update arrives in time.
+    ///
+    /// #### Parameters
+    ///
+    /// - `manager`: the manager whose listener the application owns
+    /// - `timeout`: how long to wait, -1 for as long as it takes
+    /// - `since`: the oldest timestamp worth accepting
+    private static Location trackedFix(LocationManager manager, long timeout,
+            long since) {
+        long until = timeout < 0 ? Long.MAX_VALUE
+                : System.currentTimeMillis() + timeout;
+        Location best = null;
+        while (true) {
+            Location current = null;
+            try {
+                current = manager.getCurrentLocation();
+            } catch (Throwable err) {
+                // Nothing to be had this time round; the tracker may still
+                // deliver one before the deadline.
+                current = null;
+            }
+            if (current != null) {
+                best = current;
+                if (current.getTimeStamp() >= since) {
+                    return current;
+                }
+            }
+            if (System.currentTimeMillis() >= until) {
+                // The cache never moved. This is what the old code answered
+                // immediately, so returning it is no loss -- only late.
+                return best;
+            }
+            try {
+                Thread.sleep(TRACKED_POLL_MILLIS);
+            } catch (InterruptedException err) {
+                return best;
+            }
+        }
     }
 
 
