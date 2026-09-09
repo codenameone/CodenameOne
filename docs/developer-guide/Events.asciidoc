@@ -219,7 +219,9 @@ Low-level events can be bound in one of 3 ways:
 
 TIP: That last one depends on the event. A key callback on an ordinary `Component` only fires while that
 component holds focus, because `Form` routes key events to the focused one - the exception is a key the
-menu bar claims, which `Form.keyPressed` hands to `MenuBar` before it consults `focused` at all.
+menu bar claims, which `Form.keyPressed` hands to `MenuBar` first. That exception has its own exception:
+`focusedHandlesInput` gives a printable key back to the focused component when it consumes raw text input,
+which is how a focused text editor keeps typing out of the menu bar.
 
 A pointer callback has no focus prerequisite at all, and three things about its target are worth knowing.
 `Form.pointerPressed` resolves the *lead parent* of whatever sits under the touch, so `isEnabled()` and
