@@ -55,3 +55,29 @@ ld: warning: object file was built for newer iOS version than being linked
 # a diagnostic; if either matched, every warning would be counted twice.
  1502 |     JAVA_OBJECT locals_3_;
       |                 ^
+
+# ---------------------------------------------------------------------------
+# Splits observed in a real iOS build log (92,129 warnings, ~18 split lines).
+# xcodebuild's output reaches the log through a pipe and a long diagnostic can
+# arrive broken at an arbitrary byte. Three shapes, all found in real output:
+
+# 11. Split inside the PATH. Alone, the second line names a file that does not
+# exist and belongs to nobody; joined, it is com_codename1_ui_Display.m.
+/tmp/proj/HelloApp-src/watch-src/com_c
+odename1_ui_Display.m:5646:5: warning: unused variable 'SP' [-Wunused-variable]
+
+# 12. Split inside the MESSAGE. The first line parses on its own, which is worse
+# than not parsing: it yields the message shape "unuse" and a baseline row that
+# could never match again.
+/tmp/proj/HelloApp-src/com_codename1_ui_Form.m:912:9: warning: unuse
+d variable 'methodBlockOffset' [-Wunused-variable]
+
+# 13. Bytes LOST, not merely split -- the path and location are gone outright, so
+# nothing can put this back. It must be counted as lost rather than attributed to
+# the toolchain, and never baselined: a row keyed on no file can never recur.
+warning: unused variable 'currentOffset' [-Wunused-variable]
+
+# 14. A genuine fileless build-system warning, which looks similar and must NOT be
+# treated as truncation. It carries no [-Wflag], because clang flags belong to
+# file-scoped diagnostics -- that is what separates the two.
+warning: Skipping duplicate build file in Compile Sources build phase

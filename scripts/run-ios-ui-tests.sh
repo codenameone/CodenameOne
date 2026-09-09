@@ -759,22 +759,40 @@ COMPILE_END=$(date +%s)
 COMPILATION_TIME=$((COMPILE_END - COMPILE_START))
 ri_log "Compilation time: ${COMPILATION_TIME}s"
 
-# Attribute this build's warnings to whoever owns the code. Report-only for now:
-# the census has to produce the first honest numbers before any baseline can be
-# frozen from them. The tool exits 2 by itself if this build did not compile
-# everything, so an incremental build cannot quietly report a small number.
+# Attribute this build's warnings to whoever owns the code and hold the result
+# against the leg's baseline. A new warning kind fails here; so does a baselined
+# one that has stopped reproducing, which is what keeps the file from drifting
+# into a description of a build nobody runs.
+#
+# --probe re-runs the whole chain with one synthetic warning injected and asserts
+# it comes back as new. That is what catches this gate going blind -- a missing
+# manifest, a wrong baseline path, everything silently bucketed as vendored -- on
+# the day it breaks rather than the day someone notices it never fired.
+#
+# The tool exits 2 on its own if this build compiled less than the one the
+# baseline came from, so an incremental build cannot quietly report a small
+# number and pass.
 if [ "${CN1_WARNING_CENSUS:-0}" = "1" ]; then
   CN1_WARNING_MANIFEST="${CN1_WARNING_MANIFEST:-$ARTIFACTS_DIR/cn1-source-manifest.txt}"
-  if [ -f "$CN1_WARNING_MANIFEST" ]; then
-    "$REPO_ROOT/scripts/check-native-warnings.sh" \
-      --leg "${CN1_WARNING_LEG:-ios-sim-debug}" \
-      --log "$BUILD_LOG" \
-      --manifest "$CN1_WARNING_MANIFEST" \
-      --json "$ARTIFACTS_DIR/native-warnings.json" \
-      --report-only || ri_log "STAGE:WARNING_CENSUS_FAILED"
-  else
-    ri_log "Warning census requested but no manifest at $CN1_WARNING_MANIFEST"
+  if [ ! -f "$CN1_WARNING_MANIFEST" ]; then
+    ri_log "STAGE:WARNING_CENSUS_FAILED -> no manifest at $CN1_WARNING_MANIFEST"
+    exit 12
   fi
+  CN1_WARNING_ARGS=(
+    --leg "${CN1_WARNING_LEG:-ios-sim-debug}"
+    --log "$BUILD_LOG"
+    --manifest "$CN1_WARNING_MANIFEST"
+  )
+  if ! "$REPO_ROOT/scripts/check-native-warnings.sh" "${CN1_WARNING_ARGS[@]}" \
+      --json "$ARTIFACTS_DIR/native-warnings.json"; then
+    ri_log "STAGE:WARNING_CENSUS_FAILED -> see the census output above"
+    exit 12
+  fi
+  if ! "$REPO_ROOT/scripts/check-native-warnings.sh" "${CN1_WARNING_ARGS[@]}" --probe > /dev/null; then
+    ri_log "STAGE:WARNING_CENSUS_FAILED -> the gate did not react to an injected warning"
+    exit 12
+  fi
+  ri_log "Warning census clean and the gate verified against an injected warning"
 fi
 
 BUILD_SETTINGS="$("$XCODEBUILD" "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"

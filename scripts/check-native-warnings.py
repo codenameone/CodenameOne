@@ -89,7 +89,19 @@ SDK_MARKERS = (
 VENDORED_MARKERS = (
     "/Pods/", "/SourcePackages/", "/Checkouts/", "/DerivedData/",
     "/node_modules/", "/.build/", "/third_party/", "/xwin/",
+    # An .xcframework is unzipped into the build's own products directory before
+    # its headers are compiled against, so those headers arrive under a path that
+    # looks local and is not: TensorFlowLiteC's c_api.h reached the census this
+    # way. Not ours, and not something an application author can fix.
+    "/XCFrameworkIntermediates/", ".framework/Headers/",
 )
+
+# A companion watchOS or tvOS app embedded in an iOS project is translated by a
+# SECOND, independent ParparVM run, which writes its output to a sibling -src
+# directory and its own manifest that nothing stages. Its files are generated code
+# by exactly the same argument as the main app's, and a warning in one is a defect
+# in the same emitter, so it is attributed the same way rather than left homeless.
+COMPANION_SRC_MARKERS = ("/watch-src/", "/tv-src/")
 
 GATING_GROUPS = ("generated", "runtime", "port", "toolchain")
 ALL_GROUPS = GATING_GROUPS + ("vendored", "sdk")
@@ -158,13 +170,81 @@ class Diagnostic(object):
         return "|".join((self.group, self.identity, self.flag, signature(self.msg)))
 
 
+# A line that is nothing but a path fragment: no whitespace, contains a slash, and
+# carries no diagnostic of its own. xcodebuild occasionally breaks a long
+# diagnostic across two lines at an arbitrary column, leaving the path prefix on
+# one line and the rest on the next -- measured at 8 occurrences in 92,129 warnings
+# on the iOS leg. Rare, but it produced file names like "odename1_ui_Display.m"
+# (com_c + odename1_ui_Display.m), which belong to no file that exists and so could
+# not be attributed to anyone.
+SPLIT_PREFIX_RE = re.compile(r'^\S*/\S*$')
+
+# Lines that legitimately follow a diagnostic and must never be glued onto it:
+# clang's source snippet and caret (both indented), the include-trace header, and
+# a build task announcement.
+CONTINUATION_EXCLUDE_RE = re.compile(
+    r'^(?:\s|In file included from\b|[A-Z][A-Za-z]+\s+/|\[\s*\d)')
+
+
+def _parses(line):
+    return bool(GNU_RE.match(line) or MSVC_RE.match(line))
+
+
+def rejoin_split_lines(lines):
+    """Puts diagnostics back together that the log transport broke in two.
+
+    xcodebuild's output reaches the log through a pipe, and a long diagnostic
+    occasionally arrives split at an arbitrary byte with the remainder on the next
+    line -- measured at roughly 18 occurrences in 92,129 warnings on the iOS leg.
+    It happens in two places, and both were found in real output rather than
+    imagined:
+
+    - in the PATH, leaving "com_c" on one line and
+      "odename1_ui_Display.m:5646:5: warning: ..." on the next, which names a file
+      that does not exist and so belongs to nobody;
+    - in the MESSAGE, leaving "... warning: unuse" and then "d variable 'SP'
+      [-Wunused-variable]", which parses fine and produces a truncated message
+      shape -- a bogus baseline row that would never match again.
+
+    Both joins are self-validating rather than guessed. A path join is only made
+    when the result parses as a diagnostic at all; a message join only when it
+    completes a trailing [-Wflag] that was absent before. Anything that does not
+    satisfy that is left exactly as it came.
+    """
+    out = []
+    i = 0
+    n = len(lines)
+    while i < n:
+        line = lines[i]
+        nxt = lines[i + 1] if i + 1 < n else None
+
+        if nxt is not None and not _parses(line) and SPLIT_PREFIX_RE.match(line) \
+                and ": warning:" not in line and ": error:" not in line \
+                and ": note:" not in line and _parses(line + nxt):
+            out.append(line + nxt)
+            i += 2
+            continue
+
+        if nxt is not None and _parses(line) and not FLAG_RE.search(line) \
+                and not _parses(nxt) and not CONTINUATION_EXCLUDE_RE.match(nxt) \
+                and FLAG_RE.search(line + nxt):
+            out.append(line + nxt)
+            i += 2
+            continue
+
+        out.append(line)
+        i += 1
+    return out
+
+
 def parse_log(text):
     """Every warning in the log, deduplicated, plus the sources that were compiled."""
     seen = {}
     order = []
     compiled = set()
-    for raw in text.splitlines():
-        line = raw.rstrip("\r")
+    lost = 0
+    for raw in rejoin_split_lines([l.rstrip("\r") for l in text.splitlines()]):
+        line = raw
 
         m = COMPILE_XCODE_RE.match(line)
         if m:
@@ -196,14 +276,23 @@ def parse_log(text):
             m = BARE_RE.match(line)
             if not m or m.group("sev") != "warning":
                 continue
-            # No file: a linker or driver diagnostic. It still matters -- ThinLTO
-            # puts real findings here -- but it belongs to no source.
+            # A fileless diagnostic that nonetheless carries a [-Wflag] is not a
+            # build-system warning -- clang flags belong to file-scoped diagnostics.
+            # It is a compiler warning whose path the log transport dropped outright
+            # (bytes lost, not merely split, so nothing can put it back). Counting
+            # these keeps them visible; attributing them to the toolchain would be a
+            # lie, and baselining them would freeze a row that can never recur.
+            if FLAG_RE.search(m.group("msg")):
+                lost += 1
+                continue
+            # No file and no flag: a linker or driver diagnostic. It still matters --
+            # ThinLTO puts real findings here -- but it belongs to no source.
             d = Diagnostic("<none>", 0, 0, "<no-flag>", m.group("msg"))
 
         if d.dedup_key not in seen:
             seen[d.dedup_key] = d
             order.append(d)
-    return order, compiled
+    return order, compiled, lost
 
 
 def read_manifest(path):
@@ -293,6 +382,9 @@ def classify(diags, manifest, leg):
                 d.identity = repo_path or name
             else:
                 unattributed.append(d)
+            continue
+        if any(marker in norm for marker in COMPANION_SRC_MARKERS):
+            d.group, d.identity = "generated", "*"
             continue
         # Vendored is tested first because its markers are the more specific ones.
         # "/Library/Developer/" matches a developer's own
@@ -506,7 +598,7 @@ def self_test():
     caret lines that must not be mistaken for diagnostics.
     """
     with open(FIXTURE, encoding="utf-8") as fh:
-        diags, compiled = parse_log(fh.read())
+        diags, compiled, lost = parse_log(fh.read())
     got = {(os.path.basename(d.path), d.line, d.col, d.flag, signature(d.msg)) for d in diags}
     expected = {
         ("IOSNative.m", 4211, 9, "-Wdeprecated-declarations",
@@ -518,6 +610,13 @@ def self_test():
         ("<none>", 0, 0, "<no-flag>",
          "object file was built for newer iOS version than being linked"),
         ("com_codename1_ui_Form.m", 1502, 17, "-Wunused-variable", "unused variable ?"),
+        # Rejoined from a path split; the fragment alone named no real file.
+        ("com_codename1_ui_Display.m", 5646, 5, "-Wunused-variable", "unused variable ?"),
+        # Rejoined from a message split; unjoined this reads "unuse".
+        ("com_codename1_ui_Form.m", 912, 9, "-Wunused-variable", "unused variable ?"),
+        # A real fileless build-system warning, kept.
+        ("<none>", 0, 0, "<no-flag>",
+         "Skipping duplicate build file in Compile Sources build phase"),
     }
     problems = []
     for extra in sorted(got - expected):
@@ -526,6 +625,8 @@ def self_test():
         problems.append("failed to parse: %r" % (missing,))
     # The header diagnostic appears three times in the fixture -- twice from
     # different TUs, once from a second architecture -- and must survive as one.
+    if lost != 1:
+        problems.append("expected exactly 1 truncation-lost diagnostic, got %d" % lost)
     header = [d for d in diags if os.path.basename(d.path) == "cn1_globals.h"]
     if len(header) != 1:
         problems.append("header warning deduped to %d entries, expected 1" % len(header))
@@ -628,7 +729,7 @@ def main():
         text += "\n%s:1:1: warning: %s [%s]\n" % (target, PROBE_MESSAGE, PROBE_FLAG)
         probe_key = "|".join(("runtime", target, PROBE_FLAG, PROBE_MESSAGE))
 
-    diags, compiled = parse_log(text)
+    diags, compiled, lost = parse_log(text)
 
     never_compiled, expected, regressed = check_completeness(manifest, compiled, args.leg)
     if not args.allow_partial:
@@ -644,6 +745,9 @@ def main():
                   % (len(regressed), "\n  ".join(regressed[:40]),
                      "\n  ..." if len(regressed) > 40 else ""), file=sys.stderr)
             return 2
+    if lost:
+        print("note: %d diagnostic(s) lost their file to log truncation and are not "
+              "attributed to anyone; they are reported here and never baselined." % lost)
     print("coverage: %d source(s) compiled; %d of the %d in the manifest were not built by "
           "this target" % (len(compiled), len(never_compiled), len(expected)))
     if never_compiled:

@@ -298,6 +298,7 @@ jobs:
             artifacts/vm_time.txt
             artifacts/xcodebuild-list.txt
             artifacts/cn1-source-manifest.txt
+            artifacts/ios-ui-tests/native-warnings.json
           if-no-files-found: warn
           retention-days: 14
 
