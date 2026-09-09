@@ -39,6 +39,14 @@ public final class Tcp {
     }
 
     public static Tcp connect(String host, int port, int timeoutMillis) throws IOException {
+        // The same range ServerSocket.bind refuses, and for the same reason: the
+        // native side renders this into the service string getaddrinfo parses, and
+        // a value past 65535 does not fail there -- glibc wraps it, so 65536 dials
+        // port 0 and 99999 dials 34463. The Java SE arm rejects it outright, so a
+        // malformed database URL reached a DIFFERENT port only once packaged.
+        if(port < 0 || port > 65535) {
+            throw new IllegalArgumentException("port out of range: " + port);
+        }
         long h = connectImpl(host, port, timeoutMillis);
         if(h == 0) {
             throw new IOException("Connection to " + host + ":" + port + " failed");

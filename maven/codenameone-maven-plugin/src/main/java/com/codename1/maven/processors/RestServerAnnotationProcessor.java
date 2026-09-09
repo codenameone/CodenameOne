@@ -513,7 +513,28 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        String path = stripQuery(rawPath);\n");
         sb.append("        String query = queryOf(rawPath);\n");
         sb.append("        String[] seg = split(path);\n");
-        for (Op op : api.ops) {
+        // Order matters HERE and nowhere else in this file: dispatch returns from
+        // the first branch that matches, while hasRoute is an or and the interface
+        // is only declarations. A route with a placeholder accepts any value in that
+        // segment, so "GET /notes/{id}" declared before "GET /notes/latest" answered
+        // /notes/latest itself and the literal method could never run. The generator
+        // for @RestController already sorts for this; this half did not.
+        List<Op> ordered = new ArrayList<Op>(api.ops);
+        Collections.sort(ordered, new java.util.Comparator<Op>() {
+            public int compare(Op a, Op b) {
+                int byVerb = a.verb.compareTo(b.verb);
+                if (byVerb != 0) {
+                    return byVerb;
+                }
+                boolean aVar = placeholderShape(a.pathTemplate).indexOf("{}") >= 0;
+                boolean bVar = placeholderShape(b.pathTemplate).indexOf("{}") >= 0;
+                if (aVar != bVar) {
+                    return aVar ? 1 : -1;
+                }
+                return b.pathTemplate.length() - a.pathTemplate.length();
+            }
+        });
+        for (Op op : ordered) {
             emitRoute(sb, op);
         }
         sb.append("        return null;\n");

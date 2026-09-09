@@ -67,6 +67,8 @@ import com.codename1.backend.sql.Postgres;
  */
 public final class Database {
     private final Db sqlite;
+    /** Db has no isClosed, so closure is recorded where it happens. */
+    private boolean sqliteClosed;
     private final Postgres postgres;
     private final MySql mysql;
     private final String describedAs;
@@ -224,6 +226,7 @@ public final class Database {
 
     public void close() {
         if(sqlite != null) {
+            sqliteClosed = true;
             sqlite.close();
         } else if(postgres != null) {
             postgres.close();
@@ -240,7 +243,11 @@ public final class Database {
         if(mysql != null) {
             return !mysql.isClosed();
         }
-        return true;
+        // The SQLite arm used to answer "yes" whatever had happened to it, so a
+        // pool asking the documented usability question put a CLOSED connection
+        // back and the next caller got "Database is closed" instead. Db has no
+        // isClosed of its own, so closure is recorded here, where it happens.
+        return sqlite != null && !sqliteClosed;
     }
 
     public String toString() {
