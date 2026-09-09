@@ -553,37 +553,19 @@ public class AndroidGradleBuilder extends Executor {
                     + " infers this declaration on its own and the hint is not"
                     + " the way to ask for it.");
         }
-        if (declaresCappedFineLocation(xPermissions)) {
-            // permissionAdd() suppresses this build's declaration for any
-            // permission already named in xpermissions, by bare name, so a
-            // capped hand-written entry becomes the manifest's ONLY
-            // ACCESS_FINE_LOCATION and the application has no effective one past
-            // the cap. The build cannot rewrite the fragment, so it cannot fix
-            // this; what it can do is not ship it silently.
-            //
-            // Refused only where it is certainly fatal -- the location button
-            // grants precise location through this permission on Android 17,
-            // well past any cap anyone writes -- and reported everywhere else,
-            // because an ordinary location application with a capped
-            // declaration is very likely also broken but has been building for
-            // as long as the fragment has been there.
-            if (locationButtonPermission) {
-                throw new BuildException("android.xpermissions declares"
-                        + " ACCESS_FINE_LOCATION with a maxSdkVersion, which stops"
-                        + " this build declaring its own and leaves the application"
-                        + " with no effective precise-location permission on the"
-                        + " versions past that cap. The location button grants"
-                        + " precise location through it on Android 17, so it cannot"
-                        + " work. Remove the maxSdkVersion from that fragment, or"
-                        + " remove the fragment and let the build declare the"
-                        + " permission.");
-            }
-            warn("android.xpermissions declares ACCESS_FINE_LOCATION with a"
-                    + " maxSdkVersion, so this build's own declaration is"
-                    + " suppressed and the application has no effective"
-                    + " precise-location permission past that cap.");
-            return FINE_LOCATION_PERMISSION;
-        }
+        // A capped ACCESS_FINE_LOCATION in xpermissions is NOT checked here,
+        // and a check that failed the build over one was reverted after it broke
+        // the health leg. The capped entries are ours: Bluetooth emits one at
+        // maxSdkVersion 30 for BLE scanning and the Wi-Fi block used to emit one
+        // at 32, so the message told developers to remove a fragment they had
+        // never written and could not reach.
+        //
+        // The real limitation is permissionAdd(), which suppresses this build's
+        // declaration for any permission already named in xpermissions by bare
+        // name, never looking at maxSdkVersion. That is one bug, in one place,
+        // shared by every feature that caps a permission -- not something for
+        // this method to police one caller at a time. The Wi-Fi instance is
+        // fixed where it is caused, in needsCappedWifiFineLocation.
         String hint = request.getArg("android.locationButton.exclusive", "auto");
         boolean asked = "true".equals(hint);
         if (!wantsExclusiveLocation(hint, locationButtonPermission, otherLocationUse)) {
@@ -743,37 +725,6 @@ public class AndroidGradleBuilder extends Executor {
         }
         return xPermissions == null
                 || xPermissions.indexOf("android.permission.ACCESS_FINE_LOCATION") < 0;
-    }
-
-    /// Whether `android.xpermissions` declares ACCESS_FINE_LOCATION with a
-    /// `maxSdkVersion` on it, which is not an effective declaration on the
-    /// versions past that cap.
-    ///
-    /// The element has to be found before the attribute is looked for. A plain
-    /// search for both strings anywhere in the value answers yes for the
-    /// ordinary case of an uncapped ACCESS_FINE_LOCATION sitting next to some
-    /// unrelated capped permission -- WRITE_EXTERNAL_STORAGE and READ_PHONE_STATE
-    /// are both commonly capped, and USE_FINGERPRINT is capped by this builder
-    /// itself a few hundred lines above.
-    ///
-    /// #### Parameters
-    ///
-    /// - `xPermissions`: the raw android.xpermissions value, possibly null
-    static boolean declaresCappedFineLocation(String xPermissions) {
-        if (xPermissions == null) {
-            return false;
-        }
-        int at = xPermissions.indexOf("ACCESS_FINE_LOCATION");
-        while (at >= 0) {
-            int open = xPermissions.lastIndexOf('<', at);
-            int close = xPermissions.indexOf('>', at);
-            if (open >= 0 && close > open
-                    && xPermissions.substring(open, close).indexOf("maxSdkVersion") >= 0) {
-                return true;
-            }
-            at = xPermissions.indexOf("ACCESS_FINE_LOCATION", at + 1);
-        }
-        return false;
     }
 
     /// Whether `android.xpermissions` hand-declares ACCESS_FINE_LOCATION
