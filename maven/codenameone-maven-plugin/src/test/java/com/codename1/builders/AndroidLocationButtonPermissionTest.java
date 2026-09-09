@@ -175,6 +175,36 @@ class AndroidLocationButtonPermissionTest {
     }
 
     /**
+     * A hand-written fragment always wins -- permissionAdd() drops this build's
+     * declaration once xpermissions names the permission -- so both spellings
+     * have to be told apart before either hint value can be honoured or
+     * refused.
+     */
+    @Test
+    void theTwoManualDeclarationsAreToldApart() {
+        String ordinary = "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />";
+        String restricted = "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\""
+                + " android:usesPermissionFlags=\"onlyForLocationButton\" />";
+
+        assertTrue(AndroidGradleBuilder.declaresOrdinaryFineLocation(ordinary));
+        assertFalse(AndroidGradleBuilder.declaresRestrictedFineLocation(ordinary));
+
+        assertTrue(AndroidGradleBuilder.declaresRestrictedFineLocation(restricted));
+        assertFalse(AndroidGradleBuilder.declaresOrdinaryFineLocation(restricted),
+                "the restricted spelling is not the ordinary one");
+    }
+
+    /** Neither rule fires on a fragment that says nothing about location. */
+    @Test
+    void anUnrelatedFragmentIsNeitherDeclaration() {
+        String other = "<uses-permission android:name=\"android.permission.CAMERA\" />";
+        assertFalse(AndroidGradleBuilder.declaresOrdinaryFineLocation(other));
+        assertFalse(AndroidGradleBuilder.declaresRestrictedFineLocation(other));
+        assertFalse(AndroidGradleBuilder.declaresOrdinaryFineLocation(null));
+        assertFalse(AndroidGradleBuilder.declaresRestrictedFineLocation(null));
+    }
+
+    /**
      * onlyForLocationButton is an API 37 enum value and AAPT resolves manifest
      * enum values against the COMPILE SDK. Below 37 it is a resource-linking
      * failure, measured:

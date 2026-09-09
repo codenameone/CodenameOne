@@ -412,11 +412,14 @@ public class LocationButton extends Container {
     /// a `setEnabled(false)` before that reached this container and nothing
     /// else, and the button that appeared afterwards was live.
     ///
-    /// The platform's own control is a different matter and this cannot fix it.
-    /// Its taps are delivered to a surface another process owns, so Codename
-    /// One never sees them and cannot withhold them; a disabled
-    /// system-rendered button still answers. Where that matters, take the
-    /// component out of the form rather than disabling it.
+    /// The platform's own control is a different matter and this only half
+    /// reaches it. Its taps are delivered to a surface another process owns, so
+    /// Codename One never sees them and cannot withhold them: a disabled
+    /// system-rendered button is still touchable and the system still runs its
+    /// consent flow. What it does not do is produce anything -- permissionResult
+    /// drops the answer while the component is disabled -- so no location is
+    /// acquired and no listener runs. Where even the consent sheet must not
+    /// appear, take the component out of the form rather than disabling it.
     private void adoptEnabledState(Component child) {
         if (!isEnabled()) {
             child.setEnabled(false);
@@ -509,6 +512,30 @@ public class LocationButton extends Container {
                     // request waiting to be resolved. What the application can
                     // see is isSystemRendered(), which now says false.
                     useFallback();
+                    return;
+                }
+                if (!isEnabled()) {
+                    // AFTER the null branch on purpose, and a test holds it
+                    // there: a null is a session failure rather than an answer,
+                    // and the fallback swap it triggers has to happen whether or
+                    // not the component is enabled. Guarding above it left a
+                    // disabled component wearing a control the platform had
+                    // already given up on, with nothing to replace it when the
+                    // application enabled it again.
+                    //
+                    // The tap itself cannot be withheld -- the surface belongs
+                    // to another process, so the system drew the control, took
+                    // the touch and ran its consent flow without asking this
+                    // component anything. Acting on the answer is still ours to
+                    // decline, and a disabled component declines: no
+                    // acquisition, no listener call.
+                    //
+                    // That is the whole of what "disabled" can mean here. The
+                    // fallback button is genuinely inert because Codename One
+                    // routes its taps and the platform's control is not, so
+                    // matching them exactly is impossible; what is possible is
+                    // that neither produces a location, which is what the
+                    // application asked for by disabling it.
                     return;
                 }
                 if (granted.booleanValue()) {

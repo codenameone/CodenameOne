@@ -556,6 +556,35 @@ public class AndroidGradleBuilder extends Executor {
         String hint = request.getArg("android.locationButton.exclusive", "auto");
         boolean asked = "true".equals(hint);
         if (!wantsExclusiveLocation(hint, locationButtonPermission, otherLocationUse)) {
+            // The mirror of the conflict below, and just as silent. Answering
+            // "ordinary" here decides nothing on its own: permissionAdd() drops
+            // this declaration whenever android.xpermissions already names
+            // ACCESS_FINE_LOCATION, so a hand-written fragment carrying
+            // onlyForLocationButton stays in the manifest and the application
+            // ships restricted precise location -- the opposite of the force-off
+            // that was asked for, and it is native code, invisible to this scan,
+            // that such a build usually turns off the restriction FOR. It would
+            // then be handed approximate location at runtime with nothing in the
+            // build saying why.
+            if (declaresRestrictedFineLocation(xPermissions)) {
+                if ("false".equals(hint)) {
+                    throw new BuildException("android.locationButton.exclusive=false"
+                            + " conflicts with the ACCESS_FINE_LOCATION declaration in"
+                            + " android.xpermissions, which carries"
+                            + " onlyForLocationButton and which the build can neither"
+                            + " rewrite nor override. Precise location would stay"
+                            + " limited to the location button despite the hint."
+                            + " Remove onlyForLocationButton from that fragment, or"
+                            + " drop the hint if the manual restriction is what you"
+                            + " want.");
+                }
+                // `auto` did not ask for anything, and an explicit fragment beats
+                // an inference -- the same precedence as the forced case below.
+                warn("android.xpermissions declares ACCESS_FINE_LOCATION"
+                        + " onlyForLocationButton, so precise location is limited to"
+                        + " the location button even though the build did not infer"
+                        + " that restriction.");
+            }
             return FINE_LOCATION_PERMISSION;
         }
         // onlyForLocationButton is an API 37 enum value, and AAPT resolves
@@ -587,11 +616,7 @@ public class AndroidGradleBuilder extends Executor {
         // fragment beats an inference -- but a forced `true` would then succeed
         // while shipping ordinary precise access, which is the opposite of what
         // was asked for, and silently.
-        boolean manualFine = xPermissions != null
-                && xPermissions.indexOf("ACCESS_FINE_LOCATION") >= 0;
-        boolean manualExclusive = xPermissions != null
-                && xPermissions.indexOf("onlyForLocationButton") >= 0;
-        if (manualFine && !manualExclusive) {
+        if (declaresOrdinaryFineLocation(xPermissions)) {
             if (asked) {
                 throw new BuildException("android.locationButton.exclusive=true"
                         + " conflicts with the ACCESS_FINE_LOCATION declaration in"
@@ -657,6 +682,34 @@ public class AndroidGradleBuilder extends Executor {
     /// #### Returns
     ///
     /// whether to declare the restriction, before the compile SDK is consulted
+    /// Whether `android.xpermissions` hand-declares ACCESS_FINE_LOCATION
+    /// WITHOUT the location-button restriction.
+    ///
+    /// Both of these matter because permissionAdd() drops this build's own
+    /// declaration as soon as the fragment names the permission, so whatever
+    /// the fragment says is what ships and neither hint value can change it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `xPermissions`: the raw android.xpermissions value, possibly null
+    static boolean declaresOrdinaryFineLocation(String xPermissions) {
+        return xPermissions != null
+                && xPermissions.indexOf("ACCESS_FINE_LOCATION") >= 0
+                && xPermissions.indexOf("onlyForLocationButton") < 0;
+    }
+
+    /// Whether `android.xpermissions` hand-declares ACCESS_FINE_LOCATION WITH
+    /// the location-button restriction on it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `xPermissions`: the raw android.xpermissions value, possibly null
+    static boolean declaresRestrictedFineLocation(String xPermissions) {
+        return xPermissions != null
+                && xPermissions.indexOf("ACCESS_FINE_LOCATION") >= 0
+                && xPermissions.indexOf("onlyForLocationButton") >= 0;
+    }
+
     static boolean wantsExclusiveLocation(String hint, boolean buttonUsed,
             boolean otherLocationUse) {
         if ("true".equals(hint)) {

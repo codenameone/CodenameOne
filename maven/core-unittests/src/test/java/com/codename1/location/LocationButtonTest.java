@@ -403,6 +403,42 @@ class LocationButtonTest extends UITestBase {
         assertTrue(shared.isEmpty(), "a disabled fallback must not acquire");
     }
 
+    /// The system's control is drawn by another process, so a disabled component
+    /// cannot stop the tap or the consent flow. It can refuse to act on the
+    /// answer, and that is the part the application asked for: no location, no
+    /// listener.
+    @FormTest
+    void aDisabledSystemRenderedButtonDoesNotActOnAGrant() {
+        implementation.setLocationButtonSupported(true);
+        manager.currentLocation = new Location(9.0, 10.0);
+        LocationButton button = showButton(new LocationButton());
+        assertTrue(button.isSystemRendered(),
+                "the platform control is what this test is about");
+        button.setEnabled(false);
+        List<Location> shared = record(button);
+
+        // The platform granted: the user tapped a control this component could
+        // not withhold and answered the system's prompt.
+        grant(Boolean.TRUE);
+
+        assertTrue(shared.isEmpty(),
+                "a disabled button must not deliver a location it was told not to get");
+    }
+
+    /// The same for a decline, which would otherwise report a null location and
+    /// look to the application like a real answer from a live button.
+    @FormTest
+    void aDisabledSystemRenderedButtonDoesNotReportADecline() {
+        implementation.setLocationButtonSupported(true);
+        LocationButton button = showButton(new LocationButton());
+        button.setEnabled(false);
+        List<Location> shared = record(button);
+
+        grant(Boolean.FALSE);
+
+        assertTrue(shared.isEmpty(), "a disabled button reports nothing at all");
+    }
+
     /// And the ordinary case still works, so the guard is not disabling
     /// everything.
     @FormTest
