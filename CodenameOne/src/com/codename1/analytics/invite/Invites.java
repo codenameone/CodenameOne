@@ -506,6 +506,15 @@ public final class Invites {
         // this a refused user who opened an invite link still had a profile
         // persisted -- by a different route to the one that was fixed.
         if (explicitlyDenied()) {
+            if (getAttribution() != null) {
+                // Already attributed, and the listener has had its callback.
+                // Writing a fresh DECLINED marker here contradicted the durable
+                // attribution -- which is still there and makes the state
+                // RESOLVED again on the next launch -- and delivered
+                // attributionUnavailable() as a second, opposite answer for an
+                // install that had already been given one.
+                return true;
+            }
             // Told, not silently dropped. checkForInvite() records the url as
             // consumed and skips the deferred path after this, so this is the
             // only chance the listener gets for this install -- and a
@@ -526,6 +535,10 @@ public final class Invites {
         }
         Map<String, String> pending = pendingRecord();
         pending.put("code", code);
+        pending.put("codeSource", "universal_link");
+        pending.put("codeMatch", MATCH_DIRECT);
+        pending.put("codeDeferred", "false");
+        pending.put("codeReferrer", "");
         // The referrer question is settled: this install came from a link we
         // are holding the code for, so a referrer read is no longer a better
         // answer waiting to happen.
@@ -997,6 +1010,14 @@ public final class Invites {
                 path = path.substring(0, rel);
             }
         }
+        // A fragment is not part of the path and is not part of the code, and
+        // an App Link commonly arrives with one still attached -- so
+        // /i/acme/ABC123#section claimed a code called "ABC123#section", which
+        // exists nowhere.
+        int hash = path.indexOf('#');
+        if (hash >= 0) {
+            path = path.substring(0, hash);
+        }
         if (!path.startsWith("/i/")) {
             return null;
         }
@@ -1105,6 +1126,27 @@ public final class Invites {
     // answer was no". Durable, so no later launch repeats the lookup, and it
     // carries none of the device profile the pending record held -- the profile
     // exists to be matched, and there is nothing left to match it against.
+    // A pending record that sits BESIDE a resolved attribution is a
+    // re-attribution replacement, not this install's only answer. Every way of
+    // giving up on it -- a server no-match, the attempt cap, the window
+    // expiring -- has to drop the replacement and leave the install resolved,
+    // rather than writing a terminal marker the durable attribution contradicts
+    // and telling the listener "no invite" after it has already been told
+    // otherwise.
+    //
+    // Returns true when it handled the outcome.
+    private static boolean abandonReplacement() {
+        if (getAttribution() == null) {
+            return false;
+        }
+        InviteStore.delete(InviteStore.PENDING);
+        state = STATE_RESOLVED;
+        stateLoaded = true;
+        deferredStarted = false;
+        lookupIssuedAt = 0;
+        return true;
+    }
+
     private static void markTerminal() {
         markTerminal(null);
     }
@@ -1250,11 +1292,17 @@ public final class Invites {
         Map<String, String> pending = pendingRecord();
         long expires = InviteStore.getLong(pending, "expiresAt", 0);
         if (expires > 0 && System.currentTimeMillis() > expires) {
+            if (abandonReplacement()) {
+                return;
+            }
             markTerminal(REASON_EXPIRED);
             notifyUnavailable(REASON_EXPIRED);
             return;
         }
         if (InviteStore.getInt(pending, "attempts", 0) >= MAX_ATTEMPTS) {
+            if (abandonReplacement()) {
+                return;
+            }
             markTerminal();
             notifyUnavailable(REASON_NO_MATCH);
             return;
@@ -1268,7 +1316,17 @@ public final class Invites {
         deferredStarted = true;
         String code = InviteStore.get(pending, "code", null);
         if (code != null && code.length() > 0) {
-            claim(code, "universal_link", "", MATCH_DIRECT, false);
+            // Resent as what it was, not as a direct link. A referrer claim
+            // that timed out is persisted here and retried, and hard-coding
+            // the direct-link metadata reported it as invite_opened rather than
+            // invite_install and handed the app an attribution whose
+            // isDeferred() said false -- corrupting the install funnel for
+            // exactly the deterministic answers this retry exists to save.
+            String source = InviteStore.get(pending, "codeSource", "universal_link");
+            String matchType = InviteStore.get(pending, "codeMatch", MATCH_DIRECT);
+            boolean deferred = InviteStore.getBoolean(pending, "codeDeferred", false);
+            claim(code, source, InviteStore.get(pending, "codeReferrer", ""),
+                    matchType, deferred);
             return;
         }
         InstallReferrerSource source = referrerSource;
@@ -1288,7 +1346,7 @@ public final class Invites {
         }
     }
 
-    private static void requestReferrer(InstallReferrerSource source) {
+    private static void requestReferrer(final InstallReferrerSource source) {
         // The epoch this read was ISSUED under, captured here. The platform
         // callback below can run long after a direct link arrived and advanced
         // the epoch, and reading the field at callback time made the old read
@@ -1333,6 +1391,11 @@ public final class Invites {
                             // ordinary retry path resends it.
                             Map<String, String> pending = pendingRecord();
                             pending.put("code", code);
+                            pending.put("codeSource", "install_referrer");
+                            pending.put("codeMatch", MATCH_REFERRER);
+                            pending.put("codeDeferred", "true");
+                            InviteStore.put(pending, "codeReferrer",
+                                    rawReferrer == null ? "" : rawReferrer);
                             pending.remove("referrerRetry");
                             InviteStore.write(InviteStore.PENDING, pending);
                             claim(code, "install_referrer",
@@ -1360,7 +1423,16 @@ public final class Invites {
                             // no-match answer to it must not be allowed to
                             // settle the install as organic while a
                             // deterministic answer is still reachable.
-                            fallBackToMatch(!REASON_UNSUPPORTED.equals(reason));
+                            // Retryable only while the SOURCE would try
+                            // again. Reading the reason alone was not enough:
+                            // a successful read that returns an empty referrer
+                            // reports REASON_NO_MATCH and burns the once-only
+                            // flag, so it is definitive -- and treating it as
+                            // transient left the lookup pending until the
+                            // attempt budget ran out, for an answer that had
+                            // already arrived.
+                            fallBackToMatch(!REASON_UNSUPPORTED.equals(reason)
+                                    && safeSupported(source));
                         }
                     });
                 }

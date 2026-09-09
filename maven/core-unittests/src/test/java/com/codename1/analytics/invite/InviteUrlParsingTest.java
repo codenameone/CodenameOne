@@ -23,12 +23,17 @@
 package com.codename1.analytics.invite;
 
 import com.codename1.io.Preferences;
+import java.util.Map;
+import com.codename1.junit.EdtTest;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class InviteUrlParsingTest extends UITestBase {
 
@@ -96,5 +101,26 @@ class InviteUrlParsingTest extends UITestBase {
     void valueIsSplitOnTheFirstEqualsOnly() {
         InviteTestSupport.freshInstall();
         assertEquals("a=b", Invites.codeFromQuery("cn1_invite=a%3Db"));
+    }
+
+    @Test
+    @EdtTest
+    void aFragmentIsNotPartOfTheCode() {
+        // An App Link commonly arrives with the fragment still attached, and it
+        // is not part of the path -- so this claimed a code called
+        // "ABC123#section", which exists nowhere.
+        assertTrue(Invites.handleUrl("https://cloud.codenameone.com/i/acme/ABC123#section"));
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(pending);
+        assertEquals("ABC123", InviteStore.get(pending, "code", null));
+    }
+
+    @Test
+    @EdtTest
+    void aFragmentAfterAQueryIsAlsoStripped() {
+        assertTrue(Invites.handleUrl(
+                "https://cloud.codenameone.com/i/acme/ABC124?utm_source=x#top"));
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        assertEquals("ABC124", InviteStore.get(pending, "code", null));
     }
 }

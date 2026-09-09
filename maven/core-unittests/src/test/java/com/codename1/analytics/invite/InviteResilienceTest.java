@@ -25,6 +25,7 @@ package com.codename1.analytics.invite;
 import com.codename1.analytics.Analytics;
 import com.codename1.analytics.AnalyticsConsent;
 import com.codename1.analytics.ConsentMode;
+import com.codename1.io.ConnectionRequest;
 import com.codename1.junit.EdtTest;
 import com.codename1.junit.FormTest;
 import java.io.ByteArrayInputStream;
@@ -836,5 +837,141 @@ class InviteResilienceTest extends UITestBase {
         Invites.setInviteListener(l);
         assertEquals(0, received[0],
                 "the resumed lookup announced itself to a listener already told");
+    }
+
+    @FormTest
+    void aRetriedReferrerClaimIsStillAReferrerClaim() {
+        // The persisted code was resent as a direct link, so the answer came
+        // back with isDeferred() false and was recorded as invite_opened rather
+        // than invite_install -- corrupting the install funnel for exactly the
+        // deterministic answers this retry exists to save.
+        Invites.registerInstallReferrerSource(new InstallReferrerSource() {
+            public boolean isSupported() {
+                return true;
+            }
+
+            public void requestReferrer(InstallReferrerCallback callback) {
+                callback.onReferrer("utm_source=cn1_invite&cn1_invite=PROV1", 0L, 0L);
+            }
+        });
+        Invites.checkForInvite();
+
+        // The retry itself, on the wire: what the record holds only matters if
+        // the resend uses it.
+        implementation.clearQueuedRequests();
+        implementation.setAutoProcessConnections(false);
+        Invites.lookupRetryDelay = 0L;
+        Invites.flush();
+
+        String body = null;
+        for (ConnectionRequest r : implementation.getQueuedRequests()) {
+            if (r.getUrl() != null && r.getUrl().indexOf("/claim") >= 0) {
+                body = r.getRequestBody();
+            }
+        }
+        assertNotNull(body, "the persisted referrer code was never resent");
+        assertTrue(body.contains("PROV1"), body);
+        assertTrue(body.replace(" ", "").contains("\"source\":\"install_referrer\""),
+                "a referrer answer was resent as a direct link: " + body);
+    }
+
+    @Test
+    @EdtTest
+    void anExhaustedReplacementLeavesTheEarlierAnswerStanding() {
+        // Every way of giving up on a replacement has to abandon it, not just
+        // the server no-match: the attempt cap wrote a terminal marker the
+        // durable attribution contradicts, and told the listener "no invite"
+        // after it had already been given one.
+        Invites.handleResolution(InviteTestSupport.resolvedJson("FIRST4", "c1", "sms"),
+                Invites.MATCH_DIRECT, false);
+        Invites.setReattribution(true);
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND4");
+
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        pending.put("attempts", "99");
+        InviteStore.write(InviteStore.PENDING, pending);
+
+        final int[] told = new int[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0]++;
+            }
+        });
+        Invites.forgetLoadedState();
+        Invites.checkForInvite();
+
+        assertEquals(0, told[0], "an exhausted replacement told the listener the opposite");
+        assertEquals(Invites.STATE_RESOLVED, Invites.getState());
+    }
+
+    @Test
+    @EdtTest
+    void aDeniedLinkDoesNotOverwriteAnAttributionAlreadyGiven() {
+        // Writing a fresh DECLINED marker contradicted the durable attribution,
+        // which is still there and makes the state RESOLVED again on the next
+        // launch, and delivered a second, opposite callback for one install.
+        final int[] delivered = new int[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+                delivered[0]++;
+            }
+
+            public void attributionUnavailable(String reason) {
+            }
+        });
+        Invites.handleResolution(InviteTestSupport.resolvedJson("FIRST5", "c1", "sms"),
+                Invites.MATCH_DIRECT, false);
+        assertEquals(1, delivered[0], "the attribution was not delivered, so this proves nothing");
+
+        // A later process: the callback has been given, and only the durable
+        // records remain.
+        Invites.forgetLoadedState();
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+
+        final int[] told = new int[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0]++;
+            }
+        });
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND5");
+
+        assertEquals(0, told[0], "a denied link told an attributed install it had no invite");
+        Invites.forgetLoadedState();
+        assertEquals(Invites.STATE_RESOLVED, Invites.getState(),
+                "the state contradicted the durable attribution");
+    }
+
+    @Test
+    @EdtTest
+    void anEmptyButSuccessfulReferrerReadIsDefinitive() {
+        // The source burns its once-only flag for this case, so isSupported()
+        // can never read a referrer again -- but the reason it reports is the
+        // same one a transient failure uses, so the lookup stayed pending until
+        // the attempt budget ran out for an answer that had already arrived.
+        Invites.registerInstallReferrerSource(new InstallReferrerSource() {
+            private boolean spent;
+
+            public boolean isSupported() {
+                return !spent;
+            }
+
+            public void requestReferrer(InstallReferrerCallback callback) {
+                spent = true;
+                callback.onUnavailable(Invites.REASON_NO_MATCH);
+            }
+        });
+        Invites.checkForInvite();
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_FINGERPRINT, true);
+
+        Invites.forgetLoadedState();
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState(),
+                "a definitive empty referrer read was treated as retryable");
     }
 }
