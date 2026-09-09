@@ -1654,6 +1654,55 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    /// Delivers a link that arrived at an already-running activity, so the
+    /// router sees it on Android as it already does on iOS.
+    ///
+    /// The two ports were asymmetric here, and silently so. iOS routes every
+    /// deep link through `Display.setProperty("AppArg", url)`, which fires
+    /// [com.codename1.router.Navigation#dispatchExternalUrl]. Android's
+    /// `onNewIntent` only stored the intent, and [#getAppArg] then derived
+    /// the value lazily through the implementation's own setter -- so
+    /// `setProperty` never ran and the router never fired. Anything built on
+    /// `@Route` therefore worked on iOS and did nothing on Android, which
+    /// reads as a feature that "just doesn't convert" on the platform rather
+    /// than as a bug.
+    ///
+    /// Deliberately narrow. Only `ACTION_VIEW` with an http or https scheme
+    /// goes through here; `EXTRA_TEXT` shares, `content://` attachments and
+    /// `EXTRA_STREAM` payloads keep their existing lazy path. Dispatching for
+    /// every intent would double-fire against the `setAppArg` inside
+    /// [#getAppArg] and would change behaviour for every share-target
+    /// application in the field.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intent`: the intent delivered to the running activity
+    static void dispatchNewIntentUrl(Intent intent) {
+        if (intent == null || instance == null || !Display.isInitialized()) {
+            return;
+        }
+        try {
+            if (!Intent.ACTION_VIEW.equals(intent.getAction())) {
+                return;
+            }
+            android.net.Uri data = intent.getData();
+            if (data == null) {
+                return;
+            }
+            String scheme = data.getScheme();
+            if (!"http".equals(scheme) && !"https".equals(scheme)) {
+                return;
+            }
+            // Cleared first so the value below is what getAppArg() reports,
+            // rather than whatever the previous intent left cached.
+            instance.setAppArg(null);
+            clearIntentProperties();
+            Display.getInstance().setProperty("AppArg", data.toString());
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
     private static void clearIntentProperties() {
         synchronized (intentPropertyLock) {
             if (Display.isInitialized()) {
