@@ -604,6 +604,22 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                         + "binds to String or java.util.Map");
                 return null;
             }
+            // A default that is not a value of the parameter's type. The generated
+            // to<Type> answers its fallback for anything unparseable, so
+            // defaultValue="oops" on an int became 0 -- and because the default is
+            // NON-EMPTY the required-value guard is skipped too, so an absent
+            // parameter called the handler with a number the controller never
+            // wrote. This is the author's own configuration, not a client's input,
+            // and it is wrong at build time or never.
+            if (p.defaultValue != null && p.defaultValue.length() > 0
+                    && !defaultParsesAs(p.javaType, p.defaultValue)) {
+                ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " declares "
+                        + "defaultValue=\"" + p.defaultValue + "\" for a " + p.javaType
+                        + " parameter, which is not a " + p.javaType + ". It would be "
+                        + "silently replaced by zero, and the handler would run on a "
+                        + "value nobody wrote.");
+                return null;
+            }
             route.params.add(p);
         }
 
@@ -1170,6 +1186,37 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             out.add(last);
         }
         return out;
+    }
+
+    /** Whether an annotation's declared default really is a value of that type. */
+    private static boolean defaultParsesAs(String javaType, String value) {
+        String v = value.trim();
+        try {
+            if ("int".equals(javaType)) {
+                Integer.parseInt(v);
+            } else if ("long".equals(javaType)) {
+                Long.parseLong(v);
+            } else if ("short".equals(javaType)) {
+                Short.parseShort(v);
+            } else if ("byte".equals(javaType)) {
+                Byte.parseByte(v);
+            } else if ("double".equals(javaType)) {
+                Double.parseDouble(v);
+            } else if ("float".equals(javaType)) {
+                // Same rule as the request path: parseFloat answers infinity for a
+                // value too large rather than failing, and an infinite default is
+                // no more writable than an unparseable one.
+                double d = Double.parseDouble(v);
+                return !Float.isInfinite((float) d) || Double.isInfinite(d);
+            } else if ("boolean".equals(javaType)) {
+                // The binder accepts only these two, so a default of "yes" would
+                // bind false and read as a deliberate choice.
+                return "true".equalsIgnoreCase(v) || "false".equalsIgnoreCase(v);
+            }
+            return true;                  // String and anything else: no parsing
+        } catch (NumberFormatException err) {
+            return false;
+        }
     }
 
     private static String numericChecker(String javaType) {

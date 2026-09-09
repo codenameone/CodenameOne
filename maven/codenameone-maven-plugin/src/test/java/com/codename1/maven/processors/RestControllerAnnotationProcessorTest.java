@@ -286,6 +286,41 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aDefaultThatIsNotOfTheTypeIsRefused() throws Exception {
+        // to<Type> answers its fallback for anything unparseable, so this bound
+        // 0 -- and a non-empty default also skips the required-value guard, so an
+        // absent parameter reached the handler as a number nobody wrote. It is
+        // the author's own configuration, so it is wrong at build time or never.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/notes\")\n"
+                + "    public String all(@RequestParam(value = \"limit\", "
+                + "defaultValue = \"oops\") int limit) { return \"[]\"; }\n"
+                + "}\n"));
+        assertTrue("a default that is not an int should not compile", ctx.hasErrors());
+        assertTrue(ctx.getErrors().toString(),
+                ctx.getErrors().toString().indexOf("silently replaced by zero") >= 0);
+    }
+
+    @Test
+    public void aWellFormedDefaultStillCompiles() throws Exception {
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/notes\")\n"
+                + "    public String all(@RequestParam(value = \"limit\", "
+                + "defaultValue = \"20\") int limit) { return \"[]\"; }\n"
+                + "}\n"));
+        assertTrue("a valid default must still compile: " + ctx.getErrors(),
+                !ctx.hasErrors());
+    }
+
+    @Test
     public void aFloatTooLargeForAFloatIsRejected() throws Exception {
         // Float.parseFloat answers INFINITY for 1e100 rather than throwing, so
         // the guard approved it and the handler ran on a number the client did

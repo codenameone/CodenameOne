@@ -733,6 +733,20 @@ public class RestServerAnnotationProcessorTest {
     }
 
     /**
+     * Collection belongs with List and Set. The parser answers an ArrayList for
+     * every JSON array, so a Collection<T> that is not recognised as a collection
+     * SHAPE falls through to a guarded cast, which erases -- leaving a collection
+     * of Map under a Collection<Note> declaration, which throws on first use.
+     */
+    @Test
+    public void decodesACollectionBodyLikeAListOne() throws Exception {
+        assertNoErrors(processApi("CollectionApi",
+                "    @POST(\"/notes\")\n"
+                + "    void add(@Body java.util.Collection<String> notes,\n"
+                + "             OnComplete<Response<String>> callback);\n"));
+    }
+
+    /**
      * A Map's values are handed over as the parser built them, and nothing walks
      * them applying the declared type the way collection elements are walked. So
      * Map<String,Integer> is a map of Long at runtime and the handler's first
