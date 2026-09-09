@@ -52,6 +52,17 @@ final class BuildHintsGeneral {
                 .doc("Whether video calls are offered, on both platforms. `ios.call.video` and "
                         + "`android.call.video` override it per platform."));
 
+        h.add(new Hint("invite.domain")
+                .group(HintGroup.GENERAL)
+                .type(HintType.STRING)
+                .def("cloud.codenameone.com")
+                .platform("general")
+                .doc("The host that serves Codename One invite links "
+                        + "(`https://<host>/i/<slug>/<code>`). Changing it points the generated "
+                        + "Android App Link intent filter and the iOS associated domain at a "
+                        + "different link service; the matching `apple-app-site-association` and "
+                        + "`assetlinks.json` must be served from that host."));
+
         h.add(new Hint("KeepScreenOn")
                 .group(HintGroup.GENERAL)
                 .type(HintType.BOOLEAN)

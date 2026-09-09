@@ -209,6 +209,18 @@ final class BuildHintsIos {
                 .doc("Objective-C code that can be injected into the iOS callback method (message) "
                         + "`applicationDidEnterBackground`."));
 
+        h.add(new Hint("ios.invite.universalLinks")
+                .group(HintGroup.IOS)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("ios")
+                .doc("Whether the build appends `applinks:` for the invite link domain to "
+                        + "`ios.associatedDomains` and requests the matching "
+                        + "`com.apple.developer.associated-domains` entitlement. Set it to `false` "
+                        + "to manage both yourself. The provisioning profile must grant the "
+                        + "Associated Domains capability either way, or invite links silently "
+                        + "open Safari instead of the app."));
+
         h.add(new Hint("ios.associatedDomains")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)
