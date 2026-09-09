@@ -325,6 +325,14 @@ class AndroidLocationButton extends SurfaceView {
             }
             setVisibility(VISIBLE);
             setChild.invoke(this, new Object[]{surfacePackage});
+            // The package is the caller's to release: setChildSurfacePackage
+            // takes what it needs out of it, and holding this one keeps a
+            // native SurfaceControl alive for nothing. Every rebuilt peer and
+            // every detach/reattach opens another session, so keeping them
+            // piles up graphics handles until a finalizer happens to run.
+            // Verified on an Android 17 emulator that the control still renders
+            // and still grants after this, including across a rotation.
+            callQuietly(surfacePackage, "release", new Class[0], new Object[0]);
             session = opened;
             // The system's own control belongs in front of anything else this
             // surface carries; the platform's wrapper asks for the same order.

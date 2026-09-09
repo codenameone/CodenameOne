@@ -23,6 +23,7 @@
 package com.codename1.location;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
@@ -395,11 +396,31 @@ public class LocationButton extends Container {
                     });
             if (peer != null) {
                 add(BorderLayout.CENTER, peer);
+                adoptEnabledState(peer);
                 return;
             }
         }
         peer = null;
         add(BorderLayout.CENTER, fallback);
+        adoptEnabledState(fallback);
+    }
+
+    /// Gives a freshly built child the enabled state this component already has.
+    ///
+    /// Container#setEnabled propagates to the children it can see, and until now
+    /// there were none: the child is built when the component is first shown, so
+    /// a `setEnabled(false)` before that reached this container and nothing
+    /// else, and the button that appeared afterwards was live.
+    ///
+    /// The platform's own control is a different matter and this cannot fix it.
+    /// Its taps are delivered to a surface another process owns, so Codename
+    /// One never sees them and cannot withhold them; a disabled
+    /// system-rendered button still answers. Where that matters, take the
+    /// component out of the form rather than disabling it.
+    private void adoptEnabledState(Component child) {
+        if (!isEnabled()) {
+            child.setEnabled(false);
+        }
     }
 
     /// Builds the child again so a setter that arrived after the first show

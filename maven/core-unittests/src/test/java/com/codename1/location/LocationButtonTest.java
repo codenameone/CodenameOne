@@ -361,6 +361,35 @@ class LocationButtonTest extends UITestBase {
         assertEquals(0, manager.bindCount, "and must not have asked for one");
     }
 
+    /// setEnabled before the first show reached a container with no children,
+    /// so the button built afterwards came up live and still acquired on a tap.
+    @FormTest
+    void aButtonDisabledBeforeItIsShownComesUpDisabled() {
+        manager.currentLocation = new Location(1.0, 2.0);
+        LocationButton button = new LocationButton();
+        button.setEnabled(false);
+        showButton(button);
+        List<Location> shared = record(button);
+
+        Button fallback = findButton(button);
+        assertNotNull(fallback);
+        assertFalse(fallback.isEnabled(), "the fallback must come up disabled");
+
+        // Through the pointer routing rather than Button.released(), which is a
+        // direct call that never consults the enabled flag -- the check lives in
+        // event delivery, so only a real tap exercises it.
+        tapComponent(fallback);
+        assertTrue(shared.isEmpty(), "a disabled button must not acquire");
+    }
+
+    /// And the ordinary case still works, so the guard is not disabling
+    /// everything.
+    @FormTest
+    void aButtonThatWasNeverDisabledComesUpEnabled() {
+        LocationButton button = showButton(new LocationButton());
+        assertTrue(findButton(button).isEnabled());
+    }
+
     @FormTest
     void colorsReachThePlatform() {
         implementation.setLocationButtonSupported(true);
