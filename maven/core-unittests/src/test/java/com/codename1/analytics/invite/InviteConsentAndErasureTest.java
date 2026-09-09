@@ -156,8 +156,7 @@ class InviteConsentAndErasureTest extends UITestBase {
 
         Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
 
-        assertFalse(Storage.getInstance().exists(InviteStore.PENDING),
-                "a refused profile must be deleted, not held");
+        assertNoProfileHeld("a refused profile must be deleted, not held");
         assertEquals(Invites.STATE_DECLINED, Invites.getState());
     }
 
@@ -176,8 +175,7 @@ class InviteConsentAndErasureTest extends UITestBase {
 
         Invites.checkForInvite();
 
-        assertFalse(Storage.getInstance().exists(InviteStore.PENDING),
-                "a refused user must never have a profile written");
+        assertNoProfileHeld("a refused user must never have a profile written");
         assertEquals(0, implementation.getQueuedRequests().size());
         assertEquals(Invites.STATE_DECLINED, Invites.getState());
     }
@@ -308,5 +306,27 @@ class InviteConsentAndErasureTest extends UITestBase {
         Analytics.setConsent(AnalyticsConsent.granted());
         assertEquals("spring", Analytics.getDimensions().get(Invites.DIMENSION_CAMPAIGN),
                 "re-granting must restore the dimensions from the stored record");
+    }
+
+    /**
+     * Asserts that no device profile is held, which is not the same as
+     * asserting the record is absent.
+     *
+     * <p>A refusal has to be durable or the listener is told again on every
+     * launch, so what remains is a marker carrying the state and the reason and
+     * nothing else. The promise is about the profile -- the platform, the OS
+     * version, the model, the screen size, the locale -- and that is what this
+     * checks. Asserting absence instead made the promise untestable the moment
+     * it had to survive a relaunch.</p>
+     */
+    private void assertNoProfileHeld(String message) {
+        Map<String, String> record = InviteStore.read(InviteStore.PENDING);
+        if (record == null) {
+            return;
+        }
+        for (String key : new String[] {"platform", "osVersion", "deviceModel",
+                "screenWidth", "screenHeight", "locale", "firstLaunch"}) {
+            assertFalse(record.containsKey(key), message + " (held " + key + ")");
+        }
     }
 }

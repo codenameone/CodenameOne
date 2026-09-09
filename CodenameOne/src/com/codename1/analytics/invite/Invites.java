@@ -460,9 +460,7 @@ public final class Invites {
         // this a refused user who opened an invite link still had a profile
         // persisted -- by a different route to the one that was fixed.
         if (explicitlyDenied()) {
-            InviteStore.delete(InviteStore.PENDING);
-            state = STATE_DECLINED;
-            stateLoaded = true;
+            markTerminal(STATE_DECLINED, REASON_CONSENT_DENIED);
             return true;
         }
         if (getState() == STATE_RESOLVED && !reattribution) {
@@ -477,8 +475,19 @@ public final class Invites {
         }
         Map<String, String> pending = pendingRecord();
         pending.put("code", code);
+        // The referrer question is settled: this install came from a link we
+        // are holding the code for, so a referrer read is no longer a better
+        // answer waiting to happen.
+        pending.remove("referrerRetry");
         InviteStore.write(InviteStore.PENDING, pending);
         setState(STATE_PENDING);
+        // A deferred fingerprint or referrer lookup may already be on the wire,
+        // and this direct claim supersedes it. Without the bump both answers
+        // pass the epoch guard, and a statistical match arriving second
+        // overwrites the exact one -- its dimensions and its durable record
+        // included. Advancing the epoch is how every other supersede in this
+        // class is expressed, and claim() reads the new value.
+        lookupEpoch++;
         claim(code, "universal_link", "", MATCH_DIRECT, false);
         return true;
     }
@@ -539,6 +548,13 @@ public final class Invites {
         }
         stateLoaded = true;
         Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        // Reduced to a value first. The obvious spelling -- null-check the
+        // record inside the condition, then assign the static below it -- is
+        // the shape PMD reads as an unsynchronized lazy singleton, and the
+        // answer to that is not a lock: this facade runs on the EDT and adding
+        // one would be the real mistake.
+        int recorded = pending == null ? STATE_NONE
+                : InviteStore.getInt(pending, "state", STATE_PENDING);
         // The pending record is consulted first only under re-attribution.
         // There a later invite writes a new claim while the earlier attribution
         // still stands, and answering STATE_RESOLVED from that old attribution
@@ -546,18 +562,15 @@ public final class Invites {
         // death was never retried and last touch silently kept losing to first.
         // Without re-attribution the resolved record is the answer, because a
         // stale pending record must never reopen a settled attribution.
-        if (reattribution && pending != null
-                && InviteStore.getInt(pending, "state", STATE_PENDING) == STATE_PENDING) {
+        if (reattribution && recorded == STATE_PENDING) {
             state = STATE_PENDING;
             return;
         }
         if (getAttribution() != null) {
             state = STATE_RESOLVED;
-            stateLoaded = true;
             return;
         }
-        state = pending == null ? STATE_NONE
-                : InviteStore.getInt(pending, "state", STATE_PENDING);
+        state = recorded;
     }
 
     // ---- closing the funnel ---------------------------------------------
@@ -776,8 +789,12 @@ public final class Invites {
         // already in flight.
         lookupEpoch++;
         if (getState() == STATE_PENDING) {
-            InviteStore.delete(InviteStore.PENDING);
-            setState(STATE_DECLINED);
+            // The profile goes and the answer stays. Deleting the record left
+            // STATE_DECLINED in memory only -- setState() has nothing to
+            // rewrite once the record is gone -- so the next launch read
+            // STATE_NONE and told the listener again. The marker carries the
+            // reason, which is what lets a later grant reopen it.
+            markTerminal(STATE_DECLINED, REASON_CONSENT_DENIED);
             notifyUnavailable(REASON_CONSENT_DENIED);
         }
         clearDimensions();
@@ -1015,13 +1032,17 @@ public final class Invites {
     // marker is reopened rather than being permanent, which is why it is the
     // only one that carries a reason.
     private static void markTerminal(String reason) {
+        markTerminal(STATE_NONE_FOUND, reason);
+    }
+
+    private static void markTerminal(int terminalState, String reason) {
         Map<String, String> done = new LinkedHashMap<String, String>();
-        done.put("state", String.valueOf(STATE_NONE_FOUND));
+        done.put("state", String.valueOf(terminalState));
         if (reason != null) {
             done.put("reason", reason);
         }
         InviteStore.write(InviteStore.PENDING, done);
-        state = STATE_NONE_FOUND;
+        state = terminalState;
         stateLoaded = true;
     }
 
@@ -1056,13 +1077,18 @@ public final class Invites {
             return;
         }
         int s = getState();
-        if (s == STATE_NONE_FOUND && attributionWindow != 0) {
-            // The only reopenable terminal marker: it was written because the
-            // window was zero, and it no longer is. Anything else that reached
-            // STATE_NONE_FOUND was a real answer and stays.
+        // Two terminal markers can stop being true, and both carry the reason
+        // that made them. A window of zero is the documented kill switch and an
+        // application that later ships a non-zero one is asking again; a
+        // refusal is reversed by granting consent. Every other terminal answer
+        // was a real answer about this install and stays. Reopening reads the
+        // condition itself, never a second stored copy of it.
+        if (s == STATE_NONE_FOUND || s == STATE_DECLINED) {
             Map<String, String> marker = InviteStore.read(InviteStore.PENDING);
-            if (marker != null && REASON_UNSUPPORTED.equals(
-                    InviteStore.get(marker, "reason", null))) {
+            String why = InviteStore.get(marker, "reason", null);
+            boolean reopen = (REASON_UNSUPPORTED.equals(why) && attributionWindow != 0)
+                    || (REASON_CONSENT_DENIED.equals(why) && !explicitlyDenied());
+            if (reopen) {
                 InviteStore.delete(InviteStore.PENDING);
                 state = STATE_NONE;
                 s = STATE_NONE;
@@ -1088,9 +1114,10 @@ public final class Invites {
         // choice still captures, which is the whole point: the match window
         // closes long before a consent prompt is answered.
         if (explicitlyDenied()) {
-            InviteStore.delete(InviteStore.PENDING);
-            state = STATE_DECLINED;
-            stateLoaded = true;
+            // Durable, and profile free: markTerminal replaces the record with
+            // the state and the reason and nothing else. The reason is what
+            // lets beginDeferred reopen this if consent is later granted.
+            markTerminal(STATE_DECLINED, REASON_CONSENT_DENIED);
             notifyUnavailable(REASON_CONSENT_DENIED);
             return;
         }
@@ -1195,12 +1222,19 @@ public final class Invites {
     // later, so a no-match from the statistical fallback stays pending instead
     // of becoming the final word.
     private static void fallBackToMatch(boolean retryable) {
-        if (retryable) {
-            Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
-            if (pending != null) {
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        if (pending != null) {
+            if (retryable) {
                 pending.put("referrerRetry", "true");
-                InviteStore.write(InviteStore.PENDING, pending);
+            } else {
+                // Definitive: either the referrer was read and carries no
+                // invite, or the store says this device will never have one.
+                // Leaving an earlier outage's marker in place made the
+                // following no-match look retryable, so the lookup stayed
+                // pending and every launch asked again until the attempt cap.
+                pending.remove("referrerRetry");
             }
+            InviteStore.write(InviteStore.PENDING, pending);
         }
         fallBackToMatchImpl();
     }
@@ -1422,8 +1456,16 @@ public final class Invites {
                 Map<String, String> outstanding = InviteStore.read(InviteStore.PENDING);
                 if (outstanding != null
                         && "true".equals(InviteStore.get(outstanding, "referrerRetry", null))) {
+                    // Deliberately silent. attributionUnavailable() is the
+                    // terminal callback -- it means no invite will be
+                    // attributed -- and this outcome is the opposite of
+                    // terminal. Worse, it sets deliveredThisRun, so a referrer
+                    // that succeeded moments later in the same process could no
+                    // longer deliver inviteReceived(), and a relaunch could
+                    // deliver it as a second outcome after the first said
+                    // never. The listener hears nothing until there is an
+                    // answer.
                     setState(STATE_PENDING);
-                    notifyUnavailable(REASON_NO_MATCH);
                     return;
                 }
                 // Terminal, and it has to be durable. Deleting the record is

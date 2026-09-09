@@ -22,6 +22,8 @@
  */
 package com.codename1.analytics.invite;
 
+import com.codename1.analytics.Analytics;
+import com.codename1.analytics.AnalyticsConsent;
 import com.codename1.junit.EdtTest;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -251,5 +253,111 @@ class InviteResilienceTest extends UITestBase {
         Invites.markSentDirectlyForTest(invite.getCode());
         assertFalse(Invites.isRegistered(invite),
                 "an unacknowledged direct send reported itself as registered");
+    }
+
+    @Test
+    @EdtTest
+    void aDirectLinkSupersedesADeferredLookupAlreadyOnTheWire() {
+        // Both requests used to be issued under the same epoch, so both answers
+        // passed the guard and a statistical match arriving second overwrote
+        // the exact one -- dimensions and durable record included.
+        Invites.checkForInvite();
+        int deferredEpoch = Invites.currentLookupEpochForTest();
+
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/DIRECT1");
+        Invites.handleResolution(InviteTestSupport.resolvedJson("DIRECT1", "c1", "sms"),
+                Invites.MATCH_DIRECT, false);
+
+        // The deferred answer arrives late, under the epoch it was issued in.
+        Invites.handleResolution(InviteTestSupport.resolvedJson("GUESS", "c2", "unknown"),
+                Invites.MATCH_FINGERPRINT, true, deferredEpoch);
+
+        InviteAttribution a = Invites.getAttribution();
+        assertNotNull(a);
+        assertEquals("DIRECT1", a.getCode(),
+                "a late statistical match overwrote the exact direct attribution");
+    }
+
+    @Test
+    @EdtTest
+    void aPendingReferrerRetryTellsTheListenerNothing() {
+        // attributionUnavailable() is the terminal callback and this outcome is
+        // the opposite of terminal. It also sets deliveredThisRun, so a
+        // referrer that succeeded moments later could no longer deliver
+        // inviteReceived() at all.
+        Invites.checkForInvite();
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(pending);
+        pending.put("referrerRetry", "true");
+        InviteStore.write(InviteStore.PENDING, pending);
+
+        final int[] told = new int[1];
+        final int[] received = new int[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+                received[0]++;
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0]++;
+            }
+        });
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_FINGERPRINT, true);
+        assertEquals(0, told[0], "a pending outcome used the terminal callback");
+
+        // And the exact answer that arrives afterwards is still deliverable.
+        Invites.handleResolution(InviteTestSupport.resolvedJson("LATE1", "c1", "sms"),
+                Invites.MATCH_REFERRER, true);
+        assertEquals(1, received[0], "the later exact referrer result was suppressed");
+    }
+
+    @Test
+    @EdtTest
+    void aDefinitiveReferrerAnswerClearsTheRetryMarker() {
+        // An outage set the marker; a later successful read that carries no
+        // invite is definitive and must clear it, or the following no-match
+        // looks retryable for ever.
+        Invites.checkForInvite();
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        pending.put("referrerRetry", "true");
+        InviteStore.write(InviteStore.PENDING, pending);
+
+        Invites.registerInstallReferrerSource(new InstallReferrerSource() {
+            public boolean isSupported() {
+                return true;
+            }
+
+            public void requestReferrer(InstallReferrerCallback callback) {
+                callback.onReferrer("utm_source=organic", 0L, 0L);
+            }
+        });
+        Invites.reset();
+        Invites.checkForInvite();
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_FINGERPRINT, true);
+
+        Invites.forgetLoadedState();
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState(),
+                "a stale retry marker kept a definitive organic answer pending");
+    }
+
+    @Test
+    @EdtTest
+    void aRefusalIsDurableAndIsReopenedByALaterGrant() {
+        // The refusal was in memory only, so the listener heard it again on
+        // every launch; making it durable must not make it permanent, because
+        // granting consent afterwards is a real answer too.
+        Invites.checkForInvite();
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+        assertEquals(Invites.STATE_DECLINED, Invites.getState());
+
+        Invites.forgetLoadedState();
+        assertEquals(Invites.STATE_DECLINED, Invites.getState(),
+                "the refusal did not survive a relaunch");
+
+        Analytics.setConsent(AnalyticsConsent.granted());
+        Invites.forgetLoadedState();
+        Invites.checkForInvite();
+        assertEquals(Invites.STATE_PENDING, Invites.getState(),
+                "granting consent afterwards did not reopen the lookup");
     }
 }
