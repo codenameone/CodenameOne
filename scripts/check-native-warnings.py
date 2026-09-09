@@ -424,6 +424,13 @@ def write_baseline(leg, diags, config):
     return len(counts)
 
 
+# Rows per group in the rendered table. The JSON dump carries everything; this
+# only bounds what a human is asked to scroll, and keeps the GitHub step summary
+# under its 1MB ceiling -- past which GitHub drops the whole summary, so an
+# unbounded table would cost the entire report rather than its tail.
+MAX_ROWS_PER_GROUP = 60
+
+
 def summarize(diags, out):
     by_group = {}
     for d in diags:
@@ -454,11 +461,18 @@ def summarize(diags, out):
         out.write("Sorted by instance count: the top row is the single highest-leverage fix.\n\n")
         out.write("| instances | identity | flag | shape | seen in |\n")
         out.write("|---|---|---|---|---|\n")
-        for key, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
+        ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+        for key, n in ranked[:MAX_ROWS_PER_GROUP]:
             _group, identity, flag, sig = key.split("|", 3)
             names = sorted(files[key])
             shown = ", ".join(names[:3]) + (" (+%d more)" % (len(names) - 3) if len(names) > 3 else "")
             out.write("| %d | %s | %s | %s | %s |\n" % (n, identity, flag, sig[:80], shown))
+        if len(ranked) > MAX_ROWS_PER_GROUP:
+            hidden = ranked[MAX_ROWS_PER_GROUP:]
+            out.write("\n%d further row(s) not shown, %d instance(s) between them. "
+                      "They are in the --json dump; this table is truncated for length, "
+                      "not because the tail was dropped from the census.\n"
+                      % (len(hidden), sum(n for _k, n in hidden)))
         out.write("\n")
 
 
