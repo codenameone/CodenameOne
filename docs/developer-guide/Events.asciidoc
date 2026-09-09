@@ -220,7 +220,10 @@ Low-level events can be bound in one of 3 ways:
 TIP: That last one depends on the event. A key callback on a `Component` only fires while that component
 holds focus, because `Form` routes key events to the focused component. A pointer callback doesn't need
 focus: `Form` looks up whatever component sits under the touch and delivers to it, and the component is
-handed focus because of the press rather than as a condition for it. It does have to be enabled.
+handed focus because of the press rather than as a condition for it. Whether it has to be enabled depends
+on where it sits - the content pane branch of `Form.pointerPressed` checks `isEnabled()`, while the title
+area and the west side deliver without checking, so an override on a disabled `Toolbar` component still
+runs.
 
 .How one touch reaches your code
 image::img/event-dispatch-path.svg[The path a pointer event takes from the native callback to your listener,scaledwidth=85%]
