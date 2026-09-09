@@ -46,6 +46,31 @@ class AndroidLocationButtonPermissionTest {
     }
 
     /** An anonymous listener written inside the component is still the component. */
+    /**
+     * The scan sets gpsPermission for anything under com/codename1/location,
+     * and the manifest block that generates ACCESS_FINE_LOCATION -- including
+     * the exclusive flag and its compile-SDK validation -- sits behind that
+     * flag. So the button earning the restriction depends on the button also
+     * living under that prefix. It does, and this pins it: moving
+     * LocationButton to another package would leave a forced
+     * android.locationButton.exclusive=true generating no declaration at all,
+     * which is the one way review's "the outer gate bypasses the validator"
+     * reading could become true.
+     */
+    @Test
+    void theButtonSitsUnderThePrefixThatEarnsTheLocationPermission() {
+        String[] buttonClasses = {
+            "com/codename1/location/LocationButton",
+            "com/codename1/location/LocationButton$1",
+        };
+        for (int iter = 0; iter < buttonClasses.length; iter++) {
+            assertTrue(AndroidGradleBuilder.isLocationButtonClass(buttonClasses[iter]),
+                    buttonClasses[iter] + " should be the button");
+            assertTrue(buttonClasses[iter].indexOf("com/codename1/location") == 0,
+                    buttonClasses[iter] + " must keep setting gpsPermission");
+        }
+    }
+
     @Test
     void aNestedClassOfTheButtonEarnsIt() {
         assertTrue(AndroidGradleBuilder.isLocationButtonClass(

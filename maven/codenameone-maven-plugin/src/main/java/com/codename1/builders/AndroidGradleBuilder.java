@@ -5583,6 +5583,27 @@ public class AndroidGradleBuilder extends Executor {
                         "    <uses-permission android:name=\"android.permission.ACCESS_MOCK_LOCATION\"  android:required=\"false\" />\n");
             }
         }
+        // Review asked why a forced android.locationButton.exclusive=true does
+        // not reach fineLocationPermission() when gpsPermission is false, and
+        // called the outer gate a way to bypass the compile-SDK validation.
+        // It is not one. The restriction is a modifier on the declaration this
+        // method generates, so with no declaration there is nothing to modify:
+        // gpsPermission is false only when the scan saw no com/codename1/maps
+        // or com/codename1/location class at all, and LocationButton is
+        // com/codename1/location/LocationButton -- it sets gpsPermission by
+        // that very prefix, so the button's own use always enters the block
+        // above and always runs the validator. AndroidLocationButtonPermissionTest
+        // locks that coupling, which is the part a later refactor could break.
+        // The remaining case is the hint set on an application with no location
+        // usage, where emitting nothing is correct and refusing the build would
+        // fail it over a hint that cannot apply. It was silent, though, so it
+        // says so here.
+        if (!gpsPermission
+                && "true".equals(request.getArg("android.locationButton.exclusive", "auto"))) {
+            warn("android.locationButton.exclusive=true was set, but no location"
+                    + " usage was detected, so no ACCESS_FINE_LOCATION declaration"
+                    + " is generated and there is nothing to restrict.");
+        }
         if (locationButtonPermission) {
             permissions += permissionAdd(request, "USE_LOCATION_BUTTON",
                     LOCATION_BUTTON_PERMISSION);
