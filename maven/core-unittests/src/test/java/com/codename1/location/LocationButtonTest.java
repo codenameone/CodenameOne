@@ -547,6 +547,57 @@ class LocationButtonTest extends UITestBase {
         assertNotSame(stale, secondShared.get(0));
     }
 
+    /// A button that joins an acquisition keeps its own timeout. Here the one
+    /// that starts the request gives up quickly and the one that joins is
+    /// willing to wait much longer: the short one must not take the long one's
+    /// patience, and the long one must not be handed the short one's null and
+    /// told it is an answer.
+    ///
+    /// The bind count is what tells the two apart. One shared wait binds once
+    /// and answers everybody with the leader's result; honouring each deadline
+    /// means a second round for whoever still has time left.
+    @FormTest
+    void aJoiningButtonKeepsItsOwnTimeout() {
+        implementation.setLocationButtonSupported(true);
+        // Nothing ever arrives, so every round runs to its deadline.
+        manager.currentLocation = null;
+
+        Form f = new Form("timeouts");
+        LocationButton quick = new LocationButton();
+        quick.setTimeout(50);
+        LocationButton patient = new LocationButton();
+        patient.setTimeout(900);
+        f.add(quick);
+        f.add(patient);
+        f.show();
+        flushSerialCalls();
+
+        List<Location> quickShared = record(quick);
+        List<Location> patientShared = record(patient);
+        List<SuccessCallback<Boolean>> callbacks =
+                implementation.getLocationButtonCallbacks();
+        assertEquals(2, callbacks.size());
+
+        final SuccessCallback<Boolean> patientCallback = callbacks.get(1);
+        manager.duringBind = new Runnable() {
+            public void run() {
+                patientCallback.onSucess(Boolean.TRUE);
+                flushSerialCalls();
+            }
+        };
+
+        callbacks.get(0).onSucess(Boolean.TRUE);
+        flushSerialCalls();
+
+        assertEquals(2, manager.bindCount,
+                "the patient button gets a round of its own after the quick "
+                        + "one's deadline, rather than the quick one's answer");
+        assertEquals(1, quickShared.size(), "the quick button is answered once");
+        assertNull(quickShared.get(0), "and with nothing, which is its timeout");
+        assertEquals(1, patientShared.size(), "so is the patient one");
+        assertNull(patientShared.get(0));
+    }
+
     private void grant(Boolean granted) {
         SuccessCallback<Boolean> callback = implementation.getLocationButtonCallback();
         assertNotNull(callback, "the component should have handed the platform a callback");

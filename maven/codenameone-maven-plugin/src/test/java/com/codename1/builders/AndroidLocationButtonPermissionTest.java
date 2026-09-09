@@ -223,6 +223,49 @@ class AndroidLocationButtonPermissionTest {
         assertFalse(AndroidGradleBuilder.needsCappedWifiFineLocation(false, existing));
     }
 
+    /**
+     * A capped fine-location declaration is not an effective one past the cap,
+     * and permissionAdd() suppresses this build's by bare name, so the capped
+     * fragment would be the manifest's only ACCESS_FINE_LOCATION.
+     */
+    @Test
+    void aCappedManualDeclarationIsRecognised() {
+        String capped = "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\""
+                + " android:maxSdkVersion=\"32\" />";
+        assertTrue(AndroidGradleBuilder.declaresCappedFineLocation(capped));
+    }
+
+    /**
+     * The trap this has to avoid: the cap belongs to a DIFFERENT permission.
+     * Searching the whole value for both strings would call this capped, and
+     * this builder caps USE_FINGERPRINT itself, so the pairing is common.
+     */
+    @Test
+    void aCapOnAnotherPermissionIsNotACapOnThisOne() {
+        String mixed = "<uses-permission android:name=\"android.permission.USE_FINGERPRINT\""
+                + " android:maxSdkVersion=\"28\" />\n"
+                + "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />";
+        assertFalse(AndroidGradleBuilder.declaresCappedFineLocation(mixed),
+                "the uncapped location entry is the one that matters");
+        assertTrue(AndroidGradleBuilder.declaresOrdinaryFineLocation(mixed));
+    }
+
+    /** And the same value with the location entry capped too. */
+    @Test
+    void aCapOnBothIsStillACapOnThisOne() {
+        String both = "<uses-permission android:name=\"android.permission.USE_FINGERPRINT\""
+                + " android:maxSdkVersion=\"28\" />\n"
+                + "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\""
+                + " android:maxSdkVersion=\"32\" />";
+        assertTrue(AndroidGradleBuilder.declaresCappedFineLocation(both));
+    }
+
+    @Test
+    void nothingAtAllIsNotCapped() {
+        assertFalse(AndroidGradleBuilder.declaresCappedFineLocation(null));
+        assertFalse(AndroidGradleBuilder.declaresCappedFineLocation(""));
+    }
+
     /** Neither rule fires on a fragment that says nothing about location. */
     @Test
     void anUnrelatedFragmentIsNeitherDeclaration() {

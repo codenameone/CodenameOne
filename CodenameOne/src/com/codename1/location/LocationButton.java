@@ -138,6 +138,11 @@ public class LocationButton extends Container {
     private long timeout = 30000;
     private boolean acquiring;
 
+    /// When this button's own wait runs out, absolute; Long.MAX_VALUE for the
+    /// -1 timeout that never does. Per button because a shared acquisition must
+    /// not hand one button another's timeout.
+    private long deadline;
+
     /// True while some button's acquisition is running. Static because the fix
     /// is: LocationManager serves one one-shot request at a time, so a second
     /// button asking during the first would be answered from the last known
@@ -624,39 +629,97 @@ public class LocationButton extends Container {
         // Nothing is locked because nothing here is concurrent: Codename One is
         // single threaded and every line of this runs on the EDT. invokeAndBlock
         // interleaves, it does not parallelise.
+        deadline = timeout < 0 ? Long.MAX_VALUE
+                : System.currentTimeMillis() + timeout;
+        waiting.add(this);
         if (inFlight) {
             // Someone else's fix is already on its way and it is the same fix.
-            waiting.add(this);
             return;
         }
         inFlight = true;
-        waiting.add(this);
-        final Location[] result = new Location[1];
         try {
-            final LocationManager manager = LocationManager.getLocationManager();
-            if (manager != null) {
-                // invokeAndBlock so a cold fix does not freeze the form; the EDT
-                // keeps pumping while the platform looks for one.
-                Display.getInstance().invokeAndBlock(new Runnable() {
-                    @Override
-                    public void run() {
-                        result[0] = manager.getCurrentLocationSync(timeout);
-                    }
-                });
-            }
+            serveWaiting();
         } finally {
-            // Everyone who joined is told, including this one, and told the same
-            // thing. A joiner inherits the leader's timeout, which is the point:
-            // there is one fix and one wait for it.
-            List<LocationButton> told =
-                    new ArrayList<LocationButton>(waiting);
-            waiting.clear();
             inFlight = false;
-            for (LocationButton b : told) {
+        }
+    }
+
+    /// Fetches fixes until everyone waiting has an answer.
+    ///
+    /// Each round waits only as far as the EARLIEST deadline among the buttons
+    /// still waiting, which is what keeps one button's timeout from becoming
+    /// another's. A five second button behind a leader that never times out was
+    /// left waiting for ever by a single shared wait; a thirty second button
+    /// behind a five second leader was handed that leader's null and told it was
+    /// its own answer. Now the short one is answered when its own time is up and
+    /// the rest keep waiting, and a round that ends with nothing simply runs
+    /// again for whoever still has time left.
+    ///
+    /// A button that joins mid-round is served at the end of that round rather
+    /// than shortening it. That is the one place the wait can run past a
+    /// deadline, it is bounded by the round already running, and closing it
+    /// would mean interrupting a platform request that is already in flight.
+    private static void serveWaiting() {
+        if (LocationManager.getLocationManager() == null) {
+            // Nothing to wait for and no wait to do: fetch would return null
+            // the instant it was asked, and re-running it until every deadline
+            // passed would spin the EDT for the length of the longest timeout.
+            // This is an answer, not a timeout, so everyone gets it now.
+            List<LocationButton> round = new ArrayList<LocationButton>(waiting);
+            waiting.clear();
+            for (LocationButton b : round) {
                 b.acquiring = false;
-                b.fireLocationShared(result[0]);
+                b.fireLocationShared(null);
+            }
+            return;
+        }
+        while (!waiting.isEmpty()) {
+            long now = System.currentTimeMillis();
+            long earliest = Long.MAX_VALUE;
+            for (LocationButton b : waiting) {
+                if (b.deadline < earliest) {
+                    earliest = b.deadline;
+                }
+            }
+            long wait = earliest == Long.MAX_VALUE ? -1 : earliest - now;
+            if (wait == 0) {
+                // A deadline that has already passed still has to ask, because
+                // 0 would mean "no timeout" to getCurrentLocationSync.
+                wait = 1;
+            }
+            Location fix = fetch(wait);
+            now = System.currentTimeMillis();
+            List<LocationButton> round = new ArrayList<LocationButton>(waiting);
+            waiting.clear();
+            for (LocationButton b : round) {
+                if (fix != null || now >= b.deadline) {
+                    b.acquiring = false;
+                    b.fireLocationShared(fix);
+                } else {
+                    // Still has time of its own; another round is run for it.
+                    waiting.add(b);
+                }
             }
         }
+    }
+
+    /// One request to the platform, off the EDT.
+    private static Location fetch(long timeout) {
+        final LocationManager manager = LocationManager.getLocationManager();
+        if (manager == null) {
+            return null;
+        }
+        final long forTimeout = timeout;
+        final Location[] result = new Location[1];
+        // invokeAndBlock so a cold fix does not freeze the form; the EDT
+        // keeps pumping while the platform looks for one.
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                result[0] = manager.getCurrentLocationSync(forTimeout);
+            }
+        });
+        return result[0];
     }
 
 
