@@ -656,7 +656,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      * String/Long/Double/Boolean for the scalars -- so a List<Note> is a list of
      * Map at runtime, and the first use of an element as a Note throws.
      */
-    private static boolean bodyElementsAreDecoded(String javaType) {
+    /* package-private, not private: RestServerAnnotationProcessor decodes bodies
+       with the same parser and therefore needs the identical rule. One copy, so
+       the two halves cannot drift into disagreeing about what a body may hold. */
+    static boolean bodyElementsAreDecoded(String javaType) {
         if (javaType == null) {
             return true;
         }
@@ -1146,7 +1149,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      * Map&lt;String, List&lt;Note&gt;&gt; come back whole rather than being cut
      * inside the nested one.
      */
-    private static List<String> splitTypeArguments(String args) {
+    /* package-private for the same reason as bodyElementsAreDecoded above. */
+    static List<String> splitTypeArguments(String args) {
         List<String> out = new ArrayList<String>();
         int depth = 0;
         int start = 0;

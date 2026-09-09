@@ -733,6 +733,30 @@ public class RestServerAnnotationProcessorTest {
     }
 
     /**
+     * A Map's values are handed over as the parser built them, and nothing walks
+     * them applying the declared type the way collection elements are walked. So
+     * Map<String,Integer> is a map of Long at runtime and the handler's first
+     * read as an Integer throws, from a contract that processed cleanly.
+     */
+    @Test
+    public void refusesAMapOfATypeTheParserDoesNotProduce() throws Exception {
+        assertTrue("a map of Integer must fail the build",
+                processApi("MapApi",
+                        "    @POST(\"/counts\")\n"
+                        + "    void put(@Body java.util.Map<String, Integer> counts,\n"
+                        + "             OnComplete<Response<String>> callback);\n").hasErrors());
+    }
+
+    /** A map of what the parser DOES produce still works. */
+    @Test
+    public void allowsAMapOfTheTypesTheParserProduces() throws Exception {
+        assertNoErrors(processApi("MapOkApi",
+                "    @POST(\"/counts\")\n"
+                + "    void put(@Body java.util.Map<String, Long> counts,\n"
+                + "             OnComplete<Response<String>> callback);\n"));
+    }
+
+    /**
      * A placeholder nothing binds. The client substitutes the placeholder's own
      * NAME, so it asks for /users/id literally, while the server matches any
      * value there and hands it to nobody -- two halves agreeing on a route whose

@@ -465,6 +465,24 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                 // rather than mistranslated. Generating conversions for it is a
                 // feature, not a fix for this.
                 String value = mapValueType(inner);
+                // A Map's VALUES are handed over exactly as the parser made them:
+                // unlike a List or a Set, nothing walks them applying the element
+                // type. The parser answers Long for every JSON integer and Double
+                // for every real, so Map<String,Integer> is a map of Long at
+                // runtime -- the cast erases, and the handler's first read as an
+                // Integer throws. Declaring Long or Double says what actually
+                // arrives; the numeric types that need converting do not.
+                String rawValue = value.indexOf('<') < 0 ? value
+                        : value.substring(0, value.indexOf('<'));
+                if (!namesADto(value, ctx) && rawValue.startsWith("java.")
+                        && !PARSED_MAP_VALUE_TYPES.contains(rawValue)) {
+                    ctx.error("A transferred field or return typed " + t + " cannot be "
+                            + "decoded: a map's values arrive as the parser built them, so "
+                            + value + " would really be " + parserTypeFor(rawValue)
+                            + " and reading it as " + rawValue + " throws. Use a Map of "
+                            + "Long, Double, Boolean, String, Map or List, or a DTO.");
+                    return;
+                }
                 if (namesADto(value, ctx)) {
                     ctx.error("A transferred field typed " + t + " cannot be encoded: "
                             + "the generated codec round-trips a Map of JDK values "
@@ -522,6 +540,31 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
     /** A shape with no placeholder at all, which the dispatcher emits first. */
     private static boolean isLiteralShape(String shape) {
         return shape.indexOf("{}") < 0;
+    }
+
+    /**
+     * What a Map's values may be declared as, which is exactly what Json.parse
+     * produces: it answers Long for every JSON integer and Double for every real,
+     * regardless of how the field is declared, and nothing converts a map's
+     * values afterwards the way collection elements are converted.
+     */
+    private static final Set<String> PARSED_MAP_VALUE_TYPES = Collections.unmodifiableSet(
+            new LinkedHashSet<String>(Arrays.asList(
+                    "java.lang.Object", "java.lang.String", "java.lang.Long",
+                    "java.lang.Double", "java.lang.Boolean",
+                    "java.util.Map", "java.util.List", "java.util.Set",
+                    "java.util.Collection")));
+
+    /** What the parser really answers where the declared type says otherwise. */
+    private static String parserTypeFor(String declared) {
+        if ("java.lang.Integer".equals(declared) || "java.lang.Short".equals(declared)
+                || "java.lang.Byte".equals(declared)) {
+            return "a Long";
+        }
+        if ("java.lang.Float".equals(declared)) {
+            return "a Double";
+        }
+        return "something else";
     }
 
     /** The value half of a Map's type arguments, honouring nested generics. */
@@ -1232,7 +1275,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         if ("int".equals(type))     return "asInt(" + expr + ")";
         if ("long".equals(type))    return "asLong(" + expr + ")";
         if ("double".equals(type))  return "asDouble(" + expr + ")";
-        if ("float".equals(type))   return "(float)asDouble(" + expr + ")";
+        if ("float".equals(type))   return "asFloat(" + expr + ")";
         if ("short".equals(type))   return "asShort(" + expr + ")";
         if ("byte".equals(type))    return "asByte(" + expr + ")";
         if ("boolean".equals(type)) return "asBoolean(" + expr + ")";
@@ -1317,12 +1360,24 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("    }\n");
         sb.append("    private static long asLong(Object v) { return v instanceof Number ? integral(v, \"long\") : (v == null ? 0L : Long.parseLong(String.valueOf(v).trim())); }\n");
         sb.append("    private static double asDouble(Object v) { return v instanceof Number ? ((Number)v).doubleValue() : (v == null ? 0d : Double.parseDouble(String.valueOf(v).trim())); }\n");
+        // A cast to float SATURATES: a perfectly ordinary finite 1e100 becomes
+        // infinity, which is not a number JSON can express and is not the one the
+        // client sent. The scalar text path refuses it; a DTO field has to as
+        // well, or the same value is accepted or rejected by where it appears.
+        sb.append("    private static float asFloat(Object v) {\n");
+        sb.append("        double d = asDouble(v);\n");
+        sb.append("        float f = (float)d;\n");
+        sb.append("        if (Float.isInfinite(f) && !Double.isInfinite(d)) {\n");
+        sb.append("            throw new IllegalArgumentException(\"out of range for float: \" + v);\n");
+        sb.append("        }\n");
+        sb.append("        return f;\n");
+        sb.append("    }\n");
         sb.append("    private static boolean asBoolean(Object v) { return v instanceof Boolean ? ((Boolean)v).booleanValue() : (v != null && Boolean.parseBoolean(String.valueOf(v).trim())); }\n");
         sb.append("    private static Integer asBoxedInt(Object v) { return v == null ? null : Integer.valueOf(asInt(v)); }\n");
         sb.append("    private static Long asBoxedLong(Object v) { return v == null ? null : Long.valueOf(asLong(v)); }\n");
         sb.append("    private static Double asBoxedDouble(Object v) { return v == null ? null : Double.valueOf(asDouble(v)); }\n");
         sb.append("    private static Boolean asBoxedBoolean(Object v) { return v == null ? null : Boolean.valueOf(asBoolean(v)); }\n");
-        sb.append("    private static Float asBoxedFloat(Object v) { return v == null ? null : Float.valueOf((float)asDouble(v)); }\n");
+        sb.append("    private static Float asBoxedFloat(Object v) { return v == null ? null : Float.valueOf(asFloat(v)); }\n");
         sb.append("    private static Short asBoxedShort(Object v) { return v == null ? null : Short.valueOf(asShort(v)); }\n");
         sb.append("    private static Byte asBoxedByte(Object v) { return v == null ? null : Byte.valueOf(asByte(v)); }\n");
         sb.append("    /** A decoded value narrowed to a JSON object, or null -- never a cast. */\n");

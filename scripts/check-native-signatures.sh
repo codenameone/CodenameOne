@@ -103,8 +103,20 @@ for entry in "${PORTS[@]}"; do
   IFS='|' read -r name port_classes port_natives <<< "$entry"
   args=()
   ready=1
+  # An EMPTY classes path is a port that could not be built, not a port with no
+  # classes. It has to be said out loud here, because "$REPO_ROOT/" is a
+  # directory and passes every test below: the entry would take the repository
+  # root as its classes, find no natives to disagree with, and report the same
+  # success as a real pass -- while --require-all counted it as covered. That is
+  # the one failure this gate cannot afford, since it exists to catch a mistake
+  # that is otherwise silent.
+  if [[ -z "$port_classes" ]]; then
+    echo "check-native-signatures: skipping $name (its classes could not be built)" >&2
+    missing_port=1
+    continue
+  fi
   for dir in "${COMMON_CLASSES[@]}" "$port_classes"; do
-    if [[ -d "$REPO_ROOT/$dir" ]]; then
+    if [[ -n "$dir" && -d "$REPO_ROOT/$dir" ]]; then
       args+=(--classes "$REPO_ROOT/$dir")
     else
       echo "check-native-signatures: skipping $name ($dir is not built)" >&2
