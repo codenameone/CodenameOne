@@ -174,7 +174,18 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
        segment in it is signed for one path and requested at another, and comes back
        SignatureDoesNotMatch. The JavaSE path does not normalise, so such a key works
        under cn1:backend and fails only once packaged. */
-#ifdef CURLOPT_PATH_AS_IS
+/* Guarded on the VERSION, not on #ifdef. CURLOPT_PATH_AS_IS is an enum member
+   -- curl.h declares it as CURLOPT(CURLOPT_PATH_AS_IS, CURLOPTTYPE_LONG, 234),
+   not as a macro -- so the preprocessor has never heard of it and the #ifdef
+   this replaces was always false. The option was therefore never set, on any
+   libcurl, and the guard read as if it were.
+   What that costs: libcurl normalises dot segments, so a request for an S3 key
+   holding "a/../b" goes out as "/b" while Aws signed "/a/../b", and the service
+   answers SignatureDoesNotMatch. The Java SE arm sends the path as written, so
+   the key works under cn1:backend and fails once packaged -- which is exactly
+   the divergence the comment above claims to prevent.
+   7.42.0 is where the option appeared. */
+#if LIBCURL_VERSION_NUM >= 0x072A00
     curl_easy_setopt(curl, CURLOPT_PATH_AS_IS, 1L);
 #endif
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cn1WebWrite);
@@ -197,6 +208,17 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
     if(headers == NULL) {
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     } else {
+        /* This #ifdef may never fire, for the same reason the PATH_AS_IS one
+           above did not: if libcurl declares CURLFOLLOW_SAMEHOST through its
+           CURLOPT-style enum rather than as a macro, the preprocessor cannot see
+           it. Left as it is deliberately, because the two fail in OPPOSITE
+           directions. There, a guard that never fires left the option off and
+           the request wrong; here it selects the #else, which does not follow
+           the redirect at all -- more restrictive than intended, and still the
+           safe answer, since the whole point is not to carry the caller's
+           headers to another host. A version guard is not written for it because
+           the release that introduced the constant cannot be checked from here;
+           an unverified version number would be a worse guess than this. */
 #ifdef CURLFOLLOW_SAMEHOST
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, (long)CURLFOLLOW_SAMEHOST);
 #else
