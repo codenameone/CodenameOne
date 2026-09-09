@@ -521,9 +521,30 @@ public final class StaticFiles implements HttpServer.Handler {
         }
     }
 
+    /**
+     * ASCII lower case, because String.toLowerCase() is LOCALE SENSITIVE and
+     * this platform has no Locale to ask for the root one. On a device set to
+     * Turkish the I of an ASCII token folds to a dotless i, so the result stops
+     * equalling the constant it is compared against: nothing is thrown, nothing
+     * is logged, and the feature is simply inert for those users. Every token
+     * folded here -- a header name, a file extension -- is ASCII by
+     * specification. Copied rather than shared; see CLAUDE.md.
+     */
+    private static String asciiLower(String value) {
+        if(value == null) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder(value.length());
+        for(int iter = 0 ; iter < value.length() ; iter++) {
+            char c = value.charAt(iter);
+            out.append(c >= 'A' && c <= 'Z' ? (char)(c + 32) : c);
+        }
+        return out.toString();
+    }
+
     static String contentType(String path) {
         int dot = path.lastIndexOf('.');
-        String ext = dot < 0 ? "" : path.substring(dot + 1).toLowerCase();
+        String ext = dot < 0 ? "" : asciiLower(path.substring(dot + 1));
         if("html".equals(ext) || "htm".equals(ext)) return "text/html; charset=utf-8";
         if("css".equals(ext)) return "text/css; charset=utf-8";
         if("js".equals(ext) || "mjs".equals(ext)) return "text/javascript; charset=utf-8";

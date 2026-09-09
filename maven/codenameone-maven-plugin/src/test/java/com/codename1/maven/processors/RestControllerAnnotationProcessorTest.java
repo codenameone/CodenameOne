@@ -345,6 +345,54 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aBodyElementOfTheWrongTypeIs400NotACrash() throws Exception {
+        // Declaring List<String> does not make the elements strings. "[1]" fills
+        // it with a Long, and the handler's first read as a String throws --
+        // answering 500 to what is really a malformed request.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import java.util.List;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @PostMapping(\"/notes\")\n"
+                + "    public String add(@RequestBody List<String> body) {\n"
+                + "        return body.isEmpty() ? \"\" : body.get(0);\n"
+                + "    }\n"
+                + "}\n");
+        Object wrong = router.call("POST", "/notes", "[1]");
+        assertNotNull("POST /notes matched no route", wrong);
+        assertEquals(400, Router.statusOf(wrong));
+        // The declared shape still works.
+        Object right = router.call("POST", "/notes", "[\"hi\"]");
+        assertNotNull(right);
+        assertEquals(200, Router.statusOf(right));
+        assertEquals("hi", Router.bodyOf(right));
+    }
+
+    @Test
+    public void aDoubleTooLargeForADoubleIsRejected() throws Exception {
+        // parseDouble answers INFINITY for 1e999 rather than throwing, so the
+        // guard approved it and the handler ran on an infinite amount -- which
+        // Json then writes back as null, giving the client neither its value nor
+        // an error.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/amount\")\n"
+                + "    public String amount(@RequestParam(\"d\") double d) { return String.valueOf(d); }\n"
+                + "}\n");
+        Object tooLarge = router.call("GET", "/amount?d=1e999", null);
+        assertNotNull("GET /amount matched no route", tooLarge);
+        assertEquals(400, Router.statusOf(tooLarge));
+        Object ok = router.call("GET", "/amount?d=1.5", null);
+        assertNotNull(ok);
+        assertEquals(200, Router.statusOf(ok));
+    }
+
+    @Test
     public void aFloatTooLargeForAFloatIsRejected() throws Exception {
         // Float.parseFloat answers INFINITY for 1e100 rather than throwing, so
         // the guard approved it and the handler ran on a number the client did

@@ -167,6 +167,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String kind;      // PATH, QUERY, HEADER, BODY, REQUEST
         String name;
         String javaType;
+        /** The same type with its arguments, when the method carried a signature. */
+        String genericJavaType;
         String defaultValue;
         /** From the annotation. A request missing a required binding is refused. */
         boolean required;
@@ -586,6 +588,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                         + "or declare it as HttpServer.Request");
                 return null;
             }
+            p.genericJavaType = genericType;
             if ("BODY".equals(p.kind) && !bodyElementsAreDecoded(genericType)) {
                 ctx.error(cls, "Cannot bind " + genericType + " from the body on "
                         + cls.getBinaryName() + "." + m.getName() + ". A body is decoded "
@@ -1247,8 +1250,59 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append(pad).append("        return request.respond(400, \"text/plain; charset=utf-8\",\n");
             sb.append(pad).append("                utf8(\"The request body is not valid JSON\"));\n");
             sb.append(pad).append("    }\n");
+            // Declaring List<String> does not make the ELEMENTS strings. The
+            // build-time check says the declared element type is one the parser
+            // can produce; what it actually produced depends on what the client
+            // sent, so "[1]" fills a List<String> with a Long and the handler's
+            // first read of it throws -- turning a malformed request into a 500
+            // instead of the 400 it is. Checked with instanceof, never a cast:
+            // a failed cast does not throw in the packaged runtime at all.
+            String element = bodyElementType(p.genericJavaType);
+            if (element != null && !map) {
+                sb.append(pad).append("    for (int i$ = 0; i$ < ").append(p.local)
+                  .append(".size(); i$++) {\n");
+                sb.append(pad).append("        Object e$ = ").append(p.local)
+                  .append(".get(i$);\n");
+                sb.append(pad).append("        if (e$ != null && !(e$ instanceof ")
+                  .append(element).append(")) {\n");
+                sb.append(pad).append("            return request.respond(400, "
+                        + "\"text/plain; charset=utf-8\",\n");
+                sb.append(pad).append("                    utf8(")
+                  .append(quote("An element of the request body is not a " + element))
+                  .append("));\n");
+                sb.append(pad).append("        }\n");
+                sb.append(pad).append("    }\n");
+            }
             sb.append(pad).append("}\n");
         }
+    }
+
+    /**
+     * The element type of a declared List or Set body, when it is one the parser
+     * produces and can therefore be checked at runtime. Null for a raw container,
+     * a wildcard, or anything else -- there is nothing to assert in those cases.
+     */
+    private static String bodyElementType(String genericJavaType) {
+        if (genericJavaType == null) {
+            return null;
+        }
+        int lt = genericJavaType.indexOf('<');
+        int end = genericJavaType.lastIndexOf('>');
+        if (lt < 0 || end <= lt) {
+            return null;
+        }
+        String raw = genericJavaType.substring(0, lt);
+        if (!"java.util.List".equals(raw) && !"java.util.Set".equals(raw)
+                && !"java.util.Collection".equals(raw)) {
+            return null;
+        }
+        List<String> args = splitTypeArguments(genericJavaType.substring(lt + 1, end));
+        if (args.size() != 1) {
+            return null;
+        }
+        String arg = args.get(0);
+        return PARSED_JSON_TYPES.contains(arg) && !"java.lang.Object".equals(arg)
+                ? arg : null;
     }
 
     private static String argumentExpression(Param p) {
@@ -1454,7 +1508,17 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append("            return false;\n");
             sb.append("        }\n");
             sb.append("        try {\n");
-            if ("Float".equals(numeric[i][0])) {
+            if ("Double".equals(numeric[i][0])) {
+                // parseDouble does not fail on a value too large for a double
+                // either: 1e999 comes back as infinity. The handler then runs on
+                // an infinite amount, and if it is written back out Json turns it
+                // into null, so the client is answered with neither its value nor
+                // an error. Float was fixed for this and Double left, which is the
+                // same defect one type over.
+                sb.append("            double asDouble = Double.parseDouble(value.trim());\n");
+                sb.append("            return !Double.isInfinite(asDouble)"
+                        + " || value.trim().indexOf(\"Infinity\") >= 0;\n");
+            } else if ("Float".equals(numeric[i][0])) {
                 // Float.parseFloat does not FAIL on a value too large for a
                 // float: it answers infinity, so 1e100 passed this guard and the
                 // handler ran on a number the client never sent. Every other

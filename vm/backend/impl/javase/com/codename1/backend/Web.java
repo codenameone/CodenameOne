@@ -41,6 +41,28 @@ import java.util.Map;
  * of thing that ships enabled.
  */
 public final class Web {
+
+    /**
+     * ASCII lower case, because String.toLowerCase() is LOCALE SENSITIVE and this
+     * platform has no Locale to ask for the root one. On a device set to Turkish
+     * the I of an ASCII token folds to a dotless i, so a header stored under one
+     * spelling is looked up under another and getHeader answers null: nothing is
+     * thrown, nothing is logged, and the caller reads a header that is there as
+     * absent. A header name is ASCII by specification. Copied rather than shared;
+     * see CLAUDE.md. Both arms of Web carry it, because both index headers.
+     */
+    private static String asciiLower(String value) {
+        if(value == null) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder(value.length());
+        for(int iter = 0 ; iter < value.length() ; iter++) {
+            char c = value.charAt(iter);
+            out.append(c >= 'A' && c <= 'Z' ? (char)(c + 32) : c);
+        }
+        return out.toString();
+    }
+
     private Web() {
     }
 
@@ -71,7 +93,7 @@ public final class Web {
 
         /** One header by name, matched case-insensitively. Null when absent. */
         public String getHeader(String name) {
-            return name == null ? null : (String)headers.get(name.toLowerCase());
+            return name == null ? null : (String)headers.get(asciiLower(name));
         }
 
         public boolean isSuccess() {
@@ -197,7 +219,7 @@ public final class Web {
                     }
                     List values = (List)entry.getValue();
                     if(values != null && !values.isEmpty()) {
-                        responseHeaders.put(String.valueOf(name).toLowerCase(),
+                        responseHeaders.put(asciiLower(String.valueOf(name)),
                                 String.valueOf(values.get(values.size() - 1)));
                     }
                 }

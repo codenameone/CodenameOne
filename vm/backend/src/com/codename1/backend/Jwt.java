@@ -141,8 +141,13 @@ public final class Jwt {
             return null;
         }
         String prefix = "bearer ";
+        // regionMatches(true, ...) rather than folding: it compares character by
+        // character and is LOCALE INDEPENDENT, where toLowerCase() is not. On a
+        // Turkish device "Bearer " folds to a dotless i and stops equalling this
+        // constant, so every bearer token is refused and the API rejects everyone
+        // with nothing thrown to say why. It allocates nothing either.
         if(authorizationHeader.length() <= prefix.length()
-                || !authorizationHeader.substring(0, prefix.length()).toLowerCase().equals(prefix)) {
+                || !authorizationHeader.regionMatches(true, 0, prefix, 0, prefix.length())) {
             return null;
         }
         return authorizationHeader.substring(prefix.length()).trim();

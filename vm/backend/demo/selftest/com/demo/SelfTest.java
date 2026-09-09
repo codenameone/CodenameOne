@@ -446,9 +446,31 @@ public class SelfTest {
         check("and formats back", "Sun, 06 Nov 1994 08:49:37 GMT", Http1Date.format(when));
     }
 
+    /**
+     * Protocol tokens are folded by hand, never with String.toLowerCase(), which
+     * is locale sensitive and has no root-locale overload here. The values below
+     * all contain an I, which is the character a Turkish locale folds to a
+     * dotless i -- so a lookup keyed on the folded form stops matching and the
+     * header, the extension or the scheme reads as absent with nothing thrown.
+     */
+    private static void asciiFoldingIsLocaleIndependent() throws Exception {
+        // Jwt.bearer is the one such fold reachable from here; StaticFiles'
+        // content type and the Web arms' header index are package-private, and
+        // BackendHttpIntegrationTest exercises those over the wire instead.
+        check("an upper-case bearer scheme is still a bearer scheme",
+                "abc.def.ghi", String.valueOf(Jwt.bearer("BEARER abc.def.ghi")));
+        check("a mixed-case one too",
+                "abc.def.ghi", String.valueOf(Jwt.bearer("Bearer abc.def.ghi")));
+        check("and the lower-case spelling is unchanged",
+                "abc.def.ghi", String.valueOf(Jwt.bearer("bearer abc.def.ghi")));
+        check("something that is not a bearer header is still refused",
+                "null", String.valueOf(Jwt.bearer("Basic abc")));
+    }
+
     private static void json() throws Exception {
         bothJsonWritersAgree();
         malformedDatesAreNotDates();
+        asciiFoldingIsLocaleIndependent();
         Map parsed = Json.parseObject("{\"a\":1,\"b\":\"two\",\"c\":true,\"d\":null,\"e\":1.5}");
         // Integers must stay integers: a long round-tripped through double loses
         // precision above 2^53, and ids are exactly the values that get large.

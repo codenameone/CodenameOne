@@ -62,6 +62,8 @@ public final class FileIo {
         final boolean directory;
         /** Whether the descriptor and the path agreed; see openRead. */
         final boolean consistent;
+        /** The file's identity as the path saw it, or null where unsupported. */
+        final Object fileKey;
         long position;
 
         OpenFile(FileChannel channel, Path path) {
@@ -71,6 +73,7 @@ public final class FileIo {
             long capturedModified = 0;
             boolean capturedDirectory = false;
             boolean capturedConsistent = false;
+            Object capturedKey = null;
             try {
                 if(channel != null) {
                     capturedSize = channel.size();
@@ -79,6 +82,7 @@ public final class FileIo {
                         BasicFileAttributes.class);
                 capturedModified = attributes.lastModifiedTime().toMillis();
                 capturedDirectory = attributes.isDirectory();
+                capturedKey = attributes.fileKey();
                 if(channel == null) {
                     capturedSize = attributes.size();
                     capturedConsistent = true;
@@ -95,6 +99,7 @@ public final class FileIo {
             this.modified = capturedModified;
             this.directory = capturedDirectory;
             this.consistent = capturedConsistent;
+            this.fileKey = capturedKey;
         }
     }
 
@@ -132,9 +137,20 @@ public final class FileIo {
             // consistent validator to offer and gets the last pair read.
             OpenFile opened = null;
             for(int attempt = 0 ; attempt < 3 ; attempt++) {
+                // The file's IDENTITY across the open, because equal sizes prove
+                // nothing: a replacement by a file of the same length passes the
+                // size test, and then the old bytes are served under the new
+                // file's ETag -- so every later request for the new content is
+                // told 304 and the client caches the old representation for as
+                // long as it asks. An inode changes even when a length does not.
+                // Null where the filesystem has no such notion, and there the
+                // size test is all there is, which is what this did before.
+                Object keyBefore = fileKeyOf(p);
                 FileChannel channel = FileChannel.open(p, StandardOpenOption.READ);
                 OpenFile candidate = new OpenFile(channel, p);
-                if(candidate.consistent || attempt == 2) {
+                boolean sameFile = keyBefore == null || candidate.fileKey == null
+                        || keyBefore.equals(candidate.fileKey);
+                if((candidate.consistent && sameFile) || attempt == 2) {
                     opened = candidate;
                     break;
                 }
@@ -143,6 +159,15 @@ public final class FileIo {
             return Descriptors.add(opened);
         } catch (Exception err) {
             return -1;
+        }
+    }
+
+    /** A file's identity, or null when the filesystem does not report one. */
+    private static Object fileKeyOf(Path p) {
+        try {
+            return Files.readAttributes(p, BasicFileAttributes.class).fileKey();
+        } catch (Exception ignored) {
+            return null;
         }
     }
 

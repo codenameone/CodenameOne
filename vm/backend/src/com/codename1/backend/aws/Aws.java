@@ -135,7 +135,7 @@ public final class Aws {
         Iterator it = headers.entrySet().iterator();
         while(it.hasNext()) {
             Map.Entry entry = (Map.Entry)it.next();
-            canonicalHeaders.put(String.valueOf(entry.getKey()).toLowerCase(),
+            canonicalHeaders.put(asciiLower(String.valueOf(entry.getKey())),
                     collapse(String.valueOf(entry.getValue())));
         }
         StringBuilder headerBlock = new StringBuilder();
@@ -325,6 +325,26 @@ public final class Aws {
     }
 
     /** Leading and trailing space removed, internal runs collapsed to one space. */
+    /**
+     * ASCII lower case, because String.toLowerCase() is LOCALE SENSITIVE and
+     * this platform has no Locale to ask for the root one. On a device set to
+     * Turkish the I of an ASCII token folds to a dotless i, so the result stops
+     * equalling the constant it is compared against: nothing is thrown, nothing
+     * is logged, and the feature is simply inert for those users. A header name
+     * is ASCII by specification. Copied rather than shared; see CLAUDE.md.
+     */
+    private static String asciiLower(String value) {
+        if(value == null) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder(value.length());
+        for(int iter = 0 ; iter < value.length() ; iter++) {
+            char c = value.charAt(iter);
+            out.append(c >= 'A' && c <= 'Z' ? (char)(c + 32) : c);
+        }
+        return out.toString();
+    }
+
     public static String collapse(String value) {
         if(value == null) {
             return "";
