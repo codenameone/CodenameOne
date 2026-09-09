@@ -251,6 +251,24 @@ class AndroidLocationButtonPermissionTest {
         assertEquals(null, AndroidGradleBuilder.uncapFineLocation(null));
     }
 
+    /**
+     * The manual-declaration rules read what the DEVELOPER supplied, not the
+     * accumulated string. Wi-Fi, BLE and Nearby all add a fine-location entry
+     * of their own, and reading those as a hand-written declaration made `auto`
+     * drop the restriction and `exclusive=true` fail over a conflict with a
+     * fragment nobody had written.
+     */
+    @Test
+    void aGeneratedEntryIsNotAManualDeclaration() {
+        String generatedOnly = "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />\n";
+        String developerWroteNothing = "";
+        assertTrue(AndroidGradleBuilder.declaresOrdinaryFineLocation(generatedOnly),
+                "the predicate itself still reads what it is given");
+        assertFalse(AndroidGradleBuilder.declaresOrdinaryFineLocation(developerWroteNothing),
+                "and given what the developer supplied, there is no declaration");
+        assertFalse(AndroidGradleBuilder.declaresRestrictedFineLocation(developerWroteNothing));
+    }
+
     /** Neither rule fires on a fragment that says nothing about location. */
     @Test
     void anUnrelatedFragmentIsNeitherDeclaration() {

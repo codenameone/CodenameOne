@@ -579,7 +579,7 @@ public class AndroidGradleBuilder extends Executor {
             // that such a build usually turns off the restriction FOR. It would
             // then be handed approximate location at runtime with nothing in the
             // build saying why.
-            if (declaresRestrictedFineLocation(xPermissions)) {
+            if (declaresRestrictedFineLocation(xPermissionsAsSupplied)) {
                 if ("false".equals(hint)) {
                     throw new BuildException("android.locationButton.exclusive=false"
                             + " conflicts with the ACCESS_FINE_LOCATION declaration in"
@@ -629,7 +629,7 @@ public class AndroidGradleBuilder extends Executor {
         // fragment beats an inference -- but a forced `true` would then succeed
         // while shipping ordinary precise access, which is the opposite of what
         // was asked for, and silently.
-        if (declaresOrdinaryFineLocation(xPermissions)) {
+        if (declaresOrdinaryFineLocation(xPermissionsAsSupplied)) {
             if (asked) {
                 throw new BuildException("android.locationButton.exclusive=true"
                         + " conflicts with the ACCESS_FINE_LOCATION declaration in"
@@ -1307,6 +1307,10 @@ public class AndroidGradleBuilder extends Executor {
     private boolean playServicesWallet;
     private boolean playServicesWear;
     private String xPermissions, xQueries;
+
+    /// `android.xpermissions` exactly as the application supplied it, before
+    /// any of this builder's own fragments were added to it.
+    private String xPermissionsAsSupplied = "";
     /**
      * The names of the installed platforms, as sdkmanager reports them.
      *
@@ -1815,6 +1819,12 @@ public class AndroidGradleBuilder extends Executor {
 
         // Augment the xpermissions request arg with explicit android.permissions.XXX build hints
         xPermissions = request.getArg("android.xpermissions", "");
+        // What the DEVELOPER wrote, kept because the injectors below add to
+        // xPermissions and nothing afterwards can tell the two apart. Whether a
+        // fine-location declaration is theirs or ours decides both whether the
+        // build may rewrite it and whether it counts as a manual declaration
+        // that beats this build's inference.
+        xPermissionsAsSupplied = xPermissions;
 
         debug("Adding android permissions...");
         for (String xPerm : ANDROID_PERMISSIONS) {
@@ -3748,7 +3758,13 @@ public class AndroidGradleBuilder extends Executor {
         // the build over a capped entry was tried instead and was wrong twice
         // over -- it fired on fragments this builder had written itself, and it
         // told developers to remove something they had never written.
-        if (gpsPermission) {
+        if (gpsPermission
+                && xPermissionsAsSupplied.indexOf("ACCESS_FINE_LOCATION") < 0) {
+            // Only when every fine-location entry is one of ours. A developer
+            // who wrote their own -- capped or not -- gets it back untouched:
+            // rewriting a fragment somebody hand-wrote is not this build's to
+            // do, and permissionAdd() will suppress this build's declaration in
+            // favour of theirs anyway.
             xPermissions = uncapFineLocation(xPermissions);
         }
 
