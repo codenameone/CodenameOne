@@ -125,9 +125,18 @@ public final class LambdaRuntime {
                         + "; the result of " + payload.length + " byte(s) was not "
                         + "delivered. Reporting it as an error so the invocation "
                         + "does not simply hang.");
-                reportError(host, port, requestId, new java.io.IOException(
+                // And stop if even THAT could not be delivered. The result is
+                // already gone, so an unreported invocation stays outstanding
+                // until the host times it out while this loop takes the next
+                // one. Third branch with this rule; they are the three ways an
+                // invocation can end without the host being told.
+                if(!reportError(host, port, requestId, new java.io.IOException(
                         "the runtime API refused the response with status "
-                        + (posted == null ? "none" : String.valueOf(posted.getStatus()))));
+                        + (posted == null ? "none" : String.valueOf(posted.getStatus()))))) {
+                    System.err.println("The runtime API is unreachable, so this runtime is "
+                            + "stopping rather than collecting invocations it cannot answer.");
+                    return false;
+                }
             }
         } catch (Exception err) {
             // The result is GONE -- it existed only in the request that just

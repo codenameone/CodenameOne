@@ -746,9 +746,14 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         if ("long".equals(javaType))    return "parseLong(" + expr + ")";
         if ("boolean".equals(javaType)) return "parseBool(" + expr + ")";
         if ("double".equals(javaType))  return "parseDouble(" + expr + ")";
-        if ("float".equals(javaType))   return "(float)parseDouble(" + expr + ")";
-        if ("short".equals(javaType))   return "(short)parseInt(" + expr + ")";
-        if ("byte".equals(javaType))    return "(byte)parseInt(" + expr + ")";
+        // Parsed AT the target width, not parsed wide and cast down. A cast
+        // wraps: "40000" for a short became -25536 and "256" for a byte became
+        // 0, so the handler ran on a number the client never sent, from a value
+        // the client controls. The boxed forms below were always right about
+        // this, because Short.valueOf throws -- only the primitives were cast.
+        if ("float".equals(javaType))   return "parseFloat(" + expr + ")";
+        if ("short".equals(javaType))   return "parseShort(" + expr + ")";
+        if ("byte".equals(javaType))    return "parseByte(" + expr + ")";
         if ("java.lang.Integer".equals(javaType)) return "boxInt(" + expr + ")";
         if ("java.lang.Long".equals(javaType))    return "boxLong(" + expr + ")";
         if ("java.lang.Double".equals(javaType))  return "boxDouble(" + expr + ")";
@@ -1028,6 +1033,21 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("    private static int parseInt(String v) { return v == null || v.length() == 0 ? 0 : Integer.parseInt(v.trim()); }\n");
         sb.append("    private static long parseLong(String v) { return v == null || v.length() == 0 ? 0L : Long.parseLong(v.trim()); }\n");
         sb.append("    private static double parseDouble(String v) { return v == null || v.length() == 0 ? 0d : Double.parseDouble(v.trim()); }\n");
+        sb.append("    private static short parseShort(String v) { return v == null || v.length() == 0 ? (short)0 : Short.parseShort(v.trim()); }\n");
+        sb.append("    private static byte parseByte(String v) { return v == null || v.length() == 0 ? (byte)0 : Byte.parseByte(v.trim()); }\n");
+        // A double outside float range becomes INFINITY on the cast rather than
+        // failing, so 1e100 reached the handler as an infinite amount. Rejected
+        // the same way an unparseable number is, which the dispatcher already
+        // answers 400 for.
+        sb.append("    private static float parseFloat(String v) {\n");
+        sb.append("        if (v == null || v.length() == 0) { return 0f; }\n");
+        sb.append("        double d = Double.parseDouble(v.trim());\n");
+        sb.append("        float f = (float)d;\n");
+        sb.append("        if (Float.isInfinite(f) && !Double.isInfinite(d)) {\n");
+        sb.append("            throw new NumberFormatException(\"out of range for float: \" + v);\n");
+        sb.append("        }\n");
+        sb.append("        return f;\n");
+        sb.append("    }\n");
         sb.append("    private static Integer boxInt(String v) { return v == null || v.length() == 0 ? null : Integer.valueOf(v.trim()); }\n");
         sb.append("    private static Long boxLong(String v) { return v == null || v.length() == 0 ? null : Long.valueOf(v.trim()); }\n");
         sb.append("    private static Double boxDouble(String v) { return v == null || v.length() == 0 ? null : Double.valueOf(v.trim()); }\n");

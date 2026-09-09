@@ -3203,7 +3203,25 @@ public final class HttpServer {
                 // The same rule as HTTP/1: a 204, 304 or 1xx carries no body, so
                 // a DATA frame must not follow the headers here either.
                 boolean noBody = headOnly || statusForbidsBody(response.status);
-                if(response.fileFd >= 0 && !noBody) {
+                if(response.fileFd >= 0 && !noBody
+                        && Http2.pendingBodyFiles() >= MAX_OPEN_H2_FILES) {
+                    // BEFORE submitting, not after. The turn check below stops
+                    // this session, but every other session wakes on a control
+                    // frame and submits one more first, so the cap was really
+                    // "the cap plus one per connection" -- and a peer holding its
+                    // window shut can keep waking them. Descriptors are a process
+                    // resource and running out stops the server accepting sockets
+                    // at all, which is a failure for every client rather than the
+                    // one that caused it.
+                    //
+                    // Answered rather than deferred: the handler has ALREADY
+                    // opened the descriptor, so holding the response holds the
+                    // very thing being rationed. Closing it and saying so is the
+                    // honest answer, and 503 is what it is.
+                    StaticFiles.closeFile(response.fileFd);
+                    h2.respond(stream.getId(), 503, "text/plain", extra,
+                            asciiBytes("too many files in flight"));
+                } else if(response.fileFd >= 0 && !noBody) {
                     // Streamed frame by frame out of the descriptor. Reading the file
                     // in first cost its whole size in the heap plus the same again in
                     // the native copy, so a large enough public file turned one request
