@@ -217,13 +217,15 @@ Low-level events can be bound in one of 3 ways:
 
 * Override one of the event callbacks on a https://www.codenameone.com/javadoc/com/codename1/ui/Component.html[Component].
 
-TIP: That last one depends on the event. A key callback on a `Component` only fires while that component
-holds focus, because `Form` routes key events to the focused component. A pointer callback doesn't need
-focus: `Form` looks up whatever component sits under the touch and delivers to it, whichever component
-holds focus at the time. Where the press lands decides the rest. The content pane branch of
-`Form.pointerPressed` delivers only to an enabled component, and gives it focus as well if it's focusable
-and the press isn't a scroll wheel. The title area branch and the west branch check neither, and assign no
-focus, so an override on a disabled `Toolbar` component still runs and the focus stays where it was.
+TIP: That last one depends on the event. A key callback on an ordinary `Component` only fires while that
+component holds focus, because `Form` routes key events to the focused one - the exception is a key the
+menu bar claims, which `Form.keyPressed` hands to `MenuBar` before it consults `focused` at all. A pointer
+callback has no such prerequisite: `Form` looks up whatever component sits under the touch and delivers to
+it, whichever component holds focus at the time. What differs is what else happens. In the content pane the
+component has to be enabled to be called, and it takes focus before the callback runs. In the title area
+and along the west side it's called even when it's disabled, and `LeadUtil` moves focus afterwards, and only
+if that component is focusable and enabled. Focus is therefore never a condition for a pointer callback, and
+only sometimes a consequence of one.
 
 .How one touch reaches your code
 image::img/event-dispatch-path.svg[The path a pointer event takes from the native callback to your listener,scaledwidth=85%]

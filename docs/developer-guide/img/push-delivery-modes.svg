@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="820" height="598" viewBox="0 0 820 598">
   <rect x="0" y="0" width="820" height="598" fill="#ffffff"/>
   <text x="410" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">Where a push message comes from, in both modes</text>
-  <text x="410" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Registration and delivery are separate journeys, and installing a PushTransport reroutes both of them. What does not</text>
-  <text x="410" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">change is the envelope at the end: the same schema-3 message reaches the same listener, on the EDT, either way.</text>
+  <text x="410" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Registration and delivery are separate journeys, and installing a PushTransport reroutes both of them. What does not change</text>
+  <text x="410" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">is the envelope at the end: keep it identical and the same listener, deep links and surface commands work in either mode.</text>
   <rect x="16" y="70" width="788" height="226" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.6"/>
   <rect x="16" y="70" width="788" height="26" rx="4" fill="#4a6fa5" stroke="#4a6fa5" stroke-width="1"/>
   <text x="410" y="88" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#ffffff">Managed delivery, which is what you get by default</text>
@@ -21,15 +21,15 @@
   <path d="M 395 168 L 417 168" fill="none" stroke="#999999" stroke-width="1.5"/>
   <path d="M 412 164 L 417 168 L 412 172" fill="none" stroke="#999999" stroke-width="1.5"/>
   <rect x="422" y="136" width="166" height="64" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.3"/>
-  <text x="505" y="156" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#4a6fa5">BuildCloud stores it</text>
-  <text x="505" y="172" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">as a subscription with</text>
-  <text x="505" y="185" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">an installation id</text>
+  <text x="505" y="156" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#4a6fa5">onRegistration()</text>
+  <text x="505" y="172" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">at once on the EDT, and</text>
+  <text x="505" y="185" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">again on every rotation</text>
   <path d="M 593 168 L 615 168" fill="none" stroke="#999999" stroke-width="1.5"/>
   <path d="M 610 164 L 615 168 L 610 172" fill="none" stroke="#999999" stroke-width="1.5"/>
   <rect x="620" y="136" width="166" height="64" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.3"/>
-  <text x="703" y="156" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#4a6fa5">onRegistration()</text>
-  <text x="703" y="172" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">on the EDT, again on</text>
-  <text x="703" y="185" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">every token rotation</text>
+  <text x="703" y="156" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#4a6fa5">BuildCloud stores it</text>
+  <text x="703" y="172" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">a request already sent,</text>
+  <text x="703" y="185" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">still able to fail</text>
   <text x="24" y="216" font-family="Arial, sans-serif" font-size="9" fill="#4a6fa5">sending</text>
   <rect x="26" y="220" width="166" height="64" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.3"/>
   <text x="109" y="240" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#4a6fa5">your server posts it</text>
@@ -72,14 +72,14 @@
   <path d="M 412 412 L 417 416 L 412 420" fill="none" stroke="#999999" stroke-width="1.5"/>
   <rect x="422" y="384" width="166" height="64" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.3"/>
   <text x="505" y="404" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#a56a3a">Callback.registered()</text>
-  <text x="505" y="420" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">reaches your</text>
-  <text x="505" y="433" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">PushRegistrationSink</text>
+  <text x="505" y="420" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">your PushRegistrationSink</text>
+  <text x="505" y="433" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">stores it on your server</text>
   <path d="M 593 416 L 615 416" fill="none" stroke="#999999" stroke-width="1.5"/>
   <path d="M 610 412 L 615 416 L 610 420" fill="none" stroke="#999999" stroke-width="1.5"/>
   <rect x="620" y="384" width="166" height="64" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.3"/>
-  <text x="703" y="404" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#a56a3a">your server stores it</text>
-  <text x="703" y="420" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">keyed by installationId,</text>
-  <text x="703" y="433" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">replaced on rotation</text>
+  <text x="703" y="404" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#a56a3a">onRegistration()</text>
+  <text x="703" y="420" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">the same callback as above,</text>
+  <text x="703" y="433" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">also on the EDT</text>
   <text x="24" y="464" font-family="Arial, sans-serif" font-size="9" fill="#a56a3a">sending</text>
   <rect x="26" y="468" width="166" height="64" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.3"/>
   <text x="109" y="488" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#a56a3a">your server sends</text>
@@ -104,5 +104,5 @@
   <text x="703" y="504" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">the identical callback,</text>
   <text x="703" y="517" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">also on the EDT</text>
   <rect x="16" y="556" width="788" height="30" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
-  <text x="410" y="576" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Keep the envelope identical and the same listener, deep links and surface commands work in both modes.</text>
+  <text x="410" y="576" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">onRegistration() is not a delivery receipt: it fires before the storage request has answered, and a failure arrives as a PushError.</text>
 </svg>
