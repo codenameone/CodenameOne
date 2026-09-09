@@ -448,15 +448,18 @@ public class ScaffoldRenderElement extends RenderElement {
         // Body fills the remaining area.
         RenderElement bodyRender = renderOf(bodyChild);
         if (bodyRender != null) {
+            // extendBody: the body runs BEHIND the bottom bar instead of stopping above
+            // it, which is what lets a notch in that bar reveal the page underneath. The
+            // flag used to be discarded, so the mail study's notch came out opaque.
+            double bodyBottom = scaffold().getExtendBody()
+                    ? 0 : navHeight + footerHeight + bottomBand;
             BoxConstraints bodyConstraints;
             if (constraints.hasBoundedWidth() && constraints.hasBoundedHeight()) {
                 bodyConstraints = BoxConstraints.tight(width,
-                        Math.max(0, height - appBarHeight - navHeight - footerHeight
-                                - bottomBand));
+                        Math.max(0, height - appBarHeight - bodyBottom));
             } else {
                 bodyConstraints = constraints.loosen().deflate(
-                        com.codename1.flutter.EdgeInsets.only(0, appBarHeight, 0,
-                                navHeight + footerHeight + bottomBand));
+                        com.codename1.flutter.EdgeInsets.only(0, appBarHeight, 0, bodyBottom));
             }
             Size bs = bodyRender.layout(bodyConstraints);
             setChildOffset(bodyRender, 0, appBarHeight);

@@ -40,15 +40,58 @@ public class SizeTransition extends AnimatedChildWidget {
         this.axis = v;
     }
 
-    public void sizeFactor(Animation<Double> v) {
-        this.sizeFactor = v;
-    }
-
     public void axisAlignment(double v) {
         this.axisAlignment = v;
     }
 
     public Animation<Double> getSizeFactor() {
         return sizeFactor;
+    }
+
+    public void sizeFactor(Animation<Double> v) {
+        this.sizeFactor = v;
+        listenable(v);
+    }
+
+    /**
+     * Flutter's own composition: a ClipRect over an Align whose factor along the axis is
+     * the animation's value. Align already scales its box to a FRACTION of its child, and
+     * the ClipRect hides the part that does not fit yet.
+     *
+     * <p>This used to hand the child through at full size -- the note said the clip was
+     * "deferred" -- so nothing driven by one ever grew or shrank. The mail study's bottom
+     * bar is a SizeTransition, which is why it appeared and vanished instead of sliding.</p>
+     */
+    @Override
+    public com.codename1.flutter.Widget build(com.codename1.flutter.BuildContext context) {
+        com.codename1.flutter.Widget child = getChild();
+        if (child == null || sizeFactor == null) {
+            return child;
+        }
+        double factor = Math.max(0, valueOf(sizeFactor, 1));
+        if (factor >= 1) {
+            // Fully revealed: hand the child straight through. Align shrink-wraps to its
+            // child once given a factor, which throws away a tight height the parent
+            // meant it to fill -- a scaffold stretches its bottom bar over the display's
+            // bottom inset, and wrapping it unconditionally left that strip unpainted.
+            // At rest this widget should change nothing, and now it does not.
+            return child;
+        }
+        boolean horizontal = axis == com.codename1.flutter.Axis.horizontal;
+        double along = axisAlignment != null ? axisAlignment.doubleValue() : 0;
+        com.codename1.flutter.widgets.Align align = new com.codename1.flutter.widgets.Align();
+        align.alignment(horizontal
+                ? new com.codename1.flutter.Alignment(along, -1)
+                : new com.codename1.flutter.Alignment(-1, along));
+        if (horizontal) {
+            align.widthFactor(Double.valueOf(factor));
+        } else {
+            align.heightFactor(Double.valueOf(factor));
+        }
+        align.child(child);
+        com.codename1.flutter.widgets.ClipRect clip =
+                new com.codename1.flutter.widgets.ClipRect();
+        clip.child(align);
+        return clip;
     }
 }

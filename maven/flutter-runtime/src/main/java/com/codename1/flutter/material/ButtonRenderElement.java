@@ -264,7 +264,7 @@ public class ButtonRenderElement extends RenderElement {
                         .rectangle(true)
                         .color(cs.primary().rgb())
                         .shadowOpacity(40));
-                all.setBgTransparency(0);
+                clearBackground(all);
             } else if (w instanceof OutlinedButton) {
                 all.setPadding(vpad, vpad, hpad, hpad);
                 all.setFgColor(cs.primary().rgb());
@@ -274,12 +274,12 @@ public class ButtonRenderElement extends RenderElement {
                         .stroke(Dp.mm(0.3), true)
                         .strokeColor(cs.primary().rgb())
                         .strokeOpacity(160));
-                all.setBgTransparency(0);
+                clearBackground(all);
             } else if (w instanceof TextButton) {
                 all.setPadding(vpad, vpad, hpad / 2, hpad / 2);
                 all.setFgColor(cs.primary().rgb());
                 all.setBorder(Border.createEmpty());
-                all.setBgTransparency(0);
+                clearBackground(all);
             } else {
                 // IconButton (and other glyph triggers): bare glyph
                 int pad = (int) Math.round(Dp.px(8));
@@ -288,11 +288,27 @@ public class ButtonRenderElement extends RenderElement {
                         ? ((IconButton) w).getColor() : null;
                 all.setFgColor(tint != null ? tint.rgb() : cs.onSurface().rgb());
                 all.setBorder(Border.createEmpty());
-                all.setBgTransparency(0);
+                clearBackground(all);
             }
         } catch (Exception err) {
             // styling is best-effort; the base theme look remains
         }
+    }
+
+    /**
+     * Makes a style's background truly absent, in every state.
+     *
+     * <p>{@code setBgTransparency(0)} alone does not: it silences the background COLOUR
+     * and leaves any background IMAGE painting. Codename One themes routinely give a
+     * button a gradient image for its pressed and selected states, and
+     * {@code getAllStyles()} reaches all four -- so an icon button on a dark bar flashed a
+     * pale panel when touched or focused and kept it while that state held. Flutter's
+     * icon button has no background of its own in any state; its feedback is the ink.</p>
+     */
+    private static void clearBackground(com.codename1.ui.plaf.Style all) {
+        all.setBgTransparency(0);
+        all.setBgImage(null);
+        all.setBackgroundType(com.codename1.ui.plaf.Style.BACKGROUND_NONE);
     }
 
     /** Flutter's {@code kMinInteractiveDimension}. */

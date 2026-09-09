@@ -79,8 +79,23 @@ public class Scaffold extends Widget {
         return floatingActionButtonLocation;
     }
 
+    private boolean extendBody;
+
     /** Whether the body extends behind the bottom navigation bar — Flutter's {@code extendBody}. */
     public void extendBody(boolean v) {
+        this.extendBody = v;
+    }
+
+    /**
+     * {@code Scaffold.extendBody}.
+     *
+     * <p>This was an EMPTY SETTER: the flag was discarded, so the body always stopped
+     * above the bottom bar. A bar with a notch then had nothing to reveal through it --
+     * the mail study cuts a notch for its docked button and the gap came out opaque,
+     * showing the scaffold's own background where the list should run underneath.</p>
+     */
+    public boolean getExtendBody() {
+        return extendBody;
     }
 
     /** Whether the body extends behind the app bar — Flutter's {@code extendBodyBehindAppBar}. */
