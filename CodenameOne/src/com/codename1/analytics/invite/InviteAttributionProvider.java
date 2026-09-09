@@ -106,6 +106,18 @@ final class InviteAttributionProvider extends AbstractAnalyticsProvider {
         // analytics while a declined invite lookup stayed stopped and a
         // resolved attribution's dimensions stayed cleared, so the two
         // disagreed about the same user.
+        // No recorded choice, so the MODE decides -- and the two answers are
+        // not "allowed" and "refused". Under OPT_IN the prompt is simply
+        // unanswered and NOTHING happens: reporting a refusal there would
+        // delete the profile captured on the first launch and move to DECLINED
+        // for a user who has refused nothing, which is the paragraph above.
+        // Under OPT_OUT the implicit allow is in force and that is a real
+        // transition.
+        //
+        // Analytics.setConsentMode now dispatches here when the mode changes,
+        // which is what lets a switch to OPT_OUT reach this at all -- ordinary
+        // analytics used to resume on that switch while a declined lookup
+        // stayed stopped and an attribution's dimensions stayed cleared.
         if (Analytics.getConsentMode() == ConsentMode.OPT_OUT) {
             Invites.onConsentChanged(true);
         }

@@ -1145,4 +1145,55 @@ class InviteResilienceTest extends UITestBase {
         assertNull(unavailable[0], "a stale held answer was reported over a resolved one");
         assertNotNull(received[0], "the resolved attribution was suppressed by it");
     }
+
+    @Test
+    @EdtTest
+    void aSavedExactCodeIsNotSubjectToTheDeferredWindow() {
+        // The window bounds the deferred lookup, and a code we are holding is
+        // an exact answer rather than one. Applying the expiry to it lost that
+        // answer whenever the two coexist -- a zero window, where handleUrl
+        // records an expiry of "now", or a first claim that failed and is
+        // retried after the window ran out.
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SAVED9");
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(pending);
+        pending.put("expiresAt", String.valueOf(System.currentTimeMillis() - 1000L));
+        InviteStore.write(InviteStore.PENDING, pending);
+
+        final String[] told = new String[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0] = reason;
+            }
+        });
+        Invites.forgetLoadedState();
+        Invites.checkForInvite();
+
+        assertNull(told[0], "an exact code we were holding was marked expired");
+        assertEquals(Invites.STATE_PENDING, Invites.getState());
+    }
+
+    @Test
+    @EdtTest
+    void switchingToOptOutResumesADeclinedLookup() {
+        // setConsentMode changes what an absent choice means, so it changes
+        // what is allowed -- and it dispatched to no provider, so ordinary
+        // analytics resumed while a declined lookup stayed stopped and an
+        // attribution's dimensions stayed cleared.
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+        Invites.checkForInvite();
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+        assertEquals(Invites.STATE_DECLINED, Invites.getState());
+        Analytics.setConsent(null);
+        assertEquals(Invites.STATE_DECLINED, Invites.getState(),
+                "clearing the choice under opt-in must change nothing");
+
+        Analytics.setConsentMode(ConsentMode.OPT_OUT);
+
+        assertEquals(Invites.STATE_PENDING, Invites.getState(),
+                "switching to opt-out did not resume the declined lookup");
+    }
 }

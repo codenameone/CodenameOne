@@ -1697,6 +1697,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // rather than whatever the previous intent left cached.
             instance.setAppArg(null);
             clearIntentProperties();
+            // And the intent's data is consumed, exactly as the lazy
+            // getAppArg() path consumes it. CodenameOneActivity.onStop() clears
+            // the app arg, so leaving the data on the intent meant the next
+            // read after a resume rebuilt the same url from it, and an
+            // application that handles AppArg in start() saw the deep link a
+            // second time -- opening the same invite twice for one tap.
+            intent.setData(null);
             Display.getInstance().setProperty("AppArg", data.toString());
         } catch (Throwable t) {
             com.codename1.io.Log.e(t);

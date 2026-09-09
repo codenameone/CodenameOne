@@ -1359,7 +1359,13 @@ public final class Invites {
             return;
         }
         Map<String, String> pending = pendingRecord();
-        long expires = InviteStore.getLong(pending, "expiresAt", 0);
+        // The window bounds the DEFERRED lookup, and a code we are holding is
+        // not one -- it is an exact answer. Applying the expiry to it lost that
+        // answer for the two cases where a saved code coexists with an expired
+        // window: a zero window, where handleUrl records an expiry of "now",
+        // and a first claim that failed and is being retried after the window
+        // ran out. Same reasoning as the kill switch above.
+        long expires = hasSavedCode() ? 0 : InviteStore.getLong(pending, "expiresAt", 0);
         if (expires > 0 && System.currentTimeMillis() > expires) {
             if (abandonReplacement()) {
                 return;

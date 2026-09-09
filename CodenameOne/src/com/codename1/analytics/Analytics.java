@@ -148,8 +148,34 @@ public final class Analytics {
         if (mode == null) {
             return;
         }
+        List<AnalyticsProvider> snapshot;
         synchronized (LOCK) {
+            if (mode == consentMode) {
+                return;
+            }
             consentMode = mode;
+            snapshot = new ArrayList<AnalyticsProvider>(PROVIDERS);
+        }
+        // Providers are told, because the mode decides what an absent choice
+        // means: under OPT_IN nothing is permitted until the user answers, and
+        // under OPT_OUT everything is until they refuse. Changing it therefore
+        // changes what is allowed for a user who has answered nothing, and
+        // without this dispatch ordinary events resumed while a feature that
+        // had stopped on the old mode stayed stopped -- the two disagreeing
+        // about the same user with nothing to reconcile them.
+        //
+        // The consent handed over is the effective one, exactly as
+        // setConsent() does, so a provider needs no second rule for this path.
+        AnalyticsConsent recorded = getConsent();
+        AnalyticsConsent effective = recorded != null ? recorded
+                : (mode == ConsentMode.OPT_OUT
+                        ? AnalyticsConsent.granted() : AnalyticsConsent.denied());
+        for (AnalyticsProvider p : snapshot) {
+            try {
+                p.onConsentChanged(effective);
+            } catch (Throwable t) {
+                Log.e(t);
+            }
         }
     }
 
