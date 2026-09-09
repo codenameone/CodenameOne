@@ -582,14 +582,14 @@ public class AndroidGradleBuilder extends Executor {
             if (declaresRestrictedFineLocation(xPermissionsAsSupplied)) {
                 if ("false".equals(hint)) {
                     throw new BuildException("android.locationButton.exclusive=false"
-                            + " conflicts with the ACCESS_FINE_LOCATION declaration in"
-                            + " android.xpermissions, which carries"
-                            + " onlyForLocationButton and which the build can neither"
+                            + " conflicts with an ACCESS_FINE_LOCATION this"
+                            + " application declares itself carrying"
+                            + " onlyForLocationButton, which the build can neither"
                             + " rewrite nor override. Precise location would stay"
                             + " limited to the location button despite the hint."
-                            + " Remove onlyForLocationButton from that fragment, or"
-                            + " drop the hint if the manual restriction is what you"
-                            + " want.");
+                            + " Remove onlyForLocationButton from that declaration,"
+                            + " or drop the hint if the manual restriction is what"
+                            + " you want.");
                 }
                 // `auto` did not ask for anything, and an explicit fragment beats
                 // an inference -- the same precedence as the forced case below.
@@ -632,16 +632,20 @@ public class AndroidGradleBuilder extends Executor {
         if (declaresOrdinaryFineLocation(xPermissionsAsSupplied)) {
             if (asked) {
                 throw new BuildException("android.locationButton.exclusive=true"
-                        + " conflicts with the ACCESS_FINE_LOCATION declaration in"
-                        + " android.xpermissions, which the build cannot rewrite and"
-                        + " which takes precedence over the one it generates. Remove"
-                        + " that fragment and let the build declare the permission,"
-                        + " or drop the hint if the manual declaration is what you"
-                        + " want.");
+                        + " conflicts with an ACCESS_FINE_LOCATION this application"
+                        + " declares itself -- either a fragment in"
+                        + " android.xpermissions or"
+                        + " android.permission.ACCESS_FINE_LOCATION=true. The build"
+                        + " cannot rewrite either, and both take precedence over the"
+                        + " declaration it generates, so the restriction would not"
+                        + " reach the manifest. Drop whichever of the two you did not"
+                        + " mean.");
             }
-            warn("android.xpermissions declares ACCESS_FINE_LOCATION, so the"
-                    + " build's own declaration is suppressed and precise location"
-                    + " is not limited to the location button.");
+            warn("This application declares ACCESS_FINE_LOCATION itself, through"
+                    + " android.xpermissions or"
+                    + " android.permission.ACCESS_FINE_LOCATION=true, so the build's"
+                    + " own declaration is suppressed and precise location is not"
+                    + " limited to the location button.");
             return FINE_LOCATION_PERMISSION;
         }
         if (!compileSdkSupportsExclusiveLocation(compileSdk)) {
@@ -1819,12 +1823,6 @@ public class AndroidGradleBuilder extends Executor {
 
         // Augment the xpermissions request arg with explicit android.permissions.XXX build hints
         xPermissions = request.getArg("android.xpermissions", "");
-        // What the DEVELOPER wrote, kept because the injectors below add to
-        // xPermissions and nothing afterwards can tell the two apart. Whether a
-        // fine-location declaration is theirs or ours decides both whether the
-        // build may rewrite it and whether it counts as a manual declaration
-        // that beats this build's inference.
-        xPermissionsAsSupplied = xPermissions;
 
         debug("Adding android permissions...");
         for (String xPerm : ANDROID_PERMISSIONS) {
@@ -1846,6 +1844,20 @@ public class AndroidGradleBuilder extends Executor {
                 xPermissions += permissionAdd(request, xPerm, addString);
             }
         }
+        // What the DEVELOPER asked for, kept because everything below adds this
+        // builder's own fragments to the same string and nothing afterwards can
+        // tell the two apart. Whether a fine-location declaration is theirs or
+        // ours decides both whether the build may rewrite it and whether it
+        // counts as a manual declaration that beats this build's inference.
+        //
+        // AFTER the loop above, not before it: `android.permission.XXX=true` is
+        // a second way to hand-declare a permission, with its own
+        // `.maxSdkVersion`, and it is every bit as much the application's as a
+        // fragment written into android.xpermissions. Snapshotting above this
+        // read those declarations as the build's own, so a forced exclusive
+        // restriction saw no conflict and shipped ordinary precise access, and
+        // a developer's own cap was rewritten.
+        xPermissionsAsSupplied = xPermissions;
 
         final String usesFeaturePrefix = "android.uses_feature.";
         final int usesFeaturePrefixLen = usesFeaturePrefix.length();
