@@ -104,5 +104,5 @@
   <text x="703" y="504" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">the identical callback,</text>
   <text x="703" y="517" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">also on the EDT</text>
   <rect x="16" y="556" width="788" height="30" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
-  <text x="410" y="576" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">onRegistration() is not a delivery receipt: it fires before the storage request has answered, and a failure arrives as a PushError.</text>
+  <text x="410" y="576" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">onRegistration() is not a receipt: it fires before the storage request answers, an HTTP error becomes a PushError, and a transport failure is silent.</text>
 </svg>
