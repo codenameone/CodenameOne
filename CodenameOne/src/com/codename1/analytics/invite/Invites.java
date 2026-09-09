@@ -615,6 +615,7 @@ public final class Invites {
     ///
     /// the attribution
     public static InviteAttribution getAttribution() {
+        ensureProvider();
         loadAttribution();
         return resolved;
     }
@@ -653,6 +654,7 @@ public final class Invites {
     ///
     /// the current state
     public static int getState() {
+        ensureProvider();
         loadState();
         return state;
     }
@@ -833,6 +835,7 @@ public final class Invites {
     /// deferred match. Called for you on the paths that matter; exposed for
     /// an application that knows it has just regained connectivity.
     public static void flush() {
+        ensureProvider();
         drainOutbox();
         // A deferred lookup that failed because the first launch was offline
         // leaves deferredStarted set, and nothing else clears it inside the
@@ -988,6 +991,22 @@ public final class Invites {
     // Registers the provider that gives us the erasure and consent hooks.
     // Analytics.clearProviders() can drop it, so this re-registers on facade
     // entry rather than only once; the provider list is a handful of entries.
+    // Called by EVERY entry point that reads or transmits stored invite data,
+    // not only the ones that start something.
+    //
+    // Analytics.clearProviders() is public and the deprecated
+    // AnalyticsService.init() calls it, so this provider can be absent when an
+    // erasure runs. Analytics.resetClientId() clears the reserved dimensions
+    // itself, which needs no provider -- but the durable records are ours, and
+    // only this provider's init() hook drops them. Registering here re-runs
+    // that hook (addProvider calls init immediately), so the identity change is
+    // noticed before anything reads the old attribution or sends the old
+    // registration outbox under the new id.
+    //
+    // Analytics deliberately does not do this for us: a reference from
+    // com.codename1.analytics to this package would match the platform feature
+    // catalog's prefix and put a Play dependency and an API floor on every
+    // application that logs a single event.
     private static void ensureProvider() {
         try {
             List providers = Analytics.getProviders();

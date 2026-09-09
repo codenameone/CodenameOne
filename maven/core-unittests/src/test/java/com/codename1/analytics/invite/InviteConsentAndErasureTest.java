@@ -360,4 +360,26 @@ class InviteConsentAndErasureTest extends UITestBase {
         assertEquals("pro", Analytics.getDimensions().get("plan"),
                 "the application's own dimension must survive an erasure");
     }
+
+    @FormTest
+    void anErasureDropsTheDurableRecordsEvenWithNoProviderRegistered() {
+        // resetClientId clears the reserved dimensions itself, which needs no
+        // provider -- but the durable records are ours and only the provider's
+        // init hook drops them. Analytics.clearProviders() is public and the
+        // deprecated AnalyticsService.init() calls it, so an erasure really can
+        // run with the provider absent; every entry point that reads or
+        // transmits stored data re-registers first, which re-runs that hook.
+        InviteTestSupport.freshInstall();
+        Invites.handleResolution(InviteTestSupport.resolvedJson("ERASE1", "spring", "sms"),
+                Invites.MATCH_DIRECT, false);
+        assertNotNull(Invites.getAttribution());
+
+        Analytics.clearProviders();
+        Analytics.resetClientId();
+
+        assertNull(Invites.getAttribution(),
+                "the old referral identity survived an erasure and can be read under the new id");
+        assertNull(InviteStore.read(InviteStore.ATTRIBUTION),
+                "the durable attribution record was left on the device");
+    }
 }
