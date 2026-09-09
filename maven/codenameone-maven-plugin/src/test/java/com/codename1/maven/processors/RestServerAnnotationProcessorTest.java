@@ -118,6 +118,92 @@ public class RestServerAnnotationProcessorTest {
                     + "}\n";
 
     @Test
+    public void aStringBodyMustHaveArrivedAsAString() throws Exception {
+        // Declaring @Body String does not make the body a string. A client sending
+        // the number 1 or an object used to be coerced with String.valueOf, so the
+        // handler saw "1" or "{a=1}" as though those had been sent as JSON strings,
+        // instead of the IllegalArgumentException the transport turns into a 400.
+        File classes = compileApi();
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+        URLClassLoader loader = new URLClassLoader(
+                new URL[]{classes.toURI().toURL(), testClassesDir().toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> serverItf = loader.loadClass("com.example.GreeterApiServer");
+        final Object[] received = new Object[1];
+        Object handler = Proxy.newProxyInstance(loader, new Class<?>[]{serverItf},
+                new InvocationHandler() {
+                    public Object invoke(Object proxy, Method m, Object[] args) {
+                        if ("echo".equals(m.getName())) {
+                            received[0] = args[0];
+                            return args[0];
+                        }
+                        return null;
+                    }
+                });
+        Class<?> dispatcherClass = loader.loadClass("com.example.GreeterApiDispatcher");
+        Object dispatcher = dispatcherClass.getConstructor(serverItf).newInstance(handler);
+        Method dispatch = dispatcherClass.getMethod("dispatch",
+                String.class, String.class, java.util.Map.class, Object.class);
+
+        dispatch.invoke(dispatcher, "POST", "/echo", null, "hello");
+        assertEquals("a genuine string body must still arrive", "hello", received[0]);
+
+        received[0] = null;
+        try {
+            dispatch.invoke(dispatcher, "POST", "/echo", null, Long.valueOf(1));
+            fail("a JSON number reaching a String body should be refused, not stringified");
+        } catch (java.lang.reflect.InvocationTargetException expected) {
+            assertTrue(String.valueOf(expected.getCause()),
+                    expected.getCause() instanceof IllegalArgumentException);
+        }
+        assertNull("the handler must not have been called at all", received[0]);
+        loader.close();
+    }
+
+    @Test
+    public void aScalarBodyStillArrivesThroughItsTextForm() throws Exception {
+        // The other half of the rule above: a declared `int` body IS fed by
+        // rendering whatever arrived and parsing it, so that a JSON number reaching
+        // an int body behaves like one reaching an int query parameter. Making the
+        // string helper strict without splitting it broke exactly this.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.TallyApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface TallyApi {\n"
+                + "    @POST(\"/tally\")\n"
+                + "    void tally(@Body int count, OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+        URLClassLoader loader = new URLClassLoader(
+                new URL[]{classes.toURI().toURL(), testClassesDir().toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> serverItf = loader.loadClass("com.example.TallyApiServer");
+        final Object[] received = new Object[1];
+        Object handler = Proxy.newProxyInstance(loader, new Class<?>[]{serverItf},
+                new InvocationHandler() {
+                    public Object invoke(Object proxy, Method m, Object[] args) {
+                        received[0] = args[0];
+                        return "ok";
+                    }
+                });
+        Class<?> dispatcherClass = loader.loadClass("com.example.TallyApiDispatcher");
+        Object dispatcher = dispatcherClass.getConstructor(serverItf).newInstance(handler);
+        Method dispatch = dispatcherClass.getMethod("dispatch",
+                String.class, String.class, java.util.Map.class, Object.class);
+        // What the JSON reader really produces for the body `7`.
+        dispatch.invoke(dispatcher, "POST", "/tally", null, Long.valueOf(7));
+        assertEquals(Integer.valueOf(7), received[0]);
+        loader.close();
+    }
+
+    @Test
     public void twoDynamicRoutesThatOverlapAreRefused() throws Exception {
         // Different shapes, and /a/b/c satisfies both. Neither is more specific, so
         // literal-first ordering cannot break the tie and dispatch answers with

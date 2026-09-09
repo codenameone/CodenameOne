@@ -195,7 +195,13 @@ public final class Web {
                     String header = String.valueOf(headers.get(iter));
                     int colon = header.indexOf(':');
                     if(colon > 0) {
-                        connection.setRequestProperty(header.substring(0, colon).trim(),
+                        // addRequestProperty, not set: the packaged client appends
+                        // every line it is given, so two Cookie or two extension
+                        // lines both go out there while setRequestProperty kept
+                        // only the last -- an integration that depends on a
+                        // repeated header works once packaged and quietly sends
+                        // half of what it meant to under cn1:backend.
+                        connection.addRequestProperty(header.substring(0, colon).trim(),
                                 header.substring(colon + 1).trim());
                     }
                 }

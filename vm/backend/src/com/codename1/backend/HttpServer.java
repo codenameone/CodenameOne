@@ -3364,9 +3364,21 @@ public final class HttpServer {
                     // over one protocol and invalid over the other, which is the
                     // exact divergence this fix existed to remove.
                     if(headOnly && !statusForbidsLength(response.status)) {
-                        long described = response.fileFd >= 0
-                                ? response.fileLength
-                                : (response.body == null ? 0 : response.body.length);
+                        long described;
+                        if(response.fileFd >= 0) {
+                            described = response.fileLength;
+                        } else if(response.hasDeferredJson) {
+                            // respondJson leaves the value UNSERIALISED so the
+                            // HTTP/1 writer can render it straight into the
+                            // connection's buffer, which means response.body is
+                            // empty and measuring it reports zero for a
+                            // representation that is not. Rendering it is the only
+                            // way to know the length, and describing the
+                            // representation is the entire purpose of a HEAD.
+                            described = responseBodyFor(response, false).length;
+                        } else {
+                            described = response.body == null ? 0 : response.body.length;
+                        }
                         extra.add("content-length: " + described);
                     }
                     byte[] h2Body = responseBodyFor(response, noBody);
@@ -3641,6 +3653,40 @@ public final class HttpServer {
             }
         }
         return true;
+    }
+
+    /** The same token rule as isHeaderName, over a slice of the read buffer. */
+    private static boolean isRequestHeaderName(byte[] raw, int from, int to) {
+        if(to <= from) {
+            return false;
+        }
+        for(int iter = from ; iter < to ; iter++) {
+            int c = raw[iter] & 0xff;
+            boolean tchar = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9')
+                    || c == '!' || c == '#' || c == '$' || c == '%' || c == '&'
+                    || c == '\'' || c == '*' || c == '+' || c == '-' || c == '.'
+                    || c == '^' || c == '_' || c == '`' || c == '|' || c == '~';
+            if(!tchar) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Whether this slice holds a byte no field value may carry. HTAB is allowed
+     * because RFC 9110 permits it inside a value; everything else below 0x20, and
+     * DEL, is a delimiter to somebody.
+     */
+    private static boolean hasControlByte(byte[] raw, int from, int to) {
+        for(int iter = from ; iter < to ; iter++) {
+            int c = raw[iter] & 0xff;
+            if((c < 0x20 && c != '\t') || c == 0x7f) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The same characters would break the log line they are reported on. */
@@ -3940,6 +3986,22 @@ public final class HttpServer {
                 System.arraycopy(slices, 0, grown, 0, slices.length);
                 slices = grown;
                 conn.slices = grown;
+            }
+            // The name must be a TOKEN and the value must carry no control
+            // character. Both are smuggling defences, the same one the folding
+            // and whitespace-before-colon rules above are: this parser finds the
+            // end of a field by scanning for CRLF, so a bare LF inside a value is
+            // just a byte to it -- while an intermediary that accepts bare LF as
+            // a delimiter reads "X: v\nContent-Length: 5" as TWO fields and frames
+            // the body by that length. One connection, two readings, and the next
+            // request on it is whatever the attacker put after the body. The
+            // response side already refuses exactly this shape (isHeaderName); a
+            // request is the direction that matters more.
+            if(!isRequestHeaderName(raw, nameStart, nameEnd)) {
+                throw new ProtocolException(400, "malformed header name");
+            }
+            if(hasControlByte(raw, valueStart, valueEnd)) {
+                throw new ProtocolException(400, "control character in a header value");
             }
             int base = headerCount * 4;
             slices[base] = nameStart;

@@ -947,6 +947,9 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
     /// on a server takes every in-flight connection with it. Every path below
     /// either tests with instanceof or converts through text.
     private static String fromBody(String javaType) {
+        // The STRICT helper: a declared String body must have arrived as a JSON
+        // string. The lenient one below exists for scalars, where converting
+        // through text is the point.
         if ("java.lang.String".equals(javaType)) return "bodyAsString(body)";
         if (isCollectionShape(javaType)) {
             String element = javaType.substring(javaType.indexOf('<') + 1, javaType.length() - 1);
@@ -985,7 +988,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         // query and path parameters use, so a JSON number reaching an `int` body
         // behaves the same as one reaching an `int` query parameter.
         if (javaType.indexOf('.') < 0 || isBoxedScalar(javaType)) {
-            return fromText(javaType, "bodyAsString(body)");
+            return fromText(javaType, "bodyAsText(body)");
         }
         if (javaType.startsWith("java.")) {
             return guardedCast(javaType, "body");
@@ -1089,8 +1092,21 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        if(body == null || body instanceof java.util.List) return (java.util.List)body;\n");
         sb.append("        throw new IllegalArgumentException(\"a JSON array is required in the request body\");\n");
         sb.append("    }\n\n");
+        // Declaring @Body String does not make the body a string. A client can
+        // send the number 1 or an object, and String.valueOf turned those into
+        // "1" and "{a=1}" as though they had been sent as JSON strings -- the
+        // same coercion the DTO field path was fixed for, on the top-level body.
         sb.append("    private static String bodyAsString(Object body) {\n");
-        sb.append("        return body == null ? null : (body instanceof String ? (String)body : String.valueOf(body));\n");
+        sb.append("        if(body == null || body instanceof String) { return (String)body; }\n");
+        sb.append("        throw new IllegalArgumentException(\"a JSON string is required in the "
+                + "request body, not \" + body.getClass().getName());\n");
+        sb.append("    }\n\n");
+        // The lenient twin, and only for scalars: `@Body int` is fed by rendering
+        // whatever arrived and parsing it, so that a JSON number reaching an int
+        // body behaves like one reaching an int query parameter. Widening this to
+        // String is what let an object arrive as "{a=1}".
+        sb.append("    private static String bodyAsText(Object body) {\n");
+        sb.append("        return body == null ? null : String.valueOf(body);\n");
         sb.append("    }\n\n");
         sb.append("    private static String stripQuery(String rawPath) {\n");
         sb.append("        if(rawPath == null) return \"\";\n");

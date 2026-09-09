@@ -30,6 +30,7 @@ import java.util.Map;
 import com.codename1.backend.Base64Url;
 import com.codename1.backend.ByteSink;
 import com.codename1.backend.Crypto;
+import com.codename1.backend.Database;
 import com.codename1.backend.Db;
 import com.codename1.backend.DbPool;
 import com.codename1.backend.Http;
@@ -499,9 +500,75 @@ public class SelfTest {
         check("PATCH is sent, or refused with a reason", "sent or explained", outcome);
     }
 
+    /**
+     * A repeated outbound header must survive on BOTH arms.
+     *
+     * libcurl appends every list entry it is given, so two Cookie lines both go
+     * out of the packaged binary. HttpURLConnection's setRequestProperty REPLACES,
+     * so the local arm sent only the last one -- an integration that depends on a
+     * repeatable header worked once packaged and quietly sent half of what it
+     * meant to under cn1:backend, which is the worst way round for a dev loop to
+     * be wrong. Echoed back by a server here rather than inspected, because the
+     * two arms have no shared way to ask what they sent.
+     */
+    private static void repeatedOutboundHeadersSurvive() throws Exception {
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) {
+                String seen = request.getHeader("x-repeat");
+                return HttpServer.Response.text(200, seen == null ? "absent" : seen);
+            }
+        });
+        try {
+            List headers = new ArrayList();
+            headers.add("X-Repeat: one");
+            headers.add("X-Repeat: two");
+            Web.Result r = Web.request("GET",
+                    "http://127.0.0.1:" + server.getPort() + "/", headers, null);
+            String body = r == null ? "null" : r.getBodyAsString();
+            // The server joins repeats with ", " (RFC 9110 5.3), so BOTH values
+            // are present exactly when both lines were sent. Asserting on the
+            // joined string rather than on a count keeps this true whichever
+            // order the arms emit them in.
+            check("a repeated request header keeps its first value", "true",
+                    String.valueOf(body != null && body.indexOf("one") >= 0));
+            check("a repeated request header keeps its second value", "true",
+                    String.valueOf(body != null && body.indexOf("two") >= 0));
+        } finally {
+            server.stop();
+        }
+    }
+
+    /**
+     * A negative connectTimeout is refused by the PARSER, so both arms fail the
+     * same way. Left to the arms, Java SE threw IllegalArgumentException out of
+     * Socket.connect while the packaged client read any non-positive value as
+     * "block forever" and waited out the OS TCP timeout: the same URL, an error
+     * on one side and a hang on the other.
+     */
+    private static void negativeConnectTimeoutsAreRefused() throws Exception {
+        String outcome;
+        try {
+            // A NETWORK url: the query string is only parsed for the engines
+            // that have a connection to time out, and sqlite has none.
+            Database.open("postgres://u:p@127.0.0.1:1/db?connectTimeout=-1");
+            outcome = "accepted";
+        } catch (Exception refused) {
+            String message = String.valueOf(refused.getMessage());
+            // The PARSER's wording specifically. Matching on "negative" alone
+            // also matches the JDK's own "timeout can't be negative" out of
+            // Socket.connect -- which is the arm-specific failure this check
+            // exists to replace, so it would have passed either way.
+            outcome = message.indexOf("must not be negative") >= 0
+                    ? "refused" : "other: " + message;
+        }
+        check("a negative connectTimeout is refused", "refused", outcome);
+    }
+
     private static void json() throws Exception {
         bothJsonWritersAgree();
         patchIsASendableVerb();
+        repeatedOutboundHeadersSurvive();
+        negativeConnectTimeoutsAreRefused();
         malformedDatesAreNotDates();
         asciiFoldingIsLocaleIndependent();
         Map parsed = Json.parseObject("{\"a\":1,\"b\":\"two\",\"c\":true,\"d\":null,\"e\":1.5}");

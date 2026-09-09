@@ -397,6 +397,49 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aGetRouteAnswersHeadUnlessOneIsDeclared() throws Exception {
+        // A HEAD asks what a GET would answer, and the server's writer already
+        // suppresses the body -- so a controller with only @GetMapping used to
+        // answer 404 to every HEAD, which breaks health checks and cache probes.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/notes\")\n"
+                + "    public String all() { return \"[]\"; }\n"
+                + "}\n");
+        Object head = router.call("HEAD", "/notes", null);
+        assertNotNull("HEAD /notes matched no route", head);
+        assertEquals(200, Router.statusOf(head));
+        assertEquals(200, Router.statusOf(router.call("GET", "/notes", null)));
+    }
+
+    @Test
+    public void anExplicitHeadRouteWinsOverTheGetFallback() throws Exception {
+        // The fallback must not swallow the specific case it defers to. Sorted
+        // alphabetically GET comes first, so declaring both would have made the
+        // HEAD route unreachable the moment the fallback was added.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/notes\")\n"
+                + "    public String all() { return \"from-get\"; }\n"
+                + "    @RequestMapping(value = \"/notes\", method = \"HEAD\")\n"
+                + "    @ResponseStatus(204)\n"
+                + "    public void probe() { }\n"
+                + "}\n");
+        // JUnit 4 order: message first.
+        assertEquals("the declared HEAD route must win over the GET fallback",
+                204, Router.statusOf(router.call("HEAD", "/notes", null)));
+        Object get = router.call("GET", "/notes", null);
+        assertEquals(200, Router.statusOf(get));
+        assertEquals("from-get", Router.bodyOf(get));
+    }
+
+    @Test
     public void adjacentPathVariablesAreRefused() throws Exception {
         // Nothing separates them, so the matcher hands the first variable the
         // whole remainder and then fails because a second is still owed: the

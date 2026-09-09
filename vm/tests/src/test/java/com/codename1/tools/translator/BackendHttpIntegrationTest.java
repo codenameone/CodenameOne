@@ -662,6 +662,35 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("a bare LF inside a header value is refused, not carried")
+    void headerValuesMayNotHideAnotherField() throws Exception {
+        // This parser ends a field at CRLF, so a bare LF in a value is just a
+        // byte to it -- while an intermediary that accepts bare LF as a
+        // delimiter reads TWO fields here, the second a Content-Length, and
+        // frames the body by it. One connection read two ways is how the next
+        // request on it becomes whatever the attacker appended.
+        byte[] smuggled = raw("GET /healthz HTTP/1.1\r\nHost: x\r\n"
+                + "X-Thing: value\nContent-Length: 5\r\nConnection: close\r\n\r\n");
+        String text = new String(smuggled, StandardCharsets.UTF_8);
+        assertTrue(text.startsWith("HTTP/1.1 400"),
+                "a header value carrying a bare LF must be refused:\n" + text);
+
+        // A name that is not a token goes the same way.
+        byte[] badName = raw("GET /healthz HTTP/1.1\r\nHost: x\r\n"
+                + "X Thing: value\r\nConnection: close\r\n\r\n");
+        assertTrue(new String(badName, StandardCharsets.UTF_8).startsWith("HTTP/1.1 400"),
+                "a field name that is not a token must be refused");
+
+        // And an ordinary request still works, including a tab inside a value,
+        // which RFC 9110 allows and which a blanket control-character rule would
+        // have broken.
+        byte[] ok = raw("GET /healthz HTTP/1.1\r\nHost: x\r\nX-Thing: a\tb\r\n"
+                + "Connection: close\r\n\r\n");
+        assertTrue(new String(ok, StandardCharsets.UTF_8).startsWith("HTTP/1.1 200"),
+                "a tab is legal inside a field value");
+    }
+
+    @Test
     @DisplayName("a response header whose name is not a token never reaches the wire")
     void malformedResponseHeaderNamesAreDropped() throws Exception {
         // /rawheader asks for four extra headers, three of which are not field
@@ -1193,6 +1222,78 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("a large h2 body survives the bounded output buffer")
+    void http2DeliversABodyLargerThanTheOutputBuffer() throws Exception {
+        // The serialisation buffer is capped, and the send callback answers
+        // WOULDBLOCK once it is full so nghttp2 stops and keeps the rest. That
+        // only works because drain() pumps again after emptying; a cap without
+        // the re-pump would truncate every response bigger than the buffer, and
+        // the small bodies every other test sends would never notice.
+        int size = 3 * 1024 * 1024;
+        Socket socket = new Socket();
+        socket.connect(new InetSocketAddress("127.0.0.1", port), 5000);
+        socket.setSoTimeout(20000);
+        try {
+            OutputStream out = socket.getOutputStream();
+            out.write("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+            out.write(frame(4, 0, 0, new byte[0]));
+            // Raise the connection window so the whole body is writable at once:
+            // that is the condition under which nghttp2 fills the buffer in a
+            // single pump, which is exactly what the cap has to survive.
+            byte[] windowUpdate = new byte[4];
+            int increment = size + 65536;
+            windowUpdate[0] = (byte) ((increment >> 24) & 0x7f);
+            windowUpdate[1] = (byte) ((increment >> 16) & 0xff);
+            windowUpdate[2] = (byte) ((increment >> 8) & 0xff);
+            windowUpdate[3] = (byte) (increment & 0xff);
+            out.write(frame(8, 0, 0, windowUpdate));
+            ByteArrayOutputStream block = new ByteArrayOutputStream();
+            hpackLiteral(block, ":method", "GET");
+            hpackLiteral(block, ":path", "/bulk?size=" + size);
+            hpackLiteral(block, ":scheme", "http");
+            hpackLiteral(block, ":authority", "127.0.0.1");
+            out.write(frame(1, 0x05, 1, block.toByteArray()));
+            out.flush();
+            out.write(frame(8, 0, 1, windowUpdate));   // and the stream window
+            out.flush();
+
+            ByteArrayOutputStream received = new ByteArrayOutputStream();
+            boolean endStream = false;
+            long deadline = System.currentTimeMillis() + 20000;
+            InputStream in = socket.getInputStream();
+            while (System.currentTimeMillis() < deadline && !endStream) {
+                byte[] header = readExactly(in, 9);
+                if (header == null) {
+                    break;
+                }
+                int length = ((header[0] & 0xff) << 16) | ((header[1] & 0xff) << 8) | (header[2] & 0xff);
+                int type = header[3] & 0xff;
+                int flags = header[4] & 0xff;
+                byte[] payload = length == 0 ? new byte[0] : readExactly(in, length);
+                if (payload == null) {
+                    break;
+                }
+                if (type == 0) {
+                    received.write(payload);
+                    endStream = (flags & 0x01) != 0;
+                } else if (type == 7) {
+                    fail("the server sent GOAWAY: " + new String(payload, StandardCharsets.UTF_8));
+                }
+            }
+            assertTrue(endStream, "the stream never ended; got " + received.size() + " of " + size);
+            assertEquals(size, received.size(), "the body was truncated");
+            byte[] bytes = received.toByteArray();
+            for (int iter = 0; iter < bytes.length; iter++) {
+                if (bytes[iter] != (byte) ('a' + (iter % 26))) {
+                    fail("byte " + iter + " is wrong: the frames were reassembled out of order");
+                }
+            }
+        } finally {
+            socket.close();
+        }
+    }
+
+    @Test
     @DisplayName("a HEAD over h2 reports the length a GET would send")
     void http2HeadReportsRealLength() throws Exception {
         // The HTTP/1 writer keeps the representation length for a HEAD, because
@@ -1241,6 +1342,63 @@ class BackendHttpIntegrationTest {
             assertNotNull(responseHeaders, "no HEADERS frame came back for the HEAD");
             assertTrue(hpackNameIndices(responseHeaders).contains(Integer.valueOf(28)),
                     "a HEAD over h2 must report the length it is not sending");
+        } finally {
+            socket.close();
+        }
+    }
+
+    @Test
+    @DisplayName("a HEAD over h2 reports the length of a DEFERRED json body")
+    void http2HeadReportsDeferredJsonLength() throws Exception {
+        // respondJson leaves the value unserialised so the HTTP/1 writer can render
+        // it straight into the connection buffer, which means response.body is
+        // EMPTY. The h2 HEAD calculation measured that array and answered
+        // content-length: 0 for a representation that is not -- and the earlier h2
+        // HEAD fix did not close it, because it only learned about file and eager
+        // byte-array bodies. /deferred is the only route shaped this way.
+        Socket socket = new Socket();
+        socket.connect(new InetSocketAddress("127.0.0.1", port), 5000);
+        socket.setSoTimeout(10000);
+        try {
+            OutputStream out = socket.getOutputStream();
+            out.write("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+            out.write(frame(4, 0, 0, new byte[0]));
+            ByteArrayOutputStream block = new ByteArrayOutputStream();
+            hpackLiteral(block, ":method", "HEAD");
+            hpackLiteral(block, ":path", "/deferred");
+            hpackLiteral(block, ":scheme", "http");
+            hpackLiteral(block, ":authority", "127.0.0.1");
+            out.write(frame(1, 0x05, 1, block.toByteArray()));
+            out.flush();
+
+            byte[] responseHeaders = null;
+            long deadline = System.currentTimeMillis() + 8000;
+            InputStream in = socket.getInputStream();
+            while (System.currentTimeMillis() < deadline && responseHeaders == null) {
+                byte[] header = readExactly(in, 9);
+                if (header == null) {
+                    break;
+                }
+                int length = ((header[0] & 0xff) << 16) | ((header[1] & 0xff) << 8)
+                        | (header[2] & 0xff);
+                int type = header[3] & 0xff;
+                byte[] payload = length == 0 ? new byte[0] : readExactly(in, length);
+                if (payload == null) {
+                    break;
+                }
+                if (type == 1) {
+                    responseHeaders = payload;
+                }
+            }
+            assertNotNull(responseHeaders, "no HEADERS frame came back for the HEAD");
+            long described = hpackNumericValue(responseHeaders, 28);
+            assertTrue(described > 0,
+                    "a HEAD of a deferred json body reported " + described
+                            + " instead of the length a GET would send");
+            // And it is the length a GET really sends, not merely nonzero.
+            String json = body(request("GET", "/deferred", null, null));
+            assertEquals(json.getBytes(StandardCharsets.UTF_8).length, described,
+                    "the described length is not the one a GET returns");
         } finally {
             socket.close();
         }
@@ -1354,6 +1512,113 @@ class BackendHttpIntegrationTest {
             }
         }
         return names;
+    }
+
+    /**
+     * The value of one static-index field, read as a number, or -1 if absent.
+     *
+     * Only content-length is asked for here and its value is always digits, so the
+     * Huffman side needs the ten digit codes and nothing more (RFC 7541 Appendix B:
+     * 0, 1 and 2 are five bits, 3 through 9 are six). nghttp2 picks Huffman only
+     * when it is strictly shorter, which for digits starts at three of them -- so a
+     * test that read the raw bytes alone would pass on short lengths and quietly
+     * stop asserting on longer ones.
+     */
+    private static long hpackNumericValue(byte[] block, int nameIndex) {
+        int at = 0;
+        while (at < block.length) {
+            int b = block[at] & 0xff;
+            int prefixBits;
+            boolean hasValue;
+            if ((b & 0x80) != 0) {
+                prefixBits = 7;
+                hasValue = false;
+            } else if ((b & 0xC0) == 0x40) {
+                prefixBits = 6;
+                hasValue = true;
+            } else if ((b & 0xE0) == 0x20) {
+                prefixBits = 5;
+                hasValue = false;
+            } else {
+                prefixBits = 4;
+                hasValue = true;
+            }
+            int[] cursor = { at };
+            int index = hpackInteger(block, cursor, prefixBits);
+            if (index < 0) {
+                return -1;
+            }
+            at = cursor[0];
+            if (index == 0) {
+                at = hpackSkipString(block, at);
+                if (at < 0) {
+                    return -1;
+                }
+            }
+            if (hasValue) {
+                int valueAt = at;
+                at = hpackSkipString(block, at);
+                if (at < 0) {
+                    return -1;
+                }
+                if (index == nameIndex) {
+                    return hpackDigits(block, valueAt);
+                }
+            }
+        }
+        return -1;
+    }
+
+    /** A length-prefixed string of digits, raw or Huffman, as a number. */
+    private static long hpackDigits(byte[] block, int at) {
+        boolean huffman = (block[at] & 0x80) != 0;
+        int[] cursor = { at };
+        int length = hpackInteger(block, cursor, 7);
+        if (length < 0 || cursor[0] + length > block.length) {
+            return -1;
+        }
+        StringBuilder text = new StringBuilder();
+        if (!huffman) {
+            for (int iter = 0; iter < length; iter++) {
+                text.append((char) (block[cursor[0] + iter] & 0xff));
+            }
+        } else {
+            int bits = length * 8;
+            int position = 0;
+            while (bits - position >= 5) {
+                int five = hpackBits(block, cursor[0], position, 5);
+                if (five <= 2) {                       // 00000, 00001, 00010
+                    text.append((char) ('0' + five));
+                    position += 5;
+                    continue;
+                }
+                if (bits - position < 6) {
+                    break;                             // what is left is padding
+                }
+                int six = hpackBits(block, cursor[0], position, 6);
+                if (six < 0x19 || six > 0x1f) {        // 011001 .. 011111
+                    return -1;                         // not a digit: give up loudly
+                }
+                text.append((char) ('3' + (six - 0x19)));
+                position += 6;
+            }
+        }
+        try {
+            return Long.parseLong(text.toString());
+        } catch (NumberFormatException notANumber) {
+            return -1;
+        }
+    }
+
+    /** `count` bits starting `position` bits into the bytes at `from`. */
+    private static int hpackBits(byte[] block, int from, int position, int count) {
+        int value = 0;
+        for (int iter = 0; iter < count; iter++) {
+            int bit = position + iter;
+            int b = block[from + (bit >> 3)] & 0xff;
+            value = (value << 1) | ((b >> (7 - (bit & 7))) & 1);
+        }
+        return value;
     }
 
     /** RFC 7541 5.1, with the cursor left just past the integer. */

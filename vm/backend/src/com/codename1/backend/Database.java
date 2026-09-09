@@ -353,6 +353,16 @@ public final class Database {
                         throw new IOException("connectTimeout must be a number of "
                                 + "milliseconds, not '" + value + "'");
                     }
+                    // A negative one is refused here so the two arms cannot fail
+                    // differently: Java SE throws IllegalArgumentException out of
+                    // Socket.connect, while the packaged client reads any
+                    // non-positive value as "block forever" and waits out the
+                    // OS TCP timeout. Same URL, one an error and the other a
+                    // hang, which is the worst kind of difference to debug.
+                    if(out.timeoutMillis < 0) {
+                        throw new IOException("connectTimeout must not be negative: '"
+                                + value + "'. Use 0 for the platform default.");
+                    }
                 }
             }
         }

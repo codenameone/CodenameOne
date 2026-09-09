@@ -96,6 +96,18 @@ public class PetServer {
                 if("/healthz".equals(stripQuery(target))) {
                     return HttpServer.Response.json(200, Json.write(serverRef[0].getMetrics()));
                 }
+                // The DEFERRED json form: respondJson hands the value over
+                // unserialised so the HTTP/1 writer can render it straight into
+                // the connection buffer, which leaves response.body empty. Any
+                // code that measures that array instead of rendering the value
+                // reports zero for a representation that is not, and only a
+                // handler shaped like this one can show it.
+                if("/deferred".equals(stripQuery(target))) {
+                    Map value = new LinkedHashMap();
+                    value.put("name", "deferred");
+                    value.put("digits", "1234567890");
+                    return request.respondJson(200, value);
+                }
                 // Deliberately a body on a status that cannot carry one. A handler
                 // is allowed to build this -- the Response constructor takes any
                 // status and any bytes -- and suppressing it is the server's job,
@@ -124,6 +136,19 @@ public class PetServer {
                     return new HttpServer.Response(200, "text/plain",
                             ("method=" + method + " len="
                                     + (echoed == null ? 0 : echoed.length())).getBytes("UTF-8"));
+                }
+                // A body whose size the caller picks, so a test can ask for more
+                // than one serialisation buffer's worth and check that every byte
+                // still arrives. Deliberately NOT file-backed: the point is the
+                // in-memory DATA-frame path, which is where the output buffer sits.
+                if("/bulk".equals(stripQuery(target))) {
+                    String sizeText = request.queryParam("size");
+                    int size = sizeText == null ? 1024 : Integer.parseInt(sizeText);
+                    byte[] payload = new byte[size];
+                    for(int iter = 0 ; iter < size ; iter++) {
+                        payload[iter] = (byte)('a' + (iter % 26));
+                    }
+                    return new HttpServer.Response(200, "text/plain", payload);
                 }
                 if("/reset".equals(stripQuery(target))) {
                     return new HttpServer.Response(205, "text/plain",

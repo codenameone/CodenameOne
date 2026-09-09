@@ -262,11 +262,23 @@ static void cn1H2Enqueue(CN1H2Session* s, CN1H2Request* r) {
 }
 
 /* nghttp2 hands us bytes to put on the wire; they are buffered for Java to drain. */
+/* How much serialised output one session may hold before it has to be drained.
+   nghttp2 will happily fill this in one nghttp2_session_send() -- it emits as
+   much as the peer's flow-control window allows -- so a client that raises its
+   windows and asks for a large file could grow this buffer toward the whole
+   window before Java got a chance to write any of it out. Returning WOULDBLOCK
+   is the backpressure nghttp2 understands: it stops, keeps what it has not
+   handed over, and offers it again after the drain. */
+#define CN1_H2_MAX_OUT_BYTES (1024 * 1024)
+
 static ssize_t cn1H2Send(nghttp2_session* session, const uint8_t* data, size_t length,
                          int flags, void* userData) {
     CN1H2Session* s = (CN1H2Session*)userData;
     (void)session;
     (void)flags;
+    if(s->outLength >= CN1_H2_MAX_OUT_BYTES) {
+        return NGHTTP2_ERR_WOULDBLOCK;
+    }
     if(s->outLength + length > s->outCapacity) {
         size_t grown = (s->outLength + length) * 2 + 4096;
         unsigned char* buf = (unsigned char*)realloc(s->out, grown);
@@ -676,6 +688,17 @@ JAVA_OBJECT com_codename1_backend_Http2_drainImpl___long_R_byte_1ARRAY(CODENAME_
     if(s->outLength > 0) {
         memcpy((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)arr)->data, s->out, s->outLength);
         s->outLength = 0;
+    }
+    /* Give the CAPACITY back too, not just the length. A session that once sent
+       something large otherwise keeps that buffer for as long as it stays open,
+       and a keep-alive pool of them holds every peak it ever reached. Shrunk to
+       the ordinary size, so the common case reallocates nothing. */
+    if(s->outCapacity > CN1_H2_MAX_OUT_BYTES) {
+        unsigned char* shrunk = (unsigned char*)realloc(s->out, 8192);
+        if(shrunk != NULL) {
+            s->out = shrunk;
+            s->outCapacity = 8192;
+        }
     }
     return arr;
 }

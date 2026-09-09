@@ -433,6 +433,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         return null;
     }
 
+    /** HEAD sorts ahead of everything, so its own block precedes GET's fallback. */
+    private static int methodRank(String httpMethod) {
+        return "HEAD".equals(httpMethod) ? 0 : 1;
+    }
+
     /** A shape with no variables at all, which the router matches before any. */
     private static boolean isLiteralShape(String shape) {
         return shape.indexOf('{') < 0;
@@ -897,7 +902,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         List<Route> ordered = new ArrayList<Route>(c.routes);
         Collections.sort(ordered, new java.util.Comparator<Route>() {
             public int compare(Route a, Route b) {
-                int byMethod = a.httpMethod.compareTo(b.httpMethod);
+                // HEAD before GET, because a GET block also answers HEAD and
+                // dispatch returns on the first block that matches. Alphabetically
+                // GET comes first, which would have made a controller's explicit
+                // HEAD route unreachable the moment the GET fallback was added --
+                // the fallback swallowing the specific case it defers to.
+                int byMethod = methodRank(a.httpMethod) - methodRank(b.httpMethod);
+                if (byMethod == 0) {
+                    byMethod = a.httpMethod.compareTo(b.httpMethod);
+                }
                 if (byMethod != 0) {
                     return byMethod;
                 }
@@ -944,7 +957,20 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     sb.append("        }\n");
                 }
                 sb.append("        if (\"").append(route.httpMethod)
-                  .append("\".equals(httpMethod)) {\n");
+                  .append("\".equals(httpMethod)");
+                if ("GET".equals(route.httpMethod)) {
+                    // A HEAD asks what a GET would answer, so a GET route is the
+                    // route for it -- the server routes HEAD and its writer already
+                    // suppresses the body and reports the length a GET would have
+                    // sent. Without this, a controller declaring only @GetMapping
+                    // answered 404 to every HEAD, which breaks the health checks and
+                    // cache probes that use it, and disagrees with the Spring-style
+                    // semantics these annotations borrow. An explicit @RequestMapping
+                    // for HEAD still wins: its own block is emitted separately and
+                    // dispatch returns on the first that matches.
+                    sb.append(" || \"HEAD\".equals(httpMethod)");
+                }
+                sb.append(") {\n");
                 current = route.httpMethod;
                 open = true;
             }
