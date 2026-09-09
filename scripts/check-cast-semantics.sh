@@ -22,16 +22,19 @@ BASELINE="$SCRIPT_DIR/cast-semantics-baseline.txt"
 TRANSLATOR="$REPO_ROOT/vm/ByteCodeTranslator/target/classes"
 ASM_CP_FILE="$REPO_ROOT/vm/ByteCodeTranslator/target/cast-semantics-asm-classpath.txt"
 
-# The modules whose bytecode ParparVM translates and that we own. Deliberately
-# NOT covered:
+# The modules whose bytecode ParparVM translates and that we own. A translation
+# sees maven/core, maven/ios and vm/JavaAPI, and nothing else of ours.
+# Deliberately NOT covered, for the one reason: the code runs on a VM whose
+# CHECKCAST does throw, so its catch(ClassCastException) handlers are live and
+# correct and demanding an instanceof there buys nothing.
+#   - maven/android (Ports/Android) runs on ART. It is not translated -- an iOS
+#     build never loads a line of it -- and ART implements CHECKCAST to spec.
 #   - maven/java-runtime (Ports/CLDC11) runs on a real JVM -- the simulator and
-#     desktop -- where a failed cast does throw, so its catch(ClassCastException)
-#     handlers are live and correct. ParparVM's runtime is vm/JavaAPI.
+#     desktop. ParparVM's runtime is vm/JavaAPI.
 #   - Ports/retro is vendored retroweaver code, not ours to restyle.
 DEFAULT_ROOTS=(
   "vm/JavaAPI/target/classes"
   "maven/core/target/classes"
-  "maven/android/target/classes"
   "maven/ios/target/classes"
 )
 

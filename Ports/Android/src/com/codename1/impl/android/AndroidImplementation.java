@@ -486,9 +486,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
 
-    /// Named rather than anonymous on purpose. An anonymous class here takes a number from the
-    /// same sequence as every other one in this file, so adding one renumbers the ones below it
-    /// and the cast-semantics baseline stops matching methods nobody touched.
     private static final class ApplyAutofilledText implements Runnable {
         private final com.codename1.ui.TextInputClient client;
         private final String text;
@@ -9797,13 +9794,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     /**
      * Hands a picker selection back to the listener that asked for it.
-     *
-     * <p>A named class rather than the anonymous one this obviously wants to
-     * be. scripts/check-cast-semantics.sh holds its baseline against
-     * synthetic names like {@code AndroidImplementation$48}, which javac
-     * hands out in source order, so an anonymous class added here renumbers
-     * every one below it and fails a gate that has nothing to do with this
-     * change.</p>
      */
     private final class ContactPickerResult implements AndroidContactPicker.Result {
         private final ActionListener<ActionEvent> response;
@@ -13908,9 +13898,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             Class c = Class.forName("com.codename1.impl.android.cipher.AndroidCipherFactory");
             java.lang.reflect.Method open = c.getMethod("open", String.class, String.class,
                     String.class);
-            // Cast outside the try, below. ParparVM does not throw on a failed cast, so a cast
-            // inside a block that catches Throwable is a cast whose failure nothing can handle.
-            // The resolved file, not the name it was asked for: a managed key with no explicit
+            // Cast outside the try, below: inside a block that catches Throwable, a wrong type
+            // from the reflective call would be swallowed and reported as the package being
+            // absent. The resolved file, not the name it was asked for: a managed key with no explicit
             // alias is stored under whatever is passed here, so two accepted spellings of one
             // database would derive two different keys and the second open would report a wrong
             // key against data that is perfectly intact.
@@ -13978,8 +13968,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } catch (Throwable notPresent) {
             return false;
         }
-        // Tested rather than cast inside the try: ParparVM does not throw on a failed cast, so
-        // the handler above could never see one.
+        // Tested rather than cast inside the try: the reflective answer is untyped, and
+        // anything but a Boolean means the feature is unavailable rather than absent.
         return available instanceof Boolean && ((Boolean) available).booleanValue();
     }
 
@@ -14813,10 +14803,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// genuinely corrupt database is kept too, which is the answer every other port gives:
     /// reporting the failure and leaving the bytes for a backup or a repair tool beats deleting
     /// them on the application's behalf.
-    ///
-    /// Named rather than anonymous on purpose: an anonymous class here renumbers every later
-    /// `AndroidImplementation$N` in this file, and the cast-semantics baseline is keyed on those
-    /// names, so it would report a pre-existing entry as a new one.
     private static final class KeepDatabaseOnCorruption
             implements android.database.DatabaseErrorHandler {
         @Override
@@ -17736,10 +17722,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             try {
                                 Object response = args[0];
                                 Object token = responseClass.getMethod("token").invoke(response);
-                                // Tested rather than cast into the catch below. ParparVM does
-                                // not throw for a failed cast, so a handler that expects to
-                                // catch one never runs -- and a reflective call's answer is
-                                // exactly the kind of value worth testing anyway.
+                                // Tested rather than cast into the catch below: a
+                                // wrong type here is a bad token rather than a
+                                // failed call, and a reflective call's answer is
+                                // exactly the kind of value worth testing.
                                 if (token instanceof String) {
                                     result.complete((String) token);
                                 } else {

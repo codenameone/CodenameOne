@@ -129,9 +129,9 @@ public final class BiometricPromptBackend implements BiometricBackend {
             Log.e(t);
             return false;
         }
-        // Tested rather than cast inside the catch: a failed cast does not
-        // throw under ParparVM, and scripts/check-cast-semantics.sh holds the
-        // whole tree -- Android sources included -- to the guarded shape.
+        // Tested rather than cast: canAuthenticate is reached reflectively, so
+        // a platform that answers anything but an Integer degrades to "not
+        // available" rather than throwing.
         return result instanceof Integer
                 && ((Integer) result).intValue() == BIOMETRIC_SUCCESS;
     }

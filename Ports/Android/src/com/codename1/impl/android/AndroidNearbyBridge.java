@@ -74,11 +74,9 @@ public class AndroidNearbyBridge implements NearbyBridge {
             // .nearby: the builder deleted the package. Nothing to log.
             instance = null;
         }
-        // Tested rather than cast inside the catch. A failed cast does not
-        // throw under ParparVM, so a `catch` around one is a handler that
-        // never runs -- and scripts/check-cast-semantics.sh rejects the
-        // shape repo-wide, on Android sources too, so the rule stays one
-        // rule rather than a per-port exception.
+        // Tested rather than cast: the backend is loaded by name, so a
+        // renamed or partially deleted package can answer some other type,
+        // and the API should stay inert rather than throw at construction.
         this.delegate = instance instanceof NearbyBridge
                 ? (NearbyBridge) instance : null;
         java.lang.reflect.Method hook = null;
