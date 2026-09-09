@@ -694,6 +694,9 @@ class LocationButtonTest extends UITestBase {
 
         grant(Boolean.TRUE);
 
+        assertFalse(manager.readOffEdt,
+                "the cache is written on the EDT and is a plain field, so it "
+                        + "must be read there too or the update may never be seen");
         assertEquals(1, shared.size(), "the button is answered");
         assertSame(fresh, shared.get(0),
                 "with the fix that arrived after the tap, not the one the "
@@ -821,6 +824,9 @@ class LocationButtonTest extends UITestBase {
         /// delivering an update while the button waits.
         Runnable duringCurrentLocation;
 
+        /// Set when the cache was read from somewhere other than the EDT.
+        boolean readOffEdt;
+
         @Override
         public Location getCurrentLocation() throws IOException {
             // The answer is decided BEFORE the hook runs, so the hook models a
@@ -828,6 +834,12 @@ class LocationButtonTest extends UITestBase {
             // it. Running it first made the very first read return the new fix,
             // which no amount of waiting is needed for -- and a test that could
             // not tell whether any waiting happened at all.
+            // The tracked path polls from the worker invokeAndBlock spawned,
+            // while the cache is written on the EDT, so where this read happens
+            // is the whole question.
+            if (!Display.getInstance().isEdt()) {
+                readOffEdt = true;
+            }
             Location answer = staleLocation != null ? staleLocation : currentLocation;
             if (duringCurrentLocation != null) {
                 Runnable r = duringCurrentLocation;

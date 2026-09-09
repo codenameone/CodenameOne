@@ -27,8 +27,8 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
-import com.codename1.ui.Form;
 import com.codename1.ui.PeerComponent;
+import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
@@ -768,8 +768,12 @@ public class LocationButton extends Container {
             // Nothing to be early for.
             return;
         }
-        Form f = getComponentForm();
-        if (f == null) {
+        // getComponentForm() keeps its original meaning and answers null for a
+        // component in a desktop Window, so using it here left exactly the
+        // button this timer exists for -- a finite joiner behind a leader that
+        // never times out -- with no timer at all inside a Window.
+        TopLevelContainer top = getTopLevelContainer();
+        if (top == null) {
             return;
         }
         long ms = deadline - System.currentTimeMillis();
@@ -779,7 +783,7 @@ public class LocationButton extends Container {
         if (ms > Integer.MAX_VALUE) {
             return;
         }
-        UITimer.timer((int) ms, false, f, new Runnable() {
+        UITimer.timer((int) ms, false, top, new Runnable() {
             @Override
             public void run() {
                 deadlineReached();
@@ -829,6 +833,38 @@ public class LocationButton extends Container {
         return result[0];
     }
 
+    /// Reads the tracker's cached fix, on the thread that writes it.
+    ///
+    /// This runs from the worker invokeAndBlock spawned, and the cache is
+    /// written on the EDT -- AndroidLocationManager assigns lastLocation inside
+    /// a callSerially, and the field is a plain one. Reading it straight off
+    /// this thread asks for a value another thread published with no
+    /// happens-before to carry it, so the loop could keep seeing the old
+    /// reference for its whole timeout and miss the very update it is waiting
+    /// for. callSeriallyAndWait hands the read to the EDT and brings the answer
+    /// back, which is the ordering that was missing; nothing in the port needs
+    /// to change and no lock is added to a framework that does not use them.
+    ///
+    /// #### Parameters
+    ///
+    /// - `manager`: the manager holding the cache
+    private static Location readCache(final LocationManager manager) {
+        final Location[] out = new Location[1];
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    out[0] = manager.getCurrentLocation();
+                } catch (Throwable err) {
+                    // Nothing to be had this time round; the tracker may still
+                    // deliver one before the deadline.
+                    out[0] = null;
+                }
+            }
+        });
+        return out[0];
+    }
+
     /// A fix for an application that is already tracking location.
     ///
     /// getCurrentLocationSync does not wait when a listener is installed: it
@@ -859,14 +895,7 @@ public class LocationButton extends Container {
                 : System.currentTimeMillis() + timeout;
         Location best = null;
         while (true) {
-            Location current = null;
-            try {
-                current = manager.getCurrentLocation();
-            } catch (Throwable err) {
-                // Nothing to be had this time round; the tracker may still
-                // deliver one before the deadline.
-                current = null;
-            }
+            Location current = readCache(manager);
             if (current != null) {
                 best = current;
                 if (current.getTimeStamp() >= since) {
