@@ -285,23 +285,26 @@ NESTED_TYPE_RE = (
 # reason class-use/ is not accepted.
 JAVADOC_PACKAGE_PAGES = {
     "package-summary.html",
-    "package-tree.html",
 }
-# The finite set javadoc writes at the root of the tree. Taken from a real run --
-# the first seven always appear; the rest are emitted only when the sources have
-# anything to put in them, so they are accepted without being required.
+# The set the site publishes at the root of the API tree.
+#
+# This used to be the set the standard doclet writes, because the website served
+# the standard doclet's output directly. It no longer does: the pages come from
+# maven/javadoc-hugo-doclet and are rendered by the site's own templates, which
+# publish the overview and nothing else. javadoc's own navigation furniture --
+# the all-classes and all-packages listings, index-all, help-doc,
+# constant-values, deprecated-list, its jQuery search page -- has no counterpart,
+# because the site search covers the API instead.
+#
+# Keeping the old names here would accept a link to a page that is now a 404,
+# which is the failure this checker exists to prevent. The same reasoning
+# removes package-tree.html above: the per-package hierarchy page is not
+# generated either, and a type's own page carries its inheritance chain.
+#
+# serialized-form.html is gone for a different reason: Codename One does not
+# support Java serialization, so the page documented nothing.
 JAVADOC_ROOT_PAGES = {
     "index.html",
-    "overview-summary.html",
-    "overview-tree.html",
-    "allclasses-index.html",
-    "allpackages-index.html",
-    "index-all.html",
-    "help-doc.html",
-    "constant-values.html",
-    "deprecated-list.html",
-    "serialized-form.html",
-    "search.html",
 }
 # javadoc writes legal/, resources/ and script-dir/ beside the packages for its own
 # plumbing -- stylesheets, jQuery, licence texts. Their contents are version
@@ -525,7 +528,20 @@ def javadoc_path_exists(target: str) -> bool:
     """
     if _JAVADOC_ROOT is None:
         return True
-    path = target[len("/javadoc/"):] if target.startswith("/javadoc/") else target
+    # The root arrives here in two spellings and both have to reduce to "". The
+    # caller strips a trailing slash before resolving, so "/javadoc/" becomes
+    # "/javadoc", which does not start with "/javadoc/" and so kept the whole
+    # string as the path -- "javadoc" -- and was reported as a directory the
+    # generator never creates. That went unnoticed while content/api.md put
+    # /javadoc in the content tree, because a path found there never reaches this
+    # function; deleting that page in favour of a generated overview is what
+    # exposed it, and the guide links to the root nine times.
+    if target in ("/javadoc", "/javadoc/"):
+        path = ""
+    elif target.startswith("/javadoc/"):
+        path = target[len("/javadoc/"):]
+    else:
+        path = target
     path = path.strip("/")
     packages, classes = javadoc_index(_JAVADOC_ROOT)
     if not path.endswith(".html"):
