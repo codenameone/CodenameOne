@@ -124,6 +124,16 @@ public final class Crypto {
         if(salt == null || expected == null || iterations <= 0) {
             return false;
         }
+        // Non-EMPTY, not merely non-null. "pbkdf2$1$$" decodes to two empty arrays,
+        // pbkdf2 then derives zero bytes, and comparing an empty expectation with
+        // an empty derivation is TRUE -- so a stored row of that shape accepted
+        // every password. Base64Url.decode answers an empty array for an empty
+        // field, so the null check above never saw it. The floors are the standard
+        // minimums (RFC 8018 wants at least eight bytes of salt); anything this
+        // server writes is 16 and 32.
+        if(salt.length < 8 || expected.length < 16) {
+            return false;
+        }
         byte[] actual = pbkdf2Impl(utf8(password), salt, iterations, expected.length);
         return actual != null && equalsConstantTime(expected, actual);
     }

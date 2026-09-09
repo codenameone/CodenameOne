@@ -259,6 +259,13 @@ public class SelfTest {
         check("password verifies", "true", String.valueOf(Crypto.verifyPassword("hunter2", stored)));
         check("wrong password rejected", "false", String.valueOf(Crypto.verifyPassword("hunter3", stored)));
         check("empty password rejected", "false", String.valueOf(Crypto.verifyPassword("", stored)));
+        // A stored row with empty salt and hash decoded to two EMPTY arrays, not
+        // nulls, so the null check let it through, pbkdf2 derived zero bytes and
+        // comparing empty with empty was true: that row accepted every password.
+        check("a degenerate stored hash accepts nothing", "false",
+                String.valueOf(Crypto.verifyPassword("anything", "pbkdf2$1$$")));
+        check("a short salt is refused too", "false",
+                String.valueOf(Crypto.verifyPassword("anything", "pbkdf2$1$AA$AA")));
         // Two hashes of one password must differ, or the salt is not being used.
         check("hashes are salted", "true",
                 String.valueOf(!stored.equals(Crypto.hashPassword("hunter2"))));

@@ -298,8 +298,19 @@ public final class Json {
         try {
             // Integers stay integers: a long round-tripped through double loses
             // precision above 2^53, and ids are exactly the values that get large.
-            return floating ? (Object)Double.valueOf(Double.parseDouble(text))
-                            : (Object)Long.valueOf(Long.parseLong(text));
+            if(floating) {
+                double parsed = Double.parseDouble(text);
+                // parseDouble answers Infinity for "1e999" rather than throwing, so a
+                // number JSON cannot represent was accepted and handed on as one an
+                // amount or a threshold could be built from -- and the writer emits
+                // null for a non-finite double, so parsing and writing it back
+                // silently turned the value into null.
+                if(Double.isNaN(parsed) || Double.isInfinite(parsed)) {
+                    throw new IOException("Number out of range for JSON: '" + text + "'");
+                }
+                return (Object)Double.valueOf(parsed);
+            }
+            return (Object)Long.valueOf(Long.parseLong(text));
         } catch (NumberFormatException err) {
             throw new IOException("Malformed number '" + text + "'");
         }

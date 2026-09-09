@@ -56,6 +56,9 @@
 
 #ifndef _WIN32
 #include <unistd.h> /* CN1_RESUME_THREAD expands to usleep */
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h> /* inet_pton, for telling an IP literal from a DNS name */
 #endif
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -164,6 +167,37 @@ static SSL_CTX* cn1ClientTlsEnsureContext(const char* caFile) {
     return ctx;
 }
 
+/*
+ * Whether this host is an IP literal rather than a DNS name.
+ *
+ * inet_pton is the check, not a scan for dots and digits: "1.2.3.4.5" and
+ * "999.1.1.1" look like addresses to a hand-rolled test and are not ones, and a
+ * name wrongly treated as an address would be verified against IP SANs it can
+ * never have. v6 is tried as well, with the brackets a URL may carry removed.
+ */
+static int cn1IsIpLiteral(const char* host) {
+    struct in_addr v4;
+    struct in6_addr v6;
+    char trimmed[64];
+    size_t length;
+    if(host == NULL) {
+        return 0;
+    }
+    if(inet_pton(AF_INET, host, &v4) == 1) {
+        return 1;
+    }
+    length = strlen(host);
+    if(length >= 2 && host[0] == '[' && host[length - 1] == ']') {
+        if(length - 2 >= sizeof(trimmed)) {
+            return 0;
+        }
+        memcpy(trimmed, host + 1, length - 2);
+        trimmed[length - 2] = 0;
+        return inet_pton(AF_INET6, trimmed, &v6) == 1;
+    }
+    return inet_pton(AF_INET6, host, &v6) == 1;
+}
+
 JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile) {
     SSL_CTX* ctx;
     SSL* ssl;
@@ -207,8 +241,21 @@ JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_la
     SSL_set_fd(ssl, fd);
     SSL_set_tlsext_host_name(ssl, h);
     /* The name check. Without it a valid certificate for any other host would
-     * pass, which is most of what TLS is for here. */
-    if(SSL_set1_host(ssl, h) != 1) {
+     * pass, which is most of what TLS is for here.
+     *
+     * An IP literal takes a DIFFERENT call. SSL_set1_host matches DNS names and
+     * does not look at iPAddress subjectAltNames at all, so a database URL naming
+     * a host by address failed verification against a certificate that correctly
+     * carried the IP -- after packaging only, since the Java SE arm checks both.
+     * X509_VERIFY_PARAM_set1_ip_asc is the IP half of the same door. */
+    if(cn1IsIpLiteral(h)) {
+        if(X509_VERIFY_PARAM_set1_ip_asc(SSL_get0_param(ssl), h) != 1) {
+            cn1ClientTlsRecordError("could not set the expected peer address");
+            SSL_free(ssl);
+            free(h);
+            return 0;
+        }
+    } else if(SSL_set1_host(ssl, h) != 1) {
         cn1ClientTlsRecordError("could not set the expected host name");
         SSL_free(ssl);
         free(h);

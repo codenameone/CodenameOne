@@ -723,6 +723,20 @@ public final class HttpServer {
             this(status, contentType, body == null ? new byte[0] : body, -1, 0, 0, null);
         }
 
+        /**
+         * A body AND application headers, which nothing public could express.
+         *
+         * The constructor above always passed null for them, empty() takes headers
+         * but discards the body, and file() wants a descriptor -- so a handler
+         * returning JSON with a Set-Cookie, a CORS header or a cache directive had
+         * no supported way to say so, even though both protocol writers send extra
+         * headers. Server-owned names are still refused at write time.
+         */
+        public Response(int status, String contentType, byte[] body, Map extraHeaders) {
+            this(status, contentType, body == null ? new byte[0] : body, -1, 0, 0,
+                    extraHeaders);
+        }
+
         Response(int status, String contentType, byte[] body,
                  int fileFd, long fileOffset, long fileLength, Map extraHeaders) {
             this.status = status;
