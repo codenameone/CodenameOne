@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="820" height="504" viewBox="0 0 820 504">
-  <rect x="0" y="0" width="820" height="504" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="520" viewBox="0 0 820 520">
+  <rect x="0" y="0" width="820" height="520" fill="#ffffff"/>
   <text x="410" y="26" font-family="Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#222222">Picking a layout manager</text>
   <text x="410" y="44" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Every Container has one, and the default is FlowLayout. Each cell says what the layout is for.</text>
   <rect x="24" y="60" width="248" height="124" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
@@ -35,9 +35,10 @@
   <rect x="24" y="336" width="772" height="58" rx="6" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
   <text x="410" y="356" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#a56a3a">Ported from Swing, and kept for code that already uses them</text>
   <text x="410" y="376" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">GridBagLayout, GroupLayout and MigLayout all exist. GridBagLayout's own javadoc recommends TableLayout instead for new code.</text>
-  <rect x="24" y="406" width="772" height="82" rx="6" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
+  <rect x="24" y="406" width="772" height="98" rx="6" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
   <text x="410" y="426" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Most of these begin from each component's preferred size. A GridLayout with fixed rows and columns does not: it splits the</text>
   <text x="410" y="440" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">container into equal cells whatever the children ask for. Its autoFit() form does read them, to choose how many columns fit.</text>
-  <text x="410" y="460" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Every preferred size here holds only while there is room. In a container that cannot scroll, FlowLayout and</text>
-  <text x="410" y="474" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">BoxLayout clamp what does not fit, and BoxLayout leaves later children with no space at all.</text>
+  <text x="410" y="462" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">What happens when there is not enough room differs by axis. FlowLayout narrows a component too wide for its row, but</text>
+  <text x="410" y="476" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">never shortens one: rows keep their preferred height and overflow a container that cannot scroll. BoxLayout does shrink</text>
+  <text x="410" y="490" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">along its own axis, down to giving later children no space at all.</text>
 </svg>
