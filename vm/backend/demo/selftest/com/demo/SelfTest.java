@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.codename1.backend.Base64Url;
+import com.codename1.backend.ByteSink;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.Db;
 import com.codename1.backend.DbPool;
@@ -394,7 +395,33 @@ public class SelfTest {
                 String.valueOf(Base64Url.decode("SGVsbG8").length));
     }
 
+    /**
+     * The two JSON writers have to answer the same bytes. HTTP/1.1 writes through
+     * the ByteSink one and HTTP/2 through the String one, so a disagreement means
+     * one handler returns two different documents depending on which protocol the
+     * client negotiated -- and nothing in either path would ever notice. Float
+     * was the second such defect (byte[] was the first), which is why this
+     * compares the writers rather than either one's output.
+     */
+    private static void bothJsonWritersAgree() throws Exception {
+        Object[] values = new Object[] {
+            Float.valueOf(1.2f), Float.valueOf(-0.1f), Float.valueOf(3.4e38f),
+            Double.valueOf(1.2d), Double.valueOf(1e300), Long.valueOf(9007199254740993L),
+            Integer.valueOf(-7), Boolean.TRUE, "text", new byte[] {1, 2, 3},
+        };
+        for(int iter = 0 ; iter < values.length ; iter++) {
+            ByteSink sink = new ByteSink(64);
+            Json.write(values[iter], sink);
+            String viaSink = new String(sink.bytes(), 0, sink.length(), "UTF-8");
+            check("both JSON writers agree on " + values[iter].getClass().getName(),
+                    Json.write(values[iter]), viaSink);
+        }
+        // And the float keeps its OWN spelling rather than the double it widens to.
+        check("a float is not widened", "1.2", Json.write(Float.valueOf(1.2f)));
+    }
+
     private static void json() throws Exception {
+        bothJsonWritersAgree();
         Map parsed = Json.parseObject("{\"a\":1,\"b\":\"two\",\"c\":true,\"d\":null,\"e\":1.5}");
         // Integers must stay integers: a long round-tripped through double loses
         // precision above 2^53, and ids are exactly the values that get large.

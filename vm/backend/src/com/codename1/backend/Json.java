@@ -447,7 +447,14 @@ public final class Json {
                 out.putAscii("null");
                 return;
             }
-            out.putAscii(String.valueOf(d));
+            // The VALUE's own spelling, not the widened one. Float 1.2f widened
+            // to double prints as 1.2000000476837158, while the String writer
+            // prints Float.toString and gets 1.2 -- so one handler answered two
+            // different numbers depending on which protocol the client happened
+            // to negotiate, since HTTP/1.1 writes through this sink and HTTP/2
+            // through the other. The two have to agree; the byte[] branch below
+            // carries the same warning for the same reason.
+            out.putAscii(value.toString());
             return;
         }
         if(value instanceof Map) {

@@ -741,6 +741,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         while (left.endsWith("/")) {
             left = left.substring(0, left.length() - 1);
         }
+        // Every request target begins with "/", so a RELATIVE class prefix built
+        // a route no request could ever equal: @RequestMapping("api") plus
+        // "/users" produced "api/users", and /api/users answered 404 from an
+        // endpoint that packaged perfectly. The method-level half was normalised
+        // this way already; the class-level half was not.
+        if (left.length() > 0 && !left.startsWith("/")) {
+            left = "/" + left;
+        }
         if (right.length() == 0) {
             return left.length() == 0 ? "/" : left;
         }

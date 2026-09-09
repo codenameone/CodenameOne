@@ -286,6 +286,25 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aRelativeClassPrefixStillRoutes() throws Exception {
+        // Written without the leading slash, which is the ordinary slip. Every
+        // request target has one, so the route has to as well or nothing can
+        // ever match it and the endpoint answers 404 while the build says fine.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "@RequestMapping(\"api\")\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/notes\")\n"
+                + "    public String all() { return \"[]\"; }\n"
+                + "}\n");
+        Object response = router.call("GET", "/api/notes", null);
+        assertNotNull("GET /api/notes matched no route", response);
+        assertEquals("[]", Router.bodyOf(response));
+    }
+
+    @Test
     public void aBodyOfDtosIsRefused() throws Exception {
         // The descriptor erases this to java.util.List, which binds. What the
         // parser actually supplies is a list of Map, so the first use of an
