@@ -108,13 +108,11 @@ public class ClipRRectRenderElement extends ClipRectRenderElement {
         // the four agree. Where they do not, the shape clip is the only mechanism -- and
         // on iOS that does nothing at all, so say so rather than drawing square in
         // silence. See EffectRenderElement.paintRoundClipped.
-        boolean uniform = tl == tr && tr == br && br == bl;
-        if (paintRoundClipped(g, pane, paintChildren, p, uniform ? (float) tl : 0f)) {
+        if (paintShapeClipped(g, pane, paintChildren, p)) {
             return;
         }
         com.codename1.flutter.FlutterErrorReport.unimplemented("ClipRRect",
-                "this platform cannot clip to a rounded rectangle with differing corners,"
-                + " so the subtree paints square");
+                "this platform cannot clip to a shape, so the subtree paints square");
         paintChildren.paint(g);
     }
 

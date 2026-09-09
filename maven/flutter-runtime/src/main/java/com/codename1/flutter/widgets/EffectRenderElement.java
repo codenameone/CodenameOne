@@ -228,54 +228,29 @@ public abstract class EffectRenderElement extends RenderElement {
         return layerImage;
     }
 
-    /// Paints the subtree clipped to a rounded rectangle, through whichever mechanism
-    /// the port actually honours.
+    /// Paints the subtree clipped to {@code shape}.
     ///
-    /// `Graphics#setClip(Shape)` is what a clip widget reaches for, and on iOS it does
-    /// NOTHING. `isShapeClipSupported()` answers true, the clip is installed with a
-    /// correctly translated path, and a subsequent `fillRect`, `drawImage` or
-    /// `fillLinearGradient` still covers the full rectangle. Probed on the device:
-    /// setting an oval clip and filling the box paints a green SQUARE, with or without
-    /// the `clipRect` Codename One narrows to each child.
+    /// Uses `pushClip`/`popClip`, which is the idiom the ports support and the one the
+    /// shaped-clipping tests in `scripts/hellocodenameone` use. Saving `getClipX/Y/W/H`
+    /// and restoring with the four-int `setClip` -- which is what this used to do --
+    /// cannot express a shape: it degrades whatever the ancestors had established to its
+    /// BOUNDING BOX. Nest two shaped clips and the outer one stops holding, which is
+    /// what made a shaped subtree look like it was layered wrongly rather than simply
+    /// unclipped.
     ///
-    /// Everything that looks correctly shaped on iOS today is shaped by something else
-    /// -- `fillShape`, which IS honoured, or `drawImageRounded`. So a clip widget cannot
-    /// rely on the clip: Reply's avatars are `ClipOval` around a photograph and drew as
-    /// squares, and the desktop, whose clip works, showed perfect circles.
-    ///
-    /// So render the subtree into a layer and hand the LAYER to `drawImageRounded`,
-    /// which the port implements natively, whenever the port offers it. Ports whose clip
-    /// works keep using the clip, which is cheaper and exact for any shape.
-    ///
-    /// @param radius corner radius in pixels; a circle is a radius of half the shorter
-    ///               side, which is what an oval in a square box is
-    /// @return false when neither mechanism is available, so the caller can report it
-    protected final boolean paintRoundClipped(Graphics g, Container pane, Subtree subtree,
-            com.codename1.ui.geom.GeneralPath shape, float radius) {
-        int w = pane.getWidth();
-        int h = pane.getHeight();
-        if (w <= 0 || h <= 0) {
-            return true;
-        }
-        if (radius > 0 && g.isRoundedImageSupported()) {
-            com.codename1.ui.Image rendered = layer(pane, subtree);
-            if (rendered != null && g.isRoundedImageSupported(rendered)) {
-                g.drawImageRounded(rendered, pane.getX(), pane.getY(), w, h, radius);
-                return true;
-            }
-        }
+    /// @return false when the port cannot clip to a shape at all, so the caller can
+    ///         report it rather than drawing square in silence
+    protected final boolean paintShapeClipped(Graphics g, Container pane, Subtree subtree,
+            com.codename1.ui.geom.GeneralPath shape) {
         if (shape == null || !g.isShapeClipSupported()) {
             return false;
         }
-        int cx = g.getClipX();
-        int cy = g.getClipY();
-        int cw = g.getClipWidth();
-        int ch = g.getClipHeight();
-        g.setClip(shape);
+        g.pushClip();
         try {
+            g.setClip(shape);
             subtree.paint(g);
         } finally {
-            g.setClip(cx, cy, cw, ch);
+            g.popClip();
         }
         return true;
     }

@@ -39,10 +39,6 @@ import com.codename1.ui.geom.GeneralPath;
  */
 public class ClipOvalRenderElement extends ClipRectRenderElement {
 
-    /// The circle-through-Béziers constant: the control-point offset, as a
-    /// fraction of the radius, that makes a cubic segment match a quarter arc.
-    private static final double KAPPA = 0.5522847498307933;
-
     private GeneralPath path;
     private int pathX = Integer.MIN_VALUE;
     private int pathY = Integer.MIN_VALUE;
@@ -61,25 +57,17 @@ public class ClipOvalRenderElement extends ClipRectRenderElement {
             paintChildren.paint(g);
             return;
         }
-        // An oval in a SQUARE box is a circle, and a circle is a rounded rectangle of
-        // radius w/2 -- so the port's own rounded-image path draws it exactly. That
-        // matters because on iOS the shape clip does nothing at all; see
-        // EffectRenderElement.paintRoundClipped. Every ClipOval in the gallery is
-        // square: an avatar is a photograph in a box as wide as it is tall.
-        //
-        // In an oblong box it is a true ellipse, which the rounded-image path cannot
-        // express, so the shape clip is the only mechanism there. Passing radius 0 says
-        // exactly that: use the clip or answer false.
-        boolean circle = Math.abs(w - h) <= 1;
-        float radius = circle ? Math.min(w, h) / 2f : 0f;
-        if (paintRoundClipped(g, pane, paintChildren,
-                pathFor(pane.getX(), pane.getY(), w, h), radius)) {
+        if (paintShapeClipped(g, pane, paintChildren, pathFor(pane.getX(), pane.getY(), w, h))) {
             return;
         }
         com.codename1.flutter.FlutterErrorReport.unimplemented("ClipOval",
-                "this platform cannot clip to an ellipse, so the subtree paints square");
+                "this platform cannot clip to a shape, so the subtree paints square");
         paintChildren.paint(g);
     }
+
+    /// The circle-through-Beziers constant: the control-point offset, as a fraction of
+    /// the radius, that makes a cubic segment match a quarter arc.
+    private static final double KAPPA = 0.5522847498307933;
 
     /** The inscribed ellipse, rebuilt only when the box changes. */
     private GeneralPath pathFor(int x, int y, int w, int h) {
