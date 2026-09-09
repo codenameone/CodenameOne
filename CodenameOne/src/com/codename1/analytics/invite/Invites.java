@@ -216,6 +216,25 @@ public final class Invites {
     private static String undelivered;
     private static boolean deferredStarted;
 
+    // When the last claim or match was issued. flush() restarts only once this
+    // has aged out: retrying a request that is still outstanding spends an
+    // attempt without a failure having been observed, and the attempt budget is
+    // what decides when the install is settled.
+    //
+    // A timestamp rather than a boolean, because the requests are fail-silent
+    // -- a failure produces no callback at all -- so a flag cleared by a
+    // response would never be cleared for exactly the request a retry exists
+    // for, and flush() could wedge for the rest of the process.
+    private static long lookupIssuedAt;
+
+    // Package private so a test can retry without waiting.
+    static long lookupRetryDelay = 30000L;
+
+    private static boolean lookupInFlight() {
+        return lookupIssuedAt != 0
+                && System.currentTimeMillis() - lookupIssuedAt < lookupRetryDelay;
+    }
+
     // Bumped whenever the identity or the permission behind an outstanding
     // lookup changes -- an erasure, or consent being withdrawn. A response
     // carries the epoch it was issued under and is dropped if it no longer
@@ -547,6 +566,7 @@ public final class Invites {
     // the answer survives a relaunch, and nothing else can check that.
     static void forgetLoadedState() {
         undelivered = null;
+        lookupIssuedAt = 0;
         stateLoaded = false;
         attributionLoaded = false;
         resolved = null;
@@ -743,7 +763,13 @@ public final class Invites {
         // drain registrations and silently leave the attribution unresolved
         // until the next cold start. The persisted attempt counter still
         // bounds the retries.
-        if (getState() == STATE_PENDING) {
+        if (getState() == STATE_PENDING && !lookupInFlight()) {
+            // Only when nothing is outstanding. Restarting on every call burned
+            // the attempt budget without a single observed failure -- and
+            // create() calls flush() unconditionally, so five invites minted in
+            // a row exhausted MAX_ATTEMPTS and the last one settled the install
+            // as terminal while its own answer was still on the wire.
+            //
             // The retry supersedes whatever the last attempt left outstanding.
             // Without the bump, a fingerprint answer still on the wire from the
             // earlier attempt passes the guard and can land AFTER the retried
@@ -778,6 +804,7 @@ public final class Invites {
         stateLoaded = true;
         deliveredThisRun = false;
         deferredStarted = false;
+        lookupIssuedAt = 0;
         undelivered = null;
         unacknowledged.clear();
     }
@@ -814,6 +841,11 @@ public final class Invites {
             // itself, so calling it is the whole fix.
             int s = getState();
             if (s == STATE_PENDING || s == STATE_DECLINED) {
+                // The refusal may have been recorded for a listener that had
+                // not registered yet. It is not the answer any more, and
+                // leaving it held meant a lookup that went on to resolve was
+                // reported to that listener as unavailable instead.
+                undelivered = null;
                 deferredStarted = false;
                 beginDeferred();
             } else if (s == STATE_RESOLVED) {
@@ -1083,11 +1115,43 @@ public final class Invites {
         Map<String, String> done = new LinkedHashMap<String, String>();
         done.put("state", String.valueOf(terminalState));
         if (reason != null) {
+            // Recorded on the marker, not only in memory. The listener contract
+            // is "exactly one of the two methods per install, and the answer is
+            // remembered": a resolved attribution has carried a durable
+            // delivered flag from the start and the unavailable answer had
+            // nothing, so an application whose deferred question was settled
+            // before it registered its listener, in a process that then exited,
+            // got neither callback for the life of the install.
             done.put("reason", reason);
         }
         InviteStore.write(InviteStore.PENDING, done);
         state = terminalState;
         stateLoaded = true;
+    }
+
+    // The terminal answer this install reached, if it was never delivered.
+    // Null once a listener has heard it, so the contract's "exactly one per
+    // install" holds across launches exactly as it does for a resolved
+    // attribution.
+    private static String undeliveredFromMarker() {
+        int s = getState();
+        if (s != STATE_NONE_FOUND && s != STATE_DECLINED) {
+            return null;
+        }
+        Map<String, String> marker = InviteStore.read(InviteStore.PENDING);
+        if (marker == null || InviteStore.getBoolean(marker, "delivered", false)) {
+            return null;
+        }
+        return InviteStore.get(marker, "reason", REASON_NO_MATCH);
+    }
+
+    private static void markUnavailableDelivered() {
+        Map<String, String> marker = InviteStore.read(InviteStore.PENDING);
+        if (marker == null) {
+            return;
+        }
+        marker.put("delivered", "true");
+        InviteStore.write(InviteStore.PENDING, marker);
     }
 
     private static Map<String, String> pendingRecord() {
@@ -1207,6 +1271,13 @@ public final class Invites {
     }
 
     private static void requestReferrer(InstallReferrerSource source) {
+        // The epoch this read was ISSUED under, captured here. The platform
+        // callback below can run long after a direct link arrived and advanced
+        // the epoch, and reading the field at callback time made the old read
+        // inherit the new epoch -- so it passed the guard and could overwrite
+        // the direct attribution. Incrementing the epoch cannot invalidate a
+        // callback that does not remember which epoch it belongs to.
+        final int issued = lookupEpoch;
         try {
             source.requestReferrer(new InstallReferrerCallback() {
                 @Override
@@ -1215,6 +1286,9 @@ public final class Invites {
                     onEdt(new Runnable() {
                         @Override
                         public void run() {
+                            if (issued != lookupEpoch) {
+                                return;
+                            }
                             String code = codeFromQuery(rawReferrer);
                             if (code == null) {
                                 // The referrer was read and carries no invite.
@@ -1246,6 +1320,9 @@ public final class Invites {
                     onEdt(new Runnable() {
                         @Override
                         public void run() {
+                            if (issued != lookupEpoch) {
+                                return;
+                            }
                             // REASON_UNSUPPORTED is the store saying this
                             // device will never have a referrer. Anything else
                             // is transient -- the store was busy, the bind
@@ -1328,6 +1405,7 @@ public final class Invites {
         body.put("locale", InviteStore.get(pending, "locale", ""));
         body.put("screenWidth", Integer.valueOf(InviteStore.getInt(pending, "screenWidth", 0)));
         body.put("screenHeight", Integer.valueOf(InviteStore.getInt(pending, "screenHeight", 0)));
+        lookupIssuedAt = System.currentTimeMillis();
         post(getLinkBase() + PATH_MATCH, body, MATCH_FINGERPRINT, true);
     }
 
@@ -1344,6 +1422,7 @@ public final class Invites {
         body.put("code", code);
         body.put("source", source);
         body.put("rawReferrer", rawReferrer == null ? "" : rawReferrer);
+        lookupIssuedAt = System.currentTimeMillis();
         post(getLinkBase() + PATH_CLAIM, body, matchType, deferred);
     }
 
@@ -1483,6 +1562,9 @@ public final class Invites {
     }
 
     static void handleResolution(String payload, String matchType, boolean deferred, int epoch) {
+        if (epoch == lookupEpoch) {
+            lookupIssuedAt = 0;
+        }
         // A response that was already on the wire when consent was withdrawn or
         // the identity was erased must not be acted on. Both of those delete the
         // pending record and clear the dimensions; resolving anyway would write
@@ -1693,9 +1775,14 @@ public final class Invites {
         }
         // Taken into a local and cleared unconditionally, rather than
         // null-checked in place and cleared inside the branch. Same reason as
-        // notifyUnavailable above.
+        // notifyUnavailable above. The durable half comes second: an answer
+        // reached in an earlier process left nothing in memory, and the
+        // contract says the answer is remembered.
         String held = undelivered;
         undelivered = null;
+        if (held == null) {
+            held = undeliveredFromMarker();
+        }
         if (held != null) {
             notifyUnavailable(held);
             return;
@@ -1728,16 +1815,15 @@ public final class Invites {
         // and the answer is not a lock -- this facade runs on the EDT.
         InviteListener target = listener;
         if (target == null) {
-            // Held, not dropped. The answer is terminal, so no later lookup
-            // will produce it again, and setInviteListener() only replays a
-            // resolved attribution -- so an application that answers the
-            // deferred question before registering its listener got neither
-            // callback for the whole install, against the documented promise
-            // that an early answer is delivered on registration.
+            // Held for this run, and durably by the marker markTerminal wrote.
+            // Either way it is not dropped: the answer is terminal, so no later
+            // lookup produces it again, and setInviteListener() would otherwise
+            // replay only a resolved attribution.
             undelivered = reason;
             return;
         }
         deliveredThisRun = true;
+        markUnavailableDelivered();
         try {
             target.attributionUnavailable(reason);
         } catch (Throwable t) {

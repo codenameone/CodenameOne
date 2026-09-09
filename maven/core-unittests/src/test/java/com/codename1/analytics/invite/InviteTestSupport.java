@@ -46,6 +46,7 @@ final class InviteTestSupport {
         Invites.setReattribution(false);
         Invites.setAttributionWindow(Invites.DEFAULT_ATTRIBUTION_WINDOW);
         Invites.registerInstallReferrerSource(null);
+        Invites.lookupRetryDelay = 30000L;
         Invites.reset();
         Preferences.delete(Invites.PREF_SLUG);
         Preferences.delete(Invites.PREF_CONSUMED_ARG);

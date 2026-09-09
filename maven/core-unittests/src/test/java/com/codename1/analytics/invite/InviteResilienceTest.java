@@ -24,6 +24,7 @@ package com.codename1.analytics.invite;
 
 import com.codename1.analytics.Analytics;
 import com.codename1.analytics.AnalyticsConsent;
+import com.codename1.analytics.ConsentMode;
 import com.codename1.junit.EdtTest;
 import com.codename1.junit.FormTest;
 import java.io.ByteArrayInputStream;
@@ -39,7 +40,9 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -372,6 +375,9 @@ class InviteResilienceTest extends UITestBase {
         Invites.checkForInvite();
         int stale = Invites.currentLookupEpochForTest();
 
+        // The first attempt has aged out; flush() deliberately does nothing
+        // while one is still outstanding, which is the sibling case below.
+        Invites.lookupRetryDelay = 0L;
         Invites.flush();
         Invites.handleResolution(InviteTestSupport.resolvedJson("EXACT1", "c1", "sms"),
                 Invites.MATCH_REFERRER, true);
@@ -485,5 +491,164 @@ class InviteResilienceTest extends UITestBase {
         assertNotNull(invite, "minting is offline and must still work");
         assertEquals(0, implementation.getQueuedRequests().size(),
                 "a registration was transmitted before consent was given");
+    }
+
+    @Test
+    @EdtTest
+    void flushDoesNotSpendAnAttemptOnALookupThatIsStillOutstanding() {
+        // create() calls flush() unconditionally, so minting five invites in a
+        // row exhausted MAX_ATTEMPTS without a single observed failure -- and
+        // the last one settled the install as terminal while its own answer was
+        // still on the wire.
+        Invites.checkForInvite();
+        Map<String, String> after = InviteStore.read(InviteStore.PENDING);
+        int attempts = InviteStore.getInt(after, "attempts", 0);
+
+        for (int i = 0; i < 8; i++) {
+            Invites.flush();
+        }
+
+        Map<String, String> now = InviteStore.read(InviteStore.PENDING);
+        assertEquals(attempts, InviteStore.getInt(now, "attempts", 0),
+                "flush() spent the attempt budget on a lookup that had not failed");
+        assertEquals(Invites.STATE_PENDING, Invites.getState(),
+                "the install was settled while its answer was still on the wire");
+    }
+
+    @Test
+    @EdtTest
+    void aReferrerCallbackThatArrivesAfterADirectLinkIsIgnored() {
+        // The platform callback used to read lookupEpoch at callback time, so
+        // an outstanding referrer read inherited the epoch a direct link had
+        // just advanced, passed the guard, and could overwrite the direct
+        // attribution. Incrementing an epoch cannot invalidate a callback that
+        // does not remember which epoch it belongs to.
+        final InstallReferrerCallback[] held = new InstallReferrerCallback[1];
+        Invites.registerInstallReferrerSource(new InstallReferrerSource() {
+            public boolean isSupported() {
+                return true;
+            }
+
+            public void requestReferrer(InstallReferrerCallback callback) {
+                held[0] = callback;
+            }
+        });
+        Invites.checkForInvite();
+        assertNotNull(held[0], "the referrer read was never issued");
+
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/DIRECT2");
+        Invites.handleResolution(InviteTestSupport.resolvedJson("DIRECT2", "c1", "sms"),
+                Invites.MATCH_DIRECT, false);
+
+        // The referrer finally answers, carrying a different code. It must be
+        // dropped where it arrives -- before it writes its code into the
+        // pending record and issues a claim -- because once a claim goes out
+        // under the current epoch nothing downstream can tell it apart from a
+        // legitimate one.
+        held[0].onReferrer("utm_source=cn1_invite&cn1_invite=LATE2", 0L, 0L);
+
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        String recorded = pending == null ? null : InviteStore.get(pending, "code", null);
+        assertNotEquals("LATE2", recorded,
+                "a stale referrer callback wrote its code and issued a claim");
+        InviteAttribution a = Invites.getAttribution();
+        assertNotNull(a);
+        assertEquals("DIRECT2", a.getCode());
+    }
+
+    @Test
+    @EdtTest
+    void aRefusalHeldForALateListenerIsDiscardedWhenTheLookupResumes() {
+        // The refusal was recorded for a listener that had not registered yet.
+        // Once consent is granted it is not the answer any more, and leaving it
+        // held reported a lookup that went on to resolve as unavailable.
+        Invites.checkForInvite();
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+        Analytics.setConsent(AnalyticsConsent.granted());
+        Invites.handleResolution(InviteTestSupport.resolvedJson("RESOLVED1", "c1", "sms"),
+                Invites.MATCH_FINGERPRINT, true);
+
+        final String[] unavailable = new String[1];
+        final InviteAttribution[] received = new InviteAttribution[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+                received[0] = a;
+            }
+
+            public void attributionUnavailable(String reason) {
+                unavailable[0] = reason;
+            }
+        });
+        assertNull(unavailable[0], "a stale refusal was reported over a resolved attribution");
+        assertNotNull(received[0], "the resolved attribution was never delivered");
+    }
+
+    @Test
+    @EdtTest
+    void anUnavailableAnswerSurvivesTheProcessThatReachedIt() {
+        // The contract is "exactly one of the two methods per install, and the
+        // answer is remembered". A resolved attribution has carried a durable
+        // delivered flag from the start; the unavailable answer had nothing, so
+        // an application whose deferred question was settled before it
+        // registered a listener, in a process that then exited, got neither
+        // callback for the life of the install.
+        Invites.setAttributionWindow(0);
+        Invites.checkForInvite();
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState());
+
+        Invites.forgetLoadedState();
+
+        final String[] told = new String[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0] = reason;
+            }
+        });
+        assertEquals(Invites.REASON_UNSUPPORTED, told[0],
+                "the answer did not survive the process that reached it");
+    }
+
+    @Test
+    @EdtTest
+    void anAnswerAlreadyDeliveredIsNotDeliveredAgainOnALaterLaunch() {
+        // The other half of the same contract: exactly one, not one per launch.
+        Invites.setAttributionWindow(0);
+        Invites.checkForInvite();
+        final int[] told = new int[1];
+        InviteListener l = new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0]++;
+            }
+        };
+        Invites.setInviteListener(l);
+        assertEquals(1, told[0]);
+
+        Invites.forgetLoadedState();
+        Invites.setInviteListener(l);
+        assertEquals(1, told[0], "the answer was delivered twice across launches");
+    }
+
+    @Test
+    @EdtTest
+    void clearingAnExplicitDenialUnderOptOutResumesAttribution() {
+        // Under OPT_OUT a null recorded choice is the mode's implicit allow, not
+        // an unanswered prompt. Ignoring it resumed ordinary analytics while a
+        // declined invite lookup stayed stopped, so the two disagreed about the
+        // same user.
+        Analytics.setConsentMode(ConsentMode.OPT_OUT);
+        Invites.checkForInvite();
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+        assertEquals(Invites.STATE_DECLINED, Invites.getState());
+
+        Analytics.setConsent(null);
+
+        assertEquals(Invites.STATE_PENDING, Invites.getState(),
+                "clearing the denial under opt-out did not resume the lookup");
     }
 }

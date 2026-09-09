@@ -27,6 +27,7 @@ import com.codename1.analytics.Analytics;
 import com.codename1.analytics.AnalyticsCapability;
 import com.codename1.analytics.AnalyticsConsent;
 import com.codename1.analytics.AnalyticsContext;
+import com.codename1.analytics.ConsentMode;
 import com.codename1.io.Preferences;
 
 // The seam that lets invite attribution honour an erasure request and a
@@ -93,10 +94,21 @@ final class InviteAttributionProvider extends AbstractAnalyticsProvider {
         // Analytics.getConsent() returns null until there is a real choice on
         // record, so ask it instead of believing the argument.
         AnalyticsConsent recorded = Analytics.getConsent();
-        if (recorded == null) {
+        if (recorded != null) {
+            Invites.onConsentChanged(recorded.isAnalytics());
             return;
         }
-        Invites.onConsentChanged(recorded.isAnalytics());
+        // No choice on record. Under OPT_IN that means the prompt has not been
+        // answered and there is nothing to act on -- returning is the whole
+        // point of the paragraph above. Under OPT_OUT it means something else
+        // entirely: the mode's implicit allow is back in force, which is a real
+        // transition. Clearing an explicit denial there resumed ordinary
+        // analytics while a declined invite lookup stayed stopped and a
+        // resolved attribution's dimensions stayed cleared, so the two
+        // disagreed about the same user.
+        if (Analytics.getConsentMode() == ConsentMode.OPT_OUT) {
+            Invites.onConsentChanged(true);
+        }
     }
 
     @Override
