@@ -1663,15 +1663,23 @@ Codename One does pretty much everything on the EDT (Event Dispatch Thread), thi
 for example: modal dialogs, invokeAndBlock etc.
 
 For example native widgets have to be drawn on the devices native UI thread. +
-This means that drawing looks something like this:
+The oldest answer to that was to paint in two passes: loop over the Codename One components and paint
+them, then loop over the native peers and let the platform paint those over the result. That's where
+the rule that a peer always covers whatever sits under it comes from, and it isn't how the current
+ports work.
 
-. Loop over all Codename One components and paint them.
+`Display` asks the implementation one question, `paintNativePeersBehind()`, and a `false` answer
+doesn't mean the peer can't be covered. It leaves the compositing to the port, and the ports differ:
 
-. Loop over all native peer components and paint them.
+* iOS and the JavaScript port answer `true`. The native layer sits underneath and Codename One paints
+above it, punching a hole through its own surface with `clearRect` wherever a peer belongs.
 
-On a port that paints peers in front, which is the default, this means peer components are drawn on top of the Codename One components.
+* Android hands the peer's native `View` to the same ordered stream of drawing operations as every
+other component, so a component painted after the peer covers it. The simulator does the same for a
+peer that renders into a buffer.
 
-Newer ports invert that. iOS and the JavaScript port both return `true` from `paintNativePeersBehind()`, so the native layer sits underneath and Codename One paints above it, punching a hole through its own surface with `clearRect` wherever a peer belongs. Components can therefore be laid over a peer on those ports.
+* Where the peer owns a surface of its own, the system composites that surface and paint order never
+reaches it. That's the case the screenshot technique below was written for.
 
 .Where a peer sits, and what follows from it
 image::img/peer-component-painting.svg[Where a native peer is composited relative to the Codename One layer, and how it differs by port,scaledwidth=85%]
@@ -1680,7 +1688,8 @@ NOTE: This was also the case in AWT/Swing to one degree or another...
 
 ==== Showing dialogs on top of peer components
 
-Codename One grabs a screenshot of the peer, hide it and then you can show the screenshot. Since the screenshot is static it can be rendered through the standard UI. You can't do that always since grabbing a screenshot is an expensive process on all platforms and must be performed on the native device thread.
+Where the platform composites the peer itself, painting over it isn't an option, so the still image
+stands in for it. Codename One grabs a screenshot of the peer, hide it and then you can show the screenshot. Since the screenshot is static it can be rendered through the standard UI. You can't do that always since grabbing a screenshot is an expensive process on all platforms and must be performed on the native device thread.
 
 ==== Why can't you combine peer component scrolling and Codename One scrolling
 
