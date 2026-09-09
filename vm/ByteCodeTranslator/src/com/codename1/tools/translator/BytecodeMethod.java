@@ -104,12 +104,12 @@ public class BytecodeMethod implements SignatureSet {
     private int maxLocals;
     private static boolean acceptStaticOnEquals;
     private static final boolean FORCE_VOLATILE_LOCALS =
-            "true".equalsIgnoreCase(System.getProperty("CN1_FORCE_VOLATILE_LOCALS", "false"));
+            "true".equalsIgnoreCase(Util.getProperty("CN1_FORCE_VOLATILE_LOCALS", "false"));
     // Frameless codegen gate (-Dcn1.frameless, default on). When off the
     // eligibility predicate always returns false, so every method emits the
     // legacy frame code byte-for-byte identical to before.
     private static final boolean FRAMELESS_ENABLED =
-            "true".equalsIgnoreCase(System.getProperty("cn1.frameless", "true"));
+            "true".equalsIgnoreCase(Util.getProperty("cn1.frameless", "true"));
     // PHASE 3b: extend frameless codegen to OBJECT-BEARING methods (-Dcn1.frameless.objects,
     // default off). Such a method keeps its object operand stack + object locals in a
     // method-local C array on the native stack; the C runtime (built with
@@ -117,14 +117,14 @@ public class BytecodeMethod implements SignatureSet {
     // stopped thread's native stack. With this OFF, only primitive-only methods are
     // frameless (identical to the prior phase). Requires the conservative-GC runtime.
     private static final boolean FRAMELESS_OBJECTS_ENABLED =
-            "true".equalsIgnoreCase(System.getProperty("cn1.frameless.objects", "true"));
+            "true".equalsIgnoreCase(Util.getProperty("cn1.frameless.objects", "true"));
     // PHASE 3b: extend object-frameless to INSTANCE methods (receiver `this` becomes a
     // conservatively-scanned C parameter). Now DEFAULT ON: the intermittent multi-threaded
     // failure that previously gated this off was a pre-existing Thread.start/join visibility
     // race (alive set on the worker thread async after start() returned), fixed in
     // java_lang_Thread_start__ (993331107); with it fixed, MtStress is 50/50 deterministic.
     private static final boolean FRAMELESS_INSTANCE_ENABLED =
-            "true".equalsIgnoreCase(System.getProperty("cn1.frameless.instance", "true"));
+            "true".equalsIgnoreCase(Util.getProperty("cn1.frameless.instance", "true"));
     private int methodOffset;
     private boolean forceVirtual;
     private boolean virtualOverriden;
@@ -162,7 +162,7 @@ public class BytecodeMethod implements SignatureSet {
         optimizerOn = op == null || op.equalsIgnoreCase("on");
         //optimizerOn = false;
 
-        onDeviceDebug = "true".equalsIgnoreCase(System.getProperty("cn1.onDeviceDebug", "false"));
+        onDeviceDebug = "true".equalsIgnoreCase(Util.getProperty("cn1.onDeviceDebug", "false"));
     }
 
     public static boolean isOnDeviceDebug() {
@@ -1395,6 +1395,18 @@ public class BytecodeMethod implements SignatureSet {
         return rows;
     }
 
+    /**
+     * Every local, in a deterministic order, for emitting the C declarations.
+     *
+     * Unlike {@link #debugVarEntries} this drops nothing: a local whose slot lies
+     * outside the frame still needs its declaration, it just has no debug row.
+     */
+    private List<LocalVariable> declarationOrderedLocals() {
+        List<LocalVariable> ordered = new ArrayList<LocalVariable>(localVariables);
+        Collections.sort(ordered, DEBUG_VAR_ORDER);
+        return ordered;
+    }
+
     /** Slot first, then storage qualifier, so a reused slot's rows stay adjacent. */
     private static final Comparator<LocalVariable> DEBUG_VAR_ORDER = new Comparator<LocalVariable>() {
         @Override
@@ -1629,29 +1641,29 @@ public class BytecodeMethod implements SignatureSet {
                 CustomJump cj = (CustomJump)i;
                 String cmp = cj.getCustomCompareCode();
                 if (cmp != null) {
-                    cj.setCustomCompareCode(cmp.replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                    cj.setCustomCompareCode(Util.rewriteLocalObjectRefs(cmp));
                 }
             } else if (i instanceof CustomIntruction) {
                 CustomIntruction ci = (CustomIntruction)i;
                 String code = ci.getCode();
                 if (code != null) {
-                    ci.setCode(code.replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                    ci.setCode(Util.rewriteLocalObjectRefs(code));
                 }
                 String complexCode = ci.getComplexCode();
                 if (complexCode != null) {
-                    ci.setComplexCode(complexCode.replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                    ci.setComplexCode(Util.rewriteLocalObjectRefs(complexCode));
                 }
             } else if (i instanceof CustomInvoke) {
                 CustomInvoke ci = (CustomInvoke)i;
                 String target = ci.getTargetObjectLiteral();
                 if (target != null) {
-                    ci.setTargetObjectLiteral(target.replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                    ci.setTargetObjectLiteral(Util.rewriteLocalObjectRefs(target));
                 }
                 String[] args = ci.getLiteralArgs();
                 if (args != null) {
                     for (int j=0; j<args.length; j++) {
                         if (args[j] != null) {
-                            ci.setLiteralArg(j, args[j].replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                            ci.setLiteralArg(j, Util.rewriteLocalObjectRefs(args[j]));
                         }
                     }
                 }
@@ -1749,7 +1761,14 @@ public class BytecodeMethod implements SignatureSet {
             // below; empty for the ordinary ones so nothing else changes.
             String spVariant = volatileLocals ? "_VSP" : "";
             Set<String> added = new HashSet<String>();
-            for (LocalVariable lv : localVariables) {
+            // Sorted, not in localVariables iteration order: that is a HashSet, so the
+            // order of these declarations varied between builds of the same input.
+            // debugVarEntries already had to learn this for the debug side-table; the
+            // C declarations had the same defect and it stayed invisible because
+            // HotSpot's identity hash is stable within a run. Translating the
+            // translator with itself is what surfaced it -- a different runtime, a
+            // different order, and the same input produced different C.
+            for (LocalVariable lv : declarationOrderedLocals()) {
                 String variableName = lv.getQualifier() + "locals_"+lv.getIndex()+"_";
                 if (!added.contains(variableName) && (barebone || lv.getQualifier() != 'o')) {
                     added.add(variableName);
@@ -2174,7 +2193,7 @@ public class BytecodeMethod implements SignatureSet {
             b.append(cls);
             b.append("(threadStateData);\n    ");
         }
-        if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
+        if (Util.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             b.append("\n    if(__cn1ThisObject == JAVA_NULL) THROW_NULL_POINTER_EXCEPTION();\n    ");
         } 
         if(!returnType.isVoid()) {
@@ -2359,7 +2378,7 @@ public class BytecodeMethod implements SignatureSet {
         }
         return new NativeSignatureVerifier.Signature(symbol.toString(), clsName,
                 methodName, overloadPrefix, cReturnType.toString().trim(), params,
-                prototype.toString().trim().replaceAll("\\s+", " "));
+                Util.collapseWhitespace(prototype.toString().trim()));
     }
 
     public boolean isAbstract() {
@@ -2448,6 +2467,10 @@ public class BytecodeMethod implements SignatureSet {
     }
     
     public void addLabel(Label l) {
+        // Named here, in bytecode order, so the generated C label is a function of the
+        // method alone. See LabelInstruction.assignLabelName.
+        com.codename1.tools.translator.bytecodes.LabelInstruction.assignLabelName(l, nextLabelIndex);
+        nextLabelIndex++;
         addInstruction(new com.codename1.tools.translator.bytecodes.LabelInstruction(l));
     }
     
@@ -2455,6 +2478,9 @@ public class BytecodeMethod implements SignatureSet {
         addInstruction(new Invoke(opcode, owner, name, desc, itf));
     }
     
+    /** Per-method label counter; see addLabel. */
+    private int nextLabelIndex;
+
     public void setMaxes(int maxStack, int maxLocals) {
         this.maxLocals = maxLocals;
         this.maxStack = maxStack;
@@ -2755,7 +2781,7 @@ public class BytecodeMethod implements SignatureSet {
     private int varCounter = 0;
     // Master off-switch: -DCN1_DISABLE_BCE=true reverts to fully-checked array access.
     private static final boolean DISABLE_BCE =
-            "true".equalsIgnoreCase(System.getProperty("CN1_DISABLE_BCE", "false"));
+            "true".equalsIgnoreCase(Util.getProperty("CN1_DISABLE_BCE", "false"));
 
     /**
      * Prove-safe array-bounds-check elimination. Conservative and fail-closed:
@@ -2931,7 +2957,7 @@ public class BytecodeMethod implements SignatureSet {
     // the whole struct to registers.
     // ------------------------------------------------------------------
     private static final boolean DISABLE_SCALAR_REPLACE =
-            "true".equalsIgnoreCase(System.getProperty("CN1_DISABLE_SCALAR_REPLACE", "false"));
+            "true".equalsIgnoreCase(Util.getProperty("CN1_DISABLE_SCALAR_REPLACE", "false"));
 
     private static String srMangle(String s) {
         return s.replace('.', '_').replace('/', '_').replace('$', '_');
@@ -3223,7 +3249,7 @@ public class BytecodeMethod implements SignatureSet {
     // can't dispatch to an escaping override.
     // ------------------------------------------------------------------
     private static final boolean DISABLE_SB_STACK_ALLOC =
-            "true".equalsIgnoreCase(System.getProperty("CN1_DISABLE_SB_STACK_ALLOC", "false"));
+            "true".equalsIgnoreCase(Util.getProperty("CN1_DISABLE_SB_STACK_ALLOC", "false"));
     private static final String SB_OWNER = "java/lang/StringBuilder";
 
     /** Slots consumed by the argument list of a method descriptor (no receiver). */

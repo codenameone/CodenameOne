@@ -109,21 +109,21 @@ public class TryCatch extends Instruction {
         // threadObjectStackOffset from trash and later callee frames were
         // allocated on top of this frame's locals. clang happened to spill.
         b.append("    volatile int restoreTo");
-        b.append(start);
+        b.append(LabelInstruction.labelName(start));
         b.append(cid);
         b.append(counter);
         b.append(";\n    volatile int tryBlockOffset");
-        b.append(start);
+        b.append(LabelInstruction.labelName(start));
         b.append(cid);
         b.append(counter);
         b.append(";\n    DEFINE_CATCH_BLOCK(catch_");
-        b.append(start);
+        b.append(LabelInstruction.labelName(start));
         b.append(cid);
         b.append(counter);
         b.append(", label_");
-        b.append(handler);
+        b.append(LabelInstruction.labelName(handler));
         b.append(", restoreTo");
-        b.append(start);
+        b.append(LabelInstruction.labelName(start));
         b.append(cid);
         b.append(counter);
         b.append(");\n");

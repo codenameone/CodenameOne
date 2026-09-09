@@ -1027,7 +1027,7 @@ public class ByteCodeClass {
         buildInstanceFieldList(fullFieldList);
         
         String nullCheck = "";
-        if (System.getProperty("fieldNullChecks", "false").equals("true")) {
+        if (Util.getProperty("fieldNullChecks", "false").equals("true")) {
             nullCheck = "if(__cn1T == JAVA_NULL){throwException(getThreadLocalData(), __NEW_INSTANCE_java_lang_NullPointerException(getThreadLocalData()));}\n";
         }
         for(ByteCodeField fld : fullFieldList) {

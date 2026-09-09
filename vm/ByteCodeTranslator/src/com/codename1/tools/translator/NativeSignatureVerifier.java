@@ -27,7 +27,6 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -48,8 +47,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
 /**
  * Checks that every {@code native} method in a translated project has a C
@@ -400,24 +397,35 @@ public class NativeSignatureVerifier {
         }
     }
 
-    /** Reads {@link #IGNORE_FILE}: one symbol or {@code prefix*} per line. */
+    /**
+     * Reads {@link #IGNORE_FILE}: one symbol or {@code prefix*} per line.
+     *
+     * Splits the file itself rather than using a BufferedReader, which ParparVM's
+     * JavaAPI does not declare -- this runs during translation, so it has to compile
+     * when the translator is built against that JavaAPI to translate itself.
+     */
     static void readIgnoreFile(File file, Set<String> into) throws IOException {
-        BufferedReader reader = new BufferedReader(
-                new InputStreamReader(new FileInputStream(file), UTF8));
-        try {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                int hash = line.indexOf('#');
-                if (hash >= 0) {
-                    line = line.substring(0, hash);
-                }
-                line = line.trim();
-                if (line.length() > 0) {
-                    into.add(line);
-                }
+        String text = new String(readAll(file), UTF8);
+        int start = 0;
+        while (start <= text.length()) {
+            int end = text.indexOf('\n', start);
+            String line = end < 0 ? text.substring(start) : text.substring(start, end);
+            // Accept CRLF as readLine did.
+            if (line.endsWith("\r")) {
+                line = line.substring(0, line.length() - 1);
             }
-        } finally {
-            reader.close();
+            int hash = line.indexOf('#');
+            if (hash >= 0) {
+                line = line.substring(0, hash);
+            }
+            line = line.trim();
+            if (line.length() > 0) {
+                into.add(line);
+            }
+            if (end < 0) {
+                break;
+            }
+            start = end + 1;
         }
     }
 
@@ -817,7 +825,7 @@ public class NativeSignatureVerifier {
     private static String normalizeParameter(String declaration) {
         String text = declaration.replace("*", " * ").trim();
         List<String> tokens = new ArrayList<String>(
-                Arrays.asList(text.split("\\s+")));
+                Arrays.asList(Util.splitWhitespace(text)));
         // "CODENAME_ONE_THREAD_STATE" is a macro that expands to a full declaration
         // and carries no separate name to strip.
         if (tokens.size() > 1 && !"CODENAME_ONE_THREAD_STATE".equals(tokens.get(0))) {
@@ -1172,7 +1180,7 @@ public class NativeSignatureVerifier {
         if (root.isDirectory()) {
             collectClassesFromDirectory(root, found);
         } else if (root.getName().endsWith(".jar") || root.getName().endsWith(".zip")) {
-            collectClassesFromArchive(root, found);
+            ArchiveClassScanner.collect(root, found);
         } else if (root.getName().endsWith(".class")) {
             collectFromClassBytes(readAll(root), found);
         }
@@ -1195,32 +1203,7 @@ public class NativeSignatureVerifier {
         }
     }
 
-    private static void collectClassesFromArchive(File archive, List<Signature> into) throws IOException {
-        ZipFile zip = new ZipFile(archive);
-        try {
-            List<String> names = new ArrayList<String>();
-            for (Enumeration<? extends ZipEntry> e = zip.entries(); e.hasMoreElements();) {
-                ZipEntry entry = e.nextElement();
-                if (!entry.isDirectory() && entry.getName().endsWith(".class")
-                        && !entry.getName().endsWith("module-info.class")) {
-                    names.add(entry.getName());
-                }
-            }
-            Collections.sort(names);
-            for (String name : names) {
-                InputStream in = zip.getInputStream(zip.getEntry(name));
-                try {
-                    collectFromClassBytes(readAll(in), into);
-                } finally {
-                    in.close();
-                }
-            }
-        } finally {
-            zip.close();
-        }
-    }
-
-    private static void collectFromClassBytes(byte[] bytes, final List<Signature> into) {
+    static void collectFromClassBytes(byte[] bytes, final List<Signature> into) {
         final String[] owner = new String[1];
         new ClassReader(bytes).accept(new ClassVisitor(Opcodes.ASM9) {
             @Override
@@ -1291,74 +1274,6 @@ public class NativeSignatureVerifier {
             }
         }
         return true;
-    }
-
-    public static void main(String[] args) throws IOException {
-        List<File> classRoots = new ArrayList<File>();
-        List<File> nativeRoots = new ArrayList<File>();
-        boolean orphans = true;
-        for (int iter = 0; iter < args.length; iter++) {
-            if ("--classes".equals(args[iter]) && iter + 1 < args.length) {
-                classRoots.add(new File(args[++iter]));
-            } else if ("--natives".equals(args[iter]) && iter + 1 < args.length) {
-                nativeRoots.add(new File(args[++iter]));
-            } else if ("--no-orphans".equals(args[iter])) {
-                orphans = false;
-            } else {
-                System.err.println("unrecognised argument: " + args[iter]);
-                usage();
-                System.exit(2);
-            }
-        }
-        if (classRoots.isEmpty() || nativeRoots.isEmpty()) {
-            usage();
-            System.exit(2);
-        }
-
-        List<Signature> required = new ArrayList<Signature>();
-        for (File root : classRoots) {
-            if (!root.exists()) {
-                System.err.println("NativeSignatureVerifier: no such path: " + root);
-                System.exit(2);
-            }
-            required.addAll(collectFromClasses(root));
-        }
-        List<File> sources = new ArrayList<File>();
-        for (File root : nativeRoots) {
-            if (!root.exists()) {
-                System.err.println("NativeSignatureVerifier: no such path: " + root);
-                System.exit(2);
-            }
-            sources.addAll(root.isDirectory()
-                    ? listNativeSourcesRecursive(root) : Collections.singletonList(root));
-        }
-
-        SourceIndex index = new SourceIndex(sources);
-        List<Problem> problems = verify(required, index);
-        if (!orphans) {
-            List<Problem> filtered = new ArrayList<Problem>();
-            for (Problem problem : problems) {
-                if (problem.kind != Kind.ORPHAN) {
-                    filtered.add(problem);
-                }
-            }
-            problems = filtered;
-        }
-
-        if (problems.isEmpty()) {
-            System.out.println("NativeSignatureVerifier: " + required.size()
-                    + " native method(s) all resolve against " + index.size()
-                    + " C definition(s) in " + sources.size() + " file(s).");
-            return;
-        }
-        int fatal = report(problems, Mode.STRICT,
-                required.size() + " native methods, " + sources.size() + " native sources", true);
-        System.exit(fatal > 0 ? 1 : 0);
-    }
-
-    private static void usage() {
-        System.err.println("usage: NativeSignatureVerifier --classes DIR_OR_JAR [--classes ...]"
-                + " --natives DIR [--natives ...] [--no-orphans]");
     }
 
     private NativeSignatureVerifier() {

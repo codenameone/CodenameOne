@@ -343,7 +343,7 @@ public class CustomInvoke extends Instruction {
         ArrayList<String> args = new ArrayList<>();
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         if (isVirtualCall) {
-            BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
+            BytecodeMethod.addVirtualMethodsInvoked(bld.toString().substring("virtual_".length()));
         } else {
             // keep in sync with Invoke: direct/devirtualized calls of the mapped
             // String/StringBuilder natives get the inlined fast path
@@ -595,7 +595,7 @@ public class CustomInvoke extends Instruction {
         ArrayList<String> args = new ArrayList<>();
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         if (isVirtualCall) {
-            BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
+            BytecodeMethod.addVirtualMethodsInvoked(bld.toString().substring("virtual_".length()));
         } else {
             // keep in sync with Invoke: direct/devirtualized calls of the mapped
             // String/StringBuilder natives get the inlined fast path

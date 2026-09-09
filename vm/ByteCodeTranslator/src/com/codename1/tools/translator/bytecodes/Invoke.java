@@ -364,7 +364,7 @@ public class Invoke extends Instruction {
         ArrayList<String> args = new ArrayList<>();
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         if (isVirtualCall) {
-            BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
+            BytecodeMethod.addVirtualMethodsInvoked(bld.toString().substring("virtual_".length()));
         } else {
             // direct/devirtualized calls of the hottest String/StringBuilder
             // natives get the call-site-inlined fast path (cn1_intrinsics.h)
@@ -501,7 +501,7 @@ public class Invoke extends Instruction {
     
     // Master off-switch: -DCN1_DISABLE_INLINE=true disables trivial-method inlining.
     private static final boolean DISABLE_INLINE =
-            "true".equalsIgnoreCase(System.getProperty("CN1_DISABLE_INLINE", "false"));
+            "true".equalsIgnoreCase(Util.getProperty("CN1_DISABLE_INLINE", "false"));
 
     /**
      * If this invoke is a direct (provably monomorphic) instance call to a trivial

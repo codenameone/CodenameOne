@@ -40,6 +40,7 @@ final class JavascriptNativeRegistry {
             "cn1_java_lang_Class_forNameImpl_java_lang_String_R_java_lang_Class",
             "cn1_java_lang_Class_getComponentType_R_java_lang_Class",
             "cn1_java_lang_Class_getNameImpl_R_java_lang_String",
+            "cn1_java_lang_Class_getPrimitiveClass_int_R_java_lang_Class",
             "cn1_java_lang_Class_getName_R_java_lang_String",
             "cn1_java_lang_Class_getSuperclass_R_java_lang_Class",
             "cn1_java_lang_Class_hashCode_R_int",

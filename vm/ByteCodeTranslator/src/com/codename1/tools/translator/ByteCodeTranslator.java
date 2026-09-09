@@ -25,13 +25,14 @@ package com.codename1.tools.translator;
 
 import java.io.DataInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -147,9 +148,9 @@ public class ByteCodeTranslator {
     }
 
     void execute(File sourceDir, File outputDir) throws Exception {
-        File[] directoryList = sourceDir.listFiles(pathname ->
+        File[] directoryList = Util.listFiles(sourceDir, pathname ->
                 !pathname.isHidden() && !pathname.getName().startsWith(".") && pathname.isDirectory());
-        File[] fileList = sourceDir.listFiles(pathname ->
+        File[] fileList = Util.listFiles(sourceDir, pathname ->
                 !pathname.isHidden() && !pathname.getName().startsWith(".") && !pathname.isDirectory());
         // listFiles() returns whatever order the filesystem hands back, which can
         // differ between two builds of the same input (the app classes are
@@ -171,7 +172,7 @@ public class ByteCodeTranslator {
                 } else {
                     if(!f.isDirectory() && !isBuildMetadata(f)) {
                         // copy the file to the dest dir
-                        copy(Files.newInputStream(f.toPath()), Files.newOutputStream(new File(outputDir, f.getName()).toPath()));
+                        copy(new FileInputStream(f), new FileOutputStream(new File(outputDir, f.getName())));
                     }
                 }
             }
@@ -198,7 +199,7 @@ public class ByteCodeTranslator {
             if(f.isDirectory()) {
                 copyDir(f, destFile);
             } else {
-                copy(Files.newInputStream(f.toPath()), Files.newOutputStream(new File(destFile, f.getName()).toPath()));
+                copy(new FileInputStream(f), new FileOutputStream(new File(destFile, f.getName())));
             }
         }
     }
@@ -212,7 +213,7 @@ public class ByteCodeTranslator {
      * engine compiled in. Set by the platform builders from their class scan.
      */
     static boolean isBundledSqliteEnabled() {
-        return "true".equals(System.getProperty("cn1.sqlite", "false"));
+        return "true".equals(Util.getProperty("cn1.sqlite", "false"));
     }
 
     /**
@@ -220,7 +221,7 @@ public class ByteCodeTranslator {
      * system libsqlite3, which has no cipher support, with the bundled engine.
      */
     static boolean isBundledSqliteCipherEnabled() {
-        return "true".equals(System.getProperty("cn1.sqlcipher", "false"));
+        return "true".equals(Util.getProperty("cn1.sqlcipher", "false"));
     }
 
     /**
@@ -253,7 +254,7 @@ public class ByteCodeTranslator {
      * shipping target.
      */
     public static boolean isCheckedCastsEnabled() {
-        return "true".equalsIgnoreCase(System.getProperty("cn1.checkedCasts", "false"));
+        return "true".equalsIgnoreCase(Util.getProperty("cn1.checkedCasts", "false"));
     }
 
     /// Writes the bundled SQLite engine into a source root, or takes it back out.
@@ -276,12 +277,12 @@ public class ByteCodeTranslator {
         File sqliteCipherMarker = new File(srcRoot, "cn1_sqlite3_cipher.h");
         if (isBundledSqliteEnabled()) {
             copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3.c"),
-                    Files.newOutputStream(sqliteUnity.toPath()));
+                    new FileOutputStream(sqliteUnity));
             replaceInFile(sqliteUnity, "//#define CN1_INCLUDE_SQLITE", "#define CN1_INCLUDE_SQLITE");
             copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3.h"),
-                    Files.newOutputStream(sqliteHeader.toPath()));
+                    new FileOutputStream(sqliteHeader));
             copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3_amalgamation.h"),
-                    Files.newOutputStream(sqliteAmalgamation.toPath()));
+                    new FileOutputStream(sqliteAmalgamation));
         } else {
             deleteIfPresent(sqliteUnity);
             deleteIfPresent(sqliteHeader);
@@ -294,7 +295,7 @@ public class ByteCodeTranslator {
             // flags. Emitted only for an application that configures encryption, so everyone else
             // compiles the engine as plain SQLite and links no keying code at all.
             copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3_cipher.h"),
-                    Files.newOutputStream(sqliteCipherMarker.toPath()));
+                    new FileOutputStream(sqliteCipherMarker));
         } else {
             // Left behind, this would put the ciphers back into an engine emitted without them --
             // __has_include does not care which run wrote the file.
@@ -341,7 +342,7 @@ public class ByteCodeTranslator {
         final String appType = args[7];
         final String addFrameworks = args[8];
         // we accept 3 argument output types, input directory and output directory
-        if (System.getProperty("saveUnitTests", "false").equals("true")) {
+        if (Util.getProperty("saveUnitTests", "false").equals("true")) {
             System.out.println("Generating Unit Tests");
             ByteCodeClass.setSaveUnitTests(true);
         }
@@ -358,7 +359,7 @@ public class ByteCodeTranslator {
             // Unrecognized output type falls back to the plain copy-through default handler
             recognizedOutputType = false;
         }
-        String[] sourceDirectories = args[1].split(";");
+        String[] sourceDirectories = Util.splitLiteral(args[1], ';');
         File[] sources = new File[sourceDirectories.length];
         for(int iter = 0 ; iter < sourceDirectories.length ; iter++) {
             sources[iter] = new File(sourceDirectories[iter]);
@@ -436,31 +437,31 @@ public class ByteCodeTranslator {
         b.execute(sources, srcRoot);
 
         File cn1Globals = new File(srcRoot, "cn1_globals.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), Files.newOutputStream(cn1Globals.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), new FileOutputStream(cn1Globals));
         File cn1Intrinsics = new File(srcRoot, "cn1_intrinsics.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_intrinsics.h"), Files.newOutputStream(cn1Intrinsics.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_intrinsics.h"), new FileOutputStream(cn1Intrinsics));
         // Virtual threads: the switch is a few instructions of assembly per
         // architecture, so the .S travels with the runtime rather than being
         // generated. A project that gets the C and not the .S links against a
         // missing symbol, which is at least loud.
         emitVirtualThreadRuntime(srcRoot);
-        if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
+        if (Util.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
-        if ("true".equalsIgnoreCase(System.getProperty("cn1.onDeviceDebug", "false"))) {
+        if ("true".equalsIgnoreCase(Util.getProperty("cn1.onDeviceDebug", "false"))) {
             replaceInFile(cn1Globals, "//#define CN1_ON_DEVICE_DEBUG", "#define CN1_ON_DEVICE_DEBUG");
         }
         File cn1GlobalsC = new File(srcRoot, "cn1_globals.c");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), Files.newOutputStream(cn1GlobalsC.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsC));
         File nativeMethodsC = new File(srcRoot, "nativeMethods.c");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), Files.newOutputStream(nativeMethodsC.toPath()));
-        if (System.getProperty("USE_RPMALLOC", "false").equals("true")) {
+        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethodsC));
+        if (Util.getProperty("USE_RPMALLOC", "false").equals("true")) {
             File malloc = new File(srcRoot, "malloc.c");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), Files.newOutputStream(malloc.toPath()));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), new FileOutputStream(malloc));
             File rpmalloc = new File(srcRoot, "rpmalloc.c");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.c"), Files.newOutputStream(rpmalloc.toPath()));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.c"), new FileOutputStream(rpmalloc));
             File rpmalloch = new File(srcRoot, "rpmalloc.h");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), Files.newOutputStream(rpmalloch.toPath()));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), new FileOutputStream(rpmalloch));
         }
         // The bundled SQLite engine is emitted only for applications that actually use
         // com.codename1.db, so everyone else pays nothing for it. cn1_sqlite3.c is gated on
@@ -470,31 +471,31 @@ public class ByteCodeTranslator {
         // the engine is present and as stubs when it is not, so an application that references
         // com.codename1.db links regardless of how the translator was invoked.
         File sqliteBindings = new File(srcRoot, "cn1_db_sqlite_impl.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_db_sqlite_impl.h"), Files.newOutputStream(sqliteBindings.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_db_sqlite_impl.h"), new FileOutputStream(sqliteBindings));
         emitBundledSqlite(srcRoot);
         File xmlvm = new File(srcRoot, "xmlvm.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), Files.newOutputStream(xmlvm.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
 
         // Win32 POSIX compatibility shim. Always emitted; both files are gated on
         // _WIN32 internally, so they compile to nothing on iOS/macOS/Linux and
         // provide pthreads/usleep/gettimeofday on Windows (clang-cl / MSVC ABI).
         File cn1WinCompatH = new File(srcRoot, "cn1_win_compat.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_win_compat.h"), Files.newOutputStream(cn1WinCompatH.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_win_compat.h"), new FileOutputStream(cn1WinCompatH));
         File cn1WinCompatC = new File(srcRoot, "cn1_win_compat.c");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_win_compat.c"), Files.newOutputStream(cn1WinCompatC.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_win_compat.c"), new FileOutputStream(cn1WinCompatC));
 
         Parser.writeOutput(srcRoot);
 
         File javaIoFileHeader = new File(srcRoot, "java_io_File.h");
         if (javaIoFileHeader.exists()) {
             File javaIoFileC = new File(srcRoot, "java_io_File_runtime.c");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), Files.newOutputStream(javaIoFileC.toPath()));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileC));
         }
 
         File classMethodIndexM = new File(srcRoot, "cn1_class_method_index.m");
         if (classMethodIndexM.exists()) {
             File classMethodIndexC = new File(srcRoot, "cn1_class_method_index.c");
-            copy(Files.newInputStream(classMethodIndexM.toPath()), Files.newOutputStream(classMethodIndexC.toPath()));
+            copy(new FileInputStream(classMethodIndexM), new FileOutputStream(classMethodIndexC));
             if(!classMethodIndexM.delete()) {
                 System.err.println("Deletion of " + classMethodIndexM.getAbsolutePath() + " failed");
             }
@@ -563,14 +564,14 @@ public class ByteCodeTranslator {
             int id = 1;
             for (java.util.Map.Entry<String, File> e : resources.entrySet()) {
                 File staged = new File(resDir, "res" + id);
-                copy(Files.newInputStream(e.getValue().toPath()), Files.newOutputStream(staged.toPath()));
+                copy(new FileInputStream(e.getValue()), new FileOutputStream(staged));
                 // RC filenames are resolved relative to the .rc (srcRoot); llvm-rc and
                 // rc.exe both accept forward slashes.
                 rc.append(id).append(" RCDATA \"cn1_resources/res").append(id).append("\"\n");
                 table.append("    {\"").append(escapeCString(e.getKey())).append("\", ").append(id).append("},\n");
                 id++;
             }
-            Files.write(new File(srcRoot, "cn1_resources.rc").toPath(),
+            Util.writeBytes(new File(srcRoot, "cn1_resources.rc"),
                     rc.toString().getBytes(StandardCharsets.UTF_8));
         }
 
@@ -583,7 +584,7 @@ public class ByteCodeTranslator {
         table.append("    }\n");
         table.append("    return 0;\n");
         table.append("}\n");
-        Files.write(new File(srcRoot, "cn1_resources_table.c").toPath(),
+        Util.writeBytes(new File(srcRoot, "cn1_resources_table.c"),
                 table.toString().getBytes(StandardCharsets.UTF_8));
     }
 
@@ -632,7 +633,7 @@ public class ByteCodeTranslator {
             int id = 1;
             for (java.util.Map.Entry<String, File> e : resources.entrySet()) {
                 File staged = new File(resDir, "res" + id);
-                copy(Files.newInputStream(e.getValue().toPath()), Files.newOutputStream(staged.toPath()));
+                copy(new FileInputStream(e.getValue()), new FileOutputStream(staged));
                 // Absolute path so .incbin resolves regardless of the assembler's
                 // working directory (the build runs out of a separate build dir).
                 String incPath = escapeCString(staged.getAbsolutePath().replace('\\', '/'));
@@ -646,7 +647,7 @@ public class ByteCodeTranslator {
                         .append("[]; extern const unsigned char cn1res_").append(id).append("_end[];\n");
                 id++;
             }
-            Files.write(new File(srcRoot, "cn1_resources_data.S").toPath(),
+            Util.writeBytes(new File(srcRoot, "cn1_resources_data.S"),
                     asm.toString().getBytes(StandardCharsets.UTF_8));
         }
 
@@ -671,7 +672,7 @@ public class ByteCodeTranslator {
         table.append("    if (lenOut) { *lenOut = 0; }\n");
         table.append("    return 0;\n");
         table.append("}\n");
-        Files.write(new File(srcRoot, "cn1_resources_table.c").toPath(),
+        Util.writeBytes(new File(srcRoot, "cn1_resources_table.c"),
                 table.toString().getBytes(StandardCharsets.UTF_8));
     }
 
@@ -700,7 +701,7 @@ public class ByteCodeTranslator {
                     || ext.equals("mm") || ext.equals("rc")) {
                 continue;
             }
-            String rel = root.toPath().relativize(f.toPath()).toString().replace('\\', '/');
+            String rel = Util.relativePath(root, f);
             String key = "/" + rel;
             if (!out.containsKey(key)) {
                 out.put(key, f);
@@ -761,7 +762,7 @@ public class ByteCodeTranslator {
             launchImageLaunchimage.mkdirs();
             //cleanDir(launchImageLaunchimage);
 
-            copy(ByteCodeTranslator.class.getResourceAsStream("/LaunchImages.json"), Files.newOutputStream(new File(launchImageLaunchimage, "Contents.json").toPath()));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/LaunchImages.json"), new FileOutputStream(new File(launchImageLaunchimage, "Contents.json")));
         }
 
         File appIconAppiconset = new File(imagesXcassets, "AppIcon.appiconset");
@@ -772,7 +773,7 @@ public class ByteCodeTranslator {
         // wants the 16..512 @1x/@2x "mac" idiom ladder.
         copy(ByteCodeTranslator.class.getResourceAsStream(
                         platform.hasIosDeviceIdioms() ? "/Icons.json" : "/Icons-macos.json"),
-                Files.newOutputStream(new File(appIconAppiconset, "Contents.json").toPath()));
+                new FileOutputStream(new File(appIconAppiconset, "Contents.json")));
 
 
         File xcproj = new File(root, appName + ".xcodeproj");
@@ -785,34 +786,34 @@ public class ByteCodeTranslator {
         b.execute(sources, srcRoot);
 
         File cn1Globals = new File(srcRoot, "cn1_globals.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), Files.newOutputStream(cn1Globals.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), new FileOutputStream(cn1Globals));
         File cn1Intrinsics = new File(srcRoot, "cn1_intrinsics.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_intrinsics.h"), Files.newOutputStream(cn1Intrinsics.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_intrinsics.h"), new FileOutputStream(cn1Intrinsics));
         // Virtual threads: the switch is a few instructions of assembly per
         // architecture, so the .S travels with the runtime rather than being
         // generated. A project that gets the C and not the .S links against a
         // missing symbol, which is at least loud.
         emitVirtualThreadRuntime(srcRoot);
-        if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
+        if (Util.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
-        if ("true".equalsIgnoreCase(System.getProperty("cn1.onDeviceDebug", "false"))) {
+        if ("true".equalsIgnoreCase(Util.getProperty("cn1.onDeviceDebug", "false"))) {
             replaceInFile(cn1Globals, "//#define CN1_ON_DEVICE_DEBUG", "#define CN1_ON_DEVICE_DEBUG");
         }
         File cn1GlobalsM = new File(srcRoot, "cn1_globals.m");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), Files.newOutputStream(cn1GlobalsM.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsM));
         File nativeMethods = new File(srcRoot, "nativeMethods.m");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), Files.newOutputStream(nativeMethods.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
         File javaIoFileM = new File(srcRoot, "java_io_File.m");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), Files.newOutputStream(javaIoFileM.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileM));
 
-        if (System.getProperty("USE_RPMALLOC", "false").equals("true")) {
+        if (Util.getProperty("USE_RPMALLOC", "false").equals("true")) {
             File malloc = new File(srcRoot, "malloc.c");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), Files.newOutputStream(malloc.toPath()));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), new FileOutputStream(malloc));
             File rpmalloc = new File(srcRoot, "rpmalloc.c");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.c"), Files.newOutputStream(rpmalloc.toPath()));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.c"), new FileOutputStream(rpmalloc));
             File rpmalloch = new File(srcRoot, "rpmalloc.h");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), Files.newOutputStream(rpmalloch.toPath()));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), new FileOutputStream(rpmalloch));
         }
         // The bundled SQLite engine is emitted only for applications that actually use
         // com.codename1.db, so everyone else pays nothing for it. cn1_sqlite3.c is gated on
@@ -822,29 +823,29 @@ public class ByteCodeTranslator {
         // the engine is present and as stubs when it is not, so an application that references
         // com.codename1.db links regardless of how the translator was invoked.
         File sqliteBindings = new File(srcRoot, "cn1_db_sqlite_impl.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_db_sqlite_impl.h"), Files.newOutputStream(sqliteBindings.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_db_sqlite_impl.h"), new FileOutputStream(sqliteBindings));
         emitBundledSqlite(srcRoot);
 
         Parser.writeOutput(srcRoot);
 
         File templateInfoPlist = new File(srcRoot, appName + "-Info.plist");
-        copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template/template-Info.plist"), Files.newOutputStream(templateInfoPlist.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template/template-Info.plist"), new FileOutputStream(templateInfoPlist));
 
         File templatePch = new File(srcRoot, appName + "-Prefix.pch");
-        copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template/template-Prefix.pch"), Files.newOutputStream(templatePch.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template/template-Prefix.pch"), new FileOutputStream(templatePch));
 
         File xmlvm = new File(srcRoot, "xmlvm.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), Files.newOutputStream(xmlvm.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
 
         File projectWorkspaceData = new File(projectXCworkspace, "contents.xcworkspacedata");
-        copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template.xcodeproj/project.xcworkspace/contents.xcworkspacedata"), Files.newOutputStream(projectWorkspaceData.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template.xcodeproj/project.xcworkspace/contents.xcworkspacedata"), new FileOutputStream(projectWorkspaceData));
         replaceInFile(projectWorkspaceData, "KitchenSink", appName);
 
 
         File projectPbx = new File(xcproj, "project.pbxproj");
-        copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template.xcodeproj/project.pbxproj"), Files.newOutputStream(projectPbx.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template.xcodeproj/project.pbxproj"), new FileOutputStream(projectPbx));
 
-        String[] sourceFiles = srcRoot.list((pathname, string) ->
+        String[] sourceFiles = Util.list(srcRoot, (pathname, string) ->
                 string.endsWith(".bundle") || string.endsWith(".xcdatamodeld") || !pathname.isHidden() && !string.startsWith(".") && !"Images.xcassets".equals(string));
 
         StringBuilder fileOneEntry = new StringBuilder();
@@ -861,7 +862,7 @@ public class ByteCodeTranslator {
 
         List<String> includeFrameworks = new ArrayList<>();
         Set<String> optionalFrameworks = new HashSet<>();
-        for (String optionalFramework : System.getProperty("optional.frameworks", "").split(";")) {
+        for (String optionalFramework : Util.splitLiteral(Util.getProperty("optional.frameworks", ""), ';')) {
             optionalFramework = optionalFramework.trim();
             if (!optionalFramework.isEmpty()) {
                 optionalFrameworks.add(optionalFramework);
@@ -918,7 +919,7 @@ public class ByteCodeTranslator {
         includeFrameworks.add("libz.dylib");
         includeFrameworks.add("AVKit.framework");
         if(!addFrameworks.equalsIgnoreCase("none")) {
-            includeFrameworks.addAll(Arrays.asList(addFrameworks.split(";")));
+            includeFrameworks.addAll(Arrays.asList(Util.splitLiteral(addFrameworks, ';')));
         }
 
         int currentValue = 0xF63EAAA;
@@ -1064,7 +1065,7 @@ public class ByteCodeTranslator {
                     "***FRAMEWORKS2***", frameworks2.toString(), "***RESOURCES***", resources.toString());
         }
 
-        String bundleVersion = System.getProperty("bundleVersionNumber", appVersion);
+        String bundleVersion = Util.getProperty("bundleVersionNumber", appVersion);
         replaceInFile(templateInfoPlist, "com.codename1pkg", appPackageName, "${PRODUCT_NAME}", appDisplayName, "VERSION_VALUE", appVersion, "VERSION_BUNDLE_VALUE", bundleVersion);
     }
 
@@ -1082,7 +1083,7 @@ public class ByteCodeTranslator {
         boolean windows = "windows".equalsIgnoreCase(appType);
         boolean linux = "linux".equalsIgnoreCase(appType);
         boolean executable = windows || linux;
-        try (Writer writer = new OutputStreamWriter(Files.newOutputStream(cmakeLists.toPath()), StandardCharsets.UTF_8)) {
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(cmakeLists), "UTF-8")) {
             writer.append("cmake_minimum_required(VERSION 3.10)\n");
             // The native Windows port mixes the translated C runtime with a C++
             // layer for the COM APIs that have no C binding (DirectWrite), so the
@@ -1472,12 +1473,12 @@ public class ByteCodeTranslator {
     // to be mutated. Also, expire the temporary byte[] buffer so it can
     // be collected.
     //
-    private static StringBuilder readFileAsStringBuilder(File sourceFile) throws IOException
+    private static String readFileAsString(File sourceFile) throws IOException
     {
-        try(DataInputStream dis = new DataInputStream(Files.newInputStream(sourceFile.toPath()))) {
+        try(DataInputStream dis = new DataInputStream(new FileInputStream(sourceFile))) {
             byte[] data = new byte[(int) sourceFile.length()];
             dis.readFully(data);
-            return new StringBuilder(new String(data, StandardCharsets.UTF_8));
+            return new String(data, StandardCharsets.UTF_8);
         }
     }
     //
@@ -1488,21 +1489,33 @@ public class ByteCodeTranslator {
     // process for large projects.  
     //
     private static void replaceInFile(File sourceFile, String... values) throws IOException {
-        StringBuilder str = readFileAsStringBuilder(sourceFile);
+        String str = readFileAsString(sourceFile);
         int totchanges = 0;
 
-    	// perform the mutations on stringbuilder, which ought to implement
-        // these operations efficiently.
+        // One pass per target, appending the untouched runs into a fresh builder
+        // rather than mutating in place. StringBuilder.indexOf/replace do not exist
+        // in ParparVM's JavaAPI, which the translator has to compile against in
+        // order to translate itself; this keeps the same single-buffer-per-pass
+        // memory shape the in-place version had, so the OutOfMemoryError this
+        // method was written to avoid stays avoided.
         for (int iter = 0; iter < values.length; iter += 2) {
             String target = values[iter];
             String replacement = values[iter + 1];
-            int index = 0;
-            while ((index = str.indexOf(target, index)) >= 0) {
-                int targetSize = target.length();
-                str.replace(index, index + targetSize, replacement);
-                index += replacement.length();
+            int index = str.indexOf(target);
+            if (index < 0) {
+                continue;
+            }
+            StringBuilder rewritten = new StringBuilder(str.length());
+            int from = 0;
+            while (index >= 0) {
+                rewritten.append(str, from, index);
+                rewritten.append(replacement);
+                from = index + target.length();
+                index = str.indexOf(target, from);
                 totchanges++;
             }
+            rewritten.append(str, from, str.length());
+            str = rewritten.toString();
         }
 
         //
@@ -1511,8 +1524,8 @@ public class ByteCodeTranslator {
         if(verbose) {
             System.out.println("Rewrite " + sourceFile + " with " + totchanges + " changes");
         }
-        try(Writer fios = new OutputStreamWriter(Files.newOutputStream(sourceFile.toPath()), StandardCharsets.UTF_8)) {
-            fios.write(str.toString());
+        try(Writer fios = new OutputStreamWriter(new FileOutputStream(sourceFile), "UTF-8")) {
+            fios.write(str);
         }
     }
     
@@ -1569,7 +1582,7 @@ public class ByteCodeTranslator {
                 // cause, where the link error later names only a symbol.
                 throw new IOException("virtual-thread runtime resource missing: " + name);
             }
-            copy(in, Files.newOutputStream(new File(srcRoot, name).toPath()));
+            copy(in, new FileOutputStream(new File(srcRoot, name)));
         }
     }
 
