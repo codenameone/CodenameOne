@@ -135,25 +135,50 @@ class InviteConsentAndErasureTest extends UITestBase {
     }
 
     @FormTest
-    void nothingIsTransmittedBeforeConsentAndTheProfileIsDeletedIfRefused() {
+    void nothingIsTransmittedBeforeAChoiceAndTheProfileIsDeletedIfRefused() {
+        // "No choice yet" is null, NOT AnalyticsConsent.none() -- none() is an
+        // explicit refusal, and this test used to conflate the two. The
+        // distinction is the whole point: an unanswered prompt still captures
+        // the profile, because the match window closes long before a user gets
+        // round to answering.
         InviteTestSupport.freshInstall();
         Analytics.setConsentMode(ConsentMode.OPT_IN);
-        Analytics.setConsent(AnalyticsConsent.none());
+        Analytics.setConsent(null);
         implementation.clearQueuedRequests();
         implementation.setAutoProcessConnections(false);
 
         Invites.checkForInvite();
 
         assertEquals(0, implementation.getQueuedRequests().size(),
-                "nothing may leave the device before consent");
-        // The profile is held locally so a deferred match is still possible if
-        // consent arrives inside the window.
-        assertTrue(Storage.getInstance().exists(InviteStore.PENDING));
+                "nothing may leave the device before a choice is made");
+        assertTrue(Storage.getInstance().exists(InviteStore.PENDING),
+                "an unanswered prompt must still capture the profile");
 
         Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
 
         assertFalse(Storage.getInstance().exists(InviteStore.PENDING),
                 "a refused profile must be deleted, not held");
+        assertEquals(Invites.STATE_DECLINED, Invites.getState());
+    }
+
+    @FormTest
+    void anAlreadyRefusedUserNeverGetsAProfileWrittenAtAll() {
+        // The earlier hole: the record was created and persisted BEFORE the
+        // consent check, and onConsentChanged only deletes a record that exists
+        // when it runs. So a user who had already refused got a profile written
+        // on the next launch and it stayed there indefinitely -- contradicting
+        // the documented promise that a refused profile is deleted.
+        InviteTestSupport.freshInstall();
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+        implementation.clearQueuedRequests();
+        implementation.setAutoProcessConnections(false);
+
+        Invites.checkForInvite();
+
+        assertFalse(Storage.getInstance().exists(InviteStore.PENDING),
+                "a refused user must never have a profile written");
+        assertEquals(0, implementation.getQueuedRequests().size());
         assertEquals(Invites.STATE_DECLINED, Invites.getState());
     }
 

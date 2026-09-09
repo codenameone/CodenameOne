@@ -218,8 +218,8 @@ final class BuildHintsIos {
                         + "`ios.associatedDomains` and requests the matching "
                         + "`com.apple.developer.associated-domains` entitlement. Set it to `false` "
                         + "to manage both yourself. The provisioning profile must grant the "
-                        + "Associated Domains capability either way, or invite links silently "
-                        + "open Safari instead of the app."));
+                        + "Associated Domains capability either way, or invite links open Safari "
+                        + "instead of the app with no error reported."));
 
         h.add(new Hint("ios.associatedDomains")
                 .group(HintGroup.IOS)

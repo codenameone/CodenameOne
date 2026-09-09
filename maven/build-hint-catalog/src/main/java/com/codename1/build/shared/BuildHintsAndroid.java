@@ -1251,9 +1251,10 @@ final class BuildHintsAndroid {
                         + "hex, enrolled in the shared `assetlinks.json` alongside the one derived "
                         + "from the build's keystore. Apps distributed through Play App Signing "
                         + "must add the app signing certificate fingerprint from the Play Console "
-                        + "here: Google re-signs the app, so the upload key the build holds is not "
-                        + "the certificate Android verifies against, and App Links verification "
-                        + "fails silently on every Play install without it."));
+                        + "here: Google re-signs the app, so the upload key the build holds isn't "
+                        + "the certificate Android verifies against. Without it, App Links "
+                        + "verification fails on every Play install and nothing reports an "
+                        + "error."));
 
         h.add(new Hint("android.xlargeScreens")
                 .group(HintGroup.ANDROID)

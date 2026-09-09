@@ -176,6 +176,10 @@ public final class Invites {
     private static final String PATH_MATCH = "/api/v2/analytics/invites/match";
 
     // Package private so the unit tests can clear them between cases.
+    /// Display property carrying the invite host the build registered, stamped
+    /// by the builders from the `invite.domain` build hint.
+    static final String PROPERTY_DOMAIN = "invite.domain";
+
     static final String PREF_SLUG = "cn1$inviteSlug";
     static final String PREF_CONSUMED_ARG = "cn1$inviteConsumedArg";
 
@@ -562,6 +566,15 @@ public final class Invites {
             return trimSlash(linkBase);
         }
         Display d = Display.getInstance();
+        // The host the BUILD registered, stamped into the app by the builders
+        // from the invite.domain hint. Without this the client happily minted
+        // links for the default host while the generated Android intent filter
+        // and iOS associated domain named a custom one, so an installed app
+        // never opened its own links and nothing anywhere reported an error.
+        String host = d == null ? null : d.getProperty(PROPERTY_DOMAIN, null);
+        if (host != null && host.length() > 0) {
+            return trimSlash(host.indexOf("://") >= 0 ? host : "https://" + host);
+        }
         String base = d == null ? DEFAULT_BASE_URL
                 : d.getProperty("cloudServerURL", DEFAULT_BASE_URL);
         if (base == null || base.length() == 0) {
@@ -735,6 +748,13 @@ public final class Invites {
     // AnalyticsService forces exactly that for legacy callers -- and sending
     // a device profile under an implicit allow is not defensible. Everything
     // else uses allowed().
+    // A recorded choice that says no. Distinct from "no choice yet", which
+    // must never be treated as a refusal.
+    private static boolean explicitlyDenied() {
+        AnalyticsConsent c = Analytics.getConsent();
+        return c != null && !c.isAnalytics();
+    }
+
     private static boolean explicitlyAllowed() {
         AnalyticsConsent c = Analytics.getConsent();
         return c != null && c.isAnalytics();
@@ -936,6 +956,20 @@ public final class Invites {
         if (attributionWindow == 0) {
             setState(STATE_NONE_FOUND);
             notifyUnavailable(REASON_UNSUPPORTED);
+            return;
+        }
+        // Checked BEFORE the profile is created, not after. pendingRecord()
+        // persists on the spot, and onConsentChanged only deletes a record that
+        // already exists when it runs -- so creating one here for a user who
+        // had already refused left it on the device indefinitely, contradicting
+        // the documented promise that a refused profile is deleted. An UNSET
+        // choice still captures, which is the whole point: the match window
+        // closes long before a consent prompt is answered.
+        if (explicitlyDenied()) {
+            InviteStore.delete(InviteStore.PENDING);
+            state = STATE_DECLINED;
+            stateLoaded = true;
+            notifyUnavailable(REASON_CONSENT_DENIED);
             return;
         }
         Map<String, String> pending = pendingRecord();
@@ -1185,6 +1219,12 @@ public final class Invites {
             }
             applySlug(payload);
             if (!truthy(json.get("resolved"))) {
+                // Terminal, and it has to be durable. Leaving the pending
+                // record at STATE_PENDING meant loadState() resurrected the
+                // lookup on every launch, so an ordinary uninvited install
+                // re-queried the server and re-fired attributionUnavailable
+                // for ever.
+                InviteStore.delete(InviteStore.PENDING);
                 state = STATE_NONE_FOUND;
                 stateLoaded = true;
                 notifyUnavailable(REASON_NO_MATCH);
@@ -1252,8 +1292,13 @@ public final class Invites {
                     JSONParser.mapToJson(new LinkedHashMap<String, Object>(a.getParameters())));
         }
         record.put("delivered", "false");
-        InviteStore.write(InviteStore.ATTRIBUTION, record);
-        InviteStore.delete(InviteStore.PENDING);
+        // Storage was chosen over Preferences precisely because it reports a
+        // failed write, so the result is checked. Deleting the pending record
+        // after a failed write would leave neither an attribution nor any retry
+        // information, losing the resolution permanently at the next restart.
+        if (InviteStore.write(InviteStore.ATTRIBUTION, record)) {
+            InviteStore.delete(InviteStore.PENDING);
+        }
         resolved = a;
         attributionLoaded = true;
         state = STATE_RESOLVED;
@@ -1275,13 +1320,14 @@ public final class Invites {
     }
 
     private static void writeDimensions(InviteAttribution a) {
+        // Written unconditionally, nulls included -- setDimension(key, null)
+        // removes the key. Required under re-attribution: a later invite with
+        // no campaign used to leave the PREVIOUS campaign in place, so events
+        // carried the new code beside the old campaign and the last-touch
+        // cohort and its revenue were silently wrong.
         Analytics.setDimension(DIMENSION_CODE, a.getCode());
-        if (a.getCampaign() != null) {
-            Analytics.setDimension(DIMENSION_CAMPAIGN, a.getCampaign());
-        }
-        if (a.getChannel() != null) {
-            Analytics.setDimension(DIMENSION_CHANNEL, a.getChannel());
-        }
+        Analytics.setDimension(DIMENSION_CAMPAIGN, a.getCampaign());
+        Analytics.setDimension(DIMENSION_CHANNEL, a.getChannel());
         Analytics.setDimension(DIMENSION_MATCH, a.getMatchType());
     }
 

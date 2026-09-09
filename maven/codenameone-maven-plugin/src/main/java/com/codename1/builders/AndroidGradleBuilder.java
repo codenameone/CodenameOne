@@ -5984,6 +5984,17 @@ public class AndroidGradleBuilder extends Executor {
         // generated string literal -- it owns a connection lifecycle, a
         // reconnect path and a bounded retry, and as a literal it would be
         // invisible to review and to the SpotBugs gate.
+        // The host the app-links filter was generated for, handed to the client
+        // so Invites.getLinkBase() cannot disagree with it. Without this an app
+        // that set invite.domain minted links for the default host while its
+        // intent filter named a custom one, and the installed app never opened
+        // its own links.
+        String inviteDomainProperty = "";
+        if (usesInvites) {
+            inviteDomainProperty = "        Display.getInstance().setProperty(\"invite.domain\", \""
+                    + request.getArg("invite.domain", "cloud.codenameone.com") + "\");\n";
+        }
+
         String inviteRegisterInstall = "";
         if (usesInvites) {
             inviteRegisterInstall = "            com.codename1.analytics.invite.Invites"
@@ -6369,6 +6380,7 @@ public class AndroidGradleBuilder extends Executor {
                             + "        if(firstTime) {\n"
                             + "            firstTime = false;\n"
                             + firebaseRegisterInstall
+                            + inviteDomainProperty
                             + inviteRegisterInstall
                             + svgRegistryInstall
                             + "            i.init(this);\n"

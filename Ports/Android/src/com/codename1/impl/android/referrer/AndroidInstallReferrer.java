@@ -95,19 +95,30 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
                                 requestReferrer(callback);
                                 return;
                             }
-                            finish(callback, Invites.REASON_NO_MATCH);
+                            // Transient, so it is NOT recorded as attempted.
+                            // Burning the once-only flag here would make
+                            // isSupported() false for ever, and a later
+                            // Invites.flush() after the store recovered would
+                            // skip the deterministic path and fall back to a
+                            // statistical guess for a referrer we could have
+                            // read exactly.
+                            callback.onUnavailable(Invites.REASON_NO_MATCH);
                             break;
                         default:
                             // FEATURE_NOT_SUPPORTED is the ordinary answer on a
                             // device with no Play Store -- a sideload, an
                             // emulator without store services, another vendor's
-                            // store. Terminal, and not an error.
+                            // store. Terminal: this device will never have a
+                            // referrer, so the flag is recorded and the bind is
+                            // not attempted again.
                             finish(callback, Invites.REASON_UNSUPPORTED);
                             break;
                     }
                 } catch (Throwable t) {
+                    // Unknown failure: treated as transient, so a later flush
+                    // can still read a referrer that is genuinely there.
                     Log.e(t);
-                    finish(callback, Invites.REASON_UNSUPPORTED);
+                    callback.onUnavailable(Invites.REASON_NO_MATCH);
                 } finally {
                     close(client);
                 }

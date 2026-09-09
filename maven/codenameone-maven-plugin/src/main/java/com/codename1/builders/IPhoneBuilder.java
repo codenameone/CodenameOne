@@ -3687,6 +3687,16 @@ public class IPhoneBuilder extends Executor {
         if (request.getArg("ios.disableScreenshots", "false").equalsIgnoreCase("true")) {
             disableScreenshots = "        Display.getInstance().setProperty(\"DisableScreenshots\", \"true\");\n";
         }
+        // The host the associated domain was generated for, handed to the
+        // client so Invites.getLinkBase() cannot disagree with it. Without this
+        // an app that set invite.domain minted links for the default host while
+        // its entitlement named a custom one, and the installed app never
+        // opened its own links.
+        String inviteDomainProperty = "";
+        if (usesInvites) {
+            inviteDomainProperty = "        Display.getInstance().setProperty(\"invite.domain\", \""
+                    + request.getArg("invite.domain", "cloud.codenameone.com") + "\");\n";
+        }
         String dbLegacy = databaseLegacyStubProperty(request, usesDatabase);
 
         // If the build-time SVG transcoder produced a registry class, weave
@@ -3872,6 +3882,7 @@ public class IPhoneBuilder extends Executor {
                     + hardeningRuntimeProperties(request)
                     + newStorage
                     + disableScreenshots
+                    + inviteDomainProperty
                     + dbLegacy
                     + adPadding
                     + integrateFacebook
