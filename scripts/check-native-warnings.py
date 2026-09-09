@@ -294,10 +294,16 @@ def classify(diags, manifest, leg):
             else:
                 unattributed.append(d)
             continue
-        if any(marker in norm for marker in SDK_MARKERS):
-            d.group, d.identity = "sdk", name
-        elif any(marker in norm for marker in VENDORED_MARKERS):
+        # Vendored is tested first because its markers are the more specific ones.
+        # "/Library/Developer/" matches a developer's own
+        # ~/Library/Developer/Xcode/DerivedData, so checking SDK first labelled a
+        # Swift package checkout as an Apple SDK header. Neither group gates, so
+        # this only ever affected what the report claimed -- but a census nobody
+        # believes is no better than no census.
+        if any(marker in norm for marker in VENDORED_MARKERS):
             d.group, d.identity = "vendored", name
+        elif any(marker in norm for marker in SDK_MARKERS):
+            d.group, d.identity = "sdk", name
         else:
             unattributed.append(d)
     return unattributed
