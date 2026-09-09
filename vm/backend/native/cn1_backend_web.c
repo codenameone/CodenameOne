@@ -170,7 +170,27 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
     curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, cn1WebHeader);
     curl_easy_setopt(curl, CURLOPT_HEADERDATA, r);
     curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, r->error);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    /* Following a redirect RESENDS the caller's headers to wherever it points.
+       libcurl drops Authorization when the host changes, but it knows nothing
+       about X-Api-Key, X-Amz-Security-Token or any other bearer a caller
+       invented, and those go to the new host in full. A 3xx from a service that
+       has been taken over, or simply one that redirects off-domain, is then
+       enough to hand an attacker the credential -- the caller never sees where
+       its header went.
+       So redirects are followed freely only when the caller supplied NO headers,
+       where there is nothing to leak. With headers, following is restricted to
+       the same host where libcurl can express that, and otherwise not done at
+       all: the 3xx and its Location are returned as the response, which the
+       caller can act on deliberately. */
+    if(headers == NULL) {
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    } else {
+#ifdef CURLFOLLOW_SAMEHOST
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, (long)CURLFOLLOW_SAMEHOST);
+#else
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
+#endif
+    }
     curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);

@@ -247,6 +247,27 @@ public final class HttpServer {
          * name against a plain one would silently miss the parameter.
          */
         private boolean nameEquals(String name, int from, int to) {
+            // A DECODED OCTET is compared below, so the thing it is compared
+            // against has to be an octet too. For a non-ASCII name it is not:
+            // "cafe" with an acute e arrives as caf%C3%A9, whose octets are 0xC3
+            // 0xA9, while the Java char is 0xE9 -- no octet ever equals it, and
+            // the parameter reads as absent even though the client sent it
+            // exactly as every client encodes it. Such a name is compared
+            // against its UTF-8 bytes instead. ASCII names, which is nearly all
+            // of them, keep the character path: it is identical for them and
+            // allocates nothing on a per-request code path.
+            byte[] utf8 = null;
+            for(int iter = 0 ; iter < name.length() ; iter++) {
+                if(name.charAt(iter) > 0x7f) {
+                    try {
+                        utf8 = name.getBytes("UTF-8");
+                    } catch (IOException err) {
+                        return false;   // it cannot be encoded, so it cannot match
+                    }
+                    break;
+                }
+            }
+            int wanted = utf8 == null ? name.length() : utf8.length;
             int index = 0;
             int pos = from;
             while(pos < to) {
@@ -262,13 +283,15 @@ public final class HttpServer {
                 } else if(c == '+') {
                     c = ' ';
                 }
-                if(index >= name.length() || (name.charAt(index) & 0xff) != c) {
+                int want = index >= wanted ? -1
+                        : (utf8 == null ? (name.charAt(index) & 0xff) : (utf8[index] & 0xff));
+                if(want != c) {
                     return false;
                 }
                 index++;
                 pos += width;
             }
-            return index == name.length();
+            return index == wanted;
         }
 
         /**

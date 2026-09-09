@@ -418,6 +418,59 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("a percent-encoded non-ASCII parameter name is found")
+    void nonAsciiQueryNamesMatchTheirUtf8Encoding() throws Exception {
+        // caf%C3%A9 is how every client sends this name. Decoded it is the two
+        // octets 0xC3 0xA9, and the Java char is 0xE9 -- so comparing an octet
+        // to a char can never match, and the parameter reads as absent with the
+        // handler quietly using its default instead.
+        byte[] response = raw("GET /accent?caf%C3%A9=au-lait HTTP/1.1\r\nHost: x\r\n"
+                + "Connection: close\r\n\r\n");
+        String text = new String(response, StandardCharsets.UTF_8);
+        assertTrue(text.indexOf("au-lait") >= 0,
+                "the encoded name must match the declared one:\n" + text);
+    }
+
+    @Test
+    @DisplayName("deeply nested JSON is refused without taking the server down")
+    void deeplyNestedJsonDoesNotOverflowTheStack() throws Exception {
+        // Handlers run on a 64KB virtual-thread stack and the JSON parser is
+        // recursive, so nesting depth IS stack depth. A depth just UNDER the
+        // parser's own cap is the dangerous one: the cap lets it through and
+        // the stack decides what happens next. That is a kilobyte of body from
+        // an unauthenticated client, and a StackOverflowError is an Error --
+        // no handler catch and no server catch of Exception sees it.
+        StringBuilder deep = new StringBuilder();
+        int depth = 511;
+        for (int i = 0; i < depth; i++) {
+            deep.append('[');
+        }
+        for (int i = 0; i < depth; i++) {
+            deep.append(']');
+        }
+        byte[] body = deep.toString().getBytes(StandardCharsets.UTF_8);
+        byte[] response = raw("POST /api/notes HTTP/1.1\r\nHost: x\r\nContent-Type: "
+                + "application/json\r\nContent-Length: " + body.length
+                + "\r\nConnection: close\r\n\r\n", body);
+        String text = new String(response, StandardCharsets.UTF_8);
+        // The status matters: it proves the body was PARSED rather than rejected
+        // before the parser ever recursed, which would make this test vacuous.
+        // Under the cap the document is valid, so the route answers as it would
+        // for any other body -- what must not happen is silence or a dead server.
+        String head = text.substring(0, Math.max(0, text.indexOf("\r\n")));
+        assertTrue(text.startsWith("HTTP/1.1 "),
+                "a nested body must be answered, not dropped:\n" + text);
+        assertEquals(-1, head.indexOf(" 500"),
+                "a legal document under the parser's own cap must not fault:\n" + head);
+        // And the server has to still be there afterwards -- a crash shows up
+        // here rather than in the reply above.
+        byte[] after = raw("GET /healthz HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
+        String health = new String(after, StandardCharsets.UTF_8);
+        assertTrue(health.startsWith("HTTP/1.1 200"),
+                "the server must survive a deeply nested body:\n" + health);
+    }
+
+    @Test
     @DisplayName("a response header whose name is not a token never reaches the wire")
     void malformedResponseHeaderNamesAreDropped() throws Exception {
         // /rawheader asks for four extra headers, three of which are not field

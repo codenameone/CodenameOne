@@ -121,6 +121,14 @@ public class PetServer {
                     return new HttpServer.Response(200, "text/plain",
                             "raw".getBytes("UTF-8"), extra);
                 }
+                // A non-ASCII parameter NAME, spelled as an escape so this source
+                // stays ASCII. Every client percent-encodes such a name as its
+                // UTF-8 octets, so the server has to compare it that way round.
+                if("/accent".equals(stripQuery(target))) {
+                    String value = request.queryParam("caf\u00e9");
+                    return new HttpServer.Response(200, "text/plain",
+                            ("caf\u00e9=" + value).getBytes("UTF-8"));
+                }
                 if(!dispatcher.hasRoute(method, target)) {
                     if(files != null) {
                         HttpServer.Response served = files.handle(request);

@@ -82,6 +82,22 @@ public final class Json {
      * the server's catch of Exception sees it, and the thread dies rather than the
      * request failing. 512 is far past any real document and far short of the
      * stack.
+     *
+     * "Far short of the stack" holds on the PACKAGED runtime too, where handlers
+     * run on a 64KB virtual-thread stack rather than a platform thread's 16MB,
+     * and it is worth saying why because the arithmetic looks alarming until you
+     * know: a translated Java frame keeps its locals and operand stack in
+     * threadStateData->threadObjectStack, a HEAP array, so nesting costs a small
+     * C frame rather than a whole Java one -- that is the reason these stacks
+     * can be small at all (see cn1_virtual_thread.h). Both of the limits that
+     * deep recursion can actually reach are guarded and throw a catchable
+     * StackOverflowError instead of running off the end: the call depth
+     * (CN1_MAX_STACK_CALL_DEPTH) and the object stack itself.
+     *
+     * Measured rather than argued: a body nested 511 deep -- one under this cap,
+     * so the cap does not hide the recursion -- is answered cleanly by the
+     * packaged server on the default 64KB stack, with the server still serving
+     * afterwards. BackendHttpIntegrationTest keeps that as a regression test.
      */
     private static final int MAX_DEPTH = 512;
 

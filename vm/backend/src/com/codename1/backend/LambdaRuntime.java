@@ -120,12 +120,29 @@ public final class LambdaRuntime {
                         + (posted == null ? "none" : String.valueOf(posted.getStatus()))));
             }
         } catch (Exception err) {
-            System.err.println("Failed to post the response for " + requestId + ": " + err);
+            // The result is GONE -- it existed only in the request that just
+            // failed -- so this invocation has to be resolved here or it stays
+            // outstanding until the host times it out, while this loop cheerfully
+            // takes the next one. Reporting the failure is what lets the host
+            // fail it now instead.
+            System.err.println("Failed to post the response for " + requestId + ": " + err
+                    + "; reporting it as an error so the invocation is resolved rather "
+                    + "than left outstanding.");
+            if(!reportError(host, port, requestId, err)) {
+                // Not even the error reached the host, so nothing this process
+                // says is getting through. Stop polling: collecting further
+                // invocations only strands them the same way, and an exited
+                // runtime is something Lambda knows how to recover from.
+                System.err.println("The runtime API is unreachable, so this runtime is "
+                        + "stopping rather than collecting invocations it cannot answer.");
+                return false;
+            }
         }
         return true;
     }
 
-    private static void reportError(String host, int port, String requestId, Exception cause) {
+    /** @return whether the host accepted the report, so a caller can stop. */
+    private static boolean reportError(String host, int port, String requestId, Exception cause) {
         try {
             // The host parses this shape; a plain string body is reported as a
             // malformed error and masks the real failure.
@@ -140,9 +157,12 @@ public final class LambdaRuntime {
                 System.err.println("The Lambda runtime API refused the error report for "
                         + requestId + " with status "
                         + (posted == null ? "none" : String.valueOf(posted.getStatus())));
+                return false;
             }
+            return true;
         } catch (Exception err) {
             System.err.println("Failed to report the error for " + requestId + ": " + err);
+            return false;
         }
     }
 
