@@ -224,7 +224,8 @@ static void cn1H2FreeRequest(CN1H2Request* r) {
         return;
     }
     atomic_fetch_sub_explicit(&cn1H2InboundBytes,
-            (long)(r->bodyLength + r->headerBytes), memory_order_relaxed);
+            (long)(r->bodyLength + r->headerBytes + sizeof(CN1H2Request)),
+            memory_order_relaxed);
     free(r->method);
     free(r->path);
     free(r->scheme);
@@ -288,10 +289,26 @@ static int cn1H2OnBeginHeaders(nghttp2_session* session, const nghttp2_frame* fr
     if(frame->hd.type != NGHTTP2_HEADERS || frame->headers.cat != NGHTTP2_HCAT_REQUEST) {
         return 0;
     }
+    /* The STRUCTURE counts too, not only what arrives in it. It embeds
+       CN1_H2_MAX_HEADERS slots, so one is about a kilobyte before a single
+       header byte is read -- and a client that opens the advertised stream
+       concurrency and sends minimal headers keeps the payload counters near
+       zero while holding one of these per stream, per connection. Counted as
+       what it is: a fixed cost per open request, charged here and released in
+       cn1H2FreeRequest with everything else the request holds. */
+    if(atomic_load_explicit(&cn1H2InboundBytes, memory_order_relaxed)
+            + (long)sizeof(CN1H2Request) > CN1_H2_MAX_PROCESS_INBOUND_BYTES) {
+        /* Refusing the stream rather than the connection: nghttp2 resets this
+           one and the peer's other streams carry on, which is the proportionate
+           answer to a process that is momentarily full. */
+        return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+    }
     r = (CN1H2Request*)calloc(1, sizeof(CN1H2Request));
     if(r == NULL) {
         return NGHTTP2_ERR_CALLBACK_FAILURE;
     }
+    atomic_fetch_add_explicit(&cn1H2InboundBytes, (long)sizeof(CN1H2Request),
+                              memory_order_relaxed);
     r->streamId = frame->hd.stream_id;
     r->next = s->open;
     s->open = r;

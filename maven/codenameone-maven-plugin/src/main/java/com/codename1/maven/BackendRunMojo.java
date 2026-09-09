@@ -107,6 +107,16 @@ public class BackendRunMojo extends AbstractMojo {
 
         String main = mainClass;
         if (main == null || main.length() == 0) {
+            // The generator's own answer first. Annotation processing writes the
+            // entry point it created into META-INF/cn1-backend-main, and that is
+            // a statement of WHICH main to run -- scanning for main methods is a
+            // guess, and it fails the moment the module also holds a demo or a
+            // tool with one: the run is refused as ambiguous though the choice
+            // had already been made. cn1:backend-package reads the same marker,
+            // and the two must not disagree about what the module runs.
+            main = generatedMainClass(classes);
+        }
+        if (main == null || main.length() == 0) {
             main = findMainClass(classes);
         }
 
@@ -150,6 +160,43 @@ public class BackendRunMojo extends AbstractMojo {
      * Deliberately an error when there are several rather than a guess: picking
      * one and running it is how a developer ends up debugging the wrong process.
      */
+    /**
+     * The entry point annotation processing generated, or null when this module
+     * has none -- one written by hand, with no @RestController in it, has no
+     * marker and falls through to the scan below.
+     */
+    private String generatedMainClass(File classesDir) {
+        File marker = new File(classesDir,
+                com.codename1.maven.processors.RestControllerAnnotationProcessor
+                        .MAIN_CLASS_RESOURCE.replace('/', File.separatorChar));
+        if (!marker.isFile()) {
+            return null;
+        }
+        try {
+            byte[] raw = new byte[(int) marker.length()];
+            InputStream in = new java.io.FileInputStream(marker);
+            try {
+                int at = 0;
+                while (at < raw.length) {
+                    int n = in.read(raw, at, raw.length - at);
+                    if (n <= 0) {
+                        break;
+                    }
+                    at += n;
+                }
+            } finally {
+                in.close();
+            }
+            String name = new String(raw, "UTF-8").trim();
+            return name.length() == 0 ? null : name;
+        } catch (IOException err) {
+            // Unreadable is not the same as absent, and the scan below still has
+            // a fair chance of being right; refusing outright would be worse.
+            getLog().warn("cn1: could not read " + marker + ": " + err);
+            return null;
+        }
+    }
+
     private String findMainClass(File classesDir) throws MojoFailureException {
         List<String> found = new ArrayList<String>();
         collectMainClasses(classesDir, classesDir, found);
