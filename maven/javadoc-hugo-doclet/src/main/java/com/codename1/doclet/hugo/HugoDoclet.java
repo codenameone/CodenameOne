@@ -404,8 +404,31 @@ public final class HugoDoclet implements Doclet {
         // left seven documented methods with no page anywhere on the site.
         List<TypeElement> hidden = undocumentedSupertypes(type);
         List<Element> owned = new ArrayList<>(type.getEnclosedElements());
+        // A member is only promoted if no published ancestor already supplies it.
+        // A package private interface can sit behind a documented class that
+        // implements it, and then every descendant was being handed the
+        // interface's abstract methods as its own: GameSceneView declared
+        // "public abstract setup(GraphicsDevice)" though it is concrete and
+        // inherits GameView's implementation, which is what the standard page
+        // lists.
+        Set<String> suppliedByDocumented = signaturesFromDocumentedSupertypes(type);
         for (TypeElement supertype : hidden) {
-            owned.addAll(supertype.getEnclosedElements());
+            for (Element member : supertype.getEnclosedElements()) {
+                // Only an ABSTRACT one is dropped. An abstract method promoted
+                // off an unpublished interface shows a concrete class declaring
+                // something it does not declare -- GameSceneView read
+                // "public abstract setup(GraphicsDevice)" while inheriting
+                // GameView's implementation. A concrete one is the
+                // implementation and has to stay: CompoundAnimation is
+                // unpublished and overrides flush(), so UIMutation would lose the
+                // method that actually runs.
+                if (member instanceof ExecutableElement method
+                        && method.getModifiers().contains(Modifier.ABSTRACT)
+                        && suppliedByDocumented.contains(signatureKey(method))) {
+                    continue;
+                }
+                owned.add(member);
+            }
         }
 
         api.put("nested", nestedRows(type));
@@ -479,6 +502,46 @@ public final class HugoDoclet implements Doclet {
             }
             collectUndocumented(supertype, visited, out);
         }
+    }
+
+    /**
+     * The method signatures a published ancestor of this type already provides.
+     *
+     * <p>Those are inherited, and the page says so in its inherited block. What
+     * they must not be is promoted a second time as the type's own members off
+     * some unpublished interface further up.
+     */
+    private Set<String> signaturesFromDocumentedSupertypes(TypeElement type) {
+        Set<String> out = new LinkedHashSet<>();
+        Set<String> visited = new LinkedHashSet<>();
+        for (TypeMirror supertype : allSupertypes(type.asType(), visited)) {
+            if (!(supertype instanceof DeclaredType declared)
+                    || !(declared.asElement() instanceof TypeElement element)
+                    || !documented.containsKey(element.getQualifiedName().toString())) {
+                continue;
+            }
+            // Only a published CLASS actually supplies the member. A published
+            // interface merely declares it, and the implementation can still be
+            // on the unpublished class in between: the vision analysers get
+            // process() from the package private AbstractVisionAnalyzer while
+            // VisionAnalyzer only names it, and suppressing on the interface
+            // took the method off all seven pages.
+            if (isInterfaceLike(element)) {
+                continue;
+            }
+            for (ExecutableElement method : ElementFilter.methodsIn(element.getEnclosedElements())) {
+                // And only a CONCRETE one supplies anything. ComponentAnimation
+                // declares flush() abstract and the package private
+                // CompoundAnimation implements it, so UIMutation has to keep the
+                // promoted implementation: an abstract declaration higher up is
+                // not something a reader can call.
+                if (method.getModifiers().contains(Modifier.ABSTRACT)) {
+                    continue;
+                }
+                out.add(signatureKey(method));
+            }
+        }
+        return out;
     }
 
     /** Keeps the first declaration of each signature, so an override wins over what it overrides. */

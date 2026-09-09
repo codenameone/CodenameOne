@@ -22,172 +22,12 @@ Usage:
 from __future__ import annotations
 
 import collections
+import html
 import json
 import pathlib
 import re
 import sys
 import urllib.parse
-from html.parser import HTMLParser
-
-class _LinkCollector(HTMLParser):
-    """Collects ids and internal API hrefs from one page."""
-
-    def __init__(self) -> None:
-        super().__init__(convert_charrefs=True)
-        self.ids: set[str] = set()
-        self.hrefs: list[str] = []
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        values = dict(attrs)
-        identifier = values.get("id")
-        if identifier:
-            self.ids.add(identifier)
-        href = values.get("href")
-        if tag == "a" and href and href.startswith("/javadoc/"):
-            self.hrefs.append(href)
-
-    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        self.handle_starttag(tag, attrs)
-
-
-def check_search_index(hugo: pathlib.Path, index: pathlib.Path) -> int:
-    """Every entry in the API search index must land on a page and an id.
-
-    Its own pass because the index is JSON, not markup: the link checker walks
-    <a href> attributes and cannot see it at all. That blind spot shipped a real
-    defect -- constructors promoted from an undocumented superclass were indexed
-    against <init> fragments on the subclass page, which does not render them --
-    so search offered results that went nowhere.
-    """
-    if not index.exists():
-        print(f"search index not found at {index}; skipping")
-        return 0
-
-    pages = {p.relative_to(hugo).as_posix() for p in hugo.rglob("*.html")}
-    ids: dict[str, set[str]] = {}
-    for path in hugo.rglob("*.html"):
-        collector = _LinkCollector()
-        collector.feed(path.read_text(errors="replace"))
-        collector.close()
-        ids[path.relative_to(hugo).as_posix()] = collector.ids
-
-    payload = json.loads(index.read_text())
-    missing: collections.Counter = collections.Counter()
-    checked = 0
-    for entry in payload.get("types", []):
-        url = entry.get("u", "")
-        if not url.startswith("/javadoc/"):
-            continue
-        target = url[len("/javadoc/"):] or "index.html"
-        # Same normalisation the link pass does: a directory URL is served by the
-        # index.html inside it. Without this every entry looked broken.
-        if target.endswith("/") or not target:
-            target += "index.html"
-        checked += 1
-        if target not in pages:
-            missing[url] += 1
-            continue
-        for member in entry.get("m", []) or []:
-            if len(member) != 2:
-                continue
-            checked += 1
-            if member[1] not in ids[target]:
-                missing[f"{url}#{member[1]}"] += 1
-
-    print(f"search index entries checked: {checked}")
-    if not missing:
-        print("OK: every search result lands on something that exists")
-        return 0
-    print(f"{sum(missing.values())} search entr(ies) pointing at nothing:")
-    for target, count in missing.most_common(15):
-        print(f"  {count:5d}  {target}")
-    return 1
-
-
-def check_internal_links(hugo: pathlib.Path) -> int:
-    """Every /javadoc/ link on the site must land on a page and an id that exist.
-
-    Separate from the parity comparison, and worth its own pass: the generator
-    mints these addresses itself rather than copying them, so it can invent one
-    that resolves to nothing while still reproducing every address javadoc
-    publishes. Both defects this caught were of that shape -- a member promoted
-    off a package private supertype linking into the page that supertype would
-    have had, and a constructor fragment mangled by markdown because "<init>"
-    reads as a delimiter inside a link destination.
-    """
-    pages = {p.relative_to(hugo).as_posix() for p in hugo.rglob("*.html")}
-    parsed: dict[str, _LinkCollector] = {}
-    for path in hugo.rglob("*.html"):
-        collector = _LinkCollector()
-        collector.feed(path.read_text(errors="replace"))
-        collector.close()
-        parsed[path.relative_to(hugo).as_posix()] = collector
-
-    missing_pages: collections.Counter = collections.Counter()
-    missing_anchors: collections.Counter = collections.Counter()
-    checked = 0
-    for collector in parsed.values():
-        for href in collector.hrefs:
-            path_part, _, fragment = href.partition("#")
-            target = path_part[len("/javadoc/"):] or "index.html"
-            if target.endswith("/"):
-                target += "index.html"
-            if target not in pages:
-                missing_pages[target] += 1
-                continue
-            if not fragment:
-                continue
-            checked += 1
-            # A fragment is compared after percent decoding, which is why
-            # encoding one is safe in the first place.
-            if urllib.parse.unquote(fragment) not in parsed[target].ids:
-                missing_anchors[f"{target}#{urllib.parse.unquote(fragment)}"] += 1
-
-    total = sum(missing_pages.values()) + sum(missing_anchors.values())
-    print(f"internal links checked: {checked} fragment link(s) across {len(pages)} page(s)")
-    if not total:
-        print("OK: every internal API link resolves")
-        return 0
-    if missing_pages:
-        print(f"{sum(missing_pages.values())} link(s) to a page that does not exist:")
-        for target, count in missing_pages.most_common(15):
-            print(f"  {count:5d}  /javadoc/{target}")
-    if missing_anchors:
-        print(f"{sum(missing_anchors.values())} link(s) to an id that does not exist:")
-        for target, count in missing_anchors.most_common(15):
-            print(f"  {count:5d}  /javadoc/{target}")
-    return 1
-
-
-class _IdCollector(HTMLParser):
-    """Collects every element's id attribute.
-
-    A real parser rather than a regex over the text, because only one side of
-    this comparison is minified and a pattern that copes with both is a pattern
-    that reads too much. The site is built with --minify and the minifier drops
-    the quotes wherever HTML allows -- `id=top`, and a parenthesised signature is
-    legal unquoted too -- so a quotes-only pattern saw almost no fragments on the
-    minified side and reported 27784 of 29583 as missing on a build that was
-    correct. Widening it to accept unquoted values then matched Java source
-    inside <pre> blocks: `int id = row.getInteger(0);` is not an attribute.
-
-    HTMLParser knows the difference between markup and text, which is the whole
-    problem, and it resolves character references on the way through.
-    """
-
-    def __init__(self) -> None:
-        super().__init__(convert_charrefs=True)
-        self.ids: set[str] = set()
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        for name, value in attrs:
-            if name == "id" and value:
-                self.ids.add(value)
-
-    # Void and self-closing elements arrive here instead.
-    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        self.handle_starttag(tag, attrs)
-
 
 # Pages javadoc writes for its own machinery rather than for an API element.
 # None of these is a documented type, and the site provides its own equivalents
@@ -257,6 +97,177 @@ CHROME_ID_RE = re.compile(
 PROSE_ID_RE = re.compile(r"^[a-z0-9-]+-heading\d*$")
 
 
+# Tags are found by scanning rather than with html.parser, and that is not a
+# preference. HTMLParser switches into raw-text mode on <title>, <script> and
+# friends and stops recognising markup until the matching close tag -- and
+# documentation prose contains those. com.codename1.push.PushBuilder documents a
+# payload as "<title>;<body>" with no close tag, so everything after it on the
+# page went unseen: build(), getType(), isRichPush() and its constructor. Across
+# the standard tree that lost 1809 ids on 1150 pages, every one of them an
+# address this gate reports as checked. Deleting any of those anchors from the
+# Hugo side would have passed.
+#
+# A regex over the whole text is the other wrong answer, tried earlier: it reads
+# Java source in a <pre> block, where "int id = row.getInteger(0);" is not an
+# attribute. Scanning only inside <...> avoids both, and copes with the minified
+# build's unquoted attribute values.
+_TAG_START_RE = re.compile(r"<(/?)([A-Za-z][A-Za-z0-9:-]*)")
+_ATTR_RE = re.compile(
+    r"""([A-Za-z_:][-A-Za-z0-9_:.]*)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?"""
+)
+
+
+def scan_tags(text: str):
+    """Yields (tag name, attributes) for every start tag in the document."""
+    i = 0
+    n = len(text)
+    while i < n:
+        match = _TAG_START_RE.search(text, i)
+        if not match:
+            return
+        if match.group(1):  # a close tag carries no attributes worth reading
+            i = match.end()
+            continue
+        # Find the tag's end, honouring quoted attribute values so that a ">"
+        # inside one does not end it early.
+        j = match.end()
+        quote = None
+        while j < n:
+            c = text[j]
+            if quote:
+                if c == quote:
+                    quote = None
+            elif c in "\"'":
+                quote = c
+            elif c == ">":
+                break
+            j += 1
+        attributes = {}
+        for attr in _ATTR_RE.finditer(text, match.end(), j):
+            value = next((g for g in attr.groups()[1:] if g is not None), "")
+            attributes.setdefault(attr.group(1).lower(), value)
+        yield match.group(2).lower(), attributes
+        i = j + 1
+
+
+def collect(path: pathlib.Path) -> tuple[set[str], list[str]]:
+    """Every id on a page, and every internal API link it makes."""
+    text = path.read_text(errors="replace")
+    ids: set[str] = set()
+    hrefs: list[str] = []
+    for tag, attributes in scan_tags(text):
+        identifier = attributes.get("id")
+        if identifier:
+            ids.add(html.unescape(identifier))
+        href = attributes.get("href")
+        if tag == "a" and href and href.startswith("/javadoc/"):
+            hrefs.append(html.unescape(href))
+    return ids, hrefs
+
+
+def check_search_index(hugo: pathlib.Path, index: pathlib.Path) -> int:
+    """Every entry in the API search index must land on a page and an id.
+
+    Its own pass because the index is JSON, not markup: the link checker walks
+    <a href> attributes and cannot see it at all. That blind spot shipped a real
+    defect -- constructors promoted from an undocumented superclass were indexed
+    against <init> fragments on the subclass page, which does not render them --
+    so search offered results that went nowhere.
+    """
+    if not index.exists():
+        print(f"search index not found at {index}; skipping")
+        return 0
+
+    pages = {p.relative_to(hugo).as_posix() for p in hugo.rglob("*.html")}
+    ids: dict[str, set[str]] = {}
+    for path in hugo.rglob("*.html"):
+        ids[path.relative_to(hugo).as_posix()] = collect(path)[0]
+
+    payload = json.loads(index.read_text())
+    missing: collections.Counter = collections.Counter()
+    checked = 0
+    for entry in payload.get("types", []):
+        url = entry.get("u", "")
+        if not url.startswith("/javadoc/"):
+            continue
+        target = url[len("/javadoc/"):] or "index.html"
+        # Same normalisation the link pass does: a directory URL is served by the
+        # index.html inside it. Without this every entry looked broken.
+        if target.endswith("/") or not target:
+            target += "index.html"
+        checked += 1
+        if target not in pages:
+            missing[url] += 1
+            continue
+        for member in entry.get("m", []) or []:
+            if len(member) != 2:
+                continue
+            checked += 1
+            if member[1] not in ids[target]:
+                missing[f"{url}#{member[1]}"] += 1
+
+    print(f"search index entries checked: {checked}")
+    if not missing:
+        print("OK: every search result lands on something that exists")
+        return 0
+    print(f"{sum(missing.values())} search entr(ies) pointing at nothing:")
+    for target, count in missing.most_common(15):
+        print(f"  {count:5d}  {target}")
+    return 1
+
+
+def check_internal_links(hugo: pathlib.Path) -> int:
+    """Every /javadoc/ link on the site must land on a page and an id that exist.
+
+    Separate from the parity comparison, and worth its own pass: the generator
+    mints these addresses itself rather than copying them, so it can invent one
+    that resolves to nothing while still reproducing every address javadoc
+    publishes. Both defects this caught were of that shape -- a member promoted
+    off a package private supertype linking into the page that supertype would
+    have had, and a constructor fragment mangled by markdown because "<init>"
+    reads as a delimiter inside a link destination.
+    """
+    pages = {p.relative_to(hugo).as_posix() for p in hugo.rglob("*.html")}
+    parsed: dict[str, tuple[set[str], list[str]]] = {}
+    for path in hugo.rglob("*.html"):
+        parsed[path.relative_to(hugo).as_posix()] = collect(path)
+
+    missing_pages: collections.Counter = collections.Counter()
+    missing_anchors: collections.Counter = collections.Counter()
+    checked = 0
+    for _, hrefs in parsed.values():
+        for href in hrefs:
+            path_part, _, fragment = href.partition("#")
+            target = path_part[len("/javadoc/"):] or "index.html"
+            if target.endswith("/"):
+                target += "index.html"
+            if target not in pages:
+                missing_pages[target] += 1
+                continue
+            if not fragment:
+                continue
+            checked += 1
+            # A fragment is compared after percent decoding, which is why
+            # encoding one is safe in the first place.
+            if urllib.parse.unquote(fragment) not in parsed[target][0]:
+                missing_anchors[f"{target}#{urllib.parse.unquote(fragment)}"] += 1
+
+    total = sum(missing_pages.values()) + sum(missing_anchors.values())
+    print(f"internal links checked: {checked} fragment link(s) across {len(pages)} page(s)")
+    if not total:
+        print("OK: every internal API link resolves")
+        return 0
+    if missing_pages:
+        print(f"{sum(missing_pages.values())} link(s) to a page that does not exist:")
+        for target, count in missing_pages.most_common(15):
+            print(f"  {count:5d}  /javadoc/{target}")
+    if missing_anchors:
+        print(f"{sum(missing_anchors.values())} link(s) to an id that does not exist:")
+        for target, count in missing_anchors.most_common(15):
+            print(f"  {count:5d}  /javadoc/{target}")
+    return 1
+
+
 def pages(root: pathlib.Path, hugo: bool = False) -> set[str]:
     """The API pages a tree publishes, keyed by the standard doclet's spelling.
 
@@ -295,12 +306,10 @@ def hugo_path(hugo: pathlib.Path, page: str) -> pathlib.Path:
 
 
 def anchors(path: pathlib.Path) -> set[str]:
-    collector = _IdCollector()
-    collector.feed(path.read_text(errors="replace"))
-    collector.close()
+    ids, _ = collect(path)
     return {
         value
-        for value in collector.ids
+        for value in ids
         if not CHROME_ID_RE.match(value) and not PROSE_ID_RE.match(value)
     }
 
