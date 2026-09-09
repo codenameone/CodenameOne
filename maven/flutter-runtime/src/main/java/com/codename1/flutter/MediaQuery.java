@@ -34,6 +34,45 @@ package com.codename1.flutter;
  *
  * <p>Without an ancestor the metrics still come from the Display, which is the right default
  * for the root of the app.</p>
+ *
+ * <h2>Safe area: the one rule</h2>
+ *
+ * <p>Status bars, notches, display cutouts and home indicators are all the same thing here,
+ * and there is exactly one path from the device to the pixels. Nothing else may inset for
+ * them, on any platform:</p>
+ *
+ * <ol>
+ * <li>The <b>port</b> answers {@code Form.getSafeArea()}. This is the only platform-specific
+ *     input, and it is the only place a platform difference is allowed to exist.</li>
+ * <li>{@code MediaQueryData.fromDisplay} converts that rectangle into {@code padding} once,
+ *     turning device pixels into logical ones. Everything downstream reads padding and never
+ *     asks the port again.</li>
+ * <li>{@code FlutterUI.stripChrome} turns Codename One's own safe-area layout OFF
+ *     ({@code Container.setSafeArea(false)}). CN1 would otherwise hold the content off the
+ *     cutout as well, and the inset would be applied twice -- which shows up as a band of the
+ *     Form's colour above everything the app drew.</li>
+ * <li>A widget that <b>spends</b> some of the padding removes what it spent for its
+ *     descendants, via {@code removePadding}: the Scaffold body drops the top when an AppBar
+ *     stands in for it and the bottom under a bottom bar, and a scroll view drops its own
+ *     axis after padding its content. {@code SafeArea} then applies whatever is left.</li>
+ * </ol>
+ *
+ * <p>Because every consumer subtracts rather than recomputes, the invariant is that padding
+ * is applied exactly once along any path from the root to a leaf. Two things break it, and
+ * both have:</p>
+ *
+ * <ul>
+ * <li><b>Insetting outside this chain.</b> Any port-specific "hold it off the status bar"
+ *     is a second application. The answer is always to read {@code MediaQuery.padding}.</li>
+ * <li><b>Carrying a subtraction across a boundary it does not belong to.</b> A route is
+ *     mounted with a fallback ancestor, and using the widget that pushed it let a scroll
+ *     view's {@code removePadding} leak into the new page, whose SafeArea then resolved to
+ *     zero. Routes anchor at the nearest navigator scope for this reason -- see
+ *     {@code Navigator.pushingElement}.</li>
+ * </ul>
+ *
+ * <p>The rule is verified on desktop and iOS by opening a study, pushing a page out of a
+ * scrolled list, and checking that the pushed page starts at the inset rather than at zero.</p>
  */
 public class MediaQuery extends com.codename1.flutter.widgets.InheritedWidget {
 
