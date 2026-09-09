@@ -1401,6 +1401,18 @@ static inline JAVA_BOOLEAN cn1InNursery(void* p) {
 // heap ref store), which thread-pausing structurally cannot.
 extern volatile int gcSatbActive;
 extern void cn1SatbEnqueue(JAVA_OBJECT old);
+// DECLARED HERE, not beside the write barrier, because that copy sits in the #else of
+// the CN1_NURSERY split and these four have callers that are not conditional on it:
+// nativeMethods' arraycopy/cloneArray bulk barrier and CN1_REF_LOAD_BEGIN/END. With the
+// declarations behind the nursery #else, -DCN1_NURSERY compiled those calls as implicit
+// C89 declarations returning int, which clang has rejected outright since C99 became the
+// default -- so the nursery build did not compile at all, and nothing noticed because no
+// gate builds that arm. Duplicating an extern is legal and keeps the two halves honest.
+extern volatile int gcSatbTerminating;
+extern JAVA_BOOLEAN cn1SatbBulkBegin(void);
+extern void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count);
+extern void cn1SatbBulkEnd(void);
+extern void cn1SatbBulkQuiesce(void);
 #if defined(CN1_DISABLE_SATB)
 // Escape hatch to A/B the barrier cost or fall back if a regression appears. When
 // disabled, gcSatbActive is never armed (see codenameOneGCMark) AND the per-store
@@ -1414,6 +1426,26 @@ extern void cn1SatbEnqueue(JAVA_OBJECT old);
          } } while(0)
 #endif
 
+// ---- java.lang.ref support -------------------------------------------------
+// A WeakReference's referent is NOT traced by the generated mark function. That
+// function calls cn1GcDiscoverReference instead (see ByteCodeClass), handing over
+// the addresses of the reference's fields, and the collector decides for itself
+// whether the referent lives.
+//
+// Field pointers rather than the object, because this file is a fixed template
+// compiled beside whatever the translator emitted: `struct obj__java_lang_ref_Reference`
+// does not exist in a program that never uses a reference, so naming it here would
+// break the build for those. The layout stays on the generated side.
+//
+// `strength` is CN1_REF_WEAK or CN1_REF_SOFT, taken from a field the subclass
+// constructor sets. Deliberately not a class-pointer comparison: the dead-code pass
+// is entitled to remove a class symbol this file would then fail to link against,
+// and a user-written subclass of either would compare unequal to both.
+#define CN1_REF_WEAK 0
+#define CN1_REF_SOFT 1
+// cn1TouchAge value written by get_field_java_lang_ref_Reference_objReference on
+// every read. The collector turns it back into an age in cycles.
+#define CN1_REF_TOUCHED (-1)
 extern const char* volatile cn1LastNamSetter; // diagnosis: last bracket toucher
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
 // The bracket's purpose was to suppress GC interaction while native C code
@@ -3073,6 +3105,117 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
 
 extern int currentGcMarkValue;
 extern void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);
+// Drop every soft referent at the next collection, whatever the retention policy would
+// otherwise have decided. Called when an allocation has actually failed: SoftReference's
+// one hard guarantee is that all of them are cleared before the VM gives up, and the
+// retention ladder cannot see that coming on a platform with no per-process budget probe.
+extern void cn1RefDropAllSoftReferents(void);
+extern void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOOLEAN force,
+                                   JAVA_OBJECT* referentField, JAVA_INT* touchAgeField,
+                                   JAVA_INT* agedCycleField, JAVA_INT strength);
+
+
+// ---- the Reference.get() load barrier --------------------------------------
+// Emitted into get_field_java_lang_ref_Reference_objReference, and the reason the
+// clear pass is allowed to run with mutators still going.
+//
+// A thread whose stack was scanned and released early can pull the referent out of a
+// reference and hold it in a local the collector has already walked past. That referent
+// is then neither marked nor fresh, which is the one case the sweep's "already marked or
+// FRESH" invariant does not cover, so without this it is freed under a live pointer.
+// Enqueuing puts it in the snapshot: the trial clear of gcSatbActive finds a non-empty
+// log, re-arms, marks it, and the reference is left alone.
+//
+// THE FILTER IS NOT AN OPTIMIZATION, it is what makes this affordable. cn1SatbEnqueue
+// takes a mutex per accepted reference, and get() on a hot cache is called far more often
+// than anything the per-store barrier sees -- measured on RefPolicy before this filter
+// existed, a 400,000-access run put over 10,000 entries into the log per cycle and drove
+// the SATB termination loop into its CN1_SATB_MAX_REOPENS cap on every single cycle,
+// which is the collector failing to converge rather than a cost.
+//
+// It skips exactly the referents the clear pass would refuse to clear anyway: already
+// marked this epoch, or fresh and therefore kept by the sweep's grace rule. Deliberately
+// STRICTER than the clear pass's own test, which also spares mark == epoch - 1 (last
+// cycle's slack): bibopGcEpoch is only exactly equal to currentGcMarkValue once
+// cn1BibopBeginGcCycle has published it, and a barrier must not depend on a mirror being
+// current. Skipping less is always safe; skipping more is not.
+//
+// A retained soft reference costs nothing here at all, because its referent is marked as
+// an ordinary strong edge by cn1GcDiscoverReference before any get() can reach it.
+// REGISTERS AROUND THE LOAD, via the same handshake the bulk copies use, and the
+// registration is what the caller must hold ACROSS its load -- hence the awkward shape:
+// the accessor calls cn1RefLoadBegin(), loads, calls this, then cn1RefLoadEnd().
+//
+// Checking gcSatbActive and then enqueuing is not enough on this path, and the reason it
+// is enough for the per-store barrier does not carry over. cn1SatbEnqueue takes a mutex,
+// so a thread can pass a flag check and then be delayed long enough for the collector to
+// clear the field, finish its empty final take, lower gcSatbTerminating and quiesce -- and
+// the entry then lands in a log nothing will ever drain, or is skipped entirely, while the
+// sweep frees the referent the caller is about to return. The per-store barrier tolerates
+// that window because a reference STORED after the fixpoint is already marked or FRESH and
+// the sweep keeps both; a weak REFERENT handed out by get() is neither.
+//
+// AN OUTER "FAST PATH" FLAG CHECK BREAKS THIS, and did: gating entry to
+// cn1SatbBulkBegin() on a prior read of the same flags reintroduces the race one level
+// out, because the thread can be descheduled between that read and the registration. The
+// whole value of cn1SatbBulkBegin is that it registers FIRST and reports afterwards, so
+// nothing may be sampled before it.
+//
+// With the registration held across the load, a false answer is safe rather than merely
+// unlikely: the collector cannot be mid-termination (its quiesce waits for this
+// registration), so either no mark is running -- and one starting later scans this thread
+// with the value already in a register -- or reference processing is complete, in which
+// case a field still holding a pointer was not condemned and its referent is marked.
+// The deletion barrier for the referent field, with an ATOMIC load.
+//
+// CN1_SATB_DELETE next door reads through a plain JAVA_OBJECT volatile*, which is right
+// for every ordinary field because nothing else writes them concurrently. The referent is
+// the exception: cn1GcProcessReferences stores JAVA_NULL into it atomically from the
+// collector while Reference.clear() runs here, so the plain read would leave that pair a
+// mixed atomic/non-atomic access -- undefined in C, and the same defect that was fixed for
+// the getter and for this setter's own store. Making the store atomic and leaving the
+// barrier's read plain fixes half a race.
+#if defined(CN1_DISABLE_SATB)
+#define CN1_SATB_DELETE_REF(fieldAddr) do { } while(0)
+#else
+#define CN1_SATB_DELETE_REF(fieldAddr) \
+    do { if(__builtin_expect(gcSatbActive, 0)) { \
+             JAVA_OBJECT cn1__old = __atomic_load_n((JAVA_OBJECT*)(fieldAddr), __ATOMIC_RELAXED); \
+             if(cn1__old != JAVA_NULL && !CN1_IS_TAGGED(cn1__old)) cn1SatbEnqueue(cn1__old); \
+         } } while(0)
+#endif
+
+#if defined(CN1_DISABLE_SATB)
+#define CN1_REF_LOAD_BEGIN() JAVA_FALSE
+#define CN1_REF_LOAD_END()   do { } while(0)
+#define CN1_SATB_REF_KEEP(active, refVal) do { (void)(active); (void)(refVal); } while(0)
+#else
+// -DCN1_REF_NO_LOAD_BARRIER compiles the registration and the enqueue out, leaving the
+// touch stamp and the load. It is UNSOUND -- it is the arm that measures what the barrier
+// costs, not a configuration to ship -- and exists because "is get() too expensive?" has to
+// be answered with a number rather than an intuition.
+#if defined(CN1_REF_NO_LOAD_BARRIER)
+#define CN1_REF_LOAD_BEGIN() JAVA_FALSE
+#define CN1_REF_LOAD_END()   do { } while(0)
+#else
+#define CN1_REF_LOAD_BEGIN() cn1SatbBulkBegin()
+#define CN1_REF_LOAD_END()   cn1SatbBulkEnd()
+#endif
+#ifdef CN1_GC_CONFORM
+extern _Atomic long cn1RefGets;
+#define CN1_REF_COUNT_GET() atomic_fetch_add_explicit(&cn1RefGets, 1, memory_order_relaxed)
+#else
+#define CN1_REF_COUNT_GET() do { } while(0)
+#endif
+#define CN1_SATB_REF_KEEP(active, refVal) \
+    do { CN1_REF_COUNT_GET(); JAVA_OBJECT cn1__r = (refVal); \
+         if((active) && cn1__r != JAVA_NULL && !CN1_IS_TAGGED(cn1__r)) { \
+             int cn1__m = __atomic_load_n(&cn1__r->__codenameOneGcMark, __ATOMIC_RELAXED); \
+             int cn1__e = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed); \
+             if(cn1__m != -1 && cn1__m != cn1__e) cn1SatbEnqueue(cn1__r); \
+         } } while(0)
+#endif
+
 extern void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);
 extern JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
 

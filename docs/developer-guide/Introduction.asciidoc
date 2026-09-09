@@ -68,7 +68,10 @@ Codename One earlier offered a UWP (Universal Windows Platform) target based on 
 
 JavaScript build targets translate the bytecode statically with ParparVM, the same translator that generates the C sources for iOS. Cloud builds keep the original TeaVM-based compiler as a compatibility fallback, which you select with the `javascript.port` build hint. To support the complex UI Codename One uses the HTML5 Canvas API which allows absolute flexibility for building applications.
 
-For desktop builds Codename One uses `javapackager`, since both Macs and Windows machines are available in the cloud, the platform-specific nature of `javapackager` isn't a problem.
+Desktop builds are packaged on the same cloud machines, a Mac for the macOS installer and a Windows machine for the Windows one. The build originally used `javapackager`, which was abandoned because it couldn't package a ZuluFX runtime reliably; installers are now produced directly with third-party packaging tools.
+
+.What each target does with the same bytecode
+image::img/build-pipeline.svg[How one set of Java sources reaches each platform,scaledwidth=85%]
 
 ===== Lightweight architecture
 

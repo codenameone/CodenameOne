@@ -1,0 +1,5 @@
+{{- /* One type reference: linked when we publish a page for it, plain when we do not.
+       Called with a {label, url} map from the doclet. */ -}}
+{{- if and . .label -}}
+{{- if .url -}}<a class="cn1-api-type" href="{{ .url }}">{{ .label }}</a>{{- else -}}<span class="cn1-api-type">{{ .label }}</span>{{- end -}}
+{{- end -}}

@@ -264,9 +264,9 @@ public class AndroidNearbyBackend implements NearbyBridge {
             // is the ordinary path rather than an error.
             instance = null;
         }
-        // Guarded with instanceof rather than cast inside the catch: a failed
-        // cast does not throw under ParparVM, so catching one is a handler
-        // that never runs.
+        // Guarded with instanceof rather than cast inside the catch: the
+        // backend is loaded by name, so a renamed or partially deleted
+        // package answers with something else and the API stays inert.
         return instance instanceof NearbyBridge ? (NearbyBridge) instance
                 : null;
     }

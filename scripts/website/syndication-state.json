@@ -1994,6 +1994,18 @@
         "url": "https://medium.com/p/7c2081802a30/edit",
         "syndicated_at": "2026-09-08T19:01:31+00:00"
       }
+    },
+    "compile-time-build-hints": {
+      "hashnode": {
+        "url": "https://debugagent.com/build-hints-that-fail-before-the-build-server",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aa0a3607df4cf9f679e1115",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-09T00:08:57+00:00"
+      }
     }
   }
 }

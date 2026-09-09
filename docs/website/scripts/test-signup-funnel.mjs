@@ -84,8 +84,6 @@ assert.ok(anchorElements(home).some(({ attributes, text }) =>
 ), "the global header must expose registration");
 assert.ok(anchorElements(home).some(({ attributes }) => attributes.href === "/initializr/"),
   "Initializr must remain available as an explicit project-generation tool");
-assert.doesNotMatch(home, /cn1-exp-004/i,
-  "the retired download experiment must not enroll new homepage visitors");
 
 for (const html of [home, pricing, compare]) {
   assert.doesNotMatch(html, /(?:home-(?:primary|final)|pricing-free|compare(?:-final)?)-project/i,

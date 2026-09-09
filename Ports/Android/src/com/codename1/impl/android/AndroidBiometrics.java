@@ -473,10 +473,10 @@ public final class AndroidBiometrics extends Biometrics {
                 instance = null;
             }
         }
-        // Tested rather than cast inside the catch. A failed cast does not
-        // throw under ParparVM, so a catch around one is a handler that never
-        // runs, and scripts/check-cast-semantics.sh holds the whole tree --
-        // Android sources included -- to the guarded shape.
+        // Tested rather than cast: the backend is loaded by name, so a rename
+        // or a partially stripped package can answer an object of some other
+        // type, and the API degrading to unsupported beats throwing out of a
+        // lookup.
         return instance instanceof BiometricBackend
                 ? (BiometricBackend) instance : null;
     }

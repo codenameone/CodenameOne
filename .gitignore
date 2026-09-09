@@ -114,6 +114,15 @@ dependency-reduced-pom.xml
 # docs/developer-guide on every run, so a committed copy is both duplicated
 # source and guaranteed stale. 485 files of it were committed by accident once.
 /docs/website/static/developer-guide/
+# The API reference is generated into the content tree by the Hugo doclet on
+# every run of scripts/website/build.sh, one file per documented type. Roughly
+# 1850 generated pages have no business in the history: the sources they are
+# rendered from are already committed.
+/docs/website/content/javadoc/
+/docs/website/static/javadoc-search.json
+# Left behind by the previous integration, which copied the whole standard
+# doclet tree into static/ and served it through a scoping script.
+/docs/website/static/javadoc/
 /docs/website/.hugo_build.lock
 /docs/website/hugo_stats.json
 /docs/website/resources/

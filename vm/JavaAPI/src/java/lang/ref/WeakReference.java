@@ -25,36 +25,37 @@ package java.lang.ref;
 /**
  * This class provides support for weak references. Weak references are most often used to implement canonicalizing mappings. Suppose that the garbage collector determines at a certain point in time that an object is weakly reachable. At that time it will atomically clear all the weak references to that object and all weak references to any other weakly- reachable objects from which that object is reachable through a chain of strong and weak references.
  * Since: JDK1.2, CLDC 1.1
+ *
+ * <p>The referent lives in {@link Reference}, and the collector clears it once
+ * the object is reachable no other way. Two properties of THIS collector make
+ * that best-effort rather than prompt, and both are legal -- the contract says a
+ * reference "may" be cleared, never that it must be:</p>
+ *
+ * <ul>
+ * <li>A newly allocated object is kept unconditionally for one cycle by the
+ *     sweep's grace rule, so a referent is never cleared in the cycle it dies.</li>
+ * <li>The root scan reads native C stacks conservatively, so a stale machine
+ *     word that happens to look like the referent keeps it marked. {@code get()}
+ *     will occasionally keep answering an object nothing references any more.</li>
+ * </ul>
+ *
+ * <p>Historical note worth keeping, because both halves were real shipped bugs.
+ * This class first held its referent in an ordinary field, which the translator
+ * traced like any other -- so a "weak" reference was strong and the caches built
+ * on {@code CodenameOneImplementation.createSoftWeakRef} pinned every decoded
+ * bitmap for the life of the process. Before that, the constructor assigned the
+ * field to itself ({@code this.objReference = objReference}) and dropped the
+ * argument, so every reference was born empty and {@code get()} was hardwired to
+ * null: the same caches could then never hit. Note the failure modes are exact
+ * opposites, which is why this class needs tests that pin BOTH ends -- that the
+ * referent is answered while it is reachable, and that it stops being answered
+ * once it is not.</p>
  */
 public class WeakReference extends java.lang.ref.Reference{
-    private Object objReference;
-    
     /**
      * Creates a new weak reference that refers to the given object.
-     * <p>
-     * Note that ParparVM's collector has no notion of a weak root: it never
-     * clears this field, so the referent lives exactly as long as the
-     * reference object does and {@link #get()} keeps answering it until
-     * {@link Reference#clear()} is called by hand. That is a legal (if
-     * pessimistic) implementation of the contract -- "may be cleared" is not
-     * "must be cleared" -- and it is what the callers need. What is NOT legal
-     * is the reverse: this constructor used to assign the field to itself
-     * ({@code this.objReference = objReference}) and drop {@code ref} on the
-     * floor, so every reference was born empty and {@code get()} was hardwired
-     * to null. Everything built on
-     * {@code CodenameOneImplementation.createSoftWeakRef} -- the EncodedImage
-     * decode cache, Image's scale cache, Border's round-rect cache -- was then
-     * a cache that could never hit.
      */
     public WeakReference(java.lang.Object ref){
-         this.objReference = ref;
-    }
-
-    Object getImpl() {
-        return objReference;
-    }
-    
-    void clearImpl() {
-        objReference = null;
+         super(ref, STRENGTH_WEAK);
     }
 }

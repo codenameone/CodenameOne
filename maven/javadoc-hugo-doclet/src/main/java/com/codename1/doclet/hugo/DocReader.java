@@ -1,0 +1,542 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.doclet.hugo;
+
+import com.sun.source.doctree.BlockTagTree;
+import com.sun.source.doctree.DeprecatedTree;
+import com.sun.source.doctree.DocCommentTree;
+import com.sun.source.doctree.DocTree;
+import com.sun.source.doctree.InheritDocTree;
+import com.sun.source.doctree.ParamTree;
+import com.sun.source.doctree.ReturnTree;
+import com.sun.source.doctree.SeeTree;
+import com.sun.source.doctree.ThrowsTree;
+import com.sun.source.util.DocTreePath;
+import com.sun.source.util.DocTrees;
+import com.sun.source.util.TreePath;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.ElementFilter;
+import javax.lang.model.util.Elements;
+import javax.lang.model.util.Types;
+
+/**
+ * Reads one element's documentation and merges the two ways this codebase
+ * expresses it.
+ *
+ * <p>Both forms are live: 816 {@code @param} tags against 9068
+ * {@code #### Parameters} headings, 1036 {@code @return} against 7224
+ * {@code #### Returns}. The markdown form is parsed by {@link MarkdownSections}
+ * and wins where the two overlap, because it is what the author most recently
+ * wrote; block tags fill in anything it did not cover.
+ *
+ * <p>Two tags are dropped rather than rendered. {@code @since} and the
+ * {@code #### Since} heading are dropped because Codename One does not publish
+ * availability metadata at all -- {@code scripts/check-since-tags.sh} fails the
+ * build over one in a source file, on the grounds that a guessed version is
+ * worse than no version. {@code @hidden} is not dropped but obeyed: the element
+ * disappears from the output entirely.
+ */
+final class DocReader {
+
+    /** Guards against a cycle in overriding chains while resolving inherited docs. */
+    private static final int MAX_INHERIT_DEPTH = 16;
+
+    private final DocTrees trees;
+    private final Elements elements;
+    private final Types types;
+    private final CommentRenderer renderer;
+
+    /**
+     * Memo of everything already read.
+     *
+     * <p>Not an optimisation of last resort: every element is read at least twice
+     * over -- once to decide whether {@code @hidden} keeps it out of the index,
+     * again to render it, and once more for each summary row that quotes it --
+     * and reading a method walks its whole supertype chain looking for the
+     * declaration it inherits from. Without this the generator re-walks the
+     * hierarchy of roughly 1850 types several times each.
+     */
+    private final Map<Element, ElementDoc> cache = new HashMap<>();
+
+    DocReader(DocTrees trees, Elements elements, Types types, CommentRenderer renderer) {
+        this.trees = trees;
+        this.elements = elements;
+        this.types = types;
+        this.renderer = renderer;
+    }
+
+    ElementDoc read(Element element) {
+        ElementDoc cached = cache.get(element);
+        if (cached != null) {
+            return cached;
+        }
+        ElementDoc doc = read(element, 0);
+        cache.put(element, doc);
+        return doc;
+    }
+
+    private ElementDoc read(Element element, int depth) {
+        ElementDoc doc = new ElementDoc();
+        DocCommentTree comment = trees.getDocCommentTree(element);
+
+        if (comment == null) {
+            // An undocumented override still documents itself through its parent,
+            // which is the behaviour every Java developer expects from javadoc.
+            ElementDoc inherited = inherit(element, depth);
+            ElementDoc result = inherited == null ? doc : adoptParameterNames(element, inherited);
+            markAnnotationDeprecation(element, result);
+            return result;
+        }
+
+        DocTreePath path = pathOf(element, comment);
+        // Goldmark drops raw HTML rather than rendering it, so the leftovers in
+        // the comments that were converted to markdown have to be dealt with
+        // before anything else reads the body.
+        doc.description = LegacyHtml.convert(renderer.render(comment.getFullBody(), path));
+
+        MarkdownSections.Result sections =
+                MarkdownSections.parse(doc.description, element instanceof ExecutableElement);
+        doc.description = sections.description();
+        doc.parameters.addAll(sections.parameters());
+        doc.exceptions.addAll(sections.exceptions());
+        doc.seeAlso.addAll(sections.seeAlso());
+        doc.returns = sections.returns();
+        if (sections.deprecated() != null) {
+            doc.deprecated = true;
+            doc.deprecatedText = sections.deprecated();
+        }
+
+        readBlockTags(element, comment, path, doc);
+        markAnnotationDeprecation(element, doc);
+        resolveInheritDoc(element, doc, depth);
+        return doc;
+    }
+
+    /**
+     * Re-labels an inherited doc with this element's own parameter names.
+     *
+     * <p>An override with no comment of its own takes its parent's whole
+     * documentation, and the parent named the parameters as it saw fit.
+     * {@code GridBagLayout.addLayoutComponent} calls its first parameter
+     * "constraints" where {@code Layout} calls it "value", so the page looked up
+     * "constraints", found nothing, and printed "Not documented" beside it while
+     * the other two inherited normally.
+     *
+     * <p>Copies rather than edits: the doc handed back belongs to the parent and
+     * is its own cached answer.
+     */
+    private ElementDoc adoptParameterNames(Element element, ElementDoc inherited) {
+        if (!(element instanceof ExecutableElement executable)) {
+            return inherited;
+        }
+        ExecutableElement overridden = findOverridden(executable);
+        if (overridden == null) {
+            return inherited;
+        }
+        List<? extends VariableElement> mine = executable.getParameters();
+        List<? extends VariableElement> theirs = overridden.getParameters();
+
+        ElementDoc copy = new ElementDoc();
+        copy.description = inherited.description;
+        copy.returns = inherited.returns;
+        // Deprecation is deliberately NOT carried over. Java does not inherit
+        // @Deprecated and neither do the standard pages: ScaleImageLabel's
+        // setPreferredH and setPreferredW carry only @Override, and taking the
+        // parent's flag with its prose put a Deprecated banner on both. The
+        // override's own tag or annotation decides, and markAnnotationDeprecation
+        // runs after this.
+        copy.hidden = inherited.hidden;
+        copy.exceptions.addAll(inherited.exceptions);
+        copy.seeAlso.addAll(inherited.seeAlso);
+
+        for (int i = 0; i < mine.size(); i++) {
+            String name = mine.get(i).getSimpleName().toString();
+            String text = i < theirs.size()
+                    ? inherited.parameterText(theirs.get(i).getSimpleName().toString())
+                    : null;
+            if (text == null) {
+                text = inherited.parameterText(name);
+            }
+            if (text != null) {
+                copy.addParameter(new MarkdownSections.NamedText(name, text));
+            }
+        }
+        // Anything the parent documented that is not a parameter of this method
+        // -- a type parameter, most often -- carries over as written.
+        for (MarkdownSections.NamedText parameter : inherited.parameters) {
+            if (parameter.name().startsWith("<")) {
+                copy.addParameter(parameter);
+            }
+        }
+        return copy;
+    }
+
+    /**
+     * Marks an element deprecated because it is annotated, tag or no tag.
+     *
+     * <p>{@code @Deprecated} and {@code @deprecated} are independent: the
+     * annotation is what the compiler warns on, the tag is what explains it, and
+     * an API may carry either. 23 files here carry the annotation, and
+     * {@code com.codename1.ui.util.MutableResouce} carries it with no tag at all,
+     * so reading only the documentation lost its deprecated marking entirely
+     * while the standard pages showed it.
+     *
+     * <p>Only ever sets the flag. A comment that documented a deprecation keeps
+     * whatever text it gave.
+     *
+     * <p>Note the site marks 299 more members deprecated than the standard pages
+     * do, and that is correct rather than a leak. Those carry a
+     * {@code #### Deprecated} section, which the standard doclet renders as an
+     * ordinary heading inside the description because it cannot see the
+     * convention -- the same reason it shows no parameter tables. Measured: every
+     * one of the 299 has deprecation text, and none is an undocumented override
+     * inheriting the flag from its parent.
+     */
+    private void markAnnotationDeprecation(Element element, ElementDoc doc) {
+        if (elements.isDeprecated(element)) {
+            doc.deprecated = true;
+        }
+    }
+
+    private void readBlockTags(Element element, DocCommentTree comment, DocTreePath path,
+                               ElementDoc doc) {
+        for (DocTree tag : comment.getBlockTags()) {
+            switch (tag.getKind()) {
+                case PARAM -> {
+                    ParamTree param = (ParamTree) tag;
+                    // Type parameter documentation has no column in the rendered
+                    // signature table, so it is folded into the description rather
+                    // than silently dropped.
+                    String name = param.getName().getName().toString();
+                    String text = takeTrailingSections(
+                            renderer.render(param.getDescription(), path), element, doc);
+                    doc.addParameter(new MarkdownSections.NamedText(
+                            param.isTypeParameter() ? "<" + name + ">" : name, text));
+                }
+                case RETURN -> {
+                    String text = takeTrailingSections(
+                            renderer.render(((ReturnTree) tag).getDescription(), path), element, doc);
+                    if (doc.returns == null && !text.isEmpty()) {
+                        doc.returns = text;
+                    }
+                }
+                case THROWS, EXCEPTION -> {
+                    ThrowsTree thrown = (ThrowsTree) tag;
+                    doc.addException(new MarkdownSections.NamedText(
+                            thrown.getExceptionName().getSignature(),
+                            takeTrailingSections(
+                                    renderer.render(thrown.getDescription(), path), element, doc)));
+                }
+                case SEE -> {
+                    String text = renderer.render(((SeeTree) tag).getReference(), path).strip();
+                    if (!text.isEmpty()) {
+                        doc.seeAlso.add(text);
+                    }
+                }
+                case DEPRECATED -> {
+                    doc.deprecated = true;
+                    // The house convention writes @deprecated under a
+                    // "#### Deprecated" heading, and anything that follows --
+                    // "#### See also" and its bullets -- is still inside the tag
+                    // as far as the JDK is concerned. Storing the body whole put
+                    // those headings inside the deprecation banner and left the
+                    // references unresolved: CellRenderer and
+                    // ImageDownloadService both lost their See-also entirely.
+                    String text = takeTrailingSections(
+                            renderer.render(((DeprecatedTree) tag).getBody(), path), element, doc);
+                    if (!text.isEmpty()) {
+                        doc.deprecatedText = text;
+                    }
+                }
+                case HIDDEN -> doc.hidden = true;
+                default -> readUnknownTag(tag, path, doc);
+            }
+        }
+    }
+
+    /**
+     * Splits the sections a block tag's body ran on into, and returns what is
+     * genuinely the tag's own text.
+     *
+     * <p>The house convention writes a block tag underneath a heading of the
+     * same name, and everything after it -- another heading and its bullets --
+     * is still inside that tag as far as the JDK is concerned. Storing a body
+     * whole therefore swallows whatever followed it: 205 methods rendered a
+     * "#### Throws" heading and its bullet inside their Returns text and emitted
+     * no exception row at all, com.codename1.ui.CN.requestFullScreen among them.
+     *
+     * <p>Applied to every tag with a body rather than to @deprecated alone,
+     * which is where this was first noticed and fixed one tag too narrowly.
+     */
+    private String takeTrailingSections(String body, Element element, ElementDoc doc) {
+        MarkdownSections.Result split =
+                MarkdownSections.parse(body, element instanceof ExecutableElement);
+        doc.seeAlso.addAll(split.seeAlso());
+        for (MarkdownSections.NamedText parameter : split.parameters()) {
+            doc.addParameter(parameter);
+        }
+        for (MarkdownSections.NamedText thrown : split.exceptions()) {
+            doc.addException(thrown);
+        }
+        if (doc.returns == null && split.returns() != null) {
+            doc.returns = split.returns();
+        }
+        if (split.deprecated() != null) {
+            doc.deprecated = true;
+            if (doc.deprecatedText.isEmpty()) {
+                doc.deprecatedText = split.deprecated();
+            }
+        }
+        return split.description().strip();
+    }
+
+    /**
+     * Tags with no case of their own.
+     *
+     * <p>Silence here loses content. This repository writes its own
+     * {@code @warning} tag -- 22 of them, and they are safety notes:
+     * {@code Body.createFixture} warns that the function is locked during
+     * callbacks -- and every one was being dropped on the floor because the tag
+     * is not one javadoc knows.
+     *
+     * <p>Only the tags that are deliberately not published are discarded, and
+     * they are named. Anything else keeps its text.
+     */
+    private void readUnknownTag(DocTree tag, DocTreePath path, ElementDoc doc) {
+        if (!(tag instanceof BlockTagTree named)) {
+            return;
+        }
+        String name = named.getTagName();
+        if ("hidden".equals(name)) {
+            doc.hidden = true;
+            return;
+        }
+        // @author and @version are not published, and @since is rejected in
+        // sources outright by scripts/check-since-tags.sh: a guessed version is
+        // worse than none. Serial tags describe a mechanism this toolkit has no
+        // support for at all.
+        if (DROPPED_TAGS.contains(name)) {
+            return;
+        }
+
+        String body = tag.toString();
+        int at = body.indexOf('@');
+        if (at >= 0) {
+            int space = body.indexOf(' ', at);
+            body = space < 0 ? "" : body.substring(space + 1);
+        }
+        body = body.strip();
+        if (body.isEmpty()) {
+            return;
+        }
+        if ("warning".equals(name)) {
+            doc.warnings.add(body);
+        } else {
+            // Keep it visible rather than lose it; the page has no better place.
+            doc.description = doc.description.isBlank()
+                    ? body
+                    : doc.description + "\n\n" + body;
+        }
+    }
+
+    /** Tags this generator publishes nowhere, on purpose. */
+    private static final java.util.Set<String> DROPPED_TAGS = java.util.Set.of(
+            "author", "version", "since", "serial", "serialData", "serialField");
+
+    /**
+     * Fills in whatever the element left to its parent.
+     *
+     * <p>Covers both spellings of the same intent: an explicit
+     * {@code {@inheritDoc}} in the description, and a description, return or
+     * parameter the override simply did not write.
+     */
+    private void resolveInheritDoc(Element element, ElementDoc doc, int depth) {
+        boolean wantsDescription = containsInheritDoc(element) || doc.description.isBlank();
+        // A marker inside a structured section is a request too. An override that
+        // writes "#### Returns" with {@inheritDoc} under it leaves doc.returns
+        // non-null, so testing only for null published the marker itself --
+        // BubbleTransition.copy and FlipTransition.copy both showed a literal
+        // {@inheritDoc} where the parent's text belonged.
+        boolean wantsDetail = doc.returns == null
+                || isInheritDoc(doc.returns)
+                || hasUndocumentedParameter(element, doc);
+        if (!wantsDescription && !wantsDetail) {
+            return;
+        }
+
+        ElementDoc parent = inherit(element, depth);
+        if (parent == null) {
+            return;
+        }
+
+        if (wantsDescription) {
+            if (doc.description.isBlank()) {
+                doc.description = parent.description;
+            } else {
+                doc.description = doc.description.replace(INHERIT_DOC_MARKER, parent.description);
+            }
+        }
+        if (doc.returns == null || isInheritDoc(doc.returns)) {
+            doc.returns = parent.returns;
+        }
+        if (element instanceof ExecutableElement executable) {
+            // Paired by position, not by name. An override is free to rename a
+            // parameter, and looking the parent's text up under the child's name
+            // then finds nothing: GridBagLayout.addLayoutComponent calls its
+            // first parameter "constraints" where Layout calls it "value", and
+            // that one parameter came out undocumented while the rest inherited.
+            ExecutableElement overridden = findOverridden(executable);
+            List<? extends VariableElement> parameters = executable.getParameters();
+            for (int i = 0; i < parameters.size(); i++) {
+                String name = parameters.get(i).getSimpleName().toString();
+                String own = doc.parameterText(name);
+                if (own != null && !isInheritDoc(own)) {
+                    continue;
+                }
+                String inherited = null;
+                if (overridden != null && i < overridden.getParameters().size()) {
+                    inherited = parent.parameterText(
+                            overridden.getParameters().get(i).getSimpleName().toString());
+                }
+                if (inherited == null) {
+                    inherited = parent.parameterText(name);
+                }
+                final String finalName = name;
+                if (inherited != null) {
+                    doc.parameters.removeIf(existing -> existing.name().equals(finalName));
+                    doc.addParameter(new MarkdownSections.NamedText(name, inherited));
+                } else if (own != null) {
+                    // Nothing to inherit: drop the marker rather than publish it.
+                    doc.parameters.removeIf(existing -> existing.name().equals(finalName));
+                }
+            }
+        }
+        if (doc.returns != null && isInheritDoc(doc.returns)) {
+            doc.returns = null;
+        }
+        for (MarkdownSections.NamedText exception : parent.exceptions) {
+            doc.addException(exception);
+        }
+    }
+
+    private boolean hasUndocumentedParameter(Element element, ElementDoc doc) {
+        if (!(element instanceof ExecutableElement executable)) {
+            return false;
+        }
+        for (var parameter : executable.getParameters()) {
+            if (doc.parameterText(parameter.getSimpleName().toString()) == null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The rendered form of {@code {@inheritDoc}}.
+     *
+     * <p>{@link CommentRenderer} has no element context, so it renders the tag
+     * through its default branch as its own source text. That text is the marker
+     * this class substitutes into, which keeps the renderer free of any
+     * inheritance knowledge.
+     */
+    private static final String INHERIT_DOC_MARKER = "{@inheritDoc}";
+
+    /** Whether a documented value is nothing but an inherit marker. */
+    private static boolean isInheritDoc(String text) {
+        return text != null && text.strip().equals(INHERIT_DOC_MARKER);
+    }
+
+    private boolean containsInheritDoc(Element element) {
+        DocCommentTree comment = trees.getDocCommentTree(element);
+        if (comment == null) {
+            return false;
+        }
+        for (DocTree node : comment.getFullBody()) {
+            if (node instanceof InheritDocTree) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The documentation of the method this one overrides, or null when there is none. */
+    private ElementDoc inherit(Element element, int depth) {
+        if (depth >= MAX_INHERIT_DEPTH || !(element instanceof ExecutableElement method)) {
+            return null;
+        }
+        ExecutableElement overridden = findOverridden(method);
+        return overridden == null ? null : read(overridden, depth + 1);
+    }
+
+    /**
+     * The first method this one overrides, searching superclasses before
+     * interfaces, which is the order javadoc documents.
+     */
+    private ExecutableElement findOverridden(ExecutableElement method) {
+        TypeElement owner = Refs.enclosingType(method);
+        if (owner == null) {
+            return null;
+        }
+        List<TypeElement> supertypes = new ArrayList<>();
+        collectSupertypes(owner.asType(), supertypes, new ArrayList<>());
+        for (TypeElement supertype : supertypes) {
+            for (ExecutableElement candidate : ElementFilter.methodsIn(supertype.getEnclosedElements())) {
+                if (elements.overrides(method, candidate, owner)) {
+                    return candidate;
+                }
+            }
+        }
+        return null;
+    }
+
+    private void collectSupertypes(TypeMirror type, List<TypeElement> out, List<String> seen) {
+        for (TypeMirror supertype : types.directSupertypes(type)) {
+            if (!(supertype instanceof DeclaredType declared)
+                    || !(declared.asElement() instanceof TypeElement element)) {
+                continue;
+            }
+            String name = element.getQualifiedName().toString();
+            if (seen.contains(name)) {
+                continue;
+            }
+            seen.add(name);
+            out.add(element);
+            collectSupertypes(supertype, out, seen);
+        }
+    }
+
+    /** The comment's path, needed to resolve references, or null when unavailable. */
+    private DocTreePath pathOf(Element element, DocCommentTree comment) {
+        TreePath treePath = trees.getPath(element);
+        return treePath == null ? null : new DocTreePath(treePath, comment);
+    }
+}

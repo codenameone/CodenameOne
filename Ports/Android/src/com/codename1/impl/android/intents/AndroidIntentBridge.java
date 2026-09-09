@@ -158,8 +158,6 @@ public class AndroidIntentBridge implements IntentBridge {
             parked = new ArrayList<String>(PARKED);
             PARKED.clear();
         }
-        // Indexed rather than a for-each: iterating a List compiles to a CHECKCAST, and the
-        // rest of this file keeps those out of anything that reads as exception-driven.
         for (int i = 0; i < parked.size(); i++) {
             runParkedRequest(parked.get(i));
         }
@@ -807,9 +805,8 @@ public class AndroidIntentBridge implements IntentBridge {
         if (!areIntentsSupported()) {
             return out;
         }
-        // Only the platform call is guarded. A cast inside a catch(Throwable) block reads as
-        // relying on ClassCastException, which ParparVM never throws -- and the repo's gate
-        // rejects the shape wherever it appears, so the iteration stays outside.
+        // Only the platform call is guarded: a failure there means no shortcuts, while a
+        // failure in the iteration below is a bug that should surface.
         ShortcutManager manager = (ShortcutManager) ctx.getSystemService(ShortcutManager.class);
         if (manager == null) {
             return out;
@@ -900,9 +897,7 @@ public class AndroidIntentBridge implements IntentBridge {
     /// evict anything, from the application or from itself.
     @TargetApi(Build.VERSION_CODES.N_MR1)
     private static ShortcutCapacity capacity(Context ctx) {
-        // The cast stays outside the guard, as it does in publishedIds: a cast inside a
-        // catch(Throwable) block reads as relying on ClassCastException, which ParparVM does
-        // not throw -- and the repo's gate rejects the shape wherever it appears.
+        // The guard covers the platform call only, as it does in publishedIds.
         ShortcutManager manager = (ShortcutManager) ctx.getSystemService(ShortcutManager.class);
         if (manager == null) {
             // Unknown, not empty. See ShortcutCapacity.unknown().
@@ -1031,15 +1026,13 @@ public class AndroidIntentBridge implements IntentBridge {
             // with a null context when the process has no Activity yet.
             return false;
         }
-        // Cast outside the guard: inside a catch(Throwable) it reads as relying on
-        // ClassCastException, which ParparVM does not throw.
         ShortcutManager manager = (ShortcutManager) ctx.getSystemService(ShortcutManager.class);
         if (manager == null) {
             return false;
         }
-        // Only the platform call is guarded, and the iteration stays outside it: a for-each
-        // over List<ShortcutInfo> compiles to a CHECKCAST, and a handler around one reads as
-        // relying on ClassCastException. allPublished is written this way for the same reason.
+        // Only the platform call is guarded, and the iteration stays outside it, as
+        // allPublished does: a failure to read the shortcuts is not the same as a bug in
+        // the loop that walks them.
         List<ShortcutInfo> manifest;
         try {
             manifest = manager.getManifestShortcuts();
@@ -1265,9 +1258,8 @@ public class AndroidIntentBridge implements IntentBridge {
         } catch (Throwable t) {
             return false;
         }
-        // The iteration stays outside the handler: a for-each over List<ShortcutInfo> compiles
-        // to a CHECKCAST, and ParparVM does not throw for a failed cast, so a handler around
-        // one reads as relying on an exception that never arrives.
+        // The iteration stays outside the handler: the reflective answer is untyped, so it
+        // is tested here rather than left to fail somewhere the catch above would hide it.
         if (!(result instanceof List)) {
             return false;
         }

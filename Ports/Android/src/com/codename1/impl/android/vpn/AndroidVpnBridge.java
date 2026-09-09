@@ -265,10 +265,8 @@ public class AndroidVpnBridge implements VpnBridge {
 
     /// Whether any of these resolutions names this service class.
     ///
-    /// In its own method, outside any `try`, for the reason asIntent gives:
-    /// reading a typed List inserts a checkcast on every get(), and under a
-    /// handler that catches Exception that is a cast whose failure the
-    /// handler appears to cover -- which ParparVM would not deliver.
+    /// In its own method, outside any `try`: a malformed match list is a
+    /// resolution that does not name this service, not a lookup failure.
     private static boolean resolvesTo(java.util.List<
             android.content.pm.ResolveInfo> matches, String name) {
         if (matches == null) {
@@ -422,11 +420,8 @@ public class AndroidVpnBridge implements VpnBridge {
                 // No profile provisioned; nothing of ours is up.
                 return PROFILE_STATE_NONE;
             }
-            // Narrowed in asInt, outside this try, for the reason asIntent
-            // gives: ParparVM does not check CHECKCAST, so a cast that fails
-            // under a handler does not throw and cannot be caught --
-            // scripts/check-cast-semantics.sh reports the shape whether or
-            // not an instanceof sits beside it.
+            // Narrowed in asInt, outside this try: a state value of an
+            // unexpected type is unknown, not a reflection failure.
             return asInt(Reflect.STATE_OF.invoke(state),
                     PROFILE_STATE_UNKNOWN);
         } catch (Exception e) {
@@ -571,9 +566,9 @@ public class AndroidVpnBridge implements VpnBridge {
         try {
             Object profile = Reflect.buildIkev2(p);
             Object manager = Reflect.manager(context);
-            // Tested with instanceof rather than cast: ParparVM does not
-            // check CHECKCAST, so a cast that fails there does not throw and
-            // cannot be caught.
+            // Narrowed in asIntent, outside this try: an answer of an
+            // unexpected type means no consent Intent, not a failed
+            // provisioning call.
             Object raw = Reflect.PROVISION.invoke(manager, profile);
             Intent consent = asIntent(raw);
             if (raw == null) {
@@ -1700,10 +1695,6 @@ public class AndroidVpnBridge implements VpnBridge {
     }
 
     /// A reflective answer as an `Intent`, or null when it is not one.
-    ///
-    /// In its own method, outside any `try`, for the reason
-    /// `CN1CallScreeningService.asString` gives: ParparVM does not check
-    /// CHECKCAST, so a cast that fails there does not throw.
     private static Intent asIntent(Object o) {
         if (o instanceof Intent) {
             return (Intent) o;

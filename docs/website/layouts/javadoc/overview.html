@@ -1,0 +1,27 @@
+{{- define "main" -}}
+{{- $j := .Params.javadoc -}}
+<article class="post-single cn1-api cn1-api--overview">
+  <header class="post-header cn1-api__header">
+    {{ partial "breadcrumbs.html" . }}
+    <h1 class="post-title cn1-api__title">Codename One API</h1>
+    <p class="cn1-api__intro">
+      {{ $j.typeCount }} documented types across {{ len $j.packages }} packages.
+      Search the API from the <a href="/search/">site search</a>, or
+      <a href="/files/javadocs.zip">download the whole reference as a zip</a>.
+    </p>
+  </header>
+
+  <section class="cn1-api-summary">
+    <table class="cn1-api-table">
+      <tbody>
+        {{- range $j.packages }}
+        <tr>
+          <td class="cn1-api-table__member"><a href="{{ .url }}"><code class="cn1-api-signature"><span class="cn1-api-name">{{ .name }}</span></code></a></td>
+          <td class="cn1-api-table__summary">{{ with .summary }}{{ $.RenderString . }}{{ end }}</td>
+        </tr>
+        {{- end }}
+      </tbody>
+    </table>
+  </section>
+</article>
+{{- end -}}

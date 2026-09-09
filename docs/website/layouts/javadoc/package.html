@@ -1,0 +1,39 @@
+{{- define "main" -}}
+{{- $j := .Params.javadoc -}}
+<article class="post-single cn1-api cn1-api--package">
+  <header class="post-header cn1-api__header">
+    <nav class="cn1-api__crumbs" aria-label="API location">
+      <a href="/javadoc/">API</a>
+    </nav>
+    <h1 class="post-title cn1-api__title">
+      <span class="cn1-api__kind">package</span>
+      {{ $j.qualified }}
+    </h1>
+  </header>
+
+  {{- if $j.deprecated }}
+  <div class="cn1-api-deprecated cn1-api-deprecated--type" role="note">
+    <strong>Deprecated.</strong>
+    {{- with $j.deprecatedText }} {{ $.RenderString . }}{{ end }}
+  </div>
+  {{- end }}
+
+  {{- with $j.description }}
+  <div class="cn1-api-prose cn1-api__description">{{ $.RenderString . }}</div>
+  {{- end }}
+
+  <section class="cn1-api-summary">
+    <h2 class="cn1-api-summary__title">Types</h2>
+    <table class="cn1-api-table">
+      <tbody>
+        {{- range $j.types }}
+        <tr>
+          <td class="cn1-api-table__member"><a href="{{ .url }}"><code class="cn1-api-signature"><span class="cn1-api-mod">{{ .kind }}</span> <span class="cn1-api-name">{{ .name }}</span></code></a></td>
+          <td class="cn1-api-table__summary">{{ with .summary }}{{ $.RenderString . }}{{ end }}</td>
+        </tr>
+        {{- end }}
+      </tbody>
+    </table>
+  </section>
+</article>
+{{- end -}}

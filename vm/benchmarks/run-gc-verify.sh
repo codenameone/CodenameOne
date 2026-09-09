@@ -122,4 +122,50 @@ else
     fail=1
 fi
 
+# Third self-test, for java.lang.ref. The referent is the ONE reference field the
+# generated mark functions deliberately do not hand to gcMarkObject -- that
+# suppression is what makes the edge weak -- and for a while it therefore bypassed
+# the verifier completely: a live Reference holding a pointer into reclaimed memory
+# passed with violations=0, which is the single defect this collector work most
+# needs caught. cn1GcDiscoverReference now routes it to cn1GcVerifyChild, and this
+# proves that routing has teeth rather than assuming it.
+#
+# refnoclear leaves a dead referent in its field instead of clearing it. Note the
+# obvious-looking fault is the wrong one: clearing MORE references than liveness
+# warrants only produces extra nulls, which are safe, and an attempt at that
+# reported violations=0 for exactly that reason. The dangling direction is
+# clearing LESS.
+printf '%-16s ' "self-test3"
+# REMOVE FIRST, THEN BUILD, AND CHECK THE STATUS. Three things are needed and only the
+# third is obvious. Rebuilding unconditionally is not enough on its own: translate-and-build
+# replaces its output only after the final compiler run succeeds, so a failed rebuild leaves
+# the PREVIOUS binary in place. Nor is `|| true` harmless: it discards the status, and the
+# -x test below then accepts that stale executable. Either way the self-test runs old code
+# and reports green -- the "gate that cannot fail" problem this self-test exists to prevent,
+# reintroduced in how the self-test is built.
+rm -f ./target/bin/RefPolicy-verify
+if ! ./translate-and-build.sh RefPolicy target/bin/RefPolicy-verify -DCN1_GC_VERIFY \
+        > target/bin/RefPolicy-selftest-build.log 2>&1; then
+    echo "BROKEN -- could not build RefPolicy for the reference self-test"
+    tail -25 target/bin/RefPolicy-selftest-build.log
+    fail=1
+fi
+if [ ! -x ./target/bin/RefPolicy-verify ]; then
+    echo "BROKEN -- could not build RefPolicy for the reference self-test"
+    fail=1
+else
+    rcOut="$(CN1_GC_FAULT=refnoclear ./target/bin/RefPolicy-verify 128 8192 1500 24 2>&1)" || true
+    if printf '%s' "$rcOut" | grep -q 'DANGLING REFERENCE'; then
+        echo "detected the injected dangling referent ($(printf '%s' "$rcOut" | grep -c 'DANGLING REFERENCE') reports)"
+    elif ! printf '%s' "$rcOut" | grep -q 'GC-VERIFY. SUMMARY'; then
+        echo "BROKEN -- faulted run died before the verifier summary"
+        printf '%s\n' "$rcOut" | tail -20
+        fail=1
+    else
+        echo "BROKEN -- an uncleared dead referent was NOT reported; the verifier cannot see referents"
+        printf '%s\n' "$rcOut" | tail -5
+        fail=1
+    fi
+fi
+
 [ "$fail" -eq 0 ] && echo "GC-VERIFY GREEN" || { echo "GC-VERIFY FAILED"; exit 1; }

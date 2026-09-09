@@ -38,6 +38,9 @@ Now that the structure is clear, open the Java file `TodoApp.java` in the projec
 
 A layout manager decides the size and location of components within a `Container`. Every `Container` has a layout manager. The default layout manager is `FlowLayout`.
 
+.What each layout manager is for
+image::img/layout-manager-choice.svg[What each Codename One layout manager is for,scaledwidth=85%]
+
 To understand layouts, first understand a basic concept about `Component`: each component has a "`preferred size.`" That's the size a component wants to occupy. For example, a `Label` uses the exact size needed to fit the label text, icon, and padding.
 
 .Understanding Preferred Size
@@ -51,7 +54,7 @@ The preferred size depends on internal constraints such as font size, border siz
 
 When a layout manager positions and sizes the component, it **MIGHT** take the preferred size into account. It can also ignore it entirely.
 
-For example, https://www.codenameone.com/javadoc/com/codename1/ui/layouts/FlowLayout.html[FlowLayout] always gives components their exact preferred size, while https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] resizes the center component by default and the other components along one axis.
+For example, https://www.codenameone.com/javadoc/com/codename1/ui/layouts/FlowLayout.html[FlowLayout] gives components their preferred size wherever the row has space for it, narrowing one that's too wide and expanding them all when `fillRows` is set, while https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] resizes the center component by default and the other components along one axis.
 
 You can define a group of components to have the same preferred width or height by using the `setSameWidth`
 and `setSameHeight` methods, for example:

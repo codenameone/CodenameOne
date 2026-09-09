@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone-javadoc-hugo-doclet</artifactId>
+    <version>8.0-SNAPSHOT</version>
+    <name>Codename One Hugo JavaDoc Doclet</name>
+    <description>Renders the framework API documentation as Hugo content. A build-time tool, never shipped inside an application</description>
+
+    <!--
+        Deliberately NOT a module of maven/pom.xml and deliberately without its
+        parent. That reactor builds with JDK 8 (the framework targets Java 5
+        source level), and this project compiles against jdk.javadoc.doclet and
+        com.sun.source.doctree, which only expose markdown documentation
+        comments as DocTree.Kind.MARKDOWN from JDK 23 onwards. Adding it to the
+        reactor would break every JDK 8 build of the framework.
+
+        It is built the way vm/ByteCodeTranslator is: standalone, with an
+        explicit -f, by whoever needs the jar. scripts/website/build.sh does
+        that with JDK_25_HOME before it runs javadoc.
+    -->
+    <properties>
+        <maven.compiler.release>25</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <junit.jupiter.version>5.9.3</junit.jupiter.version>
+    </properties>
+
+    <dependencies>
+        <!--
+            No runtime dependencies at all, and that is a requirement rather than
+            an accident. The doclet runs inside the javadoc tool's own class
+            loader; anything on this classpath has to be passed through
+            -docletpath, and a markdown library there would be a second markdown
+            implementation disagreeing with the goldmark that actually renders
+            the site. Comment bodies are passed through verbatim instead.
+        -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
