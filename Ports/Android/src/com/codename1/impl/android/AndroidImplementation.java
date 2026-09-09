@@ -9914,9 +9914,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 try {
                     // Taken as a Parcelable and tested, rather than assigned straight
                     // to ComponentName: that assignment compiles to a CHECKCAST whose
-                    // failure this catch would have to handle, and ParparVM does not
-                    // throw for a failed cast, so the gate refuses that shape. The
-                    // extra is whatever the sending application chose to put there.
+                    // failure this catch would have to handle, and the extra is
+                    // whatever the SENDING application chose to put there, so the
+                    // failure is not hypothetical. (The cast-semantics gate no longer
+                    // scans this port, since ParparVM does not translate it -- this
+                    // stands on its own terms.)
                     android.os.Parcelable chosen =
                             intent.getParcelableExtra(Intent.EXTRA_CHOSEN_COMPONENT);
                     if (chosen instanceof android.content.ComponentName) {
