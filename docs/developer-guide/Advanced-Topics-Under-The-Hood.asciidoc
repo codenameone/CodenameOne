@@ -1688,15 +1688,18 @@ NOTE: This was also the case in AWT/Swing to one degree or another...
 
 ==== Showing dialogs on top of peer components
 
-A form transition doesn't need anything from you here: `initTransition` puts both forms into
-lightweight mode, and the peer is asked for a still image to stand in for it while the transition
-runs. Arbitrary overlap is the part that isn't automatic. Codename One grabs a screenshot of the peer, hide it and then you can show the screenshot. Since the screenshot is static it can be rendered through the standard UI. You can't do that always since grabbing a screenshot is an expensive process on all platforms and must be performed on the native device thread.
+A form transition tells the peers about itself without any help from you: `initTransition` puts both
+forms into lightweight mode, which is how the framework says that a peer isn't truly visible for a
+while. What a peer does about that is the peer's own business, and it varies by port. Arbitrary overlap
+is the part that isn't automatic anywhere. Codename One grabs a screenshot of the peer, hide it and then you can show the screenshot. Since the screenshot is static it can be rendered through the standard UI. You can't do that always since grabbing a screenshot is an expensive process on all platforms and must be performed on the native device thread.
 
-What that still contains is up to the peer. On Android the browser peer overrides the capture and draws
-its `WebView` into the bitmap, while the default renders the `View` the ordinary way. A peer that owns a
-surface has nothing there to render, so its still is blank and it disappears for the length of the
-transition. The OpenGL peer does keep a copy of each frame, read back with `glReadPixels`, but that copy
-feeds the screenshot path rather than the peer's still image, so it doesn't cover this case.
+`PeerComponent` declares that callback empty, so a port opts into the still by overriding it. The iOS
+and Android peers do, and on Android what the still contains varies again: the browser peer overrides
+the capture and draws its `WebView` into the bitmap, the default renders the `View` the ordinary way,
+and a peer that owns a surface has nothing there to render, so its still is blank and it vanishes for
+the length of the transition. The OpenGL peer keeps a copy of each frame read back with `glReadPixels`,
+but that copy feeds the screenshot path rather than the peer's still image, so it doesn't cover this.
+The JavaScript peer overrides nothing, so it stays live throughout.
 
 ==== Why can't you combine peer component scrolling and Codename One scrolling
 

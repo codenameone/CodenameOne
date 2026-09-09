@@ -56,7 +56,7 @@
   <rect x="16" y="342" width="788" height="92" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
   <text x="410" y="364" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#222222">What follows when you build a screen</text>
   <text x="410" y="386" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">On the first two models Codename One content painted after a peer covers it, so a component on the layered pane is not</text>
-  <text x="410" y="400" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">blocked by the peer as a rule. A form transition asks the peer for a still: initTransition puts both forms into lightweight</text>
-  <text x="410" y="414" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">mode, and what comes back depends on the peer - the browser peer draws its WebView, and a peer that owns a surface</text>
-  <text x="410" y="428" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">has nothing to render and goes blank for the length of it. Arbitrary overlap is not automatic at all: that capture is expensive.</text>
+  <text x="410" y="400" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">blocked by the peer as a rule. A form transition puts both forms into lightweight mode, and what a peer does about that</text>
+  <text x="410" y="414" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">is the peer's own business: iOS and Android stand a still image in for it, a peer that owns a surface has nothing to render</text>
+  <text x="410" y="428" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">and goes blank, and the JavaScript peer overrides nothing and stays live. Arbitrary overlap is not automatic on any of them.</text>
 </svg>
