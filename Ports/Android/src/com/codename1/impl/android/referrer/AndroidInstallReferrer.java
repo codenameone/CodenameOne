@@ -137,6 +137,7 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
         String referrer = "";
         long clickSeconds = 0;
         long beginSeconds = 0;
+        boolean threw = false;
         try {
             ReferrerDetails details = client.getInstallReferrer();
             if (details != null) {
@@ -145,7 +146,22 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
                 beginSeconds = details.getInstallBeginTimestampSeconds();
             }
         } catch (Throwable t) {
+            // The connection came up and the read failed -- a RemoteException
+            // from the service, most often. That is the same kind of transient
+            // failure as a bind that never succeeded, and it is not evidence
+            // about whether a referrer exists.
+            threw = true;
             Log.e(t);
+        }
+        if (threw) {
+            // Deliberately NOT recorded as attempted. Burning the once-only
+            // flag here makes isSupported() false for ever, so a later
+            // Invites.flush() skips the deterministic path entirely and a
+            // statistical no-match settles the install as organic -- for a
+            // referrer that was there all along and simply could not be read
+            // this once.
+            callback.onUnavailable(Invites.REASON_NO_MATCH);
+            return;
         }
         Preferences.set(PREF_ATTEMPTED, true);
         if (referrer == null || referrer.length() == 0) {

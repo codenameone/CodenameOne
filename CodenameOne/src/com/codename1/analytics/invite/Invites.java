@@ -209,6 +209,11 @@ public final class Invites {
     private static int state = STATE_NONE;
     private static boolean stateLoaded;
     private static boolean deliveredThisRun;
+
+    // A terminal "no invite" answer reached before a listener was registered.
+    // Held for the run rather than persisted: the state itself is durable, and
+    // a later launch reaches this answer again through the ordinary path.
+    private static String undelivered;
     private static boolean deferredStarted;
 
     // Bumped whenever the identity or the permission behind an outstanding
@@ -460,7 +465,12 @@ public final class Invites {
         // this a refused user who opened an invite link still had a profile
         // persisted -- by a different route to the one that was fixed.
         if (explicitlyDenied()) {
+            // Told, not silently dropped. checkForInvite() records the url as
+            // consumed and skips the deferred path after this, so this is the
+            // only chance the listener gets for this install -- and a
+            // registered one heard nothing at all.
             markTerminal(STATE_DECLINED, REASON_CONSENT_DENIED);
+            notifyUnavailable(REASON_CONSENT_DENIED);
             return true;
         }
         if (getState() == STATE_RESOLVED && !reattribution) {
@@ -520,6 +530,7 @@ public final class Invites {
     // private and test-only: the whole point of the durable records is that
     // the answer survives a relaunch, and nothing else can check that.
     static void forgetLoadedState() {
+        undelivered = null;
         stateLoaded = false;
         attributionLoaded = false;
         resolved = null;
@@ -717,6 +728,14 @@ public final class Invites {
         // until the next cold start. The persisted attempt counter still
         // bounds the retries.
         if (getState() == STATE_PENDING) {
+            // The retry supersedes whatever the last attempt left outstanding.
+            // Without the bump, a fingerprint answer still on the wire from the
+            // earlier attempt passes the guard and can land AFTER the retried
+            // referrer resolved exactly -- overwriting the exact attribution
+            // with a statistical one. Not hypothetical on an application with
+            // more than one NetworkManager thread, where the two are genuinely
+            // concurrent.
+            lookupEpoch++;
             deferredStarted = false;
             beginDeferred();
         }
@@ -743,6 +762,7 @@ public final class Invites {
         stateLoaded = true;
         deliveredThisRun = false;
         deferredStarted = false;
+        undelivered = null;
         unacknowledged.clear();
     }
 
@@ -769,10 +789,18 @@ public final class Invites {
     // Package private: called from the provider when consent changes.
     static void onConsentChanged(boolean allowed) {
         if (allowed) {
-            if (getState() == STATE_PENDING) {
+            // STATE_DECLINED belongs here too. It is the state a refusal during
+            // a pending lookup leaves behind, and its marker is reopenable
+            // precisely because granting consent afterwards is a real answer --
+            // but nothing restarted the lookup until the application happened
+            // to call checkForInvite() again, by which time the attribution
+            // window may well have closed. beginDeferred() reopens the marker
+            // itself, so calling it is the whole fix.
+            int s = getState();
+            if (s == STATE_PENDING || s == STATE_DECLINED) {
                 deferredStarted = false;
                 beginDeferred();
-            } else if (getState() == STATE_RESOLVED) {
+            } else if (s == STATE_RESOLVED) {
                 // Re-granting restores the dimensions from the record we kept,
                 // without re-reporting the install or telling the app again.
                 InviteAttribution a = getAttribution();
@@ -1635,6 +1663,15 @@ public final class Invites {
         if (listener == null || deliveredThisRun) {
             return;
         }
+        // Taken into a local and cleared unconditionally, rather than
+        // null-checked in place and cleared inside the branch. Same reason as
+        // notifyUnavailable above.
+        String held = undelivered;
+        undelivered = null;
+        if (held != null) {
+            notifyUnavailable(held);
+            return;
+        }
         Map<String, String> r = InviteStore.read(InviteStore.ATTRIBUTION);
         if (r == null || InviteStore.getBoolean(r, "delivered", false)) {
             return;
@@ -1654,12 +1691,27 @@ public final class Invites {
     }
 
     private static void notifyUnavailable(String reason) {
-        if (listener == null || deliveredThisRun) {
+        if (deliveredThisRun) {
+            return;
+        }
+        // Read into a local before the branch, for the same reason loadState()
+        // does: null-checking a static field and then assigning one inside the
+        // branch is the shape PMD reads as an unsynchronized lazy singleton,
+        // and the answer is not a lock -- this facade runs on the EDT.
+        InviteListener target = listener;
+        if (target == null) {
+            // Held, not dropped. The answer is terminal, so no later lookup
+            // will produce it again, and setInviteListener() only replays a
+            // resolved attribution -- so an application that answers the
+            // deferred question before registering its listener got neither
+            // callback for the whole install, against the documented promise
+            // that an early answer is delivered on registration.
+            undelivered = reason;
             return;
         }
         deliveredThisRun = true;
         try {
-            listener.attributionUnavailable(reason);
+            target.attributionUnavailable(reason);
         } catch (Throwable t) {
             Log.e(t);
         }

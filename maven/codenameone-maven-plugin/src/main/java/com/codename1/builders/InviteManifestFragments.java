@@ -166,6 +166,15 @@ final class InviteManifestFragments {
         if (!declaresHost(block, host)) {
             return false;
         }
+        // The scheme too, in this same filter. An http-only filter on the
+        // invite host and path claims nothing about https, and the links this
+        // builder generates are https -- so treating it as coverage suppressed
+        // the generated filter and left every invite link opening the browser.
+        // A filter that names no scheme at all matches none of ours: Android
+        // requires a scheme before a host is considered.
+        if (block.indexOf("android:scheme=\"https\"") < 0) {
+            return false;
+        }
         String prefix = pathPrefix(slug);
         // Any pathPrefix that is a prefix of ours covers our links: a filter
         // on "/i/" accepts "/i/<slug>/<code>". The reverse is not true, and a

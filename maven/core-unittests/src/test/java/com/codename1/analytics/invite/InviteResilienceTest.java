@@ -360,4 +360,89 @@ class InviteResilienceTest extends UITestBase {
         assertEquals(Invites.STATE_PENDING, Invites.getState(),
                 "granting consent afterwards did not reopen the lookup");
     }
+
+    @Test
+    @EdtTest
+    void flushSupersedesWhateverTheLastAttemptLeftOutstanding() {
+        // Retrying under the same epoch let a fingerprint answer from the
+        // earlier attempt land after the retried referrer resolved exactly, and
+        // overwrite it. Genuinely concurrent on an app with more than one
+        // NetworkManager thread.
+        Invites.checkForInvite();
+        int stale = Invites.currentLookupEpochForTest();
+
+        Invites.flush();
+        Invites.handleResolution(InviteTestSupport.resolvedJson("EXACT1", "c1", "sms"),
+                Invites.MATCH_REFERRER, true);
+
+        Invites.handleResolution(InviteTestSupport.resolvedJson("GUESS", "c2", "unknown"),
+                Invites.MATCH_FINGERPRINT, true, stale);
+
+        InviteAttribution a = Invites.getAttribution();
+        assertNotNull(a);
+        assertEquals("EXACT1", a.getCode(),
+                "a stale statistical answer overwrote the retried exact one");
+    }
+
+    @Test
+    @EdtTest
+    void grantingConsentResumesADeclinedLookupWithoutWaitingForTheApp() {
+        // The refusal leaves STATE_DECLINED with a reopenable marker, and
+        // nothing restarted the lookup until the application happened to call
+        // checkForInvite() again -- by which time the attribution window may
+        // have closed.
+        Invites.checkForInvite();
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+        assertEquals(Invites.STATE_DECLINED, Invites.getState());
+
+        Analytics.setConsent(AnalyticsConsent.granted());
+
+        assertEquals(Invites.STATE_PENDING, Invites.getState(),
+                "granting consent did not resume the declined lookup");
+    }
+
+    @Test
+    @EdtTest
+    void anUnavailableAnswerReachedBeforeRegistrationIsStillDelivered() {
+        // The answer is terminal, so no later lookup produces it again, and
+        // setInviteListener only replays a resolved attribution -- so an app
+        // that answered the deferred question before registering its listener
+        // got neither callback for the entire install.
+        Invites.setAttributionWindow(0);
+        Invites.checkForInvite();
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState());
+
+        final String[] told = new String[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0] = reason;
+            }
+        });
+        assertEquals(Invites.REASON_UNSUPPORTED, told[0],
+                "the answer reached before registration was dropped");
+    }
+
+    @Test
+    @EdtTest
+    void aRefusedDirectLinkTellsTheListener() {
+        // checkForInvite marks the url consumed and skips the deferred path
+        // after this, so it is the only chance the listener gets -- and a
+        // registered one heard nothing at all.
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+        final String[] told = new String[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0] = reason;
+            }
+        });
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/CODE1");
+        assertEquals(Invites.REASON_CONSENT_DENIED, told[0],
+                "a refused direct link told the listener nothing");
+    }
 }

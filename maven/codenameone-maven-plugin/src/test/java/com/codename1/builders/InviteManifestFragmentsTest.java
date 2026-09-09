@@ -113,7 +113,7 @@ class InviteManifestFragmentsTest {
 
     @Test
     void aBroaderPrefixOnTheSameHostDoesCoverTheInviteLinks() {
-        String existing = "<data android:host=\"" + HOST + "\" "
+        String existing = "<data android:scheme=\"https\" android:host=\"" + HOST + "\" "
                 + "android:pathPrefix=\"/i/\" />";
         assertTrue(InviteManifestFragments.declaresInviteLinks(existing, HOST, "acme"),
                 "/i/ accepts /i/acme/<code> and needs no second filter");
@@ -122,7 +122,7 @@ class InviteManifestFragmentsTest {
 
     @Test
     void anotherAppsSlugDoesNotCoverOurs() {
-        String existing = "<data android:host=\"" + HOST + "\" "
+        String existing = "<data android:scheme=\"https\" android:host=\"" + HOST + "\" "
                 + "android:pathPrefix=\"/i/other/\" />";
         assertFalse(InviteManifestFragments.declaresInviteLinks(existing, HOST, "acme"));
     }
@@ -195,5 +195,31 @@ class InviteManifestFragmentsTest {
         String out = InviteManifestFragments.injectAppLinks("", "links.example.com", null);
         assertTrue(out.contains("android:host=\"links.example.com\""), out);
         assertFalse(out.contains(HOST), out);
+    }
+
+    @Test
+    void anHttpOnlyFilterDoesNotCoverOurHttpsLinks() {
+        // The links this builder generates are https. An http-only filter on
+        // the same host and path claims nothing about them, and treating it as
+        // coverage suppressed the generated filter -- so every invite link kept
+        // opening the browser, which is the exact symptom the filter exists to
+        // prevent.
+        String existing = "<intent-filter>"
+                + "<data android:scheme=\"http\" android:host=\"" + HOST + "\" "
+                + "android:pathPrefix=\"/i/\" /></intent-filter>";
+        assertFalse(InviteManifestFragments.declaresInviteLinks(existing, HOST, "acme"));
+        String out = InviteManifestFragments.injectAppLinks(existing, HOST, "acme");
+        assertTrue(out.contains("android:scheme=\"https\""),
+                "the https filter was suppressed by an http-only one");
+    }
+
+    @Test
+    void aFilterNamingNoSchemeAtAllCoversNothing() {
+        // Android requires a scheme before a host is considered, so a data
+        // element without one matches no url whatsoever.
+        String existing = "<intent-filter>"
+                + "<data android:host=\"" + HOST + "\" "
+                + "android:pathPrefix=\"/i/\" /></intent-filter>";
+        assertFalse(InviteManifestFragments.declaresInviteLinks(existing, HOST, "acme"));
     }
 }
