@@ -5602,7 +5602,10 @@ public class AndroidGradleBuilder extends Executor {
                 && "true".equals(request.getArg("android.locationButton.exclusive", "auto"))) {
             warn("android.locationButton.exclusive=true was set, but no location"
                     + " usage was detected, so no ACCESS_FINE_LOCATION declaration"
-                    + " is generated and there is nothing to restrict.");
+                    + " is generated and there is nothing to restrict. An application"
+                    + " that reaches location only from native Android code, which the"
+                    + " class scan cannot see, declares the permission itself through"
+                    + " android.xpermissions and puts the flag on that entry.");
         }
         if (locationButtonPermission) {
             permissions += permissionAdd(request, "USE_LOCATION_BUTTON",

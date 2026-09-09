@@ -717,7 +717,12 @@ final class BuildHintsAndroid {
                         + "location or maps packages. Set `false` when the application "
                         + "reaches precise location through native Android code, which the "
                         + "class scan can't see because Gradle compiles it later, and "
-                        + "`true` to declare it regardless."));
+                        + "`true` to declare the flag whenever the build declares the "
+                        + "permission at all, whatever the inference would have chosen. "
+                        + "Neither value makes the build declare a permission it otherwise "
+                        + "would not: an application whose only location use is invisible to "
+                        + "the class scan gets no declaration to flag, and reaches precise "
+                        + "location through its own `android.xpermissions` entry."));
 
         h.add(new Hint("android.mockLocation")
                 .group(HintGroup.ANDROID)
