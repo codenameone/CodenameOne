@@ -55,8 +55,8 @@
   <text x="678" y="286" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#a56a3a">system compositor</text>
   <rect x="16" y="342" width="788" height="92" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
   <text x="410" y="364" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#222222">What follows when you build a screen</text>
-  <text x="410" y="386" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">On the first two models Codename One content painted after a peer covers it, so a component on the layered pane is not</text>
-  <text x="410" y="400" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">blocked by the peer as a rule. A form transition puts both forms into lightweight mode, and what a peer does about that</text>
-  <text x="410" y="414" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">is the peer's own business: iOS and Android stand a still image in for it, a peer that owns a surface has nothing to render</text>
-  <text x="410" y="428" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">and goes blank, and the JavaScript peer overrides nothing and stays live. Arbitrary overlap is not automatic on any of them.</text>
+  <text x="410" y="386" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">On the first two models Codename One content painted after a peer covers it, so a component on the layered pane needs</text>
+  <text x="410" y="400" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">nothing from you. The capture-hide-and-show dance belongs to the third: a surface the system composites stays above the</text>
+  <text x="410" y="414" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Codename One canvas whatever you paint over it, and the ordinary capture cannot read it back to stand in for it either.</text>
+  <text x="410" y="428" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">A form transition puts both forms into lightweight mode, but what a peer does with that is the peer's own business.</text>
 </svg>
