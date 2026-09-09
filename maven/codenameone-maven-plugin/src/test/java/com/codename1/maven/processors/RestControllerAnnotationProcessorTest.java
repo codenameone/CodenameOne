@@ -47,6 +47,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -902,6 +903,154 @@ public class RestControllerAnnotationProcessorTest {
         assertTrue(all, all.indexOf("can never run") >= 0);
     }
 
+    @Test
+    public void aGetInOneControllerAndAHeadInAnotherAreRefused() throws Exception {
+        // A generated GET block also answers HEAD, so these two DO compete even
+        // though the verbs differ -- and across controllers nothing orders them:
+        // the bootstrap tries the routers in turn, so whichever it lists first
+        // takes the HEAD and the declared handler never runs. Inside ONE
+        // controller the same pair is fine, because the comparator emits HEAD's
+        // block ahead of GET's fallback.
+        ProcessorContext ctx = run(compileBoth(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/notes\")\n"
+                + "    public String all() { return \"[]\"; }\n"
+                + "}\n",
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Other {\n"
+                + "    @RequestMapping(value = \"/notes\", method = \"HEAD\")\n"
+                + "    public void probe() { }\n"
+                + "}\n"));
+        assertTrue("a HEAD hidden by another controller's GET should not compile",
+                ctx.hasErrors());
+    }
+
+    @Test
+    public void aGetAndAHeadInTheSameControllerStillCompile() throws Exception {
+        // The other side of that rule. Making the pair collide across controllers
+        // must not make the ordinary declaration -- both in one class, which is
+        // what the cross-controller message tells people to do -- unwritable.
+        ProcessorContext ctx = run(compileBoth(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/notes\")\n"
+                + "    public String all() { return \"[]\"; }\n"
+                + "    @RequestMapping(value = \"/notes\", method = \"HEAD\")\n"
+                + "    public void probe() { }\n"
+                + "}\n",
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Other {\n"
+                + "    @GetMapping(\"/other\")\n"
+                + "    public String other() { return \"x\"; }\n"
+                + "}\n"));
+        assertFalse("GET and HEAD in one controller are ordered, not ambiguous: "
+                + ctx.getErrors(), ctx.hasErrors());
+    }
+
+    @Test
+    public void aMapBodyKeyedByANonStringIsRefused() throws Exception {
+        // A JSON object's names are always strings. Long is a fine body VALUE --
+        // every JSON integer arrives as one -- so the element rule approved
+        // Map<Long,String>, and the emitted shape check walks values() only. The
+        // handler then got a map whose keys violate its own declaration: typed
+        // iteration throws, and get(1L) misses the value the client sent.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Counts {\n"
+                + "    @PostMapping(\"/counts\")\n"
+                + "    public String put(@RequestBody java.util.Map<Long, String> counts) {\n"
+                + "        return \"ok\";\n"
+                + "    }\n"
+                + "}\n"));
+        assertTrue("a map keyed by Long cannot be decoded and should not compile",
+                ctx.hasErrors());
+        String all = ctx.getErrors().toString();
+        assertTrue(all, all.indexOf("names are strings") >= 0);
+    }
+
+    @Test
+    public void aMapBodyKeyedByStringIsAccepted() throws Exception {
+        // The rule must not swallow the shape it is protecting.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Counts {\n"
+                + "    @PostMapping(\"/counts\")\n"
+                + "    public String put(@RequestBody java.util.Map<String, Long> counts) {\n"
+                + "        return \"ok\";\n"
+                + "    }\n"
+                + "}\n"));
+        assertFalse("Map<String,Long> is exactly what a JSON object decodes to: "
+                + ctx.getErrors(), ctx.hasErrors());
+    }
+
+    @Test
+    public void anOverflowingDoubleDefaultIsRefused() throws Exception {
+        // Double.parseDouble("1e999") answers infinity instead of throwing, so
+        // this declaration was approved while the RUNTIME guard rejects the same
+        // spelling arriving in a request: omit the parameter and the controller
+        // runs on an infinity, send it and the client gets a 400. Two answers for
+        // one value.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Rates {\n"
+                + "    @GetMapping(\"/rate\")\n"
+                + "    public String rate(@RequestParam(value = \"r\", defaultValue = \"1e999\")\n"
+                + "                       double r) { return String.valueOf(r); }\n"
+                + "}\n"));
+        assertTrue("a default that parses to infinity should not compile", ctx.hasErrors());
+    }
+
+    @Test
+    public void anExplicitInfinityDefaultIsStillAllowed() throws Exception {
+        // The spelling is what says an infinity was meant, which is the same test
+        // the generated guard uses -- so the two cannot disagree about which
+        // values are infinities.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Rates {\n"
+                + "    @GetMapping(\"/rate\")\n"
+                + "    public String rate(@RequestParam(value = \"r\", defaultValue = \"Infinity\")\n"
+                + "                       double r) { return String.valueOf(r); }\n"
+                + "}\n"));
+        assertFalse("a deliberate Infinity is not an overflow: " + ctx.getErrors(),
+                ctx.hasErrors());
+    }
+
+    @Test
+    public void anOverflowingFloatDefaultIsRefused() throws Exception {
+        // The float branch had the bug in the other direction: Double.isInfinite
+        // was its "did they mean it" test, and Double.parseDouble("1e999") is
+        // itself infinite, so every double-overflowing default read as deliberate.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Rates {\n"
+                + "    @GetMapping(\"/rate\")\n"
+                + "    public String rate(@RequestParam(value = \"r\", defaultValue = \"1e999\")\n"
+                + "                       float r) { return String.valueOf(r); }\n"
+                + "}\n"));
+        assertTrue("a float default that parses to infinity should not compile",
+                ctx.hasErrors());
+    }
+
     private static final class Router {
         private final Object instance;
         private final Method handle;
@@ -998,8 +1147,13 @@ public class RestControllerAnnotationProcessorTest {
     private File compile(String controllerSource) throws Exception {
         File classes = tmp.newFolder();
         Map<String, String> sources = new LinkedHashMap<String, String>();
-        sources.put(controllerSource.indexOf("class Notes") >= 0
-                ? "com.example.Notes" : "com.example.Bad", controllerSource);
+        // Read out of the source rather than guessed from a pair of known names:
+        // javac wants the file to match the class, so a test that declared a
+        // third name failed to COMPILE and reported that as its result.
+        int at = controllerSource.indexOf("public class ");
+        String name = controllerSource.substring(at + "public class ".length(),
+                controllerSource.indexOf(' ', at + "public class ".length() + 1));
+        sources.put("com.example." + name.trim(), controllerSource);
         JavaSourceCompiler.compile(sources, classes, backendClasspath());
         return classes;
     }

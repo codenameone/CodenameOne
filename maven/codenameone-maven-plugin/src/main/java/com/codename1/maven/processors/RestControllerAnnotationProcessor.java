@@ -354,11 +354,19 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // first wins. That is the same ambiguity as across controllers, and it
             // has the same answer.
             String other = e.getKey();
-            // Same verb, or they cannot collide at all.
+            // Same verb, or they cannot collide at all -- except that a generated
+            // GET block also answers HEAD, so a GET route and a HEAD route on
+            // overlapping paths DO compete even though the verbs differ.
             int mySpace = shape.indexOf(' ');
             int otherSpace = other.indexOf(' ');
-            if (mySpace < 0 || otherSpace < 0
-                    || !shape.substring(0, mySpace).equals(other.substring(0, otherSpace))) {
+            if (mySpace < 0 || otherSpace < 0) {
+                continue;
+            }
+            String myVerb = shape.substring(0, mySpace);
+            String otherVerb = other.substring(0, otherSpace);
+            boolean sameVerb = myVerb.equals(otherVerb);
+            boolean getAndHead = isGetHeadPair(myVerb, otherVerb);
+            if (!sameVerb && !getAndHead) {
                 continue;
             }
             if (!overlaps(other.substring(otherSpace + 1), shape.substring(mySpace + 1))) {
@@ -374,6 +382,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // Only that pair. Two DYNAMIC shapes have no dominance in that
             // comparator, so "/a/{x}/c" against "/a/b/{y}" is still ambiguous,
             // and two literals that overlap are the same literal twice.
+            // Within ONE controller a GET and a HEAD are ordered rather than
+            // ambiguous: generateRouter's comparator emits HEAD's own block ahead
+            // of GET's fallback, so the declared HEAD wins and the GET still
+            // answers everything else. Across controllers there is no such order
+            // -- the routers are tried in whatever sequence the bootstrap lists
+            // them -- so that pair is exactly as ambiguous as two GETs.
+            if (getAndHead && !sameVerb && mine.equals(e.getValue())) {
+                continue;
+            }
             if (mine.equals(e.getValue()) && isLiteralShape(other) != isLiteralShape(shape)) {
                 continue;
             }
@@ -431,6 +448,17 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
         }
         return null;
+    }
+
+    /**
+     * Whether these two verbs are the GET/HEAD pair, in either order.
+     *
+     * They are not the same verb, but they answer the same requests: a generated
+     * GET block accepts HEAD, which is what makes a controller with only
+     * @GetMapping usable by a health check.
+     */
+    private static boolean isGetHeadPair(String a, String b) {
+        return ("GET".equals(a) && "HEAD".equals(b)) || ("HEAD".equals(a) && "GET".equals(b));
     }
 
     /** HEAD sorts ahead of everything, so its own block precedes GET's fallback. */
@@ -626,6 +654,22 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 return null;
             }
             p.genericJavaType = genericType;
+            String badKey = "BODY".equals(p.kind) ? unusableMapKey(genericType) : null;
+            if (badKey != null) {
+                // Separate from the element rule below, and with its own message,
+                // because Long is a perfectly good body VALUE -- every JSON
+                // integer arrives as one -- and only wrong as a KEY. The element
+                // check therefore approves Map<Long,String>, and the emitted
+                // shape check walks values() alone, so the map reached the
+                // handler with keys that violate its own declaration.
+                ctx.error(cls, "Cannot bind " + genericType + " from the body on "
+                        + cls.getBinaryName() + "." + m.getName() + ". A JSON object's "
+                        + "names are strings, so " + badKey + " keys arrive as String: "
+                        + "iterating them as the declared type throws and get(" + badKey
+                        + ") silently misses the value the client sent. Key the map by "
+                        + "String.");
+                return null;
+            }
             if ("BODY".equals(p.kind) && !bodyElementsAreDecoded(genericType)) {
                 ctx.error(cls, "Cannot bind " + genericType + " from the body on "
                         + cls.getBinaryName() + "." + m.getName() + ". A body is decoded "
@@ -743,6 +787,42 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
         }
         return true;
+    }
+
+    /**
+     * The first map key type in this declaration that a JSON body cannot produce,
+     * or null when every one of them is usable.
+     *
+     * Recursive, because the map need not be the outer type: List<Map<Long,?>> has
+     * the same problem one level down. Object and a wildcard claim nothing, so
+     * they are fine; String is what actually arrives.
+     */
+    static String unusableMapKey(String javaType) {
+        if (javaType == null) {
+            return null;
+        }
+        int lt = javaType.indexOf('<');
+        int end = javaType.lastIndexOf('>');
+        if (lt < 0 || end <= lt) {
+            return null;
+        }
+        List<String> args = splitTypeArguments(javaType.substring(lt + 1, end));
+        if ("java.util.Map".equals(javaType.substring(0, lt)) && args.size() == 2) {
+            String key = args.get(0).trim();
+            int inner = key.indexOf('<');
+            String rawKey = inner < 0 ? key : key.substring(0, inner);
+            if (!key.startsWith("?") && !"java.lang.String".equals(rawKey)
+                    && !"java.lang.Object".equals(rawKey)) {
+                return rawKey;
+            }
+        }
+        for (int i = 0; i < args.size(); i++) {
+            String nested = unusableMapKey(args.get(i));
+            if (nested != null) {
+                return nested;
+            }
+        }
+        return null;
     }
 
     /** What Json.parse produces, and therefore all a body can be made of. */
@@ -1278,13 +1358,22 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             } else if ("byte".equals(javaType)) {
                 Byte.parseByte(v);
             } else if ("double".equals(javaType)) {
-                Double.parseDouble(v);
-            } else if ("float".equals(javaType)) {
-                // Same rule as the request path: parseFloat answers infinity for a
-                // value too large rather than failing, and an infinite default is
-                // no more writable than an unparseable one.
+                // parseDouble answers infinity for 1e999 rather than throwing, so
+                // this branch used to approve a default the RUNTIME guard rejects
+                // in the identical spelling: omit the value and the generated
+                // converter hands the controller an infinity, send it and the
+                // request is a 400. The same rule as the request path, then, and
+                // the same test -- the SPELLING decides whether an infinity was
+                // meant, because the parsed value cannot tell 1e999 from Infinity.
                 double d = Double.parseDouble(v);
-                return !Float.isInfinite((float) d) || Double.isInfinite(d);
+                return !Double.isInfinite(d) || spellsInfinity(v);
+            } else if ("float".equals(javaType)) {
+                // Same rule, and it was wrong here in the other direction:
+                // Double.isInfinite was the "did they mean it" test, and
+                // Double.parseDouble("1e999") is itself infinite, so every
+                // double-overflowing default was read as a deliberate infinity.
+                double d = Double.parseDouble(v);
+                return !Float.isInfinite((float) d) || spellsInfinity(v);
             } else if ("boolean".equals(javaType)) {
                 // The binder accepts only these two, so a default of "yes" would
                 // bind false and read as a deliberate choice.
@@ -1294,6 +1383,18 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         } catch (NumberFormatException err) {
             return false;
         }
+    }
+
+    /**
+     * Whether this text asks for an infinity, rather than merely producing one.
+     *
+     * The same test the generated guards use, deliberately: parseDouble answers
+     * infinity for both "Infinity" and "1e999", so only the text tells the two
+     * apart, and a default and a request value that disagreed about which is
+     * which is exactly the divergence this pair of rules exists to prevent.
+     */
+    private static boolean spellsInfinity(String value) {
+        return value.trim().indexOf("Infinity") >= 0;
     }
 
     private static String numericChecker(String javaType) {
