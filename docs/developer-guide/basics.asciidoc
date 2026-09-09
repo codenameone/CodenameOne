@@ -54,7 +54,7 @@ The preferred size depends on internal constraints such as font size, border siz
 
 When a layout manager positions and sizes the component, it **MIGHT** take the preferred size into account. It can also ignore it entirely.
 
-For example, https://www.codenameone.com/javadoc/com/codename1/ui/layouts/FlowLayout.html[FlowLayout] always gives components their exact preferred size, while https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] resizes the center component by default and the other components along one axis.
+For example, https://www.codenameone.com/javadoc/com/codename1/ui/layouts/FlowLayout.html[FlowLayout] gives components their preferred size wherever the row has space for it, narrowing one that's too wide and expanding them all when `fillRows` is set, while https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] resizes the center component by default and the other components along one axis.
 
 You can define a group of components to have the same preferred width or height by using the `setSameWidth`
 and `setSameHeight` methods, for example:

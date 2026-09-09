@@ -594,9 +594,9 @@ To update the number of threads use:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava015Snippet.java[tag=io-java-015,indent=0]
 ----
 
-All the callbacks in the `ConnectionRequest` occur on the network thread and *not on the EDT*!
+The callbacks you override on a `ConnectionRequest` occur on the network thread and *not on the EDT*!
 
-One exception to this rule exists: the `postResponse()` method, designed to update the UI after the networking code completes.
+The callbacks you register are the other way round. `postResponse()`, designed to update the UI after the networking code completes, is dispatched back to the EDT with `callSerially`, and so are the listeners added through `addResponseListener` and `NetworkManager.addErrorListener`.
 
 IMPORTANT: Never change the UI from a `ConnectionRequest` callback. You can either use a listener on the `ConnectionRequest`, use `postResponse()` (which is the exception to this rule) or wrap your UI code with `callSerially`.
 
