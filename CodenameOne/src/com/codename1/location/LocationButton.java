@@ -78,18 +78,22 @@ import java.util.List;
 /// manifest, which the platform requires before it will render the control.
 /// Nothing else is needed.
 ///
-/// An application whose *only* location use is transactional can go one step
-/// further and declare that precise location is reachable through the button
-/// alone, which removes the "allow precise location" question from the app
-/// entirely. That is a manifest attribute rather than an API, so it is set
-/// through the `android.xpermissions` build hint:
+/// The build also decides how to declare `ACCESS_FINE_LOCATION`. An application
+/// that uses this component and nothing else from the location or maps packages
+/// gets it declared `onlyForLocationButton`, which means the system grants
+/// precise location through the button and never any other way -- no "allow
+/// precise location" question, and nothing to justify to Google Play. An
+/// application that also tracks, navigates or geofences needs the ordinary grant
+/// and gets the ordinary declaration. The class scan the build already runs
+/// answers this, so neither case needs a build hint.
 ///
-/// ```
-/// codename1.arg.android.xpermissions=<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:usesPermissionFlags="onlyForLocationButton" />
-/// ```
-///
-/// Do not set that in an application that also tracks, navigates or geofences:
-/// those need a grant this flag takes away.
+/// `android.locationButton.exclusive` (`auto`, `true`, `false`) overrides it,
+/// for an application whose location use that scan cannot see -- native Android
+/// code reaching the platform's own location APIs is the case that matters.
+/// Writing the declaration by hand through `android.xpermissions` is not the way
+/// to ask for it: the build cannot check a hand-written fragment against the
+/// compile SDK, and `onlyForLocationButton` is an API 37 value that AAPT rejects
+/// below it.
 public class LocationButton extends Container {
 
     /// An icon with no label. The narrowest form of the control.

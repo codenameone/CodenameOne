@@ -538,6 +538,21 @@ public class AndroidGradleBuilder extends Executor {
     /// the manifest line for ACCESS_FINE_LOCATION
     private String fineLocationPermission(BuildRequest request, int compileSdk)
             throws BuildException {
+        // A hand-written fragment reaches the manifest through xPermissions and
+        // is never routed through this method: permissionAdd() suppresses ours
+        // when xPermissions already names ACCESS_FINE_LOCATION, so the guard
+        // below would pass while the unsupported value sat in the manifest
+        // regardless. Checked as text because that is all a free-form hint is,
+        // and refused here so the developer gets this sentence instead of an
+        // AAPT resource-linking error further down.
+        if (!compileSdkSupportsExclusiveLocation(compileSdk)
+                && xPermissions != null
+                && xPermissions.indexOf("onlyForLocationButton") >= 0) {
+            throw new BuildException(requireExclusiveCompileSdkMessage(compileSdk)
+                    + " It was found in android.xpermissions; note that the build"
+                    + " infers this declaration on its own and the hint is not"
+                    + " the way to ask for it.");
+        }
         String hint = request.getArg("android.locationButton.exclusive", "auto");
         boolean asked = "true".equals(hint);
         if (!wantsExclusiveLocation(hint, locationButtonPermission, otherLocationUse)) {

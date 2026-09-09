@@ -97,6 +97,26 @@ class LocationManagerTest extends UITestBase {
                 "the second request must bind again, not reuse a stale listener");
     }
 
+    /// A one-shot request that times out must not take a subscription with it.
+    /// invokeAndBlock keeps the EDT running while it waits, so application code
+    /// is free to start tracking in the middle of one.
+    @FormTest
+    void aTimeoutDoesNotClearAListenerInstalledWhileItWaited() {
+        manager.notifyOnBind = false;
+        final DummyLocationListener tracker = new DummyLocationListener();
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                manager.setLocationListener(tracker);
+            }
+        });
+
+        Location result = manager.getCurrentLocationSync(500);
+
+        assertNull(result, "the one-shot request still timed out");
+        assertSame(tracker, manager.getCurrentListener(),
+                "the subscription installed during the wait must survive");
+    }
+
     @FormTest
     void getCurrentLocationSyncWithExistingListenerUsesCurrentLocationDirectly() throws IOException {
         manager.notifyOnBind = false;

@@ -95,6 +95,9 @@ public abstract class LocationManager {
     private LocationRequest request;
     private int status = TEMPORARILY_UNAVAILABLE;
 
+    /// Incremented by every setLocationListener, under LISTENER_LOCK.
+    private int listenerEpoch;
+
     /// Gets the LocationManager instance
     public static LocationManager getLocationManager() {
         return Display.getInstance().getLocationManager();
@@ -173,12 +176,15 @@ public abstract class LocationManager {
                 // ours is cleared -- a callback that arrived in the meantime has
                 // already replaced it.
                 //
-                // Asked of LL rather than by comparing listeners: `finished` is
-                // set by exactly the two callbacks that clear it, so "not
-                // finished" IS "still installed", and it says so without a
-                // reference comparison the static-analysis gates reject.
-                if (!l.finished) {
-                    setLocationListener(null);
+                // Only if nothing has been installed since. A callback that
+                // fired cleared it already, and application code is free to
+                // start tracking while this request waits -- invokeAndBlock
+                // keeps the EDT running -- so clearing unconditionally would
+                // silently stop a subscription this request never owned.
+                synchronized (LISTENER_LOCK) {
+                    if (listenerEpoch == l.epoch) {
+                        setLocationListener(null);
+                    }
                 }
                 return l.result;
             }
@@ -258,6 +264,17 @@ public abstract class LocationManager {
     /// from getting updates
     public void setLocationListener(final LocationListener l) {
         synchronized (LISTENER_LOCK) {
+            // Every install gets a number, and an LL is told its own. That is
+            // how a timed-out getCurrentLocationSync knows whether the listener
+            // it is about to clear is still the one it installed -- see there.
+            // A counter rather than a comparison because the static-analysis
+            // gates reject comparing references (PMD CompareObjectsWithEquals),
+            // and because it answers "was there ANY install since" rather than
+            // only "is this the same object".
+            listenerEpoch++;
+            if (l instanceof LL) {
+                ((LL) l).epoch = listenerEpoch;
+            }
             if (listener != null) {
                 clearListener();
                 request = null;
@@ -369,6 +386,9 @@ public abstract class LocationManager {
         Location result;
         boolean finished;
         long timeout;
+
+        /// The install this listener belongs to; see [#listenerEpoch].
+        int epoch;
 
         public void bind() {
             setLocationListener(this);
