@@ -78,10 +78,6 @@ public final class StaticFiles implements HttpServer.Handler {
     }
 
     public HttpServer.Response handle(HttpServer.Request request) throws Exception {
-        String method = request.getMethod();
-        if(!"GET".equalsIgnoreCase(method) && !"HEAD".equalsIgnoreCase(method)) {
-            return HttpServer.Response.text(405, "method not allowed");
-        }
         String target = request.getTarget();
         int q = target.indexOf('?');
         if(q >= 0) {
@@ -98,6 +94,16 @@ public final class StaticFiles implements HttpServer.Handler {
                 return null; // not ours; let the caller 404 it
             }
             target = target.substring(prefix.length());
+        }
+        // The method is checked only once the target is known to be OURS. This
+        // handler is one link in a chain -- the caller tries it and falls back --
+        // so refusing a verb for a path outside the mount answers on behalf of
+        // whoever was going to handle it: a POST to an unrelated path came back
+        // 405 instead of reaching the 404 the caller meant, and in a chain that
+        // tries files first it would shadow a later dynamic handler entirely.
+        String method = request.getMethod();
+        if(!"GET".equalsIgnoreCase(method) && !"HEAD".equalsIgnoreCase(method)) {
+            return HttpServer.Response.text(405, "method not allowed");
         }
         String decoded = decode(target);
         if(decoded == null) {

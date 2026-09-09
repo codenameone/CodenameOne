@@ -235,6 +235,33 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                     anyError = true;
                 }
             }
+            // And the other direction, which is the half that was missing. A
+            // placeholder nothing binds is worse than a typo: the CLIENT
+            // substitutes the placeholder's own name, so it requests /users/id
+            // literally, while the SERVER matches any value there and passes it
+            // to nobody. Both halves compile, and the route they agree on is one
+            // whose variable cannot be supplied or read.
+            for (int ti = 0; ti < template.length; ti++) {
+                String name = placeholderName(template[ti]);
+                if (name == null) {
+                    continue;
+                }
+                boolean bound = false;
+                for (int pi = 0; pi < op.params.size(); pi++) {
+                    Param p = op.params.get(pi);
+                    if ("path".equals(p.bindKind) && name.equals(p.bindName)) {
+                        bound = true;
+                        break;
+                    }
+                }
+                if (!bound) {
+                    ctx.error(cls, api.binaryName + "." + op.name + " declares the route "
+                            + op.pathTemplate + ", but nothing binds {" + name + "}. Add a "
+                            + "parameter annotated @Path(\"" + name + "\"), or take the "
+                            + "placeholder out of the path.");
+                    anyError = true;
+                }
+            }
             api.ops.add(op);
         }
         // Two routes of the same verb and shape generate the same predicate, and
@@ -259,6 +286,15 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             // whichever it emits first, so the contract gives that request no
             // stable meaning.
             String clash = overlappingShape(shapes.keySet(), shape);
+            // Unless one of the two is wholly literal. The dispatcher emits every
+            // route without a placeholder before every route with one, so
+            // "GET /users/me" beside "GET /users/{id}" is decided by that order:
+            // the literal takes its own path and every other value falls through.
+            // The comment above is right that literal-first cannot break a tie
+            // between two DYNAMIC shapes -- and equally, it does break this one.
+            if (clash != null && isLiteralShape(clash) != isLiteralShape(shape)) {
+                clash = null;
+            }
             if (clash != null) {
                 ctx.error(cls, api.binaryName + "." + op.name + " answers " + shape
                         + ", which " + shapes.get(clash) + " also answers as " + clash
@@ -482,6 +518,11 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                     "java.lang.Short", "java.lang.Byte",
                     "java.util.List", "java.util.Set", "java.util.Collection",
                     "java.util.Map")));
+
+    /** A shape with no placeholder at all, which the dispatcher emits first. */
+    private static boolean isLiteralShape(String shape) {
+        return shape.indexOf("{}") < 0;
+    }
 
     /** The value half of a Map's type arguments, honouring nested generics. */
     private static String mapValueType(String inner) {
@@ -1349,6 +1390,11 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
 
     private static boolean isPlaceholder(String segment) {
         return segment.length() > 2 && segment.charAt(0) == '{' && segment.charAt(segment.length() - 1) == '}';
+    }
+
+    /** The name inside a placeholder segment, or null when it is not one. */
+    private static String placeholderName(String segment) {
+        return isPlaceholder(segment) ? segment.substring(1, segment.length() - 1) : null;
     }
 
     private static int placeholderIndex(String[] template, String name) {

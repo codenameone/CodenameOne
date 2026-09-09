@@ -732,6 +732,36 @@ public class RestServerAnnotationProcessorTest {
                         + "                OnComplete<Response<String>> callback);\n").hasErrors());
     }
 
+    /**
+     * A placeholder nothing binds. The client substitutes the placeholder's own
+     * NAME, so it asks for /users/id literally, while the server matches any
+     * value there and hands it to nobody -- two halves agreeing on a route whose
+     * variable cannot be supplied or read.
+     */
+    @Test
+    public void refusesAPlaceholderNothingBinds() throws Exception {
+        assertTrue("a placeholder with no @Path must fail the build",
+                processApi("UnboundApi",
+                        "    @GET(\"/users/{id}\")\n"
+                        + "    void user(OnComplete<Response<String>> callback);\n").hasErrors());
+    }
+
+    /**
+     * A literal beside a placeholder is NOT ambiguous: the dispatcher emits every
+     * route without a placeholder before every route with one, so /users/me takes
+     * its own path and every other value falls through to {id}. This is the most
+     * ordinary pair there is, and refusing it left no way to write it.
+     */
+    @Test
+    public void allowsALiteralBesideAPlaceholder() throws Exception {
+        assertNoErrors(processApi("LiteralApi",
+                "    @GET(\"/users/me\")\n"
+                + "    void me(OnComplete<Response<String>> callback);\n"
+                + "    @GET(\"/users/{id}\")\n"
+                + "    void byId(@Path(\"id\") String id,\n"
+                + "              OnComplete<Response<String>> callback);\n"));
+    }
+
     /** Two routes of the same shape but DIFFERENT verbs are not ambiguous. */
     @Test
     public void allowsTheSameShapeUnderDifferentVerbs() throws Exception {
