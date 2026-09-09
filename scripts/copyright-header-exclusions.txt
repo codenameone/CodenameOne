@@ -44,3 +44,19 @@ CodenameOne/src/com/codename1/processing/HashtableContent.java | Eric Coolman co
 CodenameOne/src/com/codename1/processing/TextEvaluator.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
 CodenameOne/src/com/codename1/processing/ContainsEvaluator.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
 CodenameOne/src/com/codename1/processing/XMLContent.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
+
+# The transpiler's golden fixtures are its EXPECTED OUTPUT, compared byte for
+# byte against what a run emits. A header here is not a licence statement about
+# the fixture, it is an assertion that the transpiler emits one -- and it does
+# not, because the file it emits is generated into a build directory and is
+# nobody's source. Adding one breaks the comparison it exists to make.
+maven/dart-transpiler/src/test/resources/golden/counter/expected/FlutterRegistry.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/counter/expected/MainLib.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/counter/expected/MyApp.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/counter/expected/MyHomePage.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/counter/expected/_MyHomePageState.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/DemoApp.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/DemoPage.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/FlutterRegistry.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/MainLib.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/_DemoPageState.java | Transpiler golden fixture: expected generated output, compared byte for byte
