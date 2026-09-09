@@ -95,7 +95,17 @@ public final class LambdaRuntime {
         try {
             result = handler.handle(next.getBodyAsString(), requestId);
         } catch (Exception err) {
-            reportError(host, port, requestId, err);
+            // The same rule the response path below takes, and for the same
+            // reason: an invocation the host was never told about stays
+            // outstanding until it times out, and polling for another one while
+            // that is true just strands them one after the next. If the failure
+            // could not even be reported, nothing this process says is reaching
+            // the host, so it stops rather than collecting more.
+            if(!reportError(host, port, requestId, err)) {
+                System.err.println("The runtime API is unreachable, so this runtime is "
+                        + "stopping rather than collecting invocations it cannot answer.");
+                return false;
+            }
             return true;
         }
         try {

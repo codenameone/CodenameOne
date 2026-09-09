@@ -136,7 +136,18 @@ public final class Web {
             connection.setRequestMethod(method == null ? "GET" : method);
             connection.setConnectTimeout(30000);
             connection.setReadTimeout(30000);
-            connection.setInstanceFollowRedirects(true);
+            // Following a redirect RESENDS the caller's headers to wherever it
+            // points, and HttpURLConnection carries every request property over
+            // -- it knows nothing about which of them is an X-Api-Key. A single
+            // 3xx from a service that has been taken over, or one that simply
+            // redirects off-domain, is then enough to hand the credential to the
+            // new host, with the caller never seeing where its header went.
+            // The packaged arm makes exactly this distinction (see the
+            // CURLOPT_FOLLOWLOCATION comment in cn1_backend_web.c) and the two
+            // must not disagree about it: whatever is unsafe there is unsafe
+            // here, and a difference between the arms is one more thing that
+            // only shows up after packaging.
+            connection.setInstanceFollowRedirects(headers == null || headers.isEmpty());
             connection.setRequestProperty("User-Agent", "codenameone-backend");
             if(headers != null) {
                 for(int iter = 0 ; iter < headers.size() ; iter++) {

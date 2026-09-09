@@ -643,6 +643,15 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             if (!isPlaceholder(template[i])) {
                 sb.append(" && \"").append(RestClientAnnotationProcessor.escape(template[i]))
                   .append("\".equals(seg[").append(i).append("])");
+            } else {
+                // A placeholder stands for a segment, and "" is not one. /pets/
+                // splits to the same COUNT as /pets/{id}, so with no condition
+                // here the route ran with id set to the empty string rather than
+                // not matching -- a path the contract does not describe. The
+                // overlap checker models a placeholder as [^/]+ and the
+                // @RestController router refuses an empty variable, so this is
+                // the rule the rest of the system already applies.
+                sb.append(" && seg[").append(i).append("].length() > 0");
             }
         }
         return sb.toString();
@@ -1176,6 +1185,14 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        double d = ((Number)v).doubleValue();\n");
         sb.append("        if (Double.isNaN(d) || Double.isInfinite(d) || d != Math.floor(d)) {\n");
         sb.append("            throw new IllegalArgumentException(\"not a whole number for \" + type + \": \" + v);\n");
+        sb.append("        }\n");
+        // Range too, and BEFORE the narrowing rather than after it. longValue()
+        // SATURATES: 1e20 comes back as Long.MAX_VALUE instead of throwing, so an
+        // id or an amount too large to represent arrived as a plausible number
+        // that is not the one the client sent. Only a Double can be out of range
+        // here -- a Long already is one -- so the bound is tested on the double.
+        sb.append("        if (!(v instanceof Long) && (d < -9.223372036854776E18 || d >= 9.223372036854776E18)) {\n");
+        sb.append("            throw new IllegalArgumentException(\"out of range for \" + type + \": \" + v);\n");
         sb.append("        }\n");
         sb.append("        return ((Number)v).longValue();\n");
         sb.append("    }\n");

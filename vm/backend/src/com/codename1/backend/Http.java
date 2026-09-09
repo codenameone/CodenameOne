@@ -149,7 +149,37 @@ public final class Http {
         int bodyStart = headerEnd + 4;
         byte[] bodyBytes = new byte[all.length - bodyStart];
         System.arraycopy(all, bodyStart, bodyBytes, 0, bodyBytes.length);
+        // Everything before EOF is not the same as the whole body. A connection
+        // that dies mid-payload leaves a SHORT one, and handing that back as a
+        // complete response is how a Lambda handler is invoked on half an event
+        // and produces side effects from input the caller never sent. The
+        // declared length is the peer's own statement of what it owed, so a
+        // shortfall is a transport failure and is reported as one.
+        int declared = declaredLength(names, values);
+        if(declared >= 0 && bodyBytes.length < declared) {
+            throw new IOException("The response body stopped after " + bodyBytes.length
+                    + " of the " + declared + " byte(s) its Content-Length declared, so "
+                    + "the connection failed part way through it");
+        }
         return new Response(status, names, values, decodeBody(bodyBytes, names, values));
+    }
+
+    /**
+     * The Content-Length the peer declared, or -1 when it declared none or the
+     * value is not a number. A chunked response has no Content-Length, so the
+     * check above simply does not apply to one.
+     */
+    private static int declaredLength(List names, List values) {
+        for(int iter = 0 ; iter < names.size() ; iter++) {
+            if("content-length".equalsIgnoreCase(String.valueOf(names.get(iter)))) {
+                try {
+                    return Integer.parseInt(String.valueOf(values.get(iter)).trim());
+                } catch (NumberFormatException err) {
+                    return -1;
+                }
+            }
+        }
+        return -1;
     }
 
     /**

@@ -455,7 +455,16 @@ public final class MySql {
             Reader reader = new Reader(first.body);
             reader.skip(1);
             long affected = reader.lengthEncoded();
-            lastInsertId = reader.lengthEncoded();
+            long generated = reader.lengthEncoded();
+            // Only when the statement actually generated one. Every successful
+            // command answers with an OK packet, and an UPDATE or a DDL reports
+            // zero here -- so assigning unconditionally let the next statement
+            // after an insert wipe the id, and lastInsertId() is documented as
+            // the MOST RECENT INSERT's. The SQLite and Java SE arms both keep
+            // the last generated key, and the arms must not disagree.
+            if(generated != 0) {
+                lastInsertId = generated;
+            }
             return affected;
         }
         // A result set: a column count, the definitions again, then binary rows.
