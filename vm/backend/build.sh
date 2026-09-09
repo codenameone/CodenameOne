@@ -113,6 +113,10 @@ if [ -f "$JAVAAPI/java/lang/Object.class" ] \
     rm -rf "$JAVAAPI"
 fi
 if [ ! -f "$JAVAAPI/java/lang/Object.class" ]; then
+    # The parent first. On a fresh checkout vm/backend/target does not exist and
+    # nothing before this makes it, so mktemp failed with "No such file or
+    # directory" and the very first native build of a clone died there.
+    mkdir -p "$REPO/vm/backend/target"
     STAGING="$(mktemp -d "$REPO/vm/backend/target/javaapi.XXXXXX")"
     "$J8/bin/javac" -nowarn -source 1.8 -target 1.8 -d "$STAGING" \
         $(find "$REPO/vm/JavaAPI/src" -name '*.java')

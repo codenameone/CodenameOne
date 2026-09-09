@@ -25,6 +25,19 @@ up_to_date() {
     [ -d gen ] || return 1
     [ -n "$(find gen -name '*.class' 2>/dev/null | head -1)" ] || return 1
     [ -z "$(find contract -name '*.java' -newer gen 2>/dev/null | head -1)" ] || return 1
+    # The GENERATOR counts as an input too. Only the contract sources were
+    # checked, so editing RestServerAnnotationProcessor -- or just rebuilding the
+    # plugin -- left gen/ looking current, and build.sh and run-javase.sh went on
+    # exercising the previous dispatcher and codecs. A parity run then reported on
+    # a generator change that was not in the program it tested, which is the worst
+    # kind of green.
+    for artifact in \
+        "$REPO/maven/codenameone-maven-plugin/target/classes" \
+        "$REPO/maven/codenameone-maven-plugin/target"/codenameone-maven-plugin-*.jar
+    do
+        [ -e "$artifact" ] || continue
+        [ -z "$(find "$artifact" -newer gen 2>/dev/null | head -1)" ] || return 1
+    done
     return 0
 }
 
