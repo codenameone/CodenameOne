@@ -57,8 +57,28 @@ public class OverflowBox extends Widget implements HasChild {
         return child;
     }
 
+    public Object getAlignment() {
+        return alignment;
+    }
+
+    public Double getMinWidth() {
+        return minWidth;
+    }
+
+    public Double getMaxWidth() {
+        return maxWidth;
+    }
+
+    public Double getMinHeight() {
+        return minHeight;
+    }
+
+    public Double getMaxHeight() {
+        return maxHeight;
+    }
+
     @Override
     public Element createElement() {
-        return new PassThroughRenderElement(this);
+        return new OverflowBoxRenderElement(this);
     }
 }
