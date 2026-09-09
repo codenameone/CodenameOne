@@ -229,7 +229,16 @@ public final class HugoDoclet implements Doclet {
      */
     private List<TypeMirror> realSupertypes(TypeMirror type) {
         boolean isInterface = type instanceof DeclaredType declared
-                && declared.asElement().getKind() == ElementKind.INTERFACE;
+                && isInterfaceLike(declared.asElement());
+        // An annotation type has no supertypes worth publishing. It implicitly
+        // extends java.lang.annotation.Annotation, and the standard reference
+        // says so nowhere: no superinterface line, no inherited members, no
+        // mention of Annotation at all on the page. Reporting it put four
+        // methods under "Inherited methods" that nobody calls that way.
+        if (type instanceof DeclaredType annotation
+                && annotation.asElement().getKind() == ElementKind.ANNOTATION_TYPE) {
+            return List.of();
+        }
         List<TypeMirror> out = new ArrayList<>();
         for (TypeMirror supertype : types.directSupertypes(type)) {
             if (isInterface && supertype instanceof DeclaredType declared
@@ -240,6 +249,20 @@ public final class HugoDoclet implements Doclet {
             out.add(supertype);
         }
         return out;
+    }
+
+    /**
+     * Whether a type is an interface in the language's sense.
+     *
+     * <p>ANNOTATION_TYPE is its own ElementKind and is not INTERFACE, so a bare
+     * comparison against INTERFACE quietly excludes every annotation: they were
+     * still listed as known subtypes of Object, 78 of them, and their pages
+     * claimed to inherit clone(), wait() and the rest. An annotation interface
+     * inherits none of that.
+     */
+    private static boolean isInterfaceLike(Element element) {
+        return element.getKind() == ElementKind.INTERFACE
+                || element.getKind() == ElementKind.ANNOTATION_TYPE;
     }
 
     private void collectType(TypeElement type) {
@@ -443,7 +466,9 @@ public final class HugoDoclet implements Doclet {
     }
 
     private void collectUndocumented(TypeMirror type, Set<String> visited, List<TypeElement> out) {
-        for (TypeMirror supertype : types.directSupertypes(type)) {
+        // Through the same filter as every other walk, so an interface cannot
+        // promote Object's members and an annotation promotes nothing at all.
+        for (TypeMirror supertype : realSupertypes(type)) {
             if (!(supertype instanceof DeclaredType declared)
                     || !(declared.asElement() instanceof TypeElement element)
                     || !visited.add(element.getQualifiedName().toString())) {
@@ -569,9 +594,9 @@ public final class HugoDoclet implements Doclet {
 
     /** The superclass of a parameterized type, with its arguments substituted in. */
     private TypeMirror superclassOf(TypeMirror type) {
-        for (TypeMirror supertype : types.directSupertypes(type)) {
+        for (TypeMirror supertype : realSupertypes(type)) {
             if (supertype instanceof DeclaredType declared
-                    && declared.asElement().getKind() != ElementKind.INTERFACE) {
+                    && !isInterfaceLike(declared.asElement())) {
                 return supertype;
             }
         }
@@ -590,14 +615,14 @@ public final class HugoDoclet implements Doclet {
     private List<Map<String, Object>> interfacesOf(TypeElement type) {
         List<Map<String, Object>> out = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
-        Deque<TypeMirror> queue = new ArrayDeque<>(types.directSupertypes(type.asType()));
+        Deque<TypeMirror> queue = new ArrayDeque<>(realSupertypes(type.asType()));
         while (!queue.isEmpty()) {
             TypeMirror supertype = queue.removeFirst();
             if (!(supertype instanceof DeclaredType declared)
                     || !(declared.asElement() instanceof TypeElement element)) {
                 continue;
             }
-            boolean isInterface = element.getKind() == ElementKind.INTERFACE;
+            boolean isInterface = isInterfaceLike(element);
             if (isInterface && !seen.add(element.getQualifiedName().toString())) {
                 continue;
             }
@@ -609,7 +634,7 @@ public final class HugoDoclet implements Doclet {
             if (isInterface && documented.containsKey(element.getQualifiedName().toString())) {
                 out.add(typeNames.reference(supertype));
             }
-            queue.addAll(types.directSupertypes(supertype));
+            queue.addAll(realSupertypes(supertype));
         }
         out.sort(Comparator.comparing(row -> String.valueOf(row.get("label"))));
         return out;
@@ -626,7 +651,7 @@ public final class HugoDoclet implements Doclet {
      * names Deque, NavigableSet, ArrayList, Vector and the rest.
      */
     private List<Map<String, Object>> subclassesOf(TypeElement type) {
-        List<TypeElement> children = type.getKind() == ElementKind.INTERFACE
+        List<TypeElement> children = isInterfaceLike(type)
                 ? transitiveSubtypes(type)
                 : new ArrayList<>(subtypes.getOrDefault(type.getQualifiedName().toString(), List.of()));
         children.sort(Comparator.comparing(child -> child.getQualifiedName().toString()));
@@ -1282,16 +1307,11 @@ public final class HugoDoclet implements Doclet {
         // SuccessCallback claimed ten inherited Object methods, protected
         // clone() among them.
         boolean isInterface = type instanceof DeclaredType declaredType
-                && declaredType.asElement().getKind() == ElementKind.INTERFACE;
-        for (TypeMirror supertype : types.directSupertypes(type)) {
+                && isInterfaceLike(declaredType.asElement());
+        for (TypeMirror supertype : realSupertypes(type)) {
             if (!(supertype instanceof DeclaredType declared)
-                    || !(declared.asElement() instanceof TypeElement element)) {
-                continue;
-            }
-            if (isInterface && element.getQualifiedName().contentEquals("java.lang.Object")) {
-                continue;
-            }
-            if (!visited.add(element.getQualifiedName().toString())) {
+                    || !(declared.asElement() instanceof TypeElement element)
+                    || !visited.add(element.getQualifiedName().toString())) {
                 continue;
             }
             out.add(supertype);
