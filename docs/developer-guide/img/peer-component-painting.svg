@@ -30,9 +30,9 @@
   <text x="678" y="140" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#666666">no Codename One pixels are involved</text>
   <text x="678" y="164" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Where the peer's content lives in its own</text>
   <text x="678" y="178" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">surface, the system composites it and paint</text>
-  <text x="678" y="192" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">order never reaches it. The ordinary capture</text>
-  <text x="678" y="206" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">reads nothing back from it either, so the GL</text>
-  <text x="678" y="220" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">peer keeps its own copy of the last frame.</text>
+  <text x="678" y="192" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">order never reaches it. Nor does the ordinary</text>
+  <text x="678" y="206" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">capture, so only the screenshot path sees a GL</text>
+  <text x="678" y="220" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">frame, and only through its own readback.</text>
   <rect x="36" y="246" width="96" height="22" rx="3" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
   <text x="84" y="260" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#4a6fa5">CN1</text>
   <rect x="152" y="246" width="96" height="22" rx="3" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
@@ -56,7 +56,7 @@
   <rect x="16" y="342" width="788" height="92" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
   <text x="410" y="364" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#222222">What follows when you build a screen</text>
   <text x="410" y="386" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">On the first two models Codename One content painted after a peer covers it, so a component on the layered pane is not</text>
-  <text x="410" y="400" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">blocked by the peer as a rule. A form transition needs nothing from you on any of the three: initTransition puts both</text>
-  <text x="410" y="414" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">forms into lightweight mode and the ports stand a still image in for the peer. Arbitrary overlap is the part that is not</text>
-  <text x="410" y="428" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">automatic, because that capture is expensive - and against a surface it reads nothing back at all.</text>
+  <text x="410" y="400" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">blocked by the peer as a rule. A form transition asks the peer for a still: initTransition puts both forms into lightweight</text>
+  <text x="410" y="414" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">mode, and what comes back depends on the peer - the browser peer draws its WebView, and a peer that owns a surface</text>
+  <text x="410" y="428" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">has nothing to render and goes blank for the length of it. Arbitrary overlap is not automatic at all: that capture is expensive.</text>
 </svg>
