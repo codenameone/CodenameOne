@@ -70,6 +70,9 @@ JavaScript build targets translate the bytecode statically with ParparVM, the sa
 
 For desktop builds Codename One uses `javapackager`, since both Macs and Windows machines are available in the cloud, the platform-specific nature of `javapackager` isn't a problem.
 
+.What each target does with the same bytecode
+image::img/build-pipeline.svg[How one set of Java sources reaches each platform,scaledwidth=85%]
+
 ===== Lightweight architecture
 
 What makes Codename One stand out is the approach it takes to UI: "`lightweight architecture.`"
