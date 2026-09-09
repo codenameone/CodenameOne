@@ -101,7 +101,20 @@ final class InviteStore {
 
     // Returns false when the record did not reach the disk. Callers that care
     // about exactly-once behaviour check this; the rest may ignore it.
+    // The same seam for a named record. A full or read-only store cannot be
+    // produced from a test, and the paths that only run when a write fails are
+    // the ones most worth pinning.
+    private static String failNextNamed;
+
+    static void failNextWriteForTest(String name) {
+        failNextNamed = name;
+    }
+
     static boolean write(String record, Map<String, String> values) {
+        if (record != null && record.equals(failNextNamed)) {
+            failNextNamed = null;
+            return false;
+        }
         try {
             Storage s = Storage.getInstance();
             if (s == null) {

@@ -188,6 +188,8 @@ public final class Invites {
     static final String PROPERTY_SLUG = "invite.slug";
 
     static final String PREF_SLUG = "cn1$inviteSlug";
+    // Kept only so reset() can clear what earlier versions of this class
+    // persisted. Nothing writes it any more -- see checkForInvite.
     static final String PREF_CONSUMED_ARG = "cn1$inviteConsumedArg";
 
     // The referrer key the link service puts on the store url. Compared with
@@ -214,6 +216,9 @@ public final class Invites {
     // Held for the run rather than persisted: the state itself is durable, and
     // a later launch reaches this answer again through the ordinary path.
     private static String undelivered;
+
+    // The launch argument already handled in THIS run. See checkForInvite.
+    private static String consumedArg;
 
     // Set when a terminal marker that had already been delivered is reopened,
     // so the attribution the resumed lookup writes inherits that fact rather
@@ -477,12 +482,25 @@ public final class Invites {
         if (d != null) {
             appArg = d.getProperty("AppArg", null);
         }
+        // Deduplicated for this RUN, not for the life of the install.
+        //
+        // The point is to ignore repeated reads of one delivery -- an app that
+        // calls this from start() and again from a form -- and a durable record
+        // could not tell those apart from a second tap on the same link, which
+        // delivers the identical string. So the same link tapped again was
+        // ignored for ever: the install lost its invite_opened re-engagement
+        // event, and under re-attribution the later open could never win.
+        //
+        // What made the durable guard necessary was Android handing the same
+        // launch intent back on a later start. Both paths that read it now
+        // consume the intent's data -- the lazy getAppArg() always did, and
+        // dispatchNewIntentUrl does as well -- so a stale intent no longer
+        // reproduces the argument.
         boolean consumed = false;
-        if (appArg != null && appArg.length() > 0
-                && !appArg.equals(Preferences.get(PREF_CONSUMED_ARG, ""))) {
+        if (appArg != null && appArg.length() > 0 && !appArg.equals(consumedArg)) {
             consumed = handleUrl(appArg);
             if (consumed) {
-                Preferences.set(PREF_CONSUMED_ARG, appArg);
+                consumedArg = appArg;
             }
         }
         if (!consumed) {
@@ -607,6 +625,7 @@ public final class Invites {
     // the answer survives a relaunch, and nothing else can check that.
     static void forgetLoadedState() {
         undelivered = null;
+        consumedArg = null;
         lookupIssuedAt = 0;
         stateLoaded = false;
         attributionLoaded = false;
@@ -853,6 +872,7 @@ public final class Invites {
         deferredStarted = false;
         lookupIssuedAt = 0;
         undelivered = null;
+        consumedArg = null;
         reopenedAlreadyDelivered = false;
         reopenedFirstLaunch = 0;
         reopenedExpiresAt = 0;
@@ -1891,9 +1911,19 @@ public final class Invites {
         // failed write, so the result is checked. Deleting the pending record
         // after a failed write would leave neither an attribution nor any retry
         // information, losing the resolution permanently at the next restart.
-        if (InviteStore.write(InviteStore.ATTRIBUTION, record)) {
-            InviteStore.delete(InviteStore.PENDING);
+        if (!InviteStore.write(InviteStore.ATTRIBUTION, record)) {
+            // The store is full or read-only. Everything below assumes the
+            // record is on disk: deliverPending() re-reads it before calling
+            // the listener and finds nothing, and flush() will not retry
+            // because the state says resolved -- so a valid answer was neither
+            // delivered nor asked for again until the process restarted. The
+            // pending record is deliberately left in place, so the next flush
+            // or launch resends the lookup.
+            Log.p("invite: the attribution could not be persisted, so the lookup stays "
+                    + "pending and will be retried", Log.WARNING);
+            return;
         }
+        InviteStore.delete(InviteStore.PENDING);
         resolved = a;
         attributionLoaded = true;
         state = STATE_RESOLVED;

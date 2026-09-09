@@ -26,6 +26,7 @@ import com.codename1.analytics.Analytics;
 import com.codename1.analytics.AnalyticsConsent;
 import com.codename1.analytics.ConsentMode;
 import com.codename1.io.ConnectionRequest;
+import com.codename1.ui.Display;
 import com.codename1.junit.EdtTest;
 import com.codename1.junit.FormTest;
 import java.io.ByteArrayInputStream;
@@ -1195,5 +1196,47 @@ class InviteResilienceTest extends UITestBase {
 
         assertEquals(Invites.STATE_PENDING, Invites.getState(),
                 "switching to opt-out did not resume the declined lookup");
+    }
+
+    @Test
+    @EdtTest
+    void tappingTheSameLinkAgainInALaterRunIsProcessed() {
+        // Through checkForInvite, which is where the deduplication lives -- a
+        // test calling handleUrl directly never reaches it and proves nothing.
+        //
+        // The durable guard could not tell a repeated read of one delivery from
+        // a second tap, which delivers the identical string, so the same link
+        // was ignored for ever: the install lost its invite_opened
+        // re-engagement event, and under re-attribution the later open could
+        // never win.
+        String url = "https://cloud.codenameone.com/i/acme/TAP1";
+        Display.getInstance().setProperty("AppArg", url);
+        assertTrue(Invites.checkForInvite(), "the first delivery was not handled");
+
+        // Repeated reads within one run are still ignored, which is what the
+        // deduplication is for.
+        assertFalse(Invites.checkForInvite(), "one delivery was handled twice");
+
+        // A later run: the same url arrives again from a second tap.
+        Invites.forgetLoadedState();
+        Display.getInstance().setProperty("AppArg", url);
+        assertTrue(Invites.checkForInvite(), "a second tap on the same link was ignored");
+    }
+
+    @FormTest
+    void aFailedAttributionWriteLeavesTheLookupPending() {
+        // Everything after the write assumes the record is on disk:
+        // deliverPending() re-reads it and finds nothing, and flush() will not
+        // retry because the state says resolved -- so a valid answer was
+        // neither delivered nor asked for again until a restart.
+        Invites.checkForInvite();
+        InviteStore.failNextWriteForTest(InviteStore.ATTRIBUTION);
+        Invites.handleResolution(InviteTestSupport.resolvedJson("NOSPACE1", "c1", "sms"),
+                Invites.MATCH_DIRECT, false);
+
+        assertEquals(Invites.STATE_PENDING, Invites.getState(),
+                "a failed write still reported the install as resolved");
+        assertNotNull(InviteStore.read(InviteStore.PENDING),
+                "the retry information was thrown away with it");
     }
 }

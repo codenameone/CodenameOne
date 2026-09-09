@@ -26,6 +26,7 @@ import com.codename1.analytics.Analytics;
 import com.codename1.analytics.AnalyticsConsent;
 import com.codename1.analytics.ConsentMode;
 import com.codename1.io.Preferences;
+import com.codename1.ui.Display;
 
 /**
  * Puts the static invite state back to a fresh-install baseline. Invites keeps
@@ -37,6 +38,7 @@ final class InviteTestSupport {
     }
 
     static RecordingProvider freshInstall() {
+        clearAppArg();
         Analytics.clearProviders();
         Analytics.clearDimensions();
         Analytics.setConsentMode(ConsentMode.OPT_IN);
@@ -58,6 +60,7 @@ final class InviteTestSupport {
     }
 
     static void tearDown() {
+        clearAppArg();
         Invites.setInviteListener(null);
         Invites.registerInstallReferrerSource(null);
         Invites.reset();
@@ -67,6 +70,15 @@ final class InviteTestSupport {
         Analytics.setConsentMode(ConsentMode.OPT_IN);
         Preferences.delete(Invites.PREF_SLUG);
         Preferences.delete(Invites.PREF_CONSUMED_ARG);
+    }
+
+    // The launch argument is process-wide, so a test that sets one and does
+    // not clear it sends every later test down the direct-link path.
+    private static void clearAppArg() {
+        Display d = Display.getInstance();
+        if (d != null) {
+            d.setProperty("AppArg", null);
+        }
     }
 
     /** A canned server answer, in the shape the link service returns. */
