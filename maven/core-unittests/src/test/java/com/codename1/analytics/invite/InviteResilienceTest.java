@@ -1217,10 +1217,36 @@ class InviteResilienceTest extends UITestBase {
         // deduplication is for.
         assertFalse(Invites.checkForInvite(), "one delivery was handled twice");
 
-        // A later run: the same url arrives again from a second tap.
+        // And a second delivery IN THE SAME RUN -- an Android onNewIntent
+        // after the app is backgrounded, which is the ordinary case -- is a new
+        // delivery, not a repeated read.
+        Display.getInstance().setProperty("AppArg", url);
+        assertTrue(Invites.checkForInvite(),
+                "a second delivery in the same run was ignored");
+
+        // A later run behaves the same way.
         Invites.forgetLoadedState();
         Display.getInstance().setProperty("AppArg", url);
         assertTrue(Invites.checkForInvite(), "a second tap on the same link was ignored");
+    }
+
+    @Test
+    @EdtTest
+    void anInviteArgumentIsConsumedAndAnythingElseIsLeftAlone() {
+        // Consuming it is what distinguishes a delivery from a read. Only an
+        // invite is consumed: an application routing its own deep links must
+        // find its argument exactly as it arrived.
+        Display.getInstance().setProperty("AppArg",
+                "https://cloud.codenameone.com/i/acme/EATEN1");
+        assertTrue(Invites.checkForInvite());
+        assertNull(Display.getInstance().getProperty("AppArg", null),
+                "the invite argument was left behind for the next read");
+
+        Display.getInstance().setProperty("AppArg", "https://example.com/some/other/link");
+        assertFalse(Invites.checkForInvite());
+        assertEquals("https://example.com/some/other/link",
+                Display.getInstance().getProperty("AppArg", null),
+                "an argument that is not an invite was consumed");
     }
 
     @FormTest
@@ -1238,5 +1264,75 @@ class InviteResilienceTest extends UITestBase {
                 "a failed write still reported the install as resolved");
         assertNotNull(InviteStore.read(InviteStore.PENDING),
                 "the retry information was thrown away with it");
+    }
+
+    @Test
+    @EdtTest
+    void aConsentUpdateThatChangesNothingDoesNotQueueASecondLookup() {
+        // An application may call setConsent again with analytics still allowed
+        // -- to change only personalization or ad storage -- and restarting on
+        // that queued a second lookup whose answer was as valid as the first,
+        // so the funnel event fired twice and the retry budget was spent
+        // without a failure.
+        Invites.checkForInvite();
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        int attempts = InviteStore.getInt(pending, "attempts", 0);
+
+        for (int i = 0; i < 5; i++) {
+            Analytics.setConsent(AnalyticsConsent.builder().analytics(true)
+                    .personalization(i % 2 == 0).build());
+        }
+
+        Map<String, String> now = InviteStore.read(InviteStore.PENDING);
+        assertEquals(attempts, InviteStore.getInt(now, "attempts", 0),
+                "consent updates queued lookups for a request that had not failed");
+    }
+
+    @Test
+    @EdtTest
+    void withdrawingConsentDuringAReplacementAbandonsIt() {
+        // Withdrawing consent stops the replacement; it does not un-attribute
+        // the install, whose record is still there and makes the state resolved
+        // again on the next launch. Writing a DECLINED marker told a registered
+        // listener "no invite" as a second, contradictory callback.
+        Invites.handleResolution(InviteTestSupport.resolvedJson("FIRST7", "c1", "sms"),
+                Invites.MATCH_DIRECT, false);
+        Invites.setReattribution(true);
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND7");
+
+        final int[] told = new int[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0]++;
+            }
+        });
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+
+        assertEquals(0, told[0], "a withdrawal told an attributed install it had no invite");
+        assertEquals(Invites.STATE_RESOLVED, Invites.getState());
+    }
+
+    @FormTest
+    void aFailedWriteOnTheLastAttemptCanStillBeRetried() {
+        // Leaving the counter at the cap meant the next flush took the
+        // attempt-cap branch and marked the install terminal instead of
+        // performing the retry -- so the very last response, the one most
+        // likely to be the only one left, could never be stored.
+        Invites.checkForInvite();
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        pending.put("attempts", String.valueOf(Invites.MAX_ATTEMPTS));
+        InviteStore.write(InviteStore.PENDING, pending);
+
+        InviteStore.failNextWriteForTest(InviteStore.ATTRIBUTION);
+        Invites.handleResolution(InviteTestSupport.resolvedJson("LAST1", "c1", "sms"),
+                Invites.MATCH_DIRECT, false);
+
+        Map<String, String> after = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(after);
+        assertTrue(InviteStore.getInt(after, "attempts", 0) < Invites.MAX_ATTEMPTS,
+                "the promised retry could never happen: the budget was still exhausted");
     }
 }

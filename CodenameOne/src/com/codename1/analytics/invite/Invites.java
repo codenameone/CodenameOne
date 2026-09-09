@@ -199,7 +199,9 @@ public final class Invites {
     // the devices nobody can reproduce on.
     private static final String REFERRER_KEY = "cn1_invite";
 
-    private static final int MAX_ATTEMPTS = 5;
+    // Package private so a test can drive the attempt cap without five round
+    // trips.
+    static final int MAX_ATTEMPTS = 5;
 
     private static String linkBase;
     private static long attributionWindow = DEFAULT_ATTRIBUTION_WINDOW;
@@ -216,9 +218,6 @@ public final class Invites {
     // Held for the run rather than persisted: the state itself is durable, and
     // a later launch reaches this answer again through the ordinary path.
     private static String undelivered;
-
-    // The launch argument already handled in THIS run. See checkForInvite.
-    private static String consumedArg;
 
     // Set when a terminal marker that had already been delivered is reopened,
     // so the attribution the resumed lookup writes inherits that fact rather
@@ -496,11 +495,25 @@ public final class Invites {
         // consume the intent's data -- the lazy getAppArg() always did, and
         // dispatchNewIntentUrl does as well -- so a stale intent no longer
         // reproduces the argument.
+        // The argument is CONSUMED, not remembered.
+        //
+        // Remembering the last value cannot tell two deliveries of one url
+        // apart from two reads of one delivery -- and a live process really can
+        // span both, an Android onNewIntent after the app is backgrounded being
+        // the ordinary case. So the property is cleared instead: a later read
+        // sees nothing, and a genuine second delivery sets it again and is
+        // handled.
+        //
+        // Only when this really is an invite. Anything else is left exactly as
+        // it arrived, so an application routing its own deep links is
+        // unaffected -- and the property is read here after
+        // Display.setProperty has already fired the external-url dispatch, so
+        // a router that consumes it has done so before this runs.
         boolean consumed = false;
-        if (appArg != null && appArg.length() > 0 && !appArg.equals(consumedArg)) {
+        if (appArg != null && appArg.length() > 0) {
             consumed = handleUrl(appArg);
-            if (consumed) {
-                consumedArg = appArg;
+            if (consumed && d != null) {
+                d.setProperty("AppArg", null);
             }
         }
         if (!consumed) {
@@ -625,7 +638,6 @@ public final class Invites {
     // the answer survives a relaunch, and nothing else can check that.
     static void forgetLoadedState() {
         undelivered = null;
-        consumedArg = null;
         lookupIssuedAt = 0;
         stateLoaded = false;
         attributionLoaded = false;
@@ -872,7 +884,6 @@ public final class Invites {
         deferredStarted = false;
         lookupIssuedAt = 0;
         undelivered = null;
-        consumedArg = null;
         reopenedAlreadyDelivered = false;
         reopenedFirstLaunch = 0;
         reopenedExpiresAt = 0;
@@ -910,7 +921,18 @@ public final class Invites {
             // window may well have closed. beginDeferred() reopens the marker
             // itself, so calling it is the whole fix.
             int s = getState();
-            if (s == STATE_PENDING || s == STATE_DECLINED) {
+            // STATE_DECLINED has nothing outstanding by definition -- the
+            // withdrawal that produced it discarded whatever was -- so only
+            // STATE_PENDING is gated on the in-flight check.
+            if (s == STATE_DECLINED || (s == STATE_PENDING && !lookupInFlight())) {
+                // Only when nothing is outstanding, for the reason flush()
+                // checks the same thing. An application may call setConsent()
+                // again with analytics still allowed -- to change only
+                // personalization or ad storage -- and restarting on that
+                // queued a second lookup whose answer was every bit as valid as
+                // the first, so the funnel event fired twice; repeated updates
+                // also spent the retry budget without a failure.
+                //
                 // The refusal may have been recorded for a listener that had
                 // not registered yet. It is not the answer any more, and
                 // leaving it held meant a lookup that went on to resolve was
@@ -934,6 +956,21 @@ public final class Invites {
         // end of the window. The epoch bump additionally discards any response
         // already in flight.
         lookupEpoch++;
+        // Nothing is outstanding once the epoch has moved: any response still
+        // on the wire fails the guard. Saying so here is what lets a later
+        // grant resume immediately rather than waiting out a retry delay for a
+        // request that can no longer be acted on.
+        lookupIssuedAt = 0;
+        if (abandonReplacement()) {
+            // A replacement running beside an existing attribution. Withdrawing
+            // consent stops the replacement; it does not un-attribute the
+            // install, whose record is still there and makes the state resolved
+            // again on the next launch. Writing a DECLINED marker here told a
+            // registered listener "no invite" as a second, contradictory
+            // callback for an install it had already been told about.
+            clearDimensions();
+            return;
+        }
         if (getState() == STATE_PENDING) {
             // The profile goes and the answer stays. Deleting the record left
             // STATE_DECLINED in memory only -- setState() has nothing to
@@ -1919,6 +1956,17 @@ public final class Invites {
             // delivered nor asked for again until the process restarted. The
             // pending record is deliberately left in place, so the next flush
             // or launch resends the lookup.
+            // And the attempt is given back. Leaving the counter at the cap
+            // meant the next flush took the attempt-cap branch and marked the
+            // install terminal instead of performing the retry this promises --
+            // so the very last response, the one most likely to be the only one
+            // left, could never be stored.
+            Map<String, String> retry = InviteStore.read(InviteStore.PENDING);
+            if (retry != null) {
+                int spent = InviteStore.getInt(retry, "attempts", 0);
+                retry.put("attempts", String.valueOf(spent > 0 ? spent - 1 : 0));
+                InviteStore.write(InviteStore.PENDING, retry);
+            }
             Log.p("invite: the attribution could not be persisted, so the lookup stays "
                     + "pending and will be retried", Log.WARNING);
             return;
