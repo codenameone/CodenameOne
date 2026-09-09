@@ -96,6 +96,9 @@ Codename One emits a few events for you, so the common funnels work without any 
 
 | `share`
 | The native share sheet is invoked.
+
+| `invite_created`, `invite_shared`, `invite_share_dismissed`, `invite_opened`, `invite_install`, `invite_converted`
+| The invite funnel, under the `referral` category. See <<analytics-invites>>.
 |===
 
 You can add your own events at any time with `Analytics.event(...)`; these built-ins simply save you the boilerplate for the most common funnels.
@@ -170,6 +173,78 @@ Implement `AnalyticsProvider`, or extend `AbstractAnalyticsProvider` and overrid
 
 
 The `init(AnalyticsContext)` callback hands you the app name, version, platform, locale and the pseudonymous client id. `onConsentChanged(AnalyticsConsent)` lets a provider reconfigure when the user updates consent. `supports(AnalyticsCapability)` lets tooling introspect which features a provider offers.
+
+[[analytics-invites]]
+=== Invite a friend
+
+`com.codename1.analytics.invite` follows an invitation through to what it caused: who sent it, who installed because of it, and what that invited cohort went on to spend. It replaces what Firebase Dynamic Links and Firebase Invites used to do, both of which have been shut down.
+
+==== Sending an invite
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnalyticsJava010Snippet.java[tag=analytics-java-010,indent=0]
+----
+
+`Invites.create` returns immediately and works with no network at all, so the share sheet never waits on a server -- the code is generated on the device and registered with the link service in the background. `title` and `description` drive the preview card the link shows in a messaging app.
+
+`Invites.share` reports `invite_shared` only when the platform confirms the user shared; a dismissed sheet reports `invite_share_dismissed`. If you send the invite through your own user interface instead, call `Invites.reportShareResult` from your share callback so the funnel still records it.
+
+==== Receiving an invite
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnalyticsJava011Snippet.java[tag=analytics-java-011,indent=0]
+----
+
+Call `checkForInvite()` from `start()`. It's a pull rather than a callback on purpose: Android delivers a link by replacing the activity intent and iOS by setting a property, and reading the launch argument is the one path that behaves the same on both. An answer that arrives before you register a listener -- which happens routinely on a cold launch from a link -- is held and delivered when you register.
+
+Exactly one of the two listener methods is called per install, and neither is called again on later launches.
+
+==== Closing the funnel
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnalyticsJava012Snippet.java[tag=analytics-java-012,indent=0]
+----
+
+When attribution resolves it's also written as persistent analytics dimensions (`cn1_campaign`, `cn1_channel`, `cn1_invite_code`, `cn1_invite_match`). Every later event carries them, including the `purchase` event the framework already emits for you, so revenue and lifetime value per campaign come out of the reports you already have without any extra wiring. The `cn1_` prefix is reserved -- don't use it for your own dimensions.
+
+==== How exact the answer is
+
+`InviteAttribution.getMatchType()` tells you how the attribution was made, and the three answers aren't equally trustworthy:
+
+[options="header",cols="1,3"]
+|===
+| Match type | What it means
+
+| `MATCH_DIRECT`
+| The link opened an app that was already installed. Exact.
+
+| `MATCH_REFERRER`
+| The invite code travelled through the app store and came back verbatim. Exact. This is the Android path.
+
+| `MATCH_FINGERPRINT`
+| The server matched this install to an earlier click statistically. Not exact.
+|===
+
+The App Store carries no referrer parameter of its own, so on iOS a deferred install -- one where the friend didn't already have the app -- can only be matched statistically, on a coarse device profile within a short window. That match is occasionally wrong, and `getConfidence()` reports how much to trust it. Report it as an estimate, and don't pay a referral bounty on it without saying so.
+
+`Invites.setAttributionWindow(0)` switches deferred attribution off entirely if you would rather not use it.
+
+==== Consent
+
+Everything reported here is gated on the analytics consent category, and nothing is transmitted until consent is granted. The statistical match additionally requires an explicit grant: opt-out mode alone isn't enough, because it reports permission with no user choice on record.
+
+One thing does happen before consent. On first launch a coarse device profile -- OS version, hardware model, language, screen size -- is written to local storage so a deferred match is still possible if consent arrives in time. It's never transmitted while consent is withheld, and it's deleted outright if consent is refused. There's no alternative that also works: the window in which a deferred match can be made closes long before a typical consent prompt is answered.
+
+`Analytics.resetClientId()` erases the invite attribution along with the identity, so an erasure request can't leave a fresh pseudonymous id linked to the same inviter.
+
+==== What the build does for you
+
+Referencing this package makes the build wire the platform side: an `autoVerify` App Links intent filter on Android, an associated domain on iOS, and the Play Install Referrer dependency. An app that only reports analytics gets none of it.
+
+WARNING: On Android, App Links verification checks the certificate the installed APK is signed with. Under Play App Signing that's Google's key, not your upload key, so add the app-signing SHA-256 from the Play Console to `android.invite.signingFingerprint`. Without it verification fails on every Play install, the link opens the browser instead of your app, and nothing reports an error.
 
 [[analytics-migration]]
 === Migrating from AnalyticsService
