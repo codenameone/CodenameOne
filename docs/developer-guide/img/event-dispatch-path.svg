@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="494" viewBox="0 0 820 494">
+  <rect x="0" y="0" width="820" height="494" fill="#ffffff"/>
+  <text x="410" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">How one touch reaches your code</text>
+  <text x="410" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">A pointer event crosses two threads and four hand-offs before a listener sees it. Every row is a place you can</text>
+  <text x="410" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">intercept it, and each one sees something different.</text>
+  <rect x="16" y="64" width="200" height="72" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.5"/>
+  <text x="116" y="97" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#a56a3a">The platform's</text>
+  <text x="116" y="112" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#a56a3a">UI thread</text>
+  <text x="232" y="88" font-family="Arial, sans-serif" font-size="9.5" fill="#777777">Display.pointerPressed(int[] x, int[] y)</text>
+  <text x="232" y="107" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">The port calls this from the native UI thread. The packet is appended to the input</text>
+  <text x="232" y="122" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">stack under a lock, and nothing of yours runs yet.</text>
+  <path d="M 116 136 L 116 148" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
+  <path d="M 111 142 L 116 148 L 121 142" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
+  <rect x="16" y="148" width="200" height="72" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="116" y="181" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">The EDT,</text>
+  <text x="116" y="196" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">on its next turn</text>
+  <text x="232" y="172" font-family="Arial, sans-serif" font-size="9.5" fill="#777777">the stacks are swapped, then handleEvent walks the batch</text>
+  <text x="232" y="191" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Everything queued since the last turn is dispatched here, in order, before the frame</text>
+  <text x="232" y="206" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">is painted. That batch is the subject of the next figure.</text>
+  <path d="M 116 220 L 116 232" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 111 226 L 116 232 L 121 226" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <rect x="16" y="232" width="200" height="72" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="116" y="272" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#4a7a3d">Form.pointerPressed</text>
+  <text x="232" y="256" font-family="Arial, sans-serif" font-size="9.5" fill="#777777">form coordinates, wherever the touch landed</text>
+  <text x="232" y="275" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">The form's own pointer listeners fire first, and one that calls consume() ends the</text>
+  <text x="232" y="290" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">delivery: nothing below this row runs at all.</text>
+  <path d="M 116 304 L 116 316" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
+  <path d="M 111 310 L 116 316 L 121 310" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
+  <rect x="16" y="316" width="200" height="72" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="116" y="349" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#4a7a3d">The component</text>
+  <text x="116" y="364" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#4a7a3d">under the pointer</text>
+  <text x="232" y="340" font-family="Arial, sans-serif" font-size="9.5" fill="#777777">getComponentAt, skipping ancestors that ignore pointer events</text>
+  <text x="232" y="359" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">It only has to be enabled. It does not need focus - it is given focus here if it is</text>
+  <text x="232" y="374" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">focusable. Key events are the other way round: those go to the focused component.</text>
+  <path d="M 116 388 L 116 400" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
+  <path d="M 111 394 L 116 400 L 121 394" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
+  <rect x="16" y="400" width="200" height="72" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="116" y="440" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">Your listener</text>
+  <text x="232" y="424" font-family="Arial, sans-serif" font-size="9.5" fill="#777777">fireActionEvent -&gt; EventDispatcher -&gt; ActionListener</text>
+  <text x="232" y="443" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Still the EDT, still inside the same turn, so a blocking call here holds up every</text>
+  <text x="232" y="458" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">event queued behind it.</text>
+</svg>

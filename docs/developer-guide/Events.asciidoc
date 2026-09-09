@@ -29,6 +29,9 @@ A workaround to this issue is to wrap the code in a `callSerially`, you shouldn'
 
 Another workaround for the issue is avoiding blocking calls within an event chain.
 
+.One batch, walked in order
+image::img/event-batch-ordering.svg[Why a blocking call in the first listener delays the second one,scaledwidth=85%]
+
 ==== Action events
 
 The most common high-level event is the https://www.codenameone.com/javadoc/com/codename1/ui/events/ActionListener.html[ActionListener] which allows binding a generic action event to pretty much anything. This is so ubiquitous in Codename One that it's even used for networking (as a base class) and for some low-level event options.
@@ -214,12 +217,18 @@ Low-level events can be bound in one of 3 ways:
 
 * Override one of the event callbacks on a https://www.codenameone.com/javadoc/com/codename1/ui/Component.html[Component].
 
-TIP: When you override event callbacks on a `Component` the `Component` in question must be focusable and have focus at that point. This can be an advantage for some use cases as it will save you the need of handling unrelated events.
+TIP: That last one depends on the event. A key callback on a `Component` only fires while that component
+holds focus, because `Form` routes key events to the focused component. A pointer callback doesn't need
+focus: `Form` looks up whatever component sits under the touch and delivers to it, and the component is
+handed focus because of the press rather than as a condition for it. It does have to be enabled.
+
+.How one touch reaches your code
+image::img/event-dispatch-path.svg[The path a pointer event takes from the native callback to your listener,scaledwidth=85%]
 
 Each of those has advantages and disadvantages, specifically:
 
 * 'Form' based events and callbacks deliver pointer events in the 'Form' coordinate space.
-* 'Component' based events require focus
+* 'Component' based key events require focus, pointer events don't
 * 'Form' based events can block existing functionality from proceeding through the event chain for example, you can avoid calling super in a form event and thus block other events from happening (for example, block a listener or component event from triggering).
 
 .Event type map
