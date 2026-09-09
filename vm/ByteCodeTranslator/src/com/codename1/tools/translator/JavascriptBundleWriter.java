@@ -1783,6 +1783,76 @@ final class JavascriptBundleWriter {
         return tokens;
     }
 
+    /**
+     * Classifies the wrapper argument of a {@code bindNative([...], WRAPPER)}
+     * call whose name array ends at {@code close}.
+     *
+     * Returns TRUE for a {@code function*}, FALSE for a plain {@code
+     * function}, and null when it cannot tell -- which the caller must treat
+     * as "leave suspending", the direction virtual dispatch tolerates.
+     *
+     * One level of indirection is resolved, because the crypto bindings pass a
+     * factory result ({@code cn1CryptoAesBinding("aesEncrypt")}) rather than a
+     * literal: the named function is located and its first {@code return
+     * function} decides. Deeper indirection is deliberately not chased.
+     */
+    private static Boolean classifyBindNativeWrapper(String src, int close) {
+        int i = skipSpaceAndComments(src, close + 1);
+        if (i >= src.length() || src.charAt(i) != ',') {
+            return null;
+        }
+        i = skipSpaceAndComments(src, i + 1);
+        if (src.startsWith("function", i)) {
+            return Boolean.valueOf(isGeneratorAt(src, i));
+        }
+        // ``ident(`` -- a factory. Resolve its declaration once.
+        int j = i;
+        while (j < src.length() && (Character.isLetterOrDigit(src.charAt(j)) || src.charAt(j) == '_'
+                || src.charAt(j) == '$')) {
+            j++;
+        }
+        if (j == i || j >= src.length() || src.charAt(j) != '(') {
+            return null;
+        }
+        int decl = src.indexOf("function " + src.substring(i, j) + "(");
+        if (decl < 0) {
+            return null;
+        }
+        int ret = src.indexOf("return function", decl);
+        if (ret < 0) {
+            return null;
+        }
+        return Boolean.valueOf(isGeneratorAt(src, ret + "return ".length()));
+    }
+
+    /** True when the {@code function} keyword at {@code i} is a generator. */
+    private static boolean isGeneratorAt(String src, int i) {
+        int k = i + "function".length();
+        while (k < src.length() && Character.isWhitespace(src.charAt(k))) {
+            k++;
+        }
+        return k < src.length() && src.charAt(k) == '*';
+    }
+
+    /** Advances past JS whitespace, {@code //} and block comments. */
+    private static int skipSpaceAndComments(String src, int i) {
+        while (i < src.length()) {
+            char c = src.charAt(i);
+            if (Character.isWhitespace(c)) {
+                i++;
+            } else if (src.startsWith("//", i)) {
+                int nl = src.indexOf('\n', i);
+                i = nl < 0 ? src.length() : nl + 1;
+            } else if (src.startsWith("/*", i)) {
+                int endC = src.indexOf("*/", i);
+                i = endC < 0 ? src.length() : endC + 2;
+            } else {
+                return i;
+            }
+        }
+        return i;
+    }
+
     private static void bump(Map<String, int[]> counts, String token, int slot) {
         int[] seen = counts.get(token);
         if (seen == null) {
@@ -1838,39 +1908,24 @@ final class JavascriptBundleWriter {
                 if (close < 0) {
                     continue;
                 }
-                // The wrapper must be the LITERAL argument that follows the
-                // name array. Searching forward for the next ``function``
-                // walks straight past the end of the bindNative call when the
-                // wrapper is built by a factory --
-                // ``bindNative([...], cn1CryptoAesBinding("aesEncrypt"))``
-                // matched the ``function cn1CryptoRsaBinding(op)`` DECLARATION
-                // several lines below and classified aesEncrypt as a
-                // synchronous native. It is a generator, so callers took the
-                // sync dispatcher and the runtime raised
-                // ``cn1_ivs: ... (CHA unsound)``. Anything that is not a
-                // literal function expression here is left OUT of the sync
-                // set, i.e. stays suspending, which is the safe direction.
-                int fn = close + 1;
-                while (fn < src.length() && Character.isWhitespace(src.charAt(fn))) {
-                    fn++;
-                }
-                if (fn >= src.length() || src.charAt(fn) != ',') {
-                    continue;
-                }
-                fn++;
-                while (fn < src.length() && Character.isWhitespace(src.charAt(fn))) {
-                    fn++;
-                }
-                if (!src.startsWith("function", fn)) {
-                    continue;
-                }
-                int k = fn + "function".length();
-                while (k < src.length() && Character.isWhitespace(src.charAt(k))) {
-                    k++;
-                }
-                boolean generator = k < src.length() && src.charAt(k) == '*';
-                if (generator) {
-                    continue;                               // function* -> suspending, leave seeded
+                // Classify the wrapper that is the ARGUMENT of this call. The
+                // original scan took the next ``function`` anywhere after the
+                // ``]``, which walks past the end of the bindNative call and
+                // reads an unrelated declaration -- it classified aesEncrypt
+                // (wrapper ``cn1CryptoAesBinding("aesEncrypt")``, a generator)
+                // as a synchronous native by matching ``function
+                // cn1CryptoRsaBinding(op)`` several lines below.
+                //
+                // Getting this wrong is unsound in BOTH directions, so it has
+                // to be accurate rather than conservative: call a generator
+                // synchronously and the runtime raises ``cn1_ivs ... (CHA
+                // unsound)``; ``yield*`` a plain function and it raises "is
+                // not iterable". Skipping comments matters for the same
+                // reason -- SQLiteNative.isCipherAvailable documents itself
+                // between the ``],`` and its plain ``function``.
+                Boolean generatorWrapper = classifyBindNativeWrapper(src, close);
+                if (generatorWrapper == null || generatorWrapper.booleanValue()) {
+                    continue;   // unknown, or a generator -> leave it suspending
                 }
                 java.util.regex.Matcher lit = literal.matcher(src.substring(bracket + 1, close));
                 while (lit.find()) {
