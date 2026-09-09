@@ -25,6 +25,7 @@ package com.codename1.analytics.invite;
 import com.codename1.analytics.Analytics;
 import com.codename1.analytics.AnalyticsConsent;
 import com.codename1.junit.EdtTest;
+import com.codename1.junit.FormTest;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import com.codename1.junit.UITestBase;
@@ -444,5 +445,45 @@ class InviteResilienceTest extends UITestBase {
         Invites.handleUrl("https://cloud.codenameone.com/i/acme/CODE1");
         assertEquals(Invites.REASON_CONSENT_DENIED, told[0],
                 "a refused direct link told the listener nothing");
+    }
+
+    @Test
+    @EdtTest
+    void theReferrerCodeIsPersistedBeforeTheClaimGoesOut() {
+        // The source has already burned its once-only flag by the time the
+        // callback runs, so a claim that fails leaves the exact code nowhere
+        // but that callback and the next flush() falls back to a statistical
+        // match for an answer that had been read exactly.
+        Invites.registerInstallReferrerSource(new InstallReferrerSource() {
+            public boolean isSupported() {
+                return true;
+            }
+
+            public void requestReferrer(InstallReferrerCallback callback) {
+                callback.onReferrer("utm_source=cn1_invite&cn1_invite=EXACT9", 0L, 0L);
+            }
+        });
+        Invites.checkForInvite();
+
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(pending, "the pending record was not kept at all");
+        assertEquals("EXACT9", InviteStore.get(pending, "code", null),
+                "the exact referrer code was not persisted before the claim");
+    }
+
+    @FormTest
+    void aFailedOutboxWriteStillTransmitsNothingWithoutConsent() {
+        // drainOutbox carries the consent guard and this fallback had none, so
+        // a storage failure was the one way an undecided user's client id and
+        // invite metadata reached the server.
+        Analytics.setConsent(null);
+        implementation.clearQueuedRequests();
+        implementation.setAutoProcessConnections(false);
+        InviteStore.failNextOutboxWriteForTest();
+
+        Invite invite = Invites.create(InviteRequest.create().campaign("launch").build());
+        assertNotNull(invite, "minting is offline and must still work");
+        assertEquals(0, implementation.getQueuedRequests().size(),
+                "a registration was transmitted before consent was given");
     }
 }

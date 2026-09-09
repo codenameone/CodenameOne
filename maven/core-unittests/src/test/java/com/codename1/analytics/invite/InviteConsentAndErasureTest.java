@@ -329,4 +329,29 @@ class InviteConsentAndErasureTest extends UITestBase {
             assertFalse(record.containsKey(key), message + " (held " + key + ")");
         }
     }
+
+    @FormTest
+    void anErasureClearsTheReferralDimensionsEvenWithNoProviderRegistered() {
+        // The invite provider is the ordinary route and does more -- it drops
+        // the durable records too -- but a provider can be absent:
+        // Analytics.clearProviders() is public and the deprecated
+        // AnalyticsService.init() calls it. In that window an erasure left the
+        // reserved dimensions on the new id, and the next provider the app
+        // registered transmitted them. An erasure cannot depend on who happens
+        // to be registered when it runs.
+        InviteTestSupport.freshInstall();
+        Invites.handleResolution(InviteTestSupport.resolvedJson("CODE1", "spring", "sms"),
+                Invites.MATCH_DIRECT, false);
+        assertNotNull(Analytics.getDimensions().get("cn1_campaign"));
+        Analytics.setDimension("plan", "pro");
+
+        Analytics.clearProviders();
+        Analytics.resetClientId();
+
+        assertNull(Analytics.getDimensions().get("cn1_campaign"),
+                "an erasure left the referral dimensions on the new client id");
+        assertNull(Analytics.getDimensions().get("cn1_invite_code"));
+        assertEquals("pro", Analytics.getDimensions().get("plan"),
+                "the application's own dimension must survive an erasure");
+    }
 }

@@ -151,7 +151,21 @@ final class InviteStore {
     /// read-only store. The caller has to know: an entry that never reached
     /// the outbox carries the campaign, channel, payload and preview of a link
     /// that has already been handed out, and nothing can reconstruct it later.
+    // Package private test seam. A full or read-only store cannot be produced
+    // from a test, and the paths that only run when the write fails are the
+    // ones most worth pinning -- they are what happens when the durable queue
+    // is gone.
+    private static boolean failNextWrite;
+
+    static void failNextOutboxWriteForTest() {
+        failNextWrite = true;
+    }
+
     static boolean writeOutbox(List<String> entries) {
+        if (failNextWrite) {
+            failNextWrite = false;
+            return false;
+        }
         try {
             Storage s = Storage.getInstance();
             if (s == null) {

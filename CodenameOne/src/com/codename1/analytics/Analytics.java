@@ -27,6 +27,7 @@ import com.codename1.io.Preferences;
 import com.codename1.ui.Display;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -463,6 +464,13 @@ public final class Analytics {
     /// every provider with the new identity. Use this to honour a "right to be
     /// forgotten" / erasure request from the user.
     ///
+    /// Custom dimensions your application set are kept -- a `plan` or `role`
+    /// dimension describes the app, not the person, and losing it silently on
+    /// an erasure would surprise you. Dimensions under the reserved `cn1_`
+    /// prefix are cleared, because those are written for you by framework
+    /// features that identify the user across installs, and carrying them onto
+    /// a fresh id would re-link the two.
+    ///
     /// #### Returns
     ///
     /// the new client id
@@ -471,6 +479,15 @@ public final class Analytics {
         synchronized (LOCK) {
             clientId = newClientId();
             Preferences.set(PREF_CLIENT_ID, clientId);
+            // Cleared here rather than left to whichever feature wrote them.
+            // The feature's provider is the ordinary route and does more --
+            // it drops its own durable records too -- but a provider can be
+            // absent: Analytics.clearProviders() is public and the deprecated
+            // AnalyticsService.init() calls it. In that window an erasure left
+            // the reserved dimensions attached to the new id, and the next
+            // provider the application registered transmitted them. An erasure
+            // cannot depend on who happens to be registered when it runs.
+            clearReservedDimensions();
             snapshot = new ArrayList<AnalyticsProvider>(PROVIDERS);
         }
         AnalyticsContext ctx = context();
@@ -482,6 +499,29 @@ public final class Analytics {
             }
         }
         return clientId;
+    }
+
+    /// The prefix reserved for dimensions the framework writes on your behalf.
+    /// Do not use it for your own dimensions: everything under it is cleared by
+    /// [#resetClientId].
+    public static final String RESERVED_DIMENSION_PREFIX = "cn1_";
+
+    // Must be called while holding LOCK.
+    private static void clearReservedDimensions() {
+        loadDimensions();
+        boolean changed = false;
+        Iterator<Map.Entry<String, String>> it = DIMENSIONS.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, String> e = it.next();
+            String key = e.getKey();
+            if (key != null && key.startsWith(RESERVED_DIMENSION_PREFIX)) {
+                it.remove();
+                changed = true;
+            }
+        }
+        if (changed) {
+            persistDimensions();
+        }
     }
 
     // Must be called while holding LOCK. Lazily loads the persisted dimensions

@@ -275,8 +275,24 @@ public final class Invites {
             // registered with everything it carries; if it does not, nothing
             // is worse than the alternative. There is deliberately no retry,
             // because the queue that would drive one is the thing that failed.
-            unacknowledged.add(invite.getCode());
-            postRegistration(pendingRegistration);
+            if (allowed()) {
+                unacknowledged.add(invite.getCode());
+                postRegistration(pendingRegistration);
+            } else {
+                // Nothing leaves the device without consent, and that outranks
+                // saving the registration. drainOutbox() carries the same guard;
+                // this path had none, so a storage failure was the one way an
+                // undecided or refused user's client id and invite metadata
+                // reached the server.
+                //
+                // The registration is lost, because the queue that would have
+                // held it is the thing that failed. That is the correct trade:
+                // the link still attributes through the click, and only the
+                // campaign, channel and preview metadata go with it.
+                Log.p("invite: the registration outbox could not be written and consent "
+                        + "does not permit sending, so this invite's campaign and preview "
+                        + "metadata are lost", Log.WARNING);
+            }
         }
         Map<String, Object> p = new HashMap<String, Object>();
         p.put("invite_code", code);
@@ -1206,6 +1222,18 @@ public final class Invites {
                                 fallBackToMatch(false);
                                 return;
                             }
+                            // Persisted BEFORE the claim goes out. The source
+                            // has already burned its once-only flag by the time
+                            // this runs, so if the claim fails -- a timeout, a
+                            // dead network -- the exact code exists nowhere but
+                            // this callback, and the next flush() falls back to
+                            // a statistical match for an answer we had read
+                            // exactly. Written into the pending record, the
+                            // ordinary retry path resends it.
+                            Map<String, String> pending = pendingRecord();
+                            pending.put("code", code);
+                            pending.remove("referrerRetry");
+                            InviteStore.write(InviteStore.PENDING, pending);
                             claim(code, "install_referrer",
                                     rawReferrer == null ? "" : rawReferrer,
                                     MATCH_REFERRER, true);
