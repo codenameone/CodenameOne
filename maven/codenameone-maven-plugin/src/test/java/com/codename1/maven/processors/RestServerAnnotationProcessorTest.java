@@ -118,6 +118,76 @@ public class RestServerAnnotationProcessorTest {
                     + "}\n";
 
     @Test
+    public void twoDynamicRoutesThatOverlapAreRefused() throws Exception {
+        // Different shapes, and /a/b/c satisfies both. Neither is more specific, so
+        // literal-first ordering cannot break the tie and dispatch answers with
+        // whichever it emitted first.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.AmbiguousApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface AmbiguousApi {\n"
+                + "    @GET(\"/a/{x}/c\")\n"
+                + "    void one(@Path(\"x\") String x, OnComplete<Response<String>> callback);\n"
+                + "    @GET(\"/a/b/{y}\")\n"
+                + "    void two(@Path(\"y\") String y, OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        ProcessorContext ctx = runProcessor(compileSources(sources));
+        assertTrue("two routes that both answer /a/b/c should not compile", ctx.hasErrors());
+    }
+
+    @Test
+    public void aJsonIntegerTooLargeForTheFieldIsRefused() throws Exception {
+        // The parser answers a Long for any JSON integer, and intValue() on
+        // 2147483648 is -2147483648: the handler used to be handed a different
+        // number from the one the client sent, silently.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.Counter",
+                "package com.example;\n"
+                + "public class Counter {\n"
+                + "    public int count;\n"
+                + "    public Counter() {}\n"
+                + "}\n");
+        sources.put("com.example.CounterApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface CounterApi {\n"
+                + "    @POST(\"/count\")\n"
+                + "    void put(@Body Counter c, OnComplete<Response<Counter>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+
+        URLClassLoader loader = new URLClassLoader(
+                new URL[]{classes.toURI().toURL(), testClassesDir().toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> codec = loader.loadClass("com.example.CounterJson");
+        Method fromMap = codec.getMethod("fromMap", Map.class);
+
+        Map inRange = new java.util.LinkedHashMap();
+        inRange.put("count", Long.valueOf(7));
+        Object decoded = fromMap.invoke(null, inRange);
+        assertEquals(7, loader.loadClass("com.example.Counter").getField("count").get(decoded));
+
+        Map tooLarge = new java.util.LinkedHashMap();
+        tooLarge.put("count", Long.valueOf(2147483648L));
+        try {
+            fromMap.invoke(null, tooLarge);
+            fail("a value that does not fit the field should not be narrowed into it");
+        } catch (java.lang.reflect.InvocationTargetException expected) {
+            assertTrue(String.valueOf(expected.getCause()),
+                    expected.getCause() instanceof IllegalArgumentException);
+        }
+    }
+
+    @Test
     public void aDtoCarriesTheFieldsItInherits() throws Exception {
         // AnnotatedClass.getFields() reads one class file, so the base's fields were
         // invisible to the codec: a Cat went over the wire with no species at all,

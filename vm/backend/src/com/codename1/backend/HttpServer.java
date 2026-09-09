@@ -1401,7 +1401,23 @@ public final class HttpServer {
         // Waits on requests IN FLIGHT, not on open connections: an idle keep-alive
         // connection has nothing to finish and would otherwise hold the shutdown
         // open for the whole window for no reason.
-        while(System.currentTimeMillis() < deadline && inFlightRequests.get() > 0) {
+        //
+        // http2Turns as well, which this loop was missing when that counter was
+        // added: a turn holds the session and is not a request in flight, so a
+        // connection pumping frames was not waited for here at all.
+        //
+        // NOT covered, deliberately: a response already handed to nghttp2 whose
+        // DATA frames are still waiting on the peer's flow-control window. No
+        // worker is inside that connection, so nothing here can see it -- and the
+        // way to see it, asking the session whether it still wants to write, means
+        // calling into nghttp2 from THIS thread while a worker may be inside the
+        // same session, which is the race the descriptor-first teardown below
+        // exists to avoid. Answering it safely needs the worker to record the
+        // answer at the end of its own turn; until then such a response can still
+        // be cut short by a stop(), and that is a smaller fault than a native data
+        // race during shutdown.
+        while(System.currentTimeMillis() < deadline
+                && (inFlightRequests.get() > 0 || http2Turns.get() > 0)) {
             try {
                 Thread.sleep(20);
             } catch (InterruptedException err) {

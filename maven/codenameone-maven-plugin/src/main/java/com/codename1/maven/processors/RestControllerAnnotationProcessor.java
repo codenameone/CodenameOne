@@ -281,9 +281,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private String crossControllerClash(Controller controller, Route route, String shape) {
         String mine = controller.binaryName;
         for (Map.Entry<String, String> e : routeOwners.entrySet()) {
-            if (mine.equals(e.getValue())) {
-                continue;
-            }
+            // Same controller included. Skipping it assumed generateRouter's
+            // literal-first comparator settled everything inside one class, and it
+            // does not: two DYNAMIC patterns have no dominance, so "/a/{x}/c" and
+            // "/a/b/{y}" both answer /a/b/c and whichever the sort happens to emit
+            // first wins. That is the same ambiguity as across controllers, and it
+            // has the same answer.
             String other = e.getKey();
             // Same verb, or they cannot collide at all.
             int mySpace = shape.indexOf(' ');

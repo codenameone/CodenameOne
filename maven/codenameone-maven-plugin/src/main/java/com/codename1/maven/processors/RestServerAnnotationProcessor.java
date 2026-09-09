@@ -248,9 +248,25 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                         + " are both " + shape + " once the placeholder names are"
                         + " taken out, so only the first can ever be reached");
                 anyError = true;
-            } else {
-                shapes.put(shape, op.name);
+                continue;
             }
+            // Equality is not the only way two routes collide. "/a/{x}/c" and
+            // "/a/b/{y}" are different shapes and BOTH answer /a/b/c: a placeholder
+            // takes any value in its segment, so two dynamic patterns can overlap
+            // without either being more specific. Literal-first ordering cannot
+            // break that tie because neither is literal, and dispatch returns from
+            // whichever it emits first, so the contract gives that request no
+            // stable meaning.
+            String clash = overlappingShape(shapes.keySet(), shape);
+            if (clash != null) {
+                ctx.error(cls, api.binaryName + "." + op.name + " answers " + shape
+                        + ", which " + shapes.get(clash) + " also answers as " + clash
+                        + ". A path satisfying both is dispatched to whichever comes "
+                        + "first, so give them different paths.");
+                anyError = true;
+                continue;
+            }
+            shapes.put(shape, op.name);
         }
         if (!anyError && !api.ops.isEmpty()) {
             accepted.put(api.binaryName, api);
@@ -322,6 +338,39 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
      * is where the JDK begins; a field hidden by one of the same name in a subclass
      * is taken from the subclass, as Java resolves it.
      */
+    /** The already-seen shape that a path could satisfy along with this one, or null. */
+    private static String overlappingShape(Set<String> seen, String shape) {
+        for (String other : seen) {
+            if (shapesOverlap(other, shape)) {
+                return other;
+            }
+        }
+        return null;
+    }
+
+    /** Same verb, same segment count, and every pair of segments compatible. */
+    private static boolean shapesOverlap(String left, String right) {
+        int leftSpace = left.indexOf(' ');
+        int rightSpace = right.indexOf(' ');
+        if (leftSpace < 0 || rightSpace < 0
+                || !left.substring(0, leftSpace).equals(right.substring(0, rightSpace))) {
+            return false;
+        }
+        String[] a = left.substring(leftSpace + 1).split("/", -1);
+        String[] b = right.substring(rightSpace + 1).split("/", -1);
+        if (a.length != b.length) {
+            return false;
+        }
+        for (int i = 0; i < a.length; i++) {
+            boolean aVar = a[i].indexOf("{}") >= 0;
+            boolean bVar = b[i].indexOf("{}") >= 0;
+            if (!aVar && !bVar && !a[i].equals(b[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private List<FieldInfo> transferredFields(AnnotatedClass cls, ProcessorContext ctx) {
         List<FieldInfo> out = new ArrayList<FieldInfo>();
         Set<String> seen = new LinkedHashSet<String>();
@@ -1080,8 +1129,8 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         if ("long".equals(type))    return "asLong(" + expr + ")";
         if ("double".equals(type))  return "asDouble(" + expr + ")";
         if ("float".equals(type))   return "(float)asDouble(" + expr + ")";
-        if ("short".equals(type))   return "(short)asInt(" + expr + ")";
-        if ("byte".equals(type))    return "(byte)asInt(" + expr + ")";
+        if ("short".equals(type))   return "asShort(" + expr + ")";
+        if ("byte".equals(type))    return "asByte(" + expr + ")";
         if ("boolean".equals(type)) return "asBoolean(" + expr + ")";
         if ("java.lang.Integer".equals(type)) return "asBoxedInt(" + expr + ")";
         if ("java.lang.Long".equals(type))    return "asBoxedLong(" + expr + ")";
@@ -1113,7 +1162,35 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("    // The JSON reader produces Long for integers and Double for reals, so every\n");
         sb.append("    // numeric read goes through Number rather than casting to the field's type.\n");
         sb.append("    private static String asString(Object v) { return v == null ? null : String.valueOf(v); }\n");
-        sb.append("    private static int asInt(Object v) { return v instanceof Number ? ((Number)v).intValue() : (v == null ? 0 : Integer.parseInt(String.valueOf(v).trim())); }\n");
+        // Range-checked, not narrowed. The parser answers a Long for any JSON
+        // integer, and intValue() on 2147483648 is -2147483648 -- so an id, a count
+        // or an amount reached the handler as a DIFFERENT number from the one the
+        // client sent, with nothing raised. A value that does not fit is the
+        // client's mistake and is reported as one.
+        sb.append("    private static int asInt(Object v) {\n");
+        sb.append("        if (v instanceof Number) {\n");
+        sb.append("            long asLong = ((Number)v).longValue();\n");
+        sb.append("            if (asLong < Integer.MIN_VALUE || asLong > Integer.MAX_VALUE) {\n");
+        sb.append("                throw new IllegalArgumentException(\"out of range for int: \" + v);\n");
+        sb.append("            }\n");
+        sb.append("            return (int)asLong;\n");
+        sb.append("        }\n");
+        sb.append("        return v == null ? 0 : Integer.parseInt(String.valueOf(v).trim());\n");
+        sb.append("    }\n");
+        sb.append("    private static short asShort(Object v) {\n");
+        sb.append("        int narrowed = asInt(v);\n");
+        sb.append("        if (narrowed < Short.MIN_VALUE || narrowed > Short.MAX_VALUE) {\n");
+        sb.append("            throw new IllegalArgumentException(\"out of range for short: \" + v);\n");
+        sb.append("        }\n");
+        sb.append("        return (short)narrowed;\n");
+        sb.append("    }\n");
+        sb.append("    private static byte asByte(Object v) {\n");
+        sb.append("        int narrowed = asInt(v);\n");
+        sb.append("        if (narrowed < Byte.MIN_VALUE || narrowed > Byte.MAX_VALUE) {\n");
+        sb.append("            throw new IllegalArgumentException(\"out of range for byte: \" + v);\n");
+        sb.append("        }\n");
+        sb.append("        return (byte)narrowed;\n");
+        sb.append("    }\n");
         sb.append("    private static long asLong(Object v) { return v instanceof Number ? ((Number)v).longValue() : (v == null ? 0L : Long.parseLong(String.valueOf(v).trim())); }\n");
         sb.append("    private static double asDouble(Object v) { return v instanceof Number ? ((Number)v).doubleValue() : (v == null ? 0d : Double.parseDouble(String.valueOf(v).trim())); }\n");
         sb.append("    private static boolean asBoolean(Object v) { return v instanceof Boolean ? ((Boolean)v).booleanValue() : (v != null && Boolean.parseBoolean(String.valueOf(v).trim())); }\n");
@@ -1122,8 +1199,8 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("    private static Double asBoxedDouble(Object v) { return v == null ? null : Double.valueOf(asDouble(v)); }\n");
         sb.append("    private static Boolean asBoxedBoolean(Object v) { return v == null ? null : Boolean.valueOf(asBoolean(v)); }\n");
         sb.append("    private static Float asBoxedFloat(Object v) { return v == null ? null : Float.valueOf((float)asDouble(v)); }\n");
-        sb.append("    private static Short asBoxedShort(Object v) { return v == null ? null : Short.valueOf((short)asInt(v)); }\n");
-        sb.append("    private static Byte asBoxedByte(Object v) { return v == null ? null : Byte.valueOf((byte)asInt(v)); }\n");
+        sb.append("    private static Short asBoxedShort(Object v) { return v == null ? null : Short.valueOf(asShort(v)); }\n");
+        sb.append("    private static Byte asBoxedByte(Object v) { return v == null ? null : Byte.valueOf(asByte(v)); }\n");
         sb.append("    /** A decoded value narrowed to a JSON object, or null -- never a cast. */\n");
         sb.append("    private static java.util.Map asMap(Object v) { return v instanceof java.util.Map ? (java.util.Map)v : null; }\n");
         sb.append("    private static java.util.List asList(Object v) { return v instanceof java.util.List ? (java.util.List)v : null; }\n");
