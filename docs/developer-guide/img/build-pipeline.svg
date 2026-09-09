@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="500" viewBox="0 0 820 500">
+  <rect x="0" y="0" width="820" height="500" fill="#ffffff"/>
+  <text x="410" y="26" font-family="Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#222222">One codebase, and what each target does with it</text>
+  <rect x="310" y="44" width="200" height="40" rx="4" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="410" y="60" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">your Java source</text>
+  <text x="410" y="76" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">one set of sources</text>
+  <path d="M 410 84 L 410 102" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 405 96 L 410 102 L 415 96" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <rect x="310" y="104" width="200" height="40" rx="4" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="410" y="120" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">Java bytecode</text>
+  <text x="410" y="136" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">what the build cloud receives, not source</text>
+  <path d="M 83 164 L 733 164" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 410 144 L 410 162" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 83 164 L 83 182" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 78 176 L 83 182 L 88 176" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <rect x="24" y="184" width="118" height="100" rx="4" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="83" y="204" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a7a3d">Simulator</text>
+  <text x="83" y="222" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#222222">JavaSE port</text>
+  <text x="83" y="246" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">runs the bytecode on</text>
+  <text x="83" y="258" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">your desktop JVM</text>
+  <path d="M 213 164 L 213 182" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 208 176 L 213 182 L 218 176" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <rect x="154" y="184" width="118" height="100" rx="4" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="213" y="204" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a7a3d">Android</text>
+  <text x="213" y="222" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#222222">Gradle, then DEX</text>
+  <text x="213" y="246" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">class files become DEX,</text>
+  <text x="213" y="258" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">which ART runs</text>
+  <path d="M 343 164 L 343 182" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 338 176 L 343 182 L 348 176" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <rect x="284" y="184" width="118" height="100" rx="4" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
+  <text x="343" y="204" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#a56a3a">iOS</text>
+  <text x="343" y="222" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#222222">ParparVM</text>
+  <text x="343" y="246" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">bytecode to C, then an</text>
+  <text x="343" y="258" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">Xcode project on a Mac</text>
+  <path d="M 473 164 L 473 182" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 468 176 L 473 182 L 478 176" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <rect x="414" y="184" width="118" height="100" rx="4" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
+  <text x="473" y="204" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#a56a3a">Windows / Linux</text>
+  <text x="473" y="222" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#222222">ParparVM</text>
+  <text x="473" y="246" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">bytecode to C, then a</text>
+  <text x="473" y="258" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">standalone native binary</text>
+  <path d="M 603 164 L 603 182" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 598 176 L 603 182 L 608 176" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <rect x="544" y="184" width="118" height="100" rx="4" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
+  <text x="603" y="204" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#a56a3a">JavaScript</text>
+  <text x="603" y="222" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#222222">ParparVM</text>
+  <text x="603" y="246" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">the same translator,</text>
+  <text x="603" y="258" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">emitting JS</text>
+  <path d="M 733 164 L 733 182" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 728 176 L 733 182 L 738 176" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <rect x="674" y="184" width="118" height="100" rx="4" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="733" y="204" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a7a3d">Desktop</text>
+  <text x="733" y="222" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#222222">packaged in the cloud</text>
+  <text x="733" y="246" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">a JVM app wrapped in</text>
+  <text x="733" y="258" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#666666">a native installer</text>
+  <rect x="24" y="304" width="772" height="80" rx="6" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="410" y="324" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#4a6fa5">The translator is one program with several outputs</text>
+  <text x="410" y="344" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">ByteCodeTranslator emits C for iOS, for the native macOS port, and for the standalone Windows and Linux ports, and</text>
+  <text x="410" y="358" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">JavaScript for the web target, all from the same bytecode. The teavm compiler remains selectable there through the</text>
+  <text x="410" y="372" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">javascript.port build hint. Nothing here reads your Java source: the build cloud never receives it.</text>
+  <rect x="24" y="396" width="772" height="88" rx="6" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
+  <text x="410" y="416" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#a56a3a">Why the C step is worth the trouble</text>
+  <text x="410" y="436" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Generated C is compiled by the platform's own toolchain, so an app is built the way a hand-written one is. Xcode signs the</text>
+  <text x="410" y="450" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">iOS build; a native Windows build is signed only when you supply a certificate, and a Linux binary is not signed at all.</text>
+  <text x="410" y="464" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Apple's move to 64-bit, and bitcode arriving and later being withdrawn, needed no change to ParparVM at all.</text>
+</svg>
