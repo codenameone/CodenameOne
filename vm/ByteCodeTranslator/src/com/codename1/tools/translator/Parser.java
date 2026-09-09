@@ -842,7 +842,7 @@ public class Parser extends ClassVisitor {
             // methods don't pollute the analysis.
             if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
                 Date suspStart = new Date();
-                int syncCount = JavascriptSuspensionAnalysis.run(classes);
+                int syncCount = JavascriptSuspensionAnalysis.run(classes, outputDirectory);
                 Date suspEnd = new Date();
                 if (ByteCodeTranslator.verbose) {
                     System.out.println("JS suspension analysis: " + syncCount

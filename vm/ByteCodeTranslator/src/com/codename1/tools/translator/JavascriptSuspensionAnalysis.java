@@ -6,6 +6,19 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 
 package com.codename1.tools.translator;
@@ -13,6 +26,7 @@ package com.codename1.tools.translator;
 import com.codename1.tools.translator.bytecodes.BasicInstruction;
 import com.codename1.tools.translator.bytecodes.Instruction;
 import com.codename1.tools.translator.bytecodes.Invoke;
+import java.io.File;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -64,6 +78,16 @@ final class JavascriptSuspensionAnalysis {
     // on JSO-bridge classes, or string-referenced by the bridge JS (see
     // seedBridgeReferenced). Unconditionally suspending.
     private final Set<String> jsoDeclaredSigs = new java.util.HashSet<String>();
+    // Sigs protected because the BRIDGE JS names their class-free dispatch id
+    // as a string literal. Unlike the JSO set these stay signature-wide: the
+    // bridge also installs overrides through ``classDef.methods[id] = fn``
+    // with a computed key, so there is no receiver type to reason about.
+    private final Set<String> bridgeDispatchSigs = new java.util.HashSet<String>();
+    // Every class assignable to JSObject. A ``bindNative`` override can only
+    // land on one of these, so a call site whose receiver cone contains none
+    // of them cannot reach one -- which is what makes the JSO protection
+    // cone-aware rather than signature-wide.
+    private final Set<String> jsoBridgeClasses = new java.util.HashSet<String>();
 
     // Native bridge bindings whose wrapper is a plain ``function`` (not
     // ``function*``): SYNCHRONOUS natives that never yield. They must NOT be
@@ -80,11 +104,103 @@ final class JavascriptSuspensionAnalysis {
     // drop the ``yield*`` ceremony and use a sync dispatcher.
     static volatile java.util.Set<String> exportedSuspendingSigs = java.util.Collections.<String>emptySet();
 
-    static int run(List<ByteCodeClass> classes) {
+    // Receiver-type information from the RTA pass that ran immediately before
+    // us. Null when RTA did not run, or when owner-aware classification is
+    // switched off -- both cases fall back to the historical signature-wide
+    // behaviour, which is strictly more conservative.
+    private JavascriptReachability.Model rta;
+
+    /**
+     * The call-site decision, shared by this analysis and the emitter.
+     *
+     * They MUST agree: the analysis decides whether a method is emitted
+     * ``function*``, the emitter decides whether each call inside it is
+     * ``yield*``, and a ``yield*`` inside a plain ``function`` is a JS
+     * SyntaxError rather than a subtle bug. So there is exactly one
+     * implementation of the rule and both sides call it.
+     */
+    static final class DispatchModel {
+        private final JavascriptReachability.Model rta;
+        // Declared on a JSO bridge class. Suspending only when the call
+        // site's receiver cone can actually reach one of those classes.
+        private final java.util.Set<String> jsoSigs;
+        // Named by the bridge JS as a class-free dispatch id. Suspending
+        // whatever the receiver is -- see bridgeDispatchSigs.
+        private final java.util.Set<String> bridgeSigs;
+        private final java.util.Set<String> jsoClasses;
+        // Signature-wide fallback, i.e. the historical answer.
+        private final java.util.Set<String> suspendingSigs;
+
+        DispatchModel(JavascriptReachability.Model rta, java.util.Set<String> jsoSigs,
+                java.util.Set<String> bridgeSigs, java.util.Set<String> jsoClasses,
+                java.util.Set<String> suspendingSigs) {
+            this.rta = rta;
+            this.jsoSigs = jsoSigs;
+            this.bridgeSigs = bridgeSigs;
+            this.jsoClasses = jsoClasses;
+            this.suspendingSigs = suspendingSigs;
+        }
+
+        boolean isDispatchSuspending(String owner, String name, String desc) {
+            String sig = name + desc;
+            if (rta == null || isUnconditionallySuspendingDispatch(rta, jsoSigs, bridgeSigs,
+                    jsoClasses, owner, sig)) {
+                return rta == null ? suspendingSigs.contains(sig) : true;
+            }
+            List<BytecodeMethod> impls = rta.resolveImpls(owner, name, desc);
+            if (impls == null) {
+                return suspendingSigs.contains(sig);
+            }
+            for (int i = 0; i < impls.size(); i++) {
+                if (impls.get(i).isJavascriptSuspending()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Published for {@link JavascriptMethodGenerator}. Null until this
+     * analysis has run, which the emitter reads as "assume suspending".
+     */
+    static volatile DispatchModel exportedDispatchModel = null;
+
+    // Where the suspension report is written -- always, beside the bundle, as
+    // ``suspension-report.txt``. It exists because the sync/suspending split
+    // is the number this pass exists to move, and the only thing emitted
+    // before was a total (Parser, behind -verbose) that could not say WHICH
+    // rule was responsible for the suspending half. Null only when no output
+    // directory was supplied, which is the in-memory unit-test path.
+    private String reportPath;
+    // Method -> the rule that FIRST classified it suspending. A method can
+    // have several independent causes; this records the one that won the race
+    // in the worklist, which is why the ranking below is documented as an
+    // upper bound on beneficiaries rather than a prediction.
+    private final Map<BytecodeMethod, String> suspendReason = new IdentityHashMap<BytecodeMethod, String>();
+    // Signature -> number of INVOKEVIRTUAL / INVOKEINTERFACE call sites that
+    // dispatch on it. Captured in propagate(); for a suspending signature this
+    // is literally the number of ``yield*`` sites it is responsible for.
+    private Map<String, Integer> dispatchSiteCount = java.util.Collections.<String, Integer>emptyMap();
+
+    static int run(List<ByteCodeClass> classes, File outputDirectory) {
+        // Same reason as JavascriptReachability.run: never let a previous
+        // translation's model answer this one's questions. Cleared before the
+        // kill-switch return too, so the disabled path cannot inherit a model
+        // either.
+        exportedDispatchModel = null;
         if (System.getProperty("parparvm.js.suspension.off") != null) {
             return 0;
         }
         JavascriptSuspensionAnalysis a = new JavascriptSuspensionAnalysis();
+        // Always written, always beside the bundle. A diagnostic behind a
+        // system property is a diagnostic nobody sets, and the sync/suspending
+        // split is the number this whole pass exists to move -- it belongs in
+        // the build output where CI and a bisect can both read it.
+        if (outputDirectory != null) {
+            a.reportPath = new File(outputDirectory, "suspension-report.txt").getAbsolutePath();
+        }
+        a.rta = JavascriptReachability.modelFor(classes);
         a.index(classes);
         a.seedDirectlySuspending(classes);
         a.seedBridgeReferenced(classes);
@@ -96,6 +212,22 @@ final class JavascriptSuspensionAnalysis {
         for (ByteCodeClass cls : classes) {
             byName.put(cls.getClsName(), cls);
         }
+    }
+
+    /**
+     * Adds {@code m} to the suspending set, recording WHY when the opt-in
+     * report is on. Returns true when this call is the one that added it, so
+     * it is a drop-in for {@code suspending.add(m)} at the propagation
+     * worklist sites that depend on that return value.
+     */
+    private boolean markSuspending(BytecodeMethod m, String reason) {
+        if (!suspending.add(m)) {
+            return false;
+        }
+        if (reportPath != null) {
+            suspendReason.put(m, reason);
+        }
+        return true;
     }
 
     private void seedDirectlySuspending(List<ByteCodeClass> classes) {
@@ -111,7 +243,6 @@ final class JavascriptSuspensionAnalysis {
         // already seen this manifest as ``Window.current()`` returning
         // a non-wrapped value in the init path). Mark them suspending
         // up front so the caller stays ``yield*``-wrapped regardless.
-        java.util.Set<String> jsoBridgeClasses = new java.util.HashSet<String>();
         for (ByteCodeClass cls : classes) {
             if (isJsoBridgeClass(cls)) {
                 jsoBridgeClasses.add(cls.getClsName());
@@ -162,11 +293,21 @@ final class JavascriptSuspensionAnalysis {
                 // generator leak as a value; ``cn1_ivs*`` drives a
                 // one-shot and throws a named error on a true gap
                 // instead (see the runtime helper).
-                if ((m.isNative() && !isSyncNativeBinding(cls, m))
-                        || m.isSynchronizedMethod()
-                        || hasMonitorOps(m)
-                        || (clsIsJso && !isSyncNativeBinding(cls, m))) {
-                    suspending.add(m);
+                // Split into a labelled chain rather than one boolean so the
+                // report can name the rule. The disjunction is unchanged --
+                // order decides only which label wins, never the outcome.
+                String seed = null;
+                if (m.isNative() && !isSyncNativeBinding(cls, m)) {
+                    seed = "native";
+                } else if (m.isSynchronizedMethod()) {
+                    seed = "synchronized";
+                } else if (hasMonitorOps(m)) {
+                    seed = "monitor-op";
+                } else if (clsIsJso && !isSyncNativeBinding(cls, m)) {
+                    seed = "jso-bridge-class";
+                }
+                if (seed != null) {
+                    markSuspending(m, seed);
                 }
             }
         }
@@ -207,12 +348,11 @@ final class JavascriptSuspensionAnalysis {
                     referenced = true;
                 }
                 if (referenced && !isSyncNativeBinding(cls, m)) {
-                    suspending.add(m);
+                    markSuspending(m, "bridge-referenced");
                     if (dispatchable) {
                         // Virtual dispatch can land on the runtime-installed
-                        // override too -- protect the whole signature, same
-                        // as the JSO-declared sigs.
-                        jsoDeclaredSigs.add(m.getMethodName() + m.getSignature());
+                        // override too -- protect the whole signature.
+                        bridgeDispatchSigs.add(m.getMethodName() + m.getSignature());
                     }
                 }
             }
@@ -326,6 +466,7 @@ final class JavascriptSuspensionAnalysis {
         // Must be folded in BEFORE the caller scan below so dispatching
         // callers get escalated.
         suspendingSigs.addAll(jsoDeclaredSigs);
+        suspendingSigs.addAll(bridgeDispatchSigs);
         for (ByteCodeClass cls : classes) {
             for (BytecodeMethod caller : cls.getMethods()) {
                 if (caller.isEliminated() || caller.isAbstract()) {
@@ -346,27 +487,43 @@ final class JavascriptSuspensionAnalysis {
                         if (target == null) {
                             continue;
                         }
-                        List<BytecodeMethod> callers = callersOf.get(target);
-                        if (callers == null) {
-                            callers = new ArrayList<BytecodeMethod>();
-                            callersOf.put(target, callers);
-                        }
-                        callers.add(caller);
+                        addCaller(callersOf, target, caller);
                     } else if (op == Opcodes.INVOKEVIRTUAL || op == Opcodes.INVOKEINTERFACE) {
                         String sig = inv.getName() + inv.getDesc();
-                        List<BytecodeMethod> callers = sigCallersOf.get(sig);
-                        if (callers == null) {
-                            callers = new ArrayList<BytecodeMethod>();
-                            sigCallersOf.put(sig, callers);
+                        // Resolve the call site against its RECEIVER TYPE
+                        // rather than its bare signature. A cone that
+                        // resolves gives us exact per-impl edges, so a
+                        // blocking ``run()V`` somewhere else in the program
+                        // no longer reaches this caller at all.
+                        List<BytecodeMethod> impls = rta == null
+                                || isUnconditionallySuspendingDispatch(rta, jsoDeclaredSigs,
+                                        bridgeDispatchSigs, jsoBridgeClasses, inv.getOwner(), sig)
+                                ? null
+                                : rta.resolveImpls(inv.getOwner(), inv.getName(), inv.getDesc());
+                        if (impls != null) {
+                            for (int i = 0; i < impls.size(); i++) {
+                                BytecodeMethod impl = impls.get(i);
+                                addCaller(callersOf, impl, caller);
+                                if (suspending.contains(impl)) {
+                                    markSuspending(caller, "dispatch:"
+                                            + JavascriptNameUtil.sanitizeClassName(inv.getOwner())
+                                            + "." + sig);
+                                }
+                            }
+                            continue;
                         }
-                        callers.add(caller);
+                        // No receiver information (array owner, unindexed
+                        // class, nothing in the cone instantiated, or a
+                        // signature the bridge can override at runtime):
+                        // keep the historical signature-wide edge.
+                        addSigCaller(sigCallersOf, sig, caller);
                         // Early escalation: if ANY impl of the sig is
                         // already known suspending, this caller also
                         // needs to be suspending. Add to the initial
                         // worklist via the standard ``suspending.add``
                         // + propagate path below.
                         if (suspendingSigs.contains(sig)) {
-                            suspending.add(caller);
+                            markSuspending(caller, "dispatch:" + sig);
                         }
                     }
                 }
@@ -380,7 +537,7 @@ final class JavascriptSuspensionAnalysis {
             List<BytecodeMethod> directCallers = callersOf.get(suspended);
             if (directCallers != null) {
                 for (BytecodeMethod caller : directCallers) {
-                    if (suspending.add(caller)) {
+                    if (markSuspending(caller, "calls:" + qualify(suspended))) {
                         worklist.add(caller);
                     }
                 }
@@ -395,7 +552,7 @@ final class JavascriptSuspensionAnalysis {
                     List<BytecodeMethod> sigCallers = sigCallersOf.get(sig);
                     if (sigCallers != null) {
                         for (BytecodeMethod caller : sigCallers) {
-                            if (suspending.add(caller)) {
+                            if (markSuspending(caller, "dispatch:" + sig)) {
                                 worklist.add(caller);
                             }
                         }
@@ -403,10 +560,85 @@ final class JavascriptSuspensionAnalysis {
                 }
             }
         }
+        if (reportPath != null) {
+            // One entry per dispatch INSTRUCTION, so for a suspending sig this
+            // counts the ``yield*`` sites it costs.
+            Map<String, Integer> counts = new HashMap<String, Integer>();
+            for (Map.Entry<String, List<BytecodeMethod>> e : sigCallersOf.entrySet()) {
+                counts.put(e.getKey(), Integer.valueOf(e.getValue().size()));
+            }
+            dispatchSiteCount = counts;
+        }
         // Publish the final suspending-sig set so the emitter can
         // consult it when deciding whether an INVOKEVIRTUAL /
         // INVOKEINTERFACE call site needs ``yield*`` wrapping.
         exportedSuspendingSigs = suspendingSigs;
+        exportedDispatchModel = new DispatchModel(rta,
+                new java.util.HashSet<String>(jsoDeclaredSigs),
+                new java.util.HashSet<String>(bridgeDispatchSigs),
+                new java.util.HashSet<String>(jsoBridgeClasses),
+                suspendingSigs);
+    }
+
+    /**
+     * True when this dispatch must be suspending regardless of which body it
+     * resolves to, so neither the analysis nor the emitter may consult the
+     * receiver cone.
+     *
+     * Two different protections live here and they are NOT the same rule:
+     *
+     * - {@code bridgeSigs} is signature-wide. The bridge JS installs an
+     *   override through {@code classDef.methods[id] = fn} with a computed
+     *   key, so there is no receiver type a static walk could check.
+     * - {@code jsoSigs} is cone-aware. Those overrides land on JSO bridge
+     *   classes specifically, so a call whose receiver cone contains no such
+     *   class cannot reach one. That distinction is the whole point: {@code
+     *   getWidth()I} is declared on three JSO bridge interfaces, which used
+     *   to make every {@code Component.getWidth()} in the program a
+     *   suspension point.
+     *
+     * An unresolvable cone (array owner, class we did not index) answers true,
+     * because "we do not know" has to mean "assume the bridge can reach it".
+     */
+    private static boolean isUnconditionallySuspendingDispatch(JavascriptReachability.Model rta,
+            Set<String> jsoSigs, Set<String> bridgeSigs, Set<String> jsoClasses,
+            String owner, String sig) {
+        if (bridgeSigs.contains(sig)) {
+            return true;
+        }
+        if (!jsoSigs.contains(sig)) {
+            return false;
+        }
+        Set<String> cone = rta.coneTypes(owner);
+        if (cone == null) {
+            return true;
+        }
+        for (String type : cone) {
+            if (jsoClasses.contains(type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void addCaller(Map<BytecodeMethod, List<BytecodeMethod>> callersOf,
+            BytecodeMethod callee, BytecodeMethod caller) {
+        List<BytecodeMethod> callers = callersOf.get(callee);
+        if (callers == null) {
+            callers = new ArrayList<BytecodeMethod>();
+            callersOf.put(callee, callers);
+        }
+        callers.add(caller);
+    }
+
+    private static void addSigCaller(Map<String, List<BytecodeMethod>> sigCallersOf,
+            String sig, BytecodeMethod caller) {
+        List<BytecodeMethod> callers = sigCallersOf.get(sig);
+        if (callers == null) {
+            callers = new ArrayList<BytecodeMethod>();
+            sigCallersOf.put(sig, callers);
+        }
+        callers.add(caller);
     }
 
     /**
@@ -449,6 +681,8 @@ final class JavascriptSuspensionAnalysis {
     private int applyResults(List<ByteCodeClass> classes) {
         int sync = 0;
         int total = 0;
+        List<String> methodLines = reportPath == null ? null : new ArrayList<String>();
+        Map<String, Integer> causeCount = reportPath == null ? null : new HashMap<String, Integer>();
         for (ByteCodeClass cls : classes) {
             for (BytecodeMethod m : cls.getMethods()) {
                 if (m.isEliminated()) {
@@ -460,8 +694,131 @@ final class JavascriptSuspensionAnalysis {
                 if (!isSuspending) {
                     sync++;
                 }
+                if (methodLines == null) {
+                    continue;
+                }
+                String qualified = cls.getClsName() + "." + m.getMethodName() + m.getSignature();
+                if (!isSuspending) {
+                    methodLines.add("M SYNC " + qualified);
+                    continue;
+                }
+                // An abstract method has no body to classify -- it is forced
+                // suspending so a caller that cannot see the override still
+                // emits ``yield*``. It has no seed rule, so name it as itself.
+                String cause = suspendReason.get(m);
+                if (cause == null) {
+                    cause = m.isAbstract() ? "abstract" : "unattributed";
+                }
+                methodLines.add("M SUSP " + qualified + " " + cause);
+                Integer prev = causeCount.get(cause);
+                causeCount.put(cause, Integer.valueOf(prev == null ? 1 : prev.intValue() + 1));
             }
         }
+        if (methodLines != null) {
+            writeReport(total, sync, methodLines, causeCount);
+        }
         return sync;
+    }
+
+    /**
+     * Orders report keys by their count, largest first, then by name so the
+     * order is total and two runs of the report diff cleanly. A missing key
+     * counts as zero. Static and named rather than an anonymous inner class
+     * because SpotBugs runs as a zero-findings gate over this project.
+     */
+    private static final class ByCountDescending
+            implements java.util.Comparator<String>, java.io.Serializable {
+        private static final long serialVersionUID = 1L;
+        private final Map<String, Integer> counts;
+
+        ByCountDescending(Map<String, Integer> counts) {
+            this.counts = counts;
+        }
+
+        public int compare(String a, String b) {
+            Integer ca = counts.get(a);
+            Integer cb = counts.get(b);
+            int va = ca == null ? 0 : ca.intValue();
+            int vb = cb == null ? 0 : cb.intValue();
+            if (va != vb) {
+                return vb < va ? -1 : 1;
+            }
+            return a.compareTo(b);
+        }
+    }
+
+    /** ``owner.name+descriptor``, the identity used throughout the report. */
+    private static String qualify(BytecodeMethod m) {
+        return m.getClsName() + "." + m.getMethodName() + m.getSignature();
+    }
+
+    /**
+     * Writes the opt-in report. Deliberately plain text and sorted, so two
+     * runs diff cleanly and a shell can aggregate it without a parser.
+     *
+     * The ranking in section 2 is the point of the whole file: a suspending
+     * SIGNATURE costs one ``yield*`` per dispatch site AND forces every
+     * method containing one of those sites to be a generator, so the
+     * signatures at the top are where the bundle's generator population
+     * actually comes from.
+     *
+     * Read ``firstCause`` as an UPPER BOUND on beneficiaries, not a
+     * prediction: a method is recorded against whichever cause reached it
+     * first, and removing that cause can leave it suspending for another.
+     */
+    private void writeReport(int total, int sync, List<String> methodLines,
+            Map<String, Integer> causeCount) {
+        java.util.Set<String> suspendingSigs = exportedSuspendingSigs;
+        List<String> sigs = new ArrayList<String>(suspendingSigs);
+        Collections.sort(sigs);
+        // Rank suspending signatures by dispatch sites, then by name so the
+        // order is total and the file diffs cleanly.
+        Map<String, Integer> sites = dispatchSiteCount;
+        Collections.sort(sigs, new ByCountDescending(sites));
+        List<String> causes = new ArrayList<String>(causeCount.keySet());
+        Collections.sort(causes, new ByCountDescending(causeCount));
+        Collections.sort(methodLines);
+        java.io.PrintWriter out = null;
+        try {
+            out = new java.io.PrintWriter(new java.io.OutputStreamWriter(
+                    new java.io.FileOutputStream(reportPath), "UTF-8"));
+            out.println("# ParparVM JavaScript suspension report");
+            out.println("# A suspending method is emitted ``function*`` and every call to it is");
+            out.println("# ``yield*``; a synchronous one is a plain function called directly.");
+            out.println("TOTAL " + total);
+            out.println("SYNC " + sync);
+            out.println("SUSPENDING " + (total - sync));
+            out.println("SUSPENDING_SIGS " + suspendingSigs.size());
+            out.println("#");
+            out.println("# Section 1: first-recorded cause, most common first.");
+            out.println("# CAUSE <methods> <cause>");
+            for (String cause : causes) {
+                out.println("CAUSE " + causeCount.get(cause) + " " + cause);
+            }
+            out.println("#");
+            out.println("# Section 2: suspending signatures ranked by dispatch call sites.");
+            out.println("# SIG <dispatchSites> <firstCauseMethods> <name+descriptor>");
+            for (String sig : sigs) {
+                Integer siteCount = sites.get(sig);
+                Integer firstCause = causeCount.get("dispatch:" + sig);
+                out.println("SIG " + (siteCount == null ? 0 : siteCount.intValue())
+                        + " " + (firstCause == null ? 0 : firstCause.intValue())
+                        + " " + sig);
+            }
+            out.println("#");
+            out.println("# Section 3: every live method.");
+            out.println("# M SYNC <owner.name+desc> | M SUSP <owner.name+desc> <cause>");
+            for (String line : methodLines) {
+                out.println(line);
+            }
+        } catch (java.io.IOException err) {
+            // A diagnostic must never be the thing that breaks the build.
+            System.out.println("JS suspension report could not be written to "
+                    + reportPath + ": " + err.getMessage());
+        } finally {
+            if (out != null) {
+                out.close();
+            }
+        }
     }
 }

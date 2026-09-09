@@ -1707,13 +1707,54 @@ final class JavascriptBundleWriter {
             // to the in-bundle string scan only)
         }
         java.util.regex.Pattern literal = java.util.regex.Pattern.compile("[\"'](cn1_[A-Za-z0-9_]+)[\"']");
+        // A name the bridge only ever LOOKS UP is not a name the bridge
+        // replaces, and only replacement needs protection.
+        //
+        // ``resolveVirtual(x, "cn1_s_toString_R_java_lang_String")`` is a call;
+        // its result is driven through ``cn1_ivAdapt`` / ``adaptVirtualResult``,
+        // which tolerate a plain function. Replacement instead assigns to
+        // ``classDef.methods[...]``, and every such site in the bridge is
+        // scoped to one class. Counting a lookup as a replacement is not the
+        // "handful of generators" the original comment estimated: ``toString``
+        // and ``equals`` are named exactly this way, and between them that
+        // seeded 781 methods suspending and made 2,874 dispatch sites
+        // ``yield*`` -- the two largest entries in the whole report.
+        //
+        // The test is deliberately all-or-nothing: a token is dropped only
+        // when EVERY occurrence of it is a resolveVirtual argument. One
+        // assignment, one bindNative array entry, one mention anywhere else,
+        // and it stays protected. That keeps names reached through a variable
+        // (``const id = "cn1_s_..."; cls.methods[id] = fn``) safe, because the
+        // literal that feeds the variable is not itself a lookup.
+        java.util.regex.Pattern lookup = java.util.regex.Pattern.compile(
+                "resolveVirtual\\s*\\([^,()]*,\\s*[\"'](cn1_[A-Za-z0-9_]+)[\"']");
+        Map<String, int[]> counts = new HashMap<String, int[]>();
         for (String src : sources) {
             java.util.regex.Matcher m = literal.matcher(src);
             while (m.find()) {
-                tokens.add(m.group(1));
+                bump(counts, m.group(1), 0);
+            }
+            java.util.regex.Matcher l = lookup.matcher(src);
+            while (l.find()) {
+                bump(counts, l.group(1), 1);
+            }
+        }
+        for (Map.Entry<String, int[]> entry : counts.entrySet()) {
+            int[] seen = entry.getValue();
+            if (seen[0] > seen[1]) {
+                tokens.add(entry.getKey());
             }
         }
         return tokens;
+    }
+
+    private static void bump(Map<String, int[]> counts, String token, int slot) {
+        int[] seen = counts.get(token);
+        if (seen == null) {
+            seen = new int[2];
+            counts.put(token, seen);
+        }
+        seen[slot]++;
     }
 
     /**

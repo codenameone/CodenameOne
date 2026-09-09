@@ -614,11 +614,24 @@ final class JavascriptMethodGenerator {
     private static boolean isInvokeSuspending(Invoke invoke) {
         int op = invoke.getOpcode();
         if (op == Opcodes.INVOKEVIRTUAL || op == Opcodes.INVOKEINTERFACE) {
-            // CHA result: the signature is sync only if NO class's
-            // impl is suspending. Consult the set exported by the
-            // suspension analysis. Default (no set → all dispatches
-            // suspending) preserves the historical over-conservative
-            // behaviour when the analysis is disabled.
+            // Ask the analysis about THIS call site, receiver type included.
+            // Keying on the bare signature -- which is what this did, and what
+            // the whole JS backend still does for its runtime dispatch ids --
+            // means one blocking ``run()V`` anywhere makes every ``run()V``
+            // call site in the program a suspension point.
+            //
+            // The answer MUST match the one the analysis used when it decided
+            // whether the ENCLOSING method is a generator, so both sides go
+            // through the same DispatchModel rather than reimplementing the
+            // rule; a ``yield*`` emitted into a plain ``function`` is a JS
+            // SyntaxError, not a subtle mistake.
+            JavascriptSuspensionAnalysis.DispatchModel model =
+                    JavascriptSuspensionAnalysis.exportedDispatchModel;
+            if (model != null) {
+                return model.isDispatchSuspending(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+            }
+            // Analysis disabled (-Dparparvm.js.suspension.off): unchanged
+            // historical behaviour.
             java.util.Set<String> suspendingSigs = JavascriptSuspensionAnalysis.exportedSuspendingSigs;
             if (suspendingSigs == null) {
                 return true;
