@@ -503,6 +503,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // contract on the CI platforms (none has an AR runtime) and a
             // full session round trip when a backend is present.
             new ARApiTest(),
+            // The location button, which on Android 17 is drawn by the
+            // system in another process -- a peer still in place after the
+            // form settles is the only proof that whole handshake worked.
+            new LocationButtonApiTest(),
             new SimdLargeAllocaTest(),
             new StreamApiTest(),
             new StringApiTest(),

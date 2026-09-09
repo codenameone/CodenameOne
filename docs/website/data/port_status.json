@@ -629,6 +629,15 @@
       ]
     },
     {
+      "id": "location-button",
+      "category": "Device APIs",
+      "name": "One-time location sharing",
+      "description": "Checks the privacy-minimized location button: on Android 17 the control is rendered by the system in another process and a surviving peer is proof the whole session handshake worked, while every other port must produce the ordinary button that asks for the location permission.",
+      "tests": [
+        "LocationButtonApiTest"
+      ]
+    },
+    {
       "id": "secure-storage-crypto",
       "category": "Storage and security",
       "name": "Secure storage and cryptography",

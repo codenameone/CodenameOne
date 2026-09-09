@@ -95,6 +95,18 @@ public abstract class LocationManager {
     private LocationRequest request;
     private int status = TEMPORARILY_UNAVAILABLE;
 
+    /// Incremented by every setLocationListener, under LISTENER_LOCK.
+    ///
+    /// Static because the listener it tracks is static, and the two have to
+    /// agree. A port is free to hand out a fresh manager per call --
+    /// JavaSEPort.getLocationManager() returns a new anonymous subclass every
+    /// time -- so the one-shot wait and the listener that replaces it can sit
+    /// on different instances. Per-instance, this counter would not move when
+    /// another instance installed a listener, and the timed-out wait would
+    /// read its own untouched number as "nothing has been installed since" and
+    /// clear a tracker that belongs to somebody else.
+    private static int listenerEpoch;
+
     /// Gets the LocationManager instance
     public static LocationManager getLocationManager() {
         return Display.getInstance().getLocationManager();
@@ -164,6 +176,25 @@ public abstract class LocationManager {
                 LL l = new LL();
                 l.timeout = timeout;
                 l.bind();
+                // Timed out. Both of LL's callbacks clear the listener when
+                // they fire, but run() only breaks its wait loop, so a request
+                // that never got a fix left this one installed: the platform
+                // keeps its location updates registered, and the NEXT call
+                // takes the listener != null branch below and answers from
+                // getCurrentLocation() instead of waiting for a fresh fix. Only
+                // ours is cleared -- a callback that arrived in the meantime has
+                // already replaced it.
+                //
+                // Only if nothing has been installed since. A callback that
+                // fired cleared it already, and application code is free to
+                // start tracking while this request waits -- invokeAndBlock
+                // keeps the EDT running -- so clearing unconditionally would
+                // silently stop a subscription this request never owned.
+                synchronized (LISTENER_LOCK) {
+                    if (listenerEpoch == l.epoch) {
+                        setLocationListener(null);
+                    }
+                }
                 return l.result;
             }
             return getCurrentLocation();
@@ -242,6 +273,17 @@ public abstract class LocationManager {
     /// from getting updates
     public void setLocationListener(final LocationListener l) {
         synchronized (LISTENER_LOCK) {
+            // Every install gets a number, and an LL is told its own. That is
+            // how a timed-out getCurrentLocationSync knows whether the listener
+            // it is about to clear is still the one it installed -- see there.
+            // A counter rather than a comparison because the static-analysis
+            // gates reject comparing references (PMD CompareObjectsWithEquals),
+            // and because it answers "was there ANY install since" rather than
+            // only "is this the same object".
+            listenerEpoch++;
+            if (l instanceof LL) {
+                ((LL) l).epoch = listenerEpoch;
+            }
             if (listener != null) {
                 clearListener();
                 request = null;
@@ -353,6 +395,9 @@ public abstract class LocationManager {
         Location result;
         boolean finished;
         long timeout;
+
+        /// The install this listener belongs to; see [#listenerEpoch].
+        int epoch;
 
         public void bind() {
             setLocationListener(this);
