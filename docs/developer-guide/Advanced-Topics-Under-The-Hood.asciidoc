@@ -1671,6 +1671,9 @@ This means that drawing looks something like this:
 
 This means that all peer components are drawn on top of the Codename One components.
 
+.The two painting passes, and what the order costs you
+image::img/peer-component-painting.svg[Why a native peer component is always painted above the Codename One layer,scaledwidth=85%]
+
 NOTE: This was also the case in AWT/Swing to one degree or another...
 
 ==== Showing dialogs on top of peer components

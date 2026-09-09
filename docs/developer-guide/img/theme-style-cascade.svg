@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="470" viewBox="0 0 820 470">
+  <rect x="0" y="0" width="820" height="470" fill="#ffffff"/>
+  <text x="410" y="26" font-family="Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#222222">How a UIID becomes a Style</text>
+  <text x="410" y="44" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Every component asks UIManager for the style of its UIID. This is the order it looks in.</text>
+  <rect x="24" y="70" width="240" height="52" rx="4" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="144" y="92" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a7a3d">the UIID</text>
+  <rect x="280" y="70" width="516" height="52" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1"/>
+  <text x="538" y="92" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">a Button asks for "Button"</text>
+  <path d="M 144 122 L 144 138" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 139 132 L 144 138 L 149 132" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <rect x="24" y="140" width="240" height="52" rx="4" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="144" y="162" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a7a3d">plus the state</text>
+  <rect x="280" y="140" width="516" height="52" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1"/>
+  <text x="538" y="162" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">".sel", ".press" or ".dis" is appended for the selected,</text>
+  <text x="538" y="177" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">pressed and disabled styles</text>
+  <path d="M 144 192 L 144 208" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 139 202 L 144 208 L 149 202" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <rect x="24" y="210" width="240" height="52" rx="4" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
+  <text x="144" y="232" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#a56a3a">$Dark first, in dark mode</text>
+  <rect x="280" y="210" width="516" height="52" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
+  <text x="538" y="232" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">shouldUseDarkStyle prefixes the id; if the theme has no dark</text>
+  <text x="538" y="247" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">entry it falls back to the light one</text>
+  <path d="M 144 262 L 144 278" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 139 272 L 144 278 L 149 272" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <rect x="24" y="280" width="240" height="52" rx="4" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="144" y="302" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a7a3d">follow derive</text>
+  <rect x="280" y="280" width="516" height="52" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1"/>
+  <text x="538" y="302" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">a theme entry may name a parent with derive, and that parent</text>
+  <text x="538" y="317" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">is resolved the same way</text>
+  <path d="M 144 332 L 144 348" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 139 342 L 144 348 L 149 342" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <rect x="24" y="350" width="240" height="52" rx="4" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="144" y="372" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a6fa5">otherwise the default style</text>
+  <rect x="280" y="350" width="516" height="52" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
+  <text x="538" y="372" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">a UIID the theme never mentions gets a copy of the default</text>
+  <text x="538" y="387" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">style, not an error</text>
+  <rect x="24" y="418" width="772" height="44" rx="6" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="410" y="438" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">An overlay theme is layered on top of the one below it, so a project theme can change a handful of UIIDs without</text>
+  <text x="410" y="452" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">restating the rest. @OverlayThemes in a theme names the resources to load over it.</text>
+</svg>
