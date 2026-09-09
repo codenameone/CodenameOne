@@ -321,6 +321,30 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void anEmptyNumericValueIsRejectedRatherThanZero() throws Exception {
+        // "?limit=" is a parameter the client SENT. Treating it as an omission
+        // bound the default, so the handler ran on a number nobody wrote -- the
+        // same defect as accepting "zz", which is already a 400.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/notes\")\n"
+                + "    public String all(@RequestParam(value = \"limit\", "
+                + "defaultValue = \"20\") int limit) { return String.valueOf(limit); }\n"
+                + "}\n");
+        Object empty = router.call("GET", "/notes?limit=", null);
+        assertNotNull("GET /notes matched no route", empty);
+        assertEquals(400, Router.statusOf(empty));
+        // Omitting it entirely still takes the declared default.
+        Object absent = router.call("GET", "/notes", null);
+        assertNotNull(absent);
+        assertEquals(200, Router.statusOf(absent));
+        assertEquals("20", Router.bodyOf(absent));
+    }
+
+    @Test
     public void aFloatTooLargeForAFloatIsRejected() throws Exception {
         // Float.parseFloat answers INFINITY for 1e100 rather than throwing, so
         // the guard approved it and the handler ran on a number the client did

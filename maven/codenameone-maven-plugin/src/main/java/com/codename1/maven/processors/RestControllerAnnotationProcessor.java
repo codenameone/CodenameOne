@@ -1073,7 +1073,6 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         }
     }
 
-    /** The generated "does this parse" helper for a numeric type, or null. */
     /** Whether Json.write turns this return type into something other than toString(). */
     private static boolean isEncodableReturn(String javaType, ProcessorContext ctx) {
         if (javaType == null || "void".equals(javaType) || RESPONSE_TYPE.equals(javaType)) {
@@ -1442,8 +1441,17 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // "used when the request omits it", and "zz" is not an omission.
             sb.append("    private static boolean parses").append(numeric[i][0])
               .append("(String value) {\n");
-            sb.append("        if (value == null || value.length() == 0) {\n");
+            // ABSENT is fine; present and EMPTY is not. "?count=" is a parameter
+            // the client sent, and queryParam distinguishes it from one that was
+            // omitted -- so treating the two alike let an empty value take the
+            // default or zero and call the handler with a number nobody sent,
+            // which is the same defect as accepting "zz". A default is documented
+            // as "used when the request omits it", and this is not an omission.
+            sb.append("        if (value == null) {\n");
             sb.append("            return true;\n");
+            sb.append("        }\n");
+            sb.append("        if (value.length() == 0) {\n");
+            sb.append("            return false;\n");
             sb.append("        }\n");
             sb.append("        try {\n");
             if ("Float".equals(numeric[i][0])) {
