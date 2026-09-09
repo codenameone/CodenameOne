@@ -482,6 +482,10 @@ public class AndroidGradleBuilder extends Executor {
     /// means it cannot.
     private boolean otherLocationUse;
 
+    /// Whether a feature of this builder's own -- Bluetooth scanning, Wi-Fi,
+    /// Nearby -- declared ACCESS_FINE_LOCATION for itself.
+    private boolean featureNeedsOrdinaryFineLocation;
+
     /// What the platform requires before it will render the system location
     /// button. Google Play requires that button for transactional precise
     /// location from Android 17.
@@ -568,6 +572,22 @@ public class AndroidGradleBuilder extends Executor {
         // fixed once, after the injectors, by uncapFineLocation().
         String hint = request.getArg("android.locationButton.exclusive", "auto");
         boolean asked = "true".equals(hint);
+        if (asked && featureNeedsOrdinaryFineLocation) {
+            // Refused rather than warned. Emitting the restriction would be
+            // dropped by permissionAdd() in favour of the feature's own
+            // declaration, and the application would ship ordinary precise
+            // access having asked for restricted -- silently, which is the
+            // failure this flag exists to prevent. Honouring it is not an option
+            // either: onlyForLocationButton would stop the feature being granted
+            // location at all.
+            throw new BuildException("android.locationButton.exclusive=true"
+                    + " cannot be honoured: this application also uses a feature"
+                    + " that needs ordinary precise location -- Bluetooth"
+                    + " scanning, Wi-Fi or Nearby -- and declaring"
+                    + " ACCESS_FINE_LOCATION onlyForLocationButton would stop that"
+                    + " feature being granted location at all. Drop the hint, or"
+                    + " stop using the feature that needs location.");
+        }
         if (!wantsExclusiveLocation(hint, locationButtonPermission, otherLocationUse)) {
             // The mirror of the conflict below, and just as silent. Answering
             // "ordinary" here decides nothing on its own: permissionAdd() drops
@@ -766,6 +786,29 @@ public class AndroidGradleBuilder extends Executor {
             start--;
         }
         return element.substring(0, start) + element.substring(end + 1);
+    }
+
+    /// Whether one of this builder's own features declared ACCESS_FINE_LOCATION,
+    /// as opposed to the application declaring it.
+    ///
+    /// Bluetooth scanning, Wi-Fi and Nearby each declare it for themselves. That
+    /// makes precise location something other than the location button's alone,
+    /// and not only because permissionAdd() would drop the button's declaration:
+    /// onlyForLocationButton would BREAK those features, since a permission
+    /// restricted to the button is never granted for a scan.
+    ///
+    /// #### Parameters
+    ///
+    /// - `supplied`: xpermissions as the application supplied it
+    /// - `accumulated`: xpermissions after this builder added its own fragments
+    static boolean featureDeclaredFineLocation(String supplied,
+            String accumulated) {
+        if (accumulated == null
+                || accumulated.indexOf("ACCESS_FINE_LOCATION") < 0) {
+            return false;
+        }
+        return supplied == null
+                || supplied.indexOf("ACCESS_FINE_LOCATION") < 0;
     }
 
     /// Whether `android.xpermissions` hand-declares ACCESS_FINE_LOCATION
@@ -3770,6 +3813,15 @@ public class AndroidGradleBuilder extends Executor {
         // the build over a capped entry was tried instead and was wrong twice
         // over -- it fired on fragments this builder had written itself, and it
         // told developers to remove something they had never written.
+        if (featureDeclaredFineLocation(xPermissionsAsSupplied, xPermissions)) {
+            // Precise location is not the button's alone: a feature needs it the
+            // ordinary way. The class scan cannot see this -- Bluetooth, Wi-Fi
+            // and Nearby ask through their own manifest fragments, never through
+            // com/codename1/location -- so it is recorded here, where both
+            // strings are in hand.
+            featureNeedsOrdinaryFineLocation = true;
+            otherLocationUse = true;
+        }
         if (gpsPermission
                 && xPermissionsAsSupplied.indexOf("ACCESS_FINE_LOCATION") < 0) {
             // Only when every fine-location entry is one of ours. A developer

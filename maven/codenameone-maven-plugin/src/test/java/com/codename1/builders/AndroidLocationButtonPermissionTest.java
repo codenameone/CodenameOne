@@ -269,6 +269,35 @@ class AndroidLocationButtonPermissionTest {
         assertFalse(AndroidGradleBuilder.declaresRestrictedFineLocation(developerWroteNothing));
     }
 
+    /**
+     * Bluetooth scanning, Wi-Fi and Nearby declare ACCESS_FINE_LOCATION through
+     * their own fragments, which the class scan never sees. That still makes
+     * precise location something other than the button's alone --
+     * onlyForLocationButton would stop those features being granted it at all.
+     */
+    @Test
+    void aFeaturesOwnDeclarationCountsAsOrdinaryUse() {
+        String generated = "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\""
+                + " android:maxSdkVersion=\"30\" />\n";
+        assertTrue(AndroidGradleBuilder.featureDeclaredFineLocation("", generated));
+        assertTrue(AndroidGradleBuilder.featureDeclaredFineLocation(null, generated));
+    }
+
+    /** The application's own declaration is not a feature's. */
+    @Test
+    void theApplicationsOwnDeclarationIsNotAFeatures() {
+        String supplied = "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />\n";
+        assertFalse(AndroidGradleBuilder.featureDeclaredFineLocation(supplied, supplied),
+                "the application declared it, so the manual rules own this case");
+    }
+
+    /** And nothing declared it at all. */
+    @Test
+    void nobodyDeclaringItIsNotAFeatureDeclaration() {
+        assertFalse(AndroidGradleBuilder.featureDeclaredFineLocation("", ""));
+        assertFalse(AndroidGradleBuilder.featureDeclaredFineLocation("", null));
+    }
+
     /** Neither rule fires on a fragment that says nothing about location. */
     @Test
     void anUnrelatedFragmentIsNeitherDeclaration() {
