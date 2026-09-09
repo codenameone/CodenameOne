@@ -455,10 +455,23 @@ public final class Postgres {
                     result.rows.add(row);
                     break;
                 }
-                case COMMAND_COMPLETE:
-                    result.affected = affectedFrom(Wire.fromUtf8(message.body, 0,
-                            message.body.length - 1));
+                case COMMAND_COMPLETE: {
+                    String tag = Wire.fromUtf8(message.body, 0, message.body.length - 1);
+                    // A COMMIT on a transaction the server has already marked
+                    // aborted completes with the ROLLBACK tag rather than an
+                    // error -- which happens whenever a statement failed and the
+                    // transaction body caught it and carried on. Every change in
+                    // the transaction is discarded, and reading only the row
+                    // count out of this reports that as a successful commit and
+                    // hands the caller the body's result.
+                    if("ROLLBACK".equals(tag) && "COMMIT".equalsIgnoreCase(sql.trim())) {
+                        failure = new IOException("COMMIT rolled the transaction back: the "
+                                + "server had already marked it aborted, so nothing in it "
+                                + "was applied");
+                    }
+                    result.affected = affectedFrom(tag);
                     break;
+                }
                 case ERROR_RESPONSE:
                     // Not thrown here: the server still owes us a ReadyForQuery, and
                     // leaving it unread desynchronises every later statement.

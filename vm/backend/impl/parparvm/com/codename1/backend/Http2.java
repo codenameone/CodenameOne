@@ -220,6 +220,17 @@ public final class Http2 {
         return session == 0 ? 0 : pendingBodyBytesImpl(session);
     }
 
+    /**
+     * File-backed response bodies outstanding across the PROCESS, not this
+     * session. Such a body holds a descriptor and no heap, so it is invisible to
+     * pendingBodyBytes, and descriptors are a process resource: bounding them
+     * per connection still multiplies by the connection count, and exhausting
+     * them stops the process opening sockets or files at all.
+     */
+    public static int pendingBodyFiles() {
+        return pendingBodyFilesImpl();
+    }
+
     public void close() {
         if(session != 0) {
             long s = session;
@@ -281,5 +292,6 @@ public final class Http2 {
                                           String headerLines, byte[] body);
     private static native boolean wantsMoreImpl(long session);
     private static native long pendingBodyBytesImpl(long session);
+    private static native int pendingBodyFilesImpl();
     private static native void destroyImpl(long session);
 }

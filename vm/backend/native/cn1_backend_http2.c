@@ -53,6 +53,12 @@
    CONTINUATION frames, and again on each stream its SETTINGS allows at once.
    HTTP/1 has always refused that; this is the same ceiling for HTTP/2. */
 #define CN1_H2_MAX_HEADER_BYTES (64 * 1024)
+/* And a ceiling across the whole session, for the same reason the body limit has
+   one: the per-stream figure is what ONE request may hold, and a client may hold
+   the advertised stream concurrency open at once without ever sending END_STREAM,
+   so the per-stream ceiling alone permits that multiple. Periodic control frames
+   keep such a connection alive indefinitely. */
+#define CN1_H2_MAX_SESSION_HEADER_BYTES (4 * CN1_H2_MAX_HEADER_BYTES)
 /* The per-stream limit bounds ONE upload; it says nothing about how many run at
    once. With the advertised concurrency a single connection could hold a hundred
    nearly-complete 8 MiB bodies -- some 800 MiB of native buffers that live until
@@ -132,8 +138,17 @@ typedef struct {
  * two places is how the descriptor leaked from the teardown path: a client that
  * dropped the connection mid-download left one open per request.
  */
+/* File-backed response bodies alive across ALL sessions. Descriptors are a
+   process resource, not a per-connection one: bounding them per session still
+   multiplies by the connection count, and running out stops the process
+   accepting sockets or opening files at all -- a failure with nothing to do
+   with whichever client caused it. Every such body is created in respondFile
+   and destroyed in cn1H2FreeBody, so those two are the whole accounting. */
+static _Atomic long cn1H2OpenFileBodies = 0;
+
 static void cn1H2FreeBody(CN1H2Body* body) {
     if(body->fd >= 0) {
+        atomic_fetch_sub_explicit(&cn1H2OpenFileBodies, 1, memory_order_relaxed);
         /* The descriptor became the session's when the response was submitted, so
            this is the one place that closes it: at EOF, at an early stream reset,
            and at teardown, all of which arrive here. */
@@ -286,6 +301,27 @@ static int cn1H2OnHeader(nghttp2_session* session, const nghttp2_frame* frame,
     r->headerBytes += (size_t)nameLen + (size_t)valueLen;
     if(r->headerBytes > CN1_H2_MAX_HEADER_BYTES) {
         return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+    }
+    {
+        /* The same walk the body limit does, and bounded the same way: the
+           streams are capped by the concurrency setting, and a field is capped
+           by the per-stream ceiling above, so this cannot become the expensive
+           part of parsing a header block. r is already on s->open, so its own
+           bytes are counted by the walk rather than added to it. */
+        size_t total = 0;
+        CN1H2Request* other = s->open;
+        while(other != NULL) {
+            total += other->headerBytes;
+            other = other->next;
+        }
+        other = s->readyHead;
+        while(other != NULL) {
+            total += other->headerBytes;
+            other = other->next;
+        }
+        if(total > CN1_H2_MAX_SESSION_HEADER_BYTES) {
+            return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+        }
     }
     /* The pseudo-headers carry what a request line carries in HTTP/1.1. */
     if(nameLen == 7 && memcmp(name, ":method", 7) == 0) {
@@ -536,6 +572,17 @@ JAVA_LONG com_codename1_backend_Http2_pendingBodyBytesImpl___long_R_long(CODENAM
         }
     }
     return (JAVA_LONG)total;
+}
+
+/*
+ * File-backed response bodies outstanding across the process. Reported
+ * separately from the byte figure because it is a different resource with a
+ * different limit: such a body holds a DESCRIPTOR and no heap, so it is
+ * invisible to the byte accounting, and a peer that never opens its window
+ * keeps one per stream for as long as it likes.
+ */
+JAVA_INT com_codename1_backend_Http2_pendingBodyFilesImpl___R_int(CODENAME_ONE_THREAD_STATE) {
+    return (JAVA_INT)atomic_load_explicit(&cn1H2OpenFileBodies, memory_order_relaxed);
 }
 
 /* Takes everything nghttp2 wants written, and empties the buffer. */
@@ -923,6 +970,7 @@ JAVA_INT com_codename1_backend_Http2_respondFileImpl___long_int_java_lang_String
     pending->offset = 0;
     pending->next = s->bodies;
     s->bodies = pending;
+    atomic_fetch_add_explicit(&cn1H2OpenFileBodies, 1, memory_order_relaxed);
 
     provider.source.ptr = pending;
     provider.read_callback = cn1H2ReadBody;

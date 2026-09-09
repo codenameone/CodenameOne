@@ -1167,9 +1167,21 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         // or an amount reached the handler as a DIFFERENT number from the one the
         // client sent, with nothing raised. A value that does not fit is the
         // client's mistake and is reported as one.
+        // Whole numbers only. The parser answers a Double for any JSON real, and
+        // longValue() on 1.9 is 1 -- so a fractional id, count or amount reached
+        // the handler as a DIFFERENT number from the one the client sent, and the
+        // range check below never sees it because 1 is perfectly in range. A value
+        // that is not integral is the client's mistake and is reported as one.
+        sb.append("    private static long integral(Object v, String type) {\n");
+        sb.append("        double d = ((Number)v).doubleValue();\n");
+        sb.append("        if (Double.isNaN(d) || Double.isInfinite(d) || d != Math.floor(d)) {\n");
+        sb.append("            throw new IllegalArgumentException(\"not a whole number for \" + type + \": \" + v);\n");
+        sb.append("        }\n");
+        sb.append("        return ((Number)v).longValue();\n");
+        sb.append("    }\n");
         sb.append("    private static int asInt(Object v) {\n");
         sb.append("        if (v instanceof Number) {\n");
-        sb.append("            long asLong = ((Number)v).longValue();\n");
+        sb.append("            long asLong = integral(v, \"int\");\n");
         sb.append("            if (asLong < Integer.MIN_VALUE || asLong > Integer.MAX_VALUE) {\n");
         sb.append("                throw new IllegalArgumentException(\"out of range for int: \" + v);\n");
         sb.append("            }\n");
@@ -1191,7 +1203,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        }\n");
         sb.append("        return (byte)narrowed;\n");
         sb.append("    }\n");
-        sb.append("    private static long asLong(Object v) { return v instanceof Number ? ((Number)v).longValue() : (v == null ? 0L : Long.parseLong(String.valueOf(v).trim())); }\n");
+        sb.append("    private static long asLong(Object v) { return v instanceof Number ? integral(v, \"long\") : (v == null ? 0L : Long.parseLong(String.valueOf(v).trim())); }\n");
         sb.append("    private static double asDouble(Object v) { return v instanceof Number ? ((Number)v).doubleValue() : (v == null ? 0d : Double.parseDouble(String.valueOf(v).trim())); }\n");
         sb.append("    private static boolean asBoolean(Object v) { return v instanceof Boolean ? ((Boolean)v).booleanValue() : (v != null && Boolean.parseBoolean(String.valueOf(v).trim())); }\n");
         sb.append("    private static Integer asBoxedInt(Object v) { return v == null ? null : Integer.valueOf(asInt(v)); }\n");

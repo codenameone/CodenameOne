@@ -136,6 +136,11 @@ public final class Http2 {
         return 0;
     }
 
+    /** Likewise: no session, so no file-backed body holds a descriptor. */
+    public static int pendingBodyFiles() {
+        return 0;
+    }
+
     public void close() {
     }
 }

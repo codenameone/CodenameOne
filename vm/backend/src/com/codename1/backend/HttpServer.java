@@ -846,6 +846,17 @@ public final class HttpServer {
      * keeps answering the next ready stream.
      */
     private static final long MAX_QUEUED_H2_BODY_BYTES = 4L * 1024 * 1024;
+
+    /**
+     * File-backed HTTP/2 responses that may be outstanding across the process.
+     * A separate limit from the byte one because it is a separate resource: such
+     * a response holds a DESCRIPTOR and no heap, so the byte figure never sees
+     * it, and a peer that keeps its flow-control window shut holds one per
+     * stream for as long as it likes. Descriptors run out process-wide, and when
+     * they do the server stops accepting sockets and opening files entirely --
+     * a failure with nothing to do with whoever caused it.
+     */
+    private static final int MAX_OPEN_H2_FILES = envInt("CN1_HTTP_MAX_H2_FILES", 128);
     private static final int MAX_BODY_BYTES = 8 * 1024 * 1024;
     private static final int READY_CAPACITY = 256;
 
@@ -3208,7 +3219,8 @@ public final class HttpServer {
                             h2Body);
                 }
                 requestsServed.incrementAndGet();
-                if(queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES) {
+                if(queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES
+                        || Http2.pendingBodyFiles() > MAX_OPEN_H2_FILES) {
                     flushHttp2(fd, session, h2);
                     // What the flush could NOT write, not zero. nghttp2 pulls
                     // from a submitted body only as the peer's flow-control
@@ -3219,7 +3231,8 @@ public final class HttpServer {
                     // large endpoint is hundreds of megabytes of native buffers
                     // held for a client that is reading none of it.
                     queuedBodyBytes = h2.pendingBodyBytes();
-                    if(queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES) {
+                    if(queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES
+                            || Http2.pendingBodyFiles() > MAX_OPEN_H2_FILES) {
                         // Still over after a real attempt to write, so the peer
                         // is not draining. Leave the rest of the ready requests
                         // where they are -- their inbound bodies are already
