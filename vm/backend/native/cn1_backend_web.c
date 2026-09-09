@@ -70,9 +70,21 @@ static size_t cn1WebHeader(void* contents, size_t size, size_t count, void* user
     return total;
 }
 
+/* What a Java byte[] can hold. A response is handed back as one, so a transfer
+   that outgrows this cannot be delivered however much memory the host has --
+   and the length is carried in a size_t here and narrowed to an int there, so
+   letting it past this point produces a NEGATIVE array length and then a memcpy
+   of the full size_t into whatever that allocated. Refused while it is still a
+   failed download, which Web turns into an IOException, rather than after it has
+   become memory corruption. */
+#define CN1_WEB_MAX_BODY_BYTES ((size_t)0x7fffffff)
+
 static size_t cn1WebWrite(void* contents, size_t size, size_t count, void* userp) {
     CN1WebResponse* r = (CN1WebResponse*)userp;
     size_t total = size * count;
+    if(total > CN1_WEB_MAX_BODY_BYTES - r->length) {
+        return 0; /* aborts the transfer; libcurl reports CURLE_WRITE_ERROR */
+    }
     char* grown = (char*)realloc(r->data, r->length + total + 1);
     if(grown == NULL) {
         return 0; /* tells libcurl to abort the transfer */
@@ -305,6 +317,12 @@ JAVA_OBJECT com_codename1_backend_Web_bodyImpl___long_R_byte_1ARRAY(CODENAME_ONE
     CN1WebResponse* r = (CN1WebResponse*)(intptr_t)handle;
     JAVA_OBJECT arr;
     if(r == NULL) {
+        return JAVA_NULL;
+    }
+    if(r->length > CN1_WEB_MAX_BODY_BYTES) {
+        /* Unreachable while cn1WebWrite holds the line above, and checked anyway:
+           the cast below is what turns a length this size into a negative one,
+           and the memcpy after it does not consult the array's length. */
         return JAVA_NULL;
     }
     arr = allocArray(threadStateData, (int)r->length, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);

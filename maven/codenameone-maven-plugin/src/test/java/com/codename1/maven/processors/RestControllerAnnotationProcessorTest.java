@@ -371,6 +371,32 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aNestedBodyElementOfTheWrongTypeIsAlso400() throws Exception {
+        // The one-level check stopped at the outer list, because a nested
+        // container is not one of the scalar types it looked for. "[[1]]" then
+        // reached the handler with a Long where the inner list promised a String.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import java.util.List;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @PostMapping(\"/rows\")\n"
+                + "    public String add(@RequestBody List<List<String>> rows) {\n"
+                + "        return rows.isEmpty() || rows.get(0).isEmpty() ? \"\" "
+                + ": rows.get(0).get(0);\n"
+                + "    }\n"
+                + "}\n");
+        Object wrong = router.call("POST", "/rows", "[[1]]");
+        assertNotNull("POST /rows matched no route", wrong);
+        assertEquals(400, Router.statusOf(wrong));
+        Object right = router.call("POST", "/rows", "[[\"hi\"]]");
+        assertNotNull(right);
+        assertEquals(200, Router.statusOf(right));
+        assertEquals("hi", Router.bodyOf(right));
+    }
+
+    @Test
     public void aDoubleTooLargeForADoubleIsRejected() throws Exception {
         // parseDouble answers INFINITY for 1e999 rather than throwing, so the
         // guard approved it and the handler ran on an infinite amount -- which

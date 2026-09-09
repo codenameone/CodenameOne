@@ -1257,30 +1257,62 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // first read of it throws -- turning a malformed request into a 500
             // instead of the 400 it is. Checked with instanceof, never a cast:
             // a failed cast does not throw in the packaged runtime at all.
-            String element = bodyElementType(p.genericJavaType);
-            if (element != null && !map) {
-                sb.append(pad).append("    for (int i$ = 0; i$ < ").append(p.local)
-                  .append(".size(); i$++) {\n");
-                sb.append(pad).append("        Object e$ = ").append(p.local)
-                  .append(".get(i$);\n");
-                sb.append(pad).append("        if (e$ != null && !(e$ instanceof ")
-                  .append(element).append(")) {\n");
-                sb.append(pad).append("            return request.respond(400, "
-                        + "\"text/plain; charset=utf-8\",\n");
-                sb.append(pad).append("                    utf8(")
-                  .append(quote("An element of the request body is not a " + element))
-                  .append("));\n");
-                sb.append(pad).append("        }\n");
-                sb.append(pad).append("    }\n");
+            if (!map) {
+                // Every level, not the outermost one. List<List<String>> promises
+                // a String at depth two, and "[[1]]" breaks that promise just as
+                // "[1]" broke the one-level version -- the first fix stopped at
+                // the outer list because a nested container is not itself one of
+                // the scalar types the check looked for.
+                emitElementChecks(sb, pad + "    ", p.local, p.genericJavaType, 0);
             }
             sb.append(pad).append("}\n");
         }
     }
 
     /**
-     * The element type of a declared List or Set body, when it is one the parser
-     * produces and can therefore be checked at runtime. Null for a raw container,
-     * a wildcard, or anything else -- there is nothing to assert in those cases.
+     * Emits the runtime element checks for one declared container, and for
+     * whatever its elements are declared to contain, to whatever depth the
+     * declaration goes. Each level is a loop; the innermost is an instanceof.
+     *
+     * instanceof rather than a cast at every level, because a failed cast does
+     * not throw in the packaged runtime -- the wrong object is simply handed on.
+     */
+    private static void emitElementChecks(StringBuilder sb, String pad, String expr,
+                                          String genericJavaType, int depth) {
+        String element = bodyElementType(genericJavaType);
+        if (element == null || depth > 4) {
+            // Nothing declared to check, or nesting deeper than anything real.
+            return;
+        }
+        String var = "e" + depth + "$";
+        String index = "i" + depth + "$";
+        sb.append(pad).append("for (int ").append(index).append(" = 0; ").append(index)
+          .append(" < ").append(expr).append(".size(); ").append(index).append("++) {\n");
+        sb.append(pad).append("    Object ").append(var).append(" = ").append(expr)
+          .append(".get(").append(index).append(");\n");
+        String raw = element.indexOf('<') < 0 ? element
+                : element.substring(0, element.indexOf('<'));
+        sb.append(pad).append("    if (").append(var).append(" != null && !(").append(var)
+          .append(" instanceof ").append(raw).append(")) {\n");
+        sb.append(pad).append("        return request.respond(400, "
+                + "\"text/plain; charset=utf-8\",\n");
+        sb.append(pad).append("                utf8(")
+          .append(quote("An element of the request body is not a " + raw)).append("));\n");
+        sb.append(pad).append("    }\n");
+        if (element.indexOf('<') >= 0) {
+            sb.append(pad).append("    if (").append(var).append(" != null) {\n");
+            emitElementChecks(sb, pad + "        ", "((" + raw + ")" + var + ")",
+                    element, depth + 1);
+            sb.append(pad).append("    }\n");
+        }
+        sb.append(pad).append("}\n");
+    }
+
+    /**
+     * The element type of a declared List or Set body, when it is one the runtime
+     * check can assert -- a type the parser produces, or another container whose
+     * own elements can then be checked. Null for a raw container, a wildcard, or
+     * anything else, where there is nothing to assert.
      */
     private static String bodyElementType(String genericJavaType) {
         if (genericJavaType == null) {
@@ -1301,7 +1333,9 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             return null;
         }
         String arg = args.get(0);
-        return PARSED_JSON_TYPES.contains(arg) && !"java.lang.Object".equals(arg)
+        // A nested container counts: its own elements are checked one level in.
+        String argRaw = arg.indexOf('<') < 0 ? arg : arg.substring(0, arg.indexOf('<'));
+        return PARSED_JSON_TYPES.contains(argRaw) && !"java.lang.Object".equals(argRaw)
                 ? arg : null;
     }
 

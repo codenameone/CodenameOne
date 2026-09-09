@@ -1030,6 +1030,60 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("a HEAD over h2 reports the length a GET would send")
+    void http2HeadReportsRealLength() throws Exception {
+        // The HTTP/1 writer keeps the representation length for a HEAD, because
+        // describing what is NOT being sent is the whole point of asking. The
+        // HTTP/2 path did not, so one static file answered a size over one
+        // protocol and nothing over the other, from the same handler.
+        //
+        // The presence of the header is what is asserted here: its value is
+        // HPACK-encoded and may be Huffman-coded, and headReportsRealLength
+        // already pins the exact number over HTTP/1. Static index 28 is
+        // content-length (RFC 7541 Appendix A).
+        Socket socket = new Socket();
+        socket.connect(new InetSocketAddress("127.0.0.1", port), 5000);
+        socket.setSoTimeout(10000);
+        try {
+            OutputStream out = socket.getOutputStream();
+            out.write("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+            out.write(frame(4, 0, 0, new byte[0]));
+            ByteArrayOutputStream block = new ByteArrayOutputStream();
+            hpackLiteral(block, ":method", "HEAD");
+            hpackLiteral(block, ":path", "/static/big.bin");
+            hpackLiteral(block, ":scheme", "http");
+            hpackLiteral(block, ":authority", "127.0.0.1");
+            out.write(frame(1, 0x05, 1, block.toByteArray()));
+            out.flush();
+
+            byte[] responseHeaders = null;
+            long deadline = System.currentTimeMillis() + 8000;
+            InputStream in = socket.getInputStream();
+            while (System.currentTimeMillis() < deadline && responseHeaders == null) {
+                byte[] header = readExactly(in, 9);
+                if (header == null) {
+                    break;
+                }
+                int length = ((header[0] & 0xff) << 16) | ((header[1] & 0xff) << 8)
+                        | (header[2] & 0xff);
+                int type = header[3] & 0xff;
+                byte[] payload = length == 0 ? new byte[0] : readExactly(in, length);
+                if (payload == null) {
+                    break;
+                }
+                if (type == 1) {
+                    responseHeaders = payload;
+                }
+            }
+            assertNotNull(responseHeaders, "no HEADERS frame came back for the HEAD");
+            assertTrue(hpackNameIndices(responseHeaders).contains(Integer.valueOf(28)),
+                    "a HEAD over h2 must report the length it is not sending");
+        } finally {
+            socket.close();
+        }
+    }
+
+    @Test
     @DisplayName("an HTTP/1.1 request still works on the same port as h2c")
     void httpOneStillWorksAlongsideHttp2() throws Exception {
         // The preface detector must not swallow ordinary requests: "GET" diverges

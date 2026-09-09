@@ -3269,6 +3269,19 @@ public final class HttpServer {
                     h2.respondFile(stream.getId(), response.status, contentType,
                             extra, response.fileFd, response.fileOffset, response.fileLength);
                 } else {
+                    // A HEAD describes the representation it is not sending, and
+                    // that is the whole point of asking: over HTTP/1 this server
+                    // reports the real length, so over HTTP/2 it has to as well,
+                    // or the same static file answers a size on one protocol and
+                    // nothing on the other from one handler. Only for a HEAD --
+                    // a bodiless STATUS has no representation to describe, which
+                    // is the distinction the HTTP/1 writer already makes.
+                    if(headOnly) {
+                        long described = response.fileFd >= 0
+                                ? response.fileLength
+                                : (response.body == null ? 0 : response.body.length);
+                        extra.add("content-length: " + described);
+                    }
                     byte[] h2Body = responseBodyFor(response, noBody);
                     int bodyBytes = h2Body == null ? 0 : h2Body.length;
                     // Checked BEFORE the copy, not after it. respond() copies the
