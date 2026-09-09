@@ -397,6 +397,48 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aFloatThatOverflowsDoubleIsAlsoRejected() throws Exception {
+        // The guard tested the PARSED value for infinity, but parseDouble("1e999")
+        // is itself infinite -- so every double-overflowing value looked like a
+        // deliberate "Infinity" and was handed to the controller.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/scale\")\n"
+                + "    public String scale(@RequestParam(\"f\") float f) { return String.valueOf(f); }\n"
+                + "}\n");
+        assertEquals(400, Router.statusOf(router.call("GET", "/scale?f=1e999", null)));
+        assertEquals(400, Router.statusOf(router.call("GET", "/scale?f=1e100", null)));
+        assertEquals(200, Router.statusOf(router.call("GET", "/scale?f=1.5", null)));
+    }
+
+    @Test
+    public void deeplyNestedBodyElementsAreCheckedAtEveryLevel() throws Exception {
+        // The emitter used to stop below the fifth level while the build-time
+        // rule accepted the whole shape, so a declaration nested deeper was
+        // checked partway and the rest reached the handler unverified.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import java.util.List;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @PostMapping(\"/deep\")\n"
+                + "    public String add(@RequestBody "
+                + "List<List<List<List<List<List<String>>>>>> deep) { return \"ok\"; }\n"
+                + "}\n");
+        // A number at the innermost string position, six levels down.
+        Object wrong = router.call("POST", "/deep", "[[[[[[1]]]]]]");
+        assertNotNull("POST /deep matched no route", wrong);
+        assertEquals(400, Router.statusOf(wrong));
+        Object right = router.call("POST", "/deep", "[[[[[[\"hi\"]]]]]]");
+        assertNotNull(right);
+        assertEquals(200, Router.statusOf(right));
+    }
+
+    @Test
     public void aDoubleTooLargeForADoubleIsRejected() throws Exception {
         // parseDouble answers INFINITY for 1e999 rather than throwing, so the
         // guard approved it and the handler ran on an infinite amount -- which

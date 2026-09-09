@@ -1392,7 +1392,10 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         // Anything else out of java.* is narrowed with instanceof rather than cast:
         // the value came from the wire, so its type is the client's choice.
         if (type.startsWith("java.")) return guardedCast(type, expr);
-        return codecFor(type) + ".fromMap(asMap(" + expr + "))";
+        // requireMap, not asMap: asMap answers null for anything that is not one,
+        // so {"child":1} left the field null and the handler ran on input the
+        // client did not send -- indistinguishable from an explicit JSON null.
+        return codecFor(type) + ".fromMap(requireMap(" + expr + "))";
     }
 
     /**
@@ -1481,6 +1484,17 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("    private static Byte asBoxedByte(Object v) { return v == null ? null : Byte.valueOf(asByte(v)); }\n");
         sb.append("    /** A decoded value narrowed to a JSON object, or null -- never a cast. */\n");
         sb.append("    private static java.util.Map asMap(Object v) { return v instanceof java.util.Map ? (java.util.Map)v : null; }\n");
+        // The difference between "the client sent null" and "the client sent
+        // something that is not an object". The first is a value; the second is
+        // a mistake, and answering 400 for it is the whole point of decoding.
+        sb.append("    private static java.util.Map requireMap(Object v) {\n");
+        sb.append("        if (v == null) { return null; }\n");
+        sb.append("        if (!(v instanceof java.util.Map)) {\n");
+        sb.append("            throw new IllegalArgumentException(\"a JSON object is required, not \""
+                + " + v.getClass().getName());\n");
+        sb.append("        }\n");
+        sb.append("        return (java.util.Map)v;\n");
+        sb.append("    }\n");
         sb.append("    private static java.util.List asList(Object v) { return v instanceof java.util.List ? (java.util.List)v : null; }\n");
         sb.append("    /** A decoded array as a Set, preserving the order it arrived in. */\n");
         sb.append("    private static java.util.Set setFromList(java.util.List v) {\n");

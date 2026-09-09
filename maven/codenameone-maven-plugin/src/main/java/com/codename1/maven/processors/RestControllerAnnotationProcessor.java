@@ -1312,8 +1312,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      */
     private static void emitShapeChecks(StringBuilder sb, String pad, String expr,
                                        String genericJavaType, int depth) {
-        if (genericJavaType != null && genericJavaType.startsWith("java.util.Map<")
-                && depth <= 4) {
+        // No depth cutoff. One used to stop emitting below the fifth level while
+        // build-time validation accepted the whole shape, so a declaration nested
+        // deeper than that was checked partway and the rest reached the handler
+        // unverified -- a 500 for what is a 400, at exactly the depth nobody
+        // looks. The declaration is finite, so the recursion is too.
+        if (genericJavaType != null && genericJavaType.startsWith("java.util.Map<")) {
             String value = mapBodyValueType(genericJavaType);
             if (value != null) {
                 String raw = value.indexOf('<') < 0 ? value
@@ -1332,7 +1336,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                   .append(quote("A value of the request body is not a " + raw))
                   .append("));\n");
                 sb.append(pad).append("    }\n");
-                if (value.indexOf('<') >= 0) {
+                if (value.indexOf('<') >= 0 && depth < 32) {
                     sb.append(pad).append("    if (").append(var).append(" != null) {\n");
                     emitShapeChecks(sb, pad + "        ", "((" + raw + ")" + var + ")",
                             value, depth + 1);
@@ -1365,9 +1369,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private static void emitElementChecks(StringBuilder sb, String pad, String expr,
                                           String genericJavaType, int depth) {
         String element = bodyElementType(genericJavaType);
-        if (element == null || depth > 4) {
-            // Nothing declared to check, or nesting deeper than anything real.
-            return;
+        if (element == null) {
+            return;                       // nothing declared to check
         }
         String var = "e" + depth + "$";
         String index = "i" + depth + "$";
@@ -1384,7 +1387,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append(pad).append("                utf8(")
           .append(quote("An element of the request body is not a " + raw)).append("));\n");
         sb.append(pad).append("    }\n");
-        if (element.indexOf('<') >= 0) {
+        if (element.indexOf('<') >= 0 && depth < 32) {
             sb.append(pad).append("    if (").append(var).append(" != null) {\n");
             emitShapeChecks(sb, pad + "        ", "((" + raw + ")" + var + ")",
                     element, depth + 1);
@@ -1643,9 +1646,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 // handler ran on a number the client never sent. Every other
                 // width throws. An input that really spells an infinity is still
                 // accepted, which is what parseFloat means by it.
+                // The SPELLING decides whether an infinity was meant, not the
+                // parsed value: Double.parseDouble("1e999") is itself infinite,
+                // so testing the parsed double declared every double-overflowing
+                // value to be a deliberate infinity and handed it on. The double
+                // guard above already tests the text; these two now agree.
                 sb.append("            double asDouble = Double.parseDouble(value.trim());\n");
                 sb.append("            return !Float.isInfinite((float)asDouble)"
-                        + " || Double.isInfinite(asDouble);\n");
+                        + " || value.trim().indexOf(\"Infinity\") >= 0;\n");
             } else {
                 sb.append("            ").append(numeric[i][2]).append("(value.trim());\n");
                 sb.append("            return true;\n");
