@@ -124,6 +124,22 @@ class AndroidLocationButton extends SurfaceView {
 
     /// Set as soon as openSession has been asked for, so a second layout pass
     /// does not ask again while the first request is still in flight.
+    ///
+    /// There is deliberately no watchdog on a request that is never answered.
+    /// Review asked for one: a provider that accepts openSession and calls
+    /// neither onSessionOpened nor onSessionError leaves this true and the
+    /// surface blank. That is real, and it is bounded -- closeSession() clears
+    /// this on detach, so every form transition, rotation and return from the
+    /// background asks again -- and it needs the platform to break its own
+    /// contract first.
+    ///
+    /// A timeout would cost more than it saves. The number would be a guess at
+    /// how long another process may take to hand over a surface, and guessing
+    /// low tears down a session that was merely slow -- a cold start, a loaded
+    /// device -- and replaces a working system control with the fallback
+    /// button. That is a regression on the slowest devices in exchange for a
+    /// platform bug nobody has seen, and the slowest devices are the ones that
+    /// would pay it.
     private boolean requested;
 
     /// Which attachment the live request belongs to.
