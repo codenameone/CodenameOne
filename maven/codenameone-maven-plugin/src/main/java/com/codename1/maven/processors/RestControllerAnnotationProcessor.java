@@ -478,6 +478,21 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
 
         route.returnJavaType = RestClientAnnotationProcessor.javaTypeFor(
                 Type.getReturnType(m.getDescriptor()), null);
+        // A return type this router can actually turn into JSON. Anything else
+        // reached Json.write as an unknown object and came out as the QUOTED
+        // result of its toString() -- "com.example.Note@1a2b3c" where the caller
+        // expected an object -- while the build and the request both reported
+        // success. This processor has no DTO codec generation (the @RestClient
+        // half does), so the honest answer today is to refuse the shape rather
+        // than emit JSON nobody can use.
+        if (!isEncodableReturn(route.returnJavaType, ctx)) {
+            ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " returns "
+                    + route.returnJavaType + ", which the generated router cannot encode: "
+                    + "it would be written as the JSON string of its toString(). Return a "
+                    + "Map, a List, a Set, a String, a primitive, an HttpServer.Response, "
+                    + "or make the type implement com.codename1.backend.Json.Writable.");
+            return null;
+        }
         AnnotationValues status = m.getAnnotation(RESPONSE_STATUS);
         // ResponseStatus documents that a value-returning method answers 200 and a
         // void one answers 204. Defaulting to 200 for both made the annotation's
@@ -841,7 +856,34 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     }
 
     /** The generated "does this parse" helper for a numeric type, or null. */
+    /** Whether Json.write turns this return type into something other than toString(). */
+    private static boolean isEncodableReturn(String javaType, ProcessorContext ctx) {
+        if (javaType == null || "void".equals(javaType) || RESPONSE_TYPE.equals(javaType)) {
+            return true;
+        }
+        String raw = javaType;
+        int lt = raw.indexOf('<');
+        if (lt >= 0) {
+            raw = raw.substring(0, lt);
+        }
+        // Json.write handles the JDK shapes and anything that writes itself.
+        if (raw.startsWith("java.") || raw.indexOf('.') < 0) {
+            return true;
+        }
+        AnnotatedClass cls = ctx.lookup(raw.replace('.', '/'));
+        if (cls == null) {
+            return true;              // not ours to judge; the compiler will speak
+        }
+        for (String itf : cls.getInterfaceInternalNames()) {
+            if ("com/codename1/backend/Json$Writable".equals(itf)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static String numericChecker(String javaType) {
+        if ("boolean".equals(javaType)) return "parsesBoolean";
         if ("int".equals(javaType)) return "parsesInt";
         if ("long".equals(javaType)) return "parsesLong";
         if ("double".equals(javaType)) return "parsesDouble";
@@ -1082,6 +1124,23 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("        // wrong on a Turkish device; equalsIgnoreCase is not.\n");
         sb.append("        return value.equalsIgnoreCase(\"true\") || value.equals(\"1\")\n");
         sb.append("                || value.equalsIgnoreCase(\"yes\") || value.equalsIgnoreCase(\"on\");\n");
+        sb.append("    }\n\n");
+
+        // toBoolean answers false for everything it does not recognise, so
+        // "?enabled=treu" reached the handler as an explicit false and neither
+        // side could tell -- while the same typo in a numeric binding is a 400.
+        // The permissive spellings stay; what is refused is a value that is
+        // neither true nor false in any of them. The @RestClient half refuses
+        // its own malformed booleans, and the two generators disagreeing about
+        // the same request is its own bug.
+        sb.append("    private static boolean parsesBoolean(String value) {\n");
+        sb.append("        if (value == null || value.length() == 0) {\n");
+        sb.append("            return true;\n");
+        sb.append("        }\n");
+        sb.append("        return value.equalsIgnoreCase(\"true\") || value.equals(\"1\")\n");
+        sb.append("                || value.equalsIgnoreCase(\"yes\") || value.equalsIgnoreCase(\"on\")\n");
+        sb.append("                || value.equalsIgnoreCase(\"false\") || value.equals(\"0\")\n");
+        sb.append("                || value.equalsIgnoreCase(\"no\") || value.equalsIgnoreCase(\"off\");\n");
         sb.append("    }\n\n");
 
         sb.append("    private static java.util.Map bodyAsMap(String body) {\n");
