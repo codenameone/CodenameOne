@@ -31,7 +31,7 @@
   <text x="116" y="364" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#4a7a3d">under the pointer</text>
   <text x="232" y="340" font-family="Arial, sans-serif" font-size="9.5" fill="#777777">getComponentAt, skipping ancestors that ignore pointer events</text>
   <text x="232" y="359" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">In the content pane it has to be enabled; the title area and side branches do not</text>
-  <text x="232" y="374" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">check. Focus is a result of the press, not a condition. Key events need it though.</text>
+  <text x="232" y="374" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">check. Focus is never required here, only sometimes assigned. Key events need it.</text>
   <path d="M 116 388 L 116 400" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
   <path d="M 111 394 L 116 400 L 121 394" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
   <rect x="16" y="400" width="200" height="72" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
