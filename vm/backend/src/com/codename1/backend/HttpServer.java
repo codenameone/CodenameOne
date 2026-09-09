@@ -852,6 +852,30 @@ public final class HttpServer {
      */
     private static final int BODY_CHUNK_BYTES = 16 * 1024;
 
+    /**
+     * Request-body bytes held by uploads IN PROGRESS, across the process.
+     *
+     * Growing with the data removed the case where a client allocates 8MB by
+     * declaring it and sending nothing. It does not bound the case where the
+     * client really sends nearly all of it on many connections and pauses before
+     * the last byte: that memory is real, it is held until the rate allowance
+     * expires, and nothing counted it. The connection ceiling is in the
+     * thousands, so a modest number of near-complete uploads is the machine.
+     *
+     * Scoped to the read, which is what makes it safe to account at all: the
+     * charge is taken as the buffer grows and given back in a finally on every
+     * path out of fillTo. A reservation that outlived the call would have to be
+     * threaded through borrowed thread buffers, owned copies and every failure
+     * path, and ONE leaked reservation wedges the server for good -- a worse
+     * failure than the one it fixes. What this bounds is uploads in flight,
+     * which is the shape of the attack.
+     */
+    private static final java.util.concurrent.atomic.AtomicLong http1UploadBytes =
+            new java.util.concurrent.atomic.AtomicLong();
+
+    private static final long MAX_HTTP1_UPLOAD_BYTES =
+            envInt("CN1_HTTP_MAX_UPLOAD_MB", 64) * 1024L * 1024L;
+
     private static final long MAX_QUEUED_H2_BODY_BYTES = 4L * 1024 * 1024;
 
     /**
@@ -2745,7 +2769,13 @@ public final class HttpServer {
             if(keep >= needed) {
                 return true;
             }
+            long charged = 0;
+            try {
             byte[] grown = new byte[Math.max(keep, Math.min(needed, BODY_CHUNK_BYTES))];
+            charged += grown.length;
+            if(http1UploadBytes.addAndGet(grown.length) > MAX_HTTP1_UPLOAD_BYTES) {
+                throw new ProtocolException(503, "too many uploads in flight");
+            }
             System.arraycopy(buffer, pos, grown, 0, keep);
             int at = keep;
             // A RATE, not a deadline. The head gets a flat bound because it is small;
@@ -2770,6 +2800,11 @@ public final class HttpServer {
                     int next = (int)Math.min((long)needed, (long)grown.length * 2);
                     byte[] bigger = new byte[next];
                     System.arraycopy(grown, 0, bigger, 0, at);
+                    long delta$ = bigger.length - grown.length;
+                    charged += delta$;
+                    if(http1UploadBytes.addAndGet(delta$) > MAX_HTTP1_UPLOAD_BYTES) {
+                        throw new ProtocolException(503, "too many uploads in flight");
+                    }
                     grown = bigger;
                 }
                 // Exactly the shortfall, so a pipelined request behind this body stays
@@ -2785,6 +2820,14 @@ public final class HttpServer {
             pos = 0;
             borrowed = false;
             return true;
+            } finally {
+                // Every path out: the body arrived, the peer went away, the
+                // deadline passed, or the process was full. The charge covers
+                // the READ -- on success the buffer becomes the connection's and
+                // the request goes on to a handler, which is ordinary server
+                // memory rather than an upload being held open.
+                http1UploadBytes.addAndGet(-charged);
+            }
         }
 
         /**

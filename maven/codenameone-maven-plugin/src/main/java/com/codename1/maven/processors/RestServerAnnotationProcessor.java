@@ -1055,7 +1055,17 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        java.util.List out = new java.util.ArrayList();\n");
         sb.append("        for(int i = 0 ; i < raw.size() ; i++) {\n");
         sb.append("            Object e = raw.get(i);\n");
-        sb.append("            out.add(e instanceof java.util.Map ? f.convert((java.util.Map)e) : null);\n");
+        // A non-map element is the CLIENT being wrong, not a null. Substituting
+        // null for it handed the handler a list with a hole in it -- and the
+        // handler dereferences the DTO and answers 500, for input that should
+        // have been a 400. A JSON null stays a null, because that is a value the
+        // client really sent.
+        sb.append("            if(e != null && !(e instanceof java.util.Map)) {\n");
+        sb.append("                throw new IllegalArgumentException(\"element \" + i"
+                + " + \" of the body is \" + e.getClass().getName()"
+                + " + \", not an object\");\n");
+        sb.append("            }\n");
+        sb.append("            out.add(e == null ? null : f.convert((java.util.Map)e));\n");
         sb.append("        }\n");
         sb.append("        return out;\n");
         sb.append("    }\n\n");

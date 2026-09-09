@@ -1257,14 +1257,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // first read of it throws -- turning a malformed request into a 500
             // instead of the 400 it is. Checked with instanceof, never a cast:
             // a failed cast does not throw in the packaged runtime at all.
-            if (!map) {
-                // Every level, not the outermost one. List<List<String>> promises
-                // a String at depth two, and "[[1]]" breaks that promise just as
-                // "[1]" broke the one-level version -- the first fix stopped at
-                // the outer list because a nested container is not itself one of
-                // the scalar types the check looked for.
-                emitElementChecks(sb, pad + "    ", p.local, p.genericJavaType, 0);
-            }
+            // Maps as well as lists. A Map<String,String> that receives
+            // {"value":1} holds a Long under a String declaration, and the
+            // handler's first typed read throws -- the same 500-for-a-400 the
+            // list case had, skipped only because the check was written for
+            // lists and the map branch went past it.
+            emitShapeChecks(sb, pad + "    ", p.local, p.genericJavaType, 0);
             sb.append(pad).append("}\n");
         }
     }
@@ -1277,6 +1275,58 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      * instanceof rather than a cast at every level, because a failed cast does
      * not throw in the packaged runtime -- the wrong object is simply handed on.
      */
+    private static void emitShapeChecks(StringBuilder sb, String pad, String expr,
+                                       String genericJavaType, int depth) {
+        if (genericJavaType != null && genericJavaType.startsWith("java.util.Map<")
+                && depth <= 4) {
+            String value = mapBodyValueType(genericJavaType);
+            if (value != null) {
+                String raw = value.indexOf('<') < 0 ? value
+                        : value.substring(0, value.indexOf('<'));
+                String var = "v" + depth + "$";
+                sb.append(pad).append("for (java.util.Iterator it").append(depth)
+                  .append("$ = ").append(expr).append(".values().iterator(); it")
+                  .append(depth).append("$.hasNext();) {\n");
+                sb.append(pad).append("    Object ").append(var).append(" = it")
+                  .append(depth).append("$.next();\n");
+                sb.append(pad).append("    if (").append(var).append(" != null && !(")
+                  .append(var).append(" instanceof ").append(raw).append(")) {\n");
+                sb.append(pad).append("        return request.respond(400, "
+                        + "\"text/plain; charset=utf-8\",\n");
+                sb.append(pad).append("                utf8(")
+                  .append(quote("A value of the request body is not a " + raw))
+                  .append("));\n");
+                sb.append(pad).append("    }\n");
+                if (value.indexOf('<') >= 0) {
+                    sb.append(pad).append("    if (").append(var).append(" != null) {\n");
+                    emitShapeChecks(sb, pad + "        ", "((" + raw + ")" + var + ")",
+                            value, depth + 1);
+                    sb.append(pad).append("    }\n");
+                }
+                sb.append(pad).append("}\n");
+            }
+            return;
+        }
+        emitElementChecks(sb, pad, expr, genericJavaType, depth);
+    }
+
+    /** A map body's declared value type, when it is one worth asserting. */
+    private static String mapBodyValueType(String genericJavaType) {
+        int lt = genericJavaType.indexOf('<');
+        int end = genericJavaType.lastIndexOf('>');
+        if (lt < 0 || end <= lt) {
+            return null;
+        }
+        List<String> args = splitTypeArguments(genericJavaType.substring(lt + 1, end));
+        if (args.size() != 2) {
+            return null;
+        }
+        String value = args.get(1);
+        String raw = value.indexOf('<') < 0 ? value : value.substring(0, value.indexOf('<'));
+        return PARSED_JSON_TYPES.contains(raw) && !"java.lang.Object".equals(raw)
+                ? value : null;
+    }
+
     private static void emitElementChecks(StringBuilder sb, String pad, String expr,
                                           String genericJavaType, int depth) {
         String element = bodyElementType(genericJavaType);
@@ -1301,7 +1351,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append(pad).append("    }\n");
         if (element.indexOf('<') >= 0) {
             sb.append(pad).append("    if (").append(var).append(" != null) {\n");
-            emitElementChecks(sb, pad + "        ", "((" + raw + ")" + var + ")",
+            emitShapeChecks(sb, pad + "        ", "((" + raw + ")" + var + ")",
                     element, depth + 1);
             sb.append(pad).append("    }\n");
         }

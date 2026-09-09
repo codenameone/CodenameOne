@@ -460,6 +460,33 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("a megabyte-scale upload is read whole and answered")
+    void aLargeUploadIsReadWhole() throws Exception {
+        // The whole upload path had no test with a body big enough to grow the
+        // buffer more than once: the 8MB fixture is a static FILE, so it exercises
+        // downloads. That left the doubling growth, the rate bound and the
+        // in-flight budget all resting on small bodies. Two megabytes crosses the
+        // starting chunk about seven times.
+        StringBuilder json = new StringBuilder(2 * 1024 * 1024 + 16);
+        json.append("[\"");
+        for (int i = 0; i < 2 * 1024 * 1024; i++) {
+            json.append('a');
+        }
+        json.append("\"]");
+        byte[] body = json.toString().getBytes(StandardCharsets.UTF_8);
+        byte[] response = raw("POST /api/notes HTTP/1.1\r\nHost: x\r\nContent-Type: "
+                + "application/json\r\nContent-Length: " + body.length
+                + "\r\nConnection: close\r\n\r\n", body);
+        String text = new String(response, StandardCharsets.UTF_8);
+        assertTrue(text.startsWith("HTTP/1.1 "),
+                "a large upload must be answered, not dropped:\n"
+                        + text.substring(0, Math.min(200, text.length())));
+        assertEquals(-1, text.substring(0, Math.min(64, text.length())).indexOf(" 503"),
+                "a legitimate upload must not hit the in-flight budget:\n"
+                        + text.substring(0, Math.min(200, text.length())));
+    }
+
+    @Test
     @DisplayName("deeply nested JSON is refused without taking the server down")
     void deeplyNestedJsonDoesNotOverflowTheStack() throws Exception {
         // Handlers run on a 64KB virtual-thread stack and the JSON parser is
