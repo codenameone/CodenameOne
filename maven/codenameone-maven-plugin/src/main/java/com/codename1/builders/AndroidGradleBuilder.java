@@ -565,7 +565,7 @@ public class AndroidGradleBuilder extends Executor {
         // name, never looking at maxSdkVersion. That is one bug, in one place,
         // shared by every feature that caps a permission -- not something for
         // this method to police one caller at a time. The Wi-Fi instance is
-        // fixed where it is caused, in needsCappedWifiFineLocation.
+        // fixed once, after the injectors, by uncapFineLocation().
         String hint = request.getArg("android.locationButton.exclusive", "auto");
         boolean asked = "true".equals(hint);
         if (!wantsExclusiveLocation(hint, locationButtonPermission, otherLocationUse)) {
@@ -695,36 +695,73 @@ public class AndroidGradleBuilder extends Executor {
     /// #### Returns
     ///
     /// whether to declare the restriction, before the compile SDK is consulted
-    /// Whether the Wi-Fi permissions should bring their own ACCESS_FINE_LOCATION
-    /// capped at `maxSdkVersion="32"`.
+    /// Removes any `maxSdkVersion` from the ACCESS_FINE_LOCATION declarations
+    /// in `xPermissions`, leaving everything else exactly as it was.
     ///
-    /// Wi-Fi needs a location permission only to read the SSID/BSSID, and only
-    /// up to Android 12; from 13 NEARBY_WIFI_DEVICES covers it, so the cap keeps
-    /// a Wi-Fi-only application from asking for location on the versions where
-    /// it does not have to.
-    ///
-    /// It must not be added when the application needs precise location in its
-    /// own right. The entry goes into xPermissions, permissionAdd() drops this
-    /// build's declaration for any permission already named there -- a bare name
-    /// match that never looks at maxSdkVersion -- so the capped entry would be
-    /// the ONLY ACCESS_FINE_LOCATION in the manifest and the application would
-    /// have no effective one from Android 13 up. For a location button that is
-    /// fatal on the one platform it exists for: the system grants precise
-    /// location through a permission the manifest no longer really declares.
-    ///
-    /// The uncapped declaration this build emits instead serves Wi-Fi on every
-    /// version, so nothing is lost by leaving the cap out.
+    /// Only the attribute goes; the element, its other attributes and every
+    /// other permission are untouched, so a cap on a different permission --
+    /// USE_FINGERPRINT at 28, BLUETOOTH_SCAN, WRITE_EXTERNAL_STORAGE -- is not
+    /// disturbed.
     ///
     /// #### Parameters
     ///
-    /// - `gpsPermission`: whether the application uses location in its own right
-    /// - `xPermissions`: the extra permissions accumulated so far
-    static boolean needsCappedWifiFineLocation(boolean gpsPermission, String xPermissions) {
-        if (gpsPermission) {
-            return false;
+    /// - `xPermissions`: the extra permissions accumulated so far, possibly null
+    ///
+    /// #### Returns
+    ///
+    /// the same value with precise location left effective on every version
+    static String uncapFineLocation(String xPermissions) {
+        if (xPermissions == null
+                || xPermissions.indexOf("ACCESS_FINE_LOCATION") < 0) {
+            return xPermissions;
         }
-        return xPermissions == null
-                || xPermissions.indexOf("android.permission.ACCESS_FINE_LOCATION") < 0;
+        StringBuilder out = new StringBuilder();
+        int from = 0;
+        while (true) {
+            int at = xPermissions.indexOf("ACCESS_FINE_LOCATION", from);
+            if (at < 0) {
+                out.append(xPermissions.substring(from));
+                return out.toString();
+            }
+            int open = xPermissions.lastIndexOf('<', at);
+            int close = xPermissions.indexOf('>', at);
+            if (open < from || close < 0) {
+                out.append(xPermissions, from, at + 1);
+                from = at + 1;
+                continue;
+            }
+            out.append(xPermissions, from, open);
+            out.append(stripMaxSdkVersion(
+                    xPermissions.substring(open, close + 1)));
+            from = close + 1;
+        }
+    }
+
+    /// Removes a `maxSdkVersion` attribute from one element.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: the whole element text, from its `<` to its `>`
+    private static String stripMaxSdkVersion(String element) {
+        int at = element.indexOf("android:maxSdkVersion");
+        if (at < 0) {
+            return element;
+        }
+        int quote = element.indexOf('"', at);
+        if (quote < 0) {
+            return element;
+        }
+        int end = element.indexOf('"', quote + 1);
+        if (end < 0) {
+            return element;
+        }
+        // Take the whitespace in front of the attribute with it, so the element
+        // does not end up with a double space where it used to be.
+        int start = at;
+        while (start > 0 && element.charAt(start - 1) == ' ') {
+            start--;
+        }
+        return element.substring(0, start) + element.substring(end + 1);
     }
 
     /// Whether `android.xpermissions` hand-declares ACCESS_FINE_LOCATION
@@ -3241,7 +3278,7 @@ public class AndroidGradleBuilder extends Executor {
             // permission; on 13+ the dedicated NEARBY_WIFI_DEVICES permission
             // can replace it for scan-only flows. We declare both with
             // appropriate maxSdkVersion so the right one is requested per OS.
-            if (needsCappedWifiFineLocation(gpsPermission, xPermissions)) {
+            if (!xPermissions.contains("android.permission.ACCESS_FINE_LOCATION")) {
                 xPermissions = "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"32\" />\n" + xPermissions;
             }
             if (targetSDKVersionInt >= 33
@@ -3689,6 +3726,30 @@ public class AndroidGradleBuilder extends Executor {
                             "1.1.0-alpha07") + "'\n";
             minSDK = maxInt("26", minSDK);
             log("Health Connect raises minSdkVersion to " + minSDK);
+        }
+
+        // After every injector, because they are the ones that cap it. Wi-Fi,
+        // Bluetooth BLE and Nearby each declare ACCESS_FINE_LOCATION with a
+        // maxSdkVersion so an application that uses only THEM stops asking for
+        // location on the versions that no longer require it. That is right for
+        // those applications and wrong for one that needs precise location in
+        // its own right: permissionAdd() suppresses this build's declaration for
+        // any permission already named in xpermissions -- a bare name match that
+        // never reads maxSdkVersion -- so the capped entry would be the only
+        // ACCESS_FINE_LOCATION in the manifest and there would be none in effect
+        // past the cap.
+        //
+        // For an ordinary location application that is a silent loss of precise
+        // location on recent Android. For the location button it is fatal on the
+        // one platform it exists for: the system grants through a permission the
+        // manifest no longer really declares.
+        //
+        // Done in one place rather than in each injector. A check that refused
+        // the build over a capped entry was tried instead and was wrong twice
+        // over -- it fired on fragments this builder had written itself, and it
+        // told developers to remove something they had never written.
+        if (gpsPermission) {
+            xPermissions = uncapFineLocation(xPermissions);
         }
 
         String messagingService = request.getArg("android.messagingService",

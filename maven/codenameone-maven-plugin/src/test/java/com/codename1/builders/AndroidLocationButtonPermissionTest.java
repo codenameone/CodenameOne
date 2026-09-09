@@ -24,6 +24,7 @@ package com.codename1.builders;
 
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -194,38 +195,61 @@ class AndroidLocationButtonPermissionTest {
                 "the restricted spelling is not the ordinary one");
     }
 
+
+
+
+
+
+
+
     /**
-     * The Wi-Fi permissions bring their own ACCESS_FINE_LOCATION capped at
-     * maxSdkVersion 32, and it goes into the same xpermissions string that
-     * permissionAdd() checks by bare name. An application that needs precise
-     * location in its own right would therefore end up with the capped entry as
-     * its ONLY declaration and no effective one from Android 13 up -- fatal for
-     * a location button, whose whole platform is above that.
+     * Wi-Fi, Bluetooth BLE and Nearby each declare ACCESS_FINE_LOCATION with a
+     * maxSdkVersion so an app that uses only those stops asking for location on
+     * versions that no longer need it. permissionAdd() then suppresses this
+     * build's own declaration by bare name, so for an app that DOES need
+     * precise location the capped entry would be the only one and nothing would
+     * be in effect past the cap.
      */
     @Test
-    void wifiDoesNotCapTheLocationPermissionOfAnAppThatNeedsIt() {
-        assertFalse(AndroidGradleBuilder.needsCappedWifiFineLocation(true, ""),
-                "an app that uses location gets the uncapped declaration instead");
-        assertFalse(AndroidGradleBuilder.needsCappedWifiFineLocation(true, null));
+    void aGeneratedCapIsRemovedForAnAppThatNeedsLocation() {
+        String bluetooth = "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\""
+                + " android:maxSdkVersion=\"30\" />\n";
+        String out = AndroidGradleBuilder.uncapFineLocation(bluetooth);
+        assertFalse(out.contains("maxSdkVersion"), "the cap goes");
+        assertTrue(out.contains("android.permission.ACCESS_FINE_LOCATION"),
+                "the declaration stays");
     }
 
-    /** Wi-Fi on its own still gets the capped entry, which is what it is for. */
+    /**
+     * The trap: a cap on some OTHER permission must survive. This builder caps
+     * USE_FINGERPRINT at 28 itself, and Bluetooth caps its own scan permissions.
+     */
     @Test
-    void wifiAloneStillCapsTheLocationPermission() {
-        assertTrue(AndroidGradleBuilder.needsCappedWifiFineLocation(false, ""));
-        assertTrue(AndroidGradleBuilder.needsCappedWifiFineLocation(false, null));
+    void aCapOnAnotherPermissionSurvives() {
+        String mixed = "    <uses-permission android:name=\"android.permission.USE_FINGERPRINT\""
+                + " android:maxSdkVersion=\"28\" />\n"
+                + "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\""
+                + " android:maxSdkVersion=\"30\" />\n"
+                + "    <uses-permission android:name=\"android.permission.BLUETOOTH_SCAN\""
+                + " android:maxSdkVersion=\"32\" />\n";
+        String out = AndroidGradleBuilder.uncapFineLocation(mixed);
+        assertTrue(out.contains("USE_FINGERPRINT\" android:maxSdkVersion=\"28\""),
+                "the fingerprint cap is not ours to touch");
+        assertTrue(out.contains("BLUETOOTH_SCAN\" android:maxSdkVersion=\"32\""),
+                "nor the bluetooth one");
+        assertFalse(out.contains("ACCESS_FINE_LOCATION\" android:maxSdkVersion"),
+                "only the location cap goes");
     }
 
-    /** And it is never added twice. */
+    /** Nothing to uncap is left exactly alone. */
     @Test
-    void anExistingDeclarationIsNotDuplicated() {
-        String existing = "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />";
-        assertFalse(AndroidGradleBuilder.needsCappedWifiFineLocation(false, existing));
+    void anUncappedOrAbsentDeclarationIsUnchanged() {
+        String plain = "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />\n";
+        assertEquals(plain, AndroidGradleBuilder.uncapFineLocation(plain));
+        String none = "    <uses-permission android:name=\"android.permission.CAMERA\" />\n";
+        assertEquals(none, AndroidGradleBuilder.uncapFineLocation(none));
+        assertEquals(null, AndroidGradleBuilder.uncapFineLocation(null));
     }
-
-
-
-
 
     /** Neither rule fires on a fragment that says nothing about location. */
     @Test
