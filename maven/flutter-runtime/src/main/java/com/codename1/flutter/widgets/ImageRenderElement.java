@@ -168,8 +168,8 @@ public class ImageRenderElement extends RenderElement {
     /// to be measured. Profiled interpreted on the desktop port, that single
     /// getWidth() chain was 39.7% of start-up.
     ///
-    /// The size is in the file's header, which is a few bytes at a known offset,
-    /// so read it there and hand it to the four-argument create() -- whose own
+    /// The size is in the file's header, so read it from there -- see pngSize
+    /// for the PNG side -- and hand it to the four-argument create() -- whose own
     /// documentation exists for exactly this ("doesn't need to actually traverse
     /// the pixels of an image to find out details about it"). The decode then
     /// happens when something actually paints the image, and an image that never
@@ -184,10 +184,9 @@ public class ImageRenderElement extends RenderElement {
         boolean opaque = false;
         if (data.length > 24 && (data[0] & 0xff) == 0x89 && data[1] == 'P'
                 && data[2] == 'N' && data[3] == 'G') {
-            // IHDR is always the first chunk: width and height are big-endian
-            // 32-bit values at offsets 16 and 20.
-            w = be32(data, 16);
-            h = be32(data, 20);
+            int[] size = pngSize(data);
+            w = size[0];
+            h = size[1];
         } else if (data.length > 10 && (data[0] & 0xff) == 0xFF && (data[1] & 0xff) == 0xD8) {
             // JPEG: walk the marker segments to the frame header, which carries
             // the dimensions. JPEG has no alpha channel, hence opaque.
@@ -222,6 +221,45 @@ public class ImageRenderElement extends RenderElement {
             return EncodedImage.create(data, w, h, opaque);
         }
         return EncodedImage.create(data);
+    }
+
+    /**
+     * A PNG's pixel size, read out of its IHDR chunk.
+     *
+     * <p>IHDR is the first chunk in a standards-conforming PNG, and reading its
+     * payload at a fixed offset is what this used to do. It is NOT first in the
+     * PNGs an iOS app actually ships: Xcode rewrites every bundled PNG into
+     * Apple's CgBI form, which puts a four-byte {@code CgBI} chunk in front of
+     * it. A fixed offset then reads that chunk's payload as the width and its
+     * checksum as the height, and the picture is drawn to a garbage aspect --
+     * the gallery's category icons came out squashed to half their height on
+     * device while being pixel-exact in every desktop sweep, because the desktop
+     * copy of the same asset is an ordinary PNG.</p>
+     *
+     * @return {@code {width, height}}, or {@code {-1, -1}} when no IHDR is found
+     */
+    static int[] pngSize(byte[] data) {
+        int off = 8;
+        while (off + 12 <= data.length) {
+            int len = be32(data, off);
+            if (len < 0) {
+                break;
+            }
+            if (data[off + 4] == 'I' && data[off + 5] == 'H'
+                    && data[off + 6] == 'D' && data[off + 7] == 'R') {
+                if (off + 16 > data.length) {
+                    break;
+                }
+                return new int[] {be32(data, off + 8), be32(data, off + 12)};
+            }
+            // length + the 4-byte type + the 4-byte CRC
+            long next = (long) off + 12L + (long) len;
+            if (next <= off || next > data.length) {
+                break;
+            }
+            off = (int) next;
+        }
+        return new int[] {-1, -1};
     }
 
     private static int be32(byte[] d, int off) {
