@@ -25,6 +25,7 @@ package com.codename1.flutter.cupertino;
 
 import com.codename1.flutter.BuildContext;
 import com.codename1.flutter.Color;
+import com.codename1.flutter.TextStyle;
 import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.Widget;
 import com.codename1.flutter.material.AppBar;
@@ -51,7 +52,10 @@ public class CupertinoSliverNavigationBar extends StatelessWidget {
         this.leading = v;
     }
 
+    private boolean automaticallyImplyLeading = true;
+
     public void automaticallyImplyLeading(boolean v) {
+        this.automaticallyImplyLeading = v;
     }
 
     public void automaticallyImplyTitle(boolean v) {
@@ -85,9 +89,37 @@ public class CupertinoSliverNavigationBar extends StatelessWidget {
         if (title != null) {
             bar.title(title);
         }
-        if (backgroundColor != null) {
-            bar.backgroundColor(backgroundColor);
+        // The iOS bar's own defaults, so the material AppBarTheme never reaches it. This
+        // composes onto AppBar, which resolves an unset background and foreground through
+        // that theme -- and the gallery gives every demo page a purple one, so an iOS bar
+        // rendered as a purple material bar with a white back arrow where the reference
+        // has a white bar and a large black title. Its sibling CupertinoNavigationBar
+        // already sets these; this one did not.
+        bar.backgroundColor(backgroundColor != null ? backgroundColor
+                : new Color(BAR_BACKGROUND));
+        bar.foregroundColor(new Color(BAR_FOREGROUND));
+        // A large title is iOS's 34pt, and it is left aligned, not centred.
+        TextStyle large = new TextStyle();
+        large.fontSize(LARGE_TITLE_SIZE);
+        large.fontWeight(com.codename1.flutter.FontWeight.bold);
+        bar.titleTextStyle(large);
+        bar.centerTitle(false);
+        bar.automaticallyImplyLeading(automaticallyImplyLeading);
+        if (leading != null) {
+            bar.leading(leading);
+        }
+        if (trailing != null) {
+            dart.core.DartList<Widget> actions = new dart.core.DartList<Widget>();
+            actions.add(trailing);
+            bar.actions(actions);
         }
         return bar;
     }
+
+    /** The iOS bar's own background, matching {@link CupertinoNavigationBar}. */
+    private static final long BAR_BACKGROUND = 0xFFF9F9F9L;
+    private static final long BAR_FOREGROUND = 0xFF000000L;
+
+    /** iOS's large-title size. */
+    private static final double LARGE_TITLE_SIZE = 34;
 }
