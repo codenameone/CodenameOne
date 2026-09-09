@@ -27,12 +27,14 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.UITimer;
 import com.codename1.util.SuccessCallback;
 
 import java.util.ArrayList;
@@ -634,6 +636,13 @@ public class LocationButton extends Container {
         waiting.add(this);
         if (inFlight) {
             // Someone else's fix is already on its way and it is the same fix.
+            // The round already running cannot be shortened to suit this
+            // button, and it is not necessarily bounded either: a leader with
+            // the -1 timeout waits until a fix arrives, so a joiner that wanted
+            // to give up after a moment would wait with it for ever. Its own
+            // deadline is kept by a timer instead, which needs nothing from the
+            // request in flight.
+            scheduleDeadline();
             return;
         }
         inFlight = true;
@@ -682,9 +691,12 @@ public class LocationButton extends Container {
                 }
             }
             long wait = earliest == Long.MAX_VALUE ? -1 : earliest - now;
-            if (wait == 0) {
-                // A deadline that has already passed still has to ask, because
-                // 0 would mean "no timeout" to getCurrentLocationSync.
+            if (earliest != Long.MAX_VALUE && wait < 1) {
+                // Any expired deadline, not just one that lands exactly on
+                // zero. LL.run() tests `timeout > -1`, so every value from -1
+                // down means "never time out" to it, and a deadline that went
+                // by while this was being computed would turn a button that
+                // wanted to give up promptly into one that waits for ever.
                 wait = 1;
             }
             Location fix = fetch(wait);
@@ -692,6 +704,10 @@ public class LocationButton extends Container {
             List<LocationButton> round = new ArrayList<LocationButton>(waiting);
             waiting.clear();
             for (LocationButton b : round) {
+                if (!b.acquiring) {
+                    // Its own deadline timer answered it while this round ran.
+                    continue;
+                }
                 if (fix != null || now >= b.deadline) {
                     b.acquiring = false;
                     b.fireLocationShared(fix);
@@ -701,6 +717,48 @@ public class LocationButton extends Container {
                 }
             }
         }
+    }
+
+    /// Arranges for this button to be answered when its own time is up, whatever
+    /// the request it joined is doing.
+    ///
+    /// Only for a button that joined a round already running. One that starts a
+    /// round has its timeout enforced by getCurrentLocationSync, and one waiting
+    /// between rounds is bounded by the next round's wait, which is computed
+    /// from the earliest deadline.
+    private void scheduleDeadline() {
+        if (deadline == Long.MAX_VALUE) {
+            // Nothing to be early for.
+            return;
+        }
+        Form f = getComponentForm();
+        if (f == null) {
+            return;
+        }
+        long ms = deadline - System.currentTimeMillis();
+        if (ms < 1) {
+            ms = 1;
+        }
+        if (ms > Integer.MAX_VALUE) {
+            return;
+        }
+        UITimer.timer((int) ms, false, f, new Runnable() {
+            @Override
+            public void run() {
+                deadlineReached();
+            }
+        });
+    }
+
+    /// This button's own timeout ran out while it was waiting for somebody
+    /// else's request.
+    private void deadlineReached() {
+        if (!acquiring || !waiting.remove(this)) {
+            // Already answered, by its round or by being removed from it.
+            return;
+        }
+        acquiring = false;
+        fireLocationShared(null);
     }
 
     /// One request to the platform, off the EDT.

@@ -598,6 +598,57 @@ class LocationButtonTest extends UITestBase {
         assertNull(patientShared.get(0));
     }
 
+    /// The case a shared wait cannot serve at all: the button that starts the
+    /// request never times out, so the round it owns never ends on its own. A
+    /// button that joins it wanting to give up after a moment used to wait for
+    /// ever -- the round is not bounded, so being served "at the end of the
+    /// round" was no answer. Its own deadline is kept by a timer, which asks
+    /// nothing of the request in flight.
+    @FormTest
+    void aFiniteJoinerIsNotHeldByALeaderThatNeverTimesOut() {
+        implementation.setLocationButtonSupported(true);
+        // Nothing arrives, so the leader's -1 round would run for ever.
+        manager.currentLocation = null;
+
+        Form f = new Form("forever");
+        LocationButton forever = new LocationButton();
+        forever.setTimeout(-1);
+        LocationButton brief = new LocationButton();
+        brief.setTimeout(60);
+        f.add(forever);
+        f.add(brief);
+        f.show();
+        flushSerialCalls();
+
+        List<Location> briefShared = record(brief);
+        List<SuccessCallback<Boolean>> callbacks =
+                implementation.getLocationButtonCallbacks();
+
+        final SuccessCallback<Boolean> briefCallback = callbacks.get(1);
+        manager.duringBind = new Runnable() {
+            public void run() {
+                briefCallback.onSucess(Boolean.TRUE);
+                flushSerialCalls();
+                // The leader is still inside its endless wait here; the EDT
+                // pumping under invokeAndBlock is what lets the timer fire.
+                long until = System.currentTimeMillis() + 3000;
+                while (briefShared.isEmpty() && System.currentTimeMillis() < until) {
+                    flushSerialCalls();
+                }
+                // Let the leader's round end so the test can finish.
+                manager.currentLocation = new Location(1.0, 1.0);
+            }
+        };
+
+        callbacks.get(0).onSucess(Boolean.TRUE);
+        flushSerialCalls();
+
+        assertEquals(1, briefShared.size(),
+                "the brief button is answered on its own deadline, not the "
+                        + "leader's, which never arrives");
+        assertNull(briefShared.get(0), "and its answer is its timeout");
+    }
+
     private void grant(Boolean granted) {
         SuccessCallback<Boolean> callback = implementation.getLocationButtonCallback();
         assertNotNull(callback, "the component should have handed the platform a callback");
