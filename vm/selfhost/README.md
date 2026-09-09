@@ -91,3 +91,44 @@ self-consistent on HotSpot:
 
 Only the first is a runtime bug. The other two are reproducible-build defects in
 the translator that a second runtime made visible.
+
+## Performance
+
+`bench-selfhost.sh` runs both translators over the same corpus, interleaved, and
+reports the minimum wall clock and the peak `phys_footprint`. Ratios are refused
+unless the two emitted identical C -- a speed number from a translator that emits
+different output is meaningless.
+
+Translating the self-hosting corpus (ASM + the translator's own classes, ~570
+classes) on an M-series Mac, release shape (`-O3 -flto=thin`), against JDK 8:
+
+| | parpar | jdk8 | |
+|---|---:|---:|---|
+| wall clock (min of 3) | 7.06 s | 1.17 s | **jdk8 6.0x faster** |
+| peak phys_footprint | 1434 MB | 509 MB | **jdk8 2.8x smaller** |
+
+**This is the opposite of what was hoped for, on both axes.** It is recorded here
+rather than buried because it is reproducible and cross-checked: `/usr/bin/time -l`
+independently reports 1328 MB and 501 MB, agreeing with the sampled `vmmap`
+figures. Building at `-O1` instead of `-O3 -flto=thin` changes nothing measurable,
+so code quality is not the bottleneck.
+
+The `user` versus `real` split says where the wall-clock gap comes from:
+
+```
+parpar   6.29 real   7.31 user     -> ~1.2x parallelism
+jdk8     1.13 real   6.09 user     -> ~5.4x parallelism
+```
+
+The two burn comparable CPU. HotSpot spends it across cores -- JIT compiler
+threads and parallel GC -- while the translated program is essentially
+single-threaded. So most of the 6x is concurrency the JVM has and ParparVM does
+not, rather than per-instruction code quality.
+
+Two things to be careful about before reading more into these numbers. The JVM's
+memory figure is bounded by its own heap ergonomics: it collects to stay under a
+default maximum, while the native binary has no such ceiling, so this compares
+what each process actually used and not the live set. And this is one corpus on
+one machine; `vm/benchmarks/run-benchmark.sh` measures tight compute loops, which
+is a different shape from a large allocation-heavy graph walk, and the published
+geomean-parity result there does not transfer to this workload.
