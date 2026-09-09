@@ -286,6 +286,44 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aBodyOfDtosIsRefused() throws Exception {
+        // The descriptor erases this to java.util.List, which binds. What the
+        // parser actually supplies is a list of Map, so the first use of an
+        // element as a Note throws and the endpoint answers 500 -- having
+        // packaged perfectly.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import java.util.List;\n"
+                + "class Note { public String title = \"t\"; }\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @PostMapping(\"/notes\")\n"
+                + "    public String add(@RequestBody List<Note> body) { return \"ok\"; }\n"
+                + "}\n"));
+        assertTrue("a body of DTOs should not compile", ctx.hasErrors());
+        assertTrue(ctx.getErrors().toString(),
+                ctx.getErrors().toString().indexOf("Cannot bind") >= 0);
+    }
+
+    @Test
+    public void aBodyOfMapsIsStillAllowed() throws Exception {
+        // What the parser really produces, so it has to keep working.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import java.util.List;\n"
+                + "import java.util.Map;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @PostMapping(\"/notes\")\n"
+                + "    public String add(@RequestBody List<Map> body) { return \"ok\"; }\n"
+                + "}\n"));
+        assertTrue("List<Map> is what the parser produces: " + ctx.getErrors(),
+                !ctx.hasErrors());
+    }
+
+    @Test
     public void aJdkReturnJsonCannotWriteIsRefused() throws Exception {
         // java.util.Date has no branch in Json.writeValue, so it reaches the
         // final one and is answered as a quoted, implementation-formatted
@@ -318,9 +356,28 @@ public class RestControllerAnnotationProcessorTest {
                 + "    @ResponseStatus(700)\n"
                 + "    public String oops() { return \"x\"; }\n"
                 + "}\n"));
-        assertTrue("a status outside 100..599 should not compile", ctx.hasErrors());
+        assertTrue("a status outside 200..599 should not compile", ctx.hasErrors());
         assertTrue(ctx.getErrors().toString(),
-                ctx.getErrors().toString().indexOf("not an HTTP status") >= 0);
+                ctx.getErrors().toString().indexOf("between 200 and 599") >= 0);
+    }
+
+    @Test
+    public void anInformationalStatusIsRefused() throws Exception {
+        // In range for HTTP, but not an ANSWER: a generated route sends one
+        // response, and a 1xx is interim -- the client waits for a final one
+        // that never comes, and the writer ends the response at the headers.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/interim\")\n"
+                + "    @ResponseStatus(102)\n"
+                + "    public String interim() { return \"x\"; }\n"
+                + "}\n"));
+        assertTrue("an interim status should not compile", ctx.hasErrors());
+        assertTrue(ctx.getErrors().toString(),
+                ctx.getErrors().toString().indexOf("between 200 and 599") >= 0);
     }
 
     @Test

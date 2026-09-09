@@ -512,10 +512,20 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         }
 
         Type[] paramTypes = Type.getArgumentTypes(m.getDescriptor());
+        String[] genericParams = RestClientAnnotationProcessor.parseGenericParameterSignatures(
+                m.getSignature(), paramTypes.length);
         List<Map<String, AnnotationValues>> paramAnnotations = m.getParameterAnnotations();
         for (int i = 0; i < paramTypes.length; i++) {
             Param p = new Param();
             p.javaType = RestClientAnnotationProcessor.javaTypeFor(paramTypes[i], null);
+            // The ERASED name drives code generation below, because every check
+            // there compares against exact names like "java.util.Map". The
+            // generic form is kept separately, for validation only: the
+            // descriptor erases List<Note> to java.util.List, and accepting that
+            // is how a body of DTOs got through.
+            String genericType = genericParams == null || genericParams[i] == null
+                    ? null
+                    : RestClientAnnotationProcessor.javaTypeFor(paramTypes[i], genericParams[i]);
             Map<String, AnnotationValues> annotations = i < paramAnnotations.size()
                     ? paramAnnotations.get(i) : Collections.<String, AnnotationValues>emptyMap();
             AnnotationValues pathVariable = annotations.get(PATH_VARIABLE);
@@ -576,6 +586,17 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                         + "or declare it as HttpServer.Request");
                 return null;
             }
+            if ("BODY".equals(p.kind) && !bodyElementsAreDecoded(genericType)) {
+                ctx.error(cls, "Cannot bind " + genericType + " from the body on "
+                        + cls.getBinaryName() + "." + m.getName() + ". A body is decoded "
+                        + "by the JSON parser, which produces Map, List, String, Long, "
+                        + "Double and Boolean -- so the elements arrive as Map and "
+                        + "iterating them as the declared type throws, answering 500 "
+                        + "from an endpoint that packaged cleanly. Take Map or "
+                        + "List<Map> and convert, or use a @RestClient contract, which "
+                        + "generates the codecs.");
+                return null;
+            }
             if (!"REQUEST".equals(p.kind) && !isBindable(p.javaType, p.kind)) {
                 ctx.error(cls, "Cannot bind " + p.javaType + " from the request on "
                         + cls.getBinaryName() + "." + m.getName() + ". Path, query and "
@@ -617,14 +638,60 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // submits it as :status, so a handler that worked perfectly answers with
         // something the client rejects or cannot frame. Three digits is the whole
         // of what HTTP defines.
-        if (route.status < 100 || route.status > 599) {
+        if (route.status < 200 || route.status > 599) {
             ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " declares "
-                    + "@ResponseStatus(" + route.status + "), which is not an HTTP status "
-                    + "code. It has to be between 100 and 599.");
+                    + "@ResponseStatus(" + route.status + "), which cannot be a handler's "
+                    + "answer: a generated route sends ONE response, so it has to be a "
+                    + "final status between 200 and 599. A 1xx is interim -- the client "
+                    + "would go on waiting for the final response, and 101 is not legal "
+                    + "over HTTP/2 at all.");
             return null;
         }
         return route;
     }
+
+    /**
+     * Whether every type argument of a body type is something the JSON parser
+     * actually produces. It answers Map for an object, List for an array, and
+     * String/Long/Double/Boolean for the scalars -- so a List<Note> is a list of
+     * Map at runtime, and the first use of an element as a Note throws.
+     */
+    private static boolean bodyElementsAreDecoded(String javaType) {
+        if (javaType == null) {
+            return true;
+        }
+        int lt = javaType.indexOf('<');
+        if (lt < 0) {
+            return true;                      // raw, so nothing was claimed
+        }
+        int end = javaType.lastIndexOf('>');
+        if (end <= lt) {
+            return true;
+        }
+        List<String> args = splitTypeArguments(javaType.substring(lt + 1, end));
+        for (int i = 0; i < args.size(); i++) {
+            String arg = args.get(i);
+            if (arg.startsWith("?")) {
+                continue;                     // a wildcard claims nothing either
+            }
+            if (!PARSED_JSON_TYPES.contains(arg) && !bodyElementsAreDecoded(arg)) {
+                return false;
+            }
+            int inner = arg.indexOf('<');
+            String rawArg = inner < 0 ? arg : arg.substring(0, inner);
+            if (!PARSED_JSON_TYPES.contains(rawArg)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** What Json.parse produces, and therefore all a body can be made of. */
+    private static final Set<String> PARSED_JSON_TYPES = Collections.unmodifiableSet(
+            new LinkedHashSet<String>(Arrays.asList(
+                    "java.lang.Object", "java.lang.String", "java.lang.Long",
+                    "java.lang.Double", "java.lang.Boolean",
+                    "java.util.Map", "java.util.List")));
 
     private static boolean isBindable(String javaType, String kind) {
         if ("BODY".equals(kind)) {

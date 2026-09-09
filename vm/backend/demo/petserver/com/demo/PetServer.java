@@ -112,6 +112,14 @@ public class PetServer {
                 // appends both to whatever header came before -- so a header the
                 // handler could not have meant would silently rewrite one the
                 // server owns.
+                // 205 with bytes, for the same reason /nocontent exists: a
+                // handler may build it, and RFC 9110 ends a Reset Content
+                // response at the header section, so writing them would leave a
+                // keep-alive client reading them as the next reply.
+                if("/reset".equals(stripQuery(target))) {
+                    return new HttpServer.Response(205, "text/plain",
+                            "junk".getBytes("UTF-8"));
+                }
                 if("/rawheader".equals(stripQuery(target))) {
                     Map extra = new LinkedHashMap();
                     extra.put("X-Good", "ok");

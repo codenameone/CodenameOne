@@ -347,6 +347,18 @@ class BackendHttpIntegrationTest {
         byte[] first = request("GET", "/static/index.html", null, null);
         String etag = header(first, "ETag");
         assertNotNull(etag, "a static response must carry an ETag");
+        // And the 304 must not claim a length. Content-Length on a 304 describes
+        // the SELECTED REPRESENTATION -- what a 200 would have sent -- and the
+        // only figure available here is the empty body's zero, which would tell
+        // the cache the file it just validated is empty. The header is optional
+        // on a 304, so it is omitted rather than fabricated.
+        byte[] conditional = raw("GET /static/index.html HTTP/1.1\r\nHost: x\r\n"
+                + "If-None-Match: " + etag + "\r\nConnection: close\r\n\r\n");
+        String conditionalText = new String(conditional, StandardCharsets.UTF_8);
+        assertTrue(conditionalText.startsWith("HTTP/1.1 304"),
+                "a matching ETag should answer 304:\n" + conditionalText);
+        assertEquals(-1, conditionalText.toLowerCase().indexOf("content-length"),
+                "a 304 must not advertise a length it cannot describe:\n" + conditionalText);
         assertEquals(304, status(request("GET", "/static/index.html", null,
                 new String[]{"If-None-Match: " + etag})));
 
@@ -491,6 +503,26 @@ class BackendHttpIntegrationTest {
         assertEquals(-1, head.indexOf("colon-in-name"),
                 "a colon ends the name early and renames the field:\n" + head);
         assertTrue(text.endsWith("raw"), "the body must still be intact:\n" + text);
+    }
+
+    @Test
+    @DisplayName("a 205 carries neither content nor a length that claims any")
+    void resetContentIsBodilessAndZeroLength() throws Exception {
+        // RFC 9110 15.3.6: a Reset Content response cannot contain content and
+        // ends at the header section. Suppressing the body is only half of it --
+        // advertising the SUPPRESSED body's length would leave a keep-alive
+        // client waiting for bytes that are never sent, which is the same
+        // desync from the other direction.
+        byte[] response = raw("GET /reset HTTP/1.1\r\nHost: x\r\n\r\n"
+                + "GET /healthz HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
+        String text = new String(response, StandardCharsets.UTF_8);
+        assertTrue(text.startsWith("HTTP/1.1 205"), "the first reply should be a 205:\n" + text);
+        assertEquals(-1, text.indexOf("junk"), "a 205 must not carry content:\n" + text);
+        String head = text.substring(0, text.indexOf("\r\n\r\n") + 4);
+        assertEquals(-1, head.indexOf("Content-Length: 4"),
+                "a 205 must not advertise the length it did not send:\n" + head);
+        assertEquals(2, countOccurrences(text, "HTTP/1.1 "),
+                "both replies must be readable back to back:\n" + text);
     }
 
     @Test

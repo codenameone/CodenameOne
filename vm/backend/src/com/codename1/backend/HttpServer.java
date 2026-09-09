@@ -3326,18 +3326,30 @@ public final class HttpServer {
      * misframed. Only HEAD used to be treated this way.
      */
     static boolean statusForbidsBody(int status) {
-        return status == 204 || status == 304 || (status >= 100 && status < 200);
+        // 205 belongs here with 204: RFC 9110 15.3.6 says a Reset Content
+        // response cannot contain content and is terminated by the first empty
+        // line, so a handler that returns bytes with it desynchronises a
+        // keep-alive connection exactly the way a 204 with bytes does.
+        return status == 204 || status == 205 || status == 304
+                || (status >= 100 && status < 200);
     }
 
     /**
      * Whether this status must not carry Content-Length at all.
      *
-     * RFC 9110 6.4.1 makes that a MUST NOT for 1xx and 204. Note 304 is NOT in
-     * this set: like a HEAD, it reports the length the body would have had, which
-     * is what lets a cache validate against it.
+     * RFC 9110 6.4.1 makes that a MUST NOT for 1xx and 204.
+     *
+     * 304 is here too, which is a correction. The rule for one is not that it
+     * carries no length but that any length it carries must describe the
+     * SELECTED REPRESENTATION -- what a 200 for the same request would have
+     * sent. Nothing here knows that: a 304 is built by StaticFiles as
+     * Response.empty, so the only figure available is zero, and sending
+     * "Content-Length: 0" tells the cache the file it just validated is empty.
+     * The header is optional on a 304, so omitting it is both correct and the
+     * only honest answer available.
      */
     static boolean statusForbidsLength(int status) {
-        return status == 204 || (status >= 100 && status < 200);
+        return status == 204 || status == 304 || (status >= 100 && status < 200);
     }
 
     private byte[] responseBodyFor(Response response, boolean headOnly) throws IOException {
@@ -4110,6 +4122,15 @@ public final class HttpServer {
         // HEAD is not the only thing that suppresses a body; see statusForbidsBody.
         boolean noBody = headOnly || statusForbidsBody(response.status);
         boolean noLength = statusForbidsLength(response.status);
+        // A HEAD and a bodiless STATUS are suppressed for different reasons and
+        // must advertise different lengths. HEAD describes the representation it
+        // is not sending, so it keeps the real figure. A 205 has no
+        // representation to describe -- it tells the client to clear its form --
+        // so it advertises zero. Reporting the suppressed body's length there
+        // would leave a keep-alive client waiting for bytes that never come.
+        if(noBody && !headOnly) {
+            bodyLength = 0;
+        }
 
         // Assembled into the connection's own buffer, as bytes, with no
         // intermediate String. See Conn.out: the StringBuilder-to-String-to-bytes
