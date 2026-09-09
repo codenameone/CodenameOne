@@ -286,6 +286,39 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void anArrayReturnOtherThanBytesIsRefused() throws Exception {
+        // Json writes byte[] as base64 and has no handling for any other array,
+        // so this would be answered as the JSON string "[I@1a2b3c" while the
+        // build and the request both reported success.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/ids\")\n"
+                + "    public int[] ids() { return new int[0]; }\n"
+                + "}\n"));
+        assertTrue("an array the router cannot encode should not compile", ctx.hasErrors());
+        String all = ctx.getErrors().toString();
+        assertTrue(all, all.indexOf("cannot encode") >= 0);
+    }
+
+    @Test
+    public void aByteArrayReturnIsStillAllowed() throws Exception {
+        // The one array shape Json does handle: base64, deliberately.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/blob\")\n"
+                + "    public byte[] blob() { return new byte[0]; }\n"
+                + "}\n"));
+        assertTrue("byte[] is encodable and must still compile: " + ctx.getErrors(),
+                !ctx.hasErrors());
+    }
+
+    @Test
     public void aLiteralAndAVariableInOneControllerBothWork() throws Exception {
         // The single most ordinary pair there is. They DO overlap -- /users/me is
         // a path /users/{id} would answer -- but the router emits every route

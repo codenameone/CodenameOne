@@ -5324,6 +5324,26 @@ JAVA_INT java_lang_System_gcIdleWaitMillis___R_int(CODENAME_ONE_THREAD_STATE) {
             return 200;
         }
     }
+    // Queued dead-thread TLDs are the same race one more time, and they take the
+    // same answer. Reaching CN1_GC_DEAD_THREAD_DEMAND raises the native request
+    // latch, and that is ALL it can do: the push runs on the dying thread inside
+    // the critical section, so it may no more enter the Java monitor to notify
+    // than a parked thread may. A collector already inside the long idle
+    // therefore cannot see the request until the idle expires, and each further
+    // dead thread adds its TLD -- tens of kilobytes apiece, freed only by the
+    // drain at mark start -- so connection churn could pile up 30 SECONDS of
+    // them against a threshold meant to bound exactly that.
+    //
+    // Refusing the long idle while the demand stands bounds it to 200ms, on the
+    // same path the park case above already takes. It is the same predicate that
+    // raised the latch, so it says nothing new about when a cycle is owed, and it
+    // clears itself: the next cycle's drain zeroes the count. And a short idle
+    // only re-reads the request sooner -- it forces no cycle, which is the
+    // distinction that whole comment exists to preserve.
+    if(atomic_load_explicit(&cn1DeadPendingCount, memory_order_relaxed)
+            >= CN1_GC_DEAD_THREAD_DEMAND) {
+        return 200;
+    }
     return highFrequency ? 200 : 30000;
 }
 

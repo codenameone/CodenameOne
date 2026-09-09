@@ -955,6 +955,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if (javaType == null || "void".equals(javaType) || RESPONSE_TYPE.equals(javaType)) {
             return true;
         }
+        // Arrays before anything else, because both tests below wave them
+        // through: a primitive array's name has no dot and a JDK array's name
+        // begins with "java.". Json writes byte[] as base64 and has no handling
+        // for any other array at all, so int[] or String[] reaches
+        // String.valueOf and is written as the JSON STRING "[I@1a2b3c" -- the
+        // array's identity, not its contents.
+        if (javaType.endsWith("[]")) {
+            return "byte[]".equals(javaType);
+        }
         String raw = javaType;
         int lt = raw.indexOf('<');
         if (lt >= 0) {
