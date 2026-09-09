@@ -269,6 +269,34 @@ public class AnimationController extends Animation<Double> {
     }
 
     /**
+     * How far through a run of {@code durationMs} an elapsed time is, under the
+     * scheduler's current time dilation.
+     *
+     * <p>{@code scheduler.timeDilation} stretches every animation in the app. It was
+     * declared here and never read, so the gallery's own "Slow motion" switch -- a
+     * control whose entire purpose is to let a motion design be inspected -- moved
+     * nothing at all. Flutter divides the frame timestamp by it; dividing the run's
+     * duration is the same thing and keeps the run's zero point where the first tick
+     * put it.</p>
+     *
+     * <p>A dilation that is zero, negative or NaN would divide the animation by zero or
+     * run it backwards. Flutter asserts on it; here it means real time, so a bad value
+     * cannot wedge the UI.</p>
+     *
+     * <p>Package-private and static so it can be asserted directly -- the controller's
+     * clock is the system clock, and a test that reimplements this arithmetic to check
+     * it would be testing its own copy.</p>
+     */
+    static double progress(long elapsedMs, long durationMs) {
+        double dilation = com.codename1.flutter.scheduler.SchedulerLib.timeDilation;
+        if (!(dilation > 0)) {
+            dilation = 1.0;
+        }
+        double effective = durationMs * dilation;
+        return effective <= 0 ? 1.0 : elapsedMs / effective;
+    }
+
+    /**
      * Advances this animation to the current time. Called once per frame by
      * {@link FrameDriver}; finishing removes it from the clock.
      */
@@ -287,7 +315,7 @@ public class AnimationController extends Animation<Double> {
         }
         long elapsed = now() - runStartTime;
         FrameDriver.noteAdvance(elapsed);
-        double t = runDurationMs == 0 ? 1.0 : (double) elapsed / (double) runDurationMs;
+        double t = progress(elapsed, runDurationMs);
         if (t >= 1.0) {
             finishRun(gen);
             if (!running) {
