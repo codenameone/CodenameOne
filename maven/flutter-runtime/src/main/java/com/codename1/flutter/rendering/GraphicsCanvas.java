@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.flutter.rendering;
 
 import com.codename1.flutter.Alignment;
@@ -431,41 +454,101 @@ public class GraphicsCanvas extends Canvas {
         }
         Gradient gradient = ((Gradient.GradientShader) paint.shader()).gradient();
         int[] ramp = gradient.colorRamp();
-        if (ramp.length == 0) {
+        if (ramp.length == 0 || !shapes) {
             return false;
         }
-        int start = ramp[0];
-        int end = ramp[ramp.length - 1];
         Rectangle bounds = p.getBounds();
         if (bounds.getWidth() <= 0 || bounds.getHeight() <= 0) {
             return false;
         }
+        boolean vertical = isVertical(gradient);
         int alpha = g.getAlpha();
         int clipX = g.getClipX();
         int clipY = g.getClipY();
         int clipW = g.getClipWidth();
         int clipH = g.getClipHeight();
         try {
-            g.setAlpha(((start >>> 24) & 0xff));
-            if (shapes && g.isShapeClipSupported()) {
-                // A real ramp, confined to the shape.
-                g.setClip(p);
-                g.fillLinearGradient(start & 0xffffff, end & 0xffffff,
+            if (p.isRectangle()) {
+                // The ramp fills the whole path, so no clipping is needed at all.
+                g.setAlpha((ramp[0] >>> 24) & 0xff);
+                g.fillLinearGradient(ramp[0] & 0xffffff, ramp[ramp.length - 1] & 0xffffff,
                         bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(),
-                        !isVertical(gradient));
-            } else if (shapes) {
-                // No shape clipping on this port: the shape still beats the ramp, so fill it
-                // solid with the ramp's midpoint rather than dropping either.
-                g.setColor(blend(start, end));
+                        !vertical);
+                return true;
+            }
+            // A SHAPE clip does not confine fillLinearGradient on every port. On iOS it
+            // is simply ignored -- Graphics.isShapeClipSupported() answers true, the clip
+            // is installed, and the ramp still fills the path's bounding BOX. The
+            // gallery's settings icon is two stadium-shaped sticks painted that way, and
+            // on the device they came out as square blocks while the desktop, where the
+            // clip is honoured, drew them correctly. That is the shape of defect this
+            // whole exercise keeps turning up: the sweep cannot see it.
+            //
+            // So do not ask a shape clip to do it. Fill the SHAPE once per band of the
+            // ramp, with a RECTANGULAR clip confining each fill to its band -- a rect
+            // clip and fillShape are honoured everywhere. The shape is then exact on
+            // every port, and the ramp is quantised rather than absent.
+            int span = vertical ? bounds.getHeight() : bounds.getWidth();
+            int bands = Math.max(8, Math.min(span, 48));
+            for (int i = 0; i < bands; i++) {
+                int from = span * i / bands;
+                int to = span * (i + 1) / bands;
+                if (to <= from) {
+                    continue;
+                }
+                int bandX = vertical ? bounds.getX() : bounds.getX() + from;
+                int bandY = vertical ? bounds.getY() + from : bounds.getY();
+                int bandW = vertical ? bounds.getWidth() : to - from;
+                int bandH = vertical ? to - from : bounds.getHeight();
+                int argb = rampAt(ramp, (i + 0.5) / bands);
+                g.setClip(clipX, clipY, clipW, clipH);
+                g.clipRect(bandX, bandY, bandW, bandH);
+                if (g.getClipWidth() <= 0 || g.getClipHeight() <= 0) {
+                    continue;
+                }
+                g.setAlpha((argb >>> 24) & 0xff);
+                g.setColor(argb & 0xffffff);
                 g.fillShape(p);
-            } else {
-                return false;
             }
         } finally {
             g.setClip(clipX, clipY, clipW, clipH);
             g.setAlpha(alpha);
         }
         return true;
+    }
+
+    /// The ramp's colour at {@code t} in 0..1, with the stops spread evenly.
+    ///
+    /// Even spacing is Flutter's own default when a gradient declares no {@code stops},
+    /// and it is what the previous code assumed far more crudely: it read the first and
+    /// last entries and ignored everything between them, so a three-stop gradient lost
+    /// its middle colour entirely.
+    static int rampAt(int[] ramp, double t) {
+        if (ramp.length == 1) {
+            return ramp[0];
+        }
+        if (t <= 0) {
+            return ramp[0];
+        }
+        if (t >= 1) {
+            return ramp[ramp.length - 1];
+        }
+        double pos = t * (ramp.length - 1);
+        int i = (int) pos;
+        if (i >= ramp.length - 1) {
+            return ramp[ramp.length - 1];
+        }
+        double f = pos - i;
+        int a = ramp[i];
+        int b = ramp[i + 1];
+        return (lerpChannel(a, b, f, 24) << 24) | (lerpChannel(a, b, f, 16) << 16)
+                | (lerpChannel(a, b, f, 8) << 8) | lerpChannel(a, b, f, 0);
+    }
+
+    private static int lerpChannel(int a, int b, double t, int shift) {
+        int ca = (a >>> shift) & 0xff;
+        int cb = (b >>> shift) & 0xff;
+        return (int) Math.round(ca + (cb - ca) * t) & 0xff;
     }
 
     /** Whether the gradient runs top-to-bottom rather than left-to-right. */
@@ -478,14 +561,6 @@ public class GraphicsCanvas extends Canvas {
         double dx = Math.abs(((Alignment) end).x() - ((Alignment) begin).x());
         double dy = Math.abs(((Alignment) end).y() - ((Alignment) begin).y());
         return dy > dx;
-    }
-
-    /** The midpoint of two ARGB colours, as an RGB value. */
-    private static int blend(int a, int b) {
-        int r = (((a >> 16) & 0xff) + ((b >> 16) & 0xff)) / 2;
-        int gr = (((a >> 8) & 0xff) + ((b >> 8) & 0xff)) / 2;
-        int bl = ((a & 0xff) + (b & 0xff)) / 2;
-        return (r << 16) | (gr << 8) | bl;
     }
 
     private void strokeShape(GeneralPath p, Paint paint) {
