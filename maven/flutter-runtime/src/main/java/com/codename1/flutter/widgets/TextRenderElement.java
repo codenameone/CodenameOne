@@ -82,23 +82,75 @@ public class TextRenderElement extends RenderElement {
         return text().getData() == null ? "" : text().getData();
     }
 
+    /**
+     * The style actually in force: the widget's own, over the ambient
+     * {@code DefaultTextStyle}, field by field.
+     *
+     * <p>Flutter's rule, and the mechanism a container styles its text with. A
+     * {@code Text} that sets only a size inside a white-on-purple app bar must
+     * still come out white; reading only the widget's own style is what left
+     * every themed bar with default-ink glyphs.</p>
+     */
+    private TextStyle effectiveStyle() {
+        TextStyle own = text().getStyle();
+        TextStyle ambient;
+        try {
+            ambient = DefaultTextStyle.of(this).getStyle();
+        } catch (Throwable t) {
+            ambient = null;
+        }
+        if (ambient == null) {
+            return own;
+        }
+        if (own == null) {
+            return ambient;
+        }
+        // Start from the ambient style and let the widget's own non-null fields
+        // win: copyWith already ignores nulls, so this is exactly Flutter's
+        // "the nearer style wins field by field".
+        return ambient.copyWith(null, own.getColor(), null, own.getFontFamily(),
+                own.getFontSize(), own.getFontWeight(), null, own.getLetterSpacing(),
+                null, own.height(), null, null, null);
+    }
+
     private void applyStyle(Label l) {
-        TextStyle ts = text().getStyle();
+        TextStyle ts = effectiveStyle();
         if (l instanceof WrappedLabel) {
             double sp = ts == null || ts.getLetterSpacing() == null
                     ? 0 : Dp.px(ts.getLetterSpacing().doubleValue());
             ((WrappedLabel) l).spacingPx = sp;
+            // A TRANSLUCENT ink is ordinary in Material: the 2018 type scale
+            // paints its display roles at black54 and its body roles at
+            // black87, and Codename One's Style carries only an opaque
+            // foreground (its fgAlpha reaches the border, never the text). Kept
+            // here and applied when the label paints.
+            ((WrappedLabel) l).fgAlpha =
+                    ts == null || ts.getColor() == null ? 255 : ts.getColor().alpha();
         }
         if (ts != null) {
             Font base = l.getUnselectedStyle().getFont();
+            // A named family wins over whatever the theme put on the label:
+            // the style is asking for a specific typeface, and that is the
+            // difference between a study that looks like its design and one
+            // painted entirely in the platform default.
+            Font named = com.codename1.flutter.fonts.FontResolver.resolve(
+                    ts.fontFamily(), ts.getFontWeight(), false);
+            if (named != null) {
+                base = named;
+            }
             if (base == null) {
                 base = Font.getDefaultFont();
             }
-            if (base != null && (ts.getFontSize() != null || ts.getFontWeight() != null)) {
+            if (base != null && (ts.getFontSize() != null || ts.getFontWeight() != null
+                    || named != null)) {
                 float sizePx = ts.getFontSize() != null
                         ? (float) Dp.px(ts.getFontSize())
                         : (base.getPixelSize() > 0 ? base.getPixelSize() : base.getHeight());
-                int weight = (ts.getFontWeight() != null && ts.getFontWeight().isBold())
+                // A resolved face ALREADY carries its weight (the Bold file was
+                // picked, not the Regular one), so asking Codename One to bold
+                // it again synthesises a second helping of weight on top.
+                int weight = named == null
+                        && ts.getFontWeight() != null && ts.getFontWeight().isBold()
                         ? Font.STYLE_BOLD : Font.STYLE_PLAIN;
                 try {
                     l.getAllStyles().setFont(base.derive(sizePx, weight));
@@ -146,13 +198,84 @@ public class TextRenderElement extends RenderElement {
                 return spacedWidth(f, s, spacing);
             }
         }, constraints.maxWidth());
-        l.lines = lines;
+        lines = clamp(lines, effectiveMaxLines(), ellipsize(),
+                new Funcs.Func1<String, Double>() {
+                    @Override
+                    public Double call(String s) {
+                        return spacedWidth(f, s, spacing);
+                    }
+                }, constraints.maxWidth());
+        if (!isDryPass()) {
+            // Only a real pass may hand the painter its lines; see isDryPass().
+            l.lines = lines;
+        }
         double w = 0;
         for (String line : lines) {
             w = Math.max(w, spacedWidth(f, line, spacing));
         }
         double h = (double) f.getHeight() * Math.max(1, lines.size());
         return constraints.constrain(new Size(w, h));
+    }
+
+    /**
+     * {@code Text.maxLines}, or the ambient {@code DefaultTextStyle}'s, or none.
+     */
+    private Long effectiveMaxLines() {
+        if (text().getMaxLines() != null) {
+            return text().getMaxLines();
+        }
+        try {
+            return DefaultTextStyle.of(this).getMaxLines() == null ? null
+                    : Long.valueOf(DefaultTextStyle.of(this).getMaxLines().longValue());
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** Whether an over-long line ends in an ellipsis rather than being cut. */
+    private boolean ellipsize() {
+        return text().getOverflow() == com.codename1.flutter.TextOverflow.ellipsis;
+    }
+
+    /**
+     * Cuts a wrapped paragraph down to {@code maxLines}, ending the last line
+     * with an ellipsis when the text asked for one.
+     *
+     * <p>Both were parsed and dropped. A preview meant to be one line long
+     * rendered its whole body instead, which does not look like a bug so much
+     * as a different design: the Reply study's inbox showed every message in
+     * full and pushed the rest of the list off the screen.</p>
+     */
+    static List<String> clamp(List<String> lines, Long maxLines, boolean ellipsis,
+                              Funcs.Func1<String, Double> measure, double maxWidth) {
+        if (maxLines == null || maxLines.longValue() <= 0
+                || lines.size() <= maxLines.longValue()) {
+            return lines;
+        }
+        int keep = (int) maxLines.longValue();
+        List<String> out = new ArrayList<String>(lines.subList(0, keep));
+        if (!ellipsis) {
+            return out;
+        }
+        // The last kept line has to make room for the ellipsis, and the text
+        // that follows it is what the ellipsis stands for.
+        String last = out.get(keep - 1);
+        String marker = "\u2026";
+        while (last.length() > 0
+                && measure.call(last + marker) > maxWidth
+                && maxWidth != Double.POSITIVE_INFINITY) {
+            last = last.substring(0, last.length() - 1);
+        }
+        out.set(keep - 1, trimEnd(last) + marker);
+        return out;
+    }
+
+    private static String trimEnd(String s) {
+        int end = s.length();
+        while (end > 0 && s.charAt(end - 1) == ' ') {
+            end--;
+        }
+        return s.substring(0, end);
     }
 
     private static Font font(Label l) {
@@ -170,7 +293,50 @@ public class TextRenderElement extends RenderElement {
         if (s == null || s.length() == 0) {
             return 0;
         }
+        // stringWidth measures the WHOLE run in one go, which is the accurate number and
+        // the one the port itself would use. It is what this measures with, whether or
+        // not there is tracking -- see trackingScale for how the paint path is made to
+        // agree with it.
         return spacedWidth(f.stringWidth(s), s.length(), spacing);
+    }
+
+    /// The sum of the per-glyph advances the paint path would step through.
+    static double sumCharWidths(Font f, String s) {
+        double total = 0;
+        for (int i = 0; i < s.length(); i++) {
+            total += f.charWidth(s.charAt(i));
+        }
+        return total;
+    }
+
+    /// What to multiply each glyph's advance by so a run laid out glyph by glyph ends
+    /// exactly where {@code stringWidth} says it should.
+    ///
+    /// Tracking forces the paint path to draw one glyph at a time, because Codename One
+    /// advances a whole string in a single call and has no tracking of its own. But
+    /// {@code charWidth} returns an INT, so every glyph's advance is rounded up to a
+    /// whole pixel and the error accumulates: measured against the reference, the same
+    /// sentence came out 607px wide where it should be 589 -- 3.1%, or about 0.6px per
+    /// character. Wide text does not merely look wrong, it ellipsises strings that fit
+    /// and clips the ones that do not.
+    ///
+    /// The whole-run {@code stringWidth} does not have that error, so use it for the
+    /// total and let the per-glyph widths decide only the PROPORTIONS. Note this is not
+    /// the same as measuring each glyph with {@code stringWidth}: a standalone space
+    /// measures ~0 there, which is why the paint path uses charWidth in the first place
+    /// -- as a proportion a space is correct, as an absolute width it is not.
+    static double trackingScale(Font f, String s) {
+        return trackingScale(f.stringWidth(s), sumCharWidths(f, s));
+    }
+
+    /// The scale arithmetic on its own, so the invariant it exists to hold -- that a run
+    /// laid out glyph by glyph ends exactly where {@link #spacedWidth} said it would --
+    /// can be pinned without a Font.
+    static double trackingScale(double runWidth, double sumOfCharWidths) {
+        if (sumOfCharWidths <= 0) {
+            return 1;
+        }
+        return runWidth / sumOfCharWidths;
     }
 
     /** The tracking arithmetic on its own, so it can be pinned without a Font. */
@@ -253,6 +419,8 @@ public class TextRenderElement extends RenderElement {
         List<String> lines;
         /** Flutter's TextStyle.letterSpacing, in device pixels. */
         double spacingPx;
+        /** The ink's own alpha; see applyStyle. */
+        int fgAlpha = 255;
 
         WrappedLabel(String text) {
             super(text, "FlutterText");
@@ -260,11 +428,17 @@ public class TextRenderElement extends RenderElement {
 
         @Override
         public void paint(Graphics g) {
-            boolean multiLine = lines != null && lines.size() > 1;
-            if (!multiLine && spacingPx == 0) {
+            // Paint from the wrapped lines whenever layout produced any — NOT
+            // only when there is more than one. A single line is the interesting
+            // case: it is what a clamped `maxLines: 1` produces, and falling
+            // through to Label.paint here drew the label's raw text instead, so
+            // every one-line preview in the Reply study rendered its whole
+            // message and got cut off mid-word with no ellipsis.
+            if (lines == null && spacingPx == 0 && fgAlpha >= 255) {
                 super.paint(g);
                 return;
             }
+            boolean multiLine = lines != null;
             com.codename1.ui.plaf.Style s = getStyle();
             Font f = s.getFont();
             if (f == null) {
@@ -275,6 +449,7 @@ public class TextRenderElement extends RenderElement {
             }
             int prevColor = g.getColor();
             Font prevFont = g.getFont();
+            int prevAlpha = fgAlpha >= 255 ? -1 : g.concatenateAlpha(fgAlpha);
             g.setColor(s.getFgColor());
             g.setFont(f);
             int lh = f.getHeight();
@@ -282,6 +457,18 @@ public class TextRenderElement extends RenderElement {
             int align = s.getAlignment();
             List<String> toPaint = multiLine ? lines
                     : java.util.Collections.singletonList(getText() == null ? "" : getText());
+            if (toPaint.isEmpty()) {
+                // The graphics is shared with every other component in the
+                // frame, so an early exit still has to hand it back as it was.
+                g.setColor(prevColor);
+                if (prevAlpha >= 0) {
+                    g.setAlpha(prevAlpha);
+                }
+                if (prevFont != null) {
+                    g.setFont(prevFont);
+                }
+                return;
+            }
             for (String line : toPaint) {
                 int lineW = (int) Math.ceil(spacedWidth(f, line, spacingPx));
                 int x = getX();
@@ -295,16 +482,25 @@ public class TextRenderElement extends RenderElement {
                 } else {
                     // One glyph at a time: the only way to add tracking, since Codename One
                     // draws a whole string in a single advance.
+                    //
+                    // Advance by charWidth, NOT by stringWidth of a one-character
+                    // string: Codename One measures a standalone space as ~0 wide,
+                    // so a space advanced by the tracking alone and the words ran
+                    // together — Reply's headlines read "Packageshipped!".
+                    double scale = trackingScale(f, line);
                     double cursor = x;
                     for (int i = 0; i < line.length(); i++) {
-                        String ch = line.substring(i, i + 1);
-                        g.drawString(ch, (int) Math.round(cursor), y);
-                        cursor += f.stringWidth(ch) + spacingPx;
+                        char ch = line.charAt(i);
+                        g.drawString(line.substring(i, i + 1), (int) Math.round(cursor), y);
+                        cursor += f.charWidth(ch) * scale + spacingPx;
                     }
                 }
                 y += lh;
             }
             g.setColor(prevColor);
+            if (prevAlpha >= 0) {
+                g.setAlpha(prevAlpha);
+            }
             if (prevFont != null) {
                 g.setFont(prevFont);
             }

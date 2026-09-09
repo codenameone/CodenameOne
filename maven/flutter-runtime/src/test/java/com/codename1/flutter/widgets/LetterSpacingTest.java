@@ -26,6 +26,7 @@ package com.codename1.flutter.widgets;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Flutter adds letterSpacing BETWEEN glyphs - n-1 gaps for n characters, with nothing
@@ -57,5 +58,62 @@ class LetterSpacingTest {
     @Test
     void negativeSpacingTightens() {
         assertEquals(42.0, TextRenderElement.spacedWidth(50.0, 5, -2.0));
+    }
+
+    /// The invariant the paint path has to hold: laying a run out glyph by glyph must
+    /// end exactly where spacedWidth said it would.
+    ///
+    /// It did not. The paint path advanced by charWidth, which returns an INT, so every
+    /// glyph's advance was rounded up and the error accumulated -- the same sentence
+    /// measured 589px in the reference and drew 607px here, 3.1% wide, about 0.6px per
+    /// character. Text that is systematically wide ellipsises strings that fit and
+    /// clips the ones that do not, which is what Reply's sender lines did on iOS.
+    private static double drawnWidth(double[] charWidths, double runWidth, double spacing) {
+        double sum = 0;
+        for (double w : charWidths) {
+            sum += w;
+        }
+        double scale = TextRenderElement.trackingScale(runWidth, sum);
+        double cursor = 0;
+        for (int i = 0; i < charWidths.length - 1; i++) {
+            cursor += charWidths[i] * scale + spacing;
+        }
+        return cursor + charWidths[charWidths.length - 1] * scale;
+    }
+
+    @Test
+    void aTrackedRunEndsExactlyWhereItWasMeasured() {
+        // charWidths rounded up from a true 12.4px advance, as an int-returning
+        // charWidth does; the run itself measures 62, not 5 * 13 = 65.
+        double[] widths = {13, 13, 13, 13, 13};
+        double measured = TextRenderElement.spacedWidth(62.0, 5, 2.0);
+        assertEquals(measured, drawnWidth(widths, 62.0, 2.0), 1e-9);
+    }
+
+    @Test
+    void unevenGlyphsKeepTheirProportions() {
+        double[] widths = {20, 5, 11, 4};
+        double measured = TextRenderElement.spacedWidth(36.0, 4, 1.5);
+        assertEquals(measured, drawnWidth(widths, 36.0, 1.5), 1e-9);
+        // and the widest glyph is still the widest
+        double scale = TextRenderElement.trackingScale(36.0, 40.0);
+        assertEquals(0.9, scale, 1e-9);
+    }
+
+    /// Without the scale the run overruns, which is the defect stated numerically.
+    @Test
+    void theUnscaledRunOverrunsItsMeasurement() {
+        double[] widths = {13, 13, 13, 13, 13};
+        double measured = TextRenderElement.spacedWidth(62.0, 5, 2.0);
+        double unscaled = 4 * (13 + 2.0) + 13;   // what the old paint path advanced
+        assertTrue(unscaled > measured + 2,
+                "expected the unscaled run to overrun; got " + unscaled + " vs " + measured);
+    }
+
+    /// A font that reports nothing must not divide by zero.
+    @Test
+    void aZeroWidthRunScalesByOne() {
+        assertEquals(1.0, TextRenderElement.trackingScale(0.0, 0.0));
+        assertEquals(1.0, TextRenderElement.trackingScale(10.0, 0.0));
     }
 }
