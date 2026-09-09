@@ -1028,6 +1028,38 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aMapReturnKeyedByANonStringIsRefused() throws Exception {
+        // Json.writeValue calls String.valueOf on every map key whatever it is,
+        // so the keys come back as object identity -- "[B@1a2b3c" -- which is
+        // different on every run and describes nothing. The key was being checked
+        // as though it were a value, and byte[] is a perfectly good value.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Blobs {\n"
+                + "    @GetMapping(\"/blobs\")\n"
+                + "    public java.util.Map<byte[], String> all() { return null; }\n"
+                + "}\n"));
+        assertTrue("a map keyed by byte[] cannot be written as JSON", ctx.hasErrors());
+    }
+
+    @Test
+    public void aMapReturnKeyedByStringIsAccepted() throws Exception {
+        // The shape the rule is protecting has to keep working.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Counts {\n"
+                + "    @GetMapping(\"/counts\")\n"
+                + "    public java.util.Map<String, Long> all() { return null; }\n"
+                + "}\n"));
+        assertFalse("Map<String,Long> is exactly what Json writes: " + ctx.getErrors(),
+                ctx.hasErrors());
+    }
+
+    @Test
     public void anUnboundedWildcardReturnElementIsRefused() throws Exception {
         // "?" is not a primitive, it is UNKNOWN. Reaching the no-dot branch it was
         // read as one, so List<?> was approved and a handler returning a DTO or a

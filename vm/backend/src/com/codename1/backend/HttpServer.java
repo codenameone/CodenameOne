@@ -3284,6 +3284,18 @@ public final class HttpServer {
                 if(stream.getAuthority() != null) {
                     headers.put("host", stream.getAuthority());
                 }
+                byte[] h2RequestBody = stream.getBody();
+                if(h2RequestBody != null && h2RequestBody.length > 0
+                        && !Utf8.isValid(h2RequestBody, 0, h2RequestBody.length)) {
+                    // Decided here rather than in getBodyAsString, because this is
+                    // where a status code can be produced: the decoder has no way
+                    // to answer 400, and returning null there would have made a
+                    // malformed body indistinguishable from an absent one.
+                    h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
+                            asciiBytes("the request body is not valid UTF-8"));
+                    requestsServed.incrementAndGet();
+                    continue;
+                }
                 Request request = new Request(stream.getMethod(), stream.getPath(),
                         "HTTP/2", headers, stream.getBodyAsString());
                 Response response;
@@ -4136,6 +4148,9 @@ public final class HttpServer {
             if(decoded == null) {
                 return null;
             }
+            if(decoded.length > 0 && !Utf8.isValid(decoded, 0, decoded.length)) {
+                throw new ProtocolException(400, "the request body is not valid UTF-8");
+            }
             body = decoded.length == 0 ? null : new String(decoded, "UTF-8");
         } else if(contentLength != null) {
             // sliceToInt returns -1 for anything that is not a plain non-negative
@@ -4151,6 +4166,17 @@ public final class HttpServer {
                 return null;
             }
             if(declaredLength > 0) {
+                // Checked before it is decoded. new String replaces a malformed
+                // sequence with U+FFFD rather than failing, so without this the
+                // handler is handed text the client never sent -- and whatever
+                // validated it validated the replacement. Note the query-string
+                // decoder above does the same thing with percent-decoded bytes;
+                // that one is left alone deliberately, because refusing a query
+                // parameter is a different policy from refusing a body, and no
+                // report has been made against it.
+                if(!Utf8.isValid(conn.buffer, conn.pos, declaredLength)) {
+                    throw new ProtocolException(400, "the request body is not valid UTF-8");
+                }
                 body = new String(conn.buffer, conn.pos, declaredLength, "UTF-8");
                 conn.pos += declaredLength;
             }
@@ -4179,6 +4205,20 @@ public final class HttpServer {
      * desynchronise the next request on a keep-alive connection.
      */
     private byte[] readChunked(Conn conn, byte[] scratch) throws IOException {
+        // Charged against the SAME process-wide budget the fixed-length path uses.
+        // Bounding only that path left this one open: a chunked body is capped per
+        // request at MAX_BODY_BYTES and by nothing at all across requests, so
+        // enough unauthenticated clients sending almost 8 MiB each and pausing
+        // before the terminating chunk retain gigabytes until their rate deadlines
+        // expire, with CN1_HTTP_MAX_UPLOAD_MB looking on.
+        //
+        // The figure charged is what this read is RETAINING: the chunks already
+        // accumulated plus what is buffered on the connection for the chunk in
+        // progress. Charging only the first would miss the second, which grows to
+        // a whole chunk -- the same "fixed one of the two" that made this comment
+        // necessary in the first place.
+        long[] charged = { 0 };
+        try {
         ByteArrayOutputStream body = new ByteArrayOutputStream();
         // The same floor rate the fixed-length path got, over the WHOLE chunked
         // read: the size lines, the data and the trailers. Each of the three fill
@@ -4199,6 +4239,7 @@ public final class HttpServer {
                     throw new ProtocolException(400, "chunk size line too long");
                 }
                 requireChunkedProgress(started, body.size() + conn.available());
+                reserveUploadUpTo(charged, body.size() + conn.available());
                 if(!conn.fill(scratch)) {
                     return null;
                 }
@@ -4232,6 +4273,7 @@ public final class HttpServer {
                             throw new ProtocolException(400, "chunk trailer too long");
                         }
                         requireChunkedProgress(started, body.size() + conn.available());
+                        reserveUploadUpTo(charged, body.size() + conn.available());
                         if(!conn.fill(scratch)) {
                             // EOF before the blank line that ends the trailers: the
                             // chunked framing never finished, so this is a truncated
@@ -4266,16 +4308,49 @@ public final class HttpServer {
             // The chunk and its trailing CRLF must both be present before it is taken.
             while(conn.available() < size + 2) {
                 requireChunkedProgress(started, body.size() + conn.available());
+                reserveUploadUpTo(charged, body.size() + conn.available());
                 if(!conn.fill(scratch)) {
                     return null;
                 }
             }
+            // Reserved for the copy BEFORE it is made, like every other growth
+            // point: a budget checked afterwards has already spent what it meant
+            // to withhold.
+            reserveUploadUpTo(charged, body.size() + size + conn.available());
             body.write(conn.buffer, conn.pos, size);
             conn.pos += size;
             if(conn.buffer[conn.pos] != '\r' || conn.buffer[conn.pos + 1] != '\n') {
                 throw new ProtocolException(400, "malformed chunk terminator");
             }
             conn.pos += 2;
+        }
+        } finally {
+            // Every path out, exactly like the fixed-length reader: the body
+            // arrived, the peer went away, the deadline passed or the process was
+            // full. On success the bytes become the request's and stop being an
+            // upload in flight.
+            http1UploadBytes.addAndGet(-charged[0]);
+        }
+    }
+
+    /**
+     * Tops a reservation up to what the caller is now holding.
+     *
+     * The running total is in the array so that the charge is recorded BEFORE the
+     * ceiling is tested: if this throws, the caller's finally still releases what
+     * was just taken. Recording it afterwards leaks the last reservation of every
+     * refused upload, which is the slowest possible way to run a server out of
+     * budget.
+     */
+    private static void reserveUploadUpTo(long[] charged, long needed)
+            throws ProtocolException {
+        if(needed <= charged[0]) {
+            return;
+        }
+        long delta = needed - charged[0];
+        charged[0] = needed;
+        if(http1UploadBytes.addAndGet(delta) > MAX_HTTP1_UPLOAD_BYTES) {
+            throw new ProtocolException(503, "too many uploads in flight");
         }
     }
 

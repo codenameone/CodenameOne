@@ -88,6 +88,11 @@ public final class Http2 {
             return headers;
         }
 
+        /** The body as it ARRIVED, so the caller can check it before decoding. */
+        public byte[] getBody() {
+            return body;
+        }
+
         public String getBodyAsString() {
             if(body == null || body.length == 0) {
                 return null;

@@ -662,6 +662,108 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("chunked uploads are charged against the process budget too")
+    void chunkedUploadsAreChargedAndReleased() throws Exception {
+        // The budget bounded the fixed-length reader and nothing else, so a
+        // chunked body was capped per request at 8MB and by nothing at all across
+        // requests: enough clients sending almost that much and pausing before the
+        // terminating chunk retain gigabytes with CN1_HTTP_MAX_UPLOAD_MB looking
+        // on.
+        //
+        // Sized so that a leak is what fails: nine 2MB bodies against the 16MB
+        // ceiling charge 18MB cumulatively, while each one alone peaks at 2MB. If
+        // the charge were never made the release could not leak either, so this
+        // proves both halves are wired -- and it is sequential on purpose, because
+        // detecting the leak needs accumulation, not concurrency.
+        Assumptions.assumeTrue(smallUploadPort > 0,
+                "the small-budget server did not start");
+        for (int i = 0; i < 9; i++) {
+            byte[] response = chunkedPost(smallUploadPort, 2 * 1024 * 1024);
+            assertEquals(200, status(response),
+                    "chunked upload " + i + " was refused, so an earlier one's "
+                            + "reservation was never released:\n"
+                            + new String(response, StandardCharsets.UTF_8));
+        }
+    }
+
+    /**
+     * Posts `size` bytes of JSON to /echo, chunk-encoded.
+     *
+     * Built whole and written in one go rather than streamed: writing it
+     * incrementally raced the server's own answer, so a legitimate early response
+     * arrived as a broken pipe on the next write and the status that explained it
+     * was never read.
+     */
+    private byte[] chunkedPost(int onPort, int size) throws IOException {
+        ByteArrayOutputStream framed = new ByteArrayOutputStream();
+        framed.write("2\r\n[\"\r\n".getBytes(StandardCharsets.UTF_8));
+        byte[] payload = new byte[256 * 1024];
+        java.util.Arrays.fill(payload, (byte) 'a');
+        int sent = 0;
+        while (sent < size) {
+            int n = Math.min(payload.length, size - sent);
+            framed.write((Integer.toHexString(n) + "\r\n").getBytes(StandardCharsets.UTF_8));
+            framed.write(payload, 0, n);
+            framed.write("\r\n".getBytes(StandardCharsets.UTF_8));
+            sent += n;
+        }
+        framed.write("2\r\n\"]\r\n".getBytes(StandardCharsets.UTF_8));
+        framed.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+        return rawOn(onPort, "POST /echo HTTP/1.1\r\nHost: x\r\n"
+                + "Content-Type: application/json\r\n"
+                + "Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n",
+                framed.toByteArray());
+    }
+
+    @Test
+    @DisplayName("a body that is not UTF-8 is refused rather than repaired")
+    void malformedUtf8BodiesAreRefused() throws Exception {
+        // new String(bytes, "UTF-8") never fails: it substitutes U+FFFD, so the
+        // handler ran on text the client never sent and anything that validated
+        // the body validated the REPLACEMENT. 0x80 is a continuation byte with
+        // nothing to continue, inside an otherwise perfectly good JSON string.
+        byte[] body = new byte[] {
+            '[', '"', 'a', (byte) 0x80, 'b', '"', ']',
+        };
+        byte[] response = raw("POST /echo HTTP/1.1\r\nHost: x\r\nContent-Type: "
+                + "application/json\r\nContent-Length: " + body.length
+                + "\r\nConnection: close\r\n\r\n", body);
+        assertEquals(400, status(response),
+                "a malformed sequence must be a 400, not a silent replacement:\n"
+                        + new String(response, StandardCharsets.UTF_8));
+
+        // Multi-byte UTF-8 that IS well formed still has to get through -- the
+        // rule is about malformed bytes, not about non-ASCII.
+        byte[] good = ("[\"caf\u00e9\"]").getBytes(StandardCharsets.UTF_8);
+        byte[] ok = raw("POST /echo HTTP/1.1\r\nHost: x\r\nContent-Type: "
+                + "application/json\r\nContent-Length: " + good.length
+                + "\r\nConnection: close\r\n\r\n", good);
+        assertEquals(200, status(ok), new String(ok, StandardCharsets.UTF_8));
+    }
+
+    @Test
+    @DisplayName("a chunked body that is not UTF-8 is refused too")
+    void malformedUtf8ChunkedBodiesAreRefused() throws Exception {
+        // The chunked path decodes separately, so it needs its own proof: fixing
+        // one of two body readers is how the fixed-length path came to be bounded
+        // while this one was not.
+        String chunk = "5\r\n";
+        byte[] head = ("POST /echo HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\n"
+                + "Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n" + chunk)
+                .getBytes(StandardCharsets.UTF_8);
+        byte[] payload = new byte[] { '[', '"', (byte) 0xC3, '"', ']' };
+        byte[] tail = "\r\n0\r\n\r\n".getBytes(StandardCharsets.UTF_8);
+        byte[] all = new byte[head.length + payload.length + tail.length];
+        System.arraycopy(head, 0, all, 0, head.length);
+        System.arraycopy(payload, 0, all, head.length, payload.length);
+        System.arraycopy(tail, 0, all, head.length + payload.length, tail.length);
+        byte[] response = rawBytes(all);
+        assertEquals(400, status(response),
+                "a truncated multi-byte sequence must be a 400:\n"
+                        + new String(response, StandardCharsets.UTF_8));
+    }
+
+    @Test
     @DisplayName("concurrent uploads reserve and release their budget")
     void concurrentUploadsDoNotLeakTheirBudget() throws Exception {
         // The in-flight budget is what bounds concurrent uploads, so it is charged
@@ -1939,17 +2041,44 @@ class BackendHttpIntegrationTest {
         return rawOn(port, head, body);
     }
 
+    /** Writes exactly these bytes, for a request whose body is not text. */
+    private byte[] rawBytes(byte[] all) throws IOException {
+        Socket socket = new Socket();
+        socket.connect(new InetSocketAddress("127.0.0.1", port), 5000);
+        socket.setSoTimeout(15000);
+        try {
+            socket.getOutputStream().write(all);
+            socket.getOutputStream().flush();
+            return readFullyBytes(socket.getInputStream());
+        } finally {
+            socket.close();
+        }
+    }
+
     private byte[] rawOn(int onPort, String head, byte[] body) throws IOException {
         Socket socket = new Socket();
         socket.connect(new InetSocketAddress("127.0.0.1", onPort), 5000);
         socket.setSoTimeout(15000);
         try {
             OutputStream out = socket.getOutputStream();
-            out.write(head.getBytes(StandardCharsets.UTF_8));
-            if (body.length > 0) {
-                out.write(body);
+            try {
+                out.write(head.getBytes(StandardCharsets.UTF_8));
+                if (body.length > 0) {
+                    out.write(body);
+                }
+                out.flush();
+            } catch (IOException earlyClose) {
+                // A server is allowed to answer and close before the body finishes
+                // arriving -- a 413 or a 503 is exactly that -- and then the rest
+                // of the write meets a closed socket. Reading its answer here is
+                // the difference between a test that reports "503" and one that
+                // reports "Broken pipe" and hides the reason.
+                byte[] answered = readFullyBytes(socket.getInputStream());
+                if (answered.length > 0) {
+                    return answered;
+                }
+                throw earlyClose;
             }
-            out.flush();
             return readFullyBytes(socket.getInputStream());
         } finally {
             socket.close();

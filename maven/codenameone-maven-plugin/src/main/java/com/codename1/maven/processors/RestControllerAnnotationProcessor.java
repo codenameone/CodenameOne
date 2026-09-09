@@ -1282,6 +1282,22 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             int end = javaType.lastIndexOf('>');
             if (end > lt) {
                 List<String> args = splitTypeArguments(javaType.substring(lt + 1, end));
+                // A map's KEY is not written the way its values are. Json.writeValue
+                // calls String.valueOf on every key whatever its type, so
+                // Map<byte[], String> comes back with keys spelled "[B@1a2b3c" and
+                // a Map<Note, String> with "com.example.Note@1a2b3c" -- object
+                // identity, not data, and different on every run. Checking the key
+                // as though it were a value approved both: byte[] and a writable
+                // DTO are perfectly good VALUES. This is the return-side twin of
+                // the rule that a JSON object's names arrive as strings.
+                if ("java.util.Map".equals(raw) && args.size() == 2) {
+                    String key = args.get(0);
+                    int keyLt = key.indexOf('<');
+                    String rawKey = keyLt < 0 ? key : key.substring(0, keyLt);
+                    if (!"java.lang.String".equals(rawKey)) {
+                        return false;
+                    }
+                }
                 for (int i = 0; i < args.size(); i++) {
                     if (!isEncodableReturn(args.get(i), ctx, false)) {
                         return false;
