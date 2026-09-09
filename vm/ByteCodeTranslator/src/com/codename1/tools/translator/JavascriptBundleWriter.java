@@ -1787,23 +1787,22 @@ final class JavascriptBundleWriter {
      * Classifies the wrapper argument of a {@code bindNative([...], WRAPPER)}
      * call whose name array ends at {@code close}.
      *
-     * Returns TRUE for a {@code function*}, FALSE for a plain {@code
-     * function}, and null when it cannot tell -- which the caller must treat
-     * as "leave suspending", the direction virtual dispatch tolerates.
+     * {@link WrapperKind#UNKNOWN} means it cannot tell, which the caller must
+     * treat as "leave suspending".
      *
      * One level of indirection is resolved, because the crypto bindings pass a
      * factory result ({@code cn1CryptoAesBinding("aesEncrypt")}) rather than a
      * literal: the named function is located and its first {@code return
      * function} decides. Deeper indirection is deliberately not chased.
      */
-    private static Boolean classifyBindNativeWrapper(String src, int close) {
+    private static WrapperKind classifyBindNativeWrapper(String src, int close) {
         int i = skipSpaceAndComments(src, close + 1);
         if (i >= src.length() || src.charAt(i) != ',') {
-            return null;
+            return WrapperKind.UNKNOWN;
         }
         i = skipSpaceAndComments(src, i + 1);
         if (src.startsWith("function", i)) {
-            return Boolean.valueOf(isGeneratorAt(src, i));
+            return kindAt(src, i);
         }
         // ``ident(`` -- a factory. Resolve its declaration once.
         int j = i;
@@ -1812,18 +1811,29 @@ final class JavascriptBundleWriter {
             j++;
         }
         if (j == i || j >= src.length() || src.charAt(j) != '(') {
-            return null;
+            return WrapperKind.UNKNOWN;
         }
         int decl = src.indexOf("function " + src.substring(i, j) + "(");
         if (decl < 0) {
-            return null;
+            return WrapperKind.UNKNOWN;
         }
         int ret = src.indexOf("return function", decl);
         if (ret < 0) {
-            return null;
+            return WrapperKind.UNKNOWN;
         }
-        return Boolean.valueOf(isGeneratorAt(src, ret + "return ".length()));
+        return kindAt(src, ret + "return ".length());
     }
+
+    /** What kind of wrapper the {@code function} keyword at {@code i} opens. */
+    private static WrapperKind kindAt(String src, int i) {
+        return isGeneratorAt(src, i) ? WrapperKind.GENERATOR : WrapperKind.PLAIN;
+    }
+
+    /**
+     * Three states, not a nullable Boolean: "cannot tell" is a real answer
+     * here and must not be confused with either of the other two.
+     */
+    private enum WrapperKind { GENERATOR, PLAIN, UNKNOWN }
 
     /** True when the {@code function} keyword at {@code i} is a generator. */
     private static boolean isGeneratorAt(String src, int i) {
@@ -1923,8 +1933,7 @@ final class JavascriptBundleWriter {
                 // not iterable". Skipping comments matters for the same
                 // reason -- SQLiteNative.isCipherAvailable documents itself
                 // between the ``],`` and its plain ``function``.
-                Boolean generatorWrapper = classifyBindNativeWrapper(src, close);
-                if (generatorWrapper == null || generatorWrapper.booleanValue()) {
+                if (classifyBindNativeWrapper(src, close) != WrapperKind.PLAIN) {
                     continue;   // unknown, or a generator -> leave it suspending
                 }
                 java.util.regex.Matcher lit = literal.matcher(src.substring(bracket + 1, close));
