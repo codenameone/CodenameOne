@@ -81,3 +81,17 @@ warning: unused variable 'currentOffset' [-Wunused-variable]
 # treated as truncation. It carries no [-Wflag], because clang flags belong to
 # file-scoped diagnostics -- that is what separates the two.
 warning: Skipping duplicate build file in Compile Sources build phase
+
+# 15. Split immediately BEFORE a space, so the continuation is indented. This is
+# the shape that reddened CI: excluding every indented line as "probably a source
+# snippet" also excluded this, and the diagnostic kept a truncated message with no
+# flag. Distinguishing it from a real snippet is what the snippet/caret patterns
+# are for; the join must still complete a flag.
+/tmp/proj/HelloApp-src/com_codename1_ui_Button.m:77:9: warning: unused variable 'iterations'
+ [-Wunused-variable]
+
+# 16. A real snippet and caret pair following an UNFLAGGED diagnostic. Neither may
+# be glued on, which is what separates 15 from noise.
+/tmp/proj/HelloApp-src/cn1_globals.m:42:3: warning: implicit declaration of function 'cn1_absent'
+   42 |   cn1_absent();
+      |   ^

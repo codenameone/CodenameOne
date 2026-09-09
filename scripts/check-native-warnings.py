@@ -182,8 +182,17 @@ SPLIT_PREFIX_RE = re.compile(r'^\S*/\S*$')
 # Lines that legitimately follow a diagnostic and must never be glued onto it:
 # clang's source snippet and caret (both indented), the include-trace header, and
 # a build task announcement.
+# Lines that legitimately follow a diagnostic and must never be glued onto it:
+# clang's source snippet ("  5646 |     code") and its caret ("       |    ^"),
+# the include-trace header, and a build task announcement.
+#
+# Excluding ALL indented lines here was wrong, and cost a red build: a split can
+# land immediately before a space, leaving the continuation as " [-Wunused-variable]",
+# which is indented and is exactly the thing that needs joining. Only the shapes
+# that are genuinely something else are excluded; the join is still only made when
+# it completes a trailing flag, so nothing else can be glued on by accident.
 CONTINUATION_EXCLUDE_RE = re.compile(
-    r'^(?:\s|In file included from\b|[A-Z][A-Za-z]+\s+/|\[\s*\d)')
+    r'^(?:\s*(?:\d+\s*)?\||In file included from\b|[A-Z][A-Za-z]+\s+/|\[\s*\d)')
 
 
 def _parses(line):
@@ -322,8 +331,18 @@ def port_index(leg):
     """
     if leg in _PORT_INDEX:
         return _PORT_INDEX[leg]
+    if leg not in LEG_PORT_DIRS:
+        # Silently treating an unknown leg as "no port trees" would resolve every
+        # hand-written native to nothing, reclassify all of it as vendored, and drop
+        # it out of the gating set -- the census would still print and still pass,
+        # having quietly stopped checking the code most worth checking. A leg with
+        # genuinely no port sources says so with an empty list, as clean-target does.
+        raise SystemExit(
+            "unknown leg %r: add it to LEG_PORT_DIRS naming the port trees it builds "
+            "from (an empty list if it has none). Known legs: %s"
+            % (leg, ", ".join(sorted(LEG_PORT_DIRS))))
     index = {}
-    for rel in LEG_PORT_DIRS.get(leg, []):
+    for rel in LEG_PORT_DIRS[leg]:
         base = os.path.join(ROOT, rel)
         if not os.path.isdir(base):
             continue
@@ -401,66 +420,25 @@ def classify(diags, manifest, leg):
     return unattributed
 
 
-def coverage_path(leg):
-    return os.path.join(BASELINE_DIR, "coverage-%s.txt" % leg)
+def check_completeness(manifest, compiled):
+    """Sources the manifest lists that this build did not compile.
 
+    An incremental build recompiles nothing and reports no warnings, which reads
+    exactly like a clean codebase; so does the documented xcodebuild failure where
+    a bad ARCHS override makes every target compile nothing while still copying
+    resources. Both are fatal to a census and both must be impossible to mistake
+    for progress.
 
-def read_coverage(leg):
-    """The sources the build that wrote this leg's baseline actually compiled."""
-    path = coverage_path(leg)
-    if not os.path.exists(path):
-        return None
-    names = set()
-    with open(path, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if line and not line.startswith("#"):
-                names.add(line)
-    return names
-
-
-def write_coverage(leg, compiled):
-    with open(coverage_path(leg), "w", encoding="utf-8") as fh:
-        fh.write("# Sources compiled by the build that produced baseline-%s.txt.\n" % leg)
-        fh.write("#\n")
-        fh.write("# The gate fails when a later run compiles FEWER of these. An incremental\n")
-        fh.write("# build recompiles nothing and reports no warnings, which reads exactly like\n")
-        fh.write("# a clean codebase; comparing against what was covered once makes that\n")
-        fh.write("# impossible to mistake for progress.\n")
-        fh.write("#\n")
-        fh.write("# Not the same as the manifest: the manifest lists every file in the\n")
-        fh.write("# generated project, and a build legitimately compiles a subset of it.\n")
-        fh.write("\n")
-        for name in sorted(compiled):
-            fh.write("%s\n" % name)
-
-
-def check_completeness(manifest, compiled, leg):
-    """Whether this build covered as much as the one the baseline came from.
-
-    Two different questions live here, and conflating them is what made the first
-    version of this unusable:
-
-    - Did this build compile ANYTHING? An incremental build recompiles nothing and
-      reports no warnings; so does the documented xcodebuild failure where a bad
-      ARCHS override makes every target compile nothing while still copying
-      resources. Both are indistinguishable from a clean codebase, and both are
-      fatal to a census.
-    - Did it compile everything the manifest lists? No, and it should not have to.
-      The manifest names every file in the generated project, and a target
-      legitimately builds a subset -- a .metal goes through a different task, a
-      source can be excluded from the target. Failing on that would be demanding
-      the wrong invariant.
-
-    So the ratchet is on COVERAGE, measured against the build that wrote the
-    baseline. It is exact, needs no threshold, and needs nobody to enumerate which
-    files a target happens to include.
+    Measured against the manifest from the SAME build, deliberately. An earlier
+    version compared against the set of sources the baselined build compiled, and
+    two real runs of the same leg compiled 3147 and 3156 sources -- the app's
+    translated surface moves a little between runs, so a cross-run comparison
+    couples the gate to something that legitimately changes. Each of those runs
+    compiled 100% of its own manifest, which is the invariant that actually holds
+    and the one worth enforcing.
     """
     expected = {n for n in manifest if n.endswith(SOURCE_EXTS)}
-    never_compiled = sorted(expected - set(compiled))
-    previous = read_coverage(leg)
-    regressed = sorted(previous - set(compiled)) if previous else []
-    return never_compiled, sorted(expected), regressed
+    return sorted(expected - set(compiled)), sorted(expected)
 
 
 def baseline_path(leg):
@@ -617,6 +595,11 @@ def self_test():
         # A real fileless build-system warning, kept.
         ("<none>", 0, 0, "<no-flag>",
          "Skipping duplicate build file in Compile Sources build phase"),
+        # Rejoined across an INDENTED continuation. Unjoined this keeps a truncated
+        # message and loses its flag, which is what reddened CI once.
+        ("com_codename1_ui_Button.m", 77, 9, "-Wunused-variable", "unused variable ?"),
+        # Genuinely unflagged, and its snippet/caret must NOT have been glued on.
+        ("cn1_globals.m", 42, 3, "<no-flag>", "implicit declaration of function ?"),
     }
     problems = []
     for extra in sorted(got - expected):
@@ -731,30 +714,26 @@ def main():
 
     diags, compiled, lost = parse_log(text)
 
-    never_compiled, expected, regressed = check_completeness(manifest, compiled, args.leg)
+    never_compiled, expected = check_completeness(manifest, compiled)
     if not args.allow_partial:
         if not compiled:
             print("FAIL: this log records no compilation at all, so an empty warning list "
                   "means nothing. A build that compiles nothing while still copying "
                   "resources looks exactly like this.", file=sys.stderr)
             return 2
-        if regressed:
-            print("FAIL: %d source(s) that the baselined build compiled were not compiled "
-                  "by this one, so the census undercounts and a warning could disappear "
-                  "without being fixed. Re-run against a cold build.\n  %s%s"
-                  % (len(regressed), "\n  ".join(regressed[:40]),
-                     "\n  ..." if len(regressed) > 40 else ""), file=sys.stderr)
+        if never_compiled:
+            print("FAIL: %d of the %d sources in this build's own manifest were never "
+                  "compiled, so the census undercounts. Either the build was incremental "
+                  "-- re-run it cold -- or a source has been excluded from the target, "
+                  "in which case say so here rather than letting the count drift.\n  %s%s"
+                  % (len(never_compiled), len(expected), "\n  ".join(never_compiled[:40]),
+                     "\n  ..." if len(never_compiled) > 40 else ""), file=sys.stderr)
             return 2
     if lost:
         print("note: %d diagnostic(s) lost their file to log truncation and are not "
               "attributed to anyone; they are reported here and never baselined." % lost)
-    print("coverage: %d source(s) compiled; %d of the %d in the manifest were not built by "
-          "this target" % (len(compiled), len(never_compiled), len(expected)))
-    if never_compiled:
-        shown = ", ".join(never_compiled[:20])
-        if len(never_compiled) > 20:
-            shown += ", ... (%d more)" % (len(never_compiled) - 20)
-        print("  not built by this target: %s" % shown)
+    print("coverage: %d source(s) compiled, covering all %d in this build's manifest"
+          % (len(compiled), len(expected)))
 
     unattributed = classify(diags, manifest, args.leg)
     if unattributed:
@@ -779,9 +758,7 @@ def main():
 
     if args.write_baseline:
         n = write_baseline(args.leg, diags, "leg: %s\nlog: %s" % (args.leg, os.path.basename(args.log)))
-        write_coverage(args.leg, compiled)
         print("wrote %d baseline entries to %s" % (n, baseline_path(args.leg)))
-        print("wrote %d covered sources to %s" % (len(compiled), coverage_path(args.leg)))
         return 0
 
     gating = [d for d in diags if d.group in GATING_GROUPS]
