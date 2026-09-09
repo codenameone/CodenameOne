@@ -1,0 +1,22 @@
+{{- /* A summary table for one member group. Called with "rows", "title", "page". */ -}}
+{{- if .rows }}
+{{- $page := .page }}
+<section class="cn1-api-summary">
+  <h2 class="cn1-api-summary__title">{{ .title }}</h2>
+  <table class="cn1-api-table">
+    <tbody>
+      {{- range .rows }}
+      <tr{{ if .deprecated }} class="is-deprecated"{{ end }}>
+        <td class="cn1-api-table__member">
+          <a href="#{{ .anchor }}">{{ partial "javadoc/signature.html" . }}</a>
+        </td>
+        <td class="cn1-api-table__summary">
+          {{- if .deprecated }}<span class="cn1-api-tag">Deprecated</span> {{ end -}}
+          {{- with .summary }}{{ $page.RenderString . }}{{ end -}}
+        </td>
+      </tr>
+      {{- end }}
+    </tbody>
+  </table>
+</section>
+{{- end }}

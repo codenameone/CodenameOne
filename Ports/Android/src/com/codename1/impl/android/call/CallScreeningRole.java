@@ -134,11 +134,8 @@ class CallScreeningRole {
         try {
             Class<?> rmClass = Class.forName("android.app.role.RoleManager");
             // Every reflective result is tested with instanceof before it is
-            // cast. ParparVM does not check CHECKCAST, so a cast that fails
-            // there does not throw and cannot be caught -- and this file is
-            // gated by scripts/check-cast-semantics.sh for exactly that. The
-            // guards are worth having on their own terms too: a reflective
-            // call that answers the wrong type should degrade, not crash.
+            // cast: a call that answers the wrong type should degrade to "the
+            // role is unavailable", not crash the screening setup.
             String role = asString(
                     rmClass.getField("ROLE_CALL_SCREENING").get(null));
             Object rm = activity.getSystemService(rmClass);
@@ -261,13 +258,9 @@ class CallScreeningRole {
         } catch (Exception e) {
             finish(requestId, whenDone, false);
         }
-        // OUTSIDE the try, and not merely for tidiness: iterating a
-        // List<RoleResult> compiles to a CHECKCAST on each element, and a
-        // CHECKCAST inside a catch(Exception) is what
-        // scripts/check-cast-semantics.sh fails the build on -- ParparVM does
-        // not throw for a failed cast, so that handler would never run on
-        // iOS. Answering the waiters is not something a broad catch should be
-        // wrapped around anyway.
+        // OUTSIDE the try on purpose: answering the waiters is not something a
+        // broad catch should be wrapped around, or a failure in one of them
+        // would be reported as a failure to request the role.
         for (RoleResult w : orphaned) {
             w.neverPrompted();
         }
@@ -288,11 +281,6 @@ class CallScreeningRole {
     }
 
     /// A reflective answer as a `String`, or null when it is not one.
-    ///
-    /// The narrowing lives in its own method, outside any `try`, on purpose:
-    /// ParparVM does not check CHECKCAST, so a cast that fails there does not
-    /// throw and cannot be caught, and a cast sitting inside a broad handler
-    /// is exactly what scripts/check-cast-semantics.sh reports.
     private static String asString(Object o) {
         if (o instanceof String) {
             return (String) o;

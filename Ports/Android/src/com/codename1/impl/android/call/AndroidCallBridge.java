@@ -225,10 +225,9 @@ public class AndroidCallBridge implements CallBridge {
     /// SpotBugs gate reports for this package.
     /// A reflective answer as an `int`, or the fallback.
     ///
-    /// Guarded with `instanceof` rather than cast-and-catch: ParparVM does
-    /// not check CHECKCAST, so a cast that fails under a handler does not
-    /// throw and the handler never runs. Kept out of the reflective `try`
-    /// for the same reason, as [CallScreeningRole] does with its Intents.
+    /// Guarded with `instanceof` rather than cast-and-catch, and kept out of
+    /// the reflective `try`: an answer of the wrong type is the fallback, not
+    /// a reflection failure, as [CallScreeningRole] does with its Intents.
     private static int asInt(Object o, int fallback) {
         if (o instanceof Integer) {
             return ((Integer) o).intValue();

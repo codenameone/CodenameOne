@@ -480,8 +480,9 @@ jobs:
           scripts/gen-build-hint-annotations.sh --check
       # ParparVM's CHECKCAST is unchecked, so a failed cast does not throw
       # ClassCastException on iOS -- code written to catch it silently uses the
-      # wrong object instead (issue #5531). core/android/ios are already compiled
-      # by the SpotBugs steps above; JavaAPI is not, so build it here.
+      # wrong object instead (issue #5531). Scoped to what a translation sees:
+      # core/ios, which the SpotBugs steps above already compiled, and JavaAPI,
+      # which they do not, so build it here.
       - name: Check cast semantics
         if: ${{ matrix.java-version == 8 }}
         run: |

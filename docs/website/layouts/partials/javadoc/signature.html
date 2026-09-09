@@ -1,0 +1,30 @@
+{{- /* A member's declaration, rendered as markup rather than as a code fence so
+       that every type in it links to its own page. Called with a member map.
+
+       Fields and executables are told apart by whether the doclet set a
+       "parameters" key: it always does for a method or constructor, including
+       one that takes none, and never does for a field. */ -}}
+<code class="cn1-api-signature">
+  {{- with .modifiers }}<span class="cn1-api-mod">{{ . }}</span> {{ end -}}
+  {{- if isset . "parameters" -}}
+    {{- with .typeParameters }}<span class="cn1-api-mod">{{ . }}</span> {{ end -}}
+    {{- with .returnType }}{{ partial "javadoc/type-ref.html" . }} {{ end -}}
+    <span class="cn1-api-name">{{ .name }}</span><span class="cn1-api-punct">(</span>
+    {{- range $i, $p := .parameters -}}
+      {{- if $p.type.label -}}
+        {{- if $i }}<span class="cn1-api-punct">, </span>{{ end -}}
+        {{ partial "javadoc/type-ref.html" $p.type }} <span class="cn1-api-arg">{{ $p.name }}</span>
+      {{- end -}}
+    {{- end -}}
+    <span class="cn1-api-punct">)</span>
+    {{- with .declaredThrows }}
+      <span class="cn1-api-mod"> throws </span>
+      {{- range $i, $t := . }}{{ if $i }}<span class="cn1-api-punct">, </span>{{ end }}{{ partial "javadoc/type-ref.html" $t }}{{ end -}}
+    {{- end }}
+    {{- with .defaultValue }}<span class="cn1-api-punct"> default </span><span class="cn1-api-const">{{ . }}</span>{{ end -}}
+  {{- else -}}
+    {{- with .fieldType }}{{ partial "javadoc/type-ref.html" . }} {{ end -}}
+    <span class="cn1-api-name">{{ .name }}</span>
+    {{- with .constant }}<span class="cn1-api-punct"> = </span><span class="cn1-api-const">{{ . }}</span>{{ end -}}
+  {{- end -}}
+</code>

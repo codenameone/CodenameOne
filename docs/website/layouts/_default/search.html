@@ -10,11 +10,18 @@
     <label class="cn1-search-label" for="cn1-search-input">Search</label>
     <input id="cn1-search-input" class="cn1-search-input" type="search" placeholder="Try: native interfaces, CSS, iOS, push notifications" autocomplete="off" />
     <p class="cn1-search-note">
-      Note: this index does not cover the <a href="/developer-guide/">Developer Guide</a>.
+      Note: API types and members are matched by name and listed separately below.
+      This index does not cover the <a href="/developer-guide/">Developer Guide</a>.
       The guide is a single large document and would match almost every query &mdash;
       search it directly using your browser's find-in-page (Ctrl/Cmd&#8209;F).
     </p>
     <p class="cn1-search-status" id="cn1-search-status">Loading search index…</p>
+
+    <div class="cn1-search-api" id="cn1-search-api" hidden>
+      <h2 class="cn1-search-api__title">API reference</h2>
+      <div class="cn1-search-api__results" id="cn1-search-api-results"></div>
+    </div>
+
     <div class="cn1-search-results" id="cn1-search-results"></div>
   </section>
 </article>
@@ -186,6 +193,130 @@
     .catch((err) => {
       status.textContent = "Search index is not available yet. Run website build to generate lunr-index.json.";
       console.error("Search index load failed:", err);
+    });
+})();
+</script>
+
+<script>
+// API reference search, over the index the Hugo doclet writes beside the pages.
+//
+// Deliberately not fed into Lunr with everything else. The index is roughly
+// 2100 types and 29000 members, and what a developer types into it is an
+// identifier -- "addActionListener", "BorderLayout", "Cmp" -- not prose. Lunr
+// would tokenise those into something worse than a plain identifier match and
+// take a noticeable amount of time to build the index in the browser first.
+(() => {
+  const input = document.getElementById("cn1-search-input");
+  const panel = document.getElementById("cn1-search-api");
+  const resultsEl = document.getElementById("cn1-search-api-results");
+  if (!input || !panel || !resultsEl) return;
+
+  const MAX_RESULTS = 12;
+  let entries = null;
+
+  const escapeHtml = (value) => String(value)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+  // The capitals of an identifier, so "BL" finds BorderLayout and "aAL" finds
+  // addActionListener. This is the one shorthand an API search has to support.
+  const humps = (name) => {
+    let out = "";
+    for (let i = 0; i < name.length; i++) {
+      const c = name[i];
+      if (i === 0 || (c >= "A" && c <= "Z")) out += c.toLowerCase();
+    }
+    return out;
+  };
+
+  const buildEntries = (payload) => {
+    const out = [];
+    for (const type of payload.types || []) {
+      out.push({
+        label: type.n,
+        context: type.p,
+        url: type.u,
+        kind: type.k,
+        summary: type.s || "",
+        key: type.n.toLowerCase(),
+        humps: humps(type.n),
+        isType: true,
+      });
+      for (const [label, anchor] of type.m || []) {
+        const name = label.split("(")[0];
+        out.push({
+          label: label,
+          context: type.p + "." + type.n,
+          url: type.u + "#" + anchor,
+          kind: "member",
+          summary: "",
+          key: name.toLowerCase(),
+          humps: humps(name),
+          isType: false,
+        });
+      }
+    }
+    return out;
+  };
+
+  // Lower sorts first. Types outrank members at equal quality of match, because
+  // a query that names a type usually means the type.
+  const score = (entry, query) => {
+    const key = entry.key;
+    let base;
+    if (key === query) base = 0;
+    else if (key.startsWith(query)) base = 10;
+    else if (entry.humps.startsWith(query)) base = 20;
+    else if (key.includes(query)) base = 30;
+    else return null;
+    return base + (entry.isType ? 0 : 5) + Math.min(key.length / 100, 0.99);
+  };
+
+  const render = (matches, query) => {
+    if (!query || !matches.length) {
+      panel.hidden = true;
+      resultsEl.innerHTML = "";
+      return;
+    }
+    panel.hidden = false;
+    resultsEl.innerHTML = matches.map((entry) => `
+      <a class="cn1-search-api__hit" href="${escapeHtml(entry.url)}">
+        <code class="cn1-search-api__name">${escapeHtml(entry.label)}</code>
+        <span class="cn1-search-api__kind">${escapeHtml(entry.kind)}</span>
+        <span class="cn1-search-api__context">${escapeHtml(entry.context)}</span>
+        ${entry.summary ? `<span class="cn1-search-api__summary">${escapeHtml(entry.summary)}</span>` : ""}
+      </a>
+    `).join("\n");
+  };
+
+  const run = () => {
+    if (!entries) return;
+    const query = input.value.trim().toLowerCase();
+    if (!query) {
+      render([], query);
+      return;
+    }
+    const scored = [];
+    for (const entry of entries) {
+      const value = score(entry, query);
+      if (value !== null) scored.push([value, entry]);
+    }
+    scored.sort((a, b) => a[0] - b[0]);
+    render(scored.slice(0, MAX_RESULTS).map((pair) => pair[1]), query);
+  };
+
+  fetch("/javadoc-search.json")
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))))
+    .then((payload) => {
+      entries = buildEntries(payload);
+      input.addEventListener("input", run);
+      run();
+    })
+    .catch((err) => {
+      // The API index only exists in a build that generated the API pages, so a
+      // content-only local build simply has no API section. Not an error worth
+      // showing a visitor.
+      console.info("API search index unavailable:", err);
     });
 })();
 </script>
