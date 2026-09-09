@@ -242,11 +242,11 @@ The resource bundle is a map between keys and values for example: the code below
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava016Snippet.java[tag=miscellaneous-features-java-016,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/L10nBasicFigure.java[tag=miscellaneous-features-java-016,indent=0]
 ----
 
 .Localized label
-image::img/l10n-basic.png[Localized label,scaledwidth=30%]
+image::img/generated/l10n-basic.png[Localized label,scaledwidth=30%]
 
 ==== Localization manager
 

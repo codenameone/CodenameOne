@@ -61,6 +61,13 @@ compiler rewrites each rule inside that block into a `$Dark<UIID>`
 style entry; UIManager picks them up whenever
 `CN.isDarkMode() == true`.
 
+.One form under Android Material, rendered in each appearance
+image:img/generated/native-themes-appearance-light.png[Light appearance,scaledwidth=45%]
+image:img/generated/native-themes-appearance-dark.png[Dark appearance,scaledwidth=45%]
+
+Nothing in that form is styled by hand, so the difference between the two
+pictures is entirely what the theme's dark entries supply.
+
 `Display.getInstance().setDarkMode(Boolean)` controls the active
 appearance:
 

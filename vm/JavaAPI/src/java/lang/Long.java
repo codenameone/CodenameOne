@@ -57,28 +57,28 @@ public final class Long extends Number implements Comparable<Long> {
      * Returns the value of this Long as a double.
      */
     public double doubleValue(){
-        return (double)value;
+        return (double)cn1Value();
     }
 
     /**
      * Compares this object against the specified object. The result is true if and only if the argument is not null and is a Long object that contains the same long value as this object.
      */
     public boolean equals(java.lang.Object obj){
-        return obj != null && obj.getClass() == getClass() && ((Long)obj).value == value;
+        return obj != null && obj.getClass() == getClass() && ((Long)obj).cn1Value() == cn1Value();
     }
 
     /**
      * Returns the value of this Long as a float.
      */
     public float floatValue(){
-        return (float)value;
+        return (float)cn1Value();
     }
 
     /**
      * Computes a hashcode for this Long. The result is the exclusive OR of the two halves of the primitive long value represented by this Long object. That is, the hashcode is the value of the expression: (int)(this.longValue()^(this.longValue()>>>32))
      */
     public int hashCode(){
-        return hashCode(this.value);
+        return hashCode(cn1Value());
     }
 
     /**
@@ -94,21 +94,29 @@ public final class Long extends Number implements Comparable<Long> {
      * Returns the value of this Long as a long value.
      */
     public long longValue(){
-        return value;
+        return cn1Value();
     }
+
+    /**
+     * Returns this Long's value, transparently handling both heap-allocated and
+     * tagged-immediate representations. All value reads route here -- Long is final, so a
+     * plain `return value;` getter would be inlined into a raw field load off a tagged
+     * pointer, which has no fields.
+     */
+    private native long cn1Value();
 
     /**
      * Returns the value of this Long as an int value.
      */
     public int intValue() {
-        return (int)value;
+        return (int)cn1Value();
     }
 
     /**
      * Returns the value of this Long as a byte value.
      */
     public byte byteValue() {
-        return (byte)value;
+        return (byte)cn1Value();
     }
     
     /**
@@ -183,7 +191,7 @@ public final class Long extends Number implements Comparable<Long> {
      * method that takes one argument.
      */
     public java.lang.String toString(){
-        return toString(value);
+        return toString(cn1Value());
     }
 
     /**
@@ -212,7 +220,11 @@ public final class Long extends Number implements Comparable<Long> {
      * @param i the primitive
      * @return object instance
      */
-    public static Long valueOf(long i) {
+    // Native so the tagged build can return an immediate without allocating. The off path
+    // (and 32-bit-pointer targets) calls valueOfHeap, preserving the previous behaviour.
+    public static native Long valueOf(long i);
+
+    static Long valueOfHeap(long i) {
         if (i >= -128 && i <= 127) {
             return LongCache.cache[(int) i + 128];
         }
@@ -237,6 +249,8 @@ public final class Long extends Number implements Comparable<Long> {
     }
 
     public int compareTo(Long another) {
-        return value < another.value ? -1 : value > another.value ? 1 : 0;
+        long cn1a = cn1Value();
+        long cn1b = another.cn1Value();
+        return cn1a < cn1b ? -1 : cn1a > cn1b ? 1 : 0;
     }
 }

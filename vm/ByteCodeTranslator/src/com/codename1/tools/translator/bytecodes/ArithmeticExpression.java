@@ -599,23 +599,38 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
                 case Opcodes.LCMP: {
                     return "CN1_CMP_EXPR("+subExpression.getExpressionAsString().trim() + ", " + subExpression2.getExpressionAsString().trim()+")";
                 }
-                case Opcodes.D2F: {
+                // Widening conversions are a plain C cast, and the opcodes that share an
+                // emission now share a clause. They used to be written out one per opcode,
+                // which SpotBugs reports as DB_DUPLICATE_SWITCH_CLAUSES -- it stayed quiet
+                // only while the narrowing cases below happened to match them too.
+                case Opcodes.D2F:
+                case Opcodes.I2F:
+                case Opcodes.L2F: {
                     return "((JAVA_FLOAT)" + subExpression.getExpressionAsString().trim() + ")";
+                }
+                case Opcodes.I2D:
+                case Opcodes.L2D: {
+                    return "((JAVA_DOUBLE)" + subExpression.getExpressionAsString().trim() + ")";
                 }
                 case Opcodes.F2D: {
                     return subExpression.getExpressionAsString().trim();
                 }
+                // JLS 5.1.3 narrowing is SATURATING, and a C cast is undefined out of range --
+                // arm64 saturates and x86-64 returns 0x80000000, so a raw cast here silently
+                // disagreed with itself across the architectures we ship. The helpers live in
+                // cn1_globals.h; BC_{F2I,F2L,D2I,D2L} and BasicInstruction use the same ones.
+                // L2I below is NOT one of these: long-to-int is defined truncation.
                 case Opcodes.F2I: {
-                    return "((JAVA_INT)" + subExpression.getExpressionAsString().trim() + ")";
+                    return "cn1SaturateToInt((JAVA_DOUBLE)" + subExpression.getExpressionAsString().trim() + ")";
                 }
                 case Opcodes.F2L: {
-                    return "((JAVA_LONG)" + subExpression.getExpressionAsString().trim() + ")";
+                    return "cn1SaturateToLong((JAVA_DOUBLE)" + subExpression.getExpressionAsString().trim() + ")";
                 }
                 case Opcodes.D2I: {
-                    return "((JAVA_INT)" + subExpression.getExpressionAsString().trim() + ")";
+                    return "cn1SaturateToInt(" + subExpression.getExpressionAsString().trim() + ")";
                 }
                 case Opcodes.D2L: {
-                    return "((JAVA_LONG)" + subExpression.getExpressionAsString().trim() + ")";
+                    return "cn1SaturateToLong(" + subExpression.getExpressionAsString().trim() + ")";
                 }
                 case Opcodes.I2B: {
                     return "(("+subExpression.getExpressionAsString()+" << 24) >> 24)";
@@ -623,23 +638,11 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
                 case Opcodes.I2C: {
                     return "("+subExpression.getExpressionAsString().trim()+" & 0xffff)";
                 }
-                case Opcodes.I2D: {
-                    return "((JAVA_DOUBLE)"+subExpression.getExpressionAsString().trim()+")";
-                }
-                case Opcodes.I2F: {
-                    return "((JAVA_FLOAT)"+subExpression.getExpressionAsString().trim()+")";
-                }
                 case Opcodes.I2L: {
                     return "((JAVA_LONG)"+subExpression.getExpressionAsString().trim()+")";
                 }
                 case Opcodes.I2S: {
                     return "(("+subExpression.getExpressionAsString().trim()+" << 16) >> 16)";
-                }
-                case Opcodes.L2D: {
-                    return "((JAVA_DOUBLE)"+subExpression.getExpressionAsString().trim()+")";
-                }
-                case Opcodes.L2F: {
-                    return "((JAVA_FLOAT)"+subExpression.getExpressionAsString().trim()+")";
                 }
                 case Opcodes.L2I: {
                     return "((JAVA_INT)"+subExpression.getExpressionAsString().trim()+")";

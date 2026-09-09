@@ -120,12 +120,15 @@ static int cn1_is_registered_class(const struct clazz* cls, int classId) {
  */
 struct clazz* cn1_debugger_class_of(JAVA_OBJECT obj) {
     if (obj == JAVA_NULL) return NULL;
-    // A tagged int is a value, not an address: Integer.valueOf() returns
-    // (v << 1) | 1 on every 64-bit target, which is the shipping iOS shape.
-    // It has no header to read, and the alignment rejection below would
-    // otherwise discard every boxed Integer the debugger was asked about.
+    // A tagged immediate is a value, not an address: valueOf() encodes the value plus a
+    // type code in the low three bits on every 64-bit target, which is the shipping iOS
+    // shape. It has no header to read, and the alignment rejection below would otherwise
+    // discard every boxed value the debugger was asked about. Resolved through CN1_CLASS_OF
+    // so a new tagged type needs no edit here -- naming Integer directly was correct only
+    // while Integer was the only tagged type, and would have silently reported a Long as an
+    // Integer with a garbage value.
     if (CN1_IS_TAGGED(obj)) {
-        return &class__java_lang_Integer;
+        return CN1_CLASS_OF(obj);
     }
     struct clazz* cls = NULL;
     if (!cn1_debugger_safe_read(&obj->__codenameOneParentClsReference, &cls, sizeof(cls))) {
@@ -205,22 +208,57 @@ int cn1_debugger_is_valid_object(JAVA_OBJECT obj) {
 }
 
 /**
- * The value carried by a tagged int, for callers that must not treat it as an
- * address. Returns 0 for anything else, so a caller that has already checked
- * {@code cn1_debugger_is_tagged_int} reads the real value.
+ * Whether a reference is a tagged immediate of ANY boxed type rather than a heap
+ * object. An immediate has no object header, so no caller may compute a field
+ * address from one.
  */
-int cn1_debugger_is_tagged_int(JAVA_OBJECT obj) {
+int cn1_debugger_is_tagged_value(JAVA_OBJECT obj) {
     return obj != JAVA_NULL && CN1_IS_TAGGED(obj);
 }
 
+/**
+ * The value carried by a tagged INTEGER specifically. Returns 0 for a tagged value
+ * of any other type, so a caller wanting the general case must use
+ * {@code cn1_debugger_tagged_value} instead of assuming a tagged reference is an int.
+ */
 JAVA_INT cn1_debugger_tagged_int_value(JAVA_OBJECT obj) {
 #if CN1_TAGGED_ACTIVE
-    return CN1_IS_TAGGED(obj) ? CN1_UNTAG_INT(obj) : 0;
+    return CN1_TAG_CODE(obj) == CN1_TAG_INTEGER ? CN1_UNTAG_INT(obj) : 0;
 #else
-    // Tagged ints are compiled out on 32-bit targets and under
+    // Tagged values are compiled out on 32-bit targets and under
     // -DCN1_DISABLE_TAGGED_INT, which also leaves CN1_UNTAG_INT undefined.
     // Every reference is then a real object and no caller reaches this.
     (void)obj;
+    return 0;
+#endif
+}
+
+/**
+ * Decodes any tagged immediate into a JDWP-style type character and a 64-bit payload,
+ * so the wire protocol can serve the single field each boxed type models without ever
+ * dereferencing the reference. Floating point payloads are the IEEE bit patterns, which
+ * is what the wire format carries. Returns 0 if obj is not a tagged immediate.
+ */
+int cn1_debugger_tagged_value(JAVA_OBJECT obj, char* typeChar, uint64_t* value) {
+#if CN1_TAGGED_ACTIVE
+    switch (CN1_TAG_CODE(obj)) {
+        case CN1_TAG_INTEGER:
+            *typeChar = 'I'; *value = (uint64_t)(uint32_t)CN1_UNTAG_INT(obj); return 1;
+        case CN1_TAG_LONG:
+            *typeChar = 'J'; *value = (uint64_t)CN1_UNTAG_LONG(obj); return 1;
+        case CN1_TAG_DOUBLE:
+            *typeChar = 'D'; *value = CN1_UNTAG_DOUBLE_BITS(obj); return 1;
+        case CN1_TAG_FLOAT:
+            *typeChar = 'F'; *value = (uint64_t)CN1_UNTAG_FLOAT_BITS(obj); return 1;
+        case CN1_TAG_CHARACTER:
+            *typeChar = 'C'; *value = (uint64_t)(uint32_t)CN1_UNTAG_CHAR(obj); return 1;
+        case CN1_TAG_SHORT:
+            *typeChar = 'S'; *value = (uint64_t)(uint32_t)CN1_UNTAG_SHORT(obj); return 1;
+        default:
+            return 0;
+    }
+#else
+    (void)obj; (void)typeChar; (void)value;
     return 0;
 #endif
 }

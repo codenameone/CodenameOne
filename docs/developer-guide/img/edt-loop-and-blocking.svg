@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="462" viewBox="0 0 820 462">
+  <rect x="0" y="0" width="820" height="462" fill="#ffffff"/>
+
+  <text x="410" y="26" font-family="Arial, sans-serif" font-size="15" font-weight="bold"
+        text-anchor="middle" fill="#222222">The EDT, and the two ways to hand it work</text>
+
+  <rect x="24" y="46" width="250" height="360" rx="6" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="149" y="68" font-family="Arial, sans-serif" font-size="13" font-weight="bold"
+        text-anchor="middle" fill="#4a6fa5">Event Dispatch Thread</text>
+  <text x="149" y="84" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">one thread, one cycle, forever</text>
+
+  <rect x="44" y="98" width="210" height="34" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
+  <text x="149" y="119" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">sleep until there is work</text>
+
+  <rect x="44" y="146" width="210" height="34" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
+  <text x="149" y="167" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">deliver input events</text>
+
+  <rect x="44" y="194" width="210" height="34" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
+  <text x="149" y="215" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">paint what is dirty</text>
+
+  <rect x="44" y="242" width="210" height="34" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1"/>
+  <text x="149" y="263" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">advance animations</text>
+
+  <rect x="44" y="290" width="210" height="46" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="2"/>
+  <text x="149" y="309" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#222222">run serial calls</text>
+  <text x="149" y="326" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">everything callSerially queued</text>
+
+  <path d="M 44 336 L 30 336 L 30 115 L 44 115" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 40 110 L 44 115 L 40 120" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="149" y="360" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">a long step here freezes the app</text>
+  <text x="149" y="376" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">because nothing else paints</text>
+
+  <rect x="330" y="46" width="466" height="172" rx="6" fill="#f7faf4" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="563" y="68" font-family="Arial, sans-serif" font-size="13" font-weight="bold"
+        text-anchor="middle" fill="#4a7a3d">callSerially, from another thread</text>
+  <rect x="350" y="82" width="150" height="42" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1"/>
+  <text x="425" y="99" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">your background</text>
+  <text x="425" y="115" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">thread</text>
+  <path d="M 500 103 L 616 103" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
+  <path d="M 610 98 L 616 103 L 610 108" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
+  <rect x="620" y="82" width="156" height="42" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1"/>
+  <text x="698" y="99" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">serial call queue</text>
+  <text x="698" y="115" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">drained at the end of a cycle</text>
+  <text x="563" y="146" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">Returns at once. The Runnable runs when the queue is</text>
+  <text x="563" y="162" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">next drained, which is how off-EDT code reaches the UI.</text>
+  <text x="563" y="182" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">That may be the cycle already running, since the drain comes last.</text>
+  <text x="563" y="196" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Either way it happens after that cycle has painted.</text>
+
+  <rect x="330" y="236" width="466" height="210" rx="6" fill="#fbf6f2" stroke="#a56a3a" stroke-width="1.5"/>
+  <text x="563" y="258" font-family="Arial, sans-serif" font-size="13" font-weight="bold"
+        text-anchor="middle" fill="#a56a3a">invokeAndBlock, from the EDT</text>
+  <rect x="350" y="272" width="150" height="42" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
+  <text x="425" y="289" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">your code, on</text>
+  <text x="425" y="305" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">the EDT</text>
+  <path d="M 500 293 L 616 293" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
+  <path d="M 610 288 L 616 293 L 610 298" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
+  <rect x="620" y="272" width="156" height="42" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
+  <text x="698" y="289" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#222222">pooled thread</text>
+  <text x="698" y="305" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">runs your Runnable</text>
+  <path d="M 698 314 L 698 334 L 425 334 L 425 316" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
+  <path d="M 420 322 L 425 316 L 430 322" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
+  <text x="563" y="356" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">Your line of code is suspended, but the EDT is not: it</text>
+  <text x="563" y="372" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">keeps looping and painting while you wait. Input keeps</text>
+  <text x="563" y="388" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#222222">arriving too, unless you pass invokeAndBlock(r, true).</text>
+  <text x="563" y="408" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">Execution resumes on the EDT once the Runnable returns.</text>
+  <text x="563" y="422" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">callSeriallyAndWait is NOT this: it waits on a lock. Its no-timeout form</text>
+  <text x="563" y="436" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">throws on the EDT; the timed one does not, and freezes it instead.</text>
+</svg>

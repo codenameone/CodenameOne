@@ -589,11 +589,11 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 break;
 
             case Opcodes.F2I:
-                b.append("    SP[-1].data.i = (JAVA_INT)SP[-1].data.f; SP[-1].type = CN1_TYPE_INT; /* F2I */\n");
+                b.append("    SP[-1].data.i = cn1SaturateToInt((JAVA_DOUBLE)SP[-1].data.f); SP[-1].type = CN1_TYPE_INT; /* F2I */\n");
                 break;
 
             case Opcodes.F2L:
-                b.append("    SP[-1].data.l = (JAVA_LONG)SP[-1].data.f; SP[-1].type = CN1_TYPE_LONG; /* F2L */\n");
+                b.append("    SP[-1].data.l = cn1SaturateToLong((JAVA_DOUBLE)SP[-1].data.f); SP[-1].type = CN1_TYPE_LONG; /* F2L */\n");
                 break;
 
             case Opcodes.F2D:
@@ -601,11 +601,11 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 break;
 
             case Opcodes.D2I:
-                b.append("    SP[-1].data.i = (JAVA_INT)SP[-1].data.d; SP[-1].type = CN1_TYPE_INT; /* D2I */\n");
+                b.append("    SP[-1].data.i = cn1SaturateToInt(SP[-1].data.d); SP[-1].type = CN1_TYPE_INT; /* D2I */\n");
                 break;
 
             case Opcodes.D2L:
-                b.append("    SP[-1].data.l = (JAVA_LONG)SP[-1].data.d; SP[-1].type = CN1_TYPE_LONG; /* D2L */\n");
+                b.append("    SP[-1].data.l = cn1SaturateToLong(SP[-1].data.d); SP[-1].type = CN1_TYPE_LONG; /* D2L */\n");
                 break;
 
             case Opcodes.D2F:

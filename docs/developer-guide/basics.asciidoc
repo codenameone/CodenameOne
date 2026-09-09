@@ -211,7 +211,7 @@ To sum this up, you can use layout managers and nesting to create elaborate UI's
 
 [[flow-layout]]
 .Flow Layout
-image::img/flow-layout.png[Flow Layout,scaledwidth=20%]
+image::img/generated/flow-layout.png[Flow Layout,scaledwidth=20%]
 
 link:https://www.codenameone.com/javadoc/com/codename1/ui/layouts/FlowLayout.html[Flow layout] lets the components "flow" horizontally and break a line when reaching the edge of the container. It's the default layout manager for containers. Because it's so flexible it's also problematic as it can result in wrong preferred size values for the parent https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container]. This can create a reflow issue, as a result recommend using flow layout for trivial cases. Avoid it for things such as text input etc. As the size of the text input can vary in runtime:
 
@@ -231,15 +231,15 @@ Flow layout can be aligned to the left (the default), to the <<flow-layout-cente
 
 [[flow-layout-center]]
 .Flow layout aligned to the center
-image::img/flow-layout-center.png[Flow layout aligned to the center,scaledwidth=20%]
+image::img/generated/flow-layout-center.png[Flow layout aligned to the center,scaledwidth=20%]
 
 [[flow-layout-right]]
 .Flow layout aligned to the right
-image::img/flow-layout-right.png[Flow layout aligned to the right,scaledwidth=20%]
+image::img/generated/flow-layout-right.png[Flow layout aligned to the right,scaledwidth=20%]
 
 [[flow-layout-center-middle]]
 .Flow layout aligned to the center horizontally & the middle vertically
-image::img/flow-layout-center-middle.png[Flow layout aligned to the center horizontally & the middle vertically,scaledwidth=20%]
+image::img/generated/flow-layout-center-middle.png[Flow layout aligned to the center horizontally & the middle vertically,scaledwidth=20%]
 
 Components within the flow layout get their natural preferred size by default and aren't stretched in any axis.
 
@@ -260,7 +260,7 @@ Which results in <<box-layout-y,this>>
 
 [[box-layout-y]]
 .BoxLayout Y
-image::img/box-layout-y.png[BoxLayout Y,scaledwidth=20%]
+image::img/generated/box-layout-y.png[BoxLayout Y,scaledwidth=20%]
 
 Box layout also supports a shorter terse notation which you use here to <<box-layout-x,show the X axis box>>:
 
@@ -271,7 +271,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 [[box-layout-x]]
 .BoxLayout X
-image::img/box-layout-x.png[BoxLayout X,scaledwidth=20%]
+image::img/generated/box-layout-x.png[BoxLayout X,scaledwidth=20%]
 
 The box layout keeps the preferred size of its destination orientation and scales elements on the other axis. Specifically `X_AXIS` will keep the preferred width of the component while growing all the components vertically to match in size. Its `Y_AXIS` counterpart keeps the preferred height
 while growing the components horizontally.
@@ -281,7 +281,7 @@ This behavior is useful since it allows elements to align as they would all have
 Sometimes the growing behavior in the X axis is undesired, for these cases you can use the `X_AXIS_NO_GROW` variant.
 
 .BoxLayout X_AXIS_NO_GROW
-image::img/box-layout-x-no-grow.png[BoxLayout X_AXIS_NO_GROW,scaledwidth=20%]
+image::img/generated/box-layout-x-no-grow.png[BoxLayout X_AXIS_NO_GROW,scaledwidth=20%]
 
 .`FlowLayout` vs. `BoxLayout.X_AXIS`
 TIP: When applicable recommend `BoxLayout` over `FlowLayout` as it acts more consistently in all situations. Another advantage of `BoxLayout` is the fact that it grows and thus aligns the components in a consistent column or row
@@ -289,7 +289,7 @@ TIP: When applicable recommend `BoxLayout` over `FlowLayout` as it acts more con
 ===== Border Layout
 
 .Border Layout
-image::img/border-layout.png[Border Layout,scaledwidth=20%]
+image::img/generated/border-layout.png[Border Layout,scaledwidth=20%]
 
 link:https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[Border layout] is unique. `BorderLayout` is a constraint-based layout that can place up to five components in one of the five positions: `NORTH`, `SOUTH`,
 `EAST`, `WEST` or `CENTER`:
@@ -314,7 +314,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 Results in:
 
 .Border Layout with CENTER_BEHAVIOR_CENTER
-image::img/border-layout-center.png[Border Layout with CENTER_BEHAVIOR_CENTER,scaledwidth=20%]
+image::img/generated/border-layout-center.png[Border Layout with CENTER_BEHAVIOR_CENTER,scaledwidth=20%]
 
 .Scrolling is Disabled in Border Layout
 NOTE: Because of its scaling behavior scrolling a border
@@ -323,7 +323,7 @@ layout makes no sense. `Container` implicitly blocks scrolling on a border layou
 For RTL the EAST and WEST values are implicitly reversed as shown in this image:
 
 .Border Layout in RTL mode
-image::img/border-layout-RTL.png[Border Layout in RTL mode,scaledwidth=20%]
+image::img/generated/border-layout-RTL.png[Border Layout in RTL mode,scaledwidth=20%]
 
 .RTL and Bidi
 ****
@@ -353,12 +353,12 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .Grid Layout 2×2
-image::img/grid-layout-2x2.png[Grid Layout 2×2,scaledwidth=20%]
+image::img/generated/grid-layout-2x2.png[Grid Layout 2×2,scaledwidth=20%]
 
 When you use a 2×4 size ratio you would see elements getting cropped as you do here. The grid layout uses the grid size first and doesn't pay too much attention to the preferred size of the components it holds.
 
 .Grid Layout 2×4
-image::img/grid-layout-2x4.png[Grid Layout 2×4,scaledwidth=20%]
+image::img/generated/grid-layout-2x4.png[Grid Layout 2×4,scaledwidth=20%]
 
 Grid also has an autoFit attribute that can be used to automatically calculate the column count based on
 available space and preferred width. This is useful for working with UI's where the device orientation
@@ -376,10 +376,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .Grid Layout autofit portrait
-image::img/grid-layout-autofit-portrait.png[Grid Layout autofit portrait,scaledwidth=20%]
+image::img/generated/grid-layout-autofit-portrait.png[Grid Layout autofit portrait,scaledwidth=20%]
 
 .Grid Layout autofit landscape
-image::img/grid-layout-autofit-landscape.png[Grid Layout autofit landscape,scaledwidth=20%]
+image::img/generated/grid-layout-autofit-landscape.png[Grid Layout autofit landscape,scaledwidth=20%]
 
 [[table-layout-section]]
 ==== Table Layout
@@ -400,7 +400,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .2×2 TableLayout with 5 elements, notice that the last element is missing
-image::img/table-layout-2x2.png[2×2 TableLayout with 5 elements, notice that the last element is missing,scaledwidth=20%]
+image::img/generated/table-layout-2x2.png[2×2 TableLayout with 5 elements, notice that the last element is missing,scaledwidth=20%]
 
 `TableLayout` supports the ability to grow the last column which can be enabled using the `setGrowHorizontally` method. You can also use a shortened terse syntax to construct a `TableLayout` but since the `TableLayout` is a constraint based layout you won't be able to use its full power with this syntax.
 
@@ -412,7 +412,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .`TableLayout.encloseIn()` with default behavior of growing the last column
-image::img/table-layout-enclose.png[TableLayout.encloseIn() with default behavior of growing the last column,scaledwidth=20%]
+image::img/generated/table-layout-enclose.png[TableLayout.encloseIn() with default behavior of growing the last column,scaledwidth=20%]
 
 ===== The full potential
 
@@ -461,7 +461,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 [[table-layout-constraints]]
 .TableLayout constraints can be used to create elaborate UI's
-image::img/table-layout-constraints.png[TableLayout constraints can be used to create elaborate UI's,scaledwidth=20%]
+image::img/generated/table-layout-constraints.png[TableLayout constraints can be used to create elaborate UI's,scaledwidth=20%]
 
 ===== TextMode Layout
 
@@ -497,7 +497,7 @@ When working in the non-android environment you use a `BoxLayout` on the Y axis 
 When used without constraints, the https://www.codenameone.com/javadoc/com/codename1/ui/layouts/LayeredLayout.html[LayeredLayout] places the components in order one on top of the other and sizes them all to the size of the largest component. This is useful when trying to create an overlay on top of an existing component. For example: an "x" button to allow removing the component.
 
 .The X on this button was placed there using the layered layout code below
-image::img/layered-layout.png[The X on this button was placed there using the layered layout code below,scaledwidth=20%]
+image::img/generated/layered-layout.png[The X on this button was placed there using the layered layout code below,scaledwidth=20%]
 
 The code to generate this UI is slightly complex and contains few relevant pieces. The truly relevant piece is this block:
 
@@ -541,7 +541,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 The result is:
 
-image::img/guibuilder-2-insets-1.png[Button positioned in bottom right using insets,scaledwidth=20%]
+image::img/generated/guibuilder-2-insets-1.png[Button positioned in bottom right using insets,scaledwidth=20%]
 
 The thing new here is this line:
 
@@ -573,7 +573,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 Resulting in:
 
 .Button vertically centered 5mm from left edge
-image::img/guibuilder-2-insets-2.png[Button vertically centered 5mm from left edge,scaledwidth=20%]
+image::img/generated/guibuilder-2-insets-2.png[Button vertically centered 5mm from left edge,scaledwidth=20%]
 
 Move it to the right edge with:
 
@@ -616,7 +616,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 This would result in:
 
 .Button's left inset linked to text field
-image::img/guibuilder-2-insets-3.png[Button's left inset linked to text field,scaledwidth=50%]
+image::img/generated/guibuilder-2-insets-3.png[Button's left inset linked to text field,scaledwidth=50%]
 
 The two active lines here are the last two:
 
@@ -675,7 +675,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 Because of the way GridBag works there's no terse syntax for it, although one should be possible.
 
 .GridbagLayout sample from the Java tutorial running on Codename One
-image::img/gridbag-layout.png[GridbagLayout sample from the Java tutorial running on Codename One,scaledwidth=20%]
+image::img/generated/gridbag-layout.png[GridbagLayout sample from the Java tutorial running on Codename One,scaledwidth=20%]
 
 ==== Group Layout
 
@@ -693,7 +693,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .GroupLayout Matisse generated UI running in Codename One
-image::img/group-layout.png[GroupLayout Matisse generated UI running in Codename One,scaledwidth=20%]
+image::img/generated/group-layout.png[GroupLayout Matisse generated UI running in Codename One,scaledwidth=20%]
 
 If you're porting newer Matisse code there are simple changes you can do:
 
@@ -716,7 +716,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .MiG layout sample ported to Codename One
-image::img/mig-layout.png[MiG layout sample ported to Codename One,scaledwidth=20%]
+image::img/generated/mig-layout.png[MiG layout sample ported to Codename One,scaledwidth=20%]
 
 It should be reasonably easy to port MiG code but you should notice the following:
 

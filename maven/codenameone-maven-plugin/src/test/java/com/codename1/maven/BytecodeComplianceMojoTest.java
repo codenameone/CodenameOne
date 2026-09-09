@@ -343,23 +343,56 @@ class BytecodeComplianceMojoTest {
                 "Expected SIMD alloca verifier to reject returning scratch arrays");
     }
 
+    /**
+     * The rule has always named all eight wrappers, but only Integer was ever exercised.
+     * ParparVM now returns a tagged immediate from valueOf for Long, Double, Float,
+     * Character and Short as well, and a monitor attached to an immediate is never
+     * reclaimed -- there is no object death to trigger removal -- so this build-time
+     * refusal is the only thing standing between an application and an unbounded
+     * side-table leak. A rule that is only proven for one of the types it claims to cover
+     * is not a rule anyone should rely on, so prove it for each.
+     *
+     * A loop rather than @ParameterizedTest: this module depends on junit-jupiter-api and
+     * -engine only, and adding junit-jupiter-params to a Maven plugin's pom for one test is
+     * not worth it. The assertion message carries the wrapper so a failure still names it.
+     */
     @Test
-    void rejectsSynchronizationOnPrimitiveWrapper(@TempDir Path tempDir) throws Exception {
-        Path outputDir = tempDir.resolve("classes");
-        Path allowedDir = tempDir.resolve("allowed");
-        Files.createDirectories(outputDir);
-        Files.createDirectories(allowedDir);
+    void rejectsSynchronizationOnEveryPrimitiveWrapper(@TempDir Path tempDir) throws Exception {
+        String[][] wrappers = {
+                { "java/lang/Integer", "(I)Ljava/lang/Integer;" },
+                { "java/lang/Long", "(J)Ljava/lang/Long;" },
+                { "java/lang/Double", "(D)Ljava/lang/Double;" },
+                { "java/lang/Float", "(F)Ljava/lang/Float;" },
+                { "java/lang/Character", "(C)Ljava/lang/Character;" },
+                { "java/lang/Short", "(S)Ljava/lang/Short;" },
+                { "java/lang/Byte", "(B)Ljava/lang/Byte;" },
+                { "java/lang/Boolean", "(Z)Ljava/lang/Boolean;" }
+        };
+        for (int i = 0; i < wrappers.length; i++) {
+            String owner = wrappers[i][0];
+            String descriptor = wrappers[i][1];
+            String simpleName = owner.substring(owner.lastIndexOf('/') + 1);
 
-        writeJavaLangObject(allowedDir);
-        writePrimitiveWrapperApi(allowedDir, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;");
-        writePrimitiveWrapperSynchronizedClass(outputDir, "app/IntegerLockUser", "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;");
+            Path outputDir = tempDir.resolve(simpleName + "-classes");
+            Path allowedDir = tempDir.resolve(simpleName + "-allowed");
+            Files.createDirectories(outputDir);
+            Files.createDirectories(allowedDir);
 
-        BytecodeComplianceMojo mojo = new BytecodeComplianceMojo();
-        Map<String, ?> allowedIndex = buildClassIndex(mojo, Collections.singletonList(allowedDir.toFile()));
-        List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex, Collections.<String, Object>emptyMap());
+            writeJavaLangObject(allowedDir);
+            writePrimitiveWrapperApi(allowedDir, owner, "valueOf", descriptor);
+            writePrimitiveWrapperSynchronizedClass(outputDir, "app/" + simpleName + "LockUser",
+                    owner, "valueOf", descriptor);
 
-        assertTrue(hasViolationForReferencePrefix(violations, "Synchronization on primitive wrapper java/lang/Integer"),
-                "Expected primitive wrapper synchronization to be rejected");
+            BytecodeComplianceMojo mojo = new BytecodeComplianceMojo();
+            Map<String, ?> allowedIndex = buildClassIndex(mojo,
+                    Collections.singletonList(allowedDir.toFile()));
+            List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex,
+                    Collections.<String, Object>emptyMap());
+
+            assertTrue(hasViolationForReferencePrefix(violations,
+                            "Synchronization on primitive wrapper " + owner),
+                    "Expected synchronization on " + owner + " to be rejected");
+        }
     }
 
     @Test
@@ -798,6 +831,21 @@ class BytecodeComplianceMojoTest {
         writeBytes(root, className, writer.toByteArray());
     }
 
+    /** The 1 constant in the argument type the given valueOf descriptor expects. */
+    private static int constantForDescriptor(String descriptor) {
+        char arg = descriptor.charAt(1);
+        if (arg == 'J') {
+            return Opcodes.LCONST_1;
+        }
+        if (arg == 'D') {
+            return Opcodes.DCONST_1;
+        }
+        if (arg == 'F') {
+            return Opcodes.FCONST_1;
+        }
+        return Opcodes.ICONST_1;
+    }
+
     private void writePrimitiveWrapperSynchronizedClass(Path root, String className, String owner, String methodName, String descriptor) throws Exception {
         ClassWriter writer = new ClassWriter(0);
         writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
@@ -812,7 +860,10 @@ class BytecodeComplianceMojoTest {
 
         MethodVisitor run = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "run", "()V", null, null);
         run.visitCode();
-        run.visitInsn(Opcodes.ICONST_1);
+        // The constant has to match the wrapper's own valueOf argument, or the analyzer sees
+        // a type-incorrect frame instead of the MONITORENTER this test is about. Long and
+        // double occupy two stack slots, which is why maxStack below is 4 rather than 2.
+        run.visitInsn(constantForDescriptor(descriptor));
         run.visitMethodInsn(Opcodes.INVOKESTATIC, owner, methodName, descriptor, false);
         run.visitInsn(Opcodes.DUP);
         run.visitVarInsn(Opcodes.ASTORE, 0);
@@ -820,7 +871,7 @@ class BytecodeComplianceMojoTest {
         run.visitVarInsn(Opcodes.ALOAD, 0);
         run.visitInsn(Opcodes.MONITOREXIT);
         run.visitInsn(Opcodes.RETURN);
-        run.visitMaxs(2, 1);
+        run.visitMaxs(4, 1);
         run.visitEnd();
 
         writer.visitEnd();

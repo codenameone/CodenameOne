@@ -5393,6 +5393,39 @@ bindNative(["cn1_java_lang_Integer_cn1Value_R_int"], function(__cn1ThisObject) {
 bindNative(["cn1_java_lang_Integer_valueOf_int_R_java_lang_Integer"], function*(i) {
   return yield* adaptVirtualResult(cn1_java_lang_Integer_valueOfHeap_int_R_java_lang_Integer(i));
 });
+// The same pair for the other five tagged boxes. Every native the C runtime gains for this
+// scheme needs a binding here or the JS port fails at run time on a missing symbol, and
+// JavascriptNativeAuditTest does not catch an omission -- these are checked by hand.
+bindNative(["cn1_java_lang_Long_cn1Value_R_long"], function(__cn1ThisObject) {
+  return __cn1ThisObject.cn1_java_lang_Long_value;
+});
+bindNative(["cn1_java_lang_Long_valueOf_long_R_java_lang_Long"], function*(i) {
+  return yield* adaptVirtualResult(cn1_java_lang_Long_valueOfHeap_long_R_java_lang_Long(i));
+});
+bindNative(["cn1_java_lang_Double_cn1Value_R_double"], function(__cn1ThisObject) {
+  return __cn1ThisObject.cn1_java_lang_Double_value;
+});
+bindNative(["cn1_java_lang_Double_valueOf_double_R_java_lang_Double"], function*(d) {
+  return yield* adaptVirtualResult(cn1_java_lang_Double_valueOfHeap_double_R_java_lang_Double(d));
+});
+bindNative(["cn1_java_lang_Float_cn1Value_R_float"], function(__cn1ThisObject) {
+  return __cn1ThisObject.cn1_java_lang_Float_value;
+});
+bindNative(["cn1_java_lang_Float_valueOf_float_R_java_lang_Float"], function*(f) {
+  return yield* adaptVirtualResult(cn1_java_lang_Float_valueOfHeap_float_R_java_lang_Float(f));
+});
+bindNative(["cn1_java_lang_Character_cn1Value_R_char"], function(__cn1ThisObject) {
+  return __cn1ThisObject.cn1_java_lang_Character_value | 0;
+});
+bindNative(["cn1_java_lang_Character_valueOf_char_R_java_lang_Character"], function*(c) {
+  return yield* adaptVirtualResult(cn1_java_lang_Character_valueOfHeap_char_R_java_lang_Character(c));
+});
+bindNative(["cn1_java_lang_Short_cn1Value_R_short"], function(__cn1ThisObject) {
+  return __cn1ThisObject.cn1_java_lang_Short_value | 0;
+});
+bindNative(["cn1_java_lang_Short_valueOf_short_R_java_lang_Short"], function*(v) {
+  return yield* adaptVirtualResult(cn1_java_lang_Short_valueOfHeap_short_R_java_lang_Short(v));
+});
 bindNative(["cn1_java_lang_System_exit_int", "cn1_java_lang_System_exit___int"], function(status) { jvm.finish(status); return null; });
 bindNative(["cn1_java_lang_Runtime_totalMemoryImpl_R_long"], function() { return _LfromNumber(67108864); });
 bindNative(["cn1_java_lang_Runtime_freeMemoryImpl_R_long"], function() { return _LfromNumber(33554432); });

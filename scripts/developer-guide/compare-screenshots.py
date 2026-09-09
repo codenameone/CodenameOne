@@ -67,6 +67,17 @@ def compare(generated: Path, committed: Path, tolerance: tuple[int, float] | Non
     a = Image.open(generated).convert("RGBA")
     b = Image.open(committed).convert("RGBA")
     if a.size != b.size:
+        # A tolerance sidecar deliberately does NOT cover this: a different size is
+        # a different picture, not a rendering difference.
+        #
+        # Note the figure heights are cropped to the laid-out content, and text
+        # component heights come from font metrics, which Java2D rounds slightly
+        # differently on macOS and Linux -- a handful of figures land two to five
+        # pixels apart between a developer's machine and the runner. The committed
+        # images are the runner's output, so CI compares byte-for-byte; a local
+        # regeneration of those figures reports a size change here and that is
+        # expected rather than a regression. Do not commit locally regenerated
+        # images to silence it -- that only moves the failure to CI.
         return f"size changed: generated {a.size[0]}x{a.size[1]}, committed {b.size[0]}x{b.size[1]}"
     pa, pb = a.load(), b.load()
     width, height = a.size
@@ -98,15 +109,47 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--generated", required=True, type=Path)
     parser.add_argument("--committed", required=True, type=Path)
-    parser.add_argument("--expected-count", type=int, required=True)
     args = parser.parse_args()
 
     produced = sorted(args.generated.glob("*.png"))
-    if len(produced) != args.expected_count:
-        print(
-            f"::error::Expected {args.expected_count} generated figures, found {len(produced)}",
-            file=sys.stderr,
-        )
+    committed_figures = sorted(args.committed.glob("*.png"))
+    if not produced:
+        print("::error::The generator produced no figures at all", file=sys.stderr)
+        return 1
+
+    # The committed directory is the manifest. Checking only that each produced
+    # figure matches would let a golden quietly stop being generated -- the run
+    # would compare whatever was still produced and pass, and the stale image
+    # would keep shipping. Requiring the two sets to be equal makes a figure
+    # that fell out of the generator a failure instead of a silent gap.
+    missing = sorted({c.name for c in committed_figures} - {p.name for p in produced})
+    if missing:
+        for name in missing:
+            print(
+                f"::error::{name} is committed as a generated figure but nothing produced it",
+                file=sys.stderr,
+            )
+        return 1
+
+    # Two generated figures with identical bytes mean one of them is showing
+    # something its caption does not describe. It happens whenever a sample only
+    # SETS UP an interaction -- attaches a dialog to a button, defines a callback,
+    # names a menu -- and the harness photographs the launch form instead of the
+    # state the caption promises. Nothing else catches it: each such figure
+    # renders successfully, is not blank, and matches its own committed copy, so
+    # both the render and the comparison pass while the guide shows the reader
+    # the same picture twice under two different captions.
+    by_bytes: dict[bytes, list[str]] = {}
+    for image in produced:
+        by_bytes.setdefault(image.read_bytes(), []).append(image.name)
+    clashes = [names for names in by_bytes.values() if len(names) > 1]
+    if clashes:
+        for names in clashes:
+            print(
+                "::error::these figures are byte-identical, so at least one does not "
+                "show what its caption says: " + ", ".join(sorted(names)),
+                file=sys.stderr,
+            )
         return 1
 
     failures = 0

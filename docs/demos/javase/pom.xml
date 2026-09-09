@@ -284,12 +284,57 @@
                           </arguments>
                       </configuration>
                       <executions>
+                          <!-- One JVM per pass. The device density is read once during
+                               Display.init and then cached on the implementation
+                               instance, so a single process cannot render two
+                               profiles. -->
                           <execution>
                               <id>generate-guide-screenshots</id>
                               <phase>verify</phase>
                               <goals>
                                   <goal>exec</goal>
                               </goals>
+                              <configuration>
+                                  <arguments>
+                                      <argument>-classpath</argument>
+                                      <classpath />
+                                      <argument>${exec.mainClass}</argument>
+                                      <argument>${guide.screenshot.output}</argument>
+                                      <argument>schematic</argument>
+                                  </arguments>
+                              </configuration>
+                          </execution>
+                          <execution>
+                              <id>generate-guide-figures-ios</id>
+                              <phase>verify</phase>
+                              <goals>
+                                  <goal>exec</goal>
+                              </goals>
+                              <configuration>
+                                  <arguments>
+                                      <argument>-classpath</argument>
+                                      <classpath />
+                                      <argument>${exec.mainClass}</argument>
+                                      <argument>${guide.screenshot.output}</argument>
+                                      <argument>ios</argument>
+                                  </arguments>
+                              </configuration>
+                          </execution>
+                          <execution>
+                              <id>generate-guide-figures-android</id>
+                              <phase>verify</phase>
+                              <goals>
+                                  <goal>exec</goal>
+                              </goals>
+                              <configuration>
+                                  <arguments>
+                                      <argument>-classpath</argument>
+                                      <classpath />
+                                      <argument>${exec.mainClass}</argument>
+                                      <argument>${guide.screenshot.output}</argument>
+                                      <argument>android</argument>
+                                  </arguments>
+                              </configuration>
                           </execution>
                       </executions>
                   </plugin>

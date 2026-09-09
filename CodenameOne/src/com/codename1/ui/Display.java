@@ -4957,6 +4957,38 @@ public final class Display extends CN1Constants {
         impl.exit();
     }
 
+    /// Exits the application and removes it from the platform's list of recent tasks, so the
+    /// user cannot bring it back by picking it out of the task switcher. This maps to Android's
+    /// `Activity.finishAndRemoveTask()`; platforms that expose no equivalent (iOS, the desktop
+    /// ports and the simulator among them) fall back to `#exitApplication()`, which is why the
+    /// call is always safe to make. Use `#isExitAndClearTaskSupported()` when the behavior
+    /// matters enough to branch on.
+    ///
+    /// #### See also
+    ///
+    /// - `#exitApplication()`
+    ///
+    /// - `#isExitAndClearTaskSupported()`
+    public void exitAndClearTask() {
+        codenameOneExited = true;
+        impl.exitAndClearTask();
+    }
+
+    /// Indicates whether this platform can remove the application from its list of recent tasks
+    /// on exit. When this returns false `#exitAndClearTask()` is still legal, it just behaves
+    /// exactly like `#exitApplication()`.
+    ///
+    /// #### Returns
+    ///
+    /// true if the task can be cleared, false if the call degrades to a plain exit
+    ///
+    /// #### See also
+    ///
+    /// - `#exitAndClearTask()`
+    public boolean isExitAndClearTaskSupported() {
+        return impl.isExitAndClearTaskSupported();
+    }
+
     /// Checks if this platform supports full-screen mode.  If full-screen mode is supported, you can use
     /// the `#requestFullScreen()`, `#exitFullScreen()`, and `#isInFullScreenMode()` methods
     /// to enter and exit full-screen - and query the current state.

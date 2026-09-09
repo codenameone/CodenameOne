@@ -2148,16 +2148,25 @@ public class BytecodeMethod implements SignatureSet {
         appendCMethodPrefix(b, "virtual_", cls);
         b.append(" {\n    ");
 
-        // Devirtualize the tagged-Integer fast path for the hottest collection methods.
-        // A tagged receiver is ALWAYS an Integer, so its hashCode IS the untagged value --
-        // turning HashMap's per-lookup key.hashCode() into a bare inline untag with no
-        // indirect dispatch and no call. equals between two tagged ints is a pointer
-        // compare (tags are canonical); the mixed case falls through to normal dispatch.
+        // Devirtualize the tagged-Integer fast path for the hottest collection methods:
+        // an Integer's hashCode IS its value, so HashMap's per-lookup key.hashCode() becomes
+        // a bare inline untag with no indirect dispatch and no call, and equals between two
+        // tagged Integers is a pointer compare (the encoding is canonical).
+        //
+        // These test the tag CODE, not merely "is tagged". Every other boxed type is tagged
+        // too and has a different hashCode contract -- Long folds its halves, Float and
+        // Double go through *ToIntBits -- so widening this to any tagged receiver returns a
+        // wrong hash with no crash, which is the worst failure this scheme can produce.
+        // The other types reach the right implementation through the vtable, which cn1ClassOf
+        // already resolves correctly; that path is slower than this one and always correct.
+        // equals stays Integer-only for a second reason: pointer equality implies value
+        // equality for every tag, but the converse fails for Float and Double, where two
+        // distinct NaN encodings must compare equal.
         String cn1mn = getCMethodName();
         if(cn1mn.equals("hashCode") && arguments.isEmpty() && !returnType.isVoid()) {
-            b.append("\n#if CN1_TAGGED_ACTIVE\n    if(CN1_IS_TAGGED(__cn1ThisObject)) { return CN1_UNTAG_INT(__cn1ThisObject); }\n#endif\n    ");
+            b.append("\n#if CN1_TAGGED_ACTIVE\n    if(CN1_TAG_CODE(__cn1ThisObject) == CN1_TAG_INTEGER) { return CN1_UNTAG_INT(__cn1ThisObject); }\n#endif\n    ");
         } else if(cn1mn.equals("equals") && arguments.size() == 1 && !returnType.isVoid()) {
-            b.append("\n#if CN1_TAGGED_ACTIVE\n    if(CN1_IS_TAGGED(__cn1ThisObject) && CN1_IS_TAGGED(__cn1Arg1)) { return (__cn1ThisObject == __cn1Arg1) ? JAVA_TRUE : JAVA_FALSE; }\n#endif\n    ");
+            b.append("\n#if CN1_TAGGED_ACTIVE\n    if(CN1_TAG_CODE(__cn1ThisObject) == CN1_TAG_INTEGER && CN1_TAG_CODE(__cn1Arg1) == CN1_TAG_INTEGER) { return (__cn1ThisObject == __cn1Arg1) ? JAVA_TRUE : JAVA_FALSE; }\n#endif\n    ");
         }
 
         if(includeStaticInitializer) {

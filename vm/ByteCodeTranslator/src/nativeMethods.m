@@ -2093,10 +2093,14 @@ void initClazzClazz() {
 JAVA_OBJECT java_lang_Object_getClassImpl___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     initClazzClazz();
 #if CN1_TAGGED_ACTIVE
-    // A tagged Integer has no object header to read; its class is always Integer.
+    // A tagged immediate has no object header to read; its class comes from the tag code.
+    // Derived through CN1_CLASS_OF rather than named here, so a new tagged type needs no
+    // edit -- getClass() was one of the four sites that crashed the original tagged-int
+    // build precisely because it read the header directly.
     if(CN1_IS_TAGGED(obj)) {
-        class__java_lang_Integer.__codenameOneParentClsReference = &ClazzClazz;
-        return (JAVA_OBJECT)(&class__java_lang_Integer);
+        struct clazz* cn1__tagCls = CN1_CLASS_OF(obj);
+        cn1__tagCls->__codenameOneParentClsReference = &ClazzClazz;
+        return (JAVA_OBJECT)cn1__tagCls;
     }
 #endif
     if(!obj->__codenameOneParentClsReference) {
@@ -2673,11 +2677,44 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     // wait()/notify() on the value dereferenced nonexistent monitor data.
     // Equal tagged values share one monitor (identical bit pattern), which is
     // the JDK's own -128..127 Integer-cache behavior extended to the whole
-    // tagged range -- legal and deterministic. Monitors created for tagged
-    // values are never reclaimed (there is no object death to trigger removal);
-    // they are bounded by the number of DISTINCT integer values a program ever
-    // synchronizes on, which is negligible in practice. The only header-touching
-    // step, cn1BibopNoteMonitorAttached, skips tagged values internally.
+    // tagged range -- legal and deterministic. The only header-touching step,
+    // cn1BibopNoteMonitorAttached, skips tagged values internally.
+    //
+    // MONITORS ON TAGGED VALUES ARE NEVER RECLAIMED. There is no object death to
+    // trigger removal, so `synchronized (Float.valueOf(i))` over a loop leaves one
+    // side-table entry per distinct value, forever. Now that Long, Double, Float,
+    // Character and Short are tagged too, that reaches five types whose monitors a
+    // heap box did used to get reclaimed -- so this is a real widening, not just a
+    // restatement of the Integer case. Reviewers reasonably ask for lifecycle
+    // tracking; deliberately not done, for three reasons:
+    //
+    //  - The shape is ALREADY unbounded for Integer and always has been. Removal
+    //    would be a new mechanism for every monitor in the VM, not a tagged-only
+    //    patch, because nothing here reclaims a monitor at monitorExit today.
+    //  - This subsystem is where the documented three-way monitorEnter deadlock
+    //    lives (see the first-creation branch below). Adding exit-time removal
+    //    means a waiter can be parked outside the table mutex holding monitor data
+    //    a remover is about to free. That is a correctness risk taken on for a
+    //    leak, which is the wrong trade.
+    //  - The DIRECT form is refused at BUILD time. BytecodeComplianceMojo rejects
+    //    MONITORENTER whose operand is statically typed as one of the eight primitive
+    //    wrappers, and BytecodeComplianceMojoTest proves it fires for each type rather
+    //    than for Integer alone.
+    //
+    // That build check is a PARTIAL mitigation and should not be described as more.
+    // The analysis is intra-procedural and types-only, so passing Float.valueOf(i) to a
+    // helper that takes Object and synchronizing on the parameter walks straight past
+    // it -- the operand is typed Object and the build passes. Storing the box in a
+    // field, an array or a collection defeats it the same way. Tracking erased wrapper
+    // origins would catch the easiest of those and lose to the rest, which is why it is
+    // a gate against the obvious mistake rather than a proof of unreachability.
+    //
+    // So the leak IS reachable from application code, and it is accepted rather than
+    // solved. It is bounded by the number of distinct boxed values a program ever uses
+    // as a lock, which is zero for every program that follows the rule the gate states.
+    // Framework and JavaAPI code is not scanned by that mojo at all; there is no
+    // `synchronized` on a boxed value anywhere in CodenameOne/src, vm/JavaAPI/src or
+    // Ports today, and adding one would reintroduce this. Use a dedicated lock object.
     int err = 0;
     // Double-checked locking for the lazily allocated per-object monitor. The fast-path
     // read MUST be an acquire load and the publishing store (inside the critical section)
@@ -2798,6 +2835,46 @@ JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     }
 }
 
+// A tagged value never allocates, so nothing else runs the boxed class's <clinit> -- and
+// that initializer is what fills the vtable a later hashCode/equals/compareTo on the
+// immediate dispatches through. Each valueOf below therefore forces it once.
+//
+// The flag is a FAST PATH, and both of its edges have to be ordered.
+//
+// Publication: `volatile` in C is neither atomic nor ordered, so a plain flag lets a second
+// thread observe 1 while the initializer's vtable and static-field writes are still
+// invisible to it on a weak-memory target, and the next virtual call dispatches through
+// stale class state. Release on publish, acquire on read -- the same pairing
+// CN1_CONSTANT_POOL_LOAD documents in cn1_globals.h, and for the same reason.
+//
+// Acquisition: release/acquire only carries what the PUBLISHING thread itself observed, and
+// __STATIC_INITIALIZER_X is not a reliable synchronisation point. Its generated fast path
+// (ByteCodeClass.emitClassInitializer) is `if(__X_LOADED__) return;` -- a plain load -- and
+// the matching `__X_LOADED__=1` is a plain store placed AFTER monitorExitBlock. A thread
+// that returns through that path has taken no lock and may hold none of the initialising
+// thread's writes, so publishing our flag from it would hand a stale view to everyone who
+// acquires it. Taking the class monitor here makes the publisher synchronise-with whoever
+// actually ran the body; monitors are reentrant (see monitorEnter's ownerThread check), so
+// the initializer's own enter nests harmlessly. It costs one uncontended lock per class per
+// process -- the flag short-circuits every call after the first -- and the hot path is
+// unchanged at a single acquire load.
+//
+// This closes the hole for the six boxed classes only. `__X_LOADED__` is a plain-load,
+// plain-store double-check on EVERY generated class initializer in the VM, which predates
+// tagging and is not fixed here.
+#if CN1_TAGGED_ACTIVE
+#define CN1_FORCE_BOX_CLINIT(cls) \
+    do { \
+        static int cn1__clinit_##cls = 0; \
+        if(!__atomic_load_n(&cn1__clinit_##cls, __ATOMIC_ACQUIRE)) { \
+            monitorEnterBlock(threadStateData, (JAVA_OBJECT)&class__##cls); \
+            __STATIC_INITIALIZER_##cls(threadStateData); \
+            monitorExitBlock(threadStateData, (JAVA_OBJECT)&class__##cls); \
+            __atomic_store_n(&cn1__clinit_##cls, 1, __ATOMIC_RELEASE); \
+        } \
+    } while(0)
+#endif
+
 // ---- Tagged small-integer support (poor man's Valhalla, 64-bit pointers only) ----
 // Integer.valueOf returns an immediate tagged pointer instead of allocating; cn1Value
 // recovers the int from either a tagged immediate or a heap Integer's field. When the
@@ -2808,12 +2885,7 @@ extern void __STATIC_INITIALIZER_java_lang_Integer(CODENAME_ONE_THREAD_STATE);
 #endif
 JAVA_OBJECT java_lang_Integer_valueOf___int_R_java_lang_Integer(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {
 #if CN1_TAGGED_ACTIVE
-    // Tagged ints never allocate, so nothing else triggers Integer's class init -- but
-    // dispatching hashCode/equals on a tagged int reads class__java_lang_Integer.vtable,
-    // which the static initializer populates. Force it once. The guard keeps the hot path
-    // a single predictable branch (the initializer itself is also idempotent).
-    static volatile int cn1IntInit = 0;
-    if(!cn1IntInit) { __STATIC_INITIALIZER_java_lang_Integer(threadStateData); cn1IntInit = 1; }
+    CN1_FORCE_BOX_CLINIT(java_lang_Integer);
     return CN1_TAG_INT(i);
 #else
     return java_lang_Integer_valueOfHeap___int_R_java_lang_Integer(threadStateData, i);
@@ -2827,6 +2899,132 @@ JAVA_INT java_lang_Integer_cn1Value___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     }
 #endif
     return ((struct obj__java_lang_Integer*)__cn1ThisObject)->java_lang_Integer_value;
+}
+
+// ---- The other five tagged boxes ----
+// Same shape as Integer above, and the same two obligations at every valueOf:
+//
+//  * Force the class's static initializer once. A tagged value never allocates, so nothing
+//    else runs the clinit -- and the clinit is what fills the vtable that dispatching
+//    hashCode/equals/compareTo on the immediate reads through cn1ClassOf.
+//  * Fall back to valueOfHeap when the value cannot be represented. Only Long and Double
+//    have a fallback; Float, Character and Short always fit.
+//
+// cn1Value is the single door every read of the boxed value goes through. It has to be a
+// native and not a Java getter: these classes are final, so Invoke.asInlinableFieldAccess
+// would fold `return value;` into a raw GETFIELD off a pointer that has no fields.
+#if CN1_TAGGED_ACTIVE
+extern void __STATIC_INITIALIZER_java_lang_Long(CODENAME_ONE_THREAD_STATE);
+extern void __STATIC_INITIALIZER_java_lang_Double(CODENAME_ONE_THREAD_STATE);
+extern void __STATIC_INITIALIZER_java_lang_Float(CODENAME_ONE_THREAD_STATE);
+extern void __STATIC_INITIALIZER_java_lang_Character(CODENAME_ONE_THREAD_STATE);
+extern void __STATIC_INITIALIZER_java_lang_Short(CODENAME_ONE_THREAD_STATE);
+#endif
+
+JAVA_OBJECT java_lang_Long_valueOf___long_R_java_lang_Long(CODENAME_ONE_THREAD_STATE, JAVA_LONG i) {
+#if CN1_TAGGED_EXTRA_ACTIVE
+    if(CN1_LONG_TAGGABLE(i)) {
+        CN1_FORCE_BOX_CLINIT(java_lang_Long);
+        return CN1_TAG_LONG_VAL(i);
+    }
+#endif
+    return java_lang_Long_valueOfHeap___long_R_java_lang_Long(threadStateData, i);
+}
+
+JAVA_LONG java_lang_Long_cn1Value___R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+#if CN1_TAGGED_ACTIVE
+    if(CN1_TAG_CODE(__cn1ThisObject) == CN1_TAG_LONG) {
+        return CN1_UNTAG_LONG(__cn1ThisObject);
+    }
+#endif
+    return ((struct obj__java_lang_Long*)__cn1ThisObject)->java_lang_Long_value;
+}
+
+JAVA_OBJECT java_lang_Double_valueOf___double_R_java_lang_Double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE d) {
+#if CN1_TAGGED_EXTRA_ACTIVE
+    union { JAVA_DOUBLE d; uint64_t b; } u;
+    u.d = d;
+    if(CN1_DOUBLE_TAGGABLE_BITS(u.b)) {
+        CN1_FORCE_BOX_CLINIT(java_lang_Double);
+        return CN1_TAG_DOUBLE_BITS(u.b);
+    }
+#endif
+    return java_lang_Double_valueOfHeap___double_R_java_lang_Double(threadStateData, d);
+}
+
+JAVA_DOUBLE java_lang_Double_cn1Value___R_double(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+#if CN1_TAGGED_ACTIVE
+    if(CN1_TAG_CODE(__cn1ThisObject) == CN1_TAG_DOUBLE) {
+        union { JAVA_DOUBLE d; uint64_t b; } u;
+        u.b = CN1_UNTAG_DOUBLE_BITS(__cn1ThisObject);
+        return u.d;
+    }
+#endif
+    return ((struct obj__java_lang_Double*)__cn1ThisObject)->java_lang_Double_value;
+}
+
+JAVA_OBJECT java_lang_Float_valueOf___float_R_java_lang_Float(CODENAME_ONE_THREAD_STATE, JAVA_FLOAT f) {
+#if CN1_TAGGED_EXTRA_ACTIVE
+    union { JAVA_FLOAT f; uint32_t b; } u;
+    u.f = f;
+    {
+        CN1_FORCE_BOX_CLINIT(java_lang_Float);
+    }
+    return CN1_TAG_FLOAT_BITS(u.b);
+#else
+    return java_lang_Float_valueOfHeap___float_R_java_lang_Float(threadStateData, f);
+#endif
+}
+
+JAVA_FLOAT java_lang_Float_cn1Value___R_float(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+#if CN1_TAGGED_ACTIVE
+    if(CN1_TAG_CODE(__cn1ThisObject) == CN1_TAG_FLOAT) {
+        union { JAVA_FLOAT f; uint32_t b; } u;
+        u.b = CN1_UNTAG_FLOAT_BITS(__cn1ThisObject);
+        return u.f;
+    }
+#endif
+    return ((struct obj__java_lang_Float*)__cn1ThisObject)->java_lang_Float_value;
+}
+
+JAVA_OBJECT java_lang_Character_valueOf___char_R_java_lang_Character(CODENAME_ONE_THREAD_STATE, JAVA_CHAR c) {
+#if CN1_TAGGED_EXTRA_ACTIVE
+    {
+        CN1_FORCE_BOX_CLINIT(java_lang_Character);
+    }
+    return CN1_TAG_CHAR_VAL(c);
+#else
+    return java_lang_Character_valueOfHeap___char_R_java_lang_Character(threadStateData, c);
+#endif
+}
+
+JAVA_CHAR java_lang_Character_cn1Value___R_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+#if CN1_TAGGED_ACTIVE
+    if(CN1_TAG_CODE(__cn1ThisObject) == CN1_TAG_CHARACTER) {
+        return CN1_UNTAG_CHAR(__cn1ThisObject);
+    }
+#endif
+    return ((struct obj__java_lang_Character*)__cn1ThisObject)->java_lang_Character_value;
+}
+
+JAVA_OBJECT java_lang_Short_valueOf___short_R_java_lang_Short(CODENAME_ONE_THREAD_STATE, JAVA_SHORT v) {
+#if CN1_TAGGED_EXTRA_ACTIVE
+    {
+        CN1_FORCE_BOX_CLINIT(java_lang_Short);
+    }
+    return CN1_TAG_SHORT_VAL(v);
+#else
+    return java_lang_Short_valueOfHeap___short_R_java_lang_Short(threadStateData, v);
+#endif
+}
+
+JAVA_SHORT java_lang_Short_cn1Value___R_short(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+#if CN1_TAGGED_ACTIVE
+    if(CN1_TAG_CODE(__cn1ThisObject) == CN1_TAG_SHORT) {
+        return CN1_UNTAG_SHORT(__cn1ThisObject);
+    }
+#endif
+    return ((struct obj__java_lang_Short*)__cn1ThisObject)->java_lang_Short_value;
 }
 
 // monitorEnterBlock is used for synchronized methods because the JVM bytecode

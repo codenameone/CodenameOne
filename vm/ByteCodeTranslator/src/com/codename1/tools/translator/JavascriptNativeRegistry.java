@@ -132,6 +132,16 @@ final class JavascriptNativeRegistry {
             "cn1_java_lang_System_identityHashCode_java_lang_Object_R_int",
             "cn1_java_lang_Integer_cn1Value_R_int",
             "cn1_java_lang_Integer_valueOf_int_R_java_lang_Integer",
+            "cn1_java_lang_Long_cn1Value_R_long",
+            "cn1_java_lang_Long_valueOf_long_R_java_lang_Long",
+            "cn1_java_lang_Double_cn1Value_R_double",
+            "cn1_java_lang_Double_valueOf_double_R_java_lang_Double",
+            "cn1_java_lang_Float_cn1Value_R_float",
+            "cn1_java_lang_Float_valueOf_float_R_java_lang_Float",
+            "cn1_java_lang_Character_cn1Value_R_char",
+            "cn1_java_lang_Character_valueOf_char_R_java_lang_Character",
+            "cn1_java_lang_Short_cn1Value_R_short",
+            "cn1_java_lang_Short_valueOf_short_R_java_lang_Short",
             "cn1_java_lang_System_isHighFrequencyGC_R_boolean",
             "cn1_java_lang_System_gcIdleWaitMillis_R_int",
             "cn1_java_lang_Thread_currentThread_R_java_lang_Thread",
@@ -198,7 +208,12 @@ final class JavascriptNativeRegistry {
             "java_util_HashMap.containsKeyImpl",
             "java_util_HashMap.clearImpl",
             "java_lang_StringBuilder.toStringImpl",
-            "java_lang_Integer.valueOfHeap"
+            "java_lang_Integer.valueOfHeap",
+            "java_lang_Long.valueOfHeap",
+            "java_lang_Double.valueOfHeap",
+            "java_lang_Float.valueOfHeap",
+            "java_lang_Character.valueOfHeap",
+            "java_lang_Short.valueOfHeap"
     ));
 
     static boolean isRuntimeDelegateTarget(String mangledClassName, String methodName) {
