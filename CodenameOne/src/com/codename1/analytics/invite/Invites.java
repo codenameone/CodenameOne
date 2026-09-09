@@ -219,18 +219,6 @@ public final class Invites {
     // a later launch reaches this answer again through the ordinary path.
     private static String undelivered;
 
-    // Set when a terminal marker that had already been delivered is reopened,
-    // so the attribution the resumed lookup writes inherits that fact rather
-    // than announcing itself a second time. Carried onto the pending record as
-    // soon as one exists, which is what makes it survive the process.
-    private static boolean reopenedAlreadyDelivered;
-
-    // The original clock readings a reopened terminal marker carried, so the
-    // resumed lookup keeps the window it started with rather than restarting it
-    // from the moment consent was granted.
-    private static long reopenedFirstLaunch;
-
-    private static long reopenedExpiresAt;
     private static boolean deferredStarted;
 
     // When the last claim or match was issued. flush() restarts only once this
@@ -553,12 +541,27 @@ public final class Invites {
                 // install that had already been given one.
                 return true;
             }
+            // The code is recorded on the way to the marker, which carries it
+            // across the refusal. This branch runs BEFORE the pending record is
+            // written, so without this there is nothing for markTerminal to
+            // carry, and a user who grants consent afterwards has the exact
+            // claim replaced by a referrer read or a statistical match.
+            Map<String, String> denied = InviteStore.read(InviteStore.PENDING);
+            if (denied == null) {
+                denied = new LinkedHashMap<String, String>();
+            }
+            denied.put("code", code);
+            denied.put("codeSource", "universal_link");
+            denied.put("codeMatch", MATCH_DIRECT);
+            denied.put("codeDeferred", "false");
+            InviteStore.write(InviteStore.PENDING, denied);
             // Told, not silently dropped. checkForInvite() records the url as
             // consumed and skips the deferred path after this, so this is the
             // only chance the listener gets for this install -- and a
             // registered one heard nothing at all.
-            markTerminal(STATE_DECLINED, REASON_CONSENT_DENIED);
-            notifyUnavailable(REASON_CONSENT_DENIED);
+            if (markTerminal(STATE_DECLINED, REASON_CONSENT_DENIED)) {
+                notifyUnavailable(REASON_CONSENT_DENIED);
+            }
             return true;
         }
         if (getState() == STATE_RESOLVED && !reattribution) {
@@ -887,9 +890,6 @@ public final class Invites {
         deferredStarted = false;
         lookupIssuedAt = 0;
         undelivered = null;
-        reopenedAlreadyDelivered = false;
-        reopenedFirstLaunch = 0;
-        reopenedExpiresAt = 0;
         unacknowledged.clear();
     }
 
@@ -980,8 +980,9 @@ public final class Invites {
             // rewrite once the record is gone -- so the next launch read
             // STATE_NONE and told the listener again. The marker carries the
             // reason, which is what lets a later grant reopen it.
-            markTerminal(STATE_DECLINED, REASON_CONSENT_DENIED);
-            notifyUnavailable(REASON_CONSENT_DENIED);
+            if (markTerminal(STATE_DECLINED, REASON_CONSENT_DENIED)) {
+                notifyUnavailable(REASON_CONSENT_DENIED);
+            }
         }
         clearDimensions();
     }
@@ -1261,8 +1262,8 @@ public final class Invites {
         return code != null && code.length() > 0;
     }
 
-    private static void markTerminal() {
-        markTerminal(null);
+    private static boolean markTerminal() {
+        return markTerminal(null);
     }
 
     // reason is recorded only when the answer could stop being true. A window
@@ -1270,11 +1271,13 @@ public final class Invites {
     // ships a non-zero window is asking for attribution again -- so that one
     // marker is reopened rather than being permanent, which is why it is the
     // only one that carries a reason.
-    private static void markTerminal(String reason) {
-        markTerminal(STATE_NONE_FOUND, reason);
+    private static boolean markTerminal(String reason) {
+        return markTerminal(STATE_NONE_FOUND, reason);
     }
 
-    private static void markTerminal(int terminalState, String reason) {
+    // Returns false when the marker could not be persisted, in which case
+    // NOTHING is committed and the caller must not report the outcome.
+    private static boolean markTerminal(int terminalState, String reason) {
         Map<String, String> done = new LinkedHashMap<String, String>();
         done.put("state", String.valueOf(terminalState));
         // The timing is carried, and only the timing. firstLaunch and expiresAt
@@ -1304,9 +1307,31 @@ public final class Invites {
             // got neither callback for the life of the install.
             done.put("reason", reason);
         }
-        InviteStore.write(InviteStore.PENDING, done);
+        // And the direct-link details, when there are any.
+        //
+        // A refusal is reopenable, so the code has to survive it: discarding it
+        // meant a user who denied consent when the link arrived and granted it
+        // afterwards had the exact claim replaced by a referrer read or a
+        // statistical match, which can miss or credit a different click. Four
+        // short fields, and none of them describes the device.
+        for (String key : new String[] {"code", "codeSource", "codeMatch", "codeDeferred",
+                "codeReferrer"}) {
+            InviteStore.put(done, key, InviteStore.get(before, key, null));
+        }
+        if (!InviteStore.write(InviteStore.PENDING, done)) {
+            // Nothing is committed. Reporting a terminal outcome the device
+            // cannot remember meant the same lookup and the same callback
+            // repeated after every restart -- or, worse, the delivery flag
+            // landed on the OLD pending record and left the state at PENDING,
+            // so a supposedly settled lookup ran again and could never deliver
+            // its answer.
+            Log.p("invite: a terminal answer could not be persisted; it will be reached "
+                    + "again rather than reported now", Log.WARNING);
+            return false;
+        }
         state = terminalState;
         stateLoaded = true;
+        return true;
     }
 
     // The terminal answer this install reached, if it was never delivered.
@@ -1341,20 +1366,10 @@ public final class Invites {
         }
         pending = new LinkedHashMap<String, String>();
         long now = System.currentTimeMillis();
-        // Restored from the marker a reopen carried them on, when there is one,
-        // so granting consent late does not restart the attribution window.
-        pending.put("firstLaunch", String.valueOf(reopenedFirstLaunch > 0
-                ? reopenedFirstLaunch : now));
-        pending.put("expiresAt", String.valueOf(reopenedExpiresAt > 0
-                ? reopenedExpiresAt : now + attributionWindow));
-        reopenedFirstLaunch = 0;
-        reopenedExpiresAt = 0;
+        pending.put("firstLaunch", String.valueOf(now));
+        pending.put("expiresAt", String.valueOf(now + attributionWindow));
         pending.put("attempts", "0");
         pending.put("state", String.valueOf(STATE_PENDING));
-        if (reopenedAlreadyDelivered) {
-            pending.put("delivered", "true");
-            reopenedAlreadyDelivered = false;
-        }
         Display d = Display.getInstance();
         if (d != null) {
             InviteStore.put(pending, "platform", d.getPlatformName());
@@ -1387,18 +1402,21 @@ public final class Invites {
             boolean reopen = (REASON_UNSUPPORTED.equals(why) && attributionWindow != 0)
                     || (REASON_CONSENT_DENIED.equals(why) && !explicitlyDenied());
             if (reopen) {
-                // The listener may already have been told about this install,
-                // and the marker is where that fact lives. Deleting it lost it,
-                // so the resumed lookup's attribution was written as
-                // undelivered and inviteReceived() arrived as a second callback
-                // on the next launch. It rides the pending record instead.
-                reopenedAlreadyDelivered =
-                        InviteStore.getBoolean(marker, "delivered", false);
-                reopenedFirstLaunch = InviteStore.getLong(marker, "firstLaunch", 0);
-                reopenedExpiresAt = InviteStore.getLong(marker, "expiresAt", 0);
-                InviteStore.delete(InviteStore.PENDING);
-                state = STATE_NONE;
-                s = STATE_NONE;
+                // The marker is CONVERTED, not deleted and rebuilt.
+                //
+                // Everything it carries has to survive the reopening: the
+                // original window, so a late grant does not start a fresh one;
+                // the delivered flag, so the listener is not told twice; and
+                // the direct-link code, so an exact answer is not replaced by a
+                // guess. Rebuilding from scratch lost each of those in turn,
+                // one review round at a time, which is what this shape exists
+                // to stop happening again.
+                marker.put("state", String.valueOf(STATE_PENDING));
+                marker.remove("reason");
+                InviteStore.write(InviteStore.PENDING, marker);
+                state = STATE_PENDING;
+                stateLoaded = true;
+                s = STATE_PENDING;
             }
         }
         if (s == STATE_RESOLVED || s == STATE_NONE_FOUND || s == STATE_DECLINED) {
@@ -1415,8 +1433,9 @@ public final class Invites {
             // fresh install none does -- so this answer was purely in memory
             // and the listener heard it again on every launch, breaking the
             // documented once-per-install contract.
-            markTerminal(REASON_UNSUPPORTED);
-            notifyUnavailable(REASON_UNSUPPORTED);
+            if (markTerminal(REASON_UNSUPPORTED)) {
+                notifyUnavailable(REASON_UNSUPPORTED);
+            }
             return;
         }
         // Checked BEFORE the profile is created, not after. pendingRecord()
@@ -1430,8 +1449,9 @@ public final class Invites {
             // Durable, and profile free: markTerminal replaces the record with
             // the state and the reason and nothing else. The reason is what
             // lets beginDeferred reopen this if consent is later granted.
-            markTerminal(STATE_DECLINED, REASON_CONSENT_DENIED);
-            notifyUnavailable(REASON_CONSENT_DENIED);
+            if (markTerminal(STATE_DECLINED, REASON_CONSENT_DENIED)) {
+                notifyUnavailable(REASON_CONSENT_DENIED);
+            }
             return;
         }
         Map<String, String> pending = pendingRecord();
@@ -1446,16 +1466,18 @@ public final class Invites {
             if (abandonReplacement()) {
                 return;
             }
-            markTerminal(REASON_EXPIRED);
-            notifyUnavailable(REASON_EXPIRED);
+            if (markTerminal(REASON_EXPIRED)) {
+                notifyUnavailable(REASON_EXPIRED);
+            }
             return;
         }
         if (InviteStore.getInt(pending, "attempts", 0) >= MAX_ATTEMPTS) {
             if (abandonReplacement()) {
                 return;
             }
-            markTerminal();
-            notifyUnavailable(REASON_NO_MATCH);
+            if (markTerminal()) {
+                notifyUnavailable(REASON_NO_MATCH);
+            }
             return;
         }
         setState(STATE_PENDING);
@@ -1883,8 +1905,9 @@ public final class Invites {
                 // not enough: loadState() reads an absent record as STATE_NONE,
                 // so the next launch built a fresh profile and asked again, and
                 // an ordinary uninvited install re-queried the server for ever.
-                markTerminal();
-                notifyUnavailable(REASON_NO_MATCH);
+                if (markTerminal()) {
+                    notifyUnavailable(REASON_NO_MATCH);
+                }
                 return;
             }
             String code = str(json.get("code"));

@@ -1335,4 +1335,48 @@ class InviteResilienceTest extends UITestBase {
         assertTrue(InviteStore.getInt(after, "attempts", 0) < Invites.MAX_ATTEMPTS,
                 "the promised retry could never happen: the budget was still exhausted");
     }
+
+    @Test
+    @EdtTest
+    void aDeniedDirectLinkKeepsItsCodeForTheReopening() {
+        // A refusal is reopenable, so the code has to survive it. Discarding it
+        // meant a user who denied consent when the link arrived and granted it
+        // afterwards had the exact claim replaced by a referrer read or a
+        // statistical match, which can miss or credit a different click.
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/DENIED1");
+        assertEquals(Invites.STATE_DECLINED, Invites.getState());
+
+        Analytics.setConsent(AnalyticsConsent.granted());
+
+        Map<String, String> resumed = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(resumed);
+        assertEquals("DENIED1", InviteStore.get(resumed, "code", null),
+                "the reopened lookup lost the exact code and fell back to a guess");
+    }
+
+    @FormTest
+    void aTerminalAnswerThatCannotBePersistedIsNotReported() {
+        // Reporting an outcome the device cannot remember meant the same lookup
+        // and the same callback repeated after every restart -- or, worse, the
+        // delivery flag landed on the OLD pending record and left the state at
+        // PENDING, so a settled lookup ran again and could never deliver.
+        Invites.setAttributionWindow(0);
+        final int[] told = new int[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0]++;
+            }
+        });
+        InviteStore.failNextWriteForTest(InviteStore.PENDING);
+        Invites.checkForInvite();
+
+        assertEquals(0, told[0],
+                "an answer the device cannot remember was reported to the listener");
+        assertTrue(Invites.getState() != Invites.STATE_NONE_FOUND,
+                "the state was committed without its marker");
+    }
 }
