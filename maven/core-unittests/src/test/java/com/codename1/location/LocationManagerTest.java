@@ -80,6 +80,41 @@ class LocationManagerTest extends UITestBase {
         assertEquals(1, manager.clearCount, "and the platform must be told once");
     }
 
+    /// The listener is static, so the guard that protects it has to be too. A
+    /// port may hand out a fresh manager per call -- JavaSEPort's returns a new
+    /// anonymous subclass every time -- which puts the timed-out one-shot and
+    /// the tracker that replaced it on different instances. With a per-instance
+    /// epoch the waiter's own number never moved, so it read "nothing has been
+    /// installed since" and cleared a listener it did not own.
+    @FormTest
+    void aTimeoutOnOneManagerLeavesAnotherManagersListenerAlone() {
+        TestLocationManager other = new TestLocationManager();
+        DummyLocationListener tracker = new DummyLocationListener();
+        manager.notifyOnBind = false;
+        manager.setCurrentLocation(null);
+
+        // The one-shot installs its own listener and then times out, but in the
+        // meantime a second manager installs a tracker over the shared field.
+        Thread installer = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(20);
+                } catch (InterruptedException ignored) {
+                }
+                other.setLocationListener(tracker);
+            }
+        });
+        installer.start();
+        manager.getCurrentLocationSync(150);
+        try {
+            installer.join(2000);
+        } catch (InterruptedException ignored) {
+        }
+
+        assertSame(tracker, other.getCurrentListener(),
+                "the timed-out manager must not clear another manager's listener");
+    }
+
     /// The follow-up the leak would have broken: a second request still binds a
     /// fresh listener rather than taking the already-listening shortcut.
     @FormTest

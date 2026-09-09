@@ -96,7 +96,16 @@ public abstract class LocationManager {
     private int status = TEMPORARILY_UNAVAILABLE;
 
     /// Incremented by every setLocationListener, under LISTENER_LOCK.
-    private int listenerEpoch;
+    ///
+    /// Static because the listener it tracks is static, and the two have to
+    /// agree. A port is free to hand out a fresh manager per call --
+    /// JavaSEPort.getLocationManager() returns a new anonymous subclass every
+    /// time -- so the one-shot wait and the listener that replaces it can sit
+    /// on different instances. Per-instance, this counter would not move when
+    /// another instance installed a listener, and the timed-out wait would
+    /// read its own untouched number as "nothing has been installed since" and
+    /// clear a tracker that belongs to somebody else.
+    private static int listenerEpoch;
 
     /// Gets the LocationManager instance
     public static LocationManager getLocationManager() {
