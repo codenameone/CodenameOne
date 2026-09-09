@@ -400,6 +400,55 @@ RaisedButton.disabled { color: #ffffff; background-color: #b3a8a0; cn1-backgroun
 FlatButton { cn1-derive: Button; color: #1c1c1e; background-color: rgba(199,197,198,0.80); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
 FlatButton.pressed { color: #1c1c1e; background-color: rgba(186,184,185,0.85); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
 
+/* iOS segmented control. Button.setToggle(true) rewrites the UIID to
+   ToggleButton, and no theme in the tree defined it, so a toggle rendered as
+   bare unshaped text.
+
+   The control reads as a track of capsules: an unselected segment is the plain
+   glass fill with a black label, and the selected one is the accent capsule
+   with a white label. Selection therefore changes the fill, not only the label
+   colour, which is what keeps it legible against the glass. */
+ToggleButton {
+    color: #1c1c1e;
+    background-color: rgba(199,197,198,0.80);
+    cn1-background-type: cn1-pill-border;
+    padding: 1.1mm 2.6mm 1.1mm 2.6mm;
+    margin: 1mm 0.4mm 1mm 0.4mm;
+    font-family: "native:MainLight";
+    font-size: 2.7mm;
+    text-align: center;
+}
+ToggleButton.selected {
+    color: #ffffff;
+    background-color: var(--accent-color, #007aff);
+    cn1-background-type: cn1-pill-border;
+    padding: 1.1mm 2.6mm 1.1mm 2.6mm;
+    margin: 1mm 0.4mm 1mm 0.4mm;
+    font-family: "native:MainLight";
+    font-size: 2.7mm;
+    text-align: center;
+}
+ToggleButton.pressed {
+    color: #ffffff;
+    background-color: #0064d1;
+    cn1-background-type: cn1-pill-border;
+    padding: 1.1mm 2.6mm 1.1mm 2.6mm;
+    margin: 1mm 0.4mm 1mm 0.4mm;
+    font-family: "native:MainLight";
+    font-size: 2.7mm;
+    text-align: center;
+}
+ToggleButton.disabled {
+    color: #b0b0b5;
+    background-color: rgba(199,197,198,0.55);
+    cn1-background-type: cn1-pill-border;
+    padding: 1.1mm 2.6mm 1.1mm 2.6mm;
+    margin: 1mm 0.4mm 1mm 0.4mm;
+    font-family: "native:MainLight";
+    font-size: 2.7mm;
+    text-align: center;
+}
+
 TextField {
     color: #000000;
     /* Grouped-list cell (secondarySystemGroupedBackground): a WHITE rounded cell
@@ -1111,6 +1160,13 @@ PhoneVerificationLink {
     Button.disabled { color: #636366; background-color: rgba(30,30,32,0.74); cn1-background-type: cn1-pill-border; }
     /* Gray button (.gray): white label on a slightly lighter dark glass pill. */
     FlatButton { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+
+    /* Dark segmented control. The pill background type is re-declared for the
+       same reason as the buttons above: it is not carried into $Dark<UIID>. */
+    ToggleButton { color: #ffffff; background-color: rgba(58,58,60,0.78); cn1-background-type: cn1-pill-border; }
+    ToggleButton.selected { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
+    ToggleButton.pressed { color: #ffffff; background-color: #64b1ff; cn1-background-type: cn1-pill-border; }
+    ToggleButton.disabled { color: #636366; background-color: rgba(58,58,60,0.55); cn1-background-type: cn1-pill-border; }
     FlatButton.pressed { color: #ffffff; background-color: rgba(150,143,138,0.78); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
 
     /* Prominent filled button: white label on the OPAQUE dark accent pill. */

@@ -301,6 +301,65 @@ FlatButton {
 }
 FlatButton.pressed { background-color: transparent; color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.65mm 5mm 1.65mm 5mm; }
 
+/* Material 3 segmented button. Button.setToggle(true) rewrites the UIID to
+   ToggleButton, and until this entry existed no theme in the tree defined it,
+   so every toggle fell through to the default style and rendered as bare text
+   with no shape at all.
+
+   M3 draws the unselected segment as an outlined pill and fills the selected
+   one with the secondary container, which is the pairing that makes the
+   selection readable without relying on colour alone -- the fill changes, not
+   just the label. The outline stays on in every state so the row keeps its
+   shape while the selection moves.
+
+   Geometry is repeated in full on each state rather than inherited, for the
+   reason given at the top of this file: the per-state Style merge otherwise
+   drifts the text by a pixel as the selection changes. */
+ToggleButton {
+    color: #1d1b20;
+    background-color: transparent;
+    cn1-background-type: cn1-pill-border;
+    border: 0.25mm solid #79747e;
+    padding: 1.55mm 4mm 1.55mm 4mm;
+    margin: 0.5mm;
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    text-align: center;
+}
+ToggleButton.selected {
+    color: var(--accent-on-container-color, #21005d);
+    background-color: var(--accent-container-color, #eaddff);
+    cn1-background-type: cn1-pill-border;
+    border: 0.25mm solid #79747e;
+    padding: 1.55mm 4mm 1.55mm 4mm;
+    margin: 0.5mm;
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    text-align: center;
+}
+ToggleButton.pressed {
+    color: var(--accent-on-container-color, #21005d);
+    background-color: #ded1f5;
+    cn1-background-type: cn1-pill-border;
+    border: 0.25mm solid #79747e;
+    padding: 1.55mm 4mm 1.55mm 4mm;
+    margin: 0.5mm;
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    text-align: center;
+}
+ToggleButton.disabled {
+    color: #a5a0ab;
+    background-color: transparent;
+    cn1-background-type: cn1-pill-border;
+    border: 0.25mm solid #cac4d0;
+    padding: 1.55mm 4mm 1.55mm 4mm;
+    margin: 0.5mm;
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    text-align: center;
+}
+
 /* Material 3 OUTLINED text field: no fill, a thin outline, taller (more
    vertical padding), tight margins. A line border is CEF-free. */
 TextField {
@@ -794,6 +853,14 @@ PhoneVerificationLink {
     RaisedButton.disabled { background-color: #2d2b31; color: #737077; cn1-background-type: cn1-pill-border; }
 
     FlatButton { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+
+    /* Dark segmented button: the same outline/fill pairing against the dark
+       surface. cn1-background-type and the border are re-declared because the
+       compiler does not carry them into the $Dark<UIID> entries. */
+    ToggleButton { color: #e6e0e9; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    ToggleButton.selected { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    ToggleButton.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: #5c4499; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    ToggleButton.disabled { color: #5c5967; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; }
     FlatButton.pressed { background-color: transparent; color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
 
     TextField { color: #e6e0e9; background-color: transparent; border: 0.2mm solid #938f99; border-radius: 0.55mm; }

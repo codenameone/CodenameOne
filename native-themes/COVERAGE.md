@@ -70,7 +70,7 @@ SwitchMorph (droplet stretch/squash).
 
 | Native control | Suggested CN1 building block | Status |
 |---|---|---|
-| UISegmentedControl | ButtonGroup / Tabs pill variant | not started |
+| UISegmentedControl | ButtonGroup / Tabs pill variant | `ToggleButton` themed (capsule track); not in the fidelity suite |
 | UIStepper | Stepper composite (2 glass buttons) | not started |
 | UISearchBar / searchable nav | Toolbar search mode | not started |
 | UIActivityIndicatorView | InfiniteProgress | not started (UIID exists, untested) |
@@ -134,7 +134,7 @@ SwitchMorph (droplet stretch/squash).
 
 | Native control | Suggested CN1 building block | Status |
 |---|---|---|
-| SegmentedButton (single/multi) | ButtonGroup | not started |
+| SegmentedButton (single/multi) | ButtonGroup | `ToggleButton` themed (outlined pill); not in the fidelity suite |
 | Chips (assist/filter/input) | Button chip UIIDs | not started |
 | NavigationBar (bottom) | Tabs bottom mode | not started (suite tests TabLayout only) |
 | NavigationDrawer | Toolbar side menu | not started |
