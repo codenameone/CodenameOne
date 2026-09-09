@@ -8,7 +8,11 @@
 # Not a real log format -- comments are simply lines the grammars do not match,
 # which is itself worth asserting.
 
-CompileC /tmp/dd/Objects-normal/arm64/IOSNative.o /tmp/proj/HelloApp-src/IOSNative.m normal arm64 objective-c com.apple.compilers.llvm.clang.1_0.compiler
+CompileC /tmp/dd/Objects-normal/arm64/IOSNative.o /tmp/proj/HelloApp-src/IOSNative.m normal arm64 objective-c com.apple.compilers.llvm.clang.1_0.compiler (in target 'HelloApp' from project 'HelloApp')
+# A .metal goes through a DIFFERENT task. Matching only CompileC made it look
+# like a source the build skipped, which is how "in the manifest but not in this
+# target" got confused with "this build was incremental".
+CompileMetalFile /tmp/dd/Metal/default.air /tmp/proj/HelloApp-src/CN1MetalShaders.metal normal arm64 metal com.apple.compilers.metal (in target 'HelloApp' from project 'HelloApp')
 [1/9] Building C object CMakeFiles/HelloApp.dir/HelloApp-src/cn1_globals.c.o
 # The SAME announcement from CMake's other generator. Make counts percent where
 # ninja counts jobs; missing this form made a complete build look like one that

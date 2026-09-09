@@ -56,7 +56,14 @@ FLAG_RE = re.compile(r'\[(-W[^\]]+)\]\s*$')
 # Xcode names the source it is about to compile; ninja and make announce the
 # object. Either way this is how we learn what the build ACTUALLY compiled, as
 # opposed to what it could have compiled.
-COMPILE_XCODE_RE = re.compile(r'^\s*CompileC\s+(?:"[^"]*"|\S+)\s+(?P<src>"[^"]+"|\S+)\s+normal\b')
+# Xcode names the task, the output, then the source:
+#   CompileC <obj> <src> normal arm64 objective-c com.apple.compilers... (in target ...)
+# Verified against Xcode 26.3 output. CompileMetalFile and the assembler use the
+# same shape, and a .metal that only CompileC were matched would look like a
+# source the build skipped.
+COMPILE_XCODE_RE = re.compile(
+    r'^\s*(?:CompileC|CompileMetalFile|CompileAssembly)\s+(?:"[^"]*"|\S+)\s+'
+    r'(?P<src>"[^"]+"|\S+)\s+normal\b')
 # CMake's two generators announce the same thing with different progress
 # prefixes -- ninja counts jobs ("[7/91]"), make counts percent ("[  3%]") -- and
 # the prefix is absent entirely when progress reporting is off. One optional group
@@ -267,15 +274,66 @@ def classify(diags, manifest, leg):
     return unattributed
 
 
-def check_completeness(manifest, compiled):
-    """Sources the manifest lists that this build never compiled.
+def coverage_path(leg):
+    return os.path.join(BASELINE_DIR, "coverage-%s.txt" % leg)
 
-    An incremental build recompiles nothing and reports no warnings, which reads
-    exactly like a clean codebase. Comparing sets of sources rather than counts
-    keeps a multi-architecture or multi-target build from looking incomplete.
+
+def read_coverage(leg):
+    """The sources the build that wrote this leg's baseline actually compiled."""
+    path = coverage_path(leg)
+    if not os.path.exists(path):
+        return None
+    names = set()
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                names.add(line)
+    return names
+
+
+def write_coverage(leg, compiled):
+    with open(coverage_path(leg), "w", encoding="utf-8") as fh:
+        fh.write("# Sources compiled by the build that produced baseline-%s.txt.\n" % leg)
+        fh.write("#\n")
+        fh.write("# The gate fails when a later run compiles FEWER of these. An incremental\n")
+        fh.write("# build recompiles nothing and reports no warnings, which reads exactly like\n")
+        fh.write("# a clean codebase; comparing against what was covered once makes that\n")
+        fh.write("# impossible to mistake for progress.\n")
+        fh.write("#\n")
+        fh.write("# Not the same as the manifest: the manifest lists every file in the\n")
+        fh.write("# generated project, and a build legitimately compiles a subset of it.\n")
+        fh.write("\n")
+        for name in sorted(compiled):
+            fh.write("%s\n" % name)
+
+
+def check_completeness(manifest, compiled, leg):
+    """Whether this build covered as much as the one the baseline came from.
+
+    Two different questions live here, and conflating them is what made the first
+    version of this unusable:
+
+    - Did this build compile ANYTHING? An incremental build recompiles nothing and
+      reports no warnings; so does the documented xcodebuild failure where a bad
+      ARCHS override makes every target compile nothing while still copying
+      resources. Both are indistinguishable from a clean codebase, and both are
+      fatal to a census.
+    - Did it compile everything the manifest lists? No, and it should not have to.
+      The manifest names every file in the generated project, and a target
+      legitimately builds a subset -- a .metal goes through a different task, a
+      source can be excluded from the target. Failing on that would be demanding
+      the wrong invariant.
+
+    So the ratchet is on COVERAGE, measured against the build that wrote the
+    baseline. It is exact, needs no threshold, and needs nobody to enumerate which
+    files a target happens to include.
     """
     expected = {n for n in manifest if n.endswith(SOURCE_EXTS)}
-    return sorted(expected - set(compiled)), sorted(expected)
+    never_compiled = sorted(expected - set(compiled))
+    previous = read_coverage(leg)
+    regressed = sorted(previous - set(compiled)) if previous else []
+    return never_compiled, sorted(expected), regressed
 
 
 def baseline_path(leg):
@@ -422,7 +480,8 @@ def self_test():
     header = [d for d in diags if os.path.basename(d.path) == "cn1_globals.h"]
     if len(header) != 1:
         problems.append("header warning deduped to %d entries, expected 1" % len(header))
-    if not {"IOSNative.m", "cn1_globals.c", "cn1_virtual_thread.c"} <= compiled:
+    if not {"IOSNative.m", "cn1_globals.c", "cn1_virtual_thread.c",
+            "CN1MetalShaders.metal"} <= compiled:
         problems.append("did not recognise the compile lines: %s" % sorted(compiled))
     if problems:
         for p in problems:
@@ -522,19 +581,27 @@ def main():
 
     diags, compiled = parse_log(text)
 
-    missing, expected = check_completeness(manifest, compiled)
+    never_compiled, expected, regressed = check_completeness(manifest, compiled, args.leg)
     if not args.allow_partial:
         if not compiled:
             print("FAIL: this log records no compilation at all, so an empty warning list "
                   "means nothing. A build that compiles nothing while still copying "
                   "resources looks exactly like this.", file=sys.stderr)
             return 2
-        if missing:
-            print("FAIL: %d of %d sources were not compiled by this build, so the census "
-                  "would undercount. Re-run against a clean build.\n  %s%s"
-                  % (len(missing), len(expected), "\n  ".join(missing[:40]),
-                     "\n  ..." if len(missing) > 40 else ""), file=sys.stderr)
+        if regressed:
+            print("FAIL: %d source(s) that the baselined build compiled were not compiled "
+                  "by this one, so the census undercounts and a warning could disappear "
+                  "without being fixed. Re-run against a cold build.\n  %s%s"
+                  % (len(regressed), "\n  ".join(regressed[:40]),
+                     "\n  ..." if len(regressed) > 40 else ""), file=sys.stderr)
             return 2
+    print("coverage: %d source(s) compiled; %d of the %d in the manifest were not built by "
+          "this target" % (len(compiled), len(never_compiled), len(expected)))
+    if never_compiled:
+        shown = ", ".join(never_compiled[:20])
+        if len(never_compiled) > 20:
+            shown += ", ... (%d more)" % (len(never_compiled) - 20)
+        print("  not built by this target: %s" % shown)
 
     unattributed = classify(diags, manifest, args.leg)
     if unattributed:
@@ -559,7 +626,9 @@ def main():
 
     if args.write_baseline:
         n = write_baseline(args.leg, diags, "leg: %s\nlog: %s" % (args.leg, os.path.basename(args.log)))
+        write_coverage(args.leg, compiled)
         print("wrote %d baseline entries to %s" % (n, baseline_path(args.leg)))
+        print("wrote %d covered sources to %s" % (len(compiled), coverage_path(args.leg)))
         return 0
 
     gating = [d for d in diags if d.group in GATING_GROUPS]
