@@ -559,6 +559,43 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("the packaged client talks to the packaged server")
+    void theTranslatedClientDrivesTheServer() throws Exception {
+        // ParparVM on BOTH ends. Every other test here drives the server from
+        // JUnit, over a raw socket or an HttpURLConnection, so the packaged
+        // OUTBOUND client -- Web, and the libcurl under it -- was never exercised
+        // against a real server at all. Two things only this can show: that each
+        // verb arrives as itself, PATCH included, which the Java SE arm cannot
+        // send and therefore cannot test; and that the two halves agree when they
+        // actually meet.
+        Path work = Files.createTempDirectory("backend-webcheck");
+        Path clientBinary = work.resolve("webcheck");
+        Path jdk8 = BackendTestSupport.findJdk8();
+        BackendTestSupport.require(jdk8 != null, "no JDK 8 available to build the client");
+        String failure = BackendTestSupport.build("WebCheck", "demo/webcheck", clientBinary, jdk8);
+        if (failure != null) {
+            BackendTestSupport.skipOrFail(failure);
+            return;
+        }
+        ProcessBuilder run = new ProcessBuilder(clientBinary.toString());
+        run.environment().put("CN1_WEBCHECK_BASE", "http://127.0.0.1:" + port);
+        run.redirectErrorStream(true);
+        Process client = run.start();
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        InputStream clientOut = client.getInputStream();
+        byte[] chunk = new byte[4096];
+        int n;
+        while ((n = clientOut.read(chunk)) > 0) {
+            captured.write(chunk, 0, n);
+        }
+        String out = new String(captured.toByteArray(), StandardCharsets.UTF_8);
+        int exit = client.waitFor();
+        assertTrue(out.contains("WEBCHECK OK"),
+                "the translated client reported failures against the server:\n" + out);
+        assertEquals(0, exit, "the translated client exited nonzero:\n" + out);
+    }
+
+    @Test
     @DisplayName("a megabyte-scale upload is read whole and answered")
     void aLargeUploadIsReadWhole() throws Exception {
         // The whole upload path had no test with a body big enough to grow the

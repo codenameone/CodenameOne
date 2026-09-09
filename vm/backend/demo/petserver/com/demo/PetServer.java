@@ -116,6 +116,15 @@ public class PetServer {
                 // handler may build it, and RFC 9110 ends a Reset Content
                 // response at the header section, so writing them would leave a
                 // keep-alive client reading them as the next reply.
+                // Echoes the VERB back, so a client can prove which one arrived
+                // rather than which one it believes it sent. HttpServer routes
+                // seven methods; this answers for any of them.
+                if("/echo".equals(stripQuery(target))) {
+                    String echoed = request.getBody();
+                    return new HttpServer.Response(200, "text/plain",
+                            ("method=" + method + " len="
+                                    + (echoed == null ? 0 : echoed.length())).getBytes("UTF-8"));
+                }
                 if("/reset".equals(stripQuery(target))) {
                     return new HttpServer.Response(205, "text/plain",
                             "junk".getBytes("UTF-8"));
