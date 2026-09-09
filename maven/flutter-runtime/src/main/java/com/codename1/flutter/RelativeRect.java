@@ -59,6 +59,29 @@ public final class RelativeRect {
         return bottom;
     }
 
+    /**
+     * Interpolates between two rects -- Flutter's {@code RelativeRect.lerp}.
+     *
+     * <p>A null end is treated as the other end, which is what Flutter does, so an
+     * animation with only one side configured still runs.</p>
+     */
+    public static RelativeRect lerp(RelativeRect a, RelativeRect b, double t) {
+        if (a == null && b == null) {
+            return null;
+        }
+        if (a == null) {
+            return fromLTRB(b.left * t, b.top * t, b.right * t, b.bottom * t);
+        }
+        if (b == null) {
+            double k = 1.0 - t;
+            return fromLTRB(a.left * k, a.top * k, a.right * k, a.bottom * k);
+        }
+        return fromLTRB(a.left + (b.left - a.left) * t,
+                a.top + (b.top - a.top) * t,
+                a.right + (b.right - a.right) * t,
+                a.bottom + (b.bottom - a.bottom) * t);
+    }
+
     public Rect toRect(Rect container) {
         return Rect.fromLTRB(
                 left + container.left(),

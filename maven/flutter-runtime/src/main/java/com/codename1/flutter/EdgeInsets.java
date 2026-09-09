@@ -56,6 +56,39 @@ public class EdgeInsets extends EdgeInsetsGeometry {
      * When {@code other} is a direction-relative inset it cannot be resolved
      * without a text direction, so only the absolute component contributes.
      */
+    /**
+     * Interpolates between two insets -- Flutter's {@code EdgeInsets.lerp}.
+     *
+     * <p>Two directional insets interpolate to a directional one, so an animation
+     * between them does not silently become left-to-right at the first frame. Anything
+     * else interpolates as LTRB, which is what a mixed pair resolves to here anyway --
+     * see {@link EdgeInsetsDirectional}, which stores its LTR mapping.</p>
+     */
+    public static EdgeInsets lerp(EdgeInsets a, EdgeInsets b, double t) {
+        if (a == null && b == null) {
+            return null;
+        }
+        if (a == null) {
+            a = zero;
+        }
+        if (b == null) {
+            b = zero;
+        }
+        if (a instanceof EdgeInsetsDirectional && b instanceof EdgeInsetsDirectional) {
+            EdgeInsetsDirectional da = (EdgeInsetsDirectional) a;
+            EdgeInsetsDirectional db = (EdgeInsetsDirectional) b;
+            return EdgeInsetsDirectional.fromSTEB(
+                    da.start() + (db.start() - da.start()) * t,
+                    da.top() + (db.top() - da.top()) * t,
+                    da.end() + (db.end() - da.end()) * t,
+                    da.bottom() + (db.bottom() - da.bottom()) * t);
+        }
+        return fromLTRB(a.left() + (b.left() - a.left()) * t,
+                a.top() + (b.top() - a.top()) * t,
+                a.right() + (b.right() - a.right()) * t,
+                a.bottom() + (b.bottom() - a.bottom()) * t);
+    }
+
     public EdgeInsets add(EdgeInsetsGeometry other) {
         if (other instanceof EdgeInsets) {
             EdgeInsets o = (EdgeInsets) other;

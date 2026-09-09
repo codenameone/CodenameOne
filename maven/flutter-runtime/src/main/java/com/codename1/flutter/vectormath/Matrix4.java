@@ -97,6 +97,31 @@ public class Matrix4 {
         return s;
     }
 
+    /**
+     * Component-wise interpolation of two matrices, which is what Flutter's
+     * {@code Matrix4Tween} does.
+     *
+     * <p>It lives here rather than in the tween because the storage does: doing it
+     * through {@code storage()} would build two lists per frame for an animation that
+     * runs per frame.</p>
+     */
+    public static Matrix4 lerp(Matrix4 a, Matrix4 b, double t) {
+        if (a == null && b == null) {
+            return null;
+        }
+        if (a == null) {
+            a = zero();
+        }
+        if (b == null) {
+            b = zero();
+        }
+        Matrix4 r = new Matrix4();
+        for (int i = 0; i < 16; i++) {
+            r.m[i] = a.m[i] + (b.m[i] - a.m[i]) * t;
+        }
+        return r;
+    }
+
     /** A copy of this matrix — vector_math's {@code clone()}. */
     public Matrix4 clone() {
         Matrix4 r = new Matrix4();
