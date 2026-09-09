@@ -38,7 +38,12 @@ def parse_raw(path):
                 continue
             match = PROBE_RE.match(line)
             if match:
-                drove = int(match.group(1))
+                # SUM, never assign. The runner uses one process per workload
+                # and concatenates their output, so an assignment keeps only
+                # the LAST workload's count -- an earlier workload reaching
+                # cn1_ivsDrive with a generator would then be reported as
+                # zero, which is the exact failure this probe exists to catch.
+                drove += int(match.group(1))
     return workloads, suite, drove
 
 

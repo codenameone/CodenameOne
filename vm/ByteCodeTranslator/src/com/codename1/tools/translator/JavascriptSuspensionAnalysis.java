@@ -331,7 +331,10 @@ final class JavascriptSuspensionAnalysis {
      * string-referenced name.
      */
     private void seedBridgeReferenced(List<ByteCodeClass> classes) {
-        Set<String> tokens = JavascriptBundleWriter.collectBridgeReferencedCn1Tokens();
+        // REPLACED, not merely referenced -- see collectBridgeReplacedCn1Tokens.
+        // Narrowing the shared referenced-set instead renamed the names the
+        // bridge looks up and broke nine theme screenshots.
+        Set<String> tokens = JavascriptBundleWriter.collectBridgeReplacedCn1Tokens();
         if (tokens.isEmpty()) {
             return;
         }

@@ -128,12 +128,6 @@ final class JavascriptReachability {
 
     static int run(List<ByteCodeClass> classes, List<ByteCodeClass> classPool,
             String[] nativeSources) {
-        // Drop any previous translation's answer FIRST. Surefire reuses one
-        // JVM across fixtures and the build server translates repeatedly, so a
-        // stale instantiated set would let the suspension analysis resolve
-        // this app's call sites against another app's type graph -- which
-        // under-approximates, i.e. fails in the unsafe direction.
-        exportedInstantiated = Collections.<String>emptySet();
         JavascriptReachability rta = new JavascriptReachability();
         // The conservative pass may have removed an entire class after
         // eliminating the only method that instantiated it.  RTA can later
@@ -161,6 +155,24 @@ final class JavascriptReachability {
      * is instantiated" -- see {@link Model#resolveImpls}.
      */
     static volatile Set<String> exportedInstantiated = Collections.<String>emptySet();
+
+    /**
+     * Forgets the previous translation's instantiated set.
+     *
+     * This CANNOT live inside {@link #run}, which is the obvious place and the
+     * wrong one: {@code Parser} skips {@code run} entirely under
+     * ``-Dparparvm.js.rta.off``, so a JVM that translated one application with
+     * RTA on and a second with it off would hand the second application's call
+     * sites the FIRST application's type graph -- and that under-approximates,
+     * which is the direction that picks the synchronous dispatcher for a
+     * suspending override. A reused JVM flipping the property mid-run is
+     * exactly what the translator's own tests do with the minifier properties.
+     * So the caller clears this unconditionally, before deciding whether to
+     * run RTA at all.
+     */
+    static void resetExportedFacts() {
+        exportedInstantiated = Collections.<String>emptySet();
+    }
 
     /**
      * The subtype relation plus RTA's instantiated set, indexed over one class

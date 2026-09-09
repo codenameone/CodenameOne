@@ -1685,6 +1685,58 @@ final class JavascriptBundleWriter {
      * body would never run.
      */
     static Set<String> collectBridgeReferencedCn1Tokens() {
+        return collectBridgeCn1Tokens(false);
+    }
+
+    /**
+     * The subset of {@link #collectBridgeReferencedCn1Tokens()} whose bodies
+     * the bridge can REPLACE at runtime, which is the only reason a name needs
+     * to be suspending.
+     *
+     * These two questions look like one and are not, and conflating them broke
+     * nine theme screenshots:
+     *
+     * - "the bridge NAMES this method" decides whether the emitted identifier
+     *   may be renamed, whether its {@code m:} entry may be pruned, and
+     *   whether the call may be devirtualized. A name the bridge merely LOOKS
+     *   UP still needs every one of those protections, or
+     *   {@code jvm.resolveVirtual(cls, "cn1_s_...")} stops finding it.
+     * - "the bridge REPLACES this method" decides whether callers must
+     *   {@code yield*}. Only a replacement can turn out to be a generator.
+     *
+     * So the narrowing lives HERE and nowhere else. Do not push it back into
+     * the shared collector: five other call sites depend on the wide set, four
+     * of them on by default -- {@code minifyGeneratedIdentifiers},
+     * {@code mangleDispatchIds}, {@code mangleInstanceFieldProps} and the
+     * devirtualization exclusions in this file and in
+     * {@link JavascriptMethodGenerator}.
+     */
+    static Set<String> collectBridgeReplacedCn1Tokens() {
+        return collectBridgeCn1Tokens(true);
+    }
+
+    /**
+     * Scrapes {@code cn1_*} string literals out of the hand-written bridge JS
+     * (parparvm_runtime.js, browser_bridge.js, port.js).
+     *
+     * With {@code replacedOnly}, a token is dropped when EVERY occurrence of
+     * it is a {@code resolveVirtual} argument. Such a name is looked up and
+     * called, and the result is driven through {@code cn1_ivAdapt} /
+     * {@code adaptVirtualResult}, both of which tolerate a plain function; a
+     * REPLACEMENT instead assigns to {@code classDef.methods[...]}, and every
+     * such site in the bridge is scoped to one class.
+     *
+     * The test is deliberately all-or-nothing. One assignment, one
+     * {@code bindNative} array entry, one mention anywhere else, and the token
+     * stays. That keeps a name reached through a variable
+     * ({@code const id = "cn1_s_..."; cls.methods[id] = fn}) protected,
+     * because the literal feeding the variable is not itself a lookup.
+     *
+     * It is worth 10 tokens out of 705, but they are the expensive ones:
+     * {@code toString}, {@code equals}, {@code hashCode} and {@code run}
+     * between them seeded most of the bridge-referenced suspending set.
+     */
+    private static Set<String> collectBridgeCn1Tokens(boolean replacedOnly) {
         Set<String> tokens = new HashSet<String>();
         List<String> sources = new ArrayList<String>();
         for (String res : new String[]{ "parparvm_runtime.js", "browser_bridge.js" }) {
@@ -1707,25 +1759,6 @@ final class JavascriptBundleWriter {
             // to the in-bundle string scan only)
         }
         java.util.regex.Pattern literal = java.util.regex.Pattern.compile("[\"'](cn1_[A-Za-z0-9_]+)[\"']");
-        // A name the bridge only ever LOOKS UP is not a name the bridge
-        // replaces, and only replacement needs protection.
-        //
-        // ``resolveVirtual(x, "cn1_s_toString_R_java_lang_String")`` is a call;
-        // its result is driven through ``cn1_ivAdapt`` / ``adaptVirtualResult``,
-        // which tolerate a plain function. Replacement instead assigns to
-        // ``classDef.methods[...]``, and every such site in the bridge is
-        // scoped to one class. Counting a lookup as a replacement is not the
-        // "handful of generators" the original comment estimated: ``toString``
-        // and ``equals`` are named exactly this way, and between them that
-        // seeded 781 methods suspending and made 2,874 dispatch sites
-        // ``yield*`` -- the two largest entries in the whole report.
-        //
-        // The test is deliberately all-or-nothing: a token is dropped only
-        // when EVERY occurrence of it is a resolveVirtual argument. One
-        // assignment, one bindNative array entry, one mention anywhere else,
-        // and it stays protected. That keeps names reached through a variable
-        // (``const id = "cn1_s_..."; cls.methods[id] = fn``) safe, because the
-        // literal that feeds the variable is not itself a lookup.
         java.util.regex.Pattern lookup = java.util.regex.Pattern.compile(
                 "resolveVirtual\\s*\\([^,()]*,\\s*[\"'](cn1_[A-Za-z0-9_]+)[\"']");
         Map<String, int[]> counts = new HashMap<String, int[]>();
@@ -1734,9 +1767,11 @@ final class JavascriptBundleWriter {
             while (m.find()) {
                 bump(counts, m.group(1), 0);
             }
-            java.util.regex.Matcher l = lookup.matcher(src);
-            while (l.find()) {
-                bump(counts, l.group(1), 1);
+            if (replacedOnly) {
+                java.util.regex.Matcher l = lookup.matcher(src);
+                while (l.find()) {
+                    bump(counts, l.group(1), 1);
+                }
             }
         }
         for (Map.Entry<String, int[]> entry : counts.entrySet()) {
