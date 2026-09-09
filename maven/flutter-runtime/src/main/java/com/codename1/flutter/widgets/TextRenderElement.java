@@ -119,6 +119,9 @@ public class TextRenderElement extends RenderElement {
             double sp = ts == null || ts.getLetterSpacing() == null
                     ? 0 : Dp.px(ts.getLetterSpacing().doubleValue());
             ((WrappedLabel) l).spacingPx = sp;
+            ((WrappedLabel) l).lineHeightPx = ts == null || ts.height() == null
+                    || ts.getFontSize() == null ? 0
+                    : Dp.px(ts.getFontSize().doubleValue() * ts.height().doubleValue());
             // A TRANSLUCENT ink is ordinary in Material: the 2018 type scale
             // paints its display roles at black54 and its body roles at
             // black87, and Codename One's Style carries only an opaque
@@ -213,7 +216,7 @@ public class TextRenderElement extends RenderElement {
         for (String line : lines) {
             w = Math.max(w, spacedWidth(f, line, spacing));
         }
-        double h = (double) f.getHeight() * Math.max(1, lines.size());
+        double h = l.lineHeight(f) * Math.max(1, lines.size());
         return constraints.constrain(new Size(w, h));
     }
 
@@ -419,6 +422,20 @@ public class TextRenderElement extends RenderElement {
         List<String> lines;
         /** Flutter's TextStyle.letterSpacing, in device pixels. */
         double spacingPx;
+        /// Flutter's {@code TextStyle.height} MULTIPLIED BY the font size, in device
+        /// pixels; 0 when the style sets none and the font's own height should stand.
+        ///
+        /// The multiplier was parsed and merged and then never used -- the layout took
+        /// the font's height and the painter advanced by it. Material specifies a height
+        /// for most of its text styles (bodyMedium 1.43, titleLarge 1.27), so every block
+        /// was set at the wrong leading, and down a long list the error accumulates until
+        /// dividers land on the text they were meant to separate.
+        double lineHeightPx;
+
+        /** The height of one line: the style's, or the font's when it sets none. */
+        double lineHeight(Font f) {
+            return lineHeightPx > 0 ? lineHeightPx : (f == null ? 0 : f.getHeight());
+        }
         /** The ink's own alpha; see applyStyle. */
         int fgAlpha = 255;
 
@@ -452,8 +469,12 @@ public class TextRenderElement extends RenderElement {
             int prevAlpha = fgAlpha >= 255 ? -1 : g.concatenateAlpha(fgAlpha);
             g.setColor(s.getFgColor());
             g.setFont(f);
-            int lh = f.getHeight();
+            int lh = (int) Math.round(lineHeight(f));
             int y = getY();
+            // Flutter centres the glyphs in the line box, so a line taller than the font
+            // pushes the text down by half the difference. Without this the run sits on
+            // the box's top edge and every line is a little high.
+            int glyphOffset = Math.max(0, (lh - f.getHeight()) / 2);
             int align = s.getAlignment();
             List<String> toPaint = multiLine ? lines
                     : java.util.Collections.singletonList(getText() == null ? "" : getText());
@@ -478,7 +499,7 @@ public class TextRenderElement extends RenderElement {
                     x += getWidth() - lineW;
                 }
                 if (spacingPx == 0) {
-                    g.drawString(line, x, y);
+                    g.drawString(line, x, y + glyphOffset);
                 } else {
                     // One glyph at a time: the only way to add tracking, since Codename One
                     // draws a whole string in a single advance.
@@ -491,7 +512,7 @@ public class TextRenderElement extends RenderElement {
                     double cursor = x;
                     for (int i = 0; i < line.length(); i++) {
                         char ch = line.charAt(i);
-                        g.drawString(line.substring(i, i + 1), (int) Math.round(cursor), y);
+                        g.drawString(line.substring(i, i + 1), (int) Math.round(cursor), y + glyphOffset);
                         cursor += f.charWidth(ch) * scale + spacingPx;
                     }
                 }
