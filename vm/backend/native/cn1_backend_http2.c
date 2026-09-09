@@ -327,6 +327,16 @@ static int cn1H2OnHeader(nghttp2_session* session, const nghttp2_frame* frame,
        too: a single enormous :path would otherwise walk straight past a ceiling
        that only looked at ordinary fields. */
     r->headerBytes += (size_t)nameLen + (size_t)valueLen;
+    /* Charged in the SAME breath as r->headerBytes, and before every rejection
+       below, because cn1H2FreeRequest gives back r->headerBytes whichever way
+       this stream ends. Charging after the checks -- which is what this did --
+       left the rejected field counted by headerBytes and never added to the
+       global, so the free subtracted bytes the global had never gained and the
+       total drifted DOWNWARD. Repeat a rejected header block and the process
+       cap stops being a cap at all, which is the opposite of what it is for.
+       The two figures have to move together or neither means anything. */
+    atomic_fetch_add_explicit(&cn1H2InboundBytes, (long)(nameLen + valueLen),
+                              memory_order_relaxed);
     if(r->headerBytes > CN1_H2_MAX_HEADER_BYTES) {
         return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
     }
@@ -351,12 +361,7 @@ static int cn1H2OnHeader(nghttp2_session* session, const nghttp2_frame* frame,
             return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
         }
     }
-    /* Charged unconditionally, because r->headerBytes above already counts these
-       bytes and cn1H2FreeRequest gives back exactly that -- so the two have to
-       move together whether or not this field is the one that crosses the line.
-       Refusing the stream is what releases them. */
-    atomic_fetch_add_explicit(&cn1H2InboundBytes, (long)(nameLen + valueLen),
-                              memory_order_relaxed);
+    /* Already charged above, so this only asks whether the process is over. */
     if(atomic_load_explicit(&cn1H2InboundBytes, memory_order_relaxed)
             > CN1_H2_MAX_PROCESS_INBOUND_BYTES) {
         return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
