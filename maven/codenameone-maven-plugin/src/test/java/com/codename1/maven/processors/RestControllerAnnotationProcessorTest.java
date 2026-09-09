@@ -498,6 +498,52 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aResponseInsideACollectionIsRefused() throws Exception {
+        // Returning a Response IS how a route answers, and emitRoute sends it.
+        // Inside a collection nothing does: it reaches Json's fallback and comes
+        // back as the quoted result of its toString(). The exemption is real at
+        // the top and false one level in.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import com.codename1.backend.HttpServer;\n"
+                + "import java.util.List;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/many\")\n"
+                + "    public List<HttpServer.Response> many() { return null; }\n"
+                + "}\n"));
+        assertTrue("a collection of Response should not compile", ctx.hasErrors());
+        assertTrue(ctx.getErrors().toString(),
+                ctx.getErrors().toString().indexOf("cannot encode") >= 0);
+    }
+
+    @Test
+    public void aDirectResponseReturnIsSentAsItStands() throws Exception {
+        // Not just that it compiles: that the router SENDS it. The comparison
+        // this branch turns on used the dotted source spelling of a nested class
+        // while the type comes from the descriptor as HttpServer$Response, so it
+        // never matched -- the branch that sends a Response was dead, and a
+        // controller taking control of its own reply had that reply JSON-encoded
+        // instead. Status 418 is the reply here; a JSON-encoded one would be 200.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import com.codename1.backend.HttpServer;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/one\")\n"
+                + "    public HttpServer.Response one() {\n"
+                + "        return HttpServer.Response.text(418, \"teapot\");\n"
+                + "    }\n"
+                + "}\n");
+        Object response = router.call("GET", "/one", null);
+        assertNotNull("GET /one matched no route", response);
+        assertEquals(418, Router.statusOf(response));
+        assertEquals("teapot", Router.bodyOf(response));
+    }
+
+    @Test
     public void aJdkReturnJsonCannotWriteIsRefused() throws Exception {
         // java.util.Date has no branch in Json.writeValue, so it reaches the
         // final one and is answered as a quoted, implementation-formatted

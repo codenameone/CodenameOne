@@ -97,6 +97,24 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private static final String RESPONSE_TYPE = "com.codename1.backend.HttpServer.Response";
 
     /**
+     * The same class as the DESCRIPTOR spells it. A nested class is
+     * Outer$Inner in bytecode, and the type derived from the descriptor keeps
+     * that -- so comparing against the dotted source spelling alone never
+     * matched, and both places that ask "is this a Response" were dead code:
+     * emitRoute never took the branch that SENDS one, and the encodable check
+     * never exempted it. Returning a Response from a controller, which the
+     * refusal message itself offers as the way to take control of the reply,
+     * did not work.
+     */
+    private static final String RESPONSE_TYPE_BINARY =
+            "com.codename1.backend.HttpServer$Response";
+
+    /** Either spelling of HttpServer.Response. */
+    private static boolean isResponseType(String javaType) {
+        return RESPONSE_TYPE.equals(javaType) || RESPONSE_TYPE_BINARY.equals(javaType);
+    }
+
+    /**
      * The verbs HttpServer routes. It compares them with equals and answers 501
      * to everything else before dispatch, so this list is the whole truth about
      * what a generated route can be reached by. Kept in the same order the
@@ -959,7 +977,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append(pad).append(call).append(";\n");
             sb.append(pad).append("return request.respond(").append(route.status)
               .append(", \"text/plain\", EMPTY);\n");
-        } else if (RESPONSE_TYPE.equals(route.returnJavaType)) {
+        } else if (isResponseType(route.returnJavaType)) {
             // The handler built its own Response; a status annotation would be a lie
             // about something this router no longer controls.
             sb.append(pad).append("return ").append(call).append(";\n");
@@ -1078,8 +1096,25 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
 
     /** Whether Json.write turns this return type into something other than toString(). */
     private static boolean isEncodableReturn(String javaType, ProcessorContext ctx) {
-        if (javaType == null || "void".equals(javaType) || RESPONSE_TYPE.equals(javaType)) {
+        return isEncodableReturn(javaType, ctx, true);
+    }
+
+    /**
+     * @param top whether this is the RETURN type itself rather than something
+     *            inside it. void and HttpServer.Response are answers a route can
+     *            give; they are not values Json can write. emitRoute handles a
+     *            directly returned Response by sending it, so the exemption is
+     *            real at the top and false anywhere else -- a
+     *            List&lt;Response&gt; reaches the writer's fallback and each
+     *            element is emitted as the quoted result of its toString().
+     */
+    private static boolean isEncodableReturn(String javaType, ProcessorContext ctx,
+                                             boolean top) {
+        if (javaType == null) {
             return true;
+        }
+        if ("void".equals(javaType) || isResponseType(javaType)) {
+            return top;
         }
         // Arrays before anything else, because both tests below wave them
         // through: a primitive array's name has no dot and a JDK array's name
@@ -1102,7 +1137,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             if (end > lt) {
                 List<String> args = splitTypeArguments(javaType.substring(lt + 1, end));
                 for (int i = 0; i < args.size(); i++) {
-                    if (!isEncodableReturn(args.get(i), ctx)) {
+                    if (!isEncodableReturn(args.get(i), ctx, false)) {
                         return false;
                     }
                 }
