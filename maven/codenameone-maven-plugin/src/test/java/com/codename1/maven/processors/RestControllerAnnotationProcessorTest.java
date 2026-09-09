@@ -286,6 +286,30 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aLiteralAndAVariableInOneControllerBothWork() throws Exception {
+        // The single most ordinary pair there is. They DO overlap -- /users/me is
+        // a path /users/{id} would answer -- but the router emits every route
+        // with no variables before any route with one, so the literal wins its
+        // own path and everything else falls through.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/users/me\")\n"
+                + "    public String me() { return \"me\"; }\n"
+                + "    @GetMapping(\"/users/{id}\")\n"
+                + "    public String byId(@PathVariable(\"id\") String id) { return id; }\n"
+                + "}\n");
+        Object mine = router.call("GET", "/users/me", null);
+        assertNotNull("GET /users/me matched no route", mine);
+        assertEquals("me", Router.bodyOf(mine));
+        Object other = router.call("GET", "/users/42", null);
+        assertNotNull("GET /users/42 matched no route", other);
+        assertEquals("42", Router.bodyOf(other));
+    }
+
+    @Test
     public void aListOfDtosIsRefused() throws Exception {
         // The DESCRIPTOR erases this to java.util.List, which the encodable
         // check waves through on its own name. Every Note in the list would

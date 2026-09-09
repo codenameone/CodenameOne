@@ -515,11 +515,23 @@ public final class MySql {
             case 0x03: // LONG
             case 0x09: // INT24
                 return Long.valueOf(column.unsigned ? (reader.i32() & 0xffffffffL) : reader.i32());
-            case 0x08: // LONGLONG
-                // BIGINT UNSIGNED above Long.MAX_VALUE has no long that holds it, and
-                // this API returns Long. Such a value wraps to a negative number; the
-                // widths below it are exact, which is where the corruption actually was.
-                return Long.valueOf(reader.i64());
+            case 0x08: { // LONGLONG
+                // BIGINT UNSIGNED above Long.MAX_VALUE has no long that holds it:
+                // the high bit is a sign bit to Java, so the value comes back
+                // NEGATIVE -- an id or a counter arriving as a different number
+                // than the row holds, in the query result and in the JSON built
+                // from it. Such a value keeps its exact unsigned decimal as text,
+                // the same answer DECIMAL gets above and numeric gets on the
+                // PostgreSQL side: a type the API cannot hold is not rounded or
+                // wrapped into one that fits. Everything that DOES fit stays a
+                // Long, which is every signed BIGINT and every unsigned one below
+                // the boundary.
+                long value = reader.i64();
+                if(column.unsigned && value < 0) {
+                    return unsignedText(value);
+                }
+                return Long.valueOf(value);
+            }
             case 0x04: // FLOAT
                 return Double.valueOf(Float.intBitsToFloat(reader.i32()));
             case 0x05: // DOUBLE
@@ -549,6 +561,22 @@ public final class MySql {
                 return column.binary ? (Object)data : (Object)Wire.fromUtf8(data);
             }
         }
+    }
+
+    /**
+     * The exact decimal for a 64-bit value read as unsigned. Long.toString would
+     * print the negative wrap, and there is no unsigned formatter to call here,
+     * so it is divided out by hand: the top bit is worth 2^63, and the rest is
+     * an ordinary positive long.
+     */
+    private static String unsignedText(long value) {
+        long quotient = (value >>> 1) / 5;          // value / 10, unsigned
+        long remainder = value - quotient * 10;
+        if(remainder > 9) {                          // the halving can be one low
+            quotient += remainder / 10;
+            remainder %= 10;
+        }
+        return Long.toString(quotient) + (char)('0' + remainder);
     }
 
     private static int typeOf(Object value) {

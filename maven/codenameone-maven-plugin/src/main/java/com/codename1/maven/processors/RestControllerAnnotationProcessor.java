@@ -29,8 +29,10 @@ import com.codename1.maven.annotations.JavaSourceCompiler;
 import com.codename1.maven.annotations.MethodInfo;
 import com.codename1.maven.annotations.ProcessingException;
 import com.codename1.maven.annotations.ProcessorContext;
+import com.codename1.maven.annotations.ClassScanner;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,6 +43,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import org.objectweb.asm.Type;
 
 /**
@@ -321,6 +325,19 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             if (!overlaps(other.substring(otherSpace + 1), shape.substring(mySpace + 1))) {
                 continue;
             }
+            // Inside ONE controller, a wholly literal route and a dynamic one are
+            // resolved by generateRouter's comparator: it emits every route with
+            // no variables before every route with any, so /users/me is matched
+            // before /users/{id} and /users/42 still falls through to it. That
+            // pair is the single most ordinary thing to write, and it is what the
+            // message below tells people to do -- refusing it left no way to
+            // write it at all.
+            // Only that pair. Two DYNAMIC shapes have no dominance in that
+            // comparator, so "/a/{x}/c" against "/a/b/{y}" is still ambiguous,
+            // and two literals that overlap are the same literal twice.
+            if (mine.equals(e.getValue()) && isLiteralShape(other) != isLiteralShape(shape)) {
+                continue;
+            }
             return mine + "." + route.javaMethod + " answers " + shape + ", which "
                     + e.getValue() + " also answers as " + other + ". The routers are "
                     + "tried one after another, so whichever controller happens to "
@@ -329,6 +346,57 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     + "is matched first, or give them different paths.";
         }
         return null;
+    }
+
+    /**
+     * The class for an internal name as it appears on the COMPILE CLASSPATH,
+     * whether that is a directory of classes or a jar, or null when it is on
+     * neither. Read with ASM rather than loaded: a build must not run a
+     * dependency's static initialisers to answer a question about its shape.
+     */
+    private static AnnotatedClass fromCompileClasspath(ProcessorContext ctx, String internalName) {
+        String entryName = internalName + ".class";
+        for (String element : ctx.getCompileClasspath()) {
+            File file = new File(element);
+            if (file.isDirectory()) {
+                File candidate = new File(file, entryName.replace('/', File.separatorChar));
+                if (candidate.isFile()) {
+                    try {
+                        return ClassScanner.readClass(candidate);
+                    } catch (Exception err) {
+                        return null;
+                    }
+                }
+                continue;
+            }
+            if (!file.isFile()) {
+                continue;
+            }
+            try {
+                ZipFile zip = new ZipFile(file);
+                try {
+                    ZipEntry entry = zip.getEntry(entryName);
+                    if (entry != null) {
+                        InputStream in = zip.getInputStream(entry);
+                        try {
+                            return ClassScanner.readClass(in, file);
+                        } finally {
+                            in.close();
+                        }
+                    }
+                } finally {
+                    zip.close();
+                }
+            } catch (Exception err) {
+                continue;             // an unreadable entry is not an answer
+            }
+        }
+        return null;
+    }
+
+    /** A shape with no variables at all, which the router matches before any. */
+    private static boolean isLiteralShape(String shape) {
+        return shape.indexOf('{') < 0;
     }
 
     /**
@@ -909,9 +977,19 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if (raw.startsWith("java.") || raw.indexOf('.') < 0) {
             return true;
         }
-        AnnotatedClass cls = ctx.lookup(raw.replace('.', '/'));
+        String internal = raw.replace('.', '/');
+        AnnotatedClass cls = ctx.lookup(internal);
         if (cls == null) {
-            return true;              // not ours to judge; the compiler will speak
+            // Not in the index because the index holds only what this project
+            // compiles -- so a DTO from a DEPENDENCY landed here and was waved
+            // through, and Json wrote it as the quoted result of its toString().
+            // The compile classpath is where such a type actually lives, and it
+            // is read the same way the index was built: with ASM, so nothing is
+            // loaded and no static initialiser runs.
+            cls = fromCompileClasspath(ctx, internal);
+        }
+        if (cls == null) {
+            return false;             // cannot be inspected, so cannot be trusted
         }
         for (String itf : cls.getInterfaceInternalNames()) {
             if ("com/codename1/backend/Json$Writable".equals(itf)) {
