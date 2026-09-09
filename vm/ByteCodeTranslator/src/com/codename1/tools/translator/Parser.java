@@ -684,9 +684,11 @@ public class Parser extends ClassVisitor {
         FileOutputStream fos = new FileOutputStream(new File(outputDirectory, "cn1_class_method_index.h"));
         fos.write(bld.toString().getBytes(StandardCharsets.UTF_8));
         fos.close();
+        ByteCodeTranslator.sourceManifest.recordGenerated("cn1_class_method_index.h");
         fos = new FileOutputStream(new File(outputDirectory, "cn1_class_method_index.m"));
         fos.write(bldM.toString().getBytes(StandardCharsets.UTF_8));
         fos.close();
+        ByteCodeTranslator.sourceManifest.recordGenerated("cn1_class_method_index.m");
     }
     
     private static String encodeString(String con) {
@@ -1164,6 +1166,13 @@ public class Parser extends ClassVisitor {
 
         if (outMain instanceof ConcatenatingFileOutputStream) {
             ((ConcatenatingFileOutputStream)outMain).beginNextFile(cls.getClsName());
+        } else {
+            // Only the one-file-per-class case has a file name worth recording. Under
+            // concatenation the classes are bucketed into concatenated_<n> and the
+            // provenance of an individual class is genuinely gone by the time the
+            // compiler sees it; the manifest says so by simply not naming these.
+            ByteCodeTranslator.sourceManifest.recordGenerated(
+                    cls.getClsName() + "." + ByteCodeTranslator.output.extension());
         }
         if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
             outMain.write(cls.generateJavascriptCode(classes).getBytes(StandardCharsets.UTF_8));
@@ -1177,6 +1186,10 @@ public class Parser extends ClassVisitor {
             try(FileOutputStream outHeader = new FileOutputStream(new File(outputDir, headerName))) {
                 outHeader.write(cls.generateCHeader().getBytes(StandardCharsets.UTF_8));
             }
+            // The header is per-class even when the bodies are concatenated, so it is
+            // always recordable -- and it is where a good share of the generated-code
+            // diagnostics land, since every class that depends on this one includes it.
+            ByteCodeTranslator.sourceManifest.recordGenerated(headerName);
         }
     }
     

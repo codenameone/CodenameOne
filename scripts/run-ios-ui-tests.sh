@@ -702,6 +702,27 @@ fi
 CN1_TEST_OPT_LEVEL="${CN1_TEST_OPT_LEVEL:-2}"
 XCODE_BUILD_CMD+=("GCC_OPTIMIZATION_LEVEL=$CN1_TEST_OPT_LEVEL")
 ri_log "Building translated C at -O$CN1_TEST_OPT_LEVEL (GCC_OPTIMIZATION_LEVEL)"
+# Warning census (CN1_WARNING_CENSUS=1, set by our workflows and by nothing a
+# customer runs). The five settings below are OFF in the Xcode template, which
+# quietens the translator's output at the cost of also blinding the ~85k lines of
+# hand-written port natives compiled alongside it. Turning them back on for the
+# census measures what restoring each would cost before any of them is changed in
+# the template.
+#
+# These must be command-line overrides rather than an xcconfig: Xcode's precedence
+# is command line > target > project > xcconfig, so an xcconfig saying YES loses to
+# the project-level NO and would measure nothing at all -- a gate that reads
+# nothing and reports success.
+if [ "${CN1_WARNING_CENSUS:-0}" = "1" ]; then
+  ri_log "Warning census: re-enabling the warnings the template disables"
+  XCODE_BUILD_CMD+=(
+    "CLANG_WARN_EMPTY_BODY=YES"
+    "CLANG_WARN_ENUM_CONVERSION=YES"
+    "CLANG_WARN_INT_CONVERSION=YES"
+    "CLANG_WARN__DUPLICATE_METHOD_MATCH=YES"
+    "GCC_WARN_UNUSED_VARIABLE=YES"
+  )
+fi
 XCODE_BUILD_CMD+=(build)
 if ! "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
   # CI runners occasionally lose the booted device between simctl boot and the
@@ -737,6 +758,24 @@ fi
 COMPILE_END=$(date +%s)
 COMPILATION_TIME=$((COMPILE_END - COMPILE_START))
 ri_log "Compilation time: ${COMPILATION_TIME}s"
+
+# Attribute this build's warnings to whoever owns the code. Report-only for now:
+# the census has to produce the first honest numbers before any baseline can be
+# frozen from them. The tool exits 2 by itself if this build did not compile
+# everything, so an incremental build cannot quietly report a small number.
+if [ "${CN1_WARNING_CENSUS:-0}" = "1" ]; then
+  CN1_WARNING_MANIFEST="${CN1_WARNING_MANIFEST:-$ARTIFACTS_DIR/cn1-source-manifest.txt}"
+  if [ -f "$CN1_WARNING_MANIFEST" ]; then
+    "$REPO_ROOT/scripts/check-native-warnings.sh" \
+      --leg "${CN1_WARNING_LEG:-ios-sim-debug}" \
+      --log "$BUILD_LOG" \
+      --manifest "$CN1_WARNING_MANIFEST" \
+      --json "$ARTIFACTS_DIR/native-warnings.json" \
+      --report-only || ri_log "STAGE:WARNING_CENSUS_FAILED"
+  else
+    ri_log "Warning census requested but no manifest at $CN1_WARNING_MANIFEST"
+  fi
+fi
 
 BUILD_SETTINGS="$("$XCODEBUILD" "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"
 TARGET_BUILD_DIR="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ TARGET_BUILD_DIR /{print $2; exit}')"

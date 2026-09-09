@@ -544,6 +544,16 @@ jobs:
           mvn -B -q -f maven/pom.xml -pl windows,linux -am -DskipTests \
             -Dcn1.binaries="${CN1_BINARIES}" compile
           scripts/check-native-signatures.sh --require-all
+      # The native warning gate itself runs on the macOS/Windows/Linux legs that
+      # actually compile C; what runs HERE is its parser, against a hand-authored
+      # fixture, plus a structural check on the checked-in baselines. Both need no
+      # compiler, and both cover the ways this gate goes wrong silently: a parser
+      # that stops recognising a diagnostic reports zero warnings, which is
+      # indistinguishable from a clean build, and a baseline edited into a shape
+      # that no longer matches masks nothing while looking like it does.
+      - name: Check native warning parser and baselines
+        if: ${{ matrix.java-version == 8 }}
+        run: scripts/check-native-warnings.sh --self-test
       - name: Run JavaScript Port smoke integration
         if: ${{ matrix.java-version == 8 }}
         working-directory: vm

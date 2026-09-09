@@ -179,6 +179,21 @@ stage_bytecode_translator_sources() {
   find "$out_dir" -maxdepth 2 -type f \( -name '*.m' -o -name '*.c' -o -name '*.h' \) \
     | sort > "$listing_file" || true
 
+  # The translator's record of where each of those files came from. The listing
+  # above cannot answer that -- generated code, the ParparVM runtime, the port
+  # natives and vendored third-party sources are all siblings in one flat
+  # directory -- and without it a warning in the build log has no owner. It sits
+  # one level up from the sources, in the project root, because anything left in
+  # the source directory is swept into the Xcode project's resources phase and
+  # shipped inside the .app.
+  local manifest_src="$(dirname "$bt_dir")/cn1-source-manifest.txt"
+  if [ -f "$manifest_src" ]; then
+    cp "$manifest_src" "$artifacts_dir/cn1-source-manifest.txt"
+    bia_log "Staged source manifest from $manifest_src"
+  else
+    bia_log "No source manifest at $manifest_src; the warning census cannot attribute this build"
+  fi
+
   (
     cd "$artifacts_dir"
     zip -qry "$(basename "$zip_file")" "$(basename "$out_dir")"

@@ -1,0 +1,53 @@
+# Hand-authored input for scripts/check-native-warnings.py --self-test.
+#
+# One line for every branch of the parser that has a way to be wrong. Do not
+# regenerate this from a real build: the point is that each line is here because
+# somebody reasoned about it, and a real log would not reliably contain all of
+# them at once.
+#
+# Not a real log format -- comments are simply lines the grammars do not match,
+# which is itself worth asserting.
+
+CompileC /tmp/dd/Objects-normal/arm64/IOSNative.o /tmp/proj/HelloApp-src/IOSNative.m normal arm64 objective-c com.apple.compilers.llvm.clang.1_0.compiler
+[1/9] Building C object CMakeFiles/HelloApp.dir/HelloApp-src/cn1_globals.c.o
+# The SAME announcement from CMake's other generator. Make counts percent where
+# ninja counts jobs; missing this form made a complete build look like one that
+# compiled nothing, which the completeness guard reports as a hard failure.
+[ 42%] Building C object CMakeFiles/HelloApp.dir/HelloApp-src/cn1_virtual_thread.c.o
+
+# 1. GNU format, flagged. The most common shape.
+/tmp/proj/HelloApp-src/IOSNative.m:4211:9: warning: 'keyWindow' is deprecated: first deprecated in iOS 13.0 [-Wdeprecated-declarations]
+
+# 2. GNU format, NO flag. Cannot be -Wno-'d individually; must parse anyway.
+/tmp/proj/HelloApp-src/cn1_globals.m:913:12: warning: implicit declaration of function 'cn1_missing_helper'
+
+# 3. MSVC/clang-cl location format. Still carries the clang flag.
+C:\build\proj\HelloApp-src\CN1Vpn.m(77,5): warning: unused variable 'unusedLocal' [-Wunused-variable]
+
+# 4-6. The SAME header warning, from two translation units and then from a
+# second architecture. Must dedupe to exactly one: it is one defect, and
+# counting it per TU would make the number depend on how many files include it.
+In file included from /tmp/proj/HelloApp-src/com_codename1_ui_Form.m:3:
+/tmp/proj/HelloApp-src/cn1_globals.h:2201:30: warning: comparison of integer expressions of different signedness [-Wsign-compare]
+In file included from /tmp/proj/HelloApp-src/com_codename1_ui_Label.m:3:
+/tmp/proj/HelloApp-src/cn1_globals.h:2201:30: warning: comparison of integer expressions of different signedness [-Wsign-compare]
+/tmp/proj/HelloApp-src/cn1_globals.h:2201:30: warning: comparison of integer expressions of different signedness [-Wsign-compare]
+
+# 7. A linker diagnostic with no source file at all. ThinLTO puts real findings
+# here, so it has to be captured even though it belongs to no file.
+ld: warning: object file was built for newer iOS version than being linked
+
+# 8. A note. Must be DROPPED, not attached to the warning above it: xcodebuild
+# interleaves parallel target output, so a note is not reliably adjacent to the
+# diagnostic it belongs to.
+/tmp/proj/HelloApp-src/cn1_globals.h:2199:1: note: expanded from macro 'CN1_COMPARE'
+
+# 9. Two generated-code warnings whose only difference is the local's number.
+# These must collapse to ONE baseline row: one emitter, one fix.
+/tmp/proj/HelloApp-src/com_codename1_ui_Form.m:1502:17: warning: unused variable 'locals_3_' [-Wunused-variable]
+/tmp/proj/HelloApp-src/com_codename1_ui_Form.m:1502:17: warning: unused variable 'locals_17_' [-Wunused-variable]
+
+# 10. A source snippet and its caret. Both start with whitespace and neither is
+# a diagnostic; if either matched, every warning would be counted twice.
+ 1502 |     JAVA_OBJECT locals_3_;
+      |                 ^

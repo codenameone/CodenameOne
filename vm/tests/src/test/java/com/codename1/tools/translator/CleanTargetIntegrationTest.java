@@ -264,6 +264,122 @@ class CleanTargetIntegrationTest {
      * environment. This is a compile check (clang-cl /c) -- linking the full app
      * is exercised separately once a CN1 app translation is wired.
      */
+    /**
+     * The translator records where every file in the generated source directory came
+     * from, so that a later pass over a compiler's output can tell a codegen defect
+     * from a port bug from vendored third-party code. Without this the four kinds are
+     * indistinguishable siblings in one flat directory.
+     *
+     * <p>Three things are asserted, and each of them has already been wrong once:</p>
+     * <ul>
+     *   <li><b>The manifest is complete.</b> Every source in the directory is named by
+     *       it, and it names nothing that is not there. A copy path added later without
+     *       a matching recorder shows up here as an unrecorded file; a file renamed
+     *       after it was recorded (the clean target rewrites
+     *       {@code cn1_class_method_index.m} to {@code .c}) shows up as a phantom.</li>
+     *   <li><b>All three of our origins are populated.</b> A manifest that classified
+     *       everything as one origin would pass a completeness check and be useless.</li>
+     *   <li><b>It is NOT inside the source directory.</b> The Apple path lists that
+     *       directory into the Xcode project and {@code getFileType} has no case for
+     *       {@code .txt}, so a manifest left there lands in the resources build phase
+     *       and is copied inside the shipped {@code .app}.</li>
+     * </ul>
+     */
+    @org.junit.jupiter.api.Test
+    void recordsSourceProvenanceOutsideTheSourceDirectory() throws Exception {
+        java.util.List<CompilerHelper.CompilerConfig> configs = new java.util.ArrayList<>();
+        for (String v : new String[] { "17", "21", "25", "11", "1.8" }) {
+            configs.addAll(CompilerHelper.getAvailableCompilers(v));
+        }
+        org.junit.jupiter.api.Assumptions.assumeFalse(configs.isEmpty(), "No JDK available to translate with");
+        CompilerHelper.CompilerConfig config = configs.get(0);
+
+        Parser.cleanup();
+        Path sourceDir = Files.createTempDirectory("manifest-sources");
+        Path classesDir = Files.createTempDirectory("manifest-classes");
+        Path javaApiDir = Files.createTempDirectory("manifest-japi");
+        Path javaFile = sourceDir.resolve("HelloWorld.java");
+        Files.write(javaFile, helloWorldSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("native_hello.c"), nativeHelloSource().getBytes(StandardCharsets.UTF_8));
+
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
+        List<String> compileArgs = new java.util.ArrayList<>();
+        if (CompilerHelper.useClasspath(config)) {
+            compileArgs.add("-source"); compileArgs.add(config.targetVersion);
+            compileArgs.add("-target"); compileArgs.add(config.targetVersion);
+            compileArgs.add("-classpath"); compileArgs.add(javaApiDir.toString());
+        } else {
+            compileArgs.add("-source"); compileArgs.add(config.targetVersion);
+            compileArgs.add("-target"); compileArgs.add(config.targetVersion);
+            compileArgs.add("-bootclasspath"); compileArgs.add(javaApiDir.toString());
+            compileArgs.add("-Xlint:-options");
+        }
+        compileArgs.add("-d"); compileArgs.add(classesDir.toString());
+        compileArgs.add(javaFile.toString());
+        assertEquals(0, CompilerHelper.compile(config.jdkHome, compileArgs), "HelloWorld should compile");
+        CompilerHelper.copyDirectory(javaApiDir, classesDir);
+        // A hand-written native, so the "port" origin has something in it. This is the
+        // file whose provenance is lost the instant it is copied next to the generated
+        // code, which is the whole reason the manifest exists.
+        Files.copy(sourceDir.resolve("native_hello.c"), classesDir.resolve("native_hello.c"));
+
+        Path outputDir = Files.createTempDirectory("manifest-output");
+        runTranslator(classesDir, outputDir, "ManifestApp", "clean");
+
+        Path distDir = outputDir.resolve("dist");
+        Path srcRoot = distDir.resolve("ManifestApp-src");
+        Path manifest = distDir.resolve("cn1-source-manifest.txt");
+
+        assertTrue(Files.exists(manifest), "translator should write " + manifest);
+        assertFalse(Files.exists(srcRoot.resolve("cn1-source-manifest.txt")),
+                "the manifest must not sit in the source directory: the Apple path lists that "
+                + "directory into the Xcode project and would ship the manifest inside the .app");
+
+        java.util.Map<String, String> originByName = new java.util.HashMap<>();
+        for (String line : Files.readAllLines(manifest, StandardCharsets.UTF_8)) {
+            if (line.isEmpty() || line.startsWith("#")) {
+                continue;
+            }
+            String[] parts = line.split("\\|", -1);
+            assertEquals(3, parts.length, "malformed manifest line: " + line);
+            originByName.put(parts[0], parts[1]);
+        }
+
+        java.util.Set<String> onDisk = new java.util.TreeSet<>();
+        try (java.util.stream.Stream<Path> files = Files.list(srcRoot)) {
+            files.filter(Files::isRegularFile)
+                    .map(f -> f.getFileName().toString())
+                    .filter(n -> n.endsWith(".c") || n.endsWith(".m") || n.endsWith(".h") || n.endsWith(".S"))
+                    .forEach(onDisk::add);
+        }
+        assertFalse(onDisk.isEmpty(), "the translation produced no sources at all");
+
+        java.util.Set<String> unrecorded = new java.util.TreeSet<>(onDisk);
+        unrecorded.removeAll(originByName.keySet());
+        assertTrue(unrecorded.isEmpty(),
+                "these sources are in the generated project but the manifest does not name them, "
+                + "so nothing can tell who owns a warning in them -- a copy path was probably "
+                + "added without a recorder: " + unrecorded);
+
+        java.util.Set<String> phantom = new java.util.TreeSet<>();
+        for (String name : originByName.keySet()) {
+            if ((name.endsWith(".c") || name.endsWith(".m") || name.endsWith(".h") || name.endsWith(".S"))
+                    && !onDisk.contains(name)) {
+                phantom.add(name);
+            }
+        }
+        assertTrue(phantom.isEmpty(),
+                "the manifest names sources that are not in the generated project; something "
+                + "renamed or removed a file after recording it: " + phantom);
+
+        java.util.Set<String> origins = new java.util.TreeSet<>(originByName.values());
+        assertTrue(origins.contains("generated"), "no generated code was recorded: " + origins);
+        assertTrue(origins.contains("runtime"), "no ParparVM runtime was recorded: " + origins);
+        assertTrue(origins.contains("port"), "no hand-written native was recorded: " + origins);
+        assertEquals("port", originByName.get("native_hello.c"),
+                "the hand-written native must not be classified as generated code");
+    }
+
     @org.junit.jupiter.api.Test
     void compilesWindowsPortNativeLayer() throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(CompilerHelper.isWindows(),
