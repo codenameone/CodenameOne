@@ -104,16 +104,18 @@ public class ClipRRectRenderElement extends ClipRectRenderElement {
         int ax = pane.getX();
         int ay = pane.getY();
         GeneralPath p = pathFor(ax, ay, w, h, tl, tr, br, bl);
-        int[] saved = {g.getClipX(), g.getClipY(), g.getClipWidth(), g.getClipHeight()};
-        g.setClip(p);
-        try {
-            paintChildren.paint(g);
-        } finally {
-            // A shaped clip has to be undone here: Codename One's own clip
-            // bookkeeping restores rectangles, so anything painted after this
-            // would otherwise inherit these corners.
-            g.setClip(saved[0], saved[1], saved[2], saved[3]);
+        // The port's rounded-image path takes ONE radius, so it can draw this only when
+        // the four agree. Where they do not, the shape clip is the only mechanism -- and
+        // on iOS that does nothing at all, so say so rather than drawing square in
+        // silence. See EffectRenderElement.paintRoundClipped.
+        boolean uniform = tl == tr && tr == br && br == bl;
+        if (paintRoundClipped(g, pane, paintChildren, p, uniform ? (float) tl : 0f)) {
+            return;
         }
+        com.codename1.flutter.FlutterErrorReport.unimplemented("ClipRRect",
+                "this platform cannot clip to a rounded rectangle with differing corners,"
+                + " so the subtree paints square");
+        paintChildren.paint(g);
     }
 
     private static boolean shapeClipSupported(Graphics g) {

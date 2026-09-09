@@ -57,24 +57,28 @@ public class ClipOvalRenderElement extends ClipRectRenderElement {
     protected void paintWithEffect(Graphics g, Container pane, Subtree paintChildren) {
         int w = pane.getWidth();
         int h = pane.getHeight();
-        boolean shaped;
-        try {
-            shaped = Display.isInitialized() && g.isShapeClipSupported();
-        } catch (Throwable t) {
-            shaped = false;
-        }
-        if (w <= 0 || h <= 0 || !shaped) {
+        if (w <= 0 || h <= 0) {
             paintChildren.paint(g);
             return;
         }
-        int[] saved = {g.getClipX(), g.getClipY(), g.getClipWidth(), g.getClipHeight()};
-        // Parent-relative; see ClipRRectRenderElement for why absolute is wrong.
-        g.setClip(pathFor(pane.getX(), pane.getY(), w, h));
-        try {
-            paintChildren.paint(g);
-        } finally {
-            g.setClip(saved[0], saved[1], saved[2], saved[3]);
+        // An oval in a SQUARE box is a circle, and a circle is a rounded rectangle of
+        // radius w/2 -- so the port's own rounded-image path draws it exactly. That
+        // matters because on iOS the shape clip does nothing at all; see
+        // EffectRenderElement.paintRoundClipped. Every ClipOval in the gallery is
+        // square: an avatar is a photograph in a box as wide as it is tall.
+        //
+        // In an oblong box it is a true ellipse, which the rounded-image path cannot
+        // express, so the shape clip is the only mechanism there. Passing radius 0 says
+        // exactly that: use the clip or answer false.
+        boolean circle = Math.abs(w - h) <= 1;
+        float radius = circle ? Math.min(w, h) / 2f : 0f;
+        if (paintRoundClipped(g, pane, paintChildren,
+                pathFor(pane.getX(), pane.getY(), w, h), radius)) {
+            return;
         }
+        com.codename1.flutter.FlutterErrorReport.unimplemented("ClipOval",
+                "this platform cannot clip to an ellipse, so the subtree paints square");
+        paintChildren.paint(g);
     }
 
     /** The inscribed ellipse, rebuilt only when the box changes. */
