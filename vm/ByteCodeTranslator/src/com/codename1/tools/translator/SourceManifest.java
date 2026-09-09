@@ -79,27 +79,50 @@ public class SourceManifest {
          * Emitted by the translator from Java bytecode. A warning here is a defect in
          * an emitter, and fixing one emitter fixes every file it wrote.
          */
-        GENERATED,
+        GENERATED("generated"),
 
         /**
          * The ParparVM runtime, copied verbatim out of the translator's own jar
          * ({@code cn1_globals.m}, {@code nativeMethods.m} and friends). Hand-written
          * and ours.
          */
-        RUNTIME,
+        RUNTIME("runtime"),
 
         /**
          * A hand-written native from one of the ports, or from a cn1lib. Ours to fix
          * when it is a port file; the consumer resolves which by looking the name up
          * in the checked-out tree.
          */
-        PORT,
+        PORT("port"),
 
         /**
          * Third-party code we bundle but do not maintain, such as the SQLite
          * amalgamation. Reported, never gated.
          */
-        VENDORED
+        VENDORED("vendored");
+
+        private final String token;
+
+        Origin(String token) {
+            this.token = token;
+        }
+
+        /**
+         * How this origin is spelled in the manifest.
+         *
+         * <p>A literal, not {@code name().toLowerCase()}. Case folding is locale
+         * sensitive and Codename One has no {@code java.util.Locale} to ask for the
+         * root one, so the fold a device performs depends on who is holding it -- and
+         * this is a protocol token another program parses back, which is exactly the
+         * case that must never be produced by folding. Writing it out also means the
+         * wire format is stated here rather than being an accident of the Java
+         * identifier, so renaming the constant cannot silently change the file.</p>
+         *
+         * @return the lower-case ASCII token, identical on every device
+         */
+        public String token() {
+            return token;
+        }
     }
 
     private static final Charset UTF8 = Charset.forName("UTF-8");
@@ -233,7 +256,7 @@ public class SourceManifest {
             for (Entry e : entries.values()) {
                 w.write(e.name);
                 w.write('|');
-                w.write(e.origin.name().toLowerCase());
+                w.write(e.origin.token());
                 w.write('|');
                 w.write(e.source);
                 w.write('\n');
