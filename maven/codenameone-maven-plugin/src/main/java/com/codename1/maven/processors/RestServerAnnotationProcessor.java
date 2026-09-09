@@ -1474,7 +1474,17 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        }\n");
         sb.append("        return f;\n");
         sb.append("    }\n");
-        sb.append("    private static boolean asBoolean(Object v) { return v instanceof Boolean ? ((Boolean)v).booleanValue() : (v != null && Boolean.parseBoolean(String.valueOf(v).trim())); }\n");
+        // Boolean.parseBoolean answers FALSE for everything that is not "true",
+        // so {"good":1} and {"good":"invalid"} both reached the handler as an
+        // explicit false the client never sent. This is a JSON body, where the
+        // value has a real type -- unlike the text bindings, where several
+        // spellings are a deliberate convention -- so anything that is not a
+        // boolean is the client being wrong and is answered 400.
+        sb.append("    private static boolean asBoolean(Object v) {\n");
+        sb.append("        if (v instanceof Boolean) { return ((Boolean)v).booleanValue(); }\n");
+        sb.append("        if (v == null) { return false; }\n");
+        sb.append("        throw new IllegalArgumentException(\"not a boolean: \" + v);\n");
+        sb.append("    }\n");
         sb.append("    private static Integer asBoxedInt(Object v) { return v == null ? null : Integer.valueOf(asInt(v)); }\n");
         sb.append("    private static Long asBoxedLong(Object v) { return v == null ? null : Long.valueOf(asLong(v)); }\n");
         sb.append("    private static Double asBoxedDouble(Object v) { return v == null ? null : Double.valueOf(asDouble(v)); }\n");

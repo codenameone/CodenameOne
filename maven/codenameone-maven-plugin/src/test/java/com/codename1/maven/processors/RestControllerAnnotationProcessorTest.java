@@ -397,6 +397,28 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void anEmptyBooleanValueIsRejectedRatherThanFalse() throws Exception {
+        // "?enabled=" is a parameter the client SENT. Binding it to false hands
+        // the controller a decision nobody made -- the same defect the numeric
+        // bindings were fixed for, one type over.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/flag\")\n"
+                + "    public String flag(@RequestParam(value = \"enabled\", "
+                + "defaultValue = \"true\") boolean enabled) { return String.valueOf(enabled); }\n"
+                + "}\n");
+        assertEquals(400, Router.statusOf(router.call("GET", "/flag?enabled=", null)));
+        // Omitted entirely still takes the declared default, and a real value works.
+        Object absent = router.call("GET", "/flag", null);
+        assertEquals(200, Router.statusOf(absent));
+        assertEquals("true", Router.bodyOf(absent));
+        assertEquals(200, Router.statusOf(router.call("GET", "/flag?enabled=false", null)));
+    }
+
+    @Test
     public void aFloatThatOverflowsDoubleIsAlsoRejected() throws Exception {
         // The guard tested the PARSED value for infinity, but parseDouble("1e999")
         // is itself infinite -- so every double-overflowing value looked like a

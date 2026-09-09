@@ -1680,9 +1680,16 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // neither true nor false in any of them. The @RestClient half refuses
         // its own malformed booleans, and the two generators disagreeing about
         // the same request is its own bug.
+        // Empty is not false, for the reason the numeric guards already give:
+        // "?enabled=" is a parameter the client SENT, and binding it to false
+        // hands the controller a decision nobody made. Only an absent value
+        // takes the default.
         sb.append("    private static boolean parsesBoolean(String value) {\n");
-        sb.append("        if (value == null || value.length() == 0) {\n");
+        sb.append("        if (value == null) {\n");
         sb.append("            return true;\n");
+        sb.append("        }\n");
+        sb.append("        if (value.length() == 0) {\n");
+        sb.append("            return false;\n");
         sb.append("        }\n");
         sb.append("        return value.equalsIgnoreCase(\"true\") || value.equals(\"1\")\n");
         sb.append("                || value.equalsIgnoreCase(\"yes\") || value.equalsIgnoreCase(\"on\")\n");

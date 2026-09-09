@@ -3319,7 +3319,13 @@ public final class HttpServer {
                     // nothing on the other from one handler. Only for a HEAD --
                     // a bodiless STATUS has no representation to describe, which
                     // is the distinction the HTTP/1 writer already makes.
-                    if(headOnly) {
+                    // ... and only where the status permits a length at all. A
+                    // HEAD of a 204 must not carry one, which statusForbidsLength
+                    // already knows and the HTTP/1 writer already honours -- so
+                    // adding it here unconditionally made the SAME response valid
+                    // over one protocol and invalid over the other, which is the
+                    // exact divergence this fix existed to remove.
+                    if(headOnly && !statusForbidsLength(response.status)) {
                         long described = response.fileFd >= 0
                                 ? response.fileLength
                                 : (response.body == null ? 0 : response.body.length);
