@@ -33,10 +33,18 @@ import java.lang.ref.WeakReference;
  * built on CodenameOneImplementation.createSoftWeakRef -- the EncodedImage
  * decode cache above all -- into a cache that can never hit.
  *
- * The collector has no weak roots, so a reference here holds its referent until
- * it is cleared by hand. That is the pessimistic half of the contract and is
- * what these assertions pin down; what they exist to catch is the other half
- * going missing again.
+ * Every referent below is strongly reachable through a local for as long as it
+ * is asserted on, so these assertions are about the REFERENCE, not about the
+ * collector: a reference must answer the object it was handed, distinguish its
+ * referent from another reference's, and empty only when cleared. They hold
+ * whether or not weak roots are implemented, which is the point -- the
+ * collector clearing referents is covered by RefPolicy in vm/benchmarks, where
+ * the referent is deliberately dropped and the driver scrubs its own native
+ * stack first.
+ *
+ * Note this fixture runs on the JavaScript backend, whose gcMarkSweep is a
+ * no-op: the host JS GC collects, and ParparVM's reference clearing (which
+ * lives in the C collector) does not run here at all.
  */
 public class JsWeakReferenceApp {
     static int result;
@@ -57,7 +65,7 @@ public class JsWeakReferenceApp {
             mask |= 2;
         }
 
-        // clear() is the only thing that empties a reference on this VM.
+        // clear() empties a reference by hand, independently of the collector.
         ref.clear();
         if (ref.get() == null) {
             mask |= 4;

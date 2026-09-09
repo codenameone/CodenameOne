@@ -271,6 +271,12 @@ class JavascriptRuntimeSemanticsTest {
         //
         // This runs the real vm/JavaAPI class through the translator and the
         // worker runtime, which is the only place the bug was observable.
+        //
+        // Every referent in the fixture stays strongly reachable, so this pins the
+        // reference's own behaviour and is unaffected by the collector now clearing
+        // referents. The opposite end -- that an unreachable referent stops being
+        // answered -- is RefPolicy in vm/benchmarks, which needs a driver that scrubs
+        // its native stack and therefore cannot live here.
         WorkerRunResult result = translateAndRunFixture(config, "JsWeakReferenceApp.java", "JsWeakReferenceApp");
 
         assertEquals(511, result.result,

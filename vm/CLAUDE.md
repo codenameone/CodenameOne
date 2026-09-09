@@ -560,6 +560,88 @@ A/B, and is what the gate's third scenario re-injects to prove it can fail.
 Reach for `CN1_SIMULATE_PROC_MEMORY_LIMIT=<bytes>` to exercise any of this off-device —
 without it the budgeted pacing path never runs, which is how the original bug survived.
 
+## java.lang.ref: what it cost, and what the ranking did not buy
+
+The collector clears references itself. The referent lives in `java.lang.ref.Reference`
+and the translator does NOT emit a `gcMarkObject` for it
+(`ByteCodeClass.isReferenceReferent`): it emits `cn1GcDiscoverReference`, which hands the
+collector the field addresses and decides soft retention on the spot. Clearing happens in
+`cn1GcProcessReferences`, inside the SATB termination loop, using the sweep's own liveness
+test -- `mark != -1 && mark < currentGcMarkValue - 1`, both halves of the sweep agree on
+it. Clearing a reference the sweep keeps wastes a cache entry; failing to clear one it
+frees is a dangling read, which on this VM is a native crash no Java catch can see.
+
+**The clear pass must run with the SATB barrier still ARMED.** A thread scanned and
+released early can pull a referent out through `get()` and hold it in a local the
+collector has already walked past, and that referent is then neither marked nor fresh --
+the one case the sweep's "already marked or FRESH" invariant does not cover. `get()`
+therefore carries a load barrier, emitted into
+`get_field_java_lang_ref_Reference_objReference`, and a racing read makes the trial clear
+of `gcSatbActive` find a non-empty log, which re-arms and re-runs the fixpoint and this
+pass with it.
+
+**Filter that barrier or the collector stops converging.** Logging every referent read is
+not a cost, it is a failure: `cn1SatbEnqueue` takes a mutex per accepted reference and
+`get()` on a hot cache is called far more often than any store barrier sees. Measured on
+`RefPolicy` before the filter existed -- over 10,000 log entries per cycle and
+`CN1_SATB_MAX_REOPENS` (32) reached on EVERY cycle. `CN1_SATB_REF_LOAD` skips referents
+already marked this epoch or fresh, which are exactly the ones the clear pass would refuse
+to clear: passes 32 -> 1, keptTouched ~10,000 -> ~330, refMs 0.06 -> 0.005.
+
+### The measurement, and the three ways it lied first
+
+`vm/benchmarks/src/com/bench/RefPolicy.java` + `ab-refs.sh`, arms `-DCN1_NO_WEAK_REFS`
+(references strong, what this VM did before) and `-DCN1_REF_POLICY=0|1|2`
+(pressure-triggered all-or-nothing / never clear / ranked by age). Five interleaved reps,
+`CN1_SIMULATE_PROC_MEMORY_LIMIT`, checksums identical across every arm:
+
+| ceiling | arm | hit rate | footprint | refMs | % of mark | weak cleared |
+|---|---|---|---|---|---|---|
+| 128MB | noweak | 97.44% | 63.5MB | 0.002 | 0.00% | 0/256 |
+| 128MB | pressure | 84.99% | 63.1MB | 2.760 | 2.46% | 255/256 |
+| 128MB | never | 97.44% | 63.8MB | 1.289 | 1.88% | 255/256 |
+| 128MB | ranked | 96.77% | 62.6MB | 1.197 | 1.79% | 255/256 |
+| 160MB | pressure | 87.99% | 91.0MB | 2.611 | 16.32% | 255/256 |
+| 160MB | ranked | 97.44% | 82.1MB | 0.421 | 3.63% | 255/256 |
+
+Read it in this order. **References themselves are unambiguous**: 255/256 unreachable
+referents reclaimed against 0/256, for 1.8-4% of mark time and a `vm/benchmarks` geomean
+of 1.011 over 12 interleaved reps against master. **The pressure-triggered arm is strictly
+dominated** -- it gives up 12 points of hit rate and saves no footprint at all, and at
+160MB it is worse on BOTH axes. That arm is the model of the iOS port's
+`didReceiveMemoryWarning -> flushSoftRefMap`, so it is the thing being replaced, not a
+strawman. **The ranking buys nothing over never-clearing here**: same hit rate, ~1MB less.
+It is defensible because it costs almost nothing and because it dominates the pressure
+arm, not because this measurement shows it winning.
+
+Three wrong conclusions were drawn from single runs before that table existed, and each
+survived until the data contradicted it:
+
+- **"Ranking is the difference between finishing and not."** True of the outcome, wrong
+  about the cause: the arms that did not finish were not out of memory. `sample` on a
+  wedged process put the mutator 100% in `cn1PacingPark` at 44MB of a 96MB ceiling. The
+  chain is retain-everything -> the collector cannot shrink the live set -> the pacing loop
+  parks the mutator to hold the budget. Reach for the stacks first, as the demand-signal
+  note above already says.
+- **"The pressure arm fails because all-or-nothing thrashes."** It never fired at all.
+  Its trigger was below the pacing reserve, and defending that reserve is what the pacing
+  loop DOES, so headroom converges on the trigger and stops falling. **Any
+  pressure-triggered cache policy on this collector has that trap waiting: it waits for a
+  signal the collector exists to suppress.** The second attempt then wrote the bands as
+  multiples of the reserve, where `reserve * 4` IS the whole budget, so the top band was
+  unreachable and the arm fired always. Write bands as explicit fractions; reachability is
+  then visible on inspection.
+- **"The non-trimming arms collapse."** `never` was 4x FASTER than `noweak` at 2,000
+  accesses and 100x slower at 6,000. Below roughly 1.8x the cache size this workload is
+  **bistable** -- once pacing engages, throughput drops two orders of magnitude, and
+  whether a run falls in is timing-sensitive. Single runs there measure the coin. If that
+  regime is what you want, count how many of N runs complete; do not time one.
+
+**What is still not measured.** Nothing here separates ranking by RECENCY from "trims at
+all" -- there is no random-eviction arm at a matched rate, so the LRU claim is unproven,
+only the trimming claim. And the 64MB-cache-against-a-128MB-budget shape is a choice made
+to stress the policy, not a measured property of any app.
+
 ## GC latency: the mutator's clock, not the collector's
 
 Everything above measures MEMORY. The reporter of #5537 ended up passing all of it and still
