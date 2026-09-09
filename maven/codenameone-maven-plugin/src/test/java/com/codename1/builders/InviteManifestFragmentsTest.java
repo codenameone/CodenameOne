@@ -134,6 +134,37 @@ class InviteManifestFragmentsTest {
     }
 
     @Test
+    void hostAndPathMustCoincideInOneFilter() {
+        // Two filters, neither of which opens an invite link: ours on the right
+        // host but a different path, and the right path on a different host.
+        // Searched across the whole hint value they answered yes between them
+        // and suppressed the filter that was actually needed.
+        String existing = "<intent-filter>"
+                + "<data android:scheme=\"https\" android:host=\"" + HOST + "\" "
+                + "android:pathPrefix=\"/account/\" /></intent-filter>"
+                + "<intent-filter>"
+                + "<data android:scheme=\"https\" android:host=\"other.example.com\" "
+                + "android:pathPrefix=\"/i/\" /></intent-filter>";
+        assertFalse(InviteManifestFragments.declaresInviteLinks(existing, HOST, "acme"),
+                "coverage was claimed by two filters that each fail on their own");
+        String out = InviteManifestFragments.injectAppLinks(existing, HOST, "acme");
+        assertTrue(out.contains("android:pathPrefix=\"/i/acme/\""),
+                "the invite filter was suppressed across two unrelated filters");
+    }
+
+    @Test
+    void oneFilterThatReallyCoversThemIsStillRecognized() {
+        String existing = "<intent-filter>"
+                + "<data android:scheme=\"https\" android:host=\"other.example.com\" "
+                + "android:pathPrefix=\"/x/\" /></intent-filter>"
+                + "<intent-filter>"
+                + "<data android:scheme=\"https\" android:host=\"" + HOST + "\" "
+                + "android:pathPrefix=\"/i/\" /></intent-filter>";
+        assertTrue(InviteManifestFragments.declaresInviteLinks(existing, HOST, "acme"));
+        assertEquals(existing, InviteManifestFragments.injectAppLinks(existing, HOST, "acme"));
+    }
+
+    @Test
     void anEmptyHostInjectsNothing() {
         assertEquals("", InviteManifestFragments.injectAppLinks("", "", null));
         assertEquals("", InviteManifestFragments.injectAppLinks("", null, null));

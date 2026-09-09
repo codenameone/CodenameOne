@@ -172,4 +172,84 @@ class InviteResilienceTest extends UITestBase {
         assertTrue(InviteStore.writeOutbox(ok), "a healthy store must report success");
         assertEquals(ok, InviteStore.readOutbox());
     }
+
+    @Test
+    @EdtTest
+    void aDisabledAttributionWindowIsAnsweredOnceAndSurvivesARelaunch() {
+        // setState() only rewrites a record that already exists, and on a fresh
+        // install none does -- so this answer lived only in memory and the
+        // listener heard it again on every launch.
+        Invites.setAttributionWindow(0);
+        final int[] told = new int[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0]++;
+            }
+        });
+        Invites.checkForInvite();
+        assertEquals(1, told[0]);
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState());
+
+        Invites.forgetLoadedState();
+        Invites.checkForInvite();
+        assertEquals(1, told[0], "the listener was told again after a relaunch");
+    }
+
+    @Test
+    @EdtTest
+    void reenablingTheWindowReopensThatOneTerminalMarker() {
+        // The disabled-window marker is the only terminal answer that can stop
+        // being true, so it is the only one that is reopened. An application
+        // that ships a non-zero window later is asking for attribution again.
+        Invites.setAttributionWindow(0);
+        Invites.checkForInvite();
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState());
+
+        Invites.setAttributionWindow(Invites.DEFAULT_ATTRIBUTION_WINDOW);
+        Invites.forgetLoadedState();
+        Invites.checkForInvite();
+        assertEquals(Invites.STATE_PENDING, Invites.getState(),
+                "a re-enabled window did not reopen the lookup");
+    }
+
+    @Test
+    @EdtTest
+    void aNoMatchDoesNotSettleTheInstallWhileAReferrerRetryIsOutstanding() {
+        // The Play referrer failed transiently, so the source deliberately left
+        // its once-only flag unset and a later launch can still read the exact
+        // referrer. Settling the install as organic on the statistical
+        // fallback's answer would throw that deterministic result away.
+        Invites.checkForInvite();
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(pending);
+        pending.put("referrerRetry", "true");
+        InviteStore.write(InviteStore.PENDING, pending);
+
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_FINGERPRINT, true);
+
+        Invites.forgetLoadedState();
+        assertEquals(Invites.STATE_PENDING, Invites.getState(),
+                "a transient store outage settled the install as organic");
+    }
+
+    @Test
+    @EdtTest
+    void aDirectlySentRegistrationIsNotRegisteredUntilItIsAcknowledged() {
+        // Absence from the outbox is not acknowledgement. When the store cannot
+        // be written the registration is sent directly and never queued, so the
+        // outbox says nothing about it -- and reading that silence as success
+        // reported an in-flight, possibly failed, registration as acknowledged.
+        Invite invite = Invites.create(InviteRequest.create().campaign("launch").build());
+        assertNotNull(invite);
+        // Exactly what a failed enqueue leaves behind: nothing in the durable
+        // queue, and a request on the wire. The outbox is emptied to stand in
+        // for the write that did not happen.
+        InviteStore.writeOutbox(new ArrayList<String>());
+        Invites.markSentDirectlyForTest(invite.getCode());
+        assertFalse(Invites.isRegistered(invite),
+                "an unacknowledged direct send reported itself as registered");
+    }
 }

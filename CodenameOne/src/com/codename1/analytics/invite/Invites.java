@@ -38,6 +38,7 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.util.Base64;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -269,6 +270,7 @@ public final class Invites {
             // registered with everything it carries; if it does not, nothing
             // is worse than the alternative. There is deliberately no retry,
             // because the queue that would drive one is the thing that failed.
+            unacknowledged.add(invite.getCode());
             postRegistration(pendingRegistration);
         }
         Map<String, Object> p = new HashMap<String, Object>();
@@ -728,6 +730,7 @@ public final class Invites {
         stateLoaded = true;
         deliveredThisRun = false;
         deferredStarted = false;
+        unacknowledged.clear();
     }
 
     // Package private test seam: the epoch an outstanding lookup was issued
@@ -1003,8 +1006,20 @@ public final class Invites {
     // carries none of the device profile the pending record held -- the profile
     // exists to be matched, and there is nothing left to match it against.
     private static void markTerminal() {
+        markTerminal(null);
+    }
+
+    // reason is recorded only when the answer could stop being true. A window
+    // of zero is the documented kill switch, and an application that later
+    // ships a non-zero window is asking for attribution again -- so that one
+    // marker is reopened rather than being permanent, which is why it is the
+    // only one that carries a reason.
+    private static void markTerminal(String reason) {
         Map<String, String> done = new LinkedHashMap<String, String>();
         done.put("state", String.valueOf(STATE_NONE_FOUND));
+        if (reason != null) {
+            done.put("reason", reason);
+        }
         InviteStore.write(InviteStore.PENDING, done);
         state = STATE_NONE_FOUND;
         stateLoaded = true;
@@ -1041,11 +1056,27 @@ public final class Invites {
             return;
         }
         int s = getState();
+        if (s == STATE_NONE_FOUND && attributionWindow != 0) {
+            // The only reopenable terminal marker: it was written because the
+            // window was zero, and it no longer is. Anything else that reached
+            // STATE_NONE_FOUND was a real answer and stays.
+            Map<String, String> marker = InviteStore.read(InviteStore.PENDING);
+            if (marker != null && REASON_UNSUPPORTED.equals(
+                    InviteStore.get(marker, "reason", null))) {
+                InviteStore.delete(InviteStore.PENDING);
+                state = STATE_NONE;
+                s = STATE_NONE;
+            }
+        }
         if (s == STATE_RESOLVED || s == STATE_NONE_FOUND || s == STATE_DECLINED) {
             return;
         }
         if (attributionWindow == 0) {
-            setState(STATE_NONE_FOUND);
+            // setState() only rewrites a record that already exists, and on a
+            // fresh install none does -- so this answer was purely in memory
+            // and the listener heard it again on every launch, breaking the
+            // documented once-per-install contract.
+            markTerminal(REASON_UNSUPPORTED);
             notifyUnavailable(REASON_UNSUPPORTED);
             return;
         }
@@ -1115,7 +1146,9 @@ public final class Invites {
                         public void run() {
                             String code = codeFromQuery(rawReferrer);
                             if (code == null) {
-                                fallBackToMatch();
+                                // The referrer was read and carries no invite.
+                                // That is an answer, not an outage.
+                                fallBackToMatch(false);
                                 return;
                             }
                             claim(code, "install_referrer",
@@ -1126,11 +1159,21 @@ public final class Invites {
                 }
 
                 @Override
-                public void onUnavailable(String reason) {
+                public void onUnavailable(final String reason) {
                     onEdt(new Runnable() {
                         @Override
                         public void run() {
-                            fallBackToMatch();
+                            // REASON_UNSUPPORTED is the store saying this
+                            // device will never have a referrer. Anything else
+                            // is transient -- the store was busy, the bind
+                            // failed -- and the source deliberately does not
+                            // burn its once-only flag for those, so a later
+                            // launch can still read the exact referrer. The
+                            // statistical fallback runs either way, but a
+                            // no-match answer to it must not be allowed to
+                            // settle the install as organic while a
+                            // deterministic answer is still reachable.
+                            fallBackToMatch(!REASON_UNSUPPORTED.equals(reason));
                         }
                     });
                 }
@@ -1145,6 +1188,24 @@ public final class Invites {
     // an organic install. Either way the statistical match is the only path
     // left, and it is the same one iOS always takes.
     private static void fallBackToMatch() {
+        fallBackToMatch(false);
+    }
+
+    // retryable: the referrer could not be read this time but may be readable
+    // later, so a no-match from the statistical fallback stays pending instead
+    // of becoming the final word.
+    private static void fallBackToMatch(boolean retryable) {
+        if (retryable) {
+            Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+            if (pending != null) {
+                pending.put("referrerRetry", "true");
+                InviteStore.write(InviteStore.PENDING, pending);
+            }
+        }
+        fallBackToMatchImpl();
+    }
+
+    private static void fallBackToMatchImpl() {
         Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
         if (pending == null) {
             return;
@@ -1350,6 +1411,21 @@ public final class Invites {
             }
             applySlug(payload);
             if (!truthy(json.get("resolved"))) {
+                // Not terminal while a deterministic answer is still
+                // reachable. The Play referrer failed transiently -- the store
+                // was busy, the bind did not take -- and the source keeps its
+                // once-only flag unset precisely so a later launch can read the
+                // exact referrer. Settling the install as organic here would
+                // throw that away for a statistical guess. Bounded by the
+                // attempt cap and the attribution window, both checked in
+                // beginDeferred().
+                Map<String, String> outstanding = InviteStore.read(InviteStore.PENDING);
+                if (outstanding != null
+                        && "true".equals(InviteStore.get(outstanding, "referrerRetry", null))) {
+                    setState(STATE_PENDING);
+                    notifyUnavailable(REASON_NO_MATCH);
+                    return;
+                }
                 // Terminal, and it has to be durable. Deleting the record is
                 // not enough: loadState() reads an absent record as STATE_NONE,
                 // so the next launch built a fresh profile and asked again, and
@@ -1553,6 +1629,13 @@ public final class Invites {
     // failed enqueue can still be sent once rather than lost silently.
     private static String pendingRegistration;
 
+    // Codes whose registration was sent directly because the outbox could not
+    // be written. They are in flight and unacknowledged, and they are in no
+    // durable queue -- so isRegistered() cannot infer anything from the outbox
+    // for them and has to be told. In memory only, which is the honest limit:
+    // the durable store is the thing that just failed.
+    private static final List<String> unacknowledged = new ArrayList<String>();
+
     private static boolean queueRegistration(Invite invite, InviteRequest request) {
         Map<String, Object> body = identity();
         body.put("code", invite.getCode());
@@ -1599,7 +1682,19 @@ public final class Invites {
     }
 
     // Called from the registration response, once its status has been checked.
+    // Package private test seam: puts a code in the in-flight set without
+    // having to make the durable store fail on demand.
+    static void markSentDirectlyForTest(String code) {
+        unacknowledged.add(code);
+    }
+
     private static void registrationAcknowledged(String json) {
+        for (int i = unacknowledged.size() - 1; i >= 0; i--) {
+            String code = unacknowledged.get(i);
+            if (json != null && json.indexOf(code) >= 0) {
+                unacknowledged.remove(i);
+            }
+        }
         List<String> outbox = InviteStore.readOutbox();
         if (outbox.remove(json)) {
             InviteStore.writeOutbox(outbox);
@@ -1624,6 +1719,14 @@ public final class Invites {
             return false;
         }
         String code = invite.getCode();
+        // Absence from the outbox is not acknowledgement on its own. When the
+        // store could not be written the registration was sent directly and
+        // never queued, so the outbox says nothing about it -- reading that
+        // silence as success reported an in-flight, and possibly failed,
+        // registration as acknowledged.
+        if (unacknowledged.contains(code)) {
+            return false;
+        }
         for (String pending : InviteStore.readOutbox()) {
             if (pending != null && pending.indexOf(code) >= 0) {
                 return false;

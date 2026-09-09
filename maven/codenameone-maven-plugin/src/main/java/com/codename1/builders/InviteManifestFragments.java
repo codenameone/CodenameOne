@@ -22,6 +22,9 @@
  */
 package com.codename1.builders;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Builds the App Links intent filter injected into the main activity when the
  * bytecode scanner detects usage of {@code com.codename1.analytics.invite}.
@@ -98,28 +101,91 @@ final class InviteManifestFragments {
      * @return true when the invite links are already covered
      */
     static boolean declaresInviteLinks(String existing, String host, String slug) {
-        if (!declaresHost(existing, host)) {
+        if (existing == null || host == null) {
+            return false;
+        }
+        // Asked of each filter separately, because an intent filter matches
+        // only when its own host and its own path both accept the url. Asked
+        // of the whole string, a filter for this host on /account/ and an
+        // unrelated host on /i/ answered yes between them, and the invite
+        // filter was suppressed although neither one would ever open an invite
+        // link.
+        for (String block : filterBlocks(existing)) {
+            if (coversInviteLinks(block, host, slug)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The individual {@code <intent-filter>} elements of a hint value.
+     *
+     * <p>Text outside any filter is returned as one more block. It cannot be a
+     * real filter, so it can only fail the test below -- which is the safe
+     * direction: the cost of not recognizing coverage is a duplicate filter,
+     * and the cost of wrongly recognizing it is invite links that open the
+     * browser for ever.</p>
+     *
+     * @param existing the current hint value
+     * @return the blocks to test, never null
+     */
+    static List<String> filterBlocks(String existing) {
+        List<String> out = new ArrayList<String>();
+        String open = "<intent-filter";
+        String close = "</intent-filter>";
+        int at = 0;
+        while (true) {
+            int start = existing.indexOf(open, at);
+            if (start < 0) {
+                out.add(existing.substring(at));
+                return out;
+            }
+            if (start > at) {
+                out.add(existing.substring(at, start));
+            }
+            int end = existing.indexOf(close, start);
+            if (end < 0) {
+                out.add(existing.substring(start));
+                return out;
+            }
+            out.add(existing.substring(start, end + close.length()));
+            at = end + close.length();
+        }
+    }
+
+    /**
+     * Whether one filter accepts the invite links on {@code host}.
+     *
+     * @param block the single filter
+     * @param host  the invite link host
+     * @param slug  this application's path segment, may be empty
+     * @return true when this filter alone covers them
+     */
+    private static boolean coversInviteLinks(String block, String host, String slug) {
+        if (!declaresHost(block, host)) {
             return false;
         }
         String prefix = pathPrefix(slug);
         // Any pathPrefix that is a prefix of ours covers our links: a filter
         // on "/i/" accepts "/i/<slug>/<code>". The reverse is not true, and a
         // longer or unrelated prefix leaves the invite links uncovered.
-        int at = existing.indexOf("android:pathPrefix=\"");
+        String attr = "android:pathPrefix=\"";
+        int at = block.indexOf(attr);
         while (at >= 0) {
-            int from = at + "android:pathPrefix=\"".length();
-            int end = existing.indexOf('"', from);
+            int from = at + attr.length();
+            int end = block.indexOf('"', from);
             if (end < 0) {
                 return false;
             }
-            if (prefix.startsWith(existing.substring(from, end))) {
+            if (prefix.startsWith(block.substring(from, end))) {
                 return true;
             }
-            at = existing.indexOf("android:pathPrefix=\"", end);
+            at = block.indexOf(attr, end);
         }
         // A filter that names the host and no path at all matches every path
         // on it, invite links included.
-        return existing.indexOf("android:path") < 0;
+        return block.indexOf("android:path") < 0;
     }
 
     /**
