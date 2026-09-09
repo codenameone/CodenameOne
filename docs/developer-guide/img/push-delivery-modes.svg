@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="598" viewBox="0 0 820 598">
+  <rect x="0" y="0" width="820" height="598" fill="#ffffff"/>
+  <text x="410" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">Where a push message comes from, in both modes</text>
+  <text x="410" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Registration and delivery are separate journeys, and installing a PushTransport reroutes both of them. What does not</text>
+  <text x="410" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">change is the envelope at the end: the same schema-3 message reaches the same listener, on the EDT, either way.</text>
+  <rect x="16" y="70" width="788" height="226" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.6"/>
+  <rect x="16" y="70" width="788" height="26" rx="4" fill="#4a6fa5" stroke="#4a6fa5" stroke-width="1"/>
+  <text x="410" y="88" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#ffffff">Managed delivery, which is what you get by default</text>
+  <text x="410" y="113" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#666666">BuildCloud holds the subscriptions and talks to every provider for you</text>
+  <text x="24" y="132" font-family="Arial, sans-serif" font-size="9" fill="#4a6fa5">registering</text>
+  <rect x="26" y="136" width="166" height="64" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.3"/>
+  <text x="109" y="156" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#4a6fa5">PushClient.register()</text>
+  <text x="109" y="172" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">called from start(),</text>
+  <text x="109" y="185" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">and idempotent</text>
+  <path d="M 197 168 L 219 168" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <path d="M 214 164 L 219 168 L 214 172" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <rect x="224" y="136" width="166" height="64" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.3"/>
+  <text x="307" y="156" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#4a6fa5">the provider issues a token</text>
+  <text x="307" y="172" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">FCM, APNs, Huawei,</text>
+  <text x="307" y="185" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">WNS or Web Push</text>
+  <path d="M 395 168 L 417 168" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <path d="M 412 164 L 417 168 L 412 172" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <rect x="422" y="136" width="166" height="64" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.3"/>
+  <text x="505" y="156" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#4a6fa5">BuildCloud stores it</text>
+  <text x="505" y="172" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">as a subscription with</text>
+  <text x="505" y="185" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">an installation id</text>
+  <path d="M 593 168 L 615 168" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <path d="M 610 164 L 615 168 L 610 172" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <rect x="620" y="136" width="166" height="64" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.3"/>
+  <text x="703" y="156" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#4a6fa5">onRegistration()</text>
+  <text x="703" y="172" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">on the EDT, again on</text>
+  <text x="703" y="185" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">every token rotation</text>
+  <text x="24" y="216" font-family="Arial, sans-serif" font-size="9" fill="#4a6fa5">sending</text>
+  <rect x="26" y="220" width="166" height="64" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.3"/>
+  <text x="109" y="240" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#4a6fa5">your server posts it</text>
+  <text x="109" y="256" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">/api/v3/push/messages,</text>
+  <text x="109" y="269" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">202 with delivery ids</text>
+  <path d="M 197 252 L 219 252" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <path d="M 214 248 L 219 252 L 214 256" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <rect x="224" y="220" width="166" height="64" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.3"/>
+  <text x="307" y="240" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#4a6fa5">BuildCloud resolves it</text>
+  <text x="307" y="256" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">targets, or an audience</text>
+  <text x="307" y="269" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">filter run at launch</text>
+  <path d="M 395 252 L 417 252" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <path d="M 412 248 L 417 252 L 412 256" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <rect x="422" y="220" width="166" height="64" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.3"/>
+  <text x="505" y="240" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#4a6fa5">the provider delivers</text>
+  <text x="505" y="256" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">one native push per</text>
+  <text x="505" y="269" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">matched subscription</text>
+  <path d="M 593 252 L 615 252" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <path d="M 610 248 L 615 252 L 610 256" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <rect x="620" y="220" width="166" height="64" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.3"/>
+  <text x="703" y="240" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#4a6fa5">onMessage()</text>
+  <text x="703" y="256" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">one schema-3 envelope,</text>
+  <text x="703" y="269" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">on the EDT</text>
+  <rect x="16" y="318" width="788" height="226" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.6"/>
+  <rect x="16" y="318" width="788" height="26" rx="4" fill="#a56a3a" stroke="#a56a3a" stroke-width="1"/>
+  <text x="410" y="336" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#ffffff">Custom delivery, once a PushTransport is installed</text>
+  <text x="410" y="361" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#666666">PushClient never contacts BuildCloud, and your server owns tokens, targeting and retries</text>
+  <text x="24" y="380" font-family="Arial, sans-serif" font-size="9" fill="#a56a3a">registering</text>
+  <rect x="26" y="384" width="166" height="64" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.3"/>
+  <text x="109" y="404" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#a56a3a">PushClient.register()</text>
+  <text x="109" y="420" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">the same call, from</text>
+  <text x="109" y="433" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">the same place</text>
+  <path d="M 197 416 L 219 416" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <path d="M 214 412 L 219 416 L 214 420" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <rect x="224" y="384" width="166" height="64" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.3"/>
+  <text x="307" y="404" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#a56a3a">your transport registers</text>
+  <text x="307" y="420" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">against the private</text>
+  <text x="307" y="433" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">provider's own SDK</text>
+  <path d="M 395 416 L 417 416" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <path d="M 412 412 L 417 416 L 412 420" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <rect x="422" y="384" width="166" height="64" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.3"/>
+  <text x="505" y="404" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#a56a3a">Callback.registered()</text>
+  <text x="505" y="420" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">reaches your</text>
+  <text x="505" y="433" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">PushRegistrationSink</text>
+  <path d="M 593 416 L 615 416" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <path d="M 610 412 L 615 416 L 610 420" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <rect x="620" y="384" width="166" height="64" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.3"/>
+  <text x="703" y="404" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#a56a3a">your server stores it</text>
+  <text x="703" y="420" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">keyed by installationId,</text>
+  <text x="703" y="433" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">replaced on rotation</text>
+  <text x="24" y="464" font-family="Arial, sans-serif" font-size="9" fill="#a56a3a">sending</text>
+  <rect x="26" y="468" width="166" height="64" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.3"/>
+  <text x="109" y="488" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#a56a3a">your server sends</text>
+  <text x="109" y="504" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">through the provider's</text>
+  <text x="109" y="517" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">own native API</text>
+  <path d="M 197 500 L 219 500" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <path d="M 214 496 L 219 500 L 214 504" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <rect x="224" y="468" width="166" height="64" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.3"/>
+  <text x="307" y="488" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#a56a3a">your transport receives</text>
+  <text x="307" y="504" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">and rebuilds the</text>
+  <text x="307" y="517" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">schema-3 envelope</text>
+  <path d="M 395 500 L 417 500" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <path d="M 412 496 L 417 500 L 412 504" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <rect x="422" y="468" width="166" height="64" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.3"/>
+  <text x="505" y="488" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#a56a3a">Callback.message()</text>
+  <text x="505" y="504" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">never call the listener</text>
+  <text x="505" y="517" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">yourself</text>
+  <path d="M 593 500 L 615 500" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <path d="M 610 496 L 615 500 L 610 504" fill="none" stroke="#999999" stroke-width="1.5"/>
+  <rect x="620" y="468" width="166" height="64" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.3"/>
+  <text x="703" y="488" font-family="Arial, sans-serif" font-size="9.8" font-weight="bold" text-anchor="middle" fill="#a56a3a">onMessage()</text>
+  <text x="703" y="504" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">the identical callback,</text>
+  <text x="703" y="517" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">also on the EDT</text>
+  <rect x="16" y="556" width="788" height="30" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
+  <text x="410" y="576" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Keep the envelope identical and the same listener, deep links and surface commands work in both modes.</text>
+</svg>

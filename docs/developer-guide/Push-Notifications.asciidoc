@@ -5,6 +5,12 @@ Codename One push uses a typed message envelope and an explicit client binding. 
 
 You can use the managed BuildCloud service or install an adapter for custom native push. A custom-provider adapter is a low-level escape hatch: it bypasses BuildCloud registration and delivery completely, so your server owns tokens, credentials, targeting, retries, and provider errors.
 
+That choice reroutes both halves of the journey, registration and delivery, and leaves the application code
+alone. The rest of this chapter fills in each box.
+
+.Registration and delivery, managed and custom
+image::img/push-delivery-modes.svg[How registration and delivery flow in managed and custom provider mode,scaledwidth=95%]
+
 === Create and configure an application
 
 Open the Codename One Console and select *Push*. Create one Push application for each logical application and environment. For example, keep production and staging separate so credentials, audiences, and analytics remain isolated.
